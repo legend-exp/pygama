@@ -1,0 +1,40 @@
+
+
+Examples using ``module.MyClass``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This is example 1. ">
+
+.. only:: html
+
+    .. figure:: /gallery/images/thumb/sphx_glr_plot_example1_thumb.png
+
+        :ref:`sphx_glr_gallery_plot_example1.py`
+
+.. raw:: html
+
+    </div>
+
+.. only:: not html
+
+    * :ref:`sphx_glr_gallery_plot_example1.py`
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="This is example 2. For more information, also see :ref:`sphx_glr_gallery_plot_example1.py`. ">
+
+.. only:: html
+
+    .. figure:: /gallery/images/thumb/sphx_glr_plot_example2_thumb.png
+
+        :ref:`sphx_glr_gallery_plot_example2.py`
+
+.. raw:: html
+
+    </div>
+
+.. only:: not html
+
+    * :ref:`sphx_glr_gallery_plot_example2.py`
