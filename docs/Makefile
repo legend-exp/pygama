@@ -1,10 +1,9 @@
 # Minimal makefile for Sphinx documentation
-#
+SPHINXPROJ    = pygama
 
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
-SPHINXPROJ    = MyModule
 SOURCEDIR     = source
 BUILDDIR      = build
 

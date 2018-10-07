@@ -6,7 +6,11 @@ Welcome to pygama's documentation!
    :caption: Contents:
 
    moduledoc
-   gallery/index.rst
+   waveformdoc
+   gallery/index
+
+   gallery/plot_example1
+   gallery/plot_example2
 
 
 

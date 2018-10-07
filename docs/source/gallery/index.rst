@@ -5,6 +5,66 @@
 Here's some examples of pygama operation.
 
 
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="test_tier_1 docstring">
+
+.. only:: html
+
+    .. figure:: /gallery/images/thumb/sphx_glr_test_tier_1_thumb.png
+
+        :ref:`sphx_glr_gallery_test_tier_1.py`
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /gallery/test_tier_1
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="phillip glass sounds like star trek iii">
+
+.. only:: html
+
+    .. figure:: /gallery/images/thumb/sphx_glr_test_3302_thumb.png
+
+        :ref:`sphx_glr_gallery_test_3302.py`
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /gallery/test_3302
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer" tooltip="another docstring">
+
+.. only:: html
+
+    .. figure:: /gallery/images/thumb/sphx_glr_test_tier_0_thumb.png
+
+        :ref:`sphx_glr_gallery_test_tier_0.py`
+
+.. raw:: html
+
+    </div>
+
+
+.. toctree::
+   :hidden:
+
+   /gallery/test_tier_0
 .. raw:: html
 
     <div style='clear:both'></div>
