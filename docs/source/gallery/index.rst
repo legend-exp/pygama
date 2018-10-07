@@ -1,50 +1,10 @@
 :orphan:
 
-The Gallery
-===========
+# Examples 
 
-This is the gallery
-
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This is example 1. ">
-
-.. only:: html
-
-    .. figure:: /gallery/images/thumb/sphx_glr_plot_example1_thumb.png
-
-        :ref:`sphx_glr_gallery_plot_example1.py`
-
-.. raw:: html
-
-    </div>
+Here's some examples of pygama operation.
 
 
-.. toctree::
-   :hidden:
-
-   /gallery/plot_example1
-
-.. raw:: html
-
-    <div class="sphx-glr-thumbcontainer" tooltip="This is example 2. For more information, also see :ref:`sphx_glr_gallery_plot_example1.py`. ">
-
-.. only:: html
-
-    .. figure:: /gallery/images/thumb/sphx_glr_plot_example2_thumb.png
-
-        :ref:`sphx_glr_gallery_plot_example2.py`
-
-.. raw:: html
-
-    </div>
-
-
-.. toctree::
-   :hidden:
-
-   /gallery/plot_example2
 .. raw:: html
 
     <div style='clear:both'></div>
@@ -59,13 +19,13 @@ This is the gallery
 
   .. container:: sphx-glr-download
 
-    :download:`Download all examples in Python source code: gallery_python.zip <//Users/wisecg/dev/sandbox/testproj/doc/source/gallery/gallery_python.zip>`
+    :download:`Download all examples in Python source code: gallery_python.zip <//Users/wisecg/dev/pygama/docs/source/gallery/gallery_python.zip>`
 
 
 
   .. container:: sphx-glr-download
 
-    :download:`Download all examples in Jupyter notebooks: gallery_jupyter.zip <//Users/wisecg/dev/sandbox/testproj/doc/source/gallery/gallery_jupyter.zip>`
+    :download:`Download all examples in Jupyter notebooks: gallery_jupyter.zip <//Users/wisecg/dev/pygama/docs/source/gallery/gallery_jupyter.zip>`
 
 
 .. only:: html
