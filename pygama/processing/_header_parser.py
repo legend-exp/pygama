@@ -2,6 +2,7 @@ import plistlib
 import sys
 import pandas as pd
 
+
 def parse_header(xmlfile):
     """
         Opens the given file for binary read ('rb'), then grabs the first 8 bytes as variable ba
@@ -15,7 +16,6 @@ def parse_header(xmlfile):
     with open(xmlfile, 'rb') as xmlfile_handle:
         #read the first word:
         ba = bytearray(xmlfile_handle.read(8))
-
 
         #Replacing this to be python2 friendly
         # #first 4 bytes: header length in long words
@@ -31,14 +31,16 @@ def parse_header(xmlfile):
         ba = bytearray(xmlfile_handle.read(j))
 
         #convert to string
-        if sys.version_info[0] < 3: #the readPlistFromBytes method doesn't exist in 2.7
+        if sys.version_info[
+                0] < 3:  #the readPlistFromBytes method doesn't exist in 2.7
             header_string = ba.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
         else:
             header_dict = plistlib.readPlistFromBytes(ba)
-        return i,j,header_dict
+        return i, j, header_dict
 
-def from_bytes (data, big_endian = False):
+
+def from_bytes(data, big_endian=False):
     #python2 doesn't have this function, so rewrite it for bw compatibility
     if isinstance(data, str):
         data = bytearray(data)
@@ -49,11 +51,13 @@ def from_bytes (data, big_endian = False):
         num += byte << (offset * 8)
     return num
 
+
 def get_run_number(header_dict):
     for d in (header_dict["ObjectInfo"]["DataChain"]):
         if "Run Control" in d:
             return (d["Run Control"]["RunNumber"])
     raise ValueError("No run number found in header!")
+
 
 def get_data_id(headerDict, class_name, super_name):
     #stored like this: headerDict["dataDescription"]["ORRunModel"]["Run"]["dataId"]
@@ -62,6 +66,7 @@ def get_data_id(headerDict, class_name, super_name):
     id_int = headerDict["dataDescription"][class_name][super_name]["dataId"]
 
     return id_int >> 18
+
 
 def flip_data_ids(headerDict):
     """
@@ -75,9 +80,9 @@ def flip_data_ids(headerDict):
         super_keys_list = []
         for super_key in headerDict["dataDescription"][class_key].keys():
             super_keys_list.append(super_key)
-            ID_val = (headerDict["dataDescription"][class_key][super_key]["dataId"])>>18
-            flipped[ID_val] = [class_key,super_keys_list]
-
+            ID_val = (headerDict["dataDescription"][class_key][super_key]
+                      ["dataId"]) >> 18
+            flipped[ID_val] = [class_key, super_keys_list]
 
     # this one just gives a single super             flipped[dataId] = [class_key, super_key]
     # for class_key in headerDict["dataDescription"].keys():
@@ -86,6 +91,7 @@ def flip_data_ids(headerDict):
     #     flipped[ID_val] = [class_key,super_keys_list]
 
     return flipped
+
 
 def get_decoder_for_id(headerDict):
     """
@@ -99,12 +105,15 @@ def get_decoder_for_id(headerDict):
         super_keys_list = []
         for super_key in headerDict["dataDescription"][class_key].keys():
             super_keys_list.append(super_key)
-            ID_val = (headerDict["dataDescription"][class_key][super_key]["dataId"])>>18
-            decoderName = headerDict["dataDescription"][class_key][super_key]["decoder"]
+            ID_val = (headerDict["dataDescription"][class_key][super_key]
+                      ["dataId"]) >> 18
+            decoderName = headerDict["dataDescription"][class_key][super_key][
+                "decoder"]
 
             d[ID_val] = decoderName
 
     return d
+
 
 def get_object_info(headerDict, class_name):
     '''

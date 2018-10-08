@@ -8,6 +8,7 @@ from ..processing._header_parser import get_object_info
 
 __all__ = ["get_next_event", "get_decoders"]
 
+
 def get_next_event(f_in):
     """
     Gets the next event, and some basic information about it \n
@@ -27,7 +28,8 @@ def get_next_event(f_in):
     # NCRATES = 10
 
     try:
-        head = np.fromstring(f_in.read(4),dtype=np.uint32)     # event header is 8 bytes (2 longs)
+        head = np.fromstring(
+            f_in.read(4), dtype=np.uint32)  # event header is 8 bytes (2 longs)
     except Exception as e:
         print(e)
         raise Exception("Failed to read in the event orca header.")
@@ -40,15 +42,16 @@ def get_next_event(f_in):
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
-    record_length   =int( (head[0] & 0x3FFFF))
-    data_id         =int( (head[0] >> 18))
+    record_length = int((head[0] & 0x3FFFF))
+    data_id = int((head[0] >> 18))
     # slot            =int( (head[1] >> 16) & 0x1f)
     # crate           =int( (head[1] >> 21) & 0xf)
     # reserved        =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
     try:
-        event_data = f_in.read(record_length*4-4)     # record_length is in longs, read gives bytes
+        event_data = f_in.read(record_length * 4 -
+                               4)  # record_length is in longs, read gives bytes
     except Exception as e:
         print("  No more data...\n")
         print(e)
@@ -60,6 +63,7 @@ def get_next_event(f_in):
 
     # return event_data, slot, crate, data_id
     return event_data, data_id
+
 
 def get_decoders(object_info):
     """
@@ -85,13 +89,14 @@ def get_decoders(object_info):
 
 
 class DataLoader(ABC):
+
     def __init__(self, object_info=None):
         self.decoded_values = []
 
         if object_info is not None:
             self.load_object_info(object_info)
 
-        self.hf5_type="fixed"
+        self.hf5_type = "fixed"
 
     def load_object_info(self, object_info):
         if isinstance(object_info, dict):
@@ -101,10 +106,12 @@ class DataLoader(ABC):
         elif isinstance(object_info, str):
             self.object_info = pd.read_hdf(object_info, self.class_name)
         else:
-            raise TypeError("DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}".format( type(object_info)  ))
+            raise TypeError(
+                "DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}"
+                .format(type(object_info)))
 
     @abstractmethod
-    def decode_event(self,event_data_bytes, event_number, header_dict):
+    def decode_event(self, event_data_bytes, event_number, header_dict):
         pass
 
     # @abstractmethod
@@ -123,9 +130,16 @@ class DataLoader(ABC):
     def to_file(self, file_name):
         df_data = self.create_df()
         if df_data is None: return
-        df_data.to_hdf(file_name, key=self.decoder_name, mode='a', format=self.hf5_type, data_columns=df_data.columns.tolist())
+        df_data.to_hdf(
+            file_name,
+            key=self.decoder_name,
+            mode='a',
+            format=self.hf5_type,
+            data_columns=df_data.columns.tolist())
 
         if self.object_info is not None:
             if self.class_name == self.decoder_name:
-                raise ValueError("Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file.".format(self.__name__, self.class_name))
+                raise ValueError(
+                    "Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file."
+                    .format(self.__name__, self.class_name))
             self.object_info.to_hdf(file_name, key=self.class_name, mode='a')

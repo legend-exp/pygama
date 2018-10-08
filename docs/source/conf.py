@@ -2,9 +2,15 @@
 
 # -- Path setup --------------------------------------------------------------
 import sys, os
+print("i'm here!")
+print(os.listdir( os.path.abspath('../../pygama')))
 sys.path.insert(0, os.path.abspath('../../pygama'))
+# exit()
 
-import module
+import decoders.dataloading
+
+import module, waveform
+import pygama
 
 # -- Project information -----------------------------------------------------
 project = 'pygama'
@@ -22,7 +28,7 @@ extensions = [
 sphinx_gallery_conf = {
     'examples_dirs': '../../examples',
     'gallery_dirs': 'gallery',
-    'doc_module': ('module'),
+    'doc_module': ('module','waveform'),
     'backreferences_dir': '_as_gen',
 }
 

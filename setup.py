@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from setuptools import setup, Extension, find_packages
-import sys,os
+import sys, os
 
 do_cython = False
 try:
@@ -13,28 +13,28 @@ if __name__ == "__main__":
 
     try:
         import numpy as np
-        include_dirs = [np.get_include(),]
+        include_dirs = [
+            np.get_include(),
+        ]
     except ImportError:
         do_cython = False
 
     src = []
     ext = ".pyx" if do_cython else ".c"
-    src += [
-        os.path.join("pygama","processing", "_pygama"+ext)
-    ]
+    src += [os.path.join("pygama", "processing", "_pygama" + ext)]
 
-    ext = [Extension(
+    ext = [
+        Extension(
             "pygama.processing._pygama",
             sources=src,
             language="c",
-            include_dirs=include_dirs
-        ),
+            include_dirs=include_dirs),
         Extension(
-                "pygama.transforms",
-                sources=[os.path.join("pygama", "transforms"+ext)],
-                language="c",
-            )
-        ]
+            "pygama.transforms",
+            sources=[os.path.join("pygama", "transforms" + ext)],
+            language="c",
+        )
+    ]
 
     if do_cython: ext = cythonize(ext)
 
@@ -45,5 +45,6 @@ if __name__ == "__main__":
         author_email="benjamin.shanks@gmail.com",
         packages=find_packages(),
         ext_modules=ext,
-        install_requires=["numpy", "scipy", "pandas", "tables", "future", "cython"]
-    )
+        install_requires=[
+            "numpy", "scipy", "pandas", "tables", "future", "cython"
+        ])

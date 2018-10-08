@@ -1,5 +1,5 @@
 import sys, os, glob
-from ._pygama import ProcessTier0,ProcessTier1, TierOneProcessorList
+from ._pygama import ProcessTier0, ProcessTier1, TierOneProcessorList
 
 from multiprocessing import Pool, cpu_count
 from functools import partial
@@ -8,24 +8,45 @@ import numpy as np
 # TODO: this file should just be merged with the cython file, np?
 # CW: i think maybe he means pygama/processing/_pygama.pyx ?
 
-def process_tier_0(datadir, runList, verbose=True, output_dir=None, chan_list=None, n_max = np.inf):
+
+def process_tier_0(datadir,
+                   runList,
+                   verbose=True,
+                   output_dir=None,
+                   chan_list=None,
+                   n_max=np.inf):
 
     for run in runList:
 
-        filenameList = glob.glob(  os.path.join(datadir, "*Run{}".format(run )))
+        filenameList = glob.glob(os.path.join(datadir, "*Run{}".format(run)))
         if len(filenameList) == 0:
-            print("No file with name Run{} in directory {}! Skipping run...".format(run, datadir))
+            print("No file with name Run{} in directory {}! Skipping run...".
+                  format(run, datadir))
             continue
         elif len(filenameList) > 1:
-            print("More than one file with name Run{} in directory {}! Skipping run...".format(run, datadir))
+            print(
+                "More than one file with name Run{} in directory {}! Skipping run..."
+                .format(run, datadir))
             continue
         filename = filenameList[0]
         filepath = os.path.join(datadir, filename)
 
-        ProcessTier0(filepath, verbose=verbose, output_dir=output_dir, n_max=n_max, chan_list=chan_list)
+        ProcessTier0(
+            filepath,
+            verbose=verbose,
+            output_dir=output_dir,
+            n_max=n_max,
+            chan_list=chan_list)
 
 
-def process_tier_1(datadir, runList, processor_list, verbose=True, output_dir=None, output_file_string="t2", num_threads=1, overwrite=True):
+def process_tier_1(datadir,
+                   runList,
+                   processor_list,
+                   verbose=True,
+                   output_dir=None,
+                   output_file_string="t2",
+                   num_threads=1,
+                   overwrite=True):
 
     # if processor_list is None:
     #     processor_list = get_default_processor_list()
@@ -34,19 +55,26 @@ def process_tier_1(datadir, runList, processor_list, verbose=True, output_dir=No
     for run in runList:
         filepath = os.path.join(datadir, "t1_run{}.h5".format(run))
         if not overwrite:
-            outfilepath = os.path.join(output_dir, output_file_string+"_run{}.h5".format(run))
+            outfilepath = os.path.join(
+                output_dir, output_file_string + "_run{}.h5".format(run))
             if os.path.isfile(outfilepath):
-                print("Skipping run {} because t2 file already created...".format(run))
+                print("Skipping run {} because t2 file already created...".
+                      format(run))
                 continue
 
         if num_threads == 1:
-            ProcessTier1(filepath, processor_list, verbose=verbose, output_dir=output_dir, output_file_string=output_file_string)
+            ProcessTier1(
+                filepath,
+                processor_list,
+                verbose=verbose,
+                output_dir=output_dir,
+                output_file_string=output_file_string)
         else:
-            t1_args.append( [filepath, processor_list] )
-            keywords = {"verbose": verbose, "output_dir":output_dir}
+            t1_args.append([filepath, processor_list])
+            keywords = {"verbose": verbose, "output_dir": output_dir}
 
     if num_threads > 1:
-        max_proc = cpu_count() # careful, its a lot to load in RAM...
+        max_proc = cpu_count()  # careful, its a lot to load in RAM...
         num_threads = num_threads if num_threads < max_proc else max_proc
         p = Pool(num_threads)
         # p.starmap( partial(ProcessTier0, **keywords), t0_args)
