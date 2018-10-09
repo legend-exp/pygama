@@ -42,57 +42,15 @@ from .decoders.digitizers import SIS3302Decoder
 from .decoders.pollers import MJDPreampDecoder
 from .decoders.pollers import ISegHVDecoder
 
-from .processing._pygama import TierOneProcessorList
 from .processing._pygama import ProcessTier0
 from .processing._pygama import ProcessTier1
 
-from .processing.processors import process_tier_0
-from .processing.processors import process_tier_1
-from .processing.processors import Calculator
-from .processing.processors import Transformer
-from .processing.processors import DatabaseLookup
+from .processing.processing import process_tier_0
+from .processing.processing import process_tier_1
 
-# __all__ = [
-#     "get_decoders",
-#     "get_next_event"
-# ]
+from .processing.base_classes import TierOneProcessorList
+from .processing.base_classes import Calculator
+from .processing.base_classes import Transformer
+from .processing.base_classes import DatabaseLookup
 
-# # pygama/decoders/__init__.py
-# from dataloading import get_decoders
-# from dataloading import get_next_event
-# # from .dataloading import DataLoader
-# from .digitizers import get_digitizers
-# from .digitizers import Gretina4MDecoder
-# from .digitizers import SIS3302Decoder
-# from .pollers import MJDPreampDecoder
-# from .pollers import ISegHVDecoder
-# __all__ = [
-#     "get_decoders",
-#     "get_next_event",
-#     "get_digitizers",
-#     # "DataLoader",
-#     #digitizers
-#     "Gretina4MDecoder",
-#     "SIS3302Decoder",
-#     #pollers
-#     "MJDPreampDecoder",
-#     "ISegHVDecoder"
-# ]
-#
-# # pygama/decoders/__init__.py
-# from ._pygama import TierOneProcessorList
-# from ._processing import process_tier_0
-# from ._processing import process_tier_1
-# from .processors import Calculator
-# from .processors import Transformer
-# from .processors import DatabaseLookup
-# # from .processors import Tier0Passer
-# __all__ = [
-#     "process_tier_0",
-#     "process_tier_1",
-#     "Calculator",
-#     "Transformer",
-#     "DatabaseLookup",
-#     # "Tier0Passer",
-#     "TierOneProcessorList"
-# ]
+from .analysis.calibration import get_most_prominent_peaks

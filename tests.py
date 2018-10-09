@@ -6,6 +6,7 @@
     - package installs and uninstalls with pip
     - ignore auto-generated files (makes cython a dependency, but ok)
     - should we add a static type checker?
+    - processing speed checks?
 """
 import glob
 import subprocess

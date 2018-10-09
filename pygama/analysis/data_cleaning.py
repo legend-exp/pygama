@@ -1,8 +1,14 @@
+"""
+mainly pulser tagging
+- gaussian_cut (fits data to a gaussian, returns mean +/- cut_sigma values)
+- xtalball_cut (fits data to a crystalball, returns mean +/- cut_sigma values)
+- find_pulser_properties (find pulser by looking for which peak has a constant time between events)
+- tag_pulsers
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy import stats
-
 from .peak_fitting import *
 
 

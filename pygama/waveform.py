@@ -4,8 +4,8 @@ Operates on pandas Series data.
 """
 import numpy as np
 
-# from .calculators import calc_timepoint, fit_baseline
-# from .transforms import center
+from .processing.calculators import calc_timepoint, fit_baseline
+from .processing.transforms import center
 
 
 class Waveform():

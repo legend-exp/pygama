@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""pygama setup script.
+- re-runs cythonize function on a list of extensions
+- currently does (pygama/processing/transforms.pyx) and (pygama/processing/_pygama.pyx)
+- uses setuptools.setup to add pygama to sys.path in python, making every
+  function in a folder with an __init__.py available, except in files which
+  have an underscore in their name, like _processing.py
+"""
 from setuptools import setup, Extension, find_packages
 import sys, os
 
@@ -30,8 +37,8 @@ if __name__ == "__main__":
             language="c",
             include_dirs=include_dirs),
         Extension(
-            "pygama.transforms",
-            sources=[os.path.join("pygama", "transforms" + ext)],
+            "pygama.processing.transforms",
+            sources=[os.path.join("pygama","processing", "transforms" + ext)],
             language="c",
         )
     ]

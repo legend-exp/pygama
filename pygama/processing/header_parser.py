@@ -5,13 +5,11 @@ import pandas as pd
 
 def parse_header(xmlfile):
     """
-        Opens the given file for binary read ('rb'), then grabs the first 8 bytes as variable ba
-        The first 4 bytes (1 long) of an orca data file are the total length in longs of the record
-        The next 4 bytes (1 long) is the length of the header in bytes
-
-        The header is then read in
-
-        These two lengths are
+    Opens the given file for binary read ('rb'), then grabs the first 8 bytes
+    The first 4 bytes (1 long) of an orca data file are the total length in
+    longs of the record
+    The next 4 bytes (1 long) is the length of the header in bytes
+    The header is then read in ...
     """
     with open(xmlfile, 'rb') as xmlfile_handle:
         #read the first word:
@@ -41,7 +39,10 @@ def parse_header(xmlfile):
 
 
 def from_bytes(data, big_endian=False):
-    #python2 doesn't have this function, so rewrite it for bw compatibility
+    """
+    python2 doesn't have this function,
+    so rewrite it for backwards compatibility
+    """
     if isinstance(data, str):
         data = bytearray(data)
     if big_endian:
@@ -53,6 +54,7 @@ def from_bytes(data, big_endian=False):
 
 
 def get_run_number(header_dict):
+    """ header_dict parse functions, ORCA specific """
     for d in (header_dict["ObjectInfo"]["DataChain"]):
         if "Run Control" in d:
             return (d["Run Control"]["RunNumber"])
@@ -60,9 +62,11 @@ def get_run_number(header_dict):
 
 
 def get_data_id(headerDict, class_name, super_name):
-    #stored like this: headerDict["dataDescription"]["ORRunModel"]["Run"]["dataId"]
-    #but integer needs to be bitshifted by 18
-
+    """
+    stored like this:
+    `headerDict["dataDescription"]["ORRunModel"]["Run"]["dataId"]`
+    but integer needs to be bitshifted by 18
+    """
     id_int = headerDict["dataDescription"][class_name][super_name]["dataId"]
 
     return id_int >> 18
@@ -95,10 +99,9 @@ def flip_data_ids(headerDict):
 
 def get_decoder_for_id(headerDict):
     """
-        Returns a dictionary that goes:
-            dict[dataIdNum] = "decoderName"
-
-            e.g: d[5] = 'ORSIS3302DecoderForEnergy'
+    Returns a dictionary that goes:
+    `dict[dataIdNum] = "decoderName"`
+    e.g: d[5] = 'ORSIS3302DecoderForEnergy'
     """
     d = dict()
     for class_key in headerDict["dataDescription"].keys():
@@ -116,10 +119,10 @@ def get_decoder_for_id(headerDict):
 
 
 def get_object_info(headerDict, class_name):
-    '''
+    """
     Returns a dict keyed by data id with all the info from the header
     TODO: won't currently work with any AuxHW
-    '''
+    """
 
     object_info_list = []
 

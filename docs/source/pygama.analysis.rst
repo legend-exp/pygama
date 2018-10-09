@@ -4,14 +4,6 @@ pygama.analysis package
 Submodules
 ----------
 
-pygama.analysis.calculators module
-----------------------------------
-
-.. automodule:: pygama.analysis.calculators
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pygama.analysis.calibration module
 ----------------------------------
 

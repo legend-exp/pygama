@@ -1,3 +1,8 @@
+"""
+- get_avse_cut (does AvsE)
+- get_ae_cut (does A/E)
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs

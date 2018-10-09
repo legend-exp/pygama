@@ -1,3 +1,6 @@
+""" MAIN PYGAMA TIER PROCESSING FILE
+This file is cythonized for maximum speed.
+"""
 cimport numpy as np
 
 import numpy as np
@@ -12,108 +15,7 @@ from ..utils import update_progress
 from ..decoders import *
 from ..decoders.digitizers import Digitizer
 from .header_parser import *
-# from .processors import Calculator, Transformer, DatabaseLookup
-
-
-class TierOneProcessorList():
-    """
-    Class to handle the list of transforms/calculations we do in the processing
-    """
-
-    def __init__(self):
-        self.list = []
-        self.waveform_dict = {}
-        self.event_data = None
-        self.digitizer = None
-        self.runNumber = 0
-
-        #t1 fields to make available for t2 processors
-        self.t0_map = {}
-
-    def Process(self, t0_row):
-        if self.verbose and self.num % 100 == 0:
-            if (float(self.num) / self.max_event_number) < 1:
-                update_progress(
-                    float(self.num) / self.max_event_number, self.runNumber)
-
-        # print("\nDEBUG:",t0_row)
-        waveform = self.digitizer.parse_event_data(t0_row)
-        # Currently, I'll just mandate that we only process full waveform data i guess
-
-        # Clear things out from the last waveform:
-        self.waveform_dict = {"waveform": waveform.get_waveform()}
-        new_cols = {}
-
-        try:
-            new_cols["fs_start"] = waveform.full_sample_range[0]
-            new_cols["fs_end"] = waveform.full_sample_range[1]
-        except AttributeError:
-            #in case it isn't a multisampled waveform object
-            pass
-
-        #Apply each processor
-        for processor in self.list:
-            processor.replace_args(new_cols)
-            processor.set_waveform(self.waveform_dict)
-            # print("now im in " +processor.function.__name__)
-
-            if isinstance(processor, Transformer):
-                self.waveform_dict[processor.output_name] = processor.process()
-            else:
-                output = processor.output_name
-                calc = processor.process()
-
-                #Handles multiple outputs for, e.g., time point calculations
-                if not isinstance(output, str) and len(output) > 1:
-                    for i, out in enumerate(output):
-                        new_cols[out] = calc[i]
-                else:
-                    new_cols[output] = calc
-        self.num += 1
-
-        new_cols_series = pd.Series(new_cols)
-        return new_cols_series
-
-    def AddTransform(self,
-                     function,
-                     args={},
-                     input_waveform="waveform",
-                     output_waveform=None):
-        self.list.append(
-            Transformer(
-                function,
-                args=args,
-                input_waveform=input_waveform,
-                output_waveform=output_waveform))
-
-    def AddCalculator(self,
-                      function,
-                      args={},
-                      input_waveform="waveform",
-                      output_name=None):
-        self.list.append(
-            Calculator(
-                function,
-                args=args,
-                input_waveform=input_waveform,
-                output_name=output_name))
-
-    # def AddDatabaseLookup(self, function, args={}, output_name=None):
-    #   self.list.append( DatabaseLookup(function, args, output_name) )
-
-    def AddFromTier0(self, name, output_name=None):
-        if output_name is None:
-            output_name = name
-        self.t0_map[name] = output_name
-        # self.list.append( Tier0Passer(name, output_name) )
-
-    def DropTier0(self, df_t1):
-        df_t1.rename(columns=self.t0_map, inplace=True)
-        drop_cols = []
-        for t0_col in self.t0_cols:
-            if t0_col not in self.t0_map.keys():
-                drop_cols.append(t0_col)
-        df_t1.drop(drop_cols, axis=1, inplace=True)
+from .base_classes import Calculator, Transformer, DatabaseLookup
 
 
 def ProcessTier0(filename,
@@ -343,5 +245,4 @@ def ProcessTier1(filename,
         mode='w',
         data_columns=event_df.columns.tolist())
     return event_df
-
 

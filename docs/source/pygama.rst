@@ -13,30 +13,6 @@ Subpackages
 Submodules
 ----------
 
-pygama.filters module
----------------------
-
-.. automodule:: pygama.filters
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-pygama.module module
---------------------
-
-.. automodule:: pygama.module
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-pygama.transforms module
-------------------------
-
-.. automodule:: pygama.transforms
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pygama.utils module
 -------------------
 

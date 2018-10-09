@@ -8,6 +8,11 @@ __all__ = ['MJDPreampDecoder', 'ISegHVDecoder']
 
 
 class Poller(DataLoader):
+    """
+    like DataLoader, not a public class.
+    members:
+      - decode_event (just passes when called)
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -16,10 +21,13 @@ class Poller(DataLoader):
         pass
 
 
-# Polled devices
-
-
 class MJDPreampDecoder(Poller):
+    """
+    members:
+      - decode_event (decodes raw data from an MJDPreAmp object)
+      - format_data (returns a dict)
+      - get_detectors_for_preamp (returns a dict)
+    """
 
     def __init__(self, *args, **kwargs):
         self.decoder_name = 'ORMJDPreAmpDecoderForAdc'  #
@@ -165,6 +173,11 @@ class MJDPreampDecoder(Poller):
 
 
 class ISegHVDecoder(Poller):
+    """
+    members:
+    - decode_event
+    - format_data
+    """
 
     def __init__(self, *args, **kwargs):
         self.decoder_name = 'ORiSegHVCardDecoderForHV'

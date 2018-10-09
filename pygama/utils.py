@@ -1,8 +1,15 @@
+"""
+this is a miscellaneous functions folder.  i found one useful before (waveLibs)
+so is it good practice to keep a file like this?
+there are just two very short functions here, they would be easy to move,
+unless we anticipate this file growing.
+"""
+
 import sys
 
 
 def update_progress(progress, runNumber=None):
-    #adapted from from https://stackoverflow.com/a/15860757
+    """ adapted from from https://stackoverflow.com/a/15860757 """
     barLength = 10  # Modify this to change the length of the progress bar
     status = ""
     if isinstance(progress, int):

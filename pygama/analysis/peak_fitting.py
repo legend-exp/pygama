@@ -1,3 +1,14 @@
+"""
+- fit_unbinned (unbinned max likelihood fit to data with given likelihood func)
+- fit_binned (regular old binned fit (nonlinear least squares))
+- neg_log_like (wrapper to give me neg log likelihoods)
+- gauss (Define a gaussian distribution and corresponding neg log likelihood)
+- radford_peak (David's peak shape)
+- xtalball (power-law tail plus gaussian)
+- get_gaussian_guess (Given a hist, gives guesses for mu, sigma, and amplitude)
+- get_fwhm (find a FWHM from a hist)
+"""
+
 import numpy as np
 from scipy.optimize import minimize, curve_fit
 from scipy.special import erfc

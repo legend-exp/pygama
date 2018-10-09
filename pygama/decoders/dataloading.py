@@ -1,3 +1,6 @@
+"""
+Class and methods for loading data from different `data takers`.
+"""
 from abc import ABC, abstractmethod
 import numpy as np
 import pandas as pd
@@ -11,13 +14,13 @@ __all__ = ["get_next_event", "get_decoders"]
 
 def get_next_event(f_in):
     """
-    Gets the next event, and some basic information about it \n
-    Takes the file pointer as input \n
-    Outputs: \n
-        event_data: a byte array of the data produced by the card (could be header + data) \n
-        slot: \n
-        crate: \n
-        data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc) \n
+    Gets the next event, and some basic information about it
+    Takes the file pointer as input
+    Outputs:
+    -event_data: a byte array of the data produced by the card (could be header + data)
+    -slot:
+    -crate:
+    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
     """
     # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
 
@@ -69,7 +72,7 @@ def get_decoders(object_info):
     """
     Looks through all the data takers that exist in this DataLoader class and see which ones exist.
     TODO: this only works if the subclasses have been imported.  is that what we want?
-    also relies on 2-level abstraction, which is dicy
+    also relies on 2-level abstraction, which is dicey
     """
 
     decoders = []

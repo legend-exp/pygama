@@ -16,6 +16,13 @@ def get_digitizers():
 
 
 class Digitizer(DataLoader):
+    """
+    members:
+    - decode_event (also in DataLoader)
+    - create_df (also in DataLoader)
+    - parse_event_data
+    - reconstruct_waveform
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -74,10 +81,30 @@ class Digitizer(DataLoader):
 
 
 class Gretina4MDecoder(Digitizer):
-    '''
+    """
+    inherits from Digitizer, DataLoader, and ABC
+    uses super() to avoid referring to the base class (ABC) explicitly
+    ** stores decoded values in a dict of arrays, self.decoded_values **
+
+    can inspect all methods with:
+    import inspect, pygama, pygama.processing
+    gr = pygama.decoders.Gretina4MDecoder()
+    inspect.getmembers(gr)
+    can show data members with `gr.__dict__`
+
     min_signal_thresh: multiplier on noise ampliude required to process a signal: helps avoid processing a ton of noise
     chanList: list of channels to process
-    '''
+
+    members:
+      - load_object_info (also in DataLoader)
+      - crate_card_chan
+      - find_active_channels
+      - decode_event (parses the header for an individual event)
+      - format_data (format the values into a pandas-friendly format)
+      - test_decode_event
+      - parse_event_data (takes a pandas df row from a decoded event,
+        returns an instance of class MultisampledWaveform)
+    """
 
     def __init__(self, *args, **kwargs):
         self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'

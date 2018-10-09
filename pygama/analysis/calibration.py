@@ -1,3 +1,11 @@
+"""
+routines for automatic calibration.
+- get_most_prominent_peaks (find by looking for spikes in spectrum derivative)
+- match_peaks (identify peaks based on ratios between known gamma energies)
+- calibrate_tl208 (main routine -- fits multiple peaks w/ Radford peak shape)
+- get_calibration_energies (unused rn but is a good place to put pk energies)
+"""
+
 import sys
 import numpy as np
 from pygama.analysis.peak_fitting import *
@@ -12,12 +20,11 @@ import scipy.optimize as op
 
 #return a histogram around the most prominent peak in a spectrum of a given percentage of width
 def get_most_prominent_peaks(energySeries, max_num_peaks=np.inf, bins=2000):
-    '''
+    """
     find the most prominent peaks in a spectrum by looking for spikes in derivative of spectrum
-
     energySeries: array of measured energies
     max_num_peaks = maximum number of most prominent peaks to find
-    '''
+    """
 
     # bins = np.linspace( np.amin(energySeries), np.amax(energySeries), 2700 )
     # bins = "auto"
@@ -55,10 +62,10 @@ def get_most_prominent_peaks(energySeries, max_num_peaks=np.inf, bins=2000):
 
 
 def match_peaks(data_peaks, cal_peaks):
-    '''
+    """
     Match uncalibrated peaks with specific energies:
     does so by trying all
-    '''
+    """
     from itertools import combinations
 
     n_peaks = len(cal_peaks) if len(cal_peaks) < len(data_peaks) else len(
@@ -93,7 +100,7 @@ def match_peaks(data_peaks, cal_peaks):
 
 
 def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
-    '''
+    """
     energy_series: array of energies we want to calibrate
     cal_peaks: array of peaks to fit
 
@@ -101,7 +108,7 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
     2.) fit that peak to get a rough guess at a calibration to find other peaks with
     3.) fit each peak in peak_energies
     4.) do a linear fit to the peak centroids to find a calibration
-    '''
+    """
 
     if cal_peaks is None:
         cal_peaks = np.array(
