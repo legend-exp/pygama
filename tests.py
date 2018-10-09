@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-""" placeholder for pygama code QC script
+""" pygama code QC suite
     - run pylint over all code: pylint [files]
     - run yapf over all code: yapf --style google -i [files]
     - documentation generated w/ sphinx (worry about web version later, since it may need to be private software?)
     - package installs and uninstalls with pip
     - ignore auto-generated files (makes cython a dependency, but ok)
-    - can we add a type checker?
+    - should we add a static type checker?
 """
 import glob
 import subprocess
@@ -23,6 +23,11 @@ def main():
     for f in pyfiles:
         print("Running yapf on file: {}".format(f))
         sh("yapf --style google -i {}".format(f))
+
+    # run pylint (not tested yet ...)
+    # for f in pyfiles:
+    #     print("Running pylint on file: {}".format(f))
+    #     sh("pylint {}".format(f))
 
 
 def sh(cmd, sh=False):

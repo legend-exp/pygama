@@ -354,8 +354,8 @@ class SIS3302Decoder(Digitizer):
         to cyclically fill a spot on memory, and it requires that you have to re-order the records
         afterwards.
         The details of how this header is formatted apparently wasn't important enough for the
-        SIS engineers to want to put it in the manual, so this is a guess in some places ...
-
+        SIS engineers to want to put it in the manual, so this is a guess in some places
+        ```
         0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
             ^^^^ ^^^- ---- ---- ---- ---- ---- ---- most sig bits of num records lost
             ---- ---- ---- ---- ---- ---- ^^^^ ^^^- least sig bits of num records lost
@@ -400,7 +400,7 @@ class SIS3302Decoder(Digitizer):
        -3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy value from first value of energy gate
        -2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx This word is said to contain "pileup flag, retrigger flag, and trigger counter" in no specified locations...
        -1   1101 1110 1010 1101 1011 1110 1110 1111 Last word is always 0xDEADBEEF
-
+       ```
         """
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)

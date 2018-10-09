@@ -20,14 +20,13 @@ def ProcessTier0(filename,
                  verbose=False,
                  output_dir=None,
                  decoders=None):
-    '''
-  Reads in "raw," or "tier 0," Orca data and saves to a hdf5 format using pandas
+    """ Reads in "raw / tier 0" ORCA data and saves to an hdf5 format using pandas
     filename: path to an orca data file
     output_file_string: output file name will be <output_file_string>_run<runNumber>.h5
     n_max: maximum number of events to process (useful for debugging)
     verbose: spits out a progressbar to let you know how the processing is going
     output_dir: where to stash the t1 file
-  '''
+    """
     SEEK_END = 2
 
     directory = os.path.dirname(filename)

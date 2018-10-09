@@ -1,15 +1,20 @@
+.. pygama documentation master file, created by
+   sphinx-quickstart on Mon Oct  8 17:14:33 2018.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
 Welcome to pygama's documentation!
-====================================
+==================================
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Contents:
 
-   moduledoc
-   waveformdoc
-   gallery/index
-   gallery/plot_example1
-   gallery/plot_example2
 
 
+Indices and tables
+==================
 
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
