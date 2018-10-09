@@ -67,9 +67,9 @@ def get_next_event(f_in):
 
 def get_decoders(object_info):
     """
-        Looks through all the data takers that exist in this DataLoader class and see which ones exist.
-        TODO: this only works if the subclasses have been imported.  is that what we want?
-              also relies on 2-level abstraction, which is dicy
+    Looks through all the data takers that exist in this DataLoader class and see which ones exist.
+    TODO: this only works if the subclasses have been imported.  is that what we want?
+    also relies on 2-level abstraction, which is dicy
     """
 
     decoders = []

@@ -347,60 +347,60 @@ class SIS3302Decoder(Digitizer):
                      header_dict,
                      verbose=False):
         """
-        The SIS3302 can produce a waveform from two sources:
-            1: ADC raw data buffer: This is a normal digitizer waveform
-            2: Energy data buffer: Not sure what this is
+        # The SIS3302 can produce a waveform from two sources:
+        #     1: ADC raw data buffer: This is a normal digitizer waveform
+        #     2: Energy data buffer: Not sure what this is
         Additionally, the ADC raw data buffer can take data in a buffer wrap mode, which seems
         to cyclically fill a spot on memory, and it requires that you have to re-order the records
         afterwards.
         The details of how this header is formatted apparently wasn't important enough for the
         SIS engineers to want to put it in the manual, so this is a guess in some places
-        ```
-        0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
-            ^^^^ ^^^- ---- ---- ---- ---- ---- ---- most sig bits of num records lost
-            ---- ---- ---- ---- ---- ---- ^^^^ ^^^- least sig bits of num records lost
-                    ^ ^^^- ---- ---- ---- ---- ---- crate
-                         ^ ^^^^ ---- ---- ---- ---- card
-                                ^^^^ ^^^^ ---- ---- channel
-                                                  ^ buffer wrap mode
-        1   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA: length of waveform (longs)
-        2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA: length of energy   (longs)
-        3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
-            ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- timestamp[47:32]
-                                ^^^^ ^^^^ ^^^^ ^^^^ "event header and ADC ID"
-        4   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx SIS:
-            ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- timestamp[31:16]
-                                ^^^^ ^^^^ ^^^^ ^^^^ timestamp[15:0]
 
-            If the buffer wrap mode is enabled, there are two more words of header:
-      (5)   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ADC raw data length (longs)
-      (6)   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ADC raw data start index (longs)
+        #   0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
+        #       ^^^^ ^^^- ---- ---- ---- ---- ---- ---- most sig bits of num records lost
+        #       ---- ---- ---- ---- ---- ---- ^^^^ ^^^- least sig bits of num records lost
+        #               ^ ^^^- ---- ---- ---- ---- ---- crate
+        #                    ^ ^^^^ ---- ---- ---- ---- card
+        #                           ^^^^ ^^^^ ---- ---- channel
+        #                                             ^ buffer wrap mode
+        #   1   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA: length of waveform (longs)
+        #   2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA: length of energy   (longs)
+        #   3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
+        #       ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- timestamp[47:32]
+        #                           ^^^^ ^^^^ ^^^^ ^^^^ "event header and ADC ID"
+        #   4   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx SIS:
+        #       ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- timestamp[31:16]
+        #                           ^^^^ ^^^^ ^^^^ ^^^^ timestamp[15:0]
+        #
+        #       If the buffer wrap mode is enabled, there are two more words of header:
+        # (5)   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ADC raw data length (longs)
+        # (6)   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ADC raw data start index (longs)
+        #
+        #       After this, it will go into the two data buffers directly.
+        #       These buffers are packed 16-bit words, like so:
+        #
+        #       xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        #       ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- sample N + 1
+        #                           ^^^^ ^^^^ ^^^^ ^^^^ sample N
+        #
+        #       here's an example of combining the 16 bit ints to get a 32 bit one.
+        #       print(hex(evt_data_16[-1] << 16 | evt_data_16[-2]))
+        #
+        #       The first data buffer is the ADC raw data buffer, which is the usual waveform
+        #       The second is the energy data buffer, which might be the output of the energy filter
+        #       This code should handle arbitrary sizes of both buffers.
+        #
+        #       An additional complexity arises if buffer wrap mode is enabled.
+        #       This apparently means the start of the buffer can be anywhere in the buffer, and
+        #       it must be read circularly from that point. Not sure why it is done that way, but
+        #       this should work correctly to disentagle that.
+        #
+        #       Finally, there should be a footer of 4 long words at the end:
+        #  -4   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy max value
+        #  -3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy value from first value of energy gate
+        #  -2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx This word is said to contain "pileup flag, retrigger flag, and trigger counter" in no specified locations...
+        #  -1   1101 1110 1010 1101 1011 1110 1110 1111 Last word is always 0xDEADBEEF
 
-            After this, it will go into the two data buffers directly.
-            These buffers are packed 16-bit words, like so:
-
-            xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-            ^^^^ ^^^^ ^^^^ ^^^^ ---- ---- ---- ---- sample N + 1
-                                ^^^^ ^^^^ ^^^^ ^^^^ sample N
-
-            here's an example of combining the 16 bit ints to get a 32 bit one.
-            print(hex(evt_data_16[-1] << 16 | evt_data_16[-2]))
-
-            The first data buffer is the ADC raw data buffer, which is the usual waveform
-            The second is the energy data buffer, which might be the output of the energy filter
-            This code should handle arbitrary sizes of both buffers.
-
-            An additional complexity arises if buffer wrap mode is enabled.
-            This apparently means the start of the buffer can be anywhere in the buffer, and
-            it must be read circularly from that point. Not sure why it is done that way, but
-            this should work correctly to disentagle that.
-
-            Finally, there should be a footer of 4 long words at the end:
-       -4   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy max value
-       -3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy value from first value of energy gate
-       -2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx This word is said to contain "pileup flag, retrigger flag, and trigger counter" in no specified locations...
-       -1   1101 1110 1010 1101 1011 1110 1110 1111 Last word is always 0xDEADBEEF
-       ```
         """
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)

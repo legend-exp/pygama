@@ -36,23 +36,22 @@ class MJDPreampDecoder(Poller):
                      header_dict,
                      verbose=False):
         """
-            Decodes the data from a MJDPreamp Object.
-            Returns:
-                adc_val     : A list of floating point voltage values for each channel
-                timestamp   : An integer unix timestamp
-                enabled     : A list of 0 or 1 values indicating which channels are enabled
-
-            Data Format:
-            0 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-                                       ^^^^ ^^^^ ^^^^- device id
-            1 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  unix time of measurement
-            2 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  enabled adc mask
-            3 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 0 encoded as a float
-            4 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 1 encoded as a float
-            ....
-            ....
-            18 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 15 encoded as a float
-
+        # Decodes the data from a MJDPreamp Object.
+        # Returns:
+        #     adc_val     : A list of floating point voltage values for each channel
+        #     timestamp   : An integer unix timestamp
+        #     enabled     : A list of 0 or 1 values indicating which channels are enabled
+        #
+        # Data Format:
+        # 0 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        #                            ^^^^ ^^^^ ^^^^- device id
+        # 1 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  unix time of measurement
+        # 2 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  enabled adc mask
+        # 3 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 0 encoded as a float
+        # 4 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 1 encoded as a float
+        # ....
+        # ....
+        # 18 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 15 encoded as a float
         """
 
         event_data_uint = np.fromstring(event_data_bytes, dtype=np.uint32)
@@ -182,34 +181,34 @@ class ISegHVDecoder(Poller):
                      header_dict,
                      verbose=False):
         """
-            Decodes an iSeg HV Card event
-
-            xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-            ^^^^ ^^^^ ^^^^ ^^----------------------- Data ID (from header)
-            -----------------^^ ^^^^ ^^^^ ^^^^ ^^^^- length
-        0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-            ----------^^^^-------------------------- Crate number
-            ---------------^^^^--------------------- Card number
-
-        1    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -ON Mask
-        2    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -Spare
-        3    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  time in seconds since Jan 1, 1970
-        4    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 0)
-        5    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 0)
-        6    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 1)
-        7    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 1)
-        8    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 2)
-        9    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 2)
-        10   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 3)
-        11   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 3)
-        12   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 4)
-        13   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 4)
-        14   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 5)
-        15   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 5)
-        16   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 6)
-        17   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 6)
-        18   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 7)
-        19   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 7)
+        #     Decodes an iSeg HV Card event
+        #
+        #     xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        #     ^^^^ ^^^^ ^^^^ ^^----------------------- Data ID (from header)
+        #     -----------------^^ ^^^^ ^^^^ ^^^^ ^^^^- length
+        # 0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        #     ----------^^^^-------------------------- Crate number
+        #     ---------------^^^^--------------------- Card number
+        #
+        # 1    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -ON Mask
+        # 2    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -Spare
+        # 3    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  time in seconds since Jan 1, 1970
+        # 4    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 0)
+        # 5    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 0)
+        # 6    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 1)
+        # 7    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 1)
+        # 8    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 2)
+        # 9    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 2)
+        # 10   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 3)
+        # 11   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 3)
+        # 12   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 4)
+        # 13   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 4)
+        # 14   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 5)
+        # 15   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 5)
+        # 16   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 6)
+        # 17   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 6)
+        # 18   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 7)
+        # 19   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 7)
         """
 
         event_data_int = np.fromstring(event_data_bytes, dtype=np.uint32)
