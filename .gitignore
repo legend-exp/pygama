@@ -1,5 +1,5 @@
 # New additions go at the top!
-#*.c this is if we want to ignore the auto-generated cython code
+transforms.c 
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
