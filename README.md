@@ -1,7 +1,7 @@
 # pygama
 Python based package for decoding ORCA data and processing it with pandas
 
-## usgae
+## usage
 Install with
 ```bash
 $ git clone [url]
