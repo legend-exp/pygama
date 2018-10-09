@@ -1,16 +1,119 @@
 cimport numpy as np
 
 import numpy as np
-import os, re, sys
+import os, re, sys, glob
 import pandas as pd
 import h5py
 from future.utils import iteritems
+from multiprocessing import Pool, cpu_count
+from functools import partial
 
 from ..utils import update_progress
 from ..decoders import *
 from ..decoders.digitizers import Digitizer
-from ._header_parser import *
-from .processors import Calculator, Transformer, DatabaseLookup
+from .header_parser import *
+# from .processors import Calculator, Transformer, DatabaseLookup
+
+
+class TierOneProcessorList():
+    """
+    Class to handle the list of transforms/calculations we do in the processing
+    """
+
+    def __init__(self):
+        self.list = []
+        self.waveform_dict = {}
+        self.event_data = None
+        self.digitizer = None
+        self.runNumber = 0
+
+        #t1 fields to make available for t2 processors
+        self.t0_map = {}
+
+    def Process(self, t0_row):
+        if self.verbose and self.num % 100 == 0:
+            if (float(self.num) / self.max_event_number) < 1:
+                update_progress(
+                    float(self.num) / self.max_event_number, self.runNumber)
+
+        # print("\nDEBUG:",t0_row)
+        waveform = self.digitizer.parse_event_data(t0_row)
+        # Currently, I'll just mandate that we only process full waveform data i guess
+
+        # Clear things out from the last waveform:
+        self.waveform_dict = {"waveform": waveform.get_waveform()}
+        new_cols = {}
+
+        try:
+            new_cols["fs_start"] = waveform.full_sample_range[0]
+            new_cols["fs_end"] = waveform.full_sample_range[1]
+        except AttributeError:
+            #in case it isn't a multisampled waveform object
+            pass
+
+        #Apply each processor
+        for processor in self.list:
+            processor.replace_args(new_cols)
+            processor.set_waveform(self.waveform_dict)
+            # print("now im in " +processor.function.__name__)
+
+            if isinstance(processor, Transformer):
+                self.waveform_dict[processor.output_name] = processor.process()
+            else:
+                output = processor.output_name
+                calc = processor.process()
+
+                #Handles multiple outputs for, e.g., time point calculations
+                if not isinstance(output, str) and len(output) > 1:
+                    for i, out in enumerate(output):
+                        new_cols[out] = calc[i]
+                else:
+                    new_cols[output] = calc
+        self.num += 1
+
+        new_cols_series = pd.Series(new_cols)
+        return new_cols_series
+
+    def AddTransform(self,
+                     function,
+                     args={},
+                     input_waveform="waveform",
+                     output_waveform=None):
+        self.list.append(
+            Transformer(
+                function,
+                args=args,
+                input_waveform=input_waveform,
+                output_waveform=output_waveform))
+
+    def AddCalculator(self,
+                      function,
+                      args={},
+                      input_waveform="waveform",
+                      output_name=None):
+        self.list.append(
+            Calculator(
+                function,
+                args=args,
+                input_waveform=input_waveform,
+                output_name=output_name))
+
+    # def AddDatabaseLookup(self, function, args={}, output_name=None):
+    #   self.list.append( DatabaseLookup(function, args, output_name) )
+
+    def AddFromTier0(self, name, output_name=None):
+        if output_name is None:
+            output_name = name
+        self.t0_map[name] = output_name
+        # self.list.append( Tier0Passer(name, output_name) )
+
+    def DropTier0(self, df_t1):
+        df_t1.rename(columns=self.t0_map, inplace=True)
+        drop_cols = []
+        for t0_col in self.t0_cols:
+            if t0_col not in self.t0_map.keys():
+                drop_cols.append(t0_col)
+        df_t1.drop(drop_cols, axis=1, inplace=True)
 
 
 def ProcessTier0(filename,
@@ -67,7 +170,8 @@ def ProcessTier0(filename,
     runNumber = get_run_number(headerDict)
     print("Run number: {}".format(runNumber))
 
-    # TODO: This is all pretty hard to read & comprehend easily.  Can we clean it up?  Move to header_parser?
+    # TODO: This is all pretty hard to read & comprehend easily.
+    # Can we clean it up?  Move to header_parser?
 
     # id_dict = flip_data_ids(headerDict)
     id_dict = get_decoder_for_id(headerDict)
@@ -173,13 +277,13 @@ def ProcessTier1(filename,
                  output_file_string="t2",
                  verbose=False,
                  output_dir=None):
-    '''
-  Reads in "raw," or "tier 0," Orca data and saves to a hdf5 format using pandas
+    """
+    Reads in "raw," or "tier 0," Orca data and saves to a hdf5 format using pandas
     filename: path to a tier1 data file
     processorList: TierOneProcessorList object with list of calculations/transforms you want done
     output_file_string: file is saved as <output_file_string>_run<runNumber>.h5
     verbose: spits out a progressbar to let you know how the processing is going
-  '''
+    """
 
     directory = os.path.dirname(filename)
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -241,102 +345,3 @@ def ProcessTier1(filename,
     return event_df
 
 
-class TierOneProcessorList():
-    '''
-  Class to handle the list of transforms/calculations we do in the processing
-  '''
-
-    def __init__(self):
-        self.list = []
-        self.waveform_dict = {}
-        self.event_data = None
-        self.digitizer = None
-        self.runNumber = 0
-
-        #t1 fields to make available for t2 processors
-        self.t0_map = {}
-
-    def Process(self, t0_row):
-        if self.verbose and self.num % 100 == 0:
-            if (float(self.num) / self.max_event_number) < 1:
-                update_progress(
-                    float(self.num) / self.max_event_number, self.runNumber)
-
-        # print("\nDEBUG:",t0_row)
-        waveform = self.digitizer.parse_event_data(t0_row)
-        # Currently, I'll just mandate that we only process full waveform data i guess
-
-        # Clear things out from the last waveform:
-        self.waveform_dict = {"waveform": waveform.get_waveform()}
-        new_cols = {}
-
-        try:
-            new_cols["fs_start"] = waveform.full_sample_range[0]
-            new_cols["fs_end"] = waveform.full_sample_range[1]
-        except AttributeError:
-            #in case it isn't a multisampled waveform object
-            pass
-
-        #Apply each processor
-        for processor in self.list:
-            processor.replace_args(new_cols)
-            processor.set_waveform(self.waveform_dict)
-            # print("now im in " +processor.function.__name__)
-
-            if isinstance(processor, Transformer):
-                self.waveform_dict[processor.output_name] = processor.process()
-            else:
-                output = processor.output_name
-                calc = processor.process()
-
-                #Handles multiple outputs for, e.g., time point calculations
-                if not isinstance(output, str) and len(output) > 1:
-                    for i, out in enumerate(output):
-                        new_cols[out] = calc[i]
-                else:
-                    new_cols[output] = calc
-        self.num += 1
-
-        new_cols_series = pd.Series(new_cols)
-        return new_cols_series
-
-    def AddTransform(self,
-                     function,
-                     args={},
-                     input_waveform="waveform",
-                     output_waveform=None):
-        self.list.append(
-            Transformer(
-                function,
-                args=args,
-                input_waveform=input_waveform,
-                output_waveform=output_waveform))
-
-    def AddCalculator(self,
-                      function,
-                      args={},
-                      input_waveform="waveform",
-                      output_name=None):
-        self.list.append(
-            Calculator(
-                function,
-                args=args,
-                input_waveform=input_waveform,
-                output_name=output_name))
-
-    # def AddDatabaseLookup(self, function, args={}, output_name=None):
-    #   self.list.append( DatabaseLookup(function, args, output_name) )
-
-    def AddFromTier0(self, name, output_name=None):
-        if output_name is None:
-            output_name = name
-        self.t0_map[name] = output_name
-        # self.list.append( Tier0Passer(name, output_name) )
-
-    def DropTier0(self, df_t1):
-        df_t1.rename(columns=self.t0_map, inplace=True)
-        drop_cols = []
-        for t0_col in self.t0_cols:
-            if t0_col not in self.t0_map.keys():
-                drop_cols.append(t0_col)
-        df_t1.drop(drop_cols, axis=1, inplace=True)

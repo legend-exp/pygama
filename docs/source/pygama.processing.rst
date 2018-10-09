@@ -4,6 +4,14 @@ pygama.processing package
 Submodules
 ----------
 
+pygama.processing.header\_parser module
+---------------------------------------
+
+.. automodule:: pygama.processing.header_parser
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 pygama.processing.processors module
 -----------------------------------
 

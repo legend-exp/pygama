@@ -1,7 +1,7 @@
 import sys
 import numpy as np
-from .peak_fitting import *
-from .utils import get_bin_centers
+from pygama.analysis.peak_fitting import *
+from pygama.utils import get_bin_centers
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy.signal import argrelextrema, medfilt, find_peaks_cwt

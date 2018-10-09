@@ -29,14 +29,6 @@ pygama.module module
     :undoc-members:
     :show-inheritance:
 
-pygama.test module
-------------------
-
-.. automodule:: pygama.test
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pygama.transforms module
 ------------------------
 

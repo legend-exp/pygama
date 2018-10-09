@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-""" pygama init file.  currently we declare nothing (no public API)
-    though it might be better to declare the public functions here if it
+""" pygama init file.  currently we declare some stuff (a public API)
+    and it might be better to declare more of the public functions here if it
     makes sphinx auto-generated documentation easier.
 """
 __version__ = "0.1.0"
@@ -32,8 +32,6 @@ __version__ = "0.1.0"
 import warnings
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
 
-# import .decoders.dataloading
-
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event
 # from .decoders.digitizers import get_digitizers
@@ -43,8 +41,10 @@ warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
 # from .decoders.pollers import ISegHVDecoder
 #
 # from .processing._pygama import TierOneProcessorList
-# from .processing._processing import process_tier_0
-# from .processing._processing import process_tier_1
+# from .processing._pygama import ProcessTier0
+# from .processing._pygama import ProcessTier1
+# from .processing.processors import process_tier_0
+# from .processing.processors import process_tier_1
 # from .processing.processors import Calculator
 # from .processing.processors import Transformer
 # from .processing.processors import DatabaseLookup

@@ -3,7 +3,8 @@ import os, re
 import pandas as pd
 from future.utils import iteritems
 
-from _header_parser import *
+from pygama.processing import header_parser
+# from header_parser import *
 from utils import update_progress
 import data_loader as dl
 

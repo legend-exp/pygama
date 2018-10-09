@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from matplotlib.colors import LogNorm
 
-from .peak_fitting import *
-from .utils import get_bin_centers
+from pygama.analysis.peak_fitting import *
+from pygama.utils import get_bin_centers
 
 
 def get_avse_cut(e_cal, current, plotFigure=None):

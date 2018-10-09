@@ -70,9 +70,9 @@ def get_data_id(headerDict, class_name, super_name):
 
 def flip_data_ids(headerDict):
     """
-        Returns an inverted dictionary such that:
-        Could be extended somehow to give you all the supers associated with a given class name (maybe like)
-            flipped[dataId] = [class_key, [super1, super2, ...]]
+    Returns an inverted dictionary such that:
+    Could be extended somehow to give you all the supers associated with a given class name (maybe like)
+    flipped[dataId] = [class_key, [super1, super2, ...]]
     """
     flipped = dict()
     # headerDict["dataDescription"][class_name][super_name]["dataId"]
