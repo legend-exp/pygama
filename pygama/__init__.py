@@ -32,25 +32,28 @@ __version__ = "0.1.0"
 import warnings
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
 
-from .decoders.dataloading import get_decoders
-from .decoders.dataloading import get_next_event
+# try to import all public functions
+import pkgutil
+__path__ = pkgutil.extend_path(__path__, __name__)
+for importer, modname, ispkg in pkgutil.walk_packages(
+        path=__path__, prefix=__name__ + '.'):
+    __import__(modname)
 
-from .decoders.digitizers import get_digitizers
-from .decoders.digitizers import Gretina4MDecoder
-from .decoders.digitizers import SIS3302Decoder
+# bring key functions to the primary API, e.g. pygama.process_tier_0
+# i don't really like how i have to specify everything here
+from .processing.processing import process_tier_0, process_tier_1
 
-from .decoders.pollers import MJDPreampDecoder
-from .decoders.pollers import ISegHVDecoder
-
-from .processing._pygama import ProcessTier0
-from .processing._pygama import ProcessTier1
-
-from .processing.processing import process_tier_0
-from .processing.processing import process_tier_1
-
-from .processing.base_classes import TierOneProcessorList
-from .processing.base_classes import Calculator
-from .processing.base_classes import Transformer
-from .processing.base_classes import DatabaseLookup
-
-from .analysis.calibration import get_most_prominent_peaks
+# from .decoders.dataloading import get_decoders
+# from .decoders.dataloading import get_next_event
+# from .decoders.digitizers import get_digitizers
+# from .decoders.digitizers import Gretina4MDecoder
+# from .decoders.digitizers import SIS3302Decoder
+# from .decoders.pollers import MJDPreampDecoder
+# from .decoders.pollers import ISegHVDecoder
+# from .processing.processing import process_tier_0
+# from .processing.processing import process_tier_1
+# from .processing.base_classes import TierOneProcessorList
+# from .processing.base_classes import Calculator
+# from .processing.base_classes import Transformer
+# from .processing.base_classes import DatabaseLookup
+# from .analysis.calibration import get_most_prominent_peaks

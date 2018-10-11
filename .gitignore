@@ -1,6 +1,7 @@
 # New additions go at the top!
 transforms.c
-_pygama.c
+_tier0.c
+_tier1.c
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""pygama setup script.
+""" pygama setup script.
 - re-runs cythonize function on a list of extensions
 - currently does (pygama/processing/transforms.pyx) and (pygama/processing/_pygama.pyx)
 - uses setuptools.setup to add pygama to sys.path in python, making every
@@ -27,23 +27,25 @@ if __name__ == "__main__":
         do_cython = False
 
     src = []
-    ext = ".pyx" if do_cython else ".c"
-    src += [os.path.join("pygama", "processing", "_pygama" + ext)]
-
-    ext = [
+    fext = ".pyx" if do_cython else ".c"
+    exts = [
         Extension(
-            "pygama.processing._pygama",
-            sources=src,
+            "pygama.processing._tier0",
+            sources=[os.path.join("pygama", "processing", "_tier0" + fext)],
+            language="c",
+            include_dirs=include_dirs),
+        Extension(
+            "pygama.processing._tier1",
+            sources=[os.path.join("pygama", "processing", "_tier1" + fext)],
             language="c",
             include_dirs=include_dirs),
         Extension(
             "pygama.processing.transforms",
-            sources=[os.path.join("pygama","processing", "transforms" + ext)],
-            language="c",
-        )
+            sources=[os.path.join("pygama", "processing", "transforms" + fext)],
+            language="c")
     ]
-
-    if do_cython: ext = cythonize(ext)
+    if do_cython:
+        exts = cythonize(exts)
 
     setup(
         name="pygama",
@@ -51,7 +53,7 @@ if __name__ == "__main__":
         author="Ben Shanks",
         author_email="benjamin.shanks@gmail.com",
         packages=find_packages(),
-        ext_modules=ext,
+        ext_modules=exts,
         install_requires=[
             "numpy", "scipy", "pandas", "tables", "future", "cython"
         ])

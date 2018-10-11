@@ -29,8 +29,8 @@ def parse_header(xmlfile):
         ba = bytearray(xmlfile_handle.read(j))
 
         #convert to string
-        if sys.version_info[
-                0] < 3:  #the readPlistFromBytes method doesn't exist in 2.7
+        #the readPlistFromBytes method doesn't exist in 2.7
+        if sys.version_info[0] < 3:
             header_string = ba.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
         else:
@@ -123,7 +123,6 @@ def get_object_info(headerDict, class_name):
     Returns a dict keyed by data id with all the info from the header
     TODO: won't currently work with any AuxHW
     """
-
     object_info_list = []
 
     crates = headerDict["ObjectInfo"]["Crates"]
@@ -135,11 +134,13 @@ def get_object_info(headerDict, class_name):
                 object_info_list.append(card)
 
     # AuxHw = headerDict["ObjectInfo"]["AuxHw"]
+    # print("AUX IS:")
     # for aux in AuxHw:
-    #     print(aux.keys())
+    # print(aux.keys())
     # exit()
+
     if len(object_info_list) == 0:
-        print("Warning: no object info parsed for {}".format(class_name))
+        # print("Warning: no object info parsed for {}".format(class_name))
         return None
     df = pd.DataFrame.from_dict(object_info_list)
     df.set_index(['Crate', 'Card'], inplace=True)

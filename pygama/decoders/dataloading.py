@@ -12,6 +12,124 @@ from ..processing.header_parser import get_object_info
 __all__ = ["get_next_event", "get_decoders"]
 
 
+class DataLoader(ABC):
+    """
+    Base class for data taking objects (digitizers or pollers).
+    - Digitizers are in digitizers.py
+    - Pollers are in pollers.py
+    Contains base methods for saving `self.decoded_values` into pandas dataframes.
+
+    Standard practice should be to put this line as the last line of
+    decode_event:
+    # send any variable with a name in "decoded_values" to the pandas output
+    self.format_data(locals())
+    """
+
+    def __init__(self, object_info=None):
+
+        if object_info is not None:
+            self.load_object_info(object_info)
+
+        self.hf5_type = "fixed"  # can also try "tables" but may be slower
+
+    def load_object_info(self, object_info):
+
+        if isinstance(object_info, dict):
+            self.object_info = get_object_info(object_info, self.class_name)
+
+        elif isinstance(object_info, pd.core.frame.DataFrame):
+            self.object_info = object_info
+
+        elif isinstance(object_info, str):
+            self.object_info = pd.read_hdf(object_info, self.class_name)
+
+        else:
+            raise TypeError(
+                "DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}"
+                .format(type(object_info)))
+
+    @abstractmethod
+    def decode_event(self, event_data_bytes, event_number, header_dict):
+        pass
+
+    def format_data(self, vals):
+        """ Write any variable with a name matching a key in "decoded_values"
+        to the pandas output.
+
+        Standard practice should be to put this line as the last line of
+        decode_event:
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())
+        """
+        for key in vals:
+            if key is not "self" and key in self.decoded_values:
+                self.decoded_values[key].append(vals[key])
+
+    def create_df(self):
+        """
+        Base dataframe creation method.
+        Classes inheriting from DataLoader (like digitizers or pollers) can
+        overload this if necessary for more complicated use cases.
+        Try to avoid pickling to 'object' types if possible.
+        """
+
+        for key in self.decoded_values:
+            print("      {} entries: {}".format(key,
+                                                len(self.decoded_values[key])))
+
+        # old faithful
+        df = pd.DataFrame.from_dict(self.decoded_values)
+
+        # # new and troublesome
+        # # try to set types s/t pandas.to_hdf won't complain
+        # vals = self.decoded_values
+        # dtypes = {}
+        # for key in vals:
+        #     if isinstance(vals[key], list):
+        #         print("KEY:",key,"len list is ", len(vals[key]))
+        #         try:
+        #             dtypes[key] = type(vals[key][0])
+        #         except:
+        #             dtypes[key] = None
+        #             pass
+        #     else:
+        #         print("ERROR: DataLoader didn't find a list!")
+        #         exit()
+        # df = pd.DataFrame.from_dict(vals).astype(dtypes)
+
+        if len(df) == 0:
+            print("Length of DataFrame for {} is 0!".format(self.class_name))
+            return None
+        df.set_index("event_number", inplace=True)
+
+        # df = pd.DataFrame({'A' : []})
+
+        return df
+
+    def to_file(self, file_name):
+
+        df_data = self.create_df()
+        if df_data is None:
+            print("Data is None!")
+            return
+
+        df_data.to_hdf(
+            file_name,
+            key=self.decoder_name,
+            mode='a',
+            format=self.hf5_type,
+            data_columns=df_data.columns.tolist())
+
+        if self.object_info is not None:
+
+            if self.class_name == self.decoder_name:
+                raise ValueError(
+                    "Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file."
+                    .format(self.__name__, self.class_name))
+
+            self.object_info.to_hdf(file_name, key=self.class_name, mode='a')
+
+
 def get_next_event(f_in):
     """
     Gets the next event, and some basic information about it
@@ -70,79 +188,20 @@ def get_next_event(f_in):
 
 def get_decoders(object_info):
     """
-    Looks through all the data takers that exist in this DataLoader class and see which ones exist.
-    TODO: this only works if the subclasses have been imported.  is that what we want?
-    also relies on 2-level abstraction, which is dicey
+    Find all the active pygama data takers that inherit from the DataLoader class.
+    This only works if the subclasses have been imported.  Is that what we want?
+    Also relies on 2-level abstraction, which is dicey
     """
-
     decoders = []
 
-    for sub in DataLoader.__subclasses__():
+    for sub in DataLoader.__subclasses__():  # either digitizers or pollers
         for subsub in sub.__subclasses__():
             try:
                 a = subsub(object_info)
-                # n = a.name
-                # print("name: ",n)
+                # print("name: ",a.decoder_name)
                 decoders.append(a)
             except Exception as e:
                 print(e)
                 pass
 
     return decoders
-
-
-class DataLoader(ABC):
-
-    def __init__(self, object_info=None):
-        self.decoded_values = []
-
-        if object_info is not None:
-            self.load_object_info(object_info)
-
-        self.hf5_type = "fixed"
-
-    def load_object_info(self, object_info):
-        if isinstance(object_info, dict):
-            self.object_info = get_object_info(object_info, self.class_name)
-        elif isinstance(object_info, pd.core.frame.DataFrame):
-            self.object_info = object_info
-        elif isinstance(object_info, str):
-            self.object_info = pd.read_hdf(object_info, self.class_name)
-        else:
-            raise TypeError(
-                "DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}"
-                .format(type(object_info)))
-
-    @abstractmethod
-    def decode_event(self, event_data_bytes, event_number, header_dict):
-        pass
-
-    # @abstractmethod
-    # def decode_header(self):
-    #     pass
-
-    def create_df(self):
-        '''
-        allows us to overload for more complicated use cases
-        '''
-        df = pd.DataFrame.from_dict(self.decoded_values)
-        if len(df) == 0: return None
-        df.set_index("event_number", inplace=True)
-        return df
-
-    def to_file(self, file_name):
-        df_data = self.create_df()
-        if df_data is None: return
-        df_data.to_hdf(
-            file_name,
-            key=self.decoder_name,
-            mode='a',
-            format=self.hf5_type,
-            data_columns=df_data.columns.tolist())
-
-        if self.object_info is not None:
-            if self.class_name == self.decoder_name:
-                raise ValueError(
-                    "Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file."
-                    .format(self.__name__, self.class_name))
-            self.object_info.to_hdf(file_name, key=self.class_name, mode='a')

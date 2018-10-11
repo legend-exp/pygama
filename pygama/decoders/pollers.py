@@ -11,7 +11,7 @@ class Poller(DataLoader):
     """
     like DataLoader, not a public class.
     members:
-      - decode_event (just passes when called)
+    - decode_event (just passes when called)
     """
 
     def __init__(self, *args, **kwargs):
@@ -24,19 +24,27 @@ class Poller(DataLoader):
 class MJDPreampDecoder(Poller):
     """
     members:
-      - decode_event (decodes raw data from an MJDPreAmp object)
-      - format_data (returns a dict)
-      - get_detectors_for_preamp (returns a dict)
+    - decode_event (decodes raw data from an MJDPreAmp object)
+    - format_data (returns a dict)
+    - get_detectors_for_preamp (returns a dict)
     """
 
     def __init__(self, *args, **kwargs):
-        self.decoder_name = 'ORMJDPreAmpDecoderForAdc'  #
-        self.class_name = 'MJDPreAmp'
 
-        super().__init__(*args, **kwargs)
+        self.decoder_name = 'ORMJDPreAmpDecoderForAdc'
+        self.class_name = 'MJDPreAmp'
         self.event_header_length = -1
 
-        return
+        # store an entry for every event -- this is what we convert to pandas
+        self.decoded_values = {
+            "adc": [],
+            "enabled": [],
+            "timestamp": [],
+            "device_id": [],
+            "event_number": []
+        }
+
+        super().__init__(*args, **kwargs)
 
     def decode_event(self,
                      event_data_bytes,
@@ -68,7 +76,7 @@ class MJDPreampDecoder(Poller):
         device_id = (event_data_uint[0] & 0xFFF)
         timestamp = event_data_uint[1]
         enabled = np.zeros(16)
-        adc_val = np.zeros(16)
+        adc = np.zeros(16)
 
         try:
             detector_names = self.get_detectors_for_preamp(
@@ -85,47 +93,20 @@ class MJDPreampDecoder(Poller):
                 else:
                     print("Channel %d is disabled" % (i))
 
-        for i, val in enumerate(adc_val):
-            adc_val[i] = event_data_float[3 + i]
+        for i, val in enumerate(adc):
+            adc[i] = event_data_float[3 + i]
 
         if (verbose):
-            print(adc_val)
+            print(adc)
 
-        data_dict = self.format_data(adc_val, timestamp, enabled, device_id,
-                                     detector_names, event_number)
-        for d in data_dict:
-            self.decoded_values.append(d)
-
-        return data_dict
-
-    def format_data(self, adc_val, timestamp, enabled, device_id,
-                    detector_names, event_number):
-        """
-        Format the values that we get from this card into a pandas-friendly format.
-        """
-        data = []
-
-        # print(detector_names)
-
-        for i, enabled_val in enumerate(enabled):
-            d = {
-                "adc": adc_val[i - 1],
-                "enabled": enabled_val,
-                "timestamp": timestamp,
-                "name": detector_names[i - 1],
-                "channel": i - 1,
-                "device_id": device_id,
-                "event_number": event_number
-            }
-            data.append(d)
-        return data
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())
 
     def get_detectors_for_preamp(self, header_dict, an_ID):
         """
-            Returns a dictionary that goes:
-                dict[preamp_id] = ["detectorName1", "detectorName2"...
-
-                e.g: d[5] = ['P12345A','P12346B','', ... 'B8765']
+        Returns a dictionary that goes:
+        dict[preamp_id] = ["detectorName1", "detectorName2"...
+        e.g: d[5] = ['P12345A','P12346B','', ... 'B8765']
         """
 
         for preampNum in header_dict["ObjectInfo"]["AuxHw"]:
@@ -173,20 +154,25 @@ class MJDPreampDecoder(Poller):
 
 
 class ISegHVDecoder(Poller):
-    """
-    members:
-    - decode_event
-    - format_data
-    """
+    """ iSeg HV Card """
 
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORiSegHVCardDecoderForHV'
-        self.class_name = 'ORiSegHVCard_placeholder'  #what should this be?
-
-        super().__init__(*args, **kwargs)
+        self.class_name = 'ORiSegHVCardDecoder'
         self.event_header_length = -1
+        super().__init__(*args, **kwargs)
 
-        return
+        # store an entry for every event -- this is what we convert to pandas
+        self.decoded_values = {
+            "timestamp": [],
+            "voltage": [],
+            "current": [],
+            "enabled": [],
+            "crate": [],
+            "card": [],
+            "event_number": []
+        }
 
     def decode_event(self,
                      event_data_bytes,
@@ -223,12 +209,8 @@ class ISegHVDecoder(Poller):
         # 18   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 7)
         # 19   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 7)
         """
-
         event_data_int = np.fromstring(event_data_bytes, dtype=np.uint32)
         event_data_float = np.fromstring(event_data_bytes, dtype=np.float32)
-
-        # print(event_data_int)
-        # print(event_data_float)
 
         crate = (event_data_int[0] >> 20) & 0xF
         card = (event_data_int[0] >> 16) & 0xF
@@ -255,28 +237,5 @@ class ISegHVDecoder(Poller):
             print("HV voltages: ", voltage)
             print("HV currents: ", current)
 
-        # self.values["channel"] = channel
-
-        data_dict = self.format_data(timestamp, voltage, current, enabled,
-                                     crate, card, event_number)
-        self.decoded_values.append(data_dict)
-
-        return data_dict
-
-    def format_data(self, timestamp, voltage, current, enabled, crate, card,
-                    event_number):
-        """
-        Format the values that we get from this card into a pandas-friendly format.
-        """
-
-        data = {
-            "timestamp": timestamp,
-            "voltage": voltage,
-            "current": current,
-            "enabled": enabled,
-            "crate": crate,
-            "card": card,
-            "event_number": event_number
-        }
-
-        return data
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())

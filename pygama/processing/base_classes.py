@@ -2,8 +2,10 @@
 
 import os, glob
 import numpy as np
+import pandas as pd
 from future.utils import iteritems
 from abc import ABC, abstractmethod
+from pygama.utils import update_progress
 
 
 class ProcessorBase(ABC):
@@ -83,7 +85,6 @@ class DatabaseLookup(ProcessorBase):
         )
         sys.exit()
 
-
     #     self.function = function
     #
     #     self.output_name = output_name
@@ -101,16 +102,17 @@ class DatabaseLookup(ProcessorBase):
 
 
 class Tier0Passer(ProcessorBase):
-  def __init__(self, t0_name, output_name=None):
-    self.t0_name = t0_name
-    if output_name is None: output_name = t0_name
-    self.output_name = output_name
 
-  def replace_args(self, param_dict):
-    self.t0_value = param_dict[self.t0_name]
+    def __init__(self, t0_name, output_name=None):
+        self.t0_name = t0_name
+        if output_name is None: output_name = t0_name
+        self.output_name = output_name
 
-  def process(self):
-    return self.t0_value
+    def replace_args(self, param_dict):
+        self.t0_value = param_dict[self.t0_name]
+
+    def process(self):
+        return self.t0_value
 
 
 class TierOneProcessorList():
@@ -212,4 +214,3 @@ class TierOneProcessorList():
             if t0_col not in self.t0_map.keys():
                 drop_cols.append(t0_col)
         df_t1.drop(drop_cols, axis=1, inplace=True)
-

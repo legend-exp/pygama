@@ -18,22 +18,22 @@ def get_digitizers():
 class Digitizer(DataLoader):
     """
     members:
-    - decode_event (also in DataLoader)
+    - decode_event (base is in DataLoader (dataloading.py))
     - create_df (also in DataLoader)
     - parse_event_data
     - reconstruct_waveform
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.split_waveform = False
-
-        self.chan_list = None  #list of channels to decode
+        self.chan_list = None  # list of channels to decode
 
         if self.split_waveform:
             self.hf5_type = "table"
         else:
             self.hf5_type = "fixed"
+
+        super().__init__(*args, **kwargs)
 
     def decode_event(self, event_data_bytes, event_number, header_dict):
         pass
@@ -57,6 +57,9 @@ class Digitizer(DataLoader):
         return np.array(waveform)
 
     def create_df(self):
+        """ Overloads DataLoader::create_df (in dataloading.py)
+        for multisampled waveforms.
+        """
         if self.split_waveform:
             waveform_arr = self.decoded_values.pop("waveform")
             waveform_arr = np.array(waveform_arr, dtype="int16")
@@ -66,33 +69,25 @@ class Digitizer(DataLoader):
                     i)] = waveform_arr[:, i]
 
             df = pd.DataFrame.from_dict(self.decoded_values)
-            # for name in df.columns:
-            #     if name.startswith("waveform_"): dtype = "int16"
-            #     else: dtype = self.decoded_values[name].typecode
-            #     df[name] = df[name].astype(dtype)
 
             return df
 
         else:
             return super(Digitizer, self).create_df()
 
-    # def decode_header():
-    #     pass
-
 
 class Gretina4MDecoder(Digitizer):
     """
-    inherits from Digitizer, DataLoader, and ABC
-    uses super() to avoid referring to the base class (ABC) explicitly
-    ** stores decoded values in a dict of arrays, self.decoded_values **
+    inherits from Digitizer and DataLoader
 
     can inspect all methods with:
-    import inspect, pygama, pygama.processing
-    gr = pygama.decoders.Gretina4MDecoder()
-    inspect.getmembers(gr)
+    `import inspect, pygama`
+    `gr = pygama.Gretina4MDecoder()`
+    `inspect.getmembers(gr)`
     can show data members with `gr.__dict__`
 
-    min_signal_thresh: multiplier on noise ampliude required to process a signal: helps avoid processing a ton of noise
+    min_signal_thresh: multiplier on noise ampliude required to process a signal:
+    helps avoid processing a ton of noise
     chanList: list of channels to process
 
     members:
@@ -110,40 +105,37 @@ class Gretina4MDecoder(Digitizer):
         self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'
         self.class_name = 'ORGretina4MModel'
 
+        super().__init__(*args, **kwargs)
+
+        # store an entry for every event -- this is what we convert to pandas
+        self.decoded_values = {
+            "event_number": [],
+            "energy": [],
+            "timestamp": [],
+            "channel": [],
+            "board_id": [],
+            "waveform": []
+        }
         try:
             self.chan_list = kwargs.pop("chan_list")
         except KeyError:
             self.chan_list = None
-
         try:
             self.load_object_info(kwargs.pop("object_info"))
         except KeyError:
             pass
-
         try:
             self.correct_presum = kwargs.pop("correct_presum")
         except KeyError:
             self.correct_presum = True
             pass
 
-        super().__init__(*args, **kwargs)
-
         #The header length "should" be 32 -- 30 from gretina header, 2 from orca header
         #but the "reserved" from 16 on seems to be good baseline info, so lets try to use it
         self.event_header_length = 18
-
         self.wf_length = 2032  #TODO: This should probably be determined more rigidly
         self.sample_period = 10  #ns
-
         self.gretina_event_no = 0
-        self.decoded_values = {
-            "event_number": [],  #array.array('I'),
-            "energy": [],  #array.array('I'),
-            "timestamp": [],  #array.array('L'),
-            "channel": [],  #array.array('I'),
-            "board_id": [],  #array.array('I'),
-            "waveform": []  #np.empty((100000,2032), dtype=np.int16)
-        }
 
     def load_object_info(self, object_info):
         super().load_object_info(object_info)
@@ -153,7 +145,12 @@ class Gretina4MDecoder(Digitizer):
         return (crate << 9) + (card << 4) + (channel)
 
     def find_active_channels(self):
+        """ Only do this for multi-detector data """
         active_channels = []
+
+        if self.object_info is None:
+            return active_channels
+
         for index, row in self.object_info.iterrows():
             crate, card = index
             for chan, chan_en in enumerate(row.Enabled):
@@ -163,11 +160,10 @@ class Gretina4MDecoder(Digitizer):
         return active_channels
 
     def decode_event(self, event_data_bytes, event_number, header_dict):
-        # parse_event_data(evtdat, &timestamp, &energy, &channel)
         """
-            Parse the header for an individual event
+        Parse the header for an individual event
         """
-
+        self.gretina_event_no += 1
         event_data = np.fromstring(event_data_bytes, dtype=np.uint16)
 
         # this is for a uint32
@@ -186,9 +182,9 @@ class Gretina4MDecoder(Digitizer):
         timestamp = event_data[6] + (event_data[7] << 16) + (
             event_data[8] << 32)
         energy = event_data[9] + ((event_data[10] & 0x7FFF) << 16)
-        wf_data = event_data[
-            self.
-            event_header_length:]  #(self.event_header_length+self.wf_length)*2]
+        wf_data = event_data[self.event_header_length:]
+        # (self.event_header_length+self.wf_length)*2]
+        waveform = wf_data.astype("int16")
 
         ccc = self.crate_card_chan(crate, card, channel)
 
@@ -205,44 +201,8 @@ class Gretina4MDecoder(Digitizer):
         #    if not board_id_map[crate_card_chan] == board_id:
         #        print("WARNING: previously channel %d had board serial id %d, now it has id %d" % (crate_card_chan, board_id_map[crate_card_chan], board_id))
 
-        self.format_data(energy, timestamp, ccc, wf_data, board_id,
-                         event_number)
-
-        # return data_dict
-
-    def format_data(self, energy, timestamp, crate_card_chan, wf_arr, board_id,
-                    event_number):
-        """
-        Format the values that we get from this card into a pandas-friendly format.
-        """
-        self.decoded_values["energy"].append(energy)
-        self.decoded_values["timestamp"].append(timestamp)
-        self.decoded_values["channel"].append(crate_card_chan)
-        self.decoded_values["board_id"].append(board_id)
-        self.decoded_values["event_number"].append(event_number)
-
-        self.decoded_values["waveform"].append(wf_arr.astype("int16"))
-
-        # self.decoded_values["waveform"][self.gretina_event_no,:] = wf_arr
-
-        self.gretina_event_no += 1
-
-    def test_decode_event(self,):
-        """
-            Runs a fake waveform through the decoder.
-        """
-        event_data_bytes = bytes.fromhex(
-            "00000a00aaaaaaaad1000000e178f14429009b9de2510b20eb43290003000000fefffffffafff9fffcfff5fffbfffafffdfffdff0300fbfff9fffafffefff9fff5fffffffefffbfff6fff6fffeff0300fdfff9fffdfff7fff8fffcfff5fff8fffafffcfffcfffefffefffafff4fff9fffbfff8fffafffbff0400f8fff8fff9fff7fff9fffdff0000fbff0400fbfff6fffcfffefffefff7fff8fffdfff9fffafffefffafff9fffcff01000000fdfff8fff9fffafffeff00000200f9fff8fffcfffbff0000f9fff8fffcff0000fbfffcfffbfffeffffffffff0200fffffafff5fff7fff7fffeff0200fefff8fffdfffcfff6fff8fffcfffdff"
-        )
-
-        wf = self.decode_event(event_data_bytes)
-
-        print(self.values["channel"])
-        print(self.values["timestamp"])
-        print(self.values["energy"])
-        print(self.values["waveform"])
-
-        return
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())
 
     def parse_event_data(self, event_data):
         '''
@@ -354,16 +314,24 @@ class Gretina4MDecoder(Digitizer):
 class SIS3302Decoder(Digitizer):
 
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.class_name = 'ORSIS3302Model'
-
-        super().__init__(*args, **kwargs)
-        self.values = dict()
         self.event_header_length = 1
-
         self.sample_period = 10  #ns
 
-        return
+        # store an entry for every event -- this is what goes into pandas
+        self.decoded_values = {
+            "energy": [],
+            "energy_first": [],
+            "timestamp": [],
+            "channel": [],
+            "event_number": [],
+            "waveform": [],
+            "energy_wf": []
+        }
+
+        super().__init__(*args, **kwargs)
 
     def get_name(self):
         return self.decoder_name
@@ -377,12 +345,12 @@ class SIS3302Decoder(Digitizer):
         # The SIS3302 can produce a waveform from two sources:
         #     1: ADC raw data buffer: This is a normal digitizer waveform
         #     2: Energy data buffer: Not sure what this is
-        Additionally, the ADC raw data buffer can take data in a buffer wrap mode, which seems
-        to cyclically fill a spot on memory, and it requires that you have to re-order the records
-        afterwards.
-        The details of how this header is formatted apparently wasn't important enough for the
-        SIS engineers to want to put it in the manual, so this is a guess in some places
-
+        # Additionally, the ADC raw data buffer can take data in a buffer wrap mode, which seems
+        # to cyclically fill a spot on memory, and it requires that you have to re-order the records
+        # afterwards.
+        # The details of how this header is formatted apparently wasn't important enough for the
+        # SIS engineers to want to put it in the manual, so this is a guess in some places
+        #
         #   0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx ORCA:
         #       ^^^^ ^^^- ---- ---- ---- ---- ---- ---- most sig bits of num records lost
         #       ---- ---- ---- ---- ---- ---- ^^^^ ^^^- least sig bits of num records lost
@@ -427,8 +395,8 @@ class SIS3302Decoder(Digitizer):
         #  -3   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Energy value from first value of energy gate
         #  -2   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx This word is said to contain "pileup flag, retrigger flag, and trigger counter" in no specified locations...
         #  -1   1101 1110 1010 1101 1011 1110 1110 1111 Last word is always 0xDEADBEEF
-
         """
+
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
         evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
@@ -474,14 +442,14 @@ class SIS3302Decoder(Digitizer):
         i_ene_start = i_wf_stop + 1
         i_ene_stop = i_ene_start + ene_wf_length16
         if buffer_wrap:
-            i_start_1 = evt_data_32[
-                6] + header_length16 + 1  # start somewhere in the middle of the record
+            # start somewhere in the middle of the record
+            i_start_1 = evt_data_32[6] + header_length16 + 1
             i_stop_1 = i_wf_stop  # end of the wf record
             i_start_2 = i_wf_start  # beginning of the wf record
             i_stop_2 = i_start_1
 
         # handle the waveform(s)
-        ene_data = np.zeros(ene_wf_length16)  # not used rn
+        energy_wf = np.zeros(ene_wf_length16)  # not used rn
         if wf_length_32 > 0:
             if not buffer_wrap:
                 wf_data = evt_data_16[i_wf_start:i_wf_stop]
@@ -494,33 +462,12 @@ class SIS3302Decoder(Digitizer):
             print("ERROR: event %d, we expected %d WF samples and only got %d" %
                   (event_number, expected_wf_length, len(wf_data)))
             exit()
+        waveform = wf_data.astype("int16")
 
         # get the footer
-        ene_max = evt_data_32[-4]
-        ene_first = evt_data_32[-3]
+        energy = evt_data_32[-4]
+        energy_first = evt_data_32[-3]
         extra_flags = evt_data_32[-2]
 
-        # format output data
-        data_dict = self.format_data(ene_max, ene_first, timestamp,
-                                     crate_card_chan, evt_header_id, wf_data,
-                                     ene_data)
-        data_dict["event_number"] = event_number  # from input
-        self.decoded_values.append(data_dict)
-
-        return data_dict
-
-    def format_data(self, energy_max_value, energy_first_value, timestamp,
-                    crate_card_chan, event_header_id, wf_data, energy_data):
-        """
-        Format the values that we get from this card into a pandas-friendly format.
-        """
-        data = {
-            "energy": energy_max_value,
-            "energy_first": energy_first_value,
-            "timestamp": timestamp,
-            "channel": crate_card_chan,
-            "board_id": event_header_id,
-            "waveform": np.array(wf_data, dtype=np.int16),
-            "energy_wf": np.array(energy_data, dtype=np.int16)
-        }
-        return data
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())
