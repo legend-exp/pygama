@@ -42,6 +42,10 @@ if __name__ == "__main__":
         Extension(
             "pygama.processing.transforms",
             sources=[os.path.join("pygama", "processing", "transforms" + fext)],
+            language="c"),
+        Extension(
+            "pygama.processing.calculators",
+            sources=[os.path.join("pygama", "processing", "calculators" + fext)],
             language="c")
     ]
     if do_cython:

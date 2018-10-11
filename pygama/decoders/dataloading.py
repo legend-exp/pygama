@@ -74,8 +74,7 @@ class DataLoader(ABC):
         """
 
         for key in self.decoded_values:
-            print("      {} entries: {}".format(key,
-                                                len(self.decoded_values[key])))
+            print("      {} entries: {}".format(key,len(self.decoded_values[key])))
 
         # old faithful
         df = pd.DataFrame.from_dict(self.decoded_values)

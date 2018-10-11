@@ -58,15 +58,14 @@ class Digitizer(DataLoader):
 
     def create_df(self):
         """ Overloads DataLoader::create_df (in dataloading.py)
-        for multisampled waveforms.
+        for multisampled waveforms.  Should this be in Gretina4MDecoder?
         """
         if self.split_waveform:
             waveform_arr = self.decoded_values.pop("waveform")
             waveform_arr = np.array(waveform_arr, dtype="int16")
 
             for i in range(waveform_arr.shape[1]):
-                self.decoded_values["waveform_{}".format(
-                    i)] = waveform_arr[:, i]
+                self.decoded_values["waveform_{}".format(i)] = waveform_arr[:, i]
 
             df = pd.DataFrame.from_dict(self.decoded_values)
 

@@ -28,9 +28,12 @@ __version__ = "0.1.0"
 #     docstring explaining what the package does. This will help users poking around
 #     in ipython, etc.
 
-# kill annoying h5py warning
-import warnings
+# kill annoying warnings
+import warnings, pandas
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
+
+warnings.filterwarnings('ignore',category=pandas.io.pytables.PerformanceWarning)
+
 
 # try to import all public functions
 import pkgutil
@@ -41,7 +44,9 @@ for importer, modname, ispkg in pkgutil.walk_packages(
 
 # bring key functions to the primary API, e.g. pygama.process_tier_0
 # i don't really like how i have to specify everything here
-from .processing.processing import process_tier_0, process_tier_1
+from .processing.processing import *
+from .processing.base_classes import *
+
 
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event
@@ -52,7 +57,6 @@ from .processing.processing import process_tier_0, process_tier_1
 # from .decoders.pollers import ISegHVDecoder
 # from .processing.processing import process_tier_0
 # from .processing.processing import process_tier_1
-# from .processing.base_classes import TierOneProcessorList
 # from .processing.base_classes import Calculator
 # from .processing.base_classes import Transformer
 # from .processing.base_classes import DatabaseLookup

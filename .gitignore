@@ -1,7 +1,8 @@
 # New additions go at the top!
-transforms.c
 _tier0.c
 _tier1.c
+transforms.c
+calculators.c
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
