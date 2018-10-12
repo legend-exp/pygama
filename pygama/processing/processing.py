@@ -5,6 +5,82 @@ from ._tier0 import ProcessTier0
 from ._tier1 import ProcessTier1
 from .base_classes import TierOneProcessorList
 
+__all__ = ["get_default_processor_list", "process_tier_0", "process_tier_1"]
+
+
+def process_tier_0(datadir,
+                   runList,
+                   verbose=True,
+                   output_dir=None,
+                   chan_list=None,
+                   n_max=np.inf):
+    """ Wrapper function for ProcessTier0 """
+
+    for run in runList:
+
+        filenameList = glob.glob(os.path.join(datadir, "*Run{}".format(run)))
+        if len(filenameList) == 0:
+            print("No file with name Run{} in directory {}! Skipping run...".
+                  format(run, datadir))
+            continue
+        elif len(filenameList) > 1:
+            print(
+                "More than one file with name Run{} in directory {}! Skipping run..."
+                .format(run, datadir))
+            continue
+        filename = filenameList[0]
+        filepath = os.path.join(datadir, filename)
+
+        ProcessTier0(
+            filepath,
+            verbose=verbose,
+            output_dir=output_dir,
+            n_max=n_max,
+            chan_list=chan_list)
+
+
+def process_tier_1(datadir,
+                   runList,
+                   processor_list,
+                   verbose=True,
+                   output_dir=None,
+                   output_file_string="t2",
+                   num_threads=1,
+                   overwrite=True):
+    """ Wrapper function for ProcessTier1 """
+
+    # if processor_list is None:
+    #     processor_list = get_default_processor_list()
+
+    t1_args = []
+    for run in runList:
+        filepath = os.path.join(datadir, "t1_run{}.h5".format(run))
+        if not overwrite:
+            outfilepath = os.path.join(
+                output_dir, output_file_string + "_run{}.h5".format(run))
+            if os.path.isfile(outfilepath):
+                print("Skipping run {} because t2 file already created...".
+                      format(run))
+                continue
+
+        if num_threads == 1:
+            ProcessTier1(
+                filepath,
+                processor_list,
+                verbose=verbose,
+                output_dir=output_dir,
+                output_file_string=output_file_string)
+        else:
+            t1_args.append([filepath, processor_list])
+            keywords = {"verbose": verbose, "output_dir": output_dir}
+
+    if num_threads > 1:
+        max_proc = cpu_count()  # careful, its a lot to load in RAM...
+        num_threads = num_threads if num_threads < max_proc else max_proc
+        p = Pool(num_threads)
+        # p.starmap( partial(ProcessTier0, **keywords), t0_args)
+        p.starmap(partial(ProcessTier1, **keywords), t1_args)
+
 
 def get_default_processor_list():
     """" Make a list of processors to do to the data for the "tier one"
@@ -96,75 +172,3 @@ def get_default_processor_list():
     return procs
 
 
-def process_tier_0(datadir,
-                   runList,
-                   verbose=True,
-                   output_dir=None,
-                   chan_list=None,
-                   n_max=np.inf):
-    """ Wrapper function for ProcessTier0 """
-
-    for run in runList:
-
-        filenameList = glob.glob(os.path.join(datadir, "*Run{}".format(run)))
-        if len(filenameList) == 0:
-            print("No file with name Run{} in directory {}! Skipping run...".
-                  format(run, datadir))
-            continue
-        elif len(filenameList) > 1:
-            print(
-                "More than one file with name Run{} in directory {}! Skipping run..."
-                .format(run, datadir))
-            continue
-        filename = filenameList[0]
-        filepath = os.path.join(datadir, filename)
-
-        ProcessTier0(
-            filepath,
-            verbose=verbose,
-            output_dir=output_dir,
-            n_max=n_max,
-            chan_list=chan_list)
-
-
-def process_tier_1(datadir,
-                   runList,
-                   processor_list,
-                   verbose=True,
-                   output_dir=None,
-                   output_file_string="t2",
-                   num_threads=1,
-                   overwrite=True):
-    """ Wrapper function for ProcessTier1 """
-
-    # if processor_list is None:
-    #     processor_list = get_default_processor_list()
-
-    t1_args = []
-    for run in runList:
-        filepath = os.path.join(datadir, "t1_run{}.h5".format(run))
-        if not overwrite:
-            outfilepath = os.path.join(
-                output_dir, output_file_string + "_run{}.h5".format(run))
-            if os.path.isfile(outfilepath):
-                print("Skipping run {} because t2 file already created...".
-                      format(run))
-                continue
-
-        if num_threads == 1:
-            ProcessTier1(
-                filepath,
-                processor_list,
-                verbose=verbose,
-                output_dir=output_dir,
-                output_file_string=output_file_string)
-        else:
-            t1_args.append([filepath, processor_list])
-            keywords = {"verbose": verbose, "output_dir": output_dir}
-
-    if num_threads > 1:
-        max_proc = cpu_count()  # careful, its a lot to load in RAM...
-        num_threads = num_threads if num_threads < max_proc else max_proc
-        p = Pool(num_threads)
-        # p.starmap( partial(ProcessTier0, **keywords), t0_args)
-        p.starmap(partial(ProcessTier1, **keywords), t1_args)

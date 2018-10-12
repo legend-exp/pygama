@@ -8,7 +8,7 @@ import array
 from .dataloading import DataLoader
 from ..waveform import Waveform, MultisampledWaveform
 
-__all__ = ['Gretina4MDecoder', 'SIS3302Decoder']
+__all__ = ['Digitizer', 'Gretina4MDecoder', 'SIS3302Decoder', 'get_digitizers']
 
 
 def get_digitizers():
@@ -42,6 +42,7 @@ class Digitizer(DataLoader):
         if self.split_waveform:
             wf_data = self.reconstruct_waveform(event_data)
         else:
+
             wf_data = event_data["waveform"]
 
         return Waveform(wf_data.astype('float_'), self.sample_period)
@@ -212,7 +213,6 @@ class Gretina4MDecoder(Digitizer):
         #TODO: you're hosed if presum div is set to be the same as number of presum
 
         #cast wf to double
-
         wf_data = super().parse_event_data(event_data).data
 
         if not self.correct_presum:
@@ -220,15 +220,23 @@ class Gretina4MDecoder(Digitizer):
         else:
             #TODO: I fix the presumming by looking for a spike in the current with a windowed convolution
             #This slows down the decoding by almost x2.  We should try to do something faster
-
             #we save crate_card_chan (for historical reasons), so decode that
             event_chan = int(event_data['channel'])
             crate = event_chan >> 9
             card = (event_chan & 0x1f0) >> 4
             chan = event_chan & 0xf
 
+            # print(7779311)
+            # print((crate,card,chan))
+            # print(type(self.object_info))
+            # print(len(self.object_info))
+            # print(self.object_info.columns)
+            # print(self.object_info["Baseline Restore Enabled"][crate])
+            # print(self.object_info["Baseline Restore Enabled"][crate][card])
+            # print(self.object_info.iloc[(crate,card)])
+
             #Get the right digitizer information:
-            card_info = self.object_info.loc[(crate, card)]
+            card_info = self.object_info.iloc[crate]
 
             multirate_sum = 10 if card_info["Mrpsrt"][chan] == 3 else 2**(
                 card_info["Mrpsrt"][chan] + 1)
@@ -265,6 +273,7 @@ class Gretina4MDecoder(Digitizer):
             #
             # idx_bl_end = get_index(idx_bl_end_expected)
             # idx_ft_start = get_index(idx_ft_start_expected)
+
 
             #TODO: doing the convolution on the whole window is unnecessarily slow
             wf_data_cat = np.concatenate(
@@ -304,6 +313,7 @@ class Gretina4MDecoder(Digitizer):
                 self.sample_period * multirate_sum + ms_start_offset)
 
             time = np.concatenate((time_pre, time_full, time_ft))
+
 
             return MultisampledWaveform(
                 time[-self.wf_length:], wf_data[-self.wf_length:],

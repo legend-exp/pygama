@@ -1,20 +1,27 @@
+""" ========= PYGAMA =========
+calculators: given a waveform,
+return a single value.
+"""
+import sys
 import numpy as np
 import pandas as pd
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy import signal, interpolate
 
 
-#Finds the maximum current ("A").  Current is calculated by convolution with a first-deriv. of Gaussian
 def current_max(waveform, sigma=1):
+    """Finds the maximum current ("A").
+    Current is calculated by convolution with a first-deriv. of Gaussian
+    """
     if sigma > 0:
         return np.amax(gaussian_filter1d(waveform, sigma=sigma, order=1))
     else:
         print("Current max requires smooth>0")
-        exit(0)
+        sys.exit(0)
 
 
-#Finds baseline from start index to end index samples (default linear)
 def fit_baseline(waveform, start_index=0, end_index=500, order=1):
+    """ Finds baseline from start index to end index samples (default linear) """
     if end_index == -1: end_index = len(waveform)
     p = np.polyfit(
         np.arange(start_index, end_index), waveform[start_index:end_index], 1)
@@ -25,11 +32,11 @@ def is_saturated(waveform, bit_precision=14):
     return True if np.amax(waveform) >= 0.5 * 2**bit_precision - 1 else False
 
 
-#Estimate t0
 def t0_estimate(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
-    '''
+    """
+    Estimate t0
     max t0 adc: maximum adc (above baseline) the wf can get to before assuming the wf has started
-    '''
+    """
 
     if np.amax(waveform) < max_t0_adc:
         return np.nan
@@ -55,22 +62,22 @@ def t0_estimate(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
     return t0
 
 
-#Estimate t0
 def max_time(waveform):
+    """ give the t_max of a waveform """
     return np.argmax(waveform)
 
 
-#Estimate arbitrary timepoint before max
 def calc_timepoint(waveform,
                    percentage=0.5,
                    baseline=0,
                    do_interp=False,
                    doNorm=True,
                    norm=None):
-    '''
+    """
+    Estimate arbitrary timepoint before max
     percentage: if less than zero, will return timepoint on falling edge
     do_interp: linear linerpolation of the timepoint...
-    '''
+    """
     wf_norm = (np.copy(waveform) - baseline)
 
     if doNorm:
@@ -105,7 +112,7 @@ def calc_timepoint(waveform,
         return vfunc(percentage)
 
 
-#Calculate maximum of trapezoid -- no pride here
 def trap_max(waveform, method="max", pickoff_sample=0):
+    """ Calculate maximum of trapezoid -- no pride here """
     if method == "max": return np.amax(waveform)
     elif method == "fixed_time": return waveform[pickoff_sample]

@@ -1,3 +1,8 @@
+""" ========= PYGAMA =========
+transforms: given a waveform,
+return a new waveform.
+"""
+import sys
 import numpy as np
 import pandas as pd
 from scipy.ndimage.filters import gaussian_filter1d
@@ -11,20 +16,21 @@ warnings.filterwarnings(
     action="ignore", module="scipy", message="^internal gelsd")
 
 
-#Finds average baseline from first [samples] number of samples
 def remove_baseline(waveform, bl_0=0, bl_1=0):
-    return (waveform - (bl_0 + bl_1 * np.arange(len(waveform))))
+    """ Finds average baseline from first [samples] number of samples """
+    return waveform - (bl_0 + bl_1 * np.arange(len(waveform)))
 
 
 def center(waveform, center_index, n_samples_before, n_samples_after):
+    """ Return a waveform centered (windowed) around center_index """
     return waveform[center_index - n_samples_before:center_index +
                     n_samples_after]
 
 
 def trim_waveform(waveform, n_samples_before=None, n_samples_after=None):
     """Cut out the first n_samples_before and the last n_samples_after samples.
-  If no values are supplied, you get the whole thing back 
-  """
+    If no values are supplied, you get the whole thing back
+    """
     start_index = n_samples_before
     if (n_samples_after == 0):
         end_index = None
@@ -45,8 +51,9 @@ def savgol_filter(waveform, window_length=47, order=2):
 
 
 def pz_correct(waveform, rc, digFreq=100E6):
-    ''' RC params are in us'''
-    #get the linear filter parameters.
+    """ pole-zero correct a waveform """
+
+    # get the linear filter parameters.  RC params are in us
     num, den = rc_decay(rc, digFreq)
 
     #reversing num and den does the inverse transform (ie, PZ corrects)
@@ -104,8 +111,9 @@ def notch_filter(
         waveform,
         notch_freq,
         qual_factor=10,
-        f_dig=1E8,
-):
+        f_dig=1E8):
+    """ apply notch filter with some quality factor Q """
+
     nyquist = 0.5 * f_dig
     w0 = notch_freq / nyquist
 
@@ -143,17 +151,17 @@ def nonlinearity_correct(waveform,
     if (time_constant_samples == 0.):
         waveform -= fNLCMap.GetCorrection()
     else:
-        # // Apply Radford's time-lagged correction
-        #
-        # // first, average baseline at the beginning to get a good starting
-        # // point for current_inl
+        # Apply Radford's time-lagged correction
+
+        # first, average baseline at the beginning to get a good starting
+        # point for current_inl
 
         if (n_bl >= len(waveform)):
             print("input wf length is only {}".format(len(waveform)))
             return
 
-        # // David initializes bl to nBLEst/2 to get good rounding when he does integer division
-        # // by nBLEst, but we do floating point division so that's not necessary
+        # David initializes bl to nBLEst/2 to get good rounding when he does integer division
+        # by nBLEst, but we do floating point division so that's not necessary
 
         try:
             bl = np.int(np.sum(waveform[:n_bl]) / n_bl)

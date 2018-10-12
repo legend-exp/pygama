@@ -34,6 +34,7 @@ def ProcessTier0(filename,
     output_dir: where to stash the t1 file
     """
     print("Starting pygama Tier 0 processing ...")
+    print("  Input file: "+filename)
 
     SEEK_END = 2
 
@@ -79,7 +80,7 @@ def ProcessTier0(filename,
         decoders = get_decoders(header_dict)
         decoder_names = [d.decoder_name for d in decoders]
     for d in decoder_names:
-        print("     {}".format(d))
+        print("    -- {}".format(d))
 
     # kill unnecessary decoders
     final_decoder_list = list(

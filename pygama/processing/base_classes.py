@@ -23,9 +23,10 @@ class ProcessorBase(ABC):
 
     #replaces arg by name with values from the existing df
     def replace_args(self, event_data):
-        #check args list for string vals which match keys in param dict
-        self.args = self.perm_args.copy(
-        )  #copy we'll actually pass to the function
+        # check args list for string vals which match keys in param dict
+
+        # copy we'll actually pass to the function
+        self.args = self.perm_args.copy()
 
         # print(self.function.__name__, self.perm_args)
 
@@ -155,7 +156,7 @@ class TierOneProcessorList():
         for processor in self.list:
             processor.replace_args(new_cols)
             processor.set_waveform(self.waveform_dict)
-            # print("now im in " +processor.function.__name__)
+            # print("now i'm using " +processor.function.__name__)
 
             if isinstance(processor, Transformer):
                 self.waveform_dict[processor.output_name] = processor.process()
