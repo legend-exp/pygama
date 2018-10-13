@@ -37,3 +37,12 @@ def update_progress(progress, runNumber=None):
 
 def get_bin_centers(bins):
     return bins[:-1] + 0.5 * (bins[1] - bins[0])
+
+
+def sizeof_fmt(num, suffix='B'):
+    """ Given a file size in bytes, output a human-readable form. """
+    for unit in ['','K','M','G','T','P','E','Z']:
+        if abs(num) < 1000.0:
+            return "{:.3f} {}{}".format(num, unit, suffix)
+        num /= 1000.0
+    return "{:.1f} {} {}".format(num, 'Y', suffix)

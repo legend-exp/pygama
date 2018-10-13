@@ -25,9 +25,9 @@ class Digitizer(DataLoader):
     """
 
     def __init__(self, *args, **kwargs):
+
         self.split_waveform = False
         self.chan_list = None  # list of channels to decode
-
         if self.split_waveform:
             self.hf5_type = "table"
         else:
@@ -42,7 +42,6 @@ class Digitizer(DataLoader):
         if self.split_waveform:
             wf_data = self.reconstruct_waveform(event_data)
         else:
-
             wf_data = event_data["waveform"]
 
         return Waveform(wf_data.astype('float_'), self.sample_period)
@@ -102,6 +101,7 @@ class Gretina4MDecoder(Digitizer):
     """
 
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'
         self.class_name = 'ORGretina4MModel'
 
@@ -274,7 +274,6 @@ class Gretina4MDecoder(Digitizer):
             # idx_bl_end = get_index(idx_bl_end_expected)
             # idx_ft_start = get_index(idx_ft_start_expected)
 
-
             #TODO: doing the convolution on the whole window is unnecessarily slow
             wf_data_cat = np.concatenate(
                 (np.ones(filter_win_mult * filter_len) * wf_data[0], wf_data,
@@ -314,7 +313,6 @@ class Gretina4MDecoder(Digitizer):
 
             time = np.concatenate((time_pre, time_full, time_ft))
 
-
             return MultisampledWaveform(
                 time[-self.wf_length:], wf_data[-self.wf_length:],
                 self.sample_period, [idx_bl_end, idx_ft_start])
@@ -329,6 +327,8 @@ class SIS3302Decoder(Digitizer):
         self.event_header_length = 1
         self.sample_period = 10  #ns
 
+        super().__init__(*args, **kwargs)
+
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
             "energy": [],
@@ -340,7 +340,6 @@ class SIS3302Decoder(Digitizer):
             "energy_wf": []
         }
 
-        super().__init__(*args, **kwargs)
 
     def get_name(self):
         return self.decoder_name

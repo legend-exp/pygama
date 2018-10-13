@@ -107,11 +107,7 @@ def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
     return trapOutput
 
 
-def notch_filter(
-        waveform,
-        notch_freq,
-        qual_factor=10,
-        f_dig=1E8):
+def notch_filter(waveform, notch_freq, qual_factor=10, f_dig=1E8):
     """ apply notch filter with some quality factor Q """
 
     nyquist = 0.5 * f_dig

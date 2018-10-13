@@ -1,6 +1,9 @@
 """ PUBLIC PROCESSING METHODS FOR TIERS 0 and 1"""
 import os, glob
 import numpy as np
+from multiprocessing import Pool, cpu_count
+from functools import partial
+
 from ._tier0 import ProcessTier0
 from ._tier1 import ProcessTier1
 from .base_classes import TierOneProcessorList
@@ -9,14 +12,14 @@ __all__ = ["get_default_processor_list", "process_tier_0", "process_tier_1"]
 
 
 def process_tier_0(datadir,
-                   runList,
+                   run_list,
                    verbose=True,
                    output_dir=None,
                    chan_list=None,
                    n_max=np.inf):
     """ Wrapper function for ProcessTier0 """
 
-    for run in runList:
+    for run in run_list:
 
         filenameList = glob.glob(os.path.join(datadir, "*Run{}".format(run)))
         if len(filenameList) == 0:
@@ -40,20 +43,24 @@ def process_tier_0(datadir,
 
 
 def process_tier_1(datadir,
-                   runList,
+                   run_list,
                    processor_list,
                    verbose=True,
                    output_dir=None,
                    output_file_string="t2",
                    num_threads=1,
                    overwrite=True):
-    """ Wrapper function for ProcessTier1 """
+    """ Wrapper function for ProcessTier1.
+    If run_list is > 1 run, can try processing each run on a separate thread
+    with num_threads > 1.  Careful, it's a lot to load in RAM ...
+    TODO: try out the multiprocessing in Tier 0 as well
+    """
 
     # if processor_list is None:
     #     processor_list = get_default_processor_list()
 
     t1_args = []
-    for run in runList:
+    for run in run_list:
         filepath = os.path.join(datadir, "t1_run{}.h5".format(run))
         if not overwrite:
             outfilepath = os.path.join(
@@ -75,17 +82,19 @@ def process_tier_1(datadir,
             keywords = {"verbose": verbose, "output_dir": output_dir}
 
     if num_threads > 1:
-        max_proc = cpu_count()  # careful, its a lot to load in RAM...
+        # careful, it's a lot to load in RAM...
+        max_proc = cpu_count()
         num_threads = num_threads if num_threads < max_proc else max_proc
+        print("Running ProcessTier1 with {} threads ...".format(num_threads))
         p = Pool(num_threads)
         # p.starmap( partial(ProcessTier0, **keywords), t0_args)
         p.starmap(partial(ProcessTier1, **keywords), t1_args)
 
 
 def get_default_processor_list():
-    """" Make a list of processors to do to the data for the "tier one"
-    (ie, gatified)"""
-
+    """" Make a list of processors to create Tier 1 (i.e. gatified) data
+    TODO: finalize this list?  put it somewhere else, maybe in analysis?
+    """
     procs = TierOneProcessorList()
 
     #pass energy thru to t1
@@ -170,5 +179,3 @@ def get_default_processor_list():
         output_name=["ft_slope", "ft_int"])
 
     return procs
-
-

@@ -20,9 +20,7 @@ if __name__ == "__main__":
 
     try:
         import numpy as np
-        include_dirs = [
-            np.get_include(),
-        ]
+        include_dirs = [np.get_include(),]
     except ImportError:
         do_cython = False
 
@@ -45,11 +43,14 @@ if __name__ == "__main__":
             language="c"),
         Extension(
             "pygama.processing.calculators",
-            sources=[os.path.join("pygama", "processing", "calculators" + fext)],
+            sources=[
+                os.path.join("pygama", "processing", "calculators" + fext)
+            ],
             language="c")
     ]
     if do_cython:
         exts = cythonize(exts)
+    # exts = []
 
     setup(
         name="pygama",

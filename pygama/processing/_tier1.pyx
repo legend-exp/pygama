@@ -4,14 +4,12 @@ Cythonized for maximum speed.
 """
 cimport numpy as np
 
-import os, re, sys
+import os, re, sys, time
 import numpy as np
 import pandas as pd
 import h5py
 
-# import ipdb; ipdb.set_trace() # launch ipython debugger
-
-from ..utils import update_progress
+from ..utils import *
 from ..decoders.digitizers import *
 
 
@@ -31,7 +29,8 @@ def ProcessTier1(filename,
     verbose: spits out a progressbar to let you know how the processing is going
     """
     print("Starting pygama Tier 1 processing ...")
-    print("  Input file: "+filename)
+    print("   Input file: "+filename)
+    start = time.clock()
 
     directory = os.path.dirname(filename)
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -59,7 +58,6 @@ def ProcessTier1(filename,
         digitizer.load_object_info(object_info)
 
         event_df = pd.read_hdf(filename, key=digitizer.decoder_name)
-        # event_df = event_df[:1000]
 
         processorList.digitizer = digitizer
         processorList.max_event_number = len(event_df)
@@ -84,6 +82,10 @@ def ProcessTier1(filename,
 
     if verbose:
         print("Writing Tier 2 File:\n    {}".format(t2_path))
+        print("   Entries: {}".format(len(event_df)))
+        print("   Data columns:")
+        for col in event_df.columns:
+            print("   -- " + col)
 
     event_df.to_hdf(
         t2_path,
@@ -92,6 +94,13 @@ def ProcessTier1(filename,
         mode='w',
         data_columns=event_df.columns.tolist())
 
-    print("Done.")
+    if verbose:
+        statinfo = os.stat(t2_path)
+        print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        elapsed = time.clock() - start
+        proc_rate = elapsed/len(event_df)
+        print("Time elapsed: {:.2f} sec  ({:.5f} sec/wf)".format(elapsed, proc_rate))
+        print("Done.")
 
-    return event_df
+    # do we want to actually return the df?  or force the user to open the file?
+    # return event_df

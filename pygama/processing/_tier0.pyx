@@ -5,14 +5,13 @@ Cythonized for maximum speed.
 cimport numpy as np
 
 import numpy as np
-import os, re, sys, glob
+import os, re, sys, glob, time
 import pandas as pd
 import h5py
 from future.utils import iteritems
-from multiprocessing import Pool, cpu_count
 from functools import partial
 
-from ..utils import update_progress
+from ..utils import *
 from ..decoders.digitizers import *
 from ..decoders.dataloading import *
 from .header_parser import *
@@ -35,6 +34,7 @@ def ProcessTier0(filename,
     """
     print("Starting pygama Tier 0 processing ...")
     print("  Input file: "+filename)
+    start = time.clock()
 
     SEEK_END = 2
 
@@ -147,4 +147,9 @@ def ProcessTier0(filename,
         for d in decoders:
             print(" -- {}".format(d.decoder_name))
             d.to_file(t1_file_name)
-    print("Done.")
+
+        statinfo = os.stat(t1_file_name)
+        print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        elapsed = time.clock() - start
+        print("Time elapsed: {:.2f} sec".format(elapsed))
+        print("Done.\n")

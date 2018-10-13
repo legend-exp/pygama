@@ -32,8 +32,8 @@ __version__ = "0.1.0"
 import warnings, pandas
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
 
-warnings.filterwarnings('ignore',category=pandas.io.pytables.PerformanceWarning)
-
+warnings.filterwarnings(
+    'ignore', category=pandas.io.pytables.PerformanceWarning)
 
 # try to import all public functions
 import pkgutil
@@ -46,7 +46,7 @@ for importer, modname, ispkg in pkgutil.walk_packages(
 # i don't really like how i have to specify everything here
 from .processing.processing import *
 from .processing.base_classes import *
-
+from .decoders.digitizers import *
 
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event

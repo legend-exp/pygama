@@ -72,9 +72,8 @@ class DataLoader(ABC):
         overload this if necessary for more complicated use cases.
         Try to avoid pickling to 'object' types if possible.
         """
-
         for key in self.decoded_values:
-            print("      {} entries: {}".format(key,len(self.decoded_values[key])))
+            print("      {} entries: {}".format(key, len(self.decoded_values[key])))
 
         # old faithful
         df = pd.DataFrame.from_dict(self.decoded_values)
@@ -192,15 +191,13 @@ def get_decoders(object_info):
     Also relies on 2-level abstraction, which is dicey
     """
     decoders = []
-
     for sub in DataLoader.__subclasses__():  # either digitizers or pollers
         for subsub in sub.__subclasses__():
             try:
-                a = subsub(object_info)
-                # print("name: ",a.decoder_name)
-                decoders.append(a)
+                decoder = subsub(object_info) # initialize the decoder
+                # print("dataloading - name: ",decoder.decoder_name)
+                decoders.append(decoder)
             except Exception as e:
                 print(e)
                 pass
-
     return decoders
