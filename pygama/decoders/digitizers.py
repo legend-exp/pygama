@@ -26,14 +26,17 @@ class Digitizer(DataLoader):
 
     def __init__(self, *args, **kwargs):
 
-        self.split_waveform = False
         self.chan_list = None  # list of channels to decode
-        if self.split_waveform:
-            self.hf5_type = "table"
-        else:
-            self.hf5_type = "fixed"
+
+        try:
+            self.split_waveform = kwargs.pop("split_waveform")
+        except KeyError:
+            self.split_waveform = False
+            pass
+        self.hf5_type = "table" if self.split_waveform else "fixed"
 
         super().__init__(*args, **kwargs)
+
 
     def decode_event(self, event_data_bytes, event_number, header_dict):
         pass
@@ -105,8 +108,6 @@ class Gretina4MDecoder(Digitizer):
         self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'
         self.class_name = 'ORGretina4MModel'
 
-        super().__init__(*args, **kwargs)
-
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
             "event_number": [],
@@ -130,12 +131,15 @@ class Gretina4MDecoder(Digitizer):
             self.correct_presum = True
             pass
 
-        #The header length "should" be 32 -- 30 from gretina header, 2 from orca header
-        #but the "reserved" from 16 on seems to be good baseline info, so lets try to use it
+        # The header length "should" be 32 -- 30 from gretina header, 2 from orca header
+        # but the "reserved" from 16 on seems to be good baseline info, so lets try to use it
         self.event_header_length = 18
         self.wf_length = 2032  #TODO: This should probably be determined more rigidly
         self.sample_period = 10  #ns
         self.gretina_event_no = 0
+
+        super().__init__(*args, **kwargs)
+
 
     def load_object_info(self, object_info):
         super().load_object_info(object_info)
@@ -327,8 +331,6 @@ class SIS3302Decoder(Digitizer):
         self.event_header_length = 1
         self.sample_period = 10  #ns
 
-        super().__init__(*args, **kwargs)
-
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
             "energy": [],
@@ -339,6 +341,8 @@ class SIS3302Decoder(Digitizer):
             "waveform": [],
             "energy_wf": []
         }
+
+        super().__init__(*args, **kwargs)
 
 
     def get_name(self):

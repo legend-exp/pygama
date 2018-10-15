@@ -22,9 +22,12 @@ def current_max(waveform, sigma=1):
 
 def fit_baseline(waveform, start_index=0, end_index=500, order=1):
     """ Finds baseline from start index to end index samples (default linear) """
-    if end_index == -1: end_index = len(waveform)
-    p = np.polyfit(
-        np.arange(start_index, end_index), waveform[start_index:end_index], 1)
+    if end_index == -1:
+        end_index = len(waveform)
+
+    x = np.arange(start_index, end_index)
+    wf = waveform[start_index:end_index]
+    p = np.polyfit(x, wf, order)
     return p
 
 

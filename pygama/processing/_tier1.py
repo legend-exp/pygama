@@ -2,19 +2,21 @@
 TIER 1 MAIN PROCESSING ROUTINE
 Cythonized for maximum speed.
 """
-cimport numpy as np
+# cimport numpy as np
 
 import os, re, sys, time
 import numpy as np
 import pandas as pd
 import h5py
 
+import cProfile # maybe get rid of this when you cythonize?
+
 from ..utils import *
 from ..decoders.digitizers import *
 
 
 def ProcessTier1(filename,
-                 processorList,
+                 processor_list,
                  digitizer_list=None,
                  output_file_string="t2",
                  verbose=False,
@@ -22,15 +24,17 @@ def ProcessTier1(filename,
     """
     Reads in "raw," or "tier 0," Orca data and saves to a hdf5 format using pandas
     filename: path to a tier1 data file
-    processorList:
+    processor_list:
         TierOneProcessorList object with list of calculations/transforms you want done
         -- NOTE -- Order matters in the list! (Some calculations depend on others.)
     output_file_string: file is saved as <output_file_string>_run<runNumber>.h5
     verbose: spits out a progressbar to let you know how the processing is going
     """
+
     print("Starting pygama Tier 1 processing ...")
     print("   Input file: "+filename)
     start = time.clock()
+
 
     directory = os.path.dirname(filename)
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -55,27 +59,42 @@ def ProcessTier1(filename,
         print("Processing data from digitizer {}".format(digitizer.decoder_name))
 
         object_info = pd.read_hdf(filename, key=digitizer.class_name)
+
         digitizer.load_object_info(object_info)
 
+        # load the tier1 data (can take a while)
         event_df = pd.read_hdf(filename, key=digitizer.decoder_name)
 
-        processorList.digitizer = digitizer
-        processorList.max_event_number = len(event_df)
-        processorList.verbose = verbose
-        processorList.t0_cols = event_df.columns.values.tolist()
-        processorList.runNumber = runNumber
-        processorList.num = 0
+        # pr = cProfile.Profile(); pr.enable()
 
-        t1_df = event_df.apply(processorList.Process, axis=1)
+        processor_list.digitizer = digitizer
+        processor_list.max_event_number = len(event_df)
+        processor_list.verbose = verbose
+        processor_list.t0_cols = event_df.columns.values.tolist()
+        processor_list.runNumber = runNumber
+        processor_list.num = 0
+
+        # loop over events with apply (written in c, so it's faster)
+
+        # print(event_df)
+
+        t1_df = event_df.apply(processor_list.Process, axis=1)
+
+        # print(t1_df)
+
+        # pr.disable(); pr.dump_stats("/Users/wisecg/dev/mj60/tier1.prof")
+        # return
+
+        # add the result of the processor back into the event_df
+
         event_df = event_df.join(t1_df, how="left")
-        processorList.DropTier0(event_df)
+
+        print(event_df)
+
+        processor_list.DropTier0(event_df)
 
     if verbose:
         update_progress(1)
-
-    # if verbose: print("Creating dataframe for file {}...".format(filename))
-    # df_data = pd.DataFrame(appended_data)
-    # df_data.set_index("event_number", inplace=True)
 
     t2_file_name = output_file_string + '_run{}.h5'.format(runNumber)
     t2_path = os.path.join(output_dir, t2_file_name)

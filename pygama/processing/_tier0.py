@@ -2,7 +2,7 @@
 TIER 0 MAIN PROCESSING ROUTINE
 Cythonized for maximum speed.
 """
-cimport numpy as np
+# cimport numpy as np
 
 import numpy as np
 import os, re, sys, glob, time
@@ -52,7 +52,7 @@ def ProcessTier0(filename,
         print("Couldn't find the file %s" % filename)
         sys.exit(0)
 
-    #figure out the total size
+    # figure out the total size
     f_in.seek(0, SEEK_END)
     file_size = float(f_in.tell())
     f_in.seek(0, 0)  # rewind

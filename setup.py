@@ -26,31 +26,31 @@ if __name__ == "__main__":
 
     src = []
     fext = ".pyx" if do_cython else ".c"
-    exts = [
-        Extension(
-            "pygama.processing._tier0",
-            sources=[os.path.join("pygama", "processing", "_tier0" + fext)],
-            language="c",
-            include_dirs=include_dirs),
-        Extension(
-            "pygama.processing._tier1",
-            sources=[os.path.join("pygama", "processing", "_tier1" + fext)],
-            language="c",
-            include_dirs=include_dirs),
-        Extension(
-            "pygama.processing.transforms",
-            sources=[os.path.join("pygama", "processing", "transforms" + fext)],
-            language="c"),
-        Extension(
-            "pygama.processing.calculators",
-            sources=[
-                os.path.join("pygama", "processing", "calculators" + fext)
-            ],
-            language="c")
-    ]
-    if do_cython:
-        exts = cythonize(exts)
-    # exts = []
+    # exts = [
+    #     Extension(
+    #         "pygama.processing._tier0",
+    #         sources=[os.path.join("pygama", "processing", "_tier0" + fext)],
+    #         language="c",
+    #         include_dirs=include_dirs),
+    #     Extension(
+    #         "pygama.processing._tier1",
+    #         sources=[os.path.join("pygama", "processing", "_tier1" + fext)],
+    #         language="c",
+    #         include_dirs=include_dirs),
+    #     Extension(
+    #         "pygama.processing.transforms",
+    #         sources=[os.path.join("pygama", "processing", "transforms" + fext)],
+    #         language="c"),
+    #     Extension(
+    #         "pygama.processing.calculators",
+    #         sources=[
+    #             os.path.join("pygama", "processing", "calculators" + fext)
+    #         ],
+    #         language="c")
+    # ]
+    # if do_cython:
+    #     exts = cythonize(exts)
+    exts = []
 
     setup(
         name="pygama",

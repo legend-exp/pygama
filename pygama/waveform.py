@@ -32,11 +32,12 @@ class Waveform():
                         num_samples=400,
                         method="percent",
                         use_slope=False):
-        '''Windows waveform around a risetime percentage timepoint
-            time_point: percentage (0-1)
-            early_samples: samples to include before the calculated time_point
-            num_samples: total number of samples to include
-        '''
+        """
+        Windows waveform around a risetime percentage timepoint
+        time_point: percentage (0-1)
+        early_samples: samples to include before the calculated time_point
+        num_samples: total number of samples to include
+        """
 
         #don't mess with the original data
         wf_copy = np.copy(self.data)

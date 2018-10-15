@@ -120,7 +120,6 @@ class TierOneProcessorList():
     """
     Class to handle the list of transforms/calculations we do in the processing
     """
-
     def __init__(self):
         self.list = []
         self.waveform_dict = {}
@@ -128,23 +127,24 @@ class TierOneProcessorList():
         self.digitizer = None
         self.runNumber = 0
 
-        #t1 fields to make available for t2 processors
+        # t1 fields to make available for t2 processors
         self.t0_map = {}
 
-    def Process(self, t0_row):
+    def Process(self, t0_row, flat=False):
         if self.verbose and self.num % 100 == 0:
             if (float(self.num) / self.max_event_number) < 1:
                 update_progress(
                     float(self.num) / self.max_event_number, self.runNumber)
 
-        # print("\nDEBUG:",t0_row)
-        waveform = self.digitizer.parse_event_data(t0_row)
-        # Currently, I'll just mandate that we only process full waveform data i guess
+        # clear things out from the last waveform
+        if flat:
+            waveform = t0_row
+            self.waveform_dict = {"waveform": waveform}
+        else:
+            waveform = self.digitizer.parse_event_data(t0_row)
+            self.waveform_dict = {"waveform": waveform.get_waveform()}
 
-        # Clear things out from the last waveform:
-        self.waveform_dict = {"waveform": waveform.get_waveform()}
         new_cols = {}
-
         try:
             new_cols["fs_start"] = waveform.full_sample_range[0]
             new_cols["fs_end"] = waveform.full_sample_range[1]
@@ -152,7 +152,7 @@ class TierOneProcessorList():
             #in case it isn't a multisampled waveform object
             pass
 
-        #Apply each processor
+        # Apply each processor
         for processor in self.list:
             processor.replace_args(new_cols)
             processor.set_waveform(self.waveform_dict)
@@ -164,7 +164,7 @@ class TierOneProcessorList():
                 output = processor.output_name
                 calc = processor.process()
 
-                #Handles multiple outputs for, e.g., time point calculations
+                # Handles multiple outputs for, e.g., time point calculations
                 if not isinstance(output, str) and len(output) > 1:
                     for i, out in enumerate(output):
                         new_cols[out] = calc[i]
@@ -215,3 +215,5 @@ class TierOneProcessorList():
             if t0_col not in self.t0_map.keys():
                 drop_cols.append(t0_col)
         df_t1.drop(drop_cols, axis=1, inplace=True)
+
+

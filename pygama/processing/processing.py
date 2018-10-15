@@ -3,6 +3,7 @@ import os, glob
 import numpy as np
 from multiprocessing import Pool, cpu_count
 from functools import partial
+import cProfile
 
 from ._tier0 import ProcessTier0
 from ._tier1 import ProcessTier1
