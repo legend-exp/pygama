@@ -7,19 +7,23 @@ import numpy as np
 import pandas as pd
 from abc import ABC
 
-class VectorizedProcessorList():
+class VectorProcess():
     """ Handle vectorized calculators and transforms. """
 
     def __init__(self):
         self.proc_list = []
         self.digitizer = None
         self.calc_df = None # df for calculation results (no wfs)
+        self.wave_dict = {} # wfs only, NxM arrays (unpacked)
 
-    def Process(self, data_df):
-        """ main routine to generate Tier 1 Dataframes.
+    def Process(self, data_df, wftypes_out=None):
+        """ Main routine to generate Tier 1 dataframes.
         Apply each processor to the input dataframe,
-        and return a new one """
-
+        and return a tier 1 dataframe (i.e. gatified single-valued)
+        and optionally return a dataframe with the waveform objects
+        embedded as numpy arrays inside each cell.
+        -- could maybe read the output with a proper pygama Waveform object
+        """
         for processor in self.proc_list:
             print("Applying processor:",processor.function.__name__)
 
@@ -31,19 +35,14 @@ class VectorizedProcessorList():
                 data_df = data_df.join(result_df, how='left')
 
             elif isinstance(processor, VectorTransformer):
+                self.update_waveforms(result_df, processor.wf_names)
 
-                print(result_df.shape)
-
-                # do i need like a zip/unzip wfs function into the nested arrays?
-
+        if wftypes_out is not None:
+            if any(x in wftypes_out for x in self.wave_dict.keys()):
+                return data_df, zip_waveforms(self, wftypes_out)
 
         return data_df
 
-    def update_calcs(self, result_df):
-        if self.calc_df is None:
-            self.calc_df = result_df
-        else:
-            self.calc_df = self.calc_df.join(result_df, how='left')
 
     def AddCalculator(self, *args, **kwargs):
         self.proc_list.append(VectorCalculator(*args, **kwargs))
@@ -51,26 +50,60 @@ class VectorizedProcessorList():
     def AddTransformer(self, *args, **kwargs):
         self.proc_list.append(VectorTransformer(*args, **kwargs))
 
+    def update_calcs(self, result_df):
+        """ update the internal dataframe of calculator results
+        s/t other processors can access them
+        """
+        if self.calc_df is None:
+            self.calc_df = result_df
+        else:
+            self.calc_df = self.calc_df.join(result_df, how='left')
+
+    def update_waveforms(self, wf_block, wf_names):
+        """ update the internal dictionary of NxM ndarray waveforms,
+        taking output from one of the VectorTransformers
+        """
+        if len(wf_names) == 1:
+            # pass single wf
+            self.wave_dict[wf_names[0]] = wf_block
+        else:
+            # pass dict of wfs
+            for wf in wf_names:
+                self.wave_dict[wf] = wf_block[wf]
+
+    def zip_waveforms(self):
+        """ embed NxM waveform blocks into 1d DataFrame columns for output
+        maybe with some metadata?
+        do we want to declare the pygama Waveform object here?
+        maybe it could be set to read in-cell arrays ?
+        """
+        print("i'm in danger!")
+        # for wftype in self.wave_df:
+            # wfs = self.wave_df[wftype]
+            # wflist = [row for row in data_df[wf_name].values]
+            # wf_df = pd.DataFrame(np.array(wflist))
+            # self.block_dict[wf_name] = wf_df
+        # return zip_df
+
+
 
 class VectorProcessorBase(ABC):
 
-    def __init__(self, function, wf_name, fun_args={}):
+    def __init__(self, function, wf_names, fun_args={}):
         """ save some argunemnts specific to this transform/calculator """
         self.function = function
-        self.wf_name = wf_name # name the wf type(s) we are operating on
+        self.wf_names = wf_names # name the wf type(s) we are operating on
         self.fun_args = fun_args # so fun
 
-        # ndarray blocks for different wf types
-        # should this be here?  don't we want other transforms to be able
-        # to operate on the same numpy matrices, to avoid copying?
+        # NxM ndarray blocks for different wf types we want to OPERATE on
         self.block_dict = {}
 
     def set_block(self, data_df):
         """ convert an embedded Tier 0 list to a NxM df.
-        remember, we can in principle operate on multiple wf types (from transforms)
-        but usually self.wf_name will just be 'waveform'
+        remember, we can in principle operate on multiple wf types
+        but usually self.wf_names will just be ['waveform']
         """
-        for wf_name in self.wf_name:
+        for wf_name in self.wf_names:
             wflist = [row for row in data_df[wf_name].values]
             wf_df = pd.DataFrame(np.array(wflist))
             self.block_dict[wf_name] = wf_df
@@ -87,8 +120,8 @@ class VectorProcessorBase(ABC):
 
 class VectorCalculator(VectorProcessorBase):
 
-    def __init__(self, function, wf_name, fun_args={}):
-        super().__init__(function, wf_name, fun_args)
+    def __init__(self, function, wf_names, fun_args={}):
+        super().__init__(function, wf_names, fun_args)
 
 
 def avg_baseline(data_block, calc_df, i_start=0, i_end=500):
@@ -121,8 +154,8 @@ def fit_baseline(data_block, calc_df, i_start=0, i_end=500, order=1):
 # ==============================================================================
 
 class VectorTransformer(VectorProcessorBase):
-    def __init__(self, function, wf_name, fun_args={}):
-        super().__init__(function, wf_name, fun_args)
+    def __init__(self, function, wf_names, fun_args={}):
+        super().__init__(function, wf_names, fun_args)
 
 
 def bl_subtract(data_block, calc_df):
@@ -145,13 +178,13 @@ def bl_subtract(data_block, calc_df):
     # bl_avg = calc_df["bl_avg"].values[:,np.newaxis]
     # blsub_avgs = wfs - bl_avg
 
-    # # quick diagnostic
-    import matplotlib.pyplot as plt
-    iwf = 1
-    plt.plot(np.arange(nsamp), wfs[iwf], '-r', label="raw")
-    plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
-    plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
-    plt.legend()
-    plt.show()
+    # # # quick diagnostic
+    # import matplotlib.pyplot as plt
+    # iwf = 1
+    # plt.plot(np.arange(nsamp), wfs[iwf], '-r', label="raw")
+    # plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
+    # plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
+    # plt.legend()
+    # plt.show()
 
     return blsub_wfs
