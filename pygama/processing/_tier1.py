@@ -86,7 +86,6 @@ def ProcessTier1(filename,
         # return
 
         # add the result of the processor back into the event_df
-
         event_df = event_df.join(t1_df, how="left")
 
         print(event_df)

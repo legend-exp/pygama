@@ -17,7 +17,7 @@ warnings.filterwarnings(
 
 
 def remove_baseline(waveform, bl_0=0, bl_1=0):
-    """ Finds average baseline from first [samples] number of samples """
+    """ Return a baseline-subtracted waveform """
     return waveform - (bl_0 + bl_1 * np.arange(len(waveform)))
 
 
