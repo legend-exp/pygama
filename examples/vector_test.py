@@ -48,18 +48,19 @@ def tier1(t1_file):
                        wf_names = ["waveform"],
                        fun_args = {"test":False})
 
-    # "gatified" only
+    # process as "gatified" only
     # t1_df = pyg.Process(event_df)
-
     # print(t1_df.shape, t1_df.columns)
     # print(t1_df[["bl_avg","bl_int","bl_slope"]])
 
-    # include waveforms
+    # process as "gatified" and output waveforms
     t1_df, wf_df = pyg.Process(event_df, ["waveform", "wf_blsub"])
+    # print(type(wf_df), wf_df.shape, wf_df.columns)
+    # print(wf_df["waveform"][0])
+    # print(wf_df["wf_blsub"][0])
 
-    print(type(wf_df), wf_df.shape, wf_df.columns)
-    print(wf_df["waveform"][0])
-    print(wf_df["wf_blsub"][0])
+    # do we want to write an object that can easily read wf_df?
+    wfs = pygama.WaveformFrame(wf_df) # cool name bro
 
 
 

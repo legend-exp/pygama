@@ -48,6 +48,7 @@ from .processing.processing import *
 from .processing.base_classes import *
 from .decoders.digitizers import *
 from .processing.vectorized import *
+from .waveform import *
 
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event

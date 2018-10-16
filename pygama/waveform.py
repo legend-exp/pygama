@@ -1,19 +1,19 @@
-"""
-This is `pygama`'s waveform class.
-Operates on pandas Series data.
-"""
 import numpy as np
-
-from .processing.calculators import calc_timepoint, fit_baseline
-from .processing.transforms import center
+import pandas as pd
 
 
-class Waveform():
+class WaveformFrame:
+    """ do stuff to zipped dataframes of numpy arrays w. different wf types """
+    def __init__(self, wf_df):
+        pass
+        # print(wf_df.shape, wf_df.columns)
+
+
+class Waveform:
     """
     This is the pygama waveform class.
     Intended for operations on a properly processed pandas dataframe.
     """
-
     def __init__(self, wf_data, sample_period):
         '''
         sample_period is in ns
@@ -22,16 +22,8 @@ class Waveform():
         self.sample_period = sample_period
         self.amplitude = np.amax(self.data)
 
-    def get_waveform(self):
-        """Putting this method here so I can overload it in subclasses w/ more options"""
-        return self.data
-
-    def window_waveform(self,
-                        time_point=0.5,
-                        early_samples=200,
-                        num_samples=400,
-                        method="percent",
-                        use_slope=False):
+    def window_waveform(self, time_point=0.5, early_samples=200,
+                        num_samples=400, method="percent", use_slope=False):
         """
         Windows waveform around a risetime percentage timepoint
         time_point: percentage (0-1)
@@ -39,7 +31,7 @@ class Waveform():
         num_samples: total number of samples to include
         """
 
-        #don't mess with the original data
+        # don't mess with the original data
         wf_copy = np.copy(self.data)
 
         #bl subtract

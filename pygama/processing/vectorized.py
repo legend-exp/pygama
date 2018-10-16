@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 from abc import ABC
 
-class VectorProcess():
-    """ Handle vectorized calculators and transforms. """
-
+class VectorProcess:
+    """ Handle vectorized calculators and transforms.
+    Keep an internal 'intercom' of calculator results and waveform transforms.
+    """
     def __init__(self):
         self.proc_list = []
         self.digitizer = None
@@ -17,11 +18,9 @@ class VectorProcess():
         self.wave_dict = {} # wfs only, NxM arrays (unpacked)
 
     def Process(self, data_df, wfnames_out=None):
-        """ -- Main routine to generate Tier 1 dataframes --
-        Apply each processor to the input dataframe,
-        and return a tier 1 dataframe (i.e. gatified single-valued)
-        and optionally return a dataframe with the waveform objects
-        -- could read the output with a proper pygama Waveform object ...
+        """ Apply each processor to the Tier 0 input dataframe,
+        and return a Tier 1 dataframe (i.e. gatified single-valued).
+        Optionally return a dataframe with the waveform objects.
         """
         # save an ndarray of the raw waveforms
         wf_raw = [row for row in data_df["waveform"].values]
