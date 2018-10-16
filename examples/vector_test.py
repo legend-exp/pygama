@@ -39,7 +39,7 @@ def tier1(t1_file):
     # pyg = pygama.ScalarProcess() # just an idea
 
     pyg.AddCalculator(pygama.processing.vectorized.avg_baseline,
-                      wf_names = ["waveform"], # can apply wfs to different calculators
+                      wf_names = ["waveform"],
                       fun_args = {"i_end":700})
 
     pyg.AddCalculator(pygama.processing.vectorized.fit_baseline,
@@ -61,8 +61,8 @@ def tier1(t1_file):
     # print(wf_df["waveform"][0])
     # print(wf_df["wf_blsub"][0])
 
-    # do we want to write an object that can easily read wf_df?
-    wfs = pygama.WaveformFrame(wf_df) # cool name bro
+    # write an object that can easily read wf_df
+    wfs = pygama.WaveformFrame(wf_df)
 
 
 def tier1_chunk(t1_file):

@@ -102,7 +102,6 @@ class Gretina4MDecoder(Digitizer):
       - parse_event_data (takes a pandas df row from a decoded event,
         returns an instance of class MultisampledWaveform)
     """
-
     def __init__(self, *args, **kwargs):
 
         self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'
@@ -139,7 +138,6 @@ class Gretina4MDecoder(Digitizer):
         self.gretina_event_no = 0
 
         super().__init__(*args, **kwargs)
-
 
     def load_object_info(self, object_info):
         super().load_object_info(object_info)
@@ -343,7 +341,6 @@ class SIS3302Decoder(Digitizer):
         }
 
         super().__init__(*args, **kwargs)
-
 
     def get_name(self):
         return self.decoder_name

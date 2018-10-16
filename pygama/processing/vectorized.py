@@ -11,13 +11,15 @@ class VectorProcess:
     """ Handle vectorized calculators and transforms.
     Keep an internal 'intercom' of calculator results and waveform transforms.
     """
-    def __init__(self):
+    def __init__(self, default_list=False):
         self.proc_list = []
         self.digitizer = None
         self.calc_df = None # df for calculation results (no wfs)
         self.wave_dict = {} # wfs only, NxM arrays (unpacked)
+        if default_list:
+            self.SetDefaultList()
 
-    def Process(self, data_df, wfnames_out=None, default_list=False):
+    def Process(self, data_df, wfnames_out=None):
         """ Apply each processor to the Tier 0 input dataframe,
         and return a Tier 1 dataframe (i.e. gatified single-valued).
         Optionally return a dataframe with the waveform objects.
@@ -50,9 +52,9 @@ class VectorProcess:
     def AddTransformer(self, *args, **kwargs):
         self.proc_list.append(VectorTransformer(*args, **kwargs))
 
-    def DefaultProcList(self):
+    def SetDefaultList(self):
         self.AddCalculator(avg_baseline,
-                          wf_names = ["waveform"], # can apply wfs to different calculators
+                          wf_names = ["waveform"],
                           fun_args = {"i_end":700})
         self.AddCalculator(fit_baseline,
                           wf_names = ["waveform"],
@@ -87,6 +89,7 @@ class VectorProcess:
                 print("waveform type '{}' not available! exiting!".format(wf))
 
             wf_cols[wf] = [row for row in wf_block]
+
         return pd.DataFrame(wf_cols)
 
 
@@ -161,7 +164,7 @@ class VectorTransformer(VectorProcessorBase):
 
 
 def bl_subtract(data_block, calc_df, test=False):
-    """ Return an NxM ndarray of baseline-subtracted waveforms
+    """ Return an ndarray of baseline-subtracted waveforms
     Depends on fit_baseline calculator.
     for reference, the non-vector version is just:
     return waveform - (bl_0 + bl_1 * np.arange(len(waveform)))
