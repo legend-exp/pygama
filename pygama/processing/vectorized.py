@@ -17,7 +17,7 @@ class VectorProcess:
         self.calc_df = None # df for calculation results (no wfs)
         self.wave_dict = {} # wfs only, NxM arrays (unpacked)
 
-    def Process(self, data_df, wfnames_out=None):
+    def Process(self, data_df, wfnames_out=None, default_list=False):
         """ Apply each processor to the Tier 0 input dataframe,
         and return a Tier 1 dataframe (i.e. gatified single-valued).
         Optionally return a dataframe with the waveform objects.
@@ -44,12 +44,22 @@ class VectorProcess:
 
         return data_df
 
-
     def AddCalculator(self, *args, **kwargs):
         self.proc_list.append(VectorCalculator(*args, **kwargs))
 
     def AddTransformer(self, *args, **kwargs):
         self.proc_list.append(VectorTransformer(*args, **kwargs))
+
+    def DefaultProcList(self):
+        self.AddCalculator(avg_baseline,
+                          wf_names = ["waveform"], # can apply wfs to different calculators
+                          fun_args = {"i_end":700})
+        self.AddCalculator(fit_baseline,
+                          wf_names = ["waveform"],
+                          fun_args = {"i_end":700})
+        self.AddTransformer(bl_subtract,
+                           wf_names = ["waveform"],
+                           fun_args = {"test":False})
 
     def update_calcs(self, result_df):
         """ update the internal dataframe of calculator results

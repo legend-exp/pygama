@@ -65,7 +65,6 @@ class MultisampledWaveform(Waveform):
     """
     Multisampled WF class.
     """
-
     def __init__(self, time, wf_data, sample_period, full_sample_range, *args,
                  **kwargs):
         self.time = time

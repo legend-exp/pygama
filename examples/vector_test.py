@@ -11,12 +11,13 @@ def main():
     t1_file = "/Users/wisecg/dev/mj60/data/t1_run42343.h5"
 
     # tier0(raw_file)
-    tier1(t1_file)
+    # tier1(t1_file)
+    tier1_chunk(t1_file)
 
 
 def tier0(raw_file):
 
-    n_evt = 10000 # 487500 or np.inf
+    n_evt = 100000 # 487500 or np.inf
 
     from pygama.processing._tier0 import ProcessTier0
     ProcessTier0(raw_file,
@@ -31,6 +32,7 @@ def tier1(t1_file):
         correct_presum = False,
         split_waveform = False,
         )
+
     event_df = pd.read_hdf(t1_file, key = digitizer.decoder_name)
 
     pyg = pygama.VectorProcess()
@@ -61,6 +63,30 @@ def tier1(t1_file):
 
     # do we want to write an object that can easily read wf_df?
     wfs = pygama.WaveformFrame(wf_df) # cool name bro
+
+
+def tier1_chunk(t1_file):
+
+    digitizer = pygama.decoders.digitizers.Gretina4MDecoder(
+        correct_presum = False,
+        split_waveform = False,
+        )
+
+    df = pd.DataFrame()
+    for event_df in pd.read_hdf(t1_file,
+                                digitizer.decoder_name,
+                                chunksize=10**6): #, where='a < someval'):
+
+        # need to chunk with HDF indexing for speed
+        # which means we need to use the "tables" format ... uh-oh.
+        # https://stackoverflow.com/questions/40348945/reading-data-by-chunking-with-hdf5-and-pandas
+
+        pyg = pygama.VectorProcess(default_list=True)
+        # t1_df = pyg.Process(event_df)
+
+        # df = pd.concat([df, chunk], ignore_index=True)
+
+    exit()
 
 
 
