@@ -41,22 +41,25 @@ def tier1(t1_file):
                       fun_args = {"i_end":700})
 
     pyg.AddCalculator(pygama.processing.vectorized.fit_baseline,
-                      wf_names = ["waveform"], fun_args = {"i_end":700})
+                      wf_names = ["waveform"],
+                      fun_args = {"i_end":700})
 
     pyg.AddTransformer(pygama.processing.vectorized.bl_subtract,
                        wf_names = ["waveform"],
-                       fun_args = {})
+                       fun_args = {"test":False})
 
     # "gatified" only
-    t1_df = pyg.Process(event_df)
+    # t1_df = pyg.Process(event_df)
 
-    # include waveforms
-    # t1_df, t1wf_df = pyg.Process(event_df, ["waveform"])
-
-    # print some results
     # print(t1_df.shape, t1_df.columns)
     # print(t1_df[["bl_avg","bl_int","bl_slope"]])
 
+    # include waveforms
+    t1_df, wf_df = pyg.Process(event_df, ["waveform", "wf_blsub"])
+
+    print(type(wf_df), wf_df.shape, wf_df.columns)
+    print(wf_df["waveform"][0])
+    print(wf_df["wf_blsub"][0])
 
 
 

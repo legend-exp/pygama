@@ -16,30 +16,32 @@ class VectorProcess():
         self.calc_df = None # df for calculation results (no wfs)
         self.wave_dict = {} # wfs only, NxM arrays (unpacked)
 
-    def Process(self, data_df, wftypes_out=None):
-        """ Main routine to generate Tier 1 dataframes.
+    def Process(self, data_df, wfnames_out=None):
+        """ -- Main routine to generate Tier 1 dataframes --
         Apply each processor to the input dataframe,
         and return a tier 1 dataframe (i.e. gatified single-valued)
         and optionally return a dataframe with the waveform objects
-        embedded as numpy arrays inside each cell.
-        -- could maybe read the output with a proper pygama Waveform object
+        -- could read the output with a proper pygama Waveform object ...
         """
+        # save an ndarray of the raw waveforms
+        wf_raw = [row for row in data_df["waveform"].values]
+        self.wave_dict["waveform"] = np.array(wf_raw)
+
+        # apply each processsor to the input dataframe
         for processor in self.proc_list:
-            print("Applying processor:",processor.function.__name__)
 
             processor.set_block(data_df)
-            result_df = processor.process(self.calc_df)
+            p_result = processor.process(self.calc_df)
 
             if isinstance(processor, VectorCalculator):
-                self.update_calcs(result_df)
-                data_df = data_df.join(result_df, how='left')
+                self.update_calcs(p_result)
+                data_df = data_df.join(p_result, how='left')
 
             elif isinstance(processor, VectorTransformer):
-                self.update_waveforms(result_df, processor.wf_names)
+                self.update_waveforms(p_result)
 
-        if wftypes_out is not None:
-            if any(x in wftypes_out for x in self.wave_dict.keys()):
-                return data_df, zip_waveforms(self, wftypes_out)
+        if wfnames_out is not None:
+            return data_df, self.zip_waveforms(wfnames_out)
 
         return data_df
 
@@ -59,32 +61,24 @@ class VectorProcess():
         else:
             self.calc_df = self.calc_df.join(result_df, how='left')
 
-    def update_waveforms(self, wf_block, wf_names):
+    def update_waveforms(self, wf_dict):
         """ update the internal dictionary of NxM ndarray waveforms,
         taking output from one of the VectorTransformers
         """
-        if len(wf_names) == 1:
-            # pass single wf
-            self.wave_dict[wf_names[0]] = wf_block
-        else:
-            # pass dict of wfs
-            for wf in wf_names:
-                self.wave_dict[wf] = wf_block[wf]
+        for wf in wf_dict:
+            self.wave_dict[wf] = wf_dict[wf]
 
-    def zip_waveforms(self):
-        """ embed NxM waveform blocks into 1d DataFrame columns for output
-        maybe with some metadata?
-        do we want to declare the pygama Waveform object here?
-        maybe it could be set to read in-cell arrays ?
-        """
-        print("i'm in danger!")
-        # for wftype in self.wave_df:
-            # wfs = self.wave_df[wftype]
-            # wflist = [row for row in data_df[wf_name].values]
-            # wf_df = pd.DataFrame(np.array(wflist))
-            # self.block_dict[wf_name] = wf_df
-        # return zip_df
+    def zip_waveforms(self, wfnames_out):
+        """ embed ndarray waveform blocks into 1d DataFrame columns """
+        wf_cols = {}
+        for wf in wfnames_out:
+            try:
+                wf_block = self.wave_dict[wf]
+            except KeyError:
+                print("waveform type '{}' not available! exiting!".format(wf))
 
+            wf_cols[wf] = [row for row in wf_block]
+        return pd.DataFrame(wf_cols)
 
 
 class VectorProcessorBase(ABC):
@@ -95,13 +89,12 @@ class VectorProcessorBase(ABC):
         self.wf_names = wf_names # name the wf type(s) we are operating on
         self.fun_args = fun_args # so fun
 
-        # NxM ndarray blocks for different wf types we want to OPERATE on
-        self.block_dict = {}
+        # ndarrays for different wf types that this processor operates on
+        self.block_dict = {} # usually just 'waveform'
 
     def set_block(self, data_df):
         """ convert an embedded Tier 0 list to a NxM df.
-        remember, we can in principle operate on multiple wf types
-        but usually self.wf_names will just be ['waveform']
+        remember, we can in principle operate on multiple wf types if needed
         """
         for wf_name in self.wf_names:
             wflist = [row for row in data_df[wf_name].values]
@@ -158,7 +151,7 @@ class VectorTransformer(VectorProcessorBase):
         super().__init__(function, wf_names, fun_args)
 
 
-def bl_subtract(data_block, calc_df):
+def bl_subtract(data_block, calc_df, test=False):
     """ Return an NxM ndarray of baseline-subtracted waveforms
     Depends on fit_baseline calculator.
     for reference, the non-vector version is just:
@@ -174,17 +167,19 @@ def bl_subtract(data_block, calc_df):
 
     blsub_wfs = wfs - (bl_0 + bl_1)
 
-    # alternate - transform based off avg_baseline calculator
-    # bl_avg = calc_df["bl_avg"].values[:,np.newaxis]
-    # blsub_avgs = wfs - bl_avg
+    if test:
+        # alternate - transform based off avg_baseline calculator
+        bl_avg = calc_df["bl_avg"].values[:,np.newaxis]
+        blsub_avgs = wfs - bl_avg
 
-    # # # quick diagnostic
-    # import matplotlib.pyplot as plt
-    # iwf = 1
-    # plt.plot(np.arange(nsamp), wfs[iwf], '-r', label="raw")
-    # plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
-    # plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
-    # plt.legend()
-    # plt.show()
+        # quick diagnostic plot
+        import matplotlib.pyplot as plt
+        iwf = 1
+        plt.plot(np.arange(nsamp), wfs[iwf], '-r', label="raw")
+        plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
+        plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
+        plt.legend()
+        plt.show()
+        exit()
 
-    return blsub_wfs
+    return {"wf_blsub": blsub_wfs} # note, floats are gonna take up more memory
