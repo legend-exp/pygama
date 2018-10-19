@@ -24,13 +24,15 @@ class DataLoader(ABC):
     # send any variable with a name in "decoded_values" to the pandas output
     self.format_data(locals())
     """
-
     def __init__(self, object_info=None):
 
+
+        # every data loader should set this (affects if we can chunk the output)
+        self.h5_format = None
+
+        # need the decoder name and the class name
         if object_info is not None:
             self.load_object_info(object_info)
-
-        self.hf5_type = "fixed"  # can also try "tables" but may be slower
 
     def load_object_info(self, object_info):
 
@@ -47,10 +49,6 @@ class DataLoader(ABC):
             raise TypeError(
                 "DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}"
                 .format(type(object_info)))
-
-    @abstractmethod
-    def decode_event(self, event_data_bytes, event_number, header_dict):
-        pass
 
     def format_data(self, vals):
         """ Write any variable with a name matching a key in "decoded_values"
@@ -75,32 +73,30 @@ class DataLoader(ABC):
         for key in self.decoded_values:
             print("      {} entries: {}".format(key, len(self.decoded_values[key])))
 
-        # old faithful
-        df = pd.DataFrame.from_dict(self.decoded_values)
+        # old faithful (embeds wfs in cells, requires h5type = 'fixed')
+        # df = pd.DataFrame.from_dict(self.decoded_values)
 
-        # # new and troublesome
-        # # try to set types s/t pandas.to_hdf won't complain
-        # vals = self.decoded_values
-        # dtypes = {}
-        # for key in vals:
-        #     if isinstance(vals[key], list):
-        #         print("KEY:",key,"len list is ", len(vals[key]))
-        #         try:
-        #             dtypes[key] = type(vals[key][0])
-        #         except:
-        #             dtypes[key] = None
-        #             pass
-        #     else:
-        #         print("ERROR: DataLoader didn't find a list!")
-        #         exit()
-        # df = pd.DataFrame.from_dict(vals).astype(dtypes)
+        # 'flatten' the values (each wf sample gets a column, h5type = 'table')
+        new_cols = []
+        for col in sorted(self.decoded_values.keys()):
+
+            # unzip waveforms (needed to use "table" hdf5 output)
+            if col == "waveform":
+                wfs = np.vstack(self.decoded_values[col]) # creates an ndarray
+                new_cols.append(pd.DataFrame(wfs, dtype='int16'))
+
+            # everything else is single-valued
+            else:
+                vals = pd.Series(self.decoded_values[col], name=col)
+                new_cols.append(vals)
+
+        # this is our flattened output (can be chunked with hdf5)
+        df = pd.concat(new_cols, axis=1)
 
         if len(df) == 0:
             print("Length of DataFrame for {} is 0!".format(self.class_name))
             return None
         df.set_index("event_number", inplace=True)
-
-        # df = pd.DataFrame({'A' : []})
 
         return df
 
@@ -110,22 +106,28 @@ class DataLoader(ABC):
         if df_data is None:
             print("Data is None!")
             return
+        # print(df_data.dtypes) # useful to check this
 
         df_data.to_hdf(
             file_name,
             key=self.decoder_name,
             mode='a',
-            format=self.hf5_type,
-            data_columns=df_data.columns.tolist())
+            format=self.h5_format)
 
+            # need the decoder name and the class name
         if self.object_info is not None:
+            # print(self.object_info.dtypes)
 
             if self.class_name == self.decoder_name:
                 raise ValueError(
                     "Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file."
                     .format(self.__name__, self.class_name))
 
-            self.object_info.to_hdf(file_name, key=self.class_name, mode='a')
+            # used fixed type for this (keys have lotsa diff types and i
+            # don't want to convert everything to strings)
+            self.object_info.to_hdf(file_name, key=self.class_name,
+                                    mode='a',
+                                    format="fixed")
 
 
 def get_next_event(f_in):

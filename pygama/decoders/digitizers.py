@@ -23,7 +23,6 @@ class Digitizer(DataLoader):
     - parse_event_data
     - reconstruct_waveform
     """
-
     def __init__(self, *args, **kwargs):
 
         self.chan_list = None  # list of channels to decode
@@ -33,10 +32,8 @@ class Digitizer(DataLoader):
         except KeyError:
             self.split_waveform = False
             pass
-        self.hf5_type = "table" if self.split_waveform else "fixed"
 
         super().__init__(*args, **kwargs)
-
 
     def decode_event(self, event_data_bytes, event_number, header_dict):
         pass
@@ -81,16 +78,10 @@ class Digitizer(DataLoader):
 class Gretina4MDecoder(Digitizer):
     """
     inherits from Digitizer and DataLoader
-
-    can inspect all methods with:
-    `import inspect, pygama`
-    `gr = pygama.Gretina4MDecoder()`
-    `inspect.getmembers(gr)`
-    can show data members with `gr.__dict__`
-
-    min_signal_thresh: multiplier on noise ampliude required to process a signal:
-    helps avoid processing a ton of noise
-    chanList: list of channels to process
+    chan_list: list of channels to process
+    -- idea:
+        min_signal_thresh: multiplier on noise ampliude required to process
+        a signal, helps avoid processing a ton of noise
 
     members:
       - load_object_info (also in DataLoader)
@@ -104,8 +95,11 @@ class Gretina4MDecoder(Digitizer):
     """
     def __init__(self, *args, **kwargs):
 
-        self.decoder_name = 'ORGretina4MWaveformDecoder'  #ORGretina4M'
+        self.decoder_name = 'ORGretina4MWaveformDecoder'
         self.class_name = 'ORGretina4MModel'
+        super().__init__(*args, **kwargs)
+
+        self.h5_format = "table"
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
@@ -136,8 +130,6 @@ class Gretina4MDecoder(Digitizer):
         self.wf_length = 2032  #TODO: This should probably be determined more rigidly
         self.sample_period = 10  #ns
         self.gretina_event_no = 0
-
-        super().__init__(*args, **kwargs)
 
     def load_object_info(self, object_info):
         super().load_object_info(object_info)
@@ -326,8 +318,11 @@ class SIS3302Decoder(Digitizer):
 
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.class_name = 'ORSIS3302Model'
+        super().__init__(*args, **kwargs)
+
         self.event_header_length = 1
         self.sample_period = 10  #ns
+        self.h5_format = "table"
 
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
@@ -340,7 +335,7 @@ class SIS3302Decoder(Digitizer):
             "energy_wf": []
         }
 
-        super().__init__(*args, **kwargs)
+
 
     def get_name(self):
         return self.decoder_name

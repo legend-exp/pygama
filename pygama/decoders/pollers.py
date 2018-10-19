@@ -30,10 +30,12 @@ class MJDPreampDecoder(Poller):
     """
 
     def __init__(self, *args, **kwargs):
-
         self.decoder_name = 'ORMJDPreAmpDecoderForAdc'
         self.class_name = 'MJDPreAmp'
+        super().__init__(*args, **kwargs)
+
         self.event_header_length = -1
+        self.h5_format = 'fixed'
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
@@ -43,8 +45,6 @@ class MJDPreampDecoder(Poller):
             "device_id": [],
             "event_number": []
         }
-
-        super().__init__(*args, **kwargs)
 
     def decode_event(self,
                      event_data_bytes,
@@ -157,11 +157,12 @@ class ISegHVDecoder(Poller):
     """ iSeg HV Card """
 
     def __init__(self, *args, **kwargs):
-
         self.decoder_name = 'ORiSegHVCardDecoderForHV'
         self.class_name = 'ORiSegHVCardDecoder'
-        self.event_header_length = -1
         super().__init__(*args, **kwargs)
+
+        self.event_header_length = -1
+        self.h5_format = 'fixed'
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
