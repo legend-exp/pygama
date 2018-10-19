@@ -96,7 +96,7 @@ class DataLoader(ABC):
         if len(df) == 0:
             print("Length of DataFrame for {} is 0!".format(self.class_name))
             return None
-        df.set_index("event_number", inplace=True)
+        # df.set_index("event_number", inplace=True)
 
         return df
 
@@ -112,7 +112,8 @@ class DataLoader(ABC):
             file_name,
             key=self.decoder_name,
             mode='a',
-            format=self.h5_format)
+            format=self.h5_format,
+            data_columns=["event_number"]) # can use hdf5 file indexing 
 
             # need the decoder name and the class name
         if self.object_info is not None:

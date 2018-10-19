@@ -1,6 +1,5 @@
 """ ========= PYGAMA =========
 TIER 0 MAIN PROCESSING ROUTINE
-Cythonized for maximum speed.
 """
 # cimport numpy as np
 

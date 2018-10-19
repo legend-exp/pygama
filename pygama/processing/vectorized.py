@@ -42,9 +42,11 @@ class VectorProcess:
             p_result = processor.process(self.wave_dict, self.calc_df)
 
             if isinstance(processor, VectorCalculator):
-                self.calc_df = self.calc_df.join(p_result, how='left')
+                # calc_df is updated inside the functions
+                pass
 
             elif isinstance(processor, VectorTransformer):
+                # 
                 for wftype in p_result:
                     self.wave_dict[wftype] = p_result[wftype]
 
@@ -97,8 +99,9 @@ def avg_baseline(wave_dict, calc_df, i_start=0, i_end=500):
     # find wf means
     avgs = np.mean(nd_block[:, i_start:i_end], axis=1)
 
-    # return df with column names
-    return pd.DataFrame(avgs, columns = ["bl_avg"])
+    # add the result as a new column
+    calc_df["bl_avg"] = avgs
+    return calc_df
 
 
 def fit_baseline(wave_dict, calc_df, i_start=0, i_end=500, order=1):
@@ -111,8 +114,11 @@ def fit_baseline(wave_dict, calc_df, i_start=0, i_end=500, order=1):
     wfs = nd_block[:, i_start:i_end].T
     pol = np.polynomial.polynomial.polyfit(x, wfs, order).T
 
-    # return df with column names
-    return pd.DataFrame(pol, columns = ["bl_int", "bl_slope"])
+    # add the result as new columns
+    calc_df["bl_int"] = pol[:,0]
+    calc_df["bl_slope"] = pol[:,1]
+    return calc_df
+
 
 # ==============================================================================
 
