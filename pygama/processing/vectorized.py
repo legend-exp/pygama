@@ -46,7 +46,7 @@ class VectorProcess:
                 pass
 
             elif isinstance(processor, VectorTransformer):
-                # 
+                #
                 for wftype in p_result:
                     self.wave_dict[wftype] = p_result[wftype]
 
@@ -66,6 +66,7 @@ class VectorProcess:
         self.AddCalculator(avg_baseline, fun_args = {"i_end":500})
         self.AddCalculator(fit_baseline, fun_args = {"i_end":500})
         self.AddTransformer(bl_subtract, fun_args = {"test":False})
+        self.AddTransformer(trap_filter, fun_args = {"test":True})
 
 
 class VectorProcessorBase(ABC):
@@ -159,3 +160,50 @@ def bl_subtract(wave_dict, calc_df, test=False):
         exit()
 
     return {"wf_blsub": blsub_wfs} # note, floats are gonna take up more memory
+
+
+def trap_filter(wave_dict, calc_df, rt=400, ft=200, dt=0, test=False):
+
+    wfs = wave_dict["wf_blsub"]
+    nwfs, nsamp = wfs.shape[0], wfs.shape[1]
+
+    baseline = 0 # do i need this?
+    trap_wfs = np.zeros_like(wfs)
+    wfs_minus_ramp = np.zeros_like(wfs)
+    wfs_minus_ft_and_ramp = np.zeros_like(wfs)
+    wfs_minus_ft_and_2ramp = np.zeros_like(wfs)
+
+    # time shift the waveforms to later and later
+    wfs_minus_ramp[:, :rt] = baseline
+    wfs_minus_ramp[:, rt:] = wfs[:, :nsamp - rt]
+
+    wfs_minus_ft_and_ramp[:, :(ft + rt)] = baseline
+    wfs_minus_ft_and_ramp[:, (ft + rt):] = wfs[:, :nsamp - ft - rt]
+
+    wfs_minus_ft_and_2ramp[:, :(ft + 2 * rt)] = baseline
+    wfs_minus_ft_and_2ramp[:, (ft + 2 * rt):] = wfs[:, :nsamp - ft - 2 * rt]
+
+    scratch = wfs - (wfs_minus_ramp + wfs_minus_ft_and_ramp + wfs_minus_ft_and_2ramp)
+
+    # final output
+    trap_wfs = np.cumsum(trap_wfs + scratch, axis=1)
+
+    # normalize
+    trap_wfs[:, :nsamp - (2 * rt + ft)] = trap_wfs[:, 2 * rt + ft:] / rt
+
+    if test:
+        # diagnostic plot
+        import matplotlib.pyplot as plt
+        iwf = 1
+        plt.plot(np.arange(nsamp), wfs[iwf], '-r', label='raw')
+        # plt.plot(np.arange(nsamp), wfs_minus_ramp[iwf], '-b', label='wf-ramp')
+        # plt.plot(np.arange(nsamp), wfs_minus_ft_and_ramp[iwf], '-g', label='wf-ft-ramp')
+        # plt.plot(np.arange(nsamp), wfs_minus_ft_and_2ramp[iwf], '-m', label='wf-ft-2ramp')
+        # plt.plot(np.arange(nsamp), scratch[iwf], '-b', label='scratch')
+        plt.plot(np.arange(nsamp), trap_wfs[iwf], '-g', label='trap')
+        plt.legend()
+        plt.show()
+
+    exit()
+    return {"wf_trap": trap_wfs}
+

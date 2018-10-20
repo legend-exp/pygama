@@ -12,8 +12,8 @@ def main():
 
     # tier0(raw_file)
     # tier1(t1_file)
-    # tier1_quick(t1_file)
-    tier1_mp(t1_file)
+    tier1_quick(t1_file)
+    # tier1_mp(t1_file)
     # check_equal(t1_file)
     # optimize_tier1_mp(t1_file)
 
@@ -80,9 +80,9 @@ def tier1_quick(t1_file):
     # exit()
 
     n_evt = 100
-    tier0("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
+    # tier0("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
 
-    # use index (can also use anything in 'data_colunns')
+    # use index (can also use anything in 'data_columns')
     # event_df = pd.read_hdf(t1_file, "ORGretina4MWaveformDecoder",
                            # where='index >= {} & index < {}'.format(15, 30))#, stop=40)
 
