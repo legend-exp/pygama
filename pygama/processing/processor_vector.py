@@ -18,7 +18,7 @@ class VectorProcess:
         self.proc_list = []
         self.digitizer = None
         self.calc_df = None # df for calculation results (no wfs)
-        self.wave_dict = {} # wfs only, NxM arrays (unpacked)
+        self.waves = {} # wfs only, NxM arrays (unpacked)
 
         if default_list:
             self.SetDefaultList()
@@ -30,7 +30,7 @@ class VectorProcess:
         """
         # save an ndarray of the waveforms
         iwf = data_df.columns.get_loc(0) # wf sample 0
-        self.wave_dict["waveform"] = data_df.iloc[:, iwf:].values
+        self.waves["waveform"] = data_df.iloc[:, iwf:].values
 
         # save the non-wf parts of the input dataframe separately
         self.calc_df = data_df.iloc[:, :iwf].copy() # make a new df here
@@ -39,7 +39,7 @@ class VectorProcess:
         for processor in self.proc_list:
             # print(processor.function.__name__)
 
-            p_result = processor.process(self.wave_dict, self.calc_df)
+            p_result = processor.process(self.waves, self.calc_df)
 
             if isinstance(processor, VectorCalculator):
                 # calc_df is updated inside the functions
@@ -47,10 +47,10 @@ class VectorProcess:
 
             elif isinstance(processor, VectorTransformer):
                 for wftype in p_result:
-                    self.wave_dict[wftype] = p_result[wftype]
+                    self.waves[wftype] = p_result[wftype]
 
         if wfnames_out is not None:
-            wf_out = {wf : self.wave_dict[wf] for wf in wfnames_out}
+            wf_out = {wf : self.waves[wf] for wf in wfnames_out}
             return self.calc_df, wf_out
 
         return self.calc_df
@@ -75,13 +75,13 @@ class VectorProcessorBase(ABC):
         self.function = function
         self.fun_args = fun_args # so fun
 
-    def process(self, wave_dict, calc_df):
-        """ run the given calculation on the wf block in wave_dict.
+    def process(self, waves, calc_df):
+        """ run the given calculation on the wf block in waves.
         can also use results from other calculations via calc_df.
         individual processor functions can decide if they want to use the
         df axes, or convert to a numpy array for extra speed
         """
-        return self.function(wave_dict, calc_df, **self.fun_args)
+        return self.function(waves, calc_df, **self.fun_args)
 
 # ==============================================================================
 
@@ -91,10 +91,10 @@ class VectorCalculator(VectorProcessorBase):
         super().__init__(function, fun_args)
 
 
-def avg_baseline(wave_dict, calc_df, i_start=0, i_end=500):
+def avg_baseline(waves, calc_df, i_start=0, i_end=500):
     """ Simple mean, vectorized version of baseline calculator """
 
-    wf_block = wave_dict["waveform"]
+    wf_block = waves["waveform"]
 
     # find wf means
     avgs = np.mean(wf_block[:, i_start:i_end], axis=1)
@@ -104,11 +104,11 @@ def avg_baseline(wave_dict, calc_df, i_start=0, i_end=500):
     return calc_df
 
 
-def fit_baseline(wave_dict, calc_df, i_start=0, i_end=500, order=1):
+def fit_baseline(waves, calc_df, i_start=0, i_end=500, order=1):
     """ Polynomial fit [order], vectorized version of baseline calculator
     TODO: arbitrary orders?
     """
-    wf_block = wave_dict["waveform"]
+    wf_block = waves["waveform"]
 
     # run polyfit
     x = np.arange(i_start, i_end)
@@ -121,10 +121,10 @@ def fit_baseline(wave_dict, calc_df, i_start=0, i_end=500, order=1):
     return calc_df
 
 
-def trap_max(wave_dict, calc_df, test=False):
+def trap_max(waves, calc_df, test=False):
     """ calculate maximum of trapezoid filter - no pride here """
 
-    wfs = wave_dict["wf_trap"]
+    wfs = waves["wf_trap"]
 
     maxes = np.amax(wfs, axis=1)
 
@@ -147,13 +147,13 @@ class VectorTransformer(VectorProcessorBase):
         super().__init__(function, fun_args)
 
 
-def bl_subtract(wave_dict, calc_df, test=False):
+def bl_subtract(waves, calc_df, test=False):
     """ Return an ndarray of baseline-subtracted waveforms
     Depends on fit_baseline calculator.
     for reference, the non-vector version is just:
     return waveform - (bl_0 + bl_1 * np.arange(len(waveform)))
     """
-    wfs = wave_dict["waveform"]
+    wfs = waves["waveform"]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
     bl_0 = calc_df["bl_int"].values[:,np.newaxis]
@@ -182,9 +182,9 @@ def bl_subtract(wave_dict, calc_df, test=False):
     return {"wf_blsub": blsub_wfs} # note, floats are gonna take up more memory
 
 
-def trap_filter(wave_dict, calc_df, rt=400, ft=200, dt=0, test=False):
+def trap_filter(waves, calc_df, rt=400, ft=200, dt=0, test=False):
 
-    wfs = wave_dict["wf_blsub"]
+    wfs = waves["wf_blsub"]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
     wfs_minus_ramp = np.zeros_like(wfs)
