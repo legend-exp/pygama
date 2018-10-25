@@ -33,20 +33,20 @@ import warnings, pandas
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
 warnings.filterwarnings('ignore', category=pandas.io.pytables.PerformanceWarning)
 
-# try to import all public functions
-import pkgutil
-__path__ = pkgutil.extend_path(__path__, __name__)
-for importer, modname, ispkg in pkgutil.walk_packages(
-        path=__path__, prefix=__name__ + '.'):
-    __import__(modname)
+# # try to import all public functions
+# import pkgutil
+# __path__ = pkgutil.extend_path(__path__, __name__)
+# for importer, modname, ispkg in pkgutil.walk_packages(
+#         path=__path__, prefix=__name__ + '.'):
+#     __import__(modname)
 
 # bring key functions to the primary API, e.g. pygama.process_tier_0
 # i don't really like how i have to specify everything here
-from .processing.processing import *
-from .processing.base_classes import *
-from .decoders.digitizers import *
-from .processing.vectorized import *
-from .waveform import *
+# from .processing.processing import *
+# from .processing.base_classes import *
+# from .decoders.digitizers import *
+# from .processing.vectorized import *
+# from .waveform import *
 
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event
