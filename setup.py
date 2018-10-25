@@ -25,21 +25,17 @@ if __name__ == "__main__":
     src = []
     fext = ".pyx" if do_cython else ".c"
 
-    cyfiles = glob.glob("./pygama/processing/*.pyx")
-
-    cynames = []
-    for f in cyfiles:
-        f_name = f.split("/")[-1]
-        cynames.append(os.path.splitext(f_name)[0])
-
     exts = []
-    for ext_name in cynames:
-        exts.append(Extension(
-            "pygama.processing." + ext_name,
-            sources = [os.path.join("pygama","processing",ext_name + fext)],
-            language = "c",
-            include_dirs = include_dirs)
-        )
+    for mod in ["decoders","processing"]:
+        for f in glob.glob("./pygama/{}/*.pyx".format(mod)):
+            f_name = f.split('/')[-1]
+            cyname = os.path.splitext(f_name)[0]
+            exts.append(Extension(
+                "pygama.{}.{}".format(mod, cyname),
+                sources = [os.path.join("pygama", mod, cyname + fext)],
+                language = 'c',
+                include_dirs = include_dirs)
+                )
 
     if do_cython:
         exts = cythonize(exts)

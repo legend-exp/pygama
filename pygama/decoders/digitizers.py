@@ -8,8 +8,6 @@ import array
 from .dataloading import DataLoader
 from ..waveform import Waveform, MultisampledWaveform
 
-__all__ = ['Digitizer', 'Gretina4MDecoder', 'SIS3302Decoder', 'get_digitizers']
-
 
 def get_digitizers():
     return [sub() for sub in Digitizer.__subclasses__()]

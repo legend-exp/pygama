@@ -13,8 +13,8 @@ from functools import partial
 from ..utils import *
 from ..decoders.digitizers import *
 from ..decoders.dataloading import *
-from .header_parser import *
-from .base_classes import *
+from ..decoders.header_parser import *
+from .processor_base import *
 
 
 def ProcessTier0(filename,

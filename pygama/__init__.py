@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-""" pygama init file.  currently we declare some stuff (a public API)
-    and it might be better to declare more of the public functions here if it
+""" pygama init file.
+    it might be better to declare more of the public functions here if it
     makes sphinx auto-generated documentation easier.
 """
 __version__ = "0.1.0"
@@ -31,7 +31,8 @@ __version__ = "0.1.0"
 # kill annoying warnings
 import warnings, pandas
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
-warnings.filterwarnings('ignore', category=pandas.io.pytables.PerformanceWarning)
+warnings.filterwarnings(
+    'ignore', category=pandas.io.pytables.PerformanceWarning)
 
 # # try to import all public functions
 # import pkgutil

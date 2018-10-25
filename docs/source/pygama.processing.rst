@@ -4,14 +4,6 @@ pygama.processing package
 Submodules
 ----------
 
-pygama.processing.base\_classes module
---------------------------------------
-
-.. automodule:: pygama.processing.base_classes
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pygama.processing.calculators module
 ------------------------------------
 
@@ -28,18 +20,42 @@ pygama.processing.filters module
     :undoc-members:
     :show-inheritance:
 
-pygama.processing.header\_parser module
----------------------------------------
+pygama.processing.processor\_base module
+----------------------------------------
 
-.. automodule:: pygama.processing.header_parser
+.. automodule:: pygama.processing.processor_base
     :members:
     :undoc-members:
     :show-inheritance:
 
-pygama.processing.processing module
------------------------------------
+pygama.processing.tier0 module
+------------------------------
 
-.. automodule:: pygama.processing.processing
+.. automodule:: pygama.processing.tier0
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pygama.processing.tier1 module
+------------------------------
+
+.. automodule:: pygama.processing.tier1
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pygama.processing.tier1vec module
+---------------------------------
+
+.. automodule:: pygama.processing.tier1vec
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pygama.processing.tier\_wrapper module
+--------------------------------------
+
+.. automodule:: pygama.processing.tier_wrapper
     :members:
     :undoc-members:
     :show-inheritance:
@@ -48,6 +64,14 @@ pygama.processing.transforms module
 -----------------------------------
 
 .. automodule:: pygama.processing.transforms
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pygama.processing.vectorized module
+-----------------------------------
+
+.. automodule:: pygama.processing.vectorized
     :members:
     :undoc-members:
     :show-inheritance:

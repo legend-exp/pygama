@@ -4,6 +4,7 @@ import pandas as pd
 
 class WaveformFrame:
     """ do stuff to zipped dataframes of numpy arrays w. different wf types """
+
     def __init__(self, wf_df):
         pass
         # print(wf_df.shape, wf_df.columns)
@@ -14,6 +15,7 @@ class Waveform:
     This is the pygama waveform class.
     Intended for operations on a properly processed pandas dataframe.
     """
+
     def __init__(self, wf_data, sample_period):
         '''
         sample_period is in ns
@@ -22,8 +24,12 @@ class Waveform:
         self.sample_period = sample_period
         self.amplitude = np.amax(self.data)
 
-    def window_waveform(self, time_point=0.5, early_samples=200,
-                        num_samples=400, method="percent", use_slope=False):
+    def window_waveform(self,
+                        time_point=0.5,
+                        early_samples=200,
+                        num_samples=400,
+                        method="percent",
+                        use_slope=False):
         """
         Windows waveform around a risetime percentage timepoint
         time_point: percentage (0-1)
@@ -65,6 +71,7 @@ class MultisampledWaveform(Waveform):
     """
     Multisampled WF class.
     """
+
     def __init__(self, time, wf_data, sample_period, full_sample_range, *args,
                  **kwargs):
         self.time = time

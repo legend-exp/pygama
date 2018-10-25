@@ -41,7 +41,7 @@ def get_bin_centers(bins):
 
 def sizeof_fmt(num, suffix='B'):
     """ Given a file size in bytes, output a human-readable form. """
-    for unit in ['','K','M','G','T','P','E','Z']:
+    for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
         if abs(num) < 1000.0:
             return "{:.3f} {}{}".format(num, unit, suffix)
         num /= 1000.0
@@ -51,7 +51,7 @@ def sizeof_fmt(num, suffix='B'):
 def get_hist(np_arr, x_lo, x_hi, xpb, nb=None, shift=True, wts=None):
     """ quick wrapper to have more control of numpy's histogram """
     if nb is None:
-        nb = int((x_hi - x_lo)/xpb)
+        nb = int((x_hi - x_lo) / xpb)
     y, x = np.histogram(np_arr, bins=nb, range=(x_lo, x_hi), weights=wts)
     y = np.insert(y, 0, 0, axis=0)
     if shift:
@@ -64,4 +64,4 @@ def sh(cmd, sh=False):
     import shlex
     import subprocess as sp
     if not sh: sp.call(shlex.split(cmd))  # "safe"
-    else:      sp.call(cmd, shell=sh)     # "less safe"
+    else: sp.call(cmd, shell=sh)  # "less safe"

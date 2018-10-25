@@ -20,6 +20,14 @@ pygama.decoders.digitizers module
     :undoc-members:
     :show-inheritance:
 
+pygama.decoders.header\_parser module
+-------------------------------------
+
+.. automodule:: pygama.decoders.header_parser
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 pygama.decoders.pollers module
 ------------------------------
 
