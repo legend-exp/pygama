@@ -8,6 +8,7 @@ import cProfile
 from .tier0 import ProcessTier0
 from .tier1 import ProcessTier1
 from .base_classes import TierOneProcessorList
+from .calculators import *
 
 __all__ = ["get_default_processor_list", "process_tier_0", "process_tier_1"]
 

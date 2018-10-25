@@ -6,6 +6,9 @@ import pygama
 
 data_dir = "/Users/wisecg/project/pygama"
 
+h5keys = {42343:"/ORGretina4MWaveformDecoder",
+          72:"ORSIS3303DecoderForEnergy"}
+
 def main():
     """ I need to get a Tier 1 format that is:
         - chunkable (paralellizable)
@@ -42,16 +45,7 @@ def check_tier1(run):
 
     with pd.HDFStore(t1_file, 'r') as store:
 
-        if "/ORGretina4MWaveformDecoder" in store.keys():
-            h5key = "ORGretina4MWaveformDecoder"
-        elif "/ORSIS3303DecoderForEnergy" in store.keys():
-            h5key = "ORSIS3303DecoderForEnergy"
-        else:
-            print("ERROR, no sensible key found!")
-            exit()
-
-        print("Found key:", h5key)
-        nrows = store.get_storer(h5key).nrows
+        nrows = store.get_storer(h5keys[run]).nrows
         # chunk_idxs = list(range(nrows//chunksize + 1))
 
     print(nrows)

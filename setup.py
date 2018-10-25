@@ -5,7 +5,7 @@ $ pip install -e pygama
 re-runs cythonize function on a list of extensions.
 """
 from setuptools import setup, Extension, find_packages
-import sys, os
+import sys, os, glob
 
 do_cython = False
 try:
@@ -24,31 +24,25 @@ if __name__ == "__main__":
 
     src = []
     fext = ".pyx" if do_cython else ".c"
-    exts = [
-        Extension(
-            "pygama.processing.tier0",
-            sources=[os.path.join("pygama", "processing", "tier0" + fext)],
-            language="c",
-            include_dirs=include_dirs),
-    #     Extension(
-    #         "pygama.processing._tier1",
-    #         sources=[os.path.join("pygama", "processing", "tier1" + fext)],
-    #         language="c",
-    #         include_dirs=include_dirs),
-    #     Extension(
-    #         "pygama.processing.transforms",
-    #         sources=[os.path.join("pygama", "processing", "transforms" + fext)],
-    #         language="c"),
-    #     Extension(
-    #         "pygama.processing.calculators",
-    #         sources=[
-    #             os.path.join("pygama", "processing", "calculators" + fext)
-    #         ],
-    #         language="c")
-    ]
+
+    cyfiles = glob.glob("./pygama/processing/*.pyx")
+
+    cynames = []
+    for f in cyfiles:
+        f_name = f.split("/")[-1]
+        cynames.append(os.path.splitext(f_name)[0])
+
+    exts = []
+    for ext_name in cynames:
+        exts.append(Extension(
+            "pygama.processing." + ext_name,
+            sources = [os.path.join("pygama","processing",ext_name + fext)],
+            language = "c",
+            include_dirs = include_dirs)
+        )
+
     if do_cython:
         exts = cythonize(exts)
-    # exts = []
 
     setup(
         name="pygama",

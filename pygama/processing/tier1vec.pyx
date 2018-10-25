@@ -8,13 +8,13 @@ from ..decoders.dataloading import *
 from ..decoders.digitizers import *
 from ..utils import *
 
-def ProcessTier1(t1_file,
-                 vec_process,
-                 digitizer_list=None,
-                 out_prefix="t2",
-                 verbose=False,
-                 output_dir=None,
-                 multiprocess=False):
+def ProcessTier1Vec(t1_file,
+                    vec_process,
+                    digitizer_list=None,
+                    out_prefix="t2",
+                    verbose=False,
+                    output_dir=None,
+                    multiprocess=False):
     """ vector version of tier 1 processor """
 
     print("Starting pygama Tier 1 (vector) processing ...")
@@ -37,11 +37,6 @@ def ProcessTier1(t1_file,
     # get digitizers in the file
     f = h5py.File(t1_file, 'r')
     digitizer_list = [d for d in digitizer_list if d.decoder_name in f.keys()]
-
-    with pd.HDFStore(t1_file, 'r') as store:
-        nrows = store.get_storer("ORSIS3302DecoderForEnergy").nrows
-        print(nrows)
-        chunk_idxs = list(range(nrows//chunksize + 1))
 
     print("   Found digitizers:")
     for d in digitizer_list:

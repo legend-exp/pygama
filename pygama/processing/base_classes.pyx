@@ -78,13 +78,13 @@ class Transformer(ProcessorBase):
             input_waveform=input_waveform)
 
 
-class DatabaseLookup(ProcessorBase):
-
-    def __init__(self, function, args={}, output_name=None):
-        print(
-            "Database Lookup has been murdered in cold blood.  B. Shanks, 8/15/18.  Either get it working or remove the DB call from your processor."
-        )
-        sys.exit()
+# class DatabaseLookup(ProcessorBase):
+#
+#     def __init__(self, function, args={}, output_name=None):
+#         print(
+#             "Database Lookup has been murdered in cold blood.  B. Shanks, 8/15/18.  Either get it working or remove the DB call from your processor."
+#         )
+#         sys.exit()
 
     #     self.function = function
     #
