@@ -4,8 +4,8 @@ so is it good practice to keep a file like this?
 there are just two very short functions here, they would be easy to move,
 unless we anticipate this file growing.
 """
-
 import sys
+import numpy as np
 
 
 def update_progress(progress, runNumber=None):
@@ -46,3 +46,22 @@ def sizeof_fmt(num, suffix='B'):
             return "{:.3f} {}{}".format(num, unit, suffix)
         num /= 1000.0
     return "{:.1f} {} {}".format(num, 'Y', suffix)
+
+
+def get_hist(np_arr, x_lo, x_hi, xpb, nb=None, shift=True, wts=None):
+    """ quick wrapper to have more control of numpy's histogram """
+    if nb is None:
+        nb = int((x_hi - x_lo)/xpb)
+    y, x = np.histogram(np_arr, bins=nb, range=(x_lo, x_hi), weights=wts)
+    y = np.insert(y, 0, 0, axis=0)
+    if shift:
+        x = x - xpb / 2.
+    return x, y
+
+
+def sh(cmd, sh=False):
+    """ Wraps a shell command."""
+    import shlex
+    import subprocess as sp
+    if not sh: sp.call(shlex.split(cmd))  # "safe"
+    else:      sp.call(cmd, shell=sh)     # "less safe"

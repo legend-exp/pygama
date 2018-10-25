@@ -63,7 +63,7 @@ class DataLoader(ABC):
             if key is not "self" and key in self.decoded_values:
                 self.decoded_values[key].append(vals[key])
 
-    def create_df(self):
+    def create_df(self, flatten):
         """
         Base dataframe creation method.
         Classes inheriting from DataLoader (like digitizers or pollers) can
@@ -73,25 +73,27 @@ class DataLoader(ABC):
         for key in self.decoded_values:
             print("      {} entries: {}".format(key, len(self.decoded_values[key])))
 
-        # old faithful (embeds wfs in cells, requires h5type = 'fixed')
-        # df = pd.DataFrame.from_dict(self.decoded_values)
+        if not flatten:
+            # old faithful (embeds wfs in cells, requires h5type = 'fixed')
+            df = pd.DataFrame.from_dict(self.decoded_values)
 
-        # 'flatten' the values (each wf sample gets a column, h5type = 'table')
-        new_cols = []
-        for col in sorted(self.decoded_values.keys()):
+        else:
+            # 'flatten' the values (each wf sample gets a column, h5type = 'table')
+            new_cols = []
+            for col in sorted(self.decoded_values.keys()):
 
-            # unzip waveforms (needed to use "table" hdf5 output)
-            if col == "waveform":
-                wfs = np.vstack(self.decoded_values[col]) # creates an ndarray
-                new_cols.append(pd.DataFrame(wfs, dtype='int16'))
+                # unzip waveforms (needed to use "table" hdf5 output)
+                if col == "waveform":
+                    wfs = np.vstack(self.decoded_values[col]) # creates an ndarray
+                    new_cols.append(pd.DataFrame(wfs, dtype='int16'))
 
-            # everything else is single-valued
-            else:
-                vals = pd.Series(self.decoded_values[col], name=col)
-                new_cols.append(vals)
+                # everything else is single-valued
+                else:
+                    vals = pd.Series(self.decoded_values[col], name=col)
+                    new_cols.append(vals)
 
-        # this is our flattened output (can be chunked with hdf5)
-        df = pd.concat(new_cols, axis=1)
+            # this is our flattened output (can be chunked with hdf5)
+            df = pd.concat(new_cols, axis=1)
 
         if len(df) == 0:
             print("Length of DataFrame for {} is 0!".format(self.class_name))
@@ -100,9 +102,9 @@ class DataLoader(ABC):
 
         return df
 
-    def to_file(self, file_name):
+    def to_file(self, file_name, flatten=False):
 
-        df_data = self.create_df()
+        df_data = self.create_df(flatten)
         if df_data is None:
             print("Data is None!")
             return
@@ -113,7 +115,7 @@ class DataLoader(ABC):
             key=self.decoder_name,
             mode='a',
             format=self.h5_format,
-            data_columns=["event_number"]) # can use hdf5 file indexing 
+            data_columns=["event_number"]) # can use for hdf5 file indexing
 
             # need the decoder name and the class name
         if self.object_info is not None:

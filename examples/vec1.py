@@ -24,7 +24,7 @@ def tier0(raw_file, n_evt=None):
         n_evt = 10000 # 487500 or np.inf
         # n_evt = 5000
 
-    from pygama.processing._tier0 import ProcessTier0
+    from pygama.processing.tier0 import ProcessTier0
     ProcessTier0(raw_file,
                  verbose=True,
                  output_dir="/Users/wisecg/dev/mj60/data",
@@ -193,11 +193,11 @@ def optimize_tier1_mp(t1_file):
 
     for chunksize in n_chunk:
 
-
         t_start = time.time()
 
         with pd.HDFStore(t1_file, 'r') as store:
-            nrows = store.get_storer(h5key).nrows
+            nrows = store.get_storer(h5key).nrows # this doesn't work for 'fixed'
+            # nrows = store.get_storer("ORSIS3302DecoderForEnergy").shape[0]
             chunk_idxs = list(range(nrows//chunksize + 1))
 
         keywords = {"t1_file":t1_file, "chunksize":chunksize, "h5key":h5key}

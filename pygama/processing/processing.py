@@ -5,8 +5,8 @@ from multiprocessing import Pool, cpu_count
 from functools import partial
 import cProfile
 
-from ._tier0 import ProcessTier0
-from ._tier1 import ProcessTier1
+from .tier0 import ProcessTier0
+from .tier1 import ProcessTier1
 from .base_classes import TierOneProcessorList
 
 __all__ = ["get_default_processor_list", "process_tier_0", "process_tier_1"]

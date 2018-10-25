@@ -33,7 +33,7 @@ class VectorProcess:
         self.wave_dict["waveform"] = data_df.iloc[:, iwf:].values
 
         # save the non-wf parts of the input dataframe separately
-        self.calc_df = data_df.iloc[:, :iwf]
+        self.calc_df = data_df.iloc[:, :iwf].copy() # make a new df here
 
         # apply each processsor
         for processor in self.proc_list:
@@ -46,7 +46,6 @@ class VectorProcess:
                 pass
 
             elif isinstance(processor, VectorTransformer):
-                #
                 for wftype in p_result:
                     self.wave_dict[wftype] = p_result[wftype]
 
@@ -66,7 +65,7 @@ class VectorProcess:
         self.AddCalculator(avg_baseline, fun_args = {"i_end":500})
         self.AddCalculator(fit_baseline, fun_args = {"i_end":500})
         self.AddTransformer(bl_subtract, fun_args = {"test":False})
-        self.AddTransformer(trap_filter, fun_args = {"test":True})
+        self.AddTransformer(trap_filter, fun_args = {"test":False})
 
 
 class VectorProcessorBase(ABC):
@@ -95,10 +94,10 @@ class VectorCalculator(VectorProcessorBase):
 def avg_baseline(wave_dict, calc_df, i_start=0, i_end=500):
     """ Simple mean, vectorized version of baseline calculator """
 
-    nd_block = wave_dict["waveform"]
+    wf_block = wave_dict["waveform"]
 
     # find wf means
-    avgs = np.mean(nd_block[:, i_start:i_end], axis=1)
+    avgs = np.mean(wf_block[:, i_start:i_end], axis=1)
 
     # add the result as a new column
     calc_df["bl_avg"] = avgs
@@ -106,18 +105,38 @@ def avg_baseline(wave_dict, calc_df, i_start=0, i_end=500):
 
 
 def fit_baseline(wave_dict, calc_df, i_start=0, i_end=500, order=1):
-    """ Polynomial fit [order], vectorized version of baseline calculator """
-
-    nd_block = wave_dict["waveform"]
+    """ Polynomial fit [order], vectorized version of baseline calculator
+    TODO: arbitrary orders?
+    """
+    wf_block = wave_dict["waveform"]
 
     # run polyfit
     x = np.arange(i_start, i_end)
-    wfs = nd_block[:, i_start:i_end].T
+    wfs = wf_block[:, i_start:i_end].T
     pol = np.polynomial.polynomial.polyfit(x, wfs, order).T
 
     # add the result as new columns
     calc_df["bl_int"] = pol[:,0]
     calc_df["bl_slope"] = pol[:,1]
+    return calc_df
+
+
+def trap_max(wave_dict, calc_df, test=False):
+    """ calculate maximum of trapezoid filter - no pride here """
+
+    wfs = wave_dict["wf_trap"]
+
+    maxes = np.amax(wfs, axis=1)
+
+    if test:
+        import matplotlib.pyplot as plt
+        iwf = 1
+        plt.plot(np.arange(len(wfs[iwf])), wfs[iwf], '-r')
+        plt.axhline(maxes[iwf])
+        plt.show()
+        exit()
+
+    calc_df["trap_max"] = maxes
     return calc_df
 
 
@@ -142,6 +161,7 @@ def bl_subtract(wave_dict, calc_df, test=False):
     slope_vals = calc_df["bl_slope"].values[:,np.newaxis]
     bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
 
+    # blsub_wfs = wfs - bl_0
     blsub_wfs = wfs - (bl_0 + bl_1)
 
     if test:
@@ -167,43 +187,42 @@ def trap_filter(wave_dict, calc_df, rt=400, ft=200, dt=0, test=False):
     wfs = wave_dict["wf_blsub"]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
-    baseline = 0 # do i need this?
-    trap_wfs = np.zeros_like(wfs)
     wfs_minus_ramp = np.zeros_like(wfs)
-    wfs_minus_ft_and_ramp = np.zeros_like(wfs)
-    wfs_minus_ft_and_2ramp = np.zeros_like(wfs)
-
-    # time shift the waveforms to later and later
-    wfs_minus_ramp[:, :rt] = baseline
+    wfs_minus_ramp[:, :rt] = 0
     wfs_minus_ramp[:, rt:] = wfs[:, :nsamp - rt]
 
-    wfs_minus_ft_and_ramp[:, :(ft + rt)] = baseline
+    wfs_minus_ft_and_ramp = np.zeros_like(wfs)
+    wfs_minus_ft_and_ramp[:, :(ft + rt)] = 0
     wfs_minus_ft_and_ramp[:, (ft + rt):] = wfs[:, :nsamp - ft - rt]
 
-    wfs_minus_ft_and_2ramp[:, :(ft + 2 * rt)] = baseline
+    wfs_minus_ft_and_2ramp = np.zeros_like(wfs)
+    wfs_minus_ft_and_2ramp[:, :(ft + 2 * rt)] = 0
     wfs_minus_ft_and_2ramp[:, (ft + 2 * rt):] = wfs[:, :nsamp - ft - 2 * rt]
 
     scratch = wfs - (wfs_minus_ramp + wfs_minus_ft_and_ramp + wfs_minus_ft_and_2ramp)
 
-    # final output
-    trap_wfs = np.cumsum(trap_wfs + scratch, axis=1)
-
-    # normalize
-    trap_wfs[:, :nsamp - (2 * rt + ft)] = trap_wfs[:, 2 * rt + ft:] / rt
+    trap_wfs = np.zeros_like(wfs)
+    trap_wfs = np.cumsum(trap_wfs + scratch, axis=1) / rt
 
     if test:
         # diagnostic plot
         import matplotlib.pyplot as plt
-        iwf = 1
+        import pygama.processing.transforms as pt
+        iwf = 2
         plt.plot(np.arange(nsamp), wfs[iwf], '-r', label='raw')
         # plt.plot(np.arange(nsamp), wfs_minus_ramp[iwf], '-b', label='wf-ramp')
         # plt.plot(np.arange(nsamp), wfs_minus_ft_and_ramp[iwf], '-g', label='wf-ft-ramp')
         # plt.plot(np.arange(nsamp), wfs_minus_ft_and_2ramp[iwf], '-m', label='wf-ft-2ramp')
         # plt.plot(np.arange(nsamp), scratch[iwf], '-b', label='scratch')
-        plt.plot(np.arange(nsamp), trap_wfs[iwf], '-g', label='trap')
+        plt.plot(np.arange(nsamp), trap_wfs[iwf], '-g', lw=4, label='trap')
+
+        trapwf = pt.trap_filter(wfs[iwf])
+        plt.plot(np.arange(len(trapwf)), trapwf, '-k', label='bentrap')
+
+        plt.ylim(-1000, 1.2*np.amax(wfs[iwf]))
         plt.legend()
         plt.show()
+        exit()
 
-    exit()
     return {"wf_trap": trap_wfs}
 

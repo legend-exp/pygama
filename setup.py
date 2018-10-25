@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 """ pygama setup script.
-- re-runs cythonize function on a list of extensions
-- currently does (pygama/processing/transforms.pyx) and (pygama/processing/_pygama.pyx)
-- uses setuptools.setup to add pygama to sys.path in python, making every
-  function in a folder with an __init__.py available, except in files which
-  have an underscore in their name, like _processing.py
+run from containing folder with:
+$ pip install -e pygama
+re-runs cythonize function on a list of extensions.
 """
 from setuptools import setup, Extension, find_packages
 import sys, os
@@ -26,15 +24,15 @@ if __name__ == "__main__":
 
     src = []
     fext = ".pyx" if do_cython else ".c"
-    # exts = [
-    #     Extension(
-    #         "pygama.processing._tier0",
-    #         sources=[os.path.join("pygama", "processing", "_tier0" + fext)],
-    #         language="c",
-    #         include_dirs=include_dirs),
+    exts = [
+        Extension(
+            "pygama.processing.tier0",
+            sources=[os.path.join("pygama", "processing", "tier0" + fext)],
+            language="c",
+            include_dirs=include_dirs),
     #     Extension(
     #         "pygama.processing._tier1",
-    #         sources=[os.path.join("pygama", "processing", "_tier1" + fext)],
+    #         sources=[os.path.join("pygama", "processing", "tier1" + fext)],
     #         language="c",
     #         include_dirs=include_dirs),
     #     Extension(
@@ -47,10 +45,10 @@ if __name__ == "__main__":
     #             os.path.join("pygama", "processing", "calculators" + fext)
     #         ],
     #         language="c")
-    # ]
-    # if do_cython:
-    #     exts = cythonize(exts)
-    exts = []
+    ]
+    if do_cython:
+        exts = cythonize(exts)
+    # exts = []
 
     setup(
         name="pygama",

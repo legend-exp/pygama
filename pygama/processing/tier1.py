@@ -1,19 +1,14 @@
 """ ========= PYGAMA =========
 TIER 1 MAIN PROCESSING ROUTINE
-Cythonized for maximum speed.
 """
 # cimport numpy as np
-
 import os, re, sys, time
 import numpy as np
 import pandas as pd
 import h5py
 
-import cProfile # maybe get rid of this when you cythonize?
-
 from ..utils import *
 from ..decoders.digitizers import *
-
 
 def ProcessTier1(filename,
                  processor_list,
@@ -30,11 +25,9 @@ def ProcessTier1(filename,
     output_file_string: file is saved as <output_file_string>_run<runNumber>.h5
     verbose: spits out a progressbar to let you know how the processing is going
     """
-
     print("Starting pygama Tier 1 processing ...")
     print("   Input file: "+filename)
     start = time.clock()
-
 
     directory = os.path.dirname(filename)
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -75,20 +68,10 @@ def ProcessTier1(filename,
         processor_list.num = 0
 
         # loop over events with apply (written in c, so it's faster)
-
-        # print(event_df)
-
         t1_df = event_df.apply(processor_list.Process, axis=1)
-
-        # print(t1_df)
-
-        # pr.disable(); pr.dump_stats("/Users/wisecg/dev/mj60/tier1.prof")
-        # return
 
         # add the result of the processor back into the event_df
         event_df = event_df.join(t1_df, how="left")
-
-        print(event_df)
 
         processor_list.DropTier0(event_df)
 

@@ -56,7 +56,7 @@ class Digitizer(DataLoader):
                 break
         return np.array(waveform)
 
-    def create_df(self):
+    def create_df(self, flatten):
         """ Overloads DataLoader::create_df (in dataloading.py)
         for multisampled waveforms.  Should this be in Gretina4MDecoder?
         """
@@ -72,7 +72,7 @@ class Digitizer(DataLoader):
             return df
 
         else:
-            return super(Digitizer, self).create_df()
+            return super(Digitizer, self).create_df(flatten)
 
 
 class Gretina4MDecoder(Digitizer):
@@ -99,7 +99,7 @@ class Gretina4MDecoder(Digitizer):
         self.class_name = 'ORGretina4MModel'
         super().__init__(*args, **kwargs)
 
-        self.h5_format = "table"
+        self.h5_format = "fixed"
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
@@ -321,8 +321,8 @@ class SIS3302Decoder(Digitizer):
         super().__init__(*args, **kwargs)
 
         self.event_header_length = 1
-        self.sample_period = 10  #ns
-        self.h5_format = "table"
+        self.sample_period = 10  # ns
+        self.h5_format = "fixed"
 
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
@@ -332,10 +332,8 @@ class SIS3302Decoder(Digitizer):
             "channel": [],
             "event_number": [],
             "waveform": [],
-            "energy_wf": []
+            # "energy_wf": []
         }
-
-
 
     def get_name(self):
         return self.decoder_name

@@ -23,7 +23,8 @@ def ProcessTier0(filename,
                  n_max=np.inf,
                  verbose=False,
                  output_dir=None,
-                 decoders=None):
+                 decoders=None,
+                 flatten=False):
     """ Reads in "raw / tier 0" ORCA data and saves to an hdf5 format using pandas
     filename: path to an orca data file
     output_file_string: output file name will be <output_file_string>_run<runNumber>.h5
@@ -145,7 +146,7 @@ def ProcessTier0(filename,
         print("Writing Tier 1 File:\n    {}".format(t1_file_name))
         for d in decoders:
             print(" -- {}".format(d.decoder_name))
-            d.to_file(t1_file_name)
+            d.to_file(t1_file_name, flatten)
 
         statinfo = os.stat(t1_file_name)
         print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
