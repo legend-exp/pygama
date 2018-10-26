@@ -7,6 +7,7 @@
     - ignore auto-generated files (makes cython a dependency, but ok)
     - should we add a static type checker?
     - processing speed checks?
+    - look for cythonizing errors (similar to g++ compiler warnings)
 """
 import sys, os, glob, argparse
 import subprocess
