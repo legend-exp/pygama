@@ -12,9 +12,9 @@ from functools import partial
 
 from ..utils import *
 from ..decoders.digitizers import *
-from ..decoders.dataloading import *
-from ..decoders.header_parser import *
-from .processor_base import *
+from ..decoders.data_loading import *
+from ..decoders.xml_parser import *
+from .base import *
 
 
 def ProcessTier0(filename,
@@ -25,7 +25,8 @@ def ProcessTier0(filename,
                  output_dir=None,
                  decoders=None,
                  flatten=False):
-    """ Reads in "raw / tier 0" ORCA data and saves to an hdf5 format using pandas
+    """
+    Reads in "raw / tier 0" ORCA data and saves to an hdf5 format using pandas
     filename: path to an orca data file
     output_file_string: output file name will be <output_file_string>_run<runNumber>.h5
     n_max: maximum number of events to process (useful for debugging)
@@ -153,3 +154,78 @@ def ProcessTier0(filename,
         elapsed = time.clock() - start
         print("Time elapsed: {:.2f} sec".format(elapsed))
         print("Done.\n")
+
+
+def get_next_event(f_in):
+    """
+    Gets the next event, and some basic information about it
+    Takes the file pointer as input
+    Outputs:
+    -event_data: a byte array of the data produced by the card (could be header + data)
+    -slot:
+    -crate:
+    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    """
+    # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
+
+    # The read is set up to do two 32-bit integers, rather than bytes or shorts
+    # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
+    # Using a
+
+    # NCRATES = 10
+
+    try:
+        head = np.fromstring(
+            f_in.read(4), dtype=np.uint32)  # event header is 8 bytes (2 longs)
+    except Exception as e:
+        print(e)
+        raise Exception("Failed to read in the event orca header.")
+
+    # Assuming we're getting an array of bytes:
+    # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
+    # data_id         = (head[2] >> 2) + (head[3]<<8)
+    # slot            = (head[6] & 0x1f)
+    # crate           = (head[6]>>5) + head[7]&0x1
+    # reserved        = (head[4] + (head[5]<<8))
+
+    # Using an array of uint32
+    record_length = int((head[0] & 0x3FFFF))
+    data_id = int((head[0] >> 18))
+    # slot            =int( (head[1] >> 16) & 0x1f)
+    # crate           =int( (head[1] >> 21) & 0xf)
+    # reserved        =int( (head[1] &0xFFFF))
+
+    # /* ========== read in the rest of the event data ========== */
+    try:
+        event_data = f_in.read(record_length * 4 -
+                               4)  # record_length is in longs, read gives bytes
+    except Exception as e:
+        print("  No more data...\n")
+        print(e)
+        raise EOFError
+
+    # if (crate < 0 or crate > NCRATES or slot  < 0 or slot > 20):
+    #     print("ERROR: Illegal VME crate or slot number {} {} (data ID {})".format(crate, slot,data_id))
+    #     raise ValueError("Encountered an invalid value of the crate or slot number...")
+
+    # return event_data, slot, crate, data_id
+    return event_data, data_id
+
+
+def get_decoders(object_info):
+    """
+    Find all the active pygama data takers that inherit from the DataLoader class.
+    This only works if the subclasses have been imported.  Is that what we want?
+    Also relies on 2-level abstraction, which is dicey
+    """
+    decoders = []
+    for sub in DataLoader.__subclasses__():  # either digitizers or pollers
+        for subsub in sub.__subclasses__():
+            try:
+                decoder = subsub(object_info) # initialize the decoder
+                # print("dataloading - name: ",decoder.decoder_name)
+                decoders.append(decoder)
+            except Exception as e:
+                print(e)
+                pass
+    return decoders

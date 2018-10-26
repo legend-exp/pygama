@@ -5,8 +5,8 @@ from scipy import signal
 import itertools
 import array
 
-from .dataloading import DataLoader
-from ..waveform import Waveform, MultisampledWaveform
+from .data_loading import DataLoader
+from ..processing.waveform import Waveform, MultisampledWaveform
 
 
 def get_digitizers():
@@ -16,7 +16,7 @@ def get_digitizers():
 class Digitizer(DataLoader):
     """
     members:
-    - decode_event (base is in DataLoader (dataloading.py))
+    - decode_event (base is in DataLoader (data_loading.py))
     - create_df (also in DataLoader)
     - parse_event_data
     - reconstruct_waveform
@@ -24,6 +24,8 @@ class Digitizer(DataLoader):
     def __init__(self, *args, **kwargs):
 
         self.chan_list = None  # list of channels to decode
+
+        # TODO: I don't like all this multisampling WF stuff here.
 
         try:
             self.split_waveform = kwargs.pop("split_waveform")
@@ -55,7 +57,7 @@ class Digitizer(DataLoader):
         return np.array(waveform)
 
     def create_df(self, flatten):
-        """ Overloads DataLoader::create_df (in dataloading.py)
+        """ Overloads DataLoader::create_df (in data_loading.py)
         for multisampled waveforms.  Should this be in Gretina4MDecoder?
         """
         if self.split_waveform:
@@ -77,9 +79,6 @@ class Gretina4MDecoder(Digitizer):
     """
     inherits from Digitizer and DataLoader
     chan_list: list of channels to process
-    -- idea:
-        min_signal_thresh: multiplier on noise ampliude required to process
-        a signal, helps avoid processing a ton of noise
 
     members:
       - load_object_info (also in DataLoader)
@@ -90,6 +89,10 @@ class Gretina4MDecoder(Digitizer):
       - test_decode_event
       - parse_event_data (takes a pandas df row from a decoded event,
         returns an instance of class MultisampledWaveform)
+
+    -- idea:
+        min_signal_thresh: multiplier on noise ampliude required to process
+        a signal, helps avoid processing a ton of noise
     """
     def __init__(self, *args, **kwargs):
 

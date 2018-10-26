@@ -1,5 +1,11 @@
 """
-Class and methods for loading data from different `data takers`.
+data_loading.py
+base class for reading raw data, usually 32-bit data words,
+from different `data takers`.
+contains methods to save pandas dataframes to files.
+subclasses:
+     - digitizers.py -- Gretina4M, SIS3302, etc.
+     - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
 """
 from abc import ABC, abstractmethod
 import numpy as np
@@ -7,23 +13,22 @@ import pandas as pd
 import sys
 
 import matplotlib.pyplot as plt
-from .header_parser import get_object_info
+from .xml_parser import get_object_info
 
 
 class DataLoader(ABC):
     """
-    Base class for data taking objects (digitizers or pollers).
-    - Digitizers are in digitizers.py
-    - Pollers are in pollers.py
-    Contains base methods for saving `self.decoded_values` into pandas dataframes.
-
-    Standard practice should be to put this line as the last line of
-    decode_event:
-    # send any variable with a name in "decoded_values" to the pandas output
-    self.format_data(locals())
+    NOTE:
+    all subclasses should save entries into pandas dataframes
+    by putting this as the last line of their decode_event:
+        self.format_data(locals())
+    This sends any variable whose name is a key in
+    `self.decoded_values` to the output (create_df) function.
     """
     def __init__(self, object_info=None):
 
+        # every DataLoader should write to this
+        self.decoded_values = {}
 
         # every data loader should set this (affects if we can chunk the output)
         self.h5_format = None
@@ -33,6 +38,7 @@ class DataLoader(ABC):
             self.load_object_info(object_info)
 
     def load_object_info(self, object_info):
+        """ Load metadata for this data taker """
 
         if isinstance(object_info, dict):
             self.object_info = get_object_info(object_info, self.class_name)
@@ -49,12 +55,8 @@ class DataLoader(ABC):
                 .format(type(object_info)))
 
     def format_data(self, vals):
-        """ Write any variable with a name matching a key in "decoded_values"
-        to the pandas output.
-
-        Standard practice should be to put this line as the last line of
-        decode_event:
-        # send any variable with a name in "decoded_values" to the pandas output
+        """
+        send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
         """
         for key in vals:
@@ -102,6 +104,7 @@ class DataLoader(ABC):
 
     def to_file(self, file_name, flatten=False):
 
+        # save primary data
         df_data = self.create_df(flatten)
         if df_data is None:
             print("Data is None!")
@@ -115,7 +118,7 @@ class DataLoader(ABC):
             format=self.h5_format,
             data_columns=["event_number"]) # can use for hdf5 file indexing
 
-            # need the decoder name and the class name
+        # save metadata
         if self.object_info is not None:
             # print(self.object_info.dtypes)
 
@@ -131,76 +134,3 @@ class DataLoader(ABC):
                                     format="fixed")
 
 
-def get_next_event(f_in):
-    """
-    Gets the next event, and some basic information about it
-    Takes the file pointer as input
-    Outputs:
-    -event_data: a byte array of the data produced by the card (could be header + data)
-    -slot:
-    -crate:
-    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
-    """
-    # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
-
-    # The read is set up to do two 32-bit integers, rather than bytes or shorts
-    # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
-    # Using a
-
-    # NCRATES = 10
-
-    try:
-        head = np.fromstring(
-            f_in.read(4), dtype=np.uint32)  # event header is 8 bytes (2 longs)
-    except Exception as e:
-        print(e)
-        raise Exception("Failed to read in the event orca header.")
-
-    # Assuming we're getting an array of bytes:
-    # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
-    # data_id         = (head[2] >> 2) + (head[3]<<8)
-    # slot            = (head[6] & 0x1f)
-    # crate           = (head[6]>>5) + head[7]&0x1
-    # reserved        = (head[4] + (head[5]<<8))
-
-    # Using an array of uint32
-    record_length = int((head[0] & 0x3FFFF))
-    data_id = int((head[0] >> 18))
-    # slot            =int( (head[1] >> 16) & 0x1f)
-    # crate           =int( (head[1] >> 21) & 0xf)
-    # reserved        =int( (head[1] &0xFFFF))
-
-    # /* ========== read in the rest of the event data ========== */
-    try:
-        event_data = f_in.read(record_length * 4 -
-                               4)  # record_length is in longs, read gives bytes
-    except Exception as e:
-        print("  No more data...\n")
-        print(e)
-        raise EOFError
-
-    # if (crate < 0 or crate > NCRATES or slot  < 0 or slot > 20):
-    #     print("ERROR: Illegal VME crate or slot number {} {} (data ID {})".format(crate, slot,data_id))
-    #     raise ValueError("Encountered an invalid value of the crate or slot number...")
-
-    # return event_data, slot, crate, data_id
-    return event_data, data_id
-
-
-def get_decoders(object_info):
-    """
-    Find all the active pygama data takers that inherit from the DataLoader class.
-    This only works if the subclasses have been imported.  Is that what we want?
-    Also relies on 2-level abstraction, which is dicey
-    """
-    decoders = []
-    for sub in DataLoader.__subclasses__():  # either digitizers or pollers
-        for subsub in sub.__subclasses__():
-            try:
-                decoder = subsub(object_info) # initialize the decoder
-                # print("dataloading - name: ",decoder.decoder_name)
-                decoders.append(decoder)
-            except Exception as e:
-                print(e)
-                pass
-    return decoders

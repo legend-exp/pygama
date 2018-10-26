@@ -9,7 +9,8 @@ from pygama.utils import update_progress
 
 
 class ProcessorBase(ABC):
-    """Classes that wrap functional implementations of calculators or transformers"""
+    """ classes that wrap functional implementations of
+    calculators or transformers """
 
     def __init__(self,
                  function,
@@ -52,29 +53,18 @@ class ProcessorBase(ABC):
 
 class Calculator(ProcessorBase):
 
-    def __init__(self,
-                 function,
-                 output_name,
-                 args={},
+    def __init__(self, function, output_name, args={},
                  input_waveform="waveform"):
-        super().__init__(
-            function,
-            output_name=output_name,
-            perm_args=args,
-            input_waveform=input_waveform)
+        super().__init__(function, output_name=output_name,
+            perm_args=args, input_waveform=input_waveform)
 
 
 class Transformer(ProcessorBase):
 
-    def __init__(self,
-                 function,
-                 output_waveform,
-                 args={},
+    def __init__(self, function, output_waveform, args={},
                  input_waveform="waveform"):
         super().__init__(
-            function,
-            output_name=output_waveform,
-            perm_args=args,
+            function, output_name=output_waveform, perm_args=args,
             input_waveform=input_waveform)
 
 
@@ -82,24 +72,26 @@ class Transformer(ProcessorBase):
 #
 #     def __init__(self, function, args={}, output_name=None):
 #         print(
-#             "Database Lookup has been murdered in cold blood.  B. Shanks, 8/15/18.  Either get it working or remove the DB call from your processor."
+#             "Database Lookup has been murdered in cold blood.
+#              Either get it working or remove the DB call from your processor.
+#              B. Shanks, 8/15/18."
 #         )
 #         sys.exit()
-
-    #     self.function = function
-    #
-    #     self.output_name = output_name
-    #
-    #   def replace_args(self, param_dict):
-    #     #check args list for string vals which match keys in param dict
-    #     self.args = self.perm_args.copy() #copy we'll actually pass to the function
-    #
-    #     for (arg, val) in iteritems(self.args):
-    #       if val in param_dict.keys():
-    #         self.args[arg] = param_dict[val]
-    #
-    #   def process(self):
-    #     return self.function(**self.args)
+#
+#         self.function = function
+#
+#         self.output_name = output_name
+#
+#       def replace_args(self, param_dict):
+#         #check args list for string vals which match keys in param dict
+#         self.args = self.perm_args.copy() #copy we'll actually pass to the function
+#
+#         for (arg, val) in iteritems(self.args):
+#           if val in param_dict.keys():
+#             self.args[arg] = param_dict[val]
+#
+#       def process(self):
+#         return self.function(**self.args)
 
 
 class Tier0Passer(ProcessorBase):

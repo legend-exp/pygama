@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 
-from .dataloading import DataLoader
+from .data_loading import DataLoader
 
 
 class Poller(DataLoader):

@@ -3,19 +3,22 @@ import pandas as pd
 import multiprocessing as mp
 from functools import partial
 
-from .vectorized import *
-from ..decoders.dataloading import *
+from .vector import *
+from ..decoders.data_loading import *
 from ..decoders.digitizers import *
 from ..utils import *
 
 def ProcessTier1Vec(t1_file,
-                    vec_process,
+                    vec_process=None,
                     digitizer_list=None,
                     out_prefix="t2",
                     verbose=False,
                     output_dir=None,
                     multiprocess=False):
     """ vector version of tier 1 processor """
+
+    if vec_process is None:
+        vec_process = VectorProcess(default_list=True)
 
     print("Starting pygama Tier 1 (vector) processing ...")
     print("   Input file: {}".format(t1_file))
@@ -45,25 +48,31 @@ def ProcessTier1Vec(t1_file,
     for d in digitizer_list:
         print("Processing data from: " + d.decoder_name)
 
-        # single thread process
-        # object_info = pd.read_hdf(t1_file, key=d.class_name)
-        # d.load_object_info(object_info)
+        object_info = pd.read_hdf(t1_file, key=d.class_name)
+        d.load_object_info(object_info)
+
+        # single thread process -- let's ABANDON THIS
         # t1_df = pd.read_hdf(t1_file, key=d.decoder_name)
         # t2_df = vec_process.Process(t1_df)
 
-        # multi process
+        # multi process -- i want to ALWAYS do this, using hdf5 chunking
+        # even if i only have one thread available.
+        # try to write each chunk to the file so you never hold the whole
+        # file in memory.
         h5key = d.class_name
-        chunksize = 3000 # in rows.  optimal for my mac, at least
+        chunksize = 3000 # num wf rows.  optimal for my mac, at least
         n_cpu = mp.cpu_count()
 
-        exit()
+        with pd.HDFStore(t1_file, 'r') as store:
+            nrows = store.get_storer(h5key).shape[0] # fixed only
+            chunk_idxs = list(range(nrows//chunksize + 1))
 
-        # keywords = {"t1_file":t1_file, "chunksize":chunksize, "h5key":h5key}
-        #
-        # with mp.Pool(n_cpu) as p:
-        #     result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
-        #
-        # mp_df = pd.concat(result_list)
+        keywords = {"t1_file":t1_file, "chunksize":chunksize, "h5key":h5key}
+
+        with mp.Pool(n_cpu) as p:
+            result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
+
+        # t2_df = pd.concat(result_list)
         #
         # print("Elapsed: {:.2f} sec".format(time.time()-t_start))
 
