@@ -7,13 +7,29 @@ subclasses:
      - digitizers.py -- Gretina4M, SIS3302, etc.
      - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
 """
-from abc import ABC, abstractmethod
+import sys
 import numpy as np
 import pandas as pd
-import sys
-
+from abc import ABC
 import matplotlib.pyplot as plt
+
 from .xml_parser import get_object_info
+
+def get_decoders(object_info=None):
+    """ Find all the active pygama data takers that inherit from DataLoader.
+    This only works if the subclasses have been imported. Is that what we want?
+    """
+    decoders = []
+    for sub in DataLoader.__subclasses__():
+        for subsub in sub.__subclasses__():
+            try:
+                decoder = subsub(object_info) # initialize the decoder
+                decoders.append(decoder)
+                print(decoder.__name__)
+            except Exception as e:
+                print(e)
+                pass
+    return decoders
 
 
 class DataLoader(ABC):
@@ -25,112 +41,221 @@ class DataLoader(ABC):
     This sends any variable whose name is a key in
     `self.decoded_values` to the output (create_df) function.
     """
-    def __init__(self, object_info=None):
+    def __init__(self, df_metadata=None):
+        """
+        when you initialize this from a derived class with 'super',
+        you should have already declared:
+        self.decoder_name, self.class_name, and self.decoded_values
+        """
+        self.total_count = 0
+        self.garbage_count = 0 # never leave any data behind
+        self.garbage_values = {key:[] for key in self.decoded_values}
 
-        # every DataLoader should write to this
-        self.decoded_values = {}
-
-        # every data loader should set this (affects if we can chunk the output)
-        self.h5_format = None
+        # every DataLoader should set this (affects if we can chunk the output)
+        self.h5_format = "table"
+        self.pytables_col_limit = 2500
 
         # need the decoder name and the class name
-        if object_info is not None:
-            self.load_object_info(object_info)
+        if df_metadata is not None:
+            self.load_metadata(df_metadata)
 
-    def load_object_info(self, object_info):
+
+    def load_metadata(self, df_metadata):
         """ Load metadata for this data taker """
 
-        if isinstance(object_info, dict):
-            self.object_info = get_object_info(object_info, self.class_name)
+        if isinstance(df_metadata, dict):
+            self.df_metadata = get_object_info(df_metadata, self.class_name)
 
-        elif isinstance(object_info, pd.core.frame.DataFrame):
-            self.object_info = object_info
+        elif isinstance(df_metadata, pd.core.frame.DataFrame):
+            self.df_metadata = df_metadata
 
-        elif isinstance(object_info, str):
-            self.object_info = pd.read_hdf(object_info, self.class_name)
+        elif isinstance(df_metadata, str):
+            self.df_metadata = pd.read_hdf(df_metadata, self.class_name)
 
         else:
             raise TypeError(
-                "DataLoader object_info must be a dict of header values, or a string hdf5 filename.  You passed a {}"
-                .format(type(object_info)))
+                "Wrong DataLoader metadata type:"
+                .format(type(df_metadata)))
 
-    def format_data(self, vals):
+
+    def format_data(self, vals, is_garbage=False):
         """
-        send any variable with a name in "decoded_values" to the pandas output
+        for every single event in the raw DAQ data, we send
+        any variable with a name in "self.decoded_values"
+        to the pandas output with:
         self.format_data(locals())
         """
+        self.total_count += 1
+
+        if is_garbage:
+            self.garbage_count += 1
+
         for key in vals:
             if key is not "self" and key in self.decoded_values:
-                self.decoded_values[key].append(vals[key])
 
-    def create_df(self, flatten):
+                # print(key, vals[key], type(vals[key]))
+                # if isinstance(vals[key], np.ndarray):
+                    # print(len(vals[key]))
+
+                if is_garbage:
+                    self.garbage_values[key].append(vals[key])
+                else:
+                    self.decoded_values[key].append(vals[key])
+
+
+    def create_df(self, get_garbage=False):
         """
         Base dataframe creation method.
         Classes inheriting from DataLoader (like digitizers or pollers) can
         overload this if necessary for more complicated use cases.
         Try to avoid pickling to 'object' types if possible.
         """
-        for key in self.decoded_values:
-            print("      {} entries: {}".format(key, len(self.decoded_values[key])))
-
-        if not flatten:
-            # old faithful (embeds wfs in cells, requires h5type = 'fixed')
-            df = pd.DataFrame.from_dict(self.decoded_values)
-
+        if not get_garbage:
+            raw_values = self.decoded_values
         else:
+            raw_values = self.garbage_values
+            df = pd.DataFrame.from_dict(self.garbage_values).infer_objects()
+            return df
+
+        # main plan is to go with pytables
+        pytables_error = False
+        if self.h5_format == "table":
+
             # 'flatten' the values (each wf sample gets a column, h5type = 'table')
             new_cols = []
-            for col in sorted(self.decoded_values.keys()):
+            for col in sorted(raw_values.keys()):
 
-                # unzip waveforms (needed to use "table" hdf5 output)
+                # unzip waveforms into an ndarray
                 if col == "waveform":
-                    wfs = np.vstack(self.decoded_values[col]) # creates an ndarray
-                    new_cols.append(pd.DataFrame(wfs, dtype='int16'))
+
+                    wf_lens = [len(wf) for wf in raw_values["waveform"]]
+                    wf_dims = set(wf_lens)
+
+                    # error checking
+                    if len(wf_dims) > 1:
+                        print("ERROR, wfs must all be same size, not ",wf_dims)
+                        pytables_error = True
+                        break
+                    if any(d > self.pytables_col_limit for d in wf_dims):
+                        print("ERROR, exceeded pytables_col_limit")
+                        print(wf_dims)
+                        self.h5_format = "fixed"
+                        pytables_error = True
+                        break
+                        # sys.exit()
+
+                    # create the ndarray and a new dataframe
+                    if not pytables_error and len(raw_values["waveform"]) > 0:
+                        wfs = np.vstack(raw_values["waveform"])
+                        new_cols.append(pd.DataFrame(wfs, dtype='int16'))
 
                 # everything else is single-valued
                 else:
-                    vals = pd.Series(self.decoded_values[col], name=col)
-                    new_cols.append(vals)
+                    if not pytables_error:
+                        vals = pd.Series(raw_values[col], name=col)
+                        new_cols.append(vals)
 
             # this is our flattened output (can be chunked with hdf5)
             df = pd.concat(new_cols, axis=1)
 
+
+        # the backup plan
+        if self.h5_format == "fixed" or pytables_error:
+            df = pd.DataFrame.from_dict(raw_values)
+
         if len(df) == 0:
-            print("Length of DataFrame for {} is 0!".format(self.class_name))
             return None
-        # df.set_index("event_number", inplace=True)
+        else:
+            return df
 
-        return df
 
-    def to_file(self, file_name, flatten=False):
+    def to_file(self, file_name, verbose=False, write_option="a"):
+        """ save primary data, garbage data, and metadata to hdf5 """
 
-        # save primary data
-        df_data = self.create_df(flatten)
-        if df_data is None:
-            print("Data is None!")
-            return
-        # print(df_data.dtypes) # useful to check this
+        if verbose:
+            print("Writing {}".format(self.decoder_name))
 
-        df_data.to_hdf(
-            file_name,
-            key=self.decoder_name,
-            mode='a',
-            format=self.h5_format,
-            data_columns=["event_number"]) # can use for hdf5 file indexing
+        # we can only fast-append to the file if it's in table format
+        append = True if self.h5_format == "table" else False
 
-        # save metadata
-        if self.object_info is not None:
-            # print(self.object_info.dtypes)
+        hdf_kwargs = {"mode":write_option,
+                      "format":self.h5_format,
+                      "append_table":append,
+                      "complib":"blosc:snappy", # idk, sounds fast
+                      "complevel":2, # compresses raw by ~0.5
+                      "data_columns":["packet_id"]} # cols for hdf5 fast file indexing
+
+        def check_and_append(file_name, key, df_data):
+            with pd.HDFStore(file_name, 'r') as store:
+                try:
+                    extant_df = store.get(key)
+                    df_data = pd.concat([extant_df, df_data]).reset_index(drop=True)
+                    if verbose:
+                        print(key, df_data.shape)
+                except KeyError:
+                    pass
+            return df_data
+
+        #  ------------- save primary data -------------
+        df_data = self.create_df()
+
+        if not append:
+            # make a copy of the df already in the file and manually append
+            df_data = check_and_append(file_name, self.decoder_name, df_data)
+
+        if verbose:
+            print(df_data)
+
+        # write to hdf5 file
+        df_data.to_hdf(file_name, key=self.decoder_name, **hdf_kwargs)
+
+        # ------------- save metadata -------------
+        if self.df_metadata is not None:
 
             if self.class_name == self.decoder_name:
                 raise ValueError(
-                    "Class {} has the same ORCA decoder and class names: {}.  Can't write dataframe to file."
-                    .format(self.__name__, self.class_name))
+                    "Can't write df_metadata if it has the same "
+                    "ORCA decoder and class names, you would overwrite the data."
+                    "Class: {}\nDecoder: {}".format(self.class_name,
+                                                    self.decoder_name))
+                sys.exit()
 
-            # used fixed type for this (keys have lotsa diff types and i
-            # don't want to convert everything to strings)
-            self.object_info.to_hdf(file_name, key=self.class_name,
+            if not append:
+                self.df_metadata = check_and_append(file_name,
+                                                    self.class_name,
+                                                    self.df_metadata).infer_objects()
+
+            self.df_metadata.to_hdf(file_name, key=self.class_name,
                                     mode='a',
                                     format="fixed")
 
+        # ------------- save garbage data -------------
+        if self.garbage_count > 0:
+            print("Saving garbage: {} of {} total events"
+                  .format(self.garbage_count, self.total_count))
+
+            df_garbage = self.create_df(get_garbage=True)
+
+            # garbage is always in fixed format since the wfs may be different lengths
+            hdf_kwargs["format"] = "fixed"
+            hdf_kwargs["append_table"] = False
+
+            df_garbage = check_and_append(file_name,
+                                          self.decoder_name+"_Garbage",
+                                          df_garbage)#.infer_objects()
+
+            df_garbage.to_hdf(file_name, key=self.decoder_name+"_Garbage",
+                              **hdf_kwargs)
+
+
+        # finally, clear out existing data (relieve memory pressure)
+        self.clear_data()
+
+
+    def clear_data(self):
+        """ clear out standard objects when we do a write to file """
+        self.total_count = 0
+        self.garbage_count = 0
+        self.decoded_values = {key:[] for key in self.decoded_values}
+        self.garbage_values = {key:[] for key in self.garbage_values}
 

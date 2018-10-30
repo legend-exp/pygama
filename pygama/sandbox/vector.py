@@ -11,7 +11,7 @@ from abc import ABC
 
 class VectorProcess:
     """
-    Handle vectorized calcsulators and transforms.
+    Handle vectorized calculators and transforms.
     Keep an internal 'intercom' of calcsulator results and waveform transforms.
     """
     def __init__(self, default_list=False):

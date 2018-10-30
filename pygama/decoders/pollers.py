@@ -6,16 +6,12 @@ from .data_loading import DataLoader
 
 
 class Poller(DataLoader):
-    """
-    like DataLoader, not a public class.
-    members:
-    - decode_event (just passes when called)
-    """
-
+    """ handle any data taker that does not record waveforms """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def decode_event(self, event_data_bytes, event_number, header_dict):
+    def apply_settings(self, settings):
+        """ apply user settings specific to this card and run """
         pass
 
 
@@ -28,12 +24,9 @@ class MJDPreampDecoder(Poller):
     """
 
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORMJDPreAmpDecoderForAdc'
         self.class_name = 'MJDPreAmp'
-        super().__init__(*args, **kwargs)
-
-        self.event_header_length = -1
-        self.h5_format = 'fixed'
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
@@ -43,30 +36,18 @@ class MJDPreampDecoder(Poller):
             "device_id": [],
             "event_number": []
         }
+        super().__init__(*args, **kwargs) # also initializes the garbage df
+
+        self.event_header_length = -1
+        self.h5_format = 'fixed'
+
 
     def decode_event(self,
                      event_data_bytes,
                      event_number,
                      header_dict,
                      verbose=False):
-        """
-        # Decodes the data from a MJDPreamp Object.
-        # Returns:
-        #     adc_val     : A list of floating point voltage values for each channel
-        #     timestamp   : An integer unix timestamp
-        #     enabled     : A list of 0 or 1 values indicating which channels are enabled
-        #
-        # Data Format:
-        # 0 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-        #                            ^^^^ ^^^^ ^^^^- device id
-        # 1 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  unix time of measurement
-        # 2 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  enabled adc mask
-        # 3 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 0 encoded as a float
-        # 4 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 1 encoded as a float
-        # ....
-        # ....
-        # 18 xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  adc chan 15 encoded as a float
-        """
+        """ see README for the 32-bit data word diagram """
 
         event_data_uint = np.fromstring(event_data_bytes, dtype=np.uint32)
         event_data_float = np.fromstring(event_data_bytes, dtype=np.float32)
@@ -111,25 +92,6 @@ class MJDPreampDecoder(Poller):
 
             preamp_ID = preampNum["MJDPreAmp"]["preampID"]
             if (preamp_ID == an_ID):
-                # channel_names =
-                #     "0" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName0"],
-                #     "1" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName1"],
-                #     "2" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName2"],
-                #     "3" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName3"],
-                #     "4" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName4"],
-                #     "5" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName5"],
-                #     "6" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName6"],
-                #     "7" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName7"],
-                #     "8" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName8"],
-                #     "9" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName9"],
-                #     "10" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName10"],
-                #     "11" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName11"],
-                #     "12" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName12"],
-                #     "13" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName13"],
-                #     "14" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName14"],
-                #     "15" : headerDict["ObjectInfo"]["AuxHw"][preampNum]["MJDPreAmp"]["detectorName15"],
-                # }
-
                 channel_names = [
                     preampNum["MJDPreAmp"]["detectorName0"],
                     preampNum["MJDPreAmp"]["detectorName1"],
@@ -155,12 +117,9 @@ class ISegHVDecoder(Poller):
     """ iSeg HV Card """
 
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORiSegHVCardDecoderForHV'
         self.class_name = 'ORiSegHVCardDecoder'
-        super().__init__(*args, **kwargs)
-
-        self.event_header_length = -1
-        self.h5_format = 'fixed'
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
@@ -172,42 +131,18 @@ class ISegHVDecoder(Poller):
             "card": [],
             "event_number": []
         }
+        super().__init__(*args, **kwargs) # also initializes the garbage df
+
+        self.event_header_length = -1
+        self.h5_format = 'fixed'
+
 
     def decode_event(self,
                      event_data_bytes,
                      event_number,
                      header_dict,
                      verbose=False):
-        """
-        #     Decodes an iSeg HV Card event
-        #
-        #     xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-        #     ^^^^ ^^^^ ^^^^ ^^----------------------- Data ID (from header)
-        #     -----------------^^ ^^^^ ^^^^ ^^^^ ^^^^- length
-        # 0   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-        #     ----------^^^^-------------------------- Crate number
-        #     ---------------^^^^--------------------- Card number
-        #
-        # 1    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -ON Mask
-        # 2    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx -Spare
-        # 3    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  time in seconds since Jan 1, 1970
-        # 4    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 0)
-        # 5    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 0)
-        # 6    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 1)
-        # 7    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 1)
-        # 8    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 2)
-        # 9    xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 2)
-        # 10   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 3)
-        # 11   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 3)
-        # 12   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 4)
-        # 13   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 4)
-        # 14   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 5)
-        # 15   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 5)
-        # 16   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 6)
-        # 17   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 6)
-        # 18   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Voltage encoded as a float (chan 7)
-        # 19   xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  actual Current encoded as a float (chan 7)
-        """
+        """ see README for the 32-bit data word diagram """
         event_data_int = np.fromstring(event_data_bytes, dtype=np.uint32)
         event_data_float = np.fromstring(event_data_bytes, dtype=np.float32)
 
