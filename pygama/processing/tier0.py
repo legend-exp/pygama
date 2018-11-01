@@ -33,10 +33,9 @@ def ProcessTier0(t0_file,
 
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
-    # ROW_LIMIT = 100000 # <- use this one (1e5)
     ROW_LIMIT = 1e5
 
-    start = time.clock()
+    start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
     if f_in == None:
         print("Couldn't find the file %s" % t0_file)
@@ -66,10 +65,11 @@ def ProcessTier0(t0_file,
         print("    {}: {}".format(id, id_dict[id]))
     used_decoder_names = set([id_dict[id] for id in id_dict])
 
-    # get all available decoders, then remove unused ones
+    # get all available pygama decoders, then remove unused ones
     if decoders is None:
         decoders = get_decoders(header_dict)
         decoder_names = [d.decoder_name for d in decoders]
+
     final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
     decoders = [d for d in decoders if d.decoder_name in final_decoder_list]
     decoder_to_id = {d.decoder_name: d for d in decoders}
@@ -113,7 +113,7 @@ def ProcessTier0(t0_file,
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file)
+                d.to_file(t1_file, verbose=True)
 
         try:
             event_data, data_id = get_next_event(f_in)
@@ -132,11 +132,12 @@ def ProcessTier0(t0_file,
         # sends data to the pandas dataframe
         decoder.decode_event(event_data, packet_id, header_dict)
 
+    print("done.  last packet ID:", packet_id)
     f_in.close()
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file)
+        d.to_file(t1_file, verbose=True)
 
     if verbose:
         update_progress(1)
@@ -151,11 +152,12 @@ def ProcessTier0(t0_file,
 
     print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
     with pd.HDFStore(t1_file,'r') as store:
-        print(store.info())
+        print(store.keys())
+        # print(store.info())
 
     statinfo = os.stat(t1_file)
     print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.clock() - start
+    elapsed = time.time() - start
     print("Time elapsed: {:.2f} sec".format(elapsed))
     print("Done.\n")
 
@@ -204,18 +206,3 @@ def get_next_event(f_in):
     return event_data, data_id
 
 
-def get_decoders(object_info=None):
-    """ Find all the active pygama data takers that inherit from DataLoader.
-    This only works if the subclasses have been imported. Is that what we want?
-    """
-    decoders = []
-    for sub in DataLoader.__subclasses__():
-        for subsub in sub.__subclasses__():
-            try:
-                decoder = subsub(object_info) # initialize the decoder
-                decoders.append(decoder)
-                print(decoder.__name__)
-            except Exception as e:
-                print(e)
-                pass
-    return decoders

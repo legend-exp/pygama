@@ -1,4 +1,5 @@
-""" PUBLIC PROCESSING METHODS FOR TIERS 0 and 1"""
+""" (NOTE: this is deprecated, need to rewrite it) 
+PUBLIC PROCESSING METHODS FOR TIERS 0 and 1"""
 import os, glob
 import numpy as np
 from multiprocessing import Pool, cpu_count

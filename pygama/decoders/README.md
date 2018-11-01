@@ -1,4 +1,5 @@
 # SIS3302
+```
 The SIS3302 can produce a waveform from two sources:
     1: ADC raw data buffer: This is a normal digitizer waveform
     2: Energy data buffer: Not sure what this is

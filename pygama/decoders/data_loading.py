@@ -15,9 +15,10 @@ import matplotlib.pyplot as plt
 
 from .xml_parser import get_object_info
 
+
 def get_decoders(object_info=None):
     """ Find all the active pygama data takers that inherit from DataLoader.
-    This only works if the subclasses have been imported. Is that what we want?
+    This only works if the subclasses have been imported.
     """
     decoders = []
     for sub in DataLoader.__subclasses__():
@@ -25,7 +26,6 @@ def get_decoders(object_info=None):
             try:
                 decoder = subsub(object_info) # initialize the decoder
                 decoders.append(decoder)
-                print(decoder.__name__)
             except Exception as e:
                 print(e)
                 pass
@@ -58,6 +58,8 @@ class DataLoader(ABC):
         # need the decoder name and the class name
         if df_metadata is not None:
             self.load_metadata(df_metadata)
+        else:
+            self.df_metadata = None
 
 
     def load_metadata(self, df_metadata):
@@ -180,7 +182,7 @@ class DataLoader(ABC):
 
         hdf_kwargs = {"mode":write_option,
                       "format":self.h5_format,
-                      "append_table":append,
+                      "append":append,
                       "complib":"blosc:snappy", # idk, sounds fast
                       "complevel":2, # compresses raw by ~0.5
                       "data_columns":["packet_id"]} # cols for hdf5 fast file indexing
@@ -203,11 +205,15 @@ class DataLoader(ABC):
             # make a copy of the df already in the file and manually append
             df_data = check_and_append(file_name, self.decoder_name, df_data)
 
-        if verbose:
-            print(df_data)
-
         # write to hdf5 file
         df_data.to_hdf(file_name, key=self.decoder_name, **hdf_kwargs)
+
+        # if verbose:
+        #     if self.decoder_name == "ORGretina4MWaveformDecoder":
+        #         print("key:", self.decoder_name, "shape:", df_data.shape, append)
+        #         with pd.HDFStore(file_name, 'r') as store:
+        #             nrows = store.get_storer(self.decoder_name).nrows
+        #             print("   found {} rows".format(nrows))
 
         # ------------- save metadata -------------
         if self.df_metadata is not None:
@@ -238,7 +244,7 @@ class DataLoader(ABC):
 
             # garbage is always in fixed format since the wfs may be different lengths
             hdf_kwargs["format"] = "fixed"
-            hdf_kwargs["append_table"] = False
+            hdf_kwargs["append"] = False
 
             df_garbage = check_and_append(file_name,
                                           self.decoder_name+"_Garbage",
@@ -246,7 +252,6 @@ class DataLoader(ABC):
 
             df_garbage.to_hdf(file_name, key=self.decoder_name+"_Garbage",
                               **hdf_kwargs)
-
 
         # finally, clear out existing data (relieve memory pressure)
         self.clear_data()

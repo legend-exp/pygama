@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 from abc import ABC
 
-from .calculators import *
-from .transforms import *
+import pygama
+import pygama.processing.calculators as pc
+import pygama.processing.transforms as pt
 from ..utils import update_progress
 
 
@@ -12,39 +13,52 @@ class Tier1Processor(ABC):
     Handle calculators and transforms.  Most are vectorized for super speed.
     Keep an internal 'intercom' of calculator results and waveform transforms.
     """
-    def __init__(self, default_list=False):
+    def __init__(self, settings=None, default_list=False):
 
         self.proc_list = []
-        self.digitizer = None
-        self.calcs = None # df for calcsulation results (no wfs)
+        self.calcs = None # df for calculation results (no wfs)
         self.waves = {} # wfs only, NxM arrays (unpacked)
+        self.digitizer = None # may need for card-specifics like nonlinearity
+
+        # options for processors
+        self.settings = settings if settings is not None else {}
 
         if default_list:
-            self.SetDefaultList()
+            self.set_default_list()
 
-    def Process(self, data_df, wfnames_out=None):
-        """ Apply each processor to the Tier 0 input dataframe,
-        and return a Tier 1 dataframe (i.e. gatified single-valued).
+
+    def set_intercom(self, data_df):
+        """
+        declare self.waves and self.calcs, our intercom data objects.
+        save waveforms as an ndarray into the dict self.waves.
+        then save the single-values parts of the input dataframe separately
+        into self.calcs, which we build on to create a Tier 2 dataframe
+        (i.e. gatified single-valued.)
+        """
+        cols = data_df.columns.values
+        wf_start = np.where(cols == 0)[0][0]
+        wf_stop = len(cols)-1
+        self.waves["waveform"] = data_df.iloc[:, wf_start:wf_stop].values
+        self.calcs = data_df.iloc[:, 0: wf_start-1].copy()
+
+
+    def process(self, data_df, wfnames_out=None):
+        """ Apply each processor to the Tier 1 input dataframe,
+        and return a Tier 2 dataframe (i.e. gatified single-valued).
         Optionally return a dataframe with the waveform objects.
         """
-        # save an ndarray of the waveforms, which are packed into cells
-        self.waves["waveform"] = np.vstack([wf for wf in data_df['waveform']])
+        self.set_intercom(data_df)
 
-        # save the non-wf parts of the input dataframe separately
-        data_cols = [col for col in data_df.columns if col != 'waveform']
-        self.calcs = data_df[data_cols]
-
-        # apply each processsor
         for processor in self.proc_list:
-            print("Applying:", processor.function.__name__)
+            # print("Applying:", processor.function.__name__)
 
-            p_result = processor.process(self.waves, self.calcs)
+            p_result = processor.process_block(self.waves, self.calcs)
 
-            if isinstance(processor, VectorCalculator):
+            if isinstance(processor, Calculator):
                 # calcs is updated inside the functions
                 pass
 
-            elif isinstance(processor, VectorTransformer):
+            elif isinstance(processor, Transformer):
                 for wftype in p_result:
                     self.waves[wftype] = p_result[wftype]
 
@@ -54,17 +68,34 @@ class Tier1Processor(ABC):
 
         return self.calcs
 
-    def AddCalculator(self, *args, **kwargs):
-        self.proc_list.append(VectorCalculator(*args, **kwargs))
 
-    def AddTransformer(self, *args, **kwargs):
-        self.proc_list.append(VectorTransformer(*args, **kwargs))
+    def add(self, fun_name, settings={}):
+        """ add a new processor to the list, with a string name and a
+        dict of settings, which overrides any other settings we've already set
+        """
+        # get the settings
+        if fun_name in self.settings:
+            self.settings[fun_name] = {**self.settings[fun_name], **settings}
+        else:
+            self.settings[fun_name] = settings
 
-    def SetDefaultList(self):
-        self.AddCalculator(avg_baseline, fun_args = {"i_end":500})
-        self.AddCalculator(fit_baseline, fun_args = {"i_end":500})
-        self.AddTransformer(bl_subtract, fun_args = {"test":False})
-        self.AddTransformer(trap_filter, fun_args = {"test":False})
+        # add the processor
+        if fun_name in dir(pc):
+            self.proc_list.append(
+                Calculator(getattr(pc, fun_name), self.settings[fun_name]))
+
+        elif fun_name in dir(pt):
+            self.proc_list.append(
+                Transformer(getattr(pt, fun_name), self.settings[fun_name]))
+        else:
+            print("ERROR! unknown function:", fun_name)
+            sys.exit()
+
+
+    def set_default_list(self):
+        for proc in ["fit_baseline", "bl_subtract", "trap_filter", "trap_max"]:
+            settings = self.settings[proc] if proc in self.settings else {}
+            self.add(proc, settings)
 
 
 class ProcessorBase(ABC):
@@ -77,8 +108,8 @@ class ProcessorBase(ABC):
         self.function = function
         self.fun_args = fun_args # so fun
 
-    def process(self, waves, calcs):
-        """ run the given calcsulation on the wf block in waves.
+    def process_block(self, waves, calcs):
+        """ run the given calculation on the wf block in waves.
         can also use results from other calculations via calcs.
         individual processor functions can decide if they want to use the
         df axes, or convert to a numpy array for extra speed
@@ -86,12 +117,13 @@ class ProcessorBase(ABC):
         return self.function(waves, calcs, **self.fun_args)
 
 
-class VectorCalculator(ProcessorBase):
+class Calculator(ProcessorBase):
     def __init__(self, function, fun_args={}):
         super().__init__(function, fun_args)
+        # may want to declare Calculator-specific stuff here at some point
 
 
-class VectorTransformer(ProcessorBase):
+class Transformer(ProcessorBase):
     def __init__(self, function, fun_args={}):
         super().__init__(function, fun_args)
-
+        # may want to declare Transformer-specific stuff here at some point

@@ -8,16 +8,18 @@ data_dir = "/Users/wisecg/project/pygama"
 run = 42343 # mjd data
 # run = 72 # mj60 data
 
-# run options
-t0_options = {42343: {"digitizer":"ORGretina4MWaveformDecoder",
-                    "n_blsamp":500},
-            72: {"digitizer":"ORSIS3302DecoderForEnergy",
-                 "window":"max", # max or tp
-                 "n_samp":2000,
-                 "n_blsamp":10000}}
-
-t1_options = {43243 : {"fit_baseline": {"i_end":500}},
-              72 : {"fit_baseline": {"i_end":8000}}}
+# user options
+t0_options = {
+    42343: {"digitizer":"ORGretina4MWaveformDecoder", "n_blsamp":500},
+    72: {"digitizer":"ORSIS3302DecoderForEnergy",
+         "window":"max", # max or tp
+         "n_samp":2000,
+         "n_blsamp":10000}
+    }
+t1_options = {
+    43243 : {"fit_baseline": {"i_end":500}},
+    72 : {"fit_baseline": {"i_end":8000}}
+    }
 
 def main():
     """
@@ -30,7 +32,7 @@ def main():
     """
     # ------- TIER 0 -------
 
-    # tier0(run, n_evt=10000)
+    tier0(run, n_evt=np.inf)
     # check_tier0(run)
 
     # ------- TIER 1 -------
@@ -68,6 +70,9 @@ def check_tier0(run):
         print("keys found:", store.keys())
         print("INFO:\n", store.info())
 
+        t1_df = store.get("/ORGretina4MWaveformDecoder")
+        print(t1_df.shape)
+
         # preamp_df = store.get("/ORMJDPreAmpDecoderForAdc")
         # print(preamp_df.shape)
         # print(preamp_df)
@@ -93,7 +98,7 @@ def tier1(run):
                  proc,
                  out_prefix="t2",
                  verbose=True,
-                 multiprocess=False)
+                 multiprocess=True)
 
 
 if __name__=="__main__":

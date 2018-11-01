@@ -4,67 +4,140 @@ tier 1 data --> DSP --> tier 2 (i.e. gatified)
 import os, re, sys, time
 import numpy as np
 import pandas as pd
+import multiprocessing as mp
+from functools import partial
 
-from .tier0 import get_decoders
 from ..decoders.data_loading import *
 from ..decoders.digitizers import *
 from ..utils import *
 
 def ProcessTier1(t1_file,
-                 processor_list,
-                 digitizer_list=None,
+                 processor,
+                 digitizers=None,
                  out_prefix="t2",
-                 verbose=False,
                  out_dir=None,
-                 multiprocess=True):
-    """
-    the processor_list is:
-    - TierOneProcessor object with list of calculations/transforms you want done
-    - Order matters in the list! (Some calculations depend on others.)
-    """
+                 verbose=False,
+                 multiprocess=True,
+                 settings={}):
+
     print("Starting pygama Tier 1 processing ...")
     print("   Input file: {}".format(t1_file))
+    t_start = time.time()
 
-    start = time.clock()
+    # multiprocessing parameters
+    CHUNKSIZE = 3000  # rows, optimal for my mac at last
+    NCPU = mp.cpu_count()
+
+    start = time.time()
     in_dir = os.path.dirname(t1_file)
     out_dir = os.getcwd() if out_dir is None else out_dir
 
-    # with pd.HDFStore(t1_file,'r') as store:
-        # print(store.keys())
+    # snag the run number (assuming t1_file ends in _run<number>.<filetype>)
+    run_str = re.findall('run\d+', t1_file)[-1]
+    run = int(''.join(filter(str.isdigit, run_str)))
 
-    if digitizer_list is None:
-        digitizer_list = get_decoders()
-        # digitizer_list = get_digitizers()
-        print(digitizer_list)
+    # get digitizers
+    if digitizers is None:
+        decoders = get_decoders()
+        digitizers = [d for d in decoders if isinstance(d, Digitizer)]
+        with pd.HDFStore(t1_file, 'r') as store:
+            keys = [key[1:] for key in store.keys()] # remove leading '/'
+            digitizers = [d for d in digitizers if d.decoder_name in keys]
+
+    # go running
+    for d in digitizers:
+        print("Processing data from digitizer: {}".format(d.decoder_name))
+
+        # get some info about the objects in the file
+        with pd.HDFStore(t1_file, 'r') as store:
+
+            s = store.get_storer(d.decoder_name)
+            object_info = store.get(d.class_name)
+            d.load_metadata(object_info)
+
+            if isinstance(s, pd.io.pytables.AppendableFrameTable):
+                use_pytables = True
+                nrows = s.nrows
+                chunk_idxs = list(range(nrows // CHUNKSIZE + 1))
+            elif isinstance(s, pd.io.pytables.FrameFixed):
+                use_pytables = False
+            else:
+                print("Unknown type!", type(s))
+                exit()
+
+        # ---------------- multiprocess data ----------------
+        if use_pytables and multiprocess:
+
+            print("Found {} rows".format(nrows))
+
+            keywords = {"t1_file":t1_file,
+                        "chunksize":CHUNKSIZE,
+                        "nchunks":len(chunk_idxs),
+                        "key":d.decoder_name,
+                        "processor":processor}
+
+            with mp.Pool(NCPU) as p:
+                result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
+
+            t2_df = pd.concat(result_list)
+
+        # ---------------- single process data ----------------
+        # if df is fixed, we have to read the whole thing in
+        else:
+            print("WARNING: unable to process with pytables")
+            t1_df = pd.read_hdf(t1_file, key=d.decoder_name)
+            t2_df = processor.process(t1_df)
+
+    update_progress(1)
+
+    # ---------------- write Tier 2 output ----------------
 
 
+    t2_file = os.path.join(out_dir, "{}_run{}.h5".format(out_prefix, run))
+
+    if verbose:
+        print("Writing Tier 2 File:\n   {}".format(t2_file))
+        print("   Entries: {}".format(len(t2_df)))
+        print("   Data columns:")
+        for col in t2_df.columns:
+            print("   -- " + str(col))
+
+    t2_df.to_hdf(
+        t2_file,
+        key="data",
+        format='table',
+        mode='w',
+        data_columns=t2_df.columns.tolist())
+
+    if verbose:
+        statinfo = os.stat(t2_file)
+        print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        elapsed = time.time() - start
+        proc_rate = elapsed/len(t2_df)
+        print("Time elapsed: {:.2f} sec  ({:.5f} sec/wf)".format(elapsed, proc_rate))
+        print("Done.")
 
 
-    # withs
+def process_chunk(chunk_idx, t1_file, chunksize, nchunks,
+                  key, processor, verbose=False):
+    """
+    use hdf5 indexing, which is way faster than reading in the df first.
+    this is a really good reason to use the 'tables' format
+    """
+    update_progress(float(chunk_idx/nchunks))
 
-    sys.exit()
+    if verbose:
+        print("Processing chunk #{}".format(chunk_idx))
 
+    with pd.HDFStore(t1_file, 'r') as store:
+        start = chunk_idx * chunksize
+        stop = (chunk_idx + 1) * chunksize
 
+        if verbose:
+            print("start: {}  stop: {}".format(start, stop))
 
+        chunk = pd.read_hdf(t1_file, key,
+                            where='index >= {} & index < {}'
+                            .format(start, stop))
 
-    if digitizer_list is None:
-        digitizer_list = get_digitizers()
-
-    f = h5py.File(t1_file, 'r')
-    digitizer_list = [d for d in digitizer_list if d.decoder_name in f.keys()]
-
-    print("   Found digitizers:")
-    for d in digitizer_list:
-        print("   -- {}".format(d.decoder_name))
-
-
-    for digitizer in digitizer_list:
-        print("Processing data from digitizer {}".format(digitizer.decoder_name))
-
-        object_info = pd.read_hdf(t1_file, key=digitizer.class_name)
-
-        digitizer.load_metadata(object_info)
-
-
-def get_digitizers():
-    return [sub() for sub in Digitizer.__subclasses__()]
+    return processor.process(chunk)

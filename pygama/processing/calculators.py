@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def avg_baseline(waves, calcs, i_start=0, i_end=500):
-    """ Simple mean, vectorized version of baseline calcsulator """
+    """ Simple mean, vectorized version of baseline calculator """
 
     wf_block = waves["waveform"]
 
@@ -16,10 +16,14 @@ def avg_baseline(waves, calcs, i_start=0, i_end=500):
 
 
 def fit_baseline(waves, calcs, i_start=0, i_end=500, order=1):
-    """ Polynomial fit [order], vectorized version of baseline calcsulator
+    """ Polynomial fit [order], vectorized version of baseline calculator
     TODO: arbitrary orders?
     """
     wf_block = waves["waveform"]
+
+    nsamp = wf_block.shape[1]
+    if i_end > nsamp:
+        i_end = nsamp-1
 
     # run polyfit
     x = np.arange(i_start, i_end)
@@ -33,7 +37,7 @@ def fit_baseline(waves, calcs, i_start=0, i_end=500, order=1):
 
 
 def trap_max(waves, calcs, test=False):
-    """ calcsulate maximum of trapezoid filter - no pride here """
+    """ calculate maximum of trapezoid filter - no pride here """
 
     wfs = waves["wf_trap"]
 
