@@ -22,6 +22,7 @@ def ProcessTier0(t0_file,
                  n_max=np.inf,
                  verbose=False,
                  output_dir=None,
+                 overwrite=True,
                  decoders=None,
                  settings={}):
     """
@@ -33,7 +34,7 @@ def ProcessTier0(t0_file,
 
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
-    ROW_LIMIT = 1e5
+    ROW_LIMIT = 5e4
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -88,9 +89,14 @@ def ProcessTier0(t0_file,
     # declare Tier 1 output file
     output_dir = os.getcwd() if output_dir is None else output_dir
     t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+
     if os.path.isfile(t1_file):
-        print("Overwriting existing file...")
-        os.remove(t1_file)
+        if overwrite:
+            print("Overwriting existing file...")
+            os.remove(t1_file)
+        else:
+            print("File already exists, continuing ...")
+            return
 
     # ------------ scan over raw data starts here -----------------
 

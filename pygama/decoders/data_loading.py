@@ -53,7 +53,7 @@ class DataLoader(ABC):
 
         # every DataLoader should set this (affects if we can chunk the output)
         self.h5_format = "table"
-        self.pytables_col_limit = 2500
+        self.pytables_col_limit = 3100
 
         # need the decoder name and the class name
         if df_metadata is not None:

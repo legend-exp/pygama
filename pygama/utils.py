@@ -1,8 +1,6 @@
 """
-this is a miscellaneous functions folder.  i found one useful before (waveLibs)
+this is a miscellaneous functions store.  i found one useful before (waveLibs)
 so is it good practice to keep a file like this?
-there are just two very short functions here, they would be easy to move,
-unless we anticipate this file growing.
 """
 import sys
 import numpy as np

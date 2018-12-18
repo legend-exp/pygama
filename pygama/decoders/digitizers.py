@@ -19,6 +19,7 @@ class Digitizer(DataLoader):
 
         if settings["digitizer"] == self.decoder_name:
 
+            self.window = False
             sk = settings.keys()
             if "window" in sk:
                 self.window = True

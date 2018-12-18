@@ -21,6 +21,12 @@ def fit_baseline(waves, calcs, i_start=0, i_end=500, order=1):
     """
     wf_block = waves["waveform"]
 
+    print(wf_block.shape)
+
+    if wf_block.size == 0:
+        print("Warning, empty block!")
+        # return calcs
+
     nsamp = wf_block.shape[1]
     if i_end > nsamp:
         i_end = nsamp-1

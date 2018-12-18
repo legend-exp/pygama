@@ -88,11 +88,11 @@ def tier1(run):
 
     t1_file = glob.glob("{}/t1_run{}.h5".format(data_dir, run))[0]
 
-    proc = Tier1Processor(default_list=True)
-    # proc = Tier1Processor()
-    # proc.AddCalculator(fit_baseline, fun_args = {"i_end":5000})
-    # proc.AddTransformer(bl_subtract, fun_args = {"test":False})
-    # proc.AddTransformer(trap_filter, fun_args = {"test":False})
+    # proc = Tier1Processor(default_list=True)
+    proc = Tier1Processor()
+    proc.AddCalculator(fit_baseline, fun_args = {"i_end":5000})
+    proc.AddTransformer(bl_subtract, fun_args = {"test":False})
+    proc.AddTransformer(trap_filter, fun_args = {"test":False})
 
     ProcessTier1(t1_file,
                  proc,

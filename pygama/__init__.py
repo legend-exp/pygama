@@ -48,6 +48,7 @@ warnings.filterwarnings(
 # from .decoders.digitizers import *
 # from .processing.vectorized import *
 # from .waveform import *
+from .dataset import DataSet
 
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event
