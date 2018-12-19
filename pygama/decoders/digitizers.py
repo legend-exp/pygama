@@ -39,8 +39,8 @@ class Gretina4MDecoder(Digitizer):
 
         # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
-            # "packet_id": [],
-            "event_number": [],
+            "packet_id": [],
+            "ievt": [],
             "energy": [],
             "timestamp": [],
             "channel": [],
@@ -57,6 +57,7 @@ class Gretina4MDecoder(Digitizer):
         self.gretina_event_no = 0
         self.window = False
         self.n_blsamp = 500
+        self.ievt = 0
 
     def crate_card_chan(self, crate, card, channel):
         return (crate << 9) + (card << 4) + (channel)
@@ -77,7 +78,7 @@ class Gretina4MDecoder(Digitizer):
 
         return active_channels
 
-    def decode_event(self, event_data_bytes, event_number, header_dict):
+    def decode_event(self, event_data_bytes, packet_id, header_dict):
         """ Parse the header for an individual event """
 
         self.gretina_event_no += 1
@@ -104,6 +105,8 @@ class Gretina4MDecoder(Digitizer):
                                           self.n_blsamp,
                                           test=False)
             if wf.is_garbage:
+                ievt = self.ievtg
+                self.ievtg += 1
                 self.garbage_count += 1
 
         if len(wf_data) > 2500 and self.h5_format == "table":
@@ -112,6 +115,10 @@ class Gretina4MDecoder(Digitizer):
             self.h5_format = "fixed"
 
         waveform = wf_data.astype("int16")
+
+        # set the event number (searchable HDF5 column)
+        ievt = self.ievt
+        self.ievt += 1
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
@@ -127,11 +134,12 @@ class SIS3302Decoder(Digitizer):
 
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
+            "packet_id": [],
+            "ievt": [],
             "energy": [],
             "energy_first": [],
             "timestamp": [],
             "channel": [],
-            "event_number": [],
             "ts_lo": [],
             "ts_hi": [],
             "waveform": [],
@@ -143,10 +151,12 @@ class SIS3302Decoder(Digitizer):
         self.sample_period = 10  # ns
         self.h5_format = "table"
         self.n_blsamp = 2000
+        self.ievt = 0
+        self.ievtg = 0
 
     def decode_event(self,
                      event_data_bytes,
-                     event_number,
+                     packet_id,
                      header_dict,
                      verbose=False):
         """
@@ -220,7 +230,7 @@ class SIS3302Decoder(Digitizer):
 
         if len(wf_data) != expected_wf_length:
             print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                  (event_number, expected_wf_length, len(wf_data)))
+                  (ievt, expected_wf_length, len(wf_data)))
             exit()
 
         # final raw wf array
@@ -239,6 +249,8 @@ class SIS3302Decoder(Digitizer):
             waveform = win_wf # modify final wf array
 
             if wf.is_garbage:
+                ievt = self.ievtg
+                self.ievtg += 1
                 self.format_data(locals(), wf.is_garbage)
                 return
 
@@ -246,6 +258,10 @@ class SIS3302Decoder(Digitizer):
             print("WARNING: too many columns for tables output,\n",
                   "         reverting to saving as fixed hdf5 ...")
             self.h5_format = "fixed"
+
+        # set the event number (searchable HDF5 column)
+        ievt = self.ievt
+        self.ievt += 1
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())

@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
-
+from pprint import pprint
 from .xml_parser import get_object_info
 
 
@@ -185,7 +185,7 @@ class DataLoader(ABC):
                       "append":append,
                       "complib":"blosc:snappy", # idk, sounds fast
                       "complevel":2, # compresses raw by ~0.5
-                      "data_columns":["packet_id"]} # cols for hdf5 fast file indexing
+                      "data_columns":["ievt"]} # cols for hdf5 fast file indexing
 
         def check_and_append(file_name, key, df_data):
             with pd.HDFStore(file_name, 'r') as store:
@@ -207,13 +207,6 @@ class DataLoader(ABC):
 
         # write to hdf5 file
         df_data.to_hdf(file_name, key=self.decoder_name, **hdf_kwargs)
-
-        # if verbose:
-        #     if self.decoder_name == "ORGretina4MWaveformDecoder":
-        #         print("key:", self.decoder_name, "shape:", df_data.shape, append)
-        #         with pd.HDFStore(file_name, 'r') as store:
-        #             nrows = store.get_storer(self.decoder_name).nrows
-        #             print("   found {} rows".format(nrows))
 
         # ------------- save metadata -------------
         if self.df_metadata is not None:

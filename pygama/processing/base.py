@@ -10,7 +10,7 @@ from ..utils import update_progress
 
 class Tier1Processor(ABC):
     """
-    Handle calculators and transforms.  Most are vectorized for super speed.
+    Handle a list of Tier 1 calculators and transforms.
     Keep an internal 'intercom' of calculator results and waveform transforms.
     """
     def __init__(self, settings=None, default_list=False):
@@ -20,8 +20,11 @@ class Tier1Processor(ABC):
         self.waves = {} # wfs only, NxM arrays (unpacked)
         self.digitizer = None # may need for card-specifics like nonlinearity
 
-        # options for processors
-        self.settings = settings if settings is not None else {}
+        # add a list of processors and options
+        if settings is not None:
+            self.settings = settings
+            for key in settings:
+                self.add(key, settings[key])
 
         if default_list:
             self.set_default_list()

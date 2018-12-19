@@ -26,8 +26,8 @@ def ProcessTier0(t0_file,
                  decoders=None,
                  settings={}):
     """
-    TODO: append to active hdf5 file in loop instead of writing it all at the end
-    TODO: df compression (wfs as integers? floats?)
+    for now, reads ORCA data and turns it into pandas DataFrames,
+    and saves to HDF5 using pytables
     """
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
@@ -60,10 +60,11 @@ def ProcessTier0(t0_file,
     run = get_run_number(header_dict)
     print("Run number: {}".format(run))
 
-    print("Data IDs present in this header are:")
     id_dict = get_decoder_for_id(header_dict)
-    for id in id_dict:
-        print("    {}: {}".format(id, id_dict[id]))
+    if verbose:
+        print("Data IDs present in this header are:")
+        for id in id_dict:
+            print("    {}: {}".format(id, id_dict[id]))
     used_decoder_names = set([id_dict[id] for id in id_dict])
 
     # get all available pygama decoders, then remove unused ones
@@ -126,7 +127,7 @@ def ProcessTier0(t0_file,
         except EOFError:
             break
         except Exception as e:
-            print("Failed to get the next event... (Exception: {})".format(e))
+            print("Failed to get the next event ... Exception:",e)
             break
         try:
             decoder = decoder_to_id[id_dict[data_id]]

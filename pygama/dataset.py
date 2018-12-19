@@ -17,11 +17,16 @@ class DataSet:
         if md is not None:
             self.load_metadata(md)
         try:
-            self.raw_dir = self.runDB["raw_dir"]
-            self.tier_dir = self.runDB["tier_dir"]
+            self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
+            self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
+            self.t1pre = self.runDB["t1_prefix"]
+            self.t2pre = self.runDB["t2_prefix"]
         except:
+            print("Bad metadata, reverting to defaults ...")
             self.raw_dir = raw_dir
             self.tier_dir = tier_dir
+            self.t1pre = "t1_run"
+            self.t2pre = "t2_run"
 
         # create the internal list of run numbers
         self.runs = []
@@ -35,12 +40,15 @@ class DataSet:
             self.runs.extend(self.get_runs(verbose=v))
 
         # filenames for every run
-        self.paths = self.get_paths(self.runs, v)
+        self.get_paths(self.runs, v)
 
         # could store concatenated dfs here, like a TChain
         self.df = None
 
     def load_metadata(self, fname):
+        """
+        load a JSON file into a dict
+        """
         with open(fname) as f:
             self.runDB = json.load(f)
 
@@ -99,44 +107,43 @@ class DataSet:
         does a directory search with os.walk, which is faster than iglob
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
         """
-        run_dict = {r:{} for r in runs}
+        self.paths = {r:{} for r in runs}
 
+        # search data directories for extant files
         for p, d, files in os.walk(self.raw_dir):
             for f in files:
                 if any("Run{}".format(r) in f for r in runs):
                     run = int(f.split("Run")[-1])
-                    run_dict[run]["t0_path"] = "{}/{}".format(p,f)
+                    self.paths[run]["t0_path"] = "{}/{}".format(p,f)
 
         for p, d, files in os.walk(self.tier_dir):
             for f in files:
-                if any("t1_run{}.h5".format(r) in f for r in runs):
+                if any("t1_run{}".format(r) in f for r in runs):
                     run = int(f.split("run")[-1].split(".h5")[0])
-                    run_dict[run]["t1_path"] = "{}/{}".format(p,f)
+                    self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
-                if any("t2_run{}.h5".format(r) in f for r in runs):
+                if any("t2_run{}".format(r) in f for r in runs):
                     run = int(f.split("run")[-1].split(".h5")[0])
-                    run_dict[run]["t2_path"] = "{}/{}".format(p,f)
-
-        # check if files already exist
-        pprint(run_dict)
-
-
-
+                    self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
+        if self.runDB is not None:
+            cov = {}
+            for conf in self.runDB["build_options"]:
+                cov[conf] = self.runDB["build_options"][conf]["coverage"]
 
-        # for conf in runDB["build_options"]:
-            # print(runDB["build_options"][conf]["coverage"])
+            for run in runs:
+                for conf, ranges in cov.items():
+                    if ranges[0] <= run <= ranges[1]:
+                        self.paths[run]["build_opt"] = conf
 
-        # if verbose:
-        #     print("Tier 0:",len(t0_files),"files:")
-        #     for f in t0_files:
-        #         print(f)
-        #
-        #     print("Tier 1:",len(t1_files),"files:")
-        #     for f in t1_files:
-        #         print(f)
-        #
-        #     print("Tier 2:",len(t2_files),"files:")
-        #     for f in t0_files:
-        #         print(f)
+        # check for missing entries
+        # TODO: get lists of unprocessed runs?
+        for r in runs:
+            if "t0_path" not in self.paths[r].keys():
+                self.paths[r]["t0_path"] = None
+            if "t1_path" not in self.paths[r].keys():
+                self.paths[r]["t1_path"] = None
+            if "build_opt" not in self.paths[r].keys():
+                self.paths[r]["build_opt"] = None
+
