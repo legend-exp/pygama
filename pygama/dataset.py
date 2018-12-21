@@ -144,6 +144,7 @@ class DataSet:
                 self.paths[r]["t0_path"] = None
             if "t1_path" not in self.paths[r].keys():
                 self.paths[r]["t1_path"] = None
+            if "t2_path" not in self.paths[r].keys():
+                self.paths[r]["t2_path"] = None
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
-
