@@ -65,6 +65,9 @@ class DataLoader(ABC):
     def load_metadata(self, df_metadata):
         """ Load metadata for this data taker """
 
+        # print('trying this', self.class_name)
+        # pprint(df_metadata)
+
         if isinstance(df_metadata, dict):
             self.df_metadata = get_object_info(df_metadata, self.class_name)
 

@@ -120,8 +120,8 @@ def get_decoder_for_id(headerDict):
 
 def get_object_info(headerDict, class_name):
     """
-    Returns a dict keyed by data id with all the info from the header
-    TODO: won't currently work with any AuxHW
+    returns a dict keyed by data id with all info from the header
+    TODO: doesn't include all parts of the header yet!
     """
     object_info_list = []
 

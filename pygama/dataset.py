@@ -175,12 +175,20 @@ class DataSet:
         """
         get the runtime (in seconds)
         of all runs in the current DataSet.
+        NOTE: right now i get it by taking the difference
+        of the last and first timestamp.
+        This is wrong by a factor ~tau (dt between events).
         """
-        # pprint(self.paths)
-        rt = 0
+        total_rt = 0
         for run in self.runs:
             p = self.paths[run]["t2_path"]
+
             df = pd.read_hdf(p)
-            print(df.columns)
-            print(df["ts_hi"][0]) # nope
-            exit()
+
+            t_start = df["timestamp"].iloc[0]
+            t_stop = df["timestamp"].iloc[-1]
+            rt = (t_stop - t_start)/1e6
+
+            print("Run", run, "runtime:", rt)
+
+

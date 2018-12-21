@@ -7,6 +7,7 @@ import pandas as pd
 import h5py
 from future.utils import iteritems
 from functools import partial
+from pprint import pprint
 
 from ..utils import *
 from ..decoders.digitizers import *
@@ -46,8 +47,8 @@ def ProcessTier0(t0_file,
     reclen, reclen2, header_dict = parse_header(t0_file)
     # print("   {} longs in plist header".format(reclen))
     # print("   {} bytes in the header".format(reclen2))
-    # from pprint import pprint
     # pprint(header_dict)
+    # exit()
 
     # figure out the total size
     SEEK_END = 2
@@ -86,6 +87,10 @@ def ProcessTier0(t0_file,
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
         d.apply_settings(settings)
+
+        # if d.class_name=="ORSIS3302Model":
+            # pprint(d.df_metadata.columns)
+            # exit()
 
     # declare Tier 1 output file
     output_dir = os.getcwd() if output_dir is None else output_dir
