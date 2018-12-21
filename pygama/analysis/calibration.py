@@ -3,9 +3,8 @@ routines for automatic calibration.
 - get_most_prominent_peaks (find by looking for spikes in spectrum derivative)
 - match_peaks (identify peaks based on ratios between known gamma energies)
 - calibrate_tl208 (main routine -- fits multiple peaks w/ Radford peak shape)
-- get_calibration_energies (unused rn but is a good place to put pk energies)
+- get_calibration_energies (a good place to put pk energies)
 """
-
 import sys
 import numpy as np
 from pygama.analysis.peak_fitting import *
@@ -18,83 +17,87 @@ from scipy.stats import norm
 import scipy.optimize as op
 
 
-#return a histogram around the most prominent peak in a spectrum of a given percentage of width
-def get_most_prominent_peaks(energySeries, max_num_peaks=np.inf, bins=2000):
+def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
+                             max_num_peaks=np.inf, test=False):
     """
     find the most prominent peaks in a spectrum by looking for spikes in derivative of spectrum
     energySeries: array of measured energies
     max_num_peaks = maximum number of most prominent peaks to find
+    return a histogram around the most prominent peak in a spectrum of a given percentage of width
     """
-
-    # bins = np.linspace( np.amin(energySeries), np.amax(energySeries), 2700 )
-    # bins = "auto"
-
-    # automatic bins
-    hist, bin_edges = np.histogram(energySeries, bins=bins)
+    nb = int((xhi-xlo)/xpb)
+    hist, bin_edges = np.histogram(energySeries, range=(xlo, xhi), bins=nb)
     bin_centers = get_bin_centers(bin_edges)
 
-    #median filter along the spectrum, do this as a "baseline subtraction"
+    # median filter along the spectrum, do this as a "baseline subtraction"
     hist_med = medfilt(hist, 21)
     hist = hist - hist_med
 
-    # plt.plot(bin_centers, hist, drawstyle='steps')
-    # plt.show()
-    # exit()
-
-    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=4)
+    # identify peaks with a scipy function (could be improved ...)
+    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=2)
     peak_energies = bin_centers[peak_idxs]
 
+    # pick the num_peaks most prominent peaks
     if max_num_peaks < len(peak_energies):
-        #pick the num_peaks most prominent peaks
         peak_vals = hist[peak_idxs]
         sort_idxs = np.argsort(peak_vals)
         peak_idxs_max = peak_idxs[sort_idxs[-max_num_peaks:]]
         peak_energies = np.sort(bin_centers[peak_idxs_max])
 
-    bin_width = bin_edges[1] - bin_edges[0]
-    return peak_energies, bin_width
+    if test:
+        plt.plot(bin_centers, hist, ls='steps', lw=2, c='b')
+        for e in peak_energies:
+            plt.axvline(e, color="r", lw=1, alpha=0.6)
+        plt.xlabel("Energy [uncal]", ha='right', x=1)
+        plt.ylabel("Filtered Spectrum", ha='right', y=1)
+        plt.tight_layout()
+        plt.show()
+        exit()
 
-    # plt.plot(bin_centers, hist, ls="steps")
-    # for peak_e in peak_energies:
-    #     plt.axvline(peak_e, color="g", ls=":")
-    # plt.show()
-    # exit()
+    return peak_energies
 
 
-def match_peaks(data_peaks, cal_peaks):
+def match_peaks(data_pks, cal_pks):
     """
-    Match uncalibrated peaks with specific energies:
-    does so by trying all
+    Match uncalibrated peaks with literature energy values.
+    Take the difference
     """
     from itertools import combinations
+    from scipy.stats import linregress
 
-    n_peaks = len(cal_peaks) if len(cal_peaks) < len(data_peaks) else len(
-        data_peaks)
-    cal_sets = combinations(range(len(cal_peaks)), n_peaks)
-    data_sets = combinations(range(len(data_peaks)), n_peaks)
+    n_pks = len(cal_pks) if len(cal_pks) < len(data_pks) else len(data_pks)
 
-    def get_ratio_sum(data, cal):
-        from scipy.stats import linregress
-        m, b, _, _, _ = linregress(data, y=cal)
-        err = np.sum((cal - (m * data + b))**2)
-        return err, m, b
+    cal_sets = combinations(range(len(cal_pks)), n_pks)
+    data_sets = combinations(range(len(data_pks)), n_pks)
 
     best_err, best_m, best_b = np.inf, None, None
+    for i,cal_set in enumerate(cal_sets):
 
-    for cal_set in cal_sets:
-        cal = cal_peaks[list(cal_set)]
+        cal = cal_pks[list(cal_set)] # lit energies for this set
+
         for data_set in data_sets:
-            data = data_peaks[list(data_set)]
 
-            err, m, b = get_ratio_sum(data, cal)
+            data = data_pks[list(data_set)] # uncal energies for this set
+
+            m, b, _, _, _ = linregress(data, y=cal)
+            err = np.sum((cal - (m * data + b))**2)
+
             if err < best_err:
                 best_err, best_m, best_b = err, m, b
-                # print(err)
-                # plt.figure()
-                # plt.scatter(data, cal)
-                # xs = np.linspace( data[0], data[-1], 10 )
-                # plt.plot( xs, m*xs+b , c="r"  )
-                # plt.show()
+
+    print(i, best_err)
+    print("cal:",cal)
+    print("data:",data)
+    plt.scatter(data, cal, label='min.err:{:.2e}'.format(err))
+    xs = np.linspace( data[0], data[-1], 10 )
+    plt.plot(xs, best_m * xs + best_b , c="r",
+             label="y = {:.2f} x + {:.2f}".format(best_m,best_b) )
+    plt.xlabel("Energy (uncal)", ha='right', x=1)
+    plt.ylabel("Energy (keV)", ha='right', y=1)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    exit()
 
     return best_m, best_b
 
@@ -274,10 +277,16 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
 def get_calibration_energies(cal_type):
     if cal_type == "th228":
-        return np.array([
-            238, 277, 300, 452, 510.77, 583.191, 727, 763, 785, 860.564, 1620,
-            2614.533
-        ],
+        return np.array([238, 277, 300, 452, 510.77, 583.191,
+                         727, 763, 785, 860.564, 1620, 2614.533],
                         dtype="double")
+
+    elif cal_type == "uwmjlab":
+        # return np.array([239, 295, 351, 510, 583, 609, 911, 969, 1120,
+        #                  1258, 1378, 1401, 1460, 1588, 1764, 2204, 2615],
+        #                 dtype="double")
+        return np.array([239, 911, 1460, 1764, 2615],
+                        dtype="double")
+
     else:
         raise ValueError

@@ -31,8 +31,8 @@ __version__ = "0.1.0"
 # kill annoying warnings
 import warnings, pandas
 warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
-warnings.filterwarnings(
-    'ignore', category=pandas.io.pytables.PerformanceWarning)
+warnings.filterwarnings(action='ignore', category=pandas.io.pytables.PerformanceWarning)
+warnings.filterwarnings(action='ignore', module="scipy.stats", category=FutureWarning)
 
 # # try to import all public functions
 # import pkgutil
