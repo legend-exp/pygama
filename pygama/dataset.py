@@ -148,3 +148,39 @@ class DataSet:
                 self.paths[r]["t2_path"] = None
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
+
+    def get_t1df(self):
+        """
+        concat tier 1 df's.
+        careful, it can be a lot
+        to load in memory ...
+        """
+        dfs = []
+        for run in self.runs:
+            p = self.paths[run]["t1_path"]
+            dfs.append(pd.read_hdf(p))
+        return pd.concat(dfs)
+
+    def get_t2df(self):
+        """
+        concat tier 2 dfs.
+        """
+        dfs = []
+        for run in self.runs:
+            p = self.paths[run]["t2_path"]
+            dfs.append(pd.read_hdf(p))
+        return pd.concat(dfs)
+
+    def get_runtime(self):
+        """
+        get the runtime (in seconds)
+        of all runs in the current DataSet.
+        """
+        # pprint(self.paths)
+        rt = 0
+        for run in self.runs:
+            p = self.paths[run]["t2_path"]
+            df = pd.read_hdf(p)
+            print(df.columns)
+            print(df["ts_hi"][0]) # nope
+            exit()
