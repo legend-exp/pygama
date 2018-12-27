@@ -29,6 +29,7 @@ def update_progress(progress, runNumber=None):
         text = "\rPROGRESS : [{}] {:0.3f}% {} (Run {})".format(
             "#" * block + "-" * (barLength - block), progress * 100, status,
             runNumber)
+
     sys.stdout.write(text)
     sys.stdout.flush()
 

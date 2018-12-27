@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os, json
+import numpy as np
 import pandas as pd
 from pprint import pprint
 
@@ -171,24 +172,82 @@ class DataSet:
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
-    def get_runtime(self):
+    def get_ts(self, df=None, clock=1e8, rollover=False, test=False):
+        """
+        return an ndarray of timestamps (in seconds) in the run.
+        - handle timestamps which roll over (SIS3302) and ones that don't.
+        - to avoid iterating over every element, we identify contiguous
+          blocks by looking for when the previous TS value is greater than the
+          current one, and then add the appropriate increment block by block.
+        """
+        if df is None:
+            # be careful, this can load multiple runs
+            df = self.get_t2df()
+
+        if not rollover:
+            return df["timestamp"].values / clock # seconds
+
+        # Maximum value for a variable of type unsigned int.
+        UINT_MAX = 4294967295 # (0xffffffff)
+        t_max = UINT_MAX / clock
+
+        ts = df["timestamp"].values / clock
+        tdiff = np.diff(ts)
+        tdiff = np.insert(tdiff, 0 , 0)
+        entry = np.arange(0, len(ts), 1)
+        iwrap = np.where(tdiff < 0)
+        iloop = np.append(iwrap[0], len(ts))
+
+        ts_new, t_roll = [], 0
+
+        for i, idx in enumerate(iloop):
+
+            ilo = 0 if i==0 else iwrap[0][i-1]
+            ihi = idx
+
+            ts_block = ts[ilo:ihi]
+            t_last = ts[ilo-1]
+            t_diff = t_max - t_last
+            ts_new.append(ts_block + t_roll)
+
+            t_roll += t_last + t_diff # increment for the next block
+
+        ts_wrapped = np.concatenate(ts_new)
+
+        if test:
+            # make sure timestamps are continuously increasing vs entry number
+            import matplotlib.pyplot as plt
+            plt.plot(ts_wrapped, entry, "-b")
+            plt.xlabel("Time (s)", ha='right', x=1)
+            plt.ylabel("Entry Num", ha='right', y=1)
+            plt.tight_layout()
+            plt.show()
+            # exit()
+
+        return ts_wrapped
+
+    def get_runtime(self, clock=None, rollover=None):
         """
         get the runtime (in seconds)
         of all runs in the current DataSet.
         NOTE: right now i get it by taking the difference
         of the last and first timestamp.
-        This is wrong by a factor ~tau (dt between events).
+        This is wrong by a factor ~2*tau (dt between events).
         """
+        if clock is None:
+            clock = self.runDB["clock"]
+        if rollover is None:
+            rollover = self.runDB["rollover"]
+
         total_rt = 0
         for run in self.runs:
             p = self.paths[run]["t2_path"]
-
             df = pd.read_hdf(p)
+            ts = self.get_ts(df, clock, rollover)
 
-            t_start = df["timestamp"].iloc[0]
-            t_stop = df["timestamp"].iloc[-1]
-            rt = (t_stop - t_start)/1e6
+            # here's where we could put in extra factors such as 2*tau
+            rt = ts[-1] - ts[0]
 
-            print("Run", run, "runtime:", rt)
+            total_rt += rt
 
-
+        return total_rt
