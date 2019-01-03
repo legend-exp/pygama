@@ -34,7 +34,7 @@ def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
     hist = hist - hist_med
 
     # identify peaks with a scipy function (could be improved ...)
-    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=2)
+    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=5)
     peak_energies = bin_centers[peak_idxs]
 
     # pick the num_peaks most prominent peaks
@@ -45,7 +45,7 @@ def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
         peak_energies = np.sort(bin_centers[peak_idxs_max])
 
     if test:
-        plt.plot(bin_centers, hist, ls='steps', lw=2, c='b')
+        plt.plot(bin_centers, hist, ls='steps', lw=1, c='b')
         for e in peak_energies:
             plt.axvline(e, color="r", lw=1, alpha=0.6)
         plt.xlabel("Energy [uncal]", ha='right', x=1)
@@ -60,7 +60,6 @@ def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
 def match_peaks(data_pks, cal_pks):
     """
     Match uncalibrated peaks with literature energy values.
-    Take the difference
     """
     from itertools import combinations
     from scipy.stats import linregress
@@ -89,7 +88,7 @@ def match_peaks(data_pks, cal_pks):
     print("cal:",cal)
     print("data:",data)
     plt.scatter(data, cal, label='min.err:{:.2e}'.format(err))
-    xs = np.linspace( data[0], data[-1], 10 )
+    xs = np.linspace(data[0], data[-1], 10)
     plt.plot(xs, best_m * xs + best_b , c="r",
              label="y = {:.2f} x + {:.2f}".format(best_m,best_b) )
     plt.xlabel("Energy (uncal)", ha='right', x=1)

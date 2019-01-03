@@ -110,7 +110,7 @@ def tier1(run):
 
 def tier2(run):
 
-    plt.style.use("./pygama.mplstyle")
+    plt.style.use("./clint.mpl")
     from pygama.utils import get_hist
 
     t2_file = glob.glob("{}/t2_run{}.h5".format(data_dir, run))[0]
