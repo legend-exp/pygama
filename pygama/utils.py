@@ -1,6 +1,6 @@
 """
-this is a miscellaneous functions store.  i found one useful before (waveLibs)
-so is it good practice to keep a file like this?
+this is a miscellaneous / frequently used functions store.
+is it good practice to keep a file like this?
 """
 import sys
 import numpy as np
@@ -64,6 +64,7 @@ def sh(cmd, sh=False):
     import subprocess as sp
     if not sh: sp.call(shlex.split(cmd))  # "safe"
     else: sp.call(cmd, shell=sh)  # "less safe"
+
 
 def TDraw(tree, vars, tcut):
     """

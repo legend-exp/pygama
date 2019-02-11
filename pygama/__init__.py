@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-""" pygama init file.
-    it might be better to declare more of the public functions here if it
-    makes sphinx auto-generated documentation easier.
+"""
+pygama init file.
+it might be better to declare more of the public functions here if it
+makes sphinx auto-generated documentation easier.
 """
 __version__ = "0.1.0"
 
