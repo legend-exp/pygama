@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
 from abc import ABC
-
-import pygama
-import pygama.processing.calculators as pc
-import pygama.processing.transforms as pt
+import pygama.dsp.calculators as pc
+import pygama.dsp.transforms as pt
 from ..utils import update_progress
 
 
@@ -45,20 +43,23 @@ class Tier1Processor(ABC):
         self.calcs = data_df.iloc[:, 0: wf_start-1].copy()
 
 
-    def process(self, data_df, wfnames_out=None):
-        """ Apply each processor to the Tier 1 input dataframe,
+    def process(self, data_df, verbose=False, wfnames_out=None):
+        """
+        Apply each processor to the Tier 1 input dataframe,
         and return a Tier 2 dataframe (i.e. gatified single-valued).
         Optionally return a dataframe with the waveform objects.
         """
         self.set_intercom(data_df)
 
         for processor in self.proc_list:
-            # print("Applying:", processor.function.__name__)
+
+            if verbose:
+                print("Applying:", processor.function.__name__)
 
             p_result = processor.process_block(self.waves, self.calcs)
 
             if isinstance(processor, Calculator):
-                # calcs is updated inside the functions
+                # self.calcs is updated inside the functions
                 pass
 
             elif isinstance(processor, Transformer):
@@ -73,7 +74,8 @@ class Tier1Processor(ABC):
 
 
     def add(self, fun_name, settings={}):
-        """ add a new processor to the list, with a string name and a
+        """
+        add a new processor to the list, with a string name and a
         dict of settings, which overrides any other settings we've already set
         """
         # get the settings
@@ -84,12 +86,10 @@ class Tier1Processor(ABC):
 
         # add the processor
         if fun_name in dir(pc):
-            self.proc_list.append(
-                Calculator(getattr(pc, fun_name), self.settings[fun_name]))
+            self.proc_list.append(Calculator(getattr(pc, fun_name), self.settings[fun_name]))
 
         elif fun_name in dir(pt):
-            self.proc_list.append(
-                Transformer(getattr(pt, fun_name), self.settings[fun_name]))
+            self.proc_list.append(Transformer(getattr(pt, fun_name), self.settings[fun_name]))
         else:
             print("ERROR! unknown function:", fun_name)
             sys.exit()

@@ -1,4 +1,5 @@
-""" pygama tier 0 processing
+"""
+pygama tier 0 processing
 raw daq data --> pandas dfs saved to hdf5 file (tier 1)
 """
 import numpy as np
@@ -10,11 +11,11 @@ from functools import partial
 from pprint import pprint
 
 from ..utils import *
-from ..decoders.digitizers import *
-from ..decoders.pollers import *
-from ..decoders.data_loading import *
-from ..decoders.xml_parser import *
-from .base import *
+from ..io.decoders.digitizers import *
+from ..io.decoders.pollers import *
+from ..io.decoders.data_loading import *
+from ..io.decoders.xml_parser import *
+from ..dsp.base import *
 
 
 def ProcessTier0(t0_file,
