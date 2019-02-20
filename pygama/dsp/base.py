@@ -59,7 +59,7 @@ class Tier1Processor(ABC):
             p_result = processor.process_block(self.waves, self.calcs)
 
             if isinstance(processor, Calculator):
-                # self.calcs is updated inside the functions
+                # self.calcs is updated inside the functions rn
                 pass
 
             elif isinstance(processor, Transformer):

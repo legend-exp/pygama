@@ -17,18 +17,23 @@ warnings.filterwarnings(
 
 
 def remove_baseline(waveform, bl_0=0, bl_1=0):
-    """ Return a baseline-subtracted waveform """
+    """
+    Return a baseline-subtracted waveform
+    """
     return waveform - (bl_0 + bl_1 * np.arange(len(waveform)))
 
 
 def center(waveform, center_index, n_samples_before, n_samples_after):
-    """ Return a waveform centered (windowed) around center_index """
+    """
+    Return a waveform centered (windowed) around center_index
+    """
     return waveform[center_index - n_samples_before:center_index +
                     n_samples_after]
 
 
 def trim_waveform(waveform, n_samples_before=None, n_samples_after=None):
-    """Cut out the first n_samples_before and the last n_samples_after samples.
+    """
+    Cut out the first n_samples_before and the last n_samples_after samples.
     If no values are supplied, you get the whole thing back
     """
     start_index = n_samples_before
@@ -51,7 +56,9 @@ def savgol_filter(waveform, window_length=47, order=2):
 
 
 def pz_correct(waveform, rc, digFreq=100E6):
-    """ pole-zero correct a waveform """
+    """
+    pole-zero correct a waveform
+    """
 
     # get the linear filter parameters.  RC params are in us
     num, den = rc_decay(rc, digFreq)
@@ -62,7 +69,9 @@ def pz_correct(waveform, rc, digFreq=100E6):
 
 def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
                 baseline=0.):
-    """ Apply a trap filter to a waveform. """
+    """
+    Apply a trap filter to a waveform.
+    """
     decayConstant = 0.
     norm = rampTime
     if decayTime != 0:
@@ -82,17 +91,16 @@ def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
 
     wf_minus_ft_and_ramp = np.zeros_like(waveform)
     wf_minus_ft_and_ramp[:(flatTime + rampTime)] = baseline
-    wf_minus_ft_and_ramp[(
-        flatTime + rampTime):] = waveform[:len(waveform) - flatTime - rampTime]
+    wf_minus_ft_and_ramp[(flatTime + rampTime):] = waveform[:len(waveform) - flatTime - rampTime]
 
     wf_minus_ft_and_2ramp = np.zeros_like(waveform)
     wf_minus_ft_and_2ramp[:(flatTime + 2 * rampTime)] = baseline
-    wf_minus_ft_and_2ramp[(
-        flatTime + 2 * rampTime):] = waveform[:len(waveform) - flatTime -
+    wf_minus_ft_and_2ramp[(flatTime + 2 * rampTime):] = waveform[:len(waveform) - flatTime -
                                               2 * rampTime]
 
-    scratch = waveform - (
-        wf_minus_ramp + wf_minus_ft_and_ramp + wf_minus_ft_and_2ramp)
+    scratch = waveform - (wf_minus_ramp +
+                          wf_minus_ft_and_ramp +
+                          wf_minus_ft_and_2ramp)
 
     if decayConstant != 0:
         fVector = np.cumsum(fVector + scratch)
@@ -101,19 +109,20 @@ def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
         trapOutput = np.cumsum(trapOutput + scratch)
 
     # Normalize and resize output
-    trapOutput[:len(waveform) - (
-        2 * rampTime + flatTime)] = trapOutput[2 * rampTime + flatTime:] / norm
+    tmp_hi = len(waveform) - (2 * rampTime + flatTime)
+    trapOutput[:tmp_hi] = trapOutput[2 * rampTime + flatTime:] / norm
     trapOutput.resize((len(waveform) - (2 * rampTime + flatTime)))
     return trapOutput
 
 
 def notch_filter(waveform, notch_freq, qual_factor=10, f_dig=1E8):
-    """ apply notch filter with some quality factor Q """
-
+    """
+    apply notch filter with some quality factor Q
+    """
     nyquist = 0.5 * f_dig
     w0 = notch_freq / nyquist
 
-    #"quality factor" which determines width of notch
+    # "quality factor" which determines width of notch
     Q = qual_factor
 
     num, den = signal.iirnotch(w0, Q)
@@ -121,7 +130,9 @@ def notch_filter(waveform, notch_freq, qual_factor=10, f_dig=1E8):
 
 
 def asym_trap_filter(waveform, ramp=200, flat=100, fall=40, padAfter=False):
-    """ Computes an asymmetric trapezoidal filter """
+    """
+    Computes an asymmetric trapezoidal filter
+    """
     trap = np.zeros(len(waveform))
     for i in range(len(waveform) - 1000):
         w1 = ramp

@@ -103,15 +103,15 @@ def ProcessTier1(t1_file,
         # ---------------- single process data ----------------
         # if df is fixed, we have to read the whole thing in
         else:
-            print("WARNING: not processing with pytables + multiprocessing")
+            print("WARNING: no multiprocessing")
 
-            if nevt is not None:
+            if nevt is not np.inf:
+                print("limiting to {} events".format(nevt))
                 t1_df = pd.read_hdf(t1_file, key=d.decoder_name,
-                                    where="index < {}".format(nevt))
+                                    where="ievt < {}".format(nevt))
             else:
                 t1_df = pd.read_hdf(t1_file, key=d.decoder_name)
-            print("uhhh")
-            exit()
+
             t2_df = processor.process(t1_df, verbose)
 
     update_progress(1)
@@ -147,6 +147,7 @@ def process_chunk(chunk_idx, t1_file, chunksize, nchunks,
     use hdf5 indexing, which is way faster than reading in the df first.
     this is a really good reason to use the 'tables' format
     """
+    # this makes the progress bar jump around randomly, should fix someday w/ a counter
     update_progress(float(chunk_idx/nchunks))
 
     with pd.HDFStore(t1_file, 'r') as store:

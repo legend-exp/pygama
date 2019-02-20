@@ -10,7 +10,8 @@ from scipy import signal, interpolate
 
 
 def current_max(waveform, sigma=1):
-    """Finds the maximum current ("A").
+    """
+    Finds the maximum current ("A").
     Current is calculated by convolution with a first-deriv. of Gaussian
     """
     if sigma > 0:
@@ -21,7 +22,9 @@ def current_max(waveform, sigma=1):
 
 
 def fit_baseline(waveform, start_index=0, end_index=500, order=1):
-    """ Finds baseline from start index to end index samples (default linear) """
+    """
+    Finds baseline from start index to end index samples (default linear)
+    """
     if end_index == -1:
         end_index = len(waveform)
 
@@ -66,7 +69,9 @@ def t0_estimate(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
 
 
 def max_time(waveform):
-    """ give the t_max of a waveform """
+    """
+    give the t_max of a waveform
+    """
     return np.argmax(waveform)
 
 
@@ -116,7 +121,9 @@ def calc_timepoint(waveform,
 
 
 def trap_max(waveform, method="max", pickoff_sample=0):
-    """ Calculate maximum of trapezoid -- no pride here """
+    """
+    Calculate maximum of trapezoid -- no pride here
+    """
     if method == "max": return np.amax(waveform)
     elif method == "fixed_time": return waveform[pickoff_sample]
 
