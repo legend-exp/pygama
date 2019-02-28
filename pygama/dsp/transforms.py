@@ -30,21 +30,31 @@ def bl_subtract(waves, calcs, test=False):
         plt.plot(np.arange(nsamp), wfs[iwf], '-g', label="raw")
         plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
         # plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
         plt.legend()
+        plt.tight_layout()
         plt.show()
         exit()
 
     return {"wf_blsub": blsub_wfs} # note, floats are gonna take up more memory
 
 
-def trap_filter(waves, calcs, rt=400, ft=200, decay_time=0, test=False):
+def trap_filter(waves, calcs, rise, flat, clk, decay=0, test=False):
     """
-    vectorized trapezoid filter
+    vectorized trapezoid filter.
+    input units are Hz (clk) and nanoseconds (rise, flat, decay)
     """
+    # start w/ baseline-subtracted wfs
     wfs = waves["wf_blsub"]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
-    wfs_minus_ramp = np.zeros_like(wfs) + 0 # baseline
+    # convert params to units of [num samples]
+    tsamp = 1e9 / clk # nanosec
+    rt, ft, dt = int(rise/tsamp), int(flat/tsamp), decay/tsamp
+
+    # calculate each component of the trap for the whole wf at once, then add 'em up
+    wfs_minus_ramp = np.zeros_like(wfs)
     wfs_minus_ramp[:, rt:] = wfs[:, :nsamp - rt]
 
     wfs_minus_ft_and_ramp = np.zeros_like(wfs)
@@ -55,22 +65,16 @@ def trap_filter(waves, calcs, rt=400, ft=200, decay_time=0, test=False):
 
     trap_wfs = np.zeros_like(wfs)
     scratch = wfs - wfs_minus_ramp - wfs_minus_ft_and_ramp + wfs_minus_trap
-
-    # # apply pole-zero correction
-    # if decay_time != 0:
-    #     decay_const = 1. / (np.exp(1. / decay_time - 1))
-    #     pz_corr = np.zeros_like(wfs)
-    #     pz_corr[:,0] = wfs[:,0]
-    #     pz_wfs = np.cumsum(trap_wfs + pz_corr + decay_const * scratch,
-    #                          axis=1) / (rt * decay_const)
-
     trap_wfs = np.cumsum(scratch, axis=1) / rt
 
-    if test:
-        import pygama.dsp.transforms as pt # maybe try importing ben's directly
-        iwf = 5
+    # pole-zero correct the trapezoid
+    if dt != 0:
+        dconst = 1. / (np.exp(1. / dt) - 1)
+        tmp = np.cumsum(scratch, axis=1)
+        pz_wfs = np.cumsum(tmp + dconst * scratch, axis=1) / (rt * dconst)
 
-        # see wtf the algorithm is actually doing
+    if test:
+        iwf = 5
         ts = np.arange(nsamp)
         plt.plot(ts, wfs[iwf], '-r', label='raw')
         # plt.plot(ts, wfs_minus_ramp[iwf], '-b', label='wf-ramp')
@@ -78,18 +82,27 @@ def trap_filter(waves, calcs, rt=400, ft=200, decay_time=0, test=False):
         # plt.plot(ts, wfs_minus_trap[iwf], '-m', label='wf-ft-2ramp')
         plt.plot(ts, scratch[iwf], '-k', label='scratch')
         plt.plot(ts, trap_wfs[iwf], '-g', label='trap')
+        plt.plot(ts, pz_wfs[iwf], '-b', label='pz_trap, {}'.format(dt))
 
-        # trapwf = pt.trap_filter(wfs[iwf], calcs)
-        # plt.plot(np.arange(len(trapwf)), trapwf, '-k', label='bentrap')
+        # check against ben's original function
+        # import pygama.sandbox.base_transforms as pt
+        # trapwf = pt.trap_filter(wfs[iwf], 400, 250, 7200)
+        # plt.plot(np.arange(len(trapwf)), trapwf, '-m', label='bentrap')
 
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
         plt.legend()
+        plt.tight_layout()
         plt.show()
         exit()
+
+    if dt != 0:
+        trap_wfs = pz_wfs
 
     return {"wf_trap": trap_wfs}
 
 
-def current_trap(waves, calcs, sigma=3, test=False):
+def current(waves, calcs, sigma=3, test=False):
     """
     calculate the current trace,
     by convolving w/ first derivative of a gaussian.
@@ -104,27 +117,77 @@ def current_trap(waves, calcs, sigma=3, test=False):
         wf = wfs[iwf] / np.amax(wfs[iwf])
         curr = wfc[iwf] / np.amax(wfc[iwf])
 
-        plt.plot(ts, wf, c='b')
-        plt.plot(ts, curr, c='r', alpha=0.7)
+        plt.plot(ts, wf, c='r', alpha=0.7, label='raw wf')
+        plt.plot(ts, curr, c='b', label='current')
+
+        # compare w/ MGDO current
+        from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
+        tsf = MGWFTrapSlopeFilter()
+        tsf.SetPeakingTime(1)
+        tsf.SetIntegrationTime(10)
+        tsf.SetEvaluateMode(7)
+        mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
+        tmp = std.vector("double")(len(wf))
+        for i in range(len(wf)): tmp[i] = wf[i]
+        mgwf_in.SetData(tmp)
+        tmp = mgwf_in.GetVectorData()
+        tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
+        out = mgwf_out.GetVectorData()
+        mgawf = np.fromiter(out, dtype=np.double, count=out.size())
+        mgawf = mgawf / np.amax(mgawf)
+        plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel('ADC', ha='right', y=1)
+        plt.legend()
+        plt.tight_layout()
         plt.show()
+        exit()
 
     return {"wf_current" : wfc}
 
 
-def pz_correct(waves, calcs, rc, f_samp, test=False):
+def pz_correct(waves, calcs, decay, clk, test=False):
     """
     pole-zero correct a waveform
+    decay is in ns, clk is in Hz
     """
     wfs = waves["wf_blsub"]
 
+    # get linear filter parameters
+    tsamp = 1e9 / clk # ns
+    dt = decay / tsamp # [number of clock ticks]
+    rc = 1. / np.exp(1. / dt)
+    num, den = [1, -1], [1, -rc]
+
+    # reversing num and den does the inverse transform (ie, PZ corrects)
+    pz_wfs = lfilter(den, num, wfs)
+
     if test:
-        print("hi clint")
+        iwf = 5
+        ts = np.arange(len(wfs[iwf]))
+        plt.plot(ts, wfs[iwf], '-r', label='raw')
+        plt.plot(ts, pz_wfs[iwf], '-b', label='pz_corr')
+
+        # let's try calling the trapezoid w/ no decay time & make sure
+        # the two transforms are equivalent!
+
+        # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
+        tmp = trap_filter({"wf_blsub":pz_wfs}, calcs, 4000, 2500, 100e6)
+        trap = tmp["wf_trap"][iwf]
+        plt.plot(ts, trap, '-g', lw=3, label='trap on pzcorr wf')
+
+        # compare to the PZ corrected trap on the RAW wf.
+        tmp = trap_filter(waves, calcs, 4000, 2500, 100e6, 72000)
+        trap2 = tmp["wf_trap"][iwf]
+        plt.plot(ts, trap2, '-m', label="pz trap on raw wf")
+
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
         exit()
 
-    # # get the linear filter parameters.  RC params are in us
-    # num, den = rc_decay(rc, f_samp)
-    #
-    # # reversing num and den does the inverse transform (ie, PZ corrects)
-    # return signal.lfilter(den, num, waveform)
-
+    return {"wf_pz" : pz_wfs}
 

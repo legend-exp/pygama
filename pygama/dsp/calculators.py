@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 def avg_baseline(waves, calcs, i_start=0, i_end=500):
     """
@@ -21,10 +22,6 @@ def fit_baseline(waves, calcs, i_start=0, i_end=500, order=1, test=False):
     """
     wf_block = waves["waveform"]
 
-    if wf_block.size == 0:
-        print("Warning, empty block!")
-        exit()
-
     nsamp = wf_block.shape[1]
     if i_end > nsamp:
         i_end = nsamp-1
@@ -34,30 +31,56 @@ def fit_baseline(waves, calcs, i_start=0, i_end=500, order=1, test=False):
     wfs = wf_block[:, i_start:i_end].T
     pol = np.polynomial.polynomial.polyfit(x, wfs, order).T
 
+    if test:
+        iwf = 5
+
+        ts, wf = np.arange(len(wf_block[iwf])), wf_block[iwf]
+        plt.plot(ts, wf, c='b')
+
+        blwf, blts = wfs.T[iwf], np.arange(len(wfs.T[iwf]))
+        plt.plot(blts, blwf, c='r')
+
+        b, m = pol[iwf]
+        fit = lambda t : m * t + b
+        plt.plot(blts, fit(blts), c='k', lw=3,
+                 label='baseline, pol1: \n{:.2e}*ts + {:.1f}'.format(m, b))
+
+        plt.xlim(0, 1100)
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
+        plt.legend(loc=2)
+        plt.tight_layout()
+        plt.show()
+        exit()
+
     # add the result as new columns
     calcs["bl_int"] = pol[:,0]
     calcs["bl_slope"] = pol[:,1]
-    return calcs
 
 
 def trap_max(waves, calcs, test=False):
     """
-    calculate maximum of trapezoid filter - no pride here
+    calculate maximum of trapezoid filter
     """
-    wfs = waves["wf_trap"]
+    traps = waves["wf_trap"]
 
-    maxes = np.amax(wfs, axis=1)
+    maxes = np.amax(traps, axis=1)
 
     if test:
-        import matplotlib.pyplot as plt
-        iwf = 1
-        plt.plot(np.arange(len(wfs[iwf])), wfs[iwf], '-r')
-        plt.axhline(maxes[iwf])
+        iwf = 5
+        ts = np.arange(len(traps[iwf]))
+        plt.plot(ts, waves["wf_blsub"][iwf], '-b', alpha=0.7, label='raw wf')
+        plt.plot(ts, traps[iwf], '-k', label="pz corrected trap")
+        imaxes = np.argmax(traps, axis=1)
+        plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", markersize=20, label="max")
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
+        plt.legend()
+        plt.tight_layout()
         plt.show()
         exit()
 
     calcs["trap_max"] = maxes
-    return calcs
 
 
 def current_max(waves, calcs, sigma=1, test=False):
@@ -66,20 +89,13 @@ def current_max(waves, calcs, sigma=1, test=False):
     """
     wfc = waves["wf_current"]
 
-    amax = np.amax(wfc, axis=1)
+    amax = np.amax(wfc, axis=1) # lol, so simple
 
     if test:
         import matplotlib.pyplot as plt
         from pygama.utils import peakdet
 
         wfs = waves["wf_blsub"]
-
-        # comparison w/ MGDO
-        from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
-        tsf = MGWFTrapSlopeFilter()
-        tsf.SetPeakingTime(1)
-        tsf.SetIntegrationTime(10)
-        tsf.SetEvaluateMode(7)
 
         iwf = -1
         f = plt.figure()
@@ -93,25 +109,7 @@ def current_max(waves, calcs, sigma=1, test=False):
             awf = wfc[iwf] / np.amax(wfc[iwf])
             aval = amax[iwf]
 
-            mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
-            tmp = std.vector("double")(len(wf))
-            for i in range(len(wf)): tmp[i] = wf[i]
-            mgwf_in.SetData(tmp)
-            tmp = mgwf_in.GetVectorData()
-            tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
-            out = mgwf_out.GetVectorData()
-            mgawf = np.fromiter(out, dtype=np.double, count=out.size())
-            mgawf = mgawf / np.amax(mgawf)
-
-            # jasondet [12:11 PM]
-            # Our A is equivalent to the slope of a linear fit over 10 samples
-            # jasondet [11:33 AM]
-            # yeah but counting peaks in a current trace is not going to be as
-            # robust (esp. for low-E pulses) as thresholding the current trace,
-            # that’s what David H-A is working on.
-            # TODO: require the sum A be over a particular value
-
-            # try out eli's pileup detector anyway
+            # try out eli's pileup detector
             maxpks, minpks = peakdet(wfc[iwf], 1)
             if len(maxpks > 0):
                 print(maxpks[:,0]) # indices
@@ -120,38 +118,36 @@ def current_max(waves, calcs, sigma=1, test=False):
             # real crude zoom into the rising edge
             t50 = np.argmax(awf)
             tlo, thi = t50-300, t50+300
-            # ts, wf, awf, mgawf = ts[tlo:thi], wf[tlo:thi], awf[tlo:thi], mgawf[tlo:thi]
+            ts, wf, awf = ts[tlo:thi], wf[tlo:thi], awf[tlo:thi]
 
             plt.cla()
-            plt.plot(ts, wf, '-b', label='data')
-            plt.plot(ts, awf, '-r', alpha=0.7, label='pygama')
-            # plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+            plt.plot(ts, wf, '-b', alpha=0.7, label='data')
+            plt.plot(ts, awf, '-k', label='current')
 
             for pk in maxpks:
-                # if tlo < pk[0] < thi:
-                plt.plot(pk[0], pk[1] / np.amax(wfc[iwf]), '.k', ms=10)
+                if tlo < pk[0] < thi:
+                    plt.plot(pk[0], pk[1] / np.amax(wfc[iwf]), '.m', ms=20)
 
-            # plt.legend()
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
             plt.show(block=False)
             plt.pause(0.01)
 
     calcs["current_max"] = amax
 
 
-def current_int(waves, calcs, test=False):
-    """
-    integrate the current signal.
-    """
-    wfc = waves["wf_current"]
-
-    csum = np.sum(wfc, axis=1)
-
-    if test:
-        print(csum.shape)
-        exit()
-
-    calcs["current_int"] = csum
-
-
 def wf_peakdet(waves, calcs, test=False):
+    """
+    find peaks in the current signal (multisite events and pileup)
+    """
+    print("hi clint")
+
+
+def tail_fit(waves, calcs, test=False):
+    """
+    look around for an exp version of np.polyfit, use it to fit the tail.
+    would probably need a separate calculator to know where the tail starts.
+    """
     print("hi clint")

@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy import signal
 
-from .filters import *
+# from .filters import *
 
 #Silence harmless warning you get using savgol on old LAPACK
 import warnings
@@ -99,7 +99,7 @@ def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
                                               2 * rampTime]
 
     scratch = waveform - (wf_minus_ramp +
-                          wf_minus_ft_and_ramp +
+                          wf_minus_ft_and_ramp - # NOTE: clint changed this to - after walter convinced him
                           wf_minus_ft_and_2ramp)
 
     if decayConstant != 0:
