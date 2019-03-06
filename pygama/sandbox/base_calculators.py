@@ -41,7 +41,9 @@ def is_saturated(waveform, bit_precision=14):
 def t0_estimate(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
     """
     Estimate t0
-    max t0 adc: maximum adc (above baseline) the wf can get to before assuming the wf has started
+    max t0 adc:
+    maximum adc (above baseline) the wf can get to 
+    before assuming the wf has started
     """
 
     if np.amax(waveform) < max_t0_adc:

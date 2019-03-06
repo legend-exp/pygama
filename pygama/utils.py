@@ -25,7 +25,14 @@ def peakdet(v, delta, x = None):
     Eli Billauer, 3.4.05 (Explicitly not copyrighted).
     This function is released to the public domain; Any use is allowed.
 
-    TODO: surely we can vectorize this?
+    TODO: can we vectorize this?
+    # i think to vectorize this, i still have to a loop over
+    # the timestamps, because the max/mins are set based on the previous
+    # value.  we could probably store the individual max/mins in arrays,
+    # and also find_max would have to be turned into an array.
+    # so this can only be "partially" vectorized at best.
+    # i'd have to really think about how to get rid of the loop
+    # over ts's.  maybe some kind of cumsum, like the trap filter?
     """
     maxtab, mintab = [], []
 
@@ -39,30 +46,33 @@ def peakdet(v, delta, x = None):
     if delta <= 0:
         sys.exit('Peak Finder Error: Input argument delta must be positive')
 
-    mn, mx, mnpos, mxpos = np.Inf, -np.Inf, np.NaN, np.NaN
-    lookformax = True
+    maxes, mins = [], []
+    min, max = np.inf, -np.inf
+    find_max = True
+    for i in x:
 
-    for i in np.arange(len(v)):
-        this = v[i]
-        if this > mx:
-            mx = this
-            mxpos = x[i]
-        if this < mn:
-            mn = this
-            mnpos = x[i]
-        if lookformax:
-            if this < mx-delta:
-                maxtab.append((mxpos, mx))
-                mn = this
-                mnpos = x[i]
-                lookformax = False
+        # for i=0, all 4 of these get set
+        if v[i] > max:
+            max, imax = v[i], x[i]
+        if v[i] < min:
+            min, imin = v[i], x[i]
+
+        if find_max:
+            # if the sample is less than the current max,
+            # declare the previous one a maximum, then set this as the new "min"
+            if v[i] < max - delta:
+                maxes.append((imax, max))
+                min, imin = v[i], x[i]
+                find_max = False
         else:
-            if this > mn+delta:
-                mintab.append((mnpos, mn))
-                mx = this
-                mxpos = x[i]
-                lookformax = True
-    return np.array(maxtab), np.array(mintab)
+            # if the sample is more than the current min,
+            # declare the previous one a minimum, then set this as the new "max"
+            if v[i] > min + delta:
+                mins.append((imin, min))
+                max, imax = v[i], x[i]
+                find_max = True
+
+    return np.array(maxes), np.array(mins)
 
 
 def TDraw(tree, vars, tcut):

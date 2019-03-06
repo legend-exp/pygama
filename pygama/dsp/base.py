@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from abc import ABC
+from pprint import pprint
 import pygama.dsp.calculators as pc
 import pygama.dsp.transforms as pt
 from ..utils import update_progress
@@ -22,17 +23,48 @@ class Tier1Processor(ABC):
         if settings is not None:
             self.settings = settings
             for key in settings:
-                self.add(key, settings[key])
+                if isinstance(settings[key], dict):
+                    self.add(key, settings[key])
 
-        if default_list:
+                # handle multiple instances of a calculator w/ diff params
+                elif isinstance(settings[key], list):
+                    for i, d2 in enumerate(settings[key]):
+                        self.add("{}-{}".format(key, i), d2)
+
+        elif default_list:
             self.set_default_list()
+        else:
+            print("Warning: no processors set!")
+
+
+    def add(self, fun_name, settings={}):
+        """
+        add a new processor to the list,
+        with a string name and a dict of settings
+        """
+        fun_name = fun_name.split("-")[0] # handle multiple instances
+        # print("adding", fun_name, settings)
+
+        if fun_name in dir(pc):
+            self.proc_list.append(Calculator(getattr(pc, fun_name), settings))
+        elif fun_name in dir(pt):
+            self.proc_list.append(Transformer(getattr(pt, fun_name), settings))
+        else:
+            print("ERROR! unknown function:", fun_name)
+            sys.exit()
+
+
+    def set_default_list(self):
+        for proc in ["fit_baseline", "bl_subtract", "trap_filter", "get_max"]:
+            settings = self.settings[proc] if proc in self.settings else {}
+            self.add(proc, settings)
 
 
     def set_intercom(self, data_df):
         """
         declare self.waves and self.calcs, our intercom data objects.
         save waveforms as an ndarray into the dict self.waves.
-        then save the single-values parts of the input dataframe separately
+        then save the single-valued parts of the input dataframe separately
         into self.calcs, which we build on to create a Tier 2 dataframe
         (i.e. gatified single-valued.)
         """
@@ -55,6 +87,7 @@ class Tier1Processor(ABC):
 
             if verbose:
                 print("Applying:", processor.function.__name__)
+                # pprint(processor.fun_args)
 
             p_result = processor.process_block(self.waves, self.calcs)
 
@@ -73,46 +106,22 @@ class Tier1Processor(ABC):
         return self.calcs
 
 
-    def add(self, fun_name, settings={}):
-        """
-        add a new processor to the list, with a string name and a
-        dict of settings, which overrides any other settings we've already set
-        """
-        # get the settings
-        if fun_name in self.settings:
-            self.settings[fun_name] = {**self.settings[fun_name], **settings}
-        else:
-            self.settings[fun_name] = settings
-
-        # add the processor
-        if fun_name in dir(pc):
-            self.proc_list.append(Calculator(getattr(pc, fun_name), self.settings[fun_name]))
-
-        elif fun_name in dir(pt):
-            self.proc_list.append(Transformer(getattr(pt, fun_name), self.settings[fun_name]))
-        else:
-            print("ERROR! unknown function:", fun_name)
-            sys.exit()
-
-
-    def set_default_list(self):
-        for proc in ["fit_baseline", "bl_subtract", "trap_filter", "trap_max"]:
-            settings = self.settings[proc] if proc in self.settings else {}
-            self.add(proc, settings)
-
-
 class ProcessorBase(ABC):
-    """ base class for Tier 1 processors.
+    """
+    base class for Tier 1 processors.
     - calculators.py - calculate single values from a waveform
     - transforms.py - create a new waveform from a waveform
     """
     def __init__(self, function, fun_args={}):
-        """ save some argunemnts specific to this transform/calculator """
+        """
+        save some argunemnts specific to this transform/calculator
+        """
         self.function = function
         self.fun_args = fun_args # so fun
 
     def process_block(self, waves, calcs):
-        """ run the given calculation on the wf block in waves.
+        """
+        run the given calculation on the wf block in waves.
         can also use results from other calculations via calcs.
         individual processor functions can decide if they want to use the
         df axes, or convert to a numpy array for extra speed

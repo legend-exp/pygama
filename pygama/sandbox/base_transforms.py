@@ -12,8 +12,7 @@ from scipy import signal
 
 #Silence harmless warning you get using savgol on old LAPACK
 import warnings
-warnings.filterwarnings(
-    action="ignore", module="scipy", message="^internal gelsd")
+warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
 
 
 def remove_baseline(waveform, bl_0=0, bl_1=0):
@@ -59,7 +58,6 @@ def pz_correct(waveform, rc, digFreq=100E6):
     """
     pole-zero correct a waveform
     """
-
     # get the linear filter parameters.  RC params are in us
     num, den = rc_decay(rc, digFreq)
 
@@ -67,8 +65,7 @@ def pz_correct(waveform, rc, digFreq=100E6):
     return signal.lfilter(den, num, waveform)
 
 
-def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0.,
-                baseline=0.):
+def trap_filter(waveform, rampTime=400, flatTime=200, decayTime=0., baseline=0.):
     """
     Apply a trap filter to a waveform.
     """
