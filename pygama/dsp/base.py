@@ -51,7 +51,7 @@ class Tier1Processor(ABC):
             self.proc_list.append(Transformer(getattr(pt, fun_name), settings))
         else:
             print("ERROR! unknown function:", fun_name)
-            sys.exit()
+            exit()
 
 
     def set_default_list(self):
@@ -86,8 +86,7 @@ class Tier1Processor(ABC):
         for processor in self.proc_list:
 
             if verbose:
-                print("Applying:", processor.function.__name__)
-                # pprint(processor.fun_args)
+                print(" -> ", processor.function.__name__, processor.fun_args)
 
             p_result = processor.process_block(self.waves, self.calcs)
 

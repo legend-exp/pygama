@@ -1,6 +1,8 @@
 """
-pygama tier 1 processing
-tier 1 data --> DSP --> tier 2 (i.e. gatified)
+pygama tier 1 processing:
+    tier 1 data
+    --> DSP -->
+    tier 2 (i.e. gatified)
 """
 import os, re, sys, time
 import numpy as np
@@ -12,6 +14,7 @@ from ..io.decoders.data_loading import *
 from ..io.decoders.digitizers import *
 from ..utils import *
 
+
 def ProcessTier1(t1_file,
                  processor,
                  digitizers=None,
@@ -20,7 +23,7 @@ def ProcessTier1(t1_file,
                  verbose=False,
                  nevt=None,
                  multiprocess=True,
-                 chunk = 3000):
+                 chunk=3000):
 
     print("Starting pygama Tier 1 processing ...")
     print("   Input file: {}".format(t1_file))
@@ -53,7 +56,7 @@ def ProcessTier1(t1_file,
         decoders = get_decoders()
         digitizers = [d for d in decoders if isinstance(d, Digitizer)]
         with pd.HDFStore(t1_file, 'r') as store:
-            keys = [key[1:] for key in store.keys()] # remove leading '/'
+            keys = [key[1:] for key in store.keys()]  # remove leading '/'
             digitizers = [d for d in digitizers if d.decoder_name in keys]
 
     # go running
@@ -71,6 +74,7 @@ def ProcessTier1(t1_file,
                 use_pytables = True
                 nrows = s.nrows
                 chunk_idxs = list(range(nrows // CHUNKSIZE + 1))
+                nchunks = len(chunk_idxs)
             elif isinstance(s, pd.io.pytables.FrameFixed):
                 use_pytables = False
             else:
@@ -80,23 +84,27 @@ def ProcessTier1(t1_file,
         # --------------- run multiprocessing ----------------
         if use_pytables and multiprocess:
 
-            print("Found {} rows".format(nrows))
+            print("Found {} rows, splitting into {} chunks".format(
+                nrows, nchunks))
 
-            keywords = {"t1_file":t1_file,
-                        "chunksize":CHUNKSIZE,
-                        "nchunks":len(chunk_idxs),
-                        "key":d.decoder_name,
-                        "processor":processor,
-                        "verbose":verbose}
+            keywords = {
+                "t1_file": t1_file,
+                "chunksize": CHUNKSIZE,
+                "nchunks": nchunks,
+                "key": d.decoder_name,
+                "processor": processor,
+                "verbose": verbose
+            }
 
+            global ichunk, pstart
+            ichunk, pstart = 0, time.time()
             with mp.Pool(NCPU) as p:
-                result_list = p.map(partial(process_chunk, **keywords),
-                                    chunk_idxs)
+                result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
 
             # debug: process chunks linearly
             # for idx in chunk_idxs:
-                # process_chunk(idx, **keywords)
-                # exit()
+            # process_chunk(idx, **keywords)
+            # exit()
 
             t2_df = pd.concat(result_list)
 
@@ -107,10 +115,17 @@ def ProcessTier1(t1_file,
 
             if nevt is not np.inf:
                 print("limiting to {} events".format(nevt))
-                t1_df = pd.read_hdf(t1_file, key=d.decoder_name,
-                                    where="ievt < {}".format(nevt))
+                t1_df = pd.read_hdf(
+                    t1_file,
+                    key=d.decoder_name,
+                    where="ievt < {}".format(nevt))
             else:
-                t1_df = pd.read_hdf(t1_file, key=d.decoder_name)
+                print("WARNING: no event limit set (-n option)")
+                print("read the whole df into memory?  are you sure? (y/n)")
+                if input() == "y":
+                    t1_df = pd.read_hdf(t1_file, key=d.decoder_name)
+                else:
+                    exit()
 
             t2_df = processor.process(t1_df, verbose)
 
@@ -121,9 +136,7 @@ def ProcessTier1(t1_file,
     if verbose:
         print("Writing Tier 2 File:\n   {}".format(t2_file))
         print("   Entries: {}".format(len(t2_df)))
-        print("   Data columns:")
-        for col in t2_df.columns:
-            print("   -- " + str(col))
+        print("Data columns:\n", t2_df.columns.values)
 
     t2_df.to_hdf(
         t2_file,
@@ -136,31 +149,46 @@ def ProcessTier1(t1_file,
         statinfo = os.stat(t2_file)
         print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
         elapsed = time.time() - start
-        proc_rate = elapsed/len(t2_df)
-        print("Time elapsed: {:.2f} sec  ({:.5f} sec/wf)".format(elapsed, proc_rate))
+        proc_rate = elapsed / len(t2_df)
+        print("Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
+            elapsed/60, proc_rate))
         print("Done.")
 
 
-def process_chunk(chunk_idx, t1_file, chunksize, nchunks,
-                  key, processor, verbose=False):
+def process_chunk(chunk_idx,
+                  t1_file,
+                  chunksize,
+                  nchunks,
+                  key,
+                  processor,
+                  verbose=False):
     """
     use hdf5 indexing, which is way faster than reading in the df first.
     this is a really good reason to use the 'tables' format
     """
-    # this makes the progress bar jump around randomly, should fix someday w/ a counter
-    update_progress(float(chunk_idx/nchunks))
+    # check progress
+    # check: i estimated 6 mins from 11:19
+    # if it's x4, then that's 6/4 = 1.5 minutes actual time
+    # code gets to 25 % at: 11:21 = 2 minutes actual time.
+
+    global ichunk, pstart
+    update_progress(float(ichunk / nchunks))
+    ichunk += 4 # actually ncpu
+    if ichunk == 40:
+        ptime = nchunks * (time.time() - pstart) / 10 / 60 / 4
+        print("Est. total processing time: {:.2f} minutes".format(ptime))
 
     with pd.HDFStore(t1_file, 'r') as store:
 
         start = chunk_idx * chunksize
         stop = (chunk_idx + 1) * chunksize
 
-        chunk = pd.read_hdf(t1_file, key,
-                            where="ievt >= {} & ievt < {}"
-                            .format(start, stop))
-        if verbose:
-            print("Chunk {}, start: {}  stop: {}, len: {},"
-                  .format(chunk_idx, start, stop, stop-start),
-                  "df shape:", chunk.shape)
+        chunk = pd.read_hdf(
+            t1_file, key, where="ievt >= {} & ievt < {}".format(start, stop))
+
+        # if verbose:
+        #     print("Chunk {}, start: {}  stop: {}, len: {},"
+        #           .format(chunk_idx, start, stop, stop - start),
+        #           "df shape:", chunk.shape)
 
     return processor.process(chunk)

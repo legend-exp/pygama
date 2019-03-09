@@ -1,7 +1,3 @@
-""" ========= PYGAMA =========
-calculators: given a waveform,
-return a single value.
-"""
 import sys
 import numpy as np
 import pandas as pd
@@ -42,7 +38,7 @@ def t0_estimate(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
     """
     Estimate t0
     max t0 adc:
-    maximum adc (above baseline) the wf can get to 
+    maximum adc (above baseline) the wf can get to
     before assuming the wf has started
     """
 
