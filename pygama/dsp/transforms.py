@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import scipy.signal as signal
 import scipy.ndimage as ndimage
 
+
 def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     """
     return an ndarray of baseline-subtracted waveforms,
@@ -35,8 +36,16 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     return {wfout: blsub_wfs}
 
 
-def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
-         wfin="wf_blsub", wfout="wf_trap", test=False):
+def trap(waves,
+         calcs,
+         rise,
+         flat,
+         clk,
+         fall=None,
+         decay=0,
+         wfin="wf_blsub",
+         wfout="wf_trap",
+         test=False):
     """
     vectorized trapezoid filter.
     inputs are in microsec (rise, flat, fall, decay), and Hz (clk).
@@ -53,10 +62,11 @@ def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
         """
         symmetric case, use recursive trap (fastest)
         """
-        tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(wfs)
+        tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(
+            wfs)
         tr1[:, rt:] = wfs[:, :-rt]
-        tr2[:, (ft + rt):] = wfs[:, :-rt-ft]
-        tr3[:, (rt + ft + flt):] = wfs[:, :-rt-ft-flt]
+        tr2[:, (ft + rt):] = wfs[:, :-rt - ft]
+        tr3[:, (rt + ft + flt):] = wfs[:, :-rt - ft - flt]
         scratch = (wfs - tr1) - (tr2 - tr3)
         atrap = np.cumsum(scratch, axis=1) / rt
     else:
@@ -66,14 +76,14 @@ def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
         TODO (someday): change this to be recursive (need to math it out)
         https://www.sciencedirect.com/science/article/pii/0168900294910111
         """
-        kernel = np.zeros(rt+ft+flt)
+        kernel = np.zeros(rt + ft + flt)
         kernel[:rt] = 1 / rt
-        kernel[rt+ft:] = -1 / flt
-        atrap = np.zeros_like(wfs) # faster than a list comprehension
+        kernel[rt + ft:] = -1 / flt
+        atrap = np.zeros_like(wfs)  # faster than a list comprehension
         for i, wf in enumerate(wfs):
-            atrap[i,:] = np.convolve(wf, kernel, 'same')
-        npad = rt + int(ft/2)
-        atrap = np.pad(atrap, ((0,0),(npad,0)), mode='constant')[:,:-npad]
+            atrap[i, :] = np.convolve(wf, kernel, 'same')
+        npad = rt + int(ft / 2)
+        atrap = np.pad(atrap, ((0, 0), (npad, 0)), mode='constant')[:, :-npad]
 
     # pole-zero correct the trapezoids
     if dt != 0:
@@ -88,7 +98,7 @@ def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
                 inp = input()
                 if inp == "q": exit()
                 if inp == "p": iwf -= 2
-                if inp.isdigit() : iwf = int(inp)-1
+                if inp.isdigit(): iwf = int(inp) - 1
             iwf += 1
             print(iwf)
             plt.cla()
@@ -108,7 +118,7 @@ def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
             plt.pause(0.001)
 
     if dt != 0:
-        return {wfout : ptrap}
+        return {wfout: ptrap}
     else:
         return {wfout: atrap}
 
@@ -157,14 +167,20 @@ def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
     return {wfout: pz_wfs}
 
 
-def current(waves, calcs, sigma=3, wfin="wf_blsub", wfout="wf_curr", test=False):
+def current(waves,
+            calcs,
+            sigma=3,
+            wfin="wf_blsub",
+            wfout="wf_curr",
+            test=False):
     """
     calculate the current trace,
     by convolving w/ first derivative of a gaussian.
     """
     wfs = waves[wfin]
 
-    wfc = ndimage.filters.gaussian_filter1d(wfs, sigma=sigma, order=1) # lol, so simple
+    wfc = ndimage.filters.gaussian_filter1d(
+        wfs, sigma=sigma, order=1)  # lol, so simple
 
     if test:
         iwf = 5
@@ -203,7 +219,14 @@ def current(waves, calcs, sigma=3, wfin="wf_blsub", wfout="wf_curr", test=False)
     return {wfout: wfc}
 
 
-def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_curr", wfout="wf_maxc", test=False):
+def peakdet(waves,
+            calcs,
+            delta,
+            i_end,
+            sigma=0,
+            wfin="wf_curr",
+            wfout="wf_maxc",
+            test=False):
     """
     find multiple maxima in the current wfs.
     this can be optimized for multi-site events, or pile-up events.
@@ -341,7 +364,13 @@ def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_curr", wfout="wf_maxc"
     return {wfout: wfmax}
 
 
-def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol", test=False):
+def savgol(waves,
+           calcs,
+           window=47,
+           order=2,
+           wfin="wf_blsub",
+           wfout="wf_savgol",
+           test=False):
     """
     apply a savitzky-golay filter to a wf.
     this is good for reducing noise on e.g. timepoint calculations
@@ -366,7 +395,7 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
         plt.show()
         exit()
 
-    return {wfout : wfsg}
+    return {wfout: wfsg}
 
 
 def psd(waves, calcs, nseg=100, test=False):
@@ -396,7 +425,14 @@ def psd(waves, calcs, nseg=100, test=False):
     return {"psd": p, "f_psd": f}
 
 
-def notch(waves, calcs, f_notch, Q, clk, wfin="wf_blsub", wfout="wf_notch", test=False):
+def notch(waves,
+          calcs,
+          f_notch,
+          Q,
+          clk,
+          wfin="wf_blsub",
+          wfout="wf_notch",
+          test=False):
     """
     apply notch filter with some quality factor Q
     """
@@ -414,7 +450,7 @@ def notch(waves, calcs, f_notch, Q, clk, wfin="wf_blsub", wfout="wf_notch", test
                 inp = input()
                 if inp == "q": exit()
                 if inp == "p": iwf -= 2
-                if inp.isdigit() : iwf = int(inp)-1
+                if inp.isdigit(): iwf = int(inp) - 1
             iwf += 1
             print(iwf)
 
@@ -422,8 +458,11 @@ def notch(waves, calcs, f_notch, Q, clk, wfin="wf_blsub", wfout="wf_notch", test
 
             plt.cla()
             plt.plot(ts, wfs[iwf], "-b", label='raw wf')
-            plt.plot(ts, wf_notch[iwf], "-r",
-                     label="notch wf, f {:.1e}, Q {}".format(f_notch, Q))
+            plt.plot(
+                ts,
+                wf_notch[iwf],
+                "-r",
+                label="notch wf, f {:.1e}, Q {}".format(f_notch, Q))
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel("ADC", ha='right', y=1)
@@ -432,11 +471,17 @@ def notch(waves, calcs, f_notch, Q, clk, wfin="wf_blsub", wfout="wf_notch", test
             plt.show(block=False)
             plt.pause(0.01)
 
-    return {wfout : wf_notch}
+    return {wfout: wf_notch}
 
 
-def center(waves, calcs, tp=50, n_pre=150, n_post=150,
-           wfin="wf_savgol", wfout="wf_ctr", test=False):
+def center(waves,
+           calcs,
+           tp=50,
+           n_pre=150,
+           n_post=150,
+           wfin="wf_savgol",
+           wfout="wf_ctr",
+           test=False):
     """
     return a waveform centered (windowed) around i_ctr.
     default: center around the 50 pct timepoint
@@ -466,23 +511,29 @@ def center(waves, calcs, tp=50, n_pre=150, n_post=150,
             if 200 < np.amax(wf) < 2000:
                 plt.plot(ts, wf, "-", lw=1)
 
-        plt.axvline(n_pre+1, c='k', label="")
+        plt.axvline(n_pre + 1, c='k', label="")
         plt.xlabel("clock ticks (shifted)", ha='right', x=1)
         plt.ylabel("ADC", ha='right', y=1)
         plt.tight_layout()
         plt.show()
         exit()
 
-    return {wfout : wf_ctr}
+    return {wfout: wf_ctr}
 
 
-def trim(waves, calcs, n_pre, n_post, wfin="wf_blsub", wfout="wf_trim", test=False):
+def trim(waves,
+         calcs,
+         n_pre,
+         n_post,
+         wfin="wf_blsub",
+         wfout="wf_trim",
+         test=False):
     """
     cut out the first n_pre and the last n_post samples.
     """
     wfs = waves[wfin]
 
-    wf_trim = wfs[:,n_pre:n_post]
+    wf_trim = wfs[:, n_pre:n_post]
 
     if test:
         iwf = 5
@@ -494,7 +545,7 @@ def trim(waves, calcs, n_pre, n_post, wfin="wf_blsub", wfout="wf_trim", test=Fal
         plt.show()
         exit()
 
-    return {wfout : wf_trim}
+    return {wfout: wf_trim}
 
 
 def interp(waveform, offset):
@@ -559,8 +610,16 @@ def nlc(waveform, time_constant_samples, fNLCMap, fNLCMap2=None, n_bl=100):
     return waveform
 
 
-def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
-              wfin="wf_blsub", wfout="wf_trap", test=False):
+def trap_test(waves,
+              calcs,
+              rise,
+              flat,
+              clk,
+              decay=0,
+              fall=None,
+              wfin="wf_blsub",
+              wfout="wf_trap",
+              test=False):
     """
     compare a few different trapezoid calculations, on single wfs
     inputs are in Hz (clk) and microseconds (rise, flat, decay)
@@ -569,7 +628,7 @@ def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
     # rise, flat, fall = 1, 1.5, 1 # fixed-time-pickoff for energy trapezoid
-    rise, flat, fall = 4, 2.5, 4 # energy trapezoid
+    rise, flat, fall = 4, 2.5, 4  # energy trapezoid
     # rise, flat, fall = 4, 2, 4 # even dims
     # rise, flat, fall = 3, 2, 1 # asymmetric short-fall (less useful)
     # rise, flat, fall = 0.04, 0.1, 2 # asymmetric short-rise (t0 trigger)
@@ -588,32 +647,32 @@ def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
     # a trapezoidal (step-like) kernel
 
     t1 = time.time()
-    kernel = np.zeros(rt+ft+flt)
+    kernel = np.zeros(rt + ft + flt)
     kernel[:rt] = 1 / rt
-    kernel[rt+ft:] = -1 / flt
-    atrap = ndimage.convolve1d(wfs, kernel, axis=1) # slow?
-    print("ndimage.convolve1d: {:.3f}".format(time.time()-t1))
+    kernel[rt + ft:] = -1 / flt
+    atrap = ndimage.convolve1d(wfs, kernel, axis=1)  # slow?
+    print("ndimage.convolve1d: {:.3f}".format(time.time() - t1))
 
     t2 = time.time()
     atrap = np.zeros_like(wfs)
     for i, wf in enumerate(wfs):
-        atrap[i,:] = np.convolve(wf, kernel, 'same')
+        atrap[i, :] = np.convolve(wf, kernel, 'same')
 
     # atrap = np.array([np.convolve(wf, kernel, 'same') for wf in wfs])
     # print(atrap.shape)
 
-    npad = rt + int(ft/2)
-    atrap = np.pad(atrap, ((0,0),(npad,0)), mode='constant')[:,:-npad]
-    print("np.convolve: {:.3f}".format(time.time()-t2))
+    npad = rt + int(ft / 2)
+    atrap = np.pad(atrap, ((0, 0), (npad, 0)), mode='constant')[:, :-npad]
+    print("np.convolve: {:.3f}".format(time.time() - t2))
 
     t3 = time.time()
     kernel = np.zeros(len(wfs[0]))
     kernel[:rt] = 1 / rt
-    kernel[rt+ft:] = -1 / flt
-    kernel = np.array(wfs.shape[0] * (kernel,))
+    kernel[rt + ft:] = -1 / flt
+    kernel = np.array(wfs.shape[0] * (kernel, ))
     # atrap = signal.convolve(wfs, kernel, 'same')
     atrap = signal.fftconvolve(wfs, kernel, 'same', axes=1)
-    print("convolve elapsed: {:.3f}".format(time.time()-t1))
+    print("convolve elapsed: {:.3f}".format(time.time() - t1))
 
     t4 = time.time()
     # check against the cumsum method.
@@ -624,11 +683,11 @@ def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
 
     tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(wfs)
     tr1[:, rt:] = wfs[:, :-rt]
-    tr2[:, (ft + rt):] = wfs[:, :-rt-ft]
-    tr3[:, (rt + ft + flt):] = wfs[:, :-rt-ft-flt]
+    tr2[:, (ft + rt):] = wfs[:, :-rt - ft]
+    tr3[:, (rt + ft + flt):] = wfs[:, :-rt - ft - flt]
     scratch = (wfs - tr1) - (tr2 - tr3)
     ctrap = np.cumsum(scratch, axis=1) / rt
-    print("cumsum elapsed: {:.3f}".format(time.time()-t4))
+    print("cumsum elapsed: {:.3f}".format(time.time() - t4))
 
     # # pole-zero correct the trapezoid
     # if dt != 0:
@@ -644,7 +703,7 @@ def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
                 inp = input()
                 if inp == "q": exit()
                 if inp == "p": iwf -= 2
-                if inp.isdigit() : iwf = int(inp)-1
+                if inp.isdigit(): iwf = int(inp) - 1
             iwf += 1
             print(iwf)
             plt.cla()
@@ -666,19 +725,19 @@ def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
             # it works for symmetric traps, but is wrong for asym traps
             looptrap = np.zeros(len(wf))
             r1vals, r2vals = [], []
-            for i in range(len(wf) - (rt+ft+flt)):
+            for i in range(len(wf) - (rt + ft + flt)):
 
                 # sum samples 0 --> rt
-                r1 = np.sum( wf[i : rt + i] ) / rt
+                r1 = np.sum(wf[i:rt + i]) / rt
                 # r1 = np.sum( wf[i : rt + i] )
                 r1vals.append(r1)
 
                 # sum samples rt+ft --> rt+ft+flt
-                r2 = np.sum( wf[(rt+ft) + i : (rt+ft+flt) + i] ) / flt
+                r2 = np.sum(wf[(rt + ft) + i:(rt + ft + flt) + i]) / flt
                 # r2 = np.sum( wf[(rt+ft) + i : (rt+ft+flt) + i] )
                 r2vals.append(r2)
 
-                looptrap[i+(rt+ft+flt)] = r2 - r1
+                looptrap[i + (rt + ft + flt)] = r2 - r1
 
             r1vals, r2vals = np.array(r1vals), np.array(r2vals)
             # plt.plot(np.arange(len(r1vals)) + rt, r1vals, '-r', lw=4, label='r1vals')
@@ -783,4 +842,3 @@ def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
     # ok, i hereby bless the "partially vectorized" peakdet function.
 
     exit()
-
