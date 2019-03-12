@@ -1,7 +1,8 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.ndimage.filters import gaussian_filter1d
 import scipy.signal as signal
+import scipy.ndimage as ndimage
 
 def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     """
@@ -34,88 +35,70 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     return {wfout: blsub_wfs}
 
 
-def trap(waves, calcs, rise, flat, clk, decay=0, fall=None,
+def trap(waves, calcs, rise, flat, clk, fall=None, decay=0,
          wfin="wf_blsub", wfout="wf_trap", test=False):
     """
     vectorized trapezoid filter.
-    inputs are in Hz (clk) and microseconds (rise, flat, decay)
+    inputs are in microsec (rise, flat, fall, decay), and Hz (clk).
     """
-    # start w/ baseline-subtracted wfs
     wfs = waves[wfin]
-    nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
-    # convert params to units of [num samples]
-    tsamp = 1e9 / clk  # nanosec
-    rt, ft = int(rise * 1000 / tsamp), int(flat * 1000 / tsamp)
-    flt = int(fall * 1000 / tsamp) if fall != None else rt
-    dt = decay * 1000 / tsamp
+    # convert params to units of [num samples, i.e. clock ticks]
+    nsamp = 1e10 / clk
+    rt, ft, dt = int(rise * nsamp), int(flat * nsamp), decay * nsamp
+    flt = rt if fall is None else int(fall * nsamp)
 
-    # calculate each component of the trap for the whole wf at once, then add 'em up
-    wfs_minus_ramp = np.zeros_like(wfs)
-    wfs_minus_ramp[:, rt:] = wfs[:, :nsamp - rt]
+    # calculate trapezoids
+    if rt == flt:
+        """
+        symmetric case, use recursive trap (fastest)
+        """
+        tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(wfs)
+        tr1[:, rt:] = wfs[:, :-rt]
+        tr2[:, (ft + rt):] = wfs[:, :-rt-ft]
+        tr3[:, (rt + ft + flt):] = wfs[:, :-rt-ft-flt]
+        scratch = (wfs - tr1) - (tr2 - tr3)
+        atrap = np.cumsum(scratch, axis=1) / rt
+    else:
+        """
+        asymmetric case, use the fastest non-recursive algo i could find.
+        (I also tried scipy.ndimage.convolve1d, scipy.signal.[fft]convolve)
+        TODO (someday): change this to be recursive (need to math it out)
+        https://www.sciencedirect.com/science/article/pii/0168900294910111
+        """
+        kernel = np.zeros(rt+ft+flt)
+        kernel[:rt] = 1 / rt
+        kernel[rt+ft:] = -1 / flt
+        atrap = np.zeros_like(wfs) # faster than a list comprehension
+        for i, wf in enumerate(wfs):
+            atrap[i,:] = np.convolve(wf, kernel, 'same')
+        npad = rt + int(ft/2)
+        atrap = np.pad(atrap, ((0,0),(npad,0)), mode='constant')[:,:-npad]
 
-    wfs_minus_ft_and_ramp = np.zeros_like(wfs)
-    wfs_minus_ft_and_ramp[:, (ft + rt):] = wfs[:, :nsamp - ft - rt]
-
-    wfs_minus_trap = np.zeros_like(wfs)
-    wfs_minus_trap[:, (ft + 2 * rt):] = wfs[:, :nsamp - ft - 2 * rt]
-    # wfs_minus_trap[:, (rt + ft + flt):] = wfs[:, :nsamp - rt - ft - flt]
-
-    trap_wfs = np.zeros_like(wfs)
-    scratch = wfs - wfs_minus_ramp - wfs_minus_ft_and_ramp + wfs_minus_trap
-    trap_wfs = np.cumsum(scratch, axis=1) / rt
-
-    # pole-zero correct the trapezoid
+    # pole-zero correct the trapezoids
     if dt != 0:
-        dconst = 1. / (np.exp(1. / dt) - 1)
-        tmp = np.cumsum(scratch, axis=1)
-        pz_wfs = np.cumsum(tmp + dconst * scratch, axis=1) / (rt * dconst)
+        rc = 1 / np.exp(1 / dt)
+        num, den = [1, -1], [1, -rc]
+        ptrap = signal.lfilter(den, num, atrap)
 
     if test:
-        iwf = 5
-
-        iwf = -1
+        iwf = 2
         while True:
-            if iwf != -1:
+            if iwf != 2:
                 inp = input()
                 if inp == "q": exit()
                 if inp == "p": iwf -= 2
                 if inp.isdigit() : iwf = int(inp)-1
             iwf += 1
             print(iwf)
-
-            ts = np.arange(nsamp)
-
             plt.cla()
-            plt.plot(ts, wfs[iwf], '-k', alpha=0.7, label='raw')
-            # plt.plot(ts, wfs_minus_ramp[iwf], '-b', label='wf-rt')
-            # plt.plot(ts, wfs_minus_ft_and_ramp[iwf], '-g', label='wf-rt-ft')
-            # plt.plot(ts, wfs_minus_trap[iwf], '-m', label='wf-rt-ft-flt')
-            # plt.plot(ts, scratch[iwf], '-k', label='scratch')
-            plt.plot(ts, trap_wfs[iwf], '-g', label='trap')
-            plt.plot(ts, pz_wfs[iwf], '-b', label='pz_trap, {}'.format(dt))
 
-            # check against ben's original function
-            # import pygama.sandbox.base_transforms as pt
-            # trapwf = pt.trap_filter(wfs[iwf], 400, 250, 7200)
-            # plt.plot(np.arange(len(trapwf)), trapwf, '-m', label='bentrap')
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wf, '-b', lw=2, alpha=0.7, label='raw wf')
+            plt.plot(ts, atrap[iwf], '-r', label='trap')
 
-            # check the asym trap.  should help find t0
-            # GAT WFA settings:  0.04 us ramp, 0.1 us flat, 2 us fall
-            arise = int(0.04 * 1000 / tsamp)
-            aflat = int(0.1 * 1000 / tsamp)
-            afall = int(2 * 1000 / tsamp)
-            wf = wfs[iwf]
-            atrap = np.zeros(len(wf))
-            w1 = int(arise)
-            w2 = int(arise + aflat)
-            w3 = int(arise + aflat + afall)
-            for i in range(len(wf) - 1000):
-                r1 = np.sum(wf[i:w1 + i]) / arise
-                r2 = np.sum(wf[w2 + i:w3 + i]) / afall
-                atrap[i] = r2 - r1
-
-            # plt.plot(ts, atrap, '-m', label="asym trap")
+            if dt != 0:
+                plt.plot(ts, ptrap[iwf], '-k', label='pz')
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel("ADC", ha='right', y=1)
@@ -125,9 +108,9 @@ def trap(waves, calcs, rise, flat, clk, decay=0, fall=None,
             plt.pause(0.001)
 
     if dt != 0:
-        trap_wfs = pz_wfs
-
-    return {wfout: trap_wfs}
+        return {wfout : ptrap}
+    else:
+        return {wfout: atrap}
 
 
 def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
@@ -137,10 +120,9 @@ def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
     """
     wfs = waves[wfin]
 
-    # get linear filter parameters
-    tsamp = 1e9 / clk  # ns
-    dt = decay*1000 / tsamp  # [number of clock ticks]
-    rc = 1. / np.exp(1. / dt)
+    # get linear filter parameters, in units of [clock ticks]
+    dt = decay * (1e10 / clk)
+    rc = 1 / np.exp(1 / dt)
     num, den = [1, -1], [1, -rc]
 
     # reversing num and den does the inverse transform (ie, PZ corrects)
@@ -161,7 +143,7 @@ def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
         plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
 
         # compare to the PZ corrected trap on the RAW wf.
-        tmp = trap(waves, calcs, 4, 2.500, 100e6, 72)
+        tmp = trap(waves, calcs, 4, 2.5, 100e6, decay=72)
         wf_trap2 = tmp["wf_trap"][iwf]
         plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
 
@@ -182,7 +164,7 @@ def current(waves, calcs, sigma=3, wfin="wf_blsub", wfout="wf_curr", test=False)
     """
     wfs = waves[wfin]
 
-    wfc = gaussian_filter1d(wfs, sigma=sigma, order=1)  # lol, so simple
+    wfc = ndimage.filters.gaussian_filter1d(wfs, sigma=sigma, order=1) # lol, so simple
 
     if test:
         iwf = 5
@@ -233,7 +215,8 @@ def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_curr", wfout="wf_maxc"
     the output number.
 
     eli's algorithm (see pygama.utils.peakdet) is dependent on the previous
-    value of the given wf.  this limits what we can vectorize.
+    value of the given wf, with multiple true/false statements.
+    this limits what we can vectorize.
     I think this is called a "forward-dependent" loop, but I'm not sure.
     So this version only vectorizes the operation on each column.
 
@@ -358,62 +341,6 @@ def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_curr", wfout="wf_maxc"
     return {wfout: wfmax}
 
 
-def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
-    """
-    do a speed test of the two peakdet methods
-    """
-    import time
-    from pygama.utils import peakdet as eli_peakdet
-
-    start = time.time()
-    print("sigma is", sigma)
-    tmp = peakdet(waves, calcs, delta, i_end, sigma)
-    tmp1 = tmp["wf_maxc"]
-    print(
-        "vectorized took {:.4f} sec.  tmp1 shape:".format(time.time() - start),
-        tmp1.shape)
-
-    start = time.time()
-    wfc = waves["wf_curr"]
-    tmp2 = np.zeros_like(wfc)
-    for i, wf in enumerate(wfc):
-
-        maxpks, minpks = eli_peakdet(wf, delta)
-
-        # could try np.vectorize here
-        # vfunc = np.vectorize(eli_peakdet)
-        # maxpks, minpks = vfunc(wf, delta) # this fails, i'm probably doing it wrong
-
-        if len(maxpks) > 0:
-            rows = np.full(len(maxpks), i)
-            cols = maxpks[:, 0].astype(int)
-            tmp2[rows, cols] = maxpks[:, 1]
-
-    print("regular took {:.4f} sec.  tmp2 shape:".format(time.time() - start),
-          tmp2.shape)
-
-    inomatch = np.where(tmp1 != tmp2)
-    print("num entries total: {}  not matching {}".format(
-        tmp1.size, len(inomatch[0])))
-
-    # print("vect values:")
-    # print(tmp1[inomatch])
-    # print("reg values:")
-    # print(tmp2[inomatch])
-
-    print("are they equal?", np.all(tmp1 == tmp2))
-
-    # so i find a few minor differences, but not really enough to be alarming.
-    # they're probably related to not matching the find_max condition
-    # quite correctly to the original peakdet function.
-    # for a wf block of (200,2999), i get ~0.6 seconds for old method,
-    # ~0.1 for the new one, so a factor 6 faster. probably even better on
-    # larger wf blocks.
-    # ok, i hereby bless the "partially vectorized" peakdet function.
-
-    exit()
-
-
 def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol", test=False):
     """
     apply a savitzky-golay filter to a wf.
@@ -421,7 +348,7 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     """
     wfs = waves[wfin]
 
-    # Silence harmless warning you get using savgol on old LAPACK
+    # silence harmless warning you get using savgol on old LAPACK
     # import warnings
     # warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
 
@@ -439,7 +366,7 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
         plt.show()
         exit()
 
-    return {wfout: wfsg}
+    return {wfout : wfsg}
 
 
 def psd(waves, calcs, nseg=100, test=False):
@@ -585,27 +512,10 @@ def interp(waveform, offset):
     return np.interp(x, xp, waveform)
 
 
-def asym_trap(waveform, ramp=200, flat=100, fall=40, padAfter=False):
-    """
-    compute an asymmetric trapezoidal filter
-    TODO: can you just add fall=None to the trap function and combine this?
-    """
-    trap = np.zeros(len(waveform))
-    for i in range(len(waveform) - 1000):
-        w1 = ramp
-        w2 = ramp + flat
-        w3 = ramp + flat + fall
-        r1 = np.sum(waveform[i:w1 + i]) / (ramp)
-        r2 = np.sum(waveform[w2 + i:w3 + i]) / (fall)
-        if not padAfter:
-            trap[i + 1000] = r2 - r1
-        else:
-            trap[i] = r2 - r1
-    return trap
-
-
 def nlc(waveform, time_constant_samples, fNLCMap, fNLCMap2=None, n_bl=100):
     """
+    i guess ben had this working for some radford nonlinearity files
+    maybe they're in GAT or on NERSC somewhere
     """
     map_offset = np.int((len(fNLCMap) - 1) / 2)
 
@@ -647,3 +557,230 @@ def nlc(waveform, time_constant_samples, fNLCMap, fNLCMap2=None, n_bl=100):
                                                    len(fNLCMap)))
 
     return waveform
+
+
+def trap_test(waves, calcs, rise, flat, clk, decay=0, fall=None,
+              wfin="wf_blsub", wfout="wf_trap", test=False):
+    """
+    compare a few different trapezoid calculations, on single wfs
+    inputs are in Hz (clk) and microseconds (rise, flat, decay)
+    """
+    wfs = waves[wfin]
+    nwfs, nsamp = wfs.shape[0], wfs.shape[1]
+
+    # rise, flat, fall = 1, 1.5, 1 # fixed-time-pickoff for energy trapezoid
+    rise, flat, fall = 4, 2.5, 4 # energy trapezoid
+    # rise, flat, fall = 4, 2, 4 # even dims
+    # rise, flat, fall = 3, 2, 1 # asymmetric short-fall (less useful)
+    # rise, flat, fall = 0.04, 0.1, 2 # asymmetric short-rise (t0 trigger)
+
+    # convert params to units of [num samples, i.e. clock ticks]
+    nsamp = 1e10 / clk
+    rt, ft, dt = int(rise * nsamp), int(flat * nsamp), decay * nsamp
+    flt = rt if fall is None else int(fall * nsamp)
+
+    # convert params to units of [num samples, i.e. clock ticks]
+    nsamp = int(1e10 / clk)
+    rt, ft, dt = int(rise * nsamp), int(flat * nsamp), decay * nsamp
+    flt = rt if fall is None else int(fall * nsamp)
+
+    # try a few different methods of convolving with
+    # a trapezoidal (step-like) kernel
+
+    t1 = time.time()
+    kernel = np.zeros(rt+ft+flt)
+    kernel[:rt] = 1 / rt
+    kernel[rt+ft:] = -1 / flt
+    atrap = ndimage.convolve1d(wfs, kernel, axis=1) # slow?
+    print("ndimage.convolve1d: {:.3f}".format(time.time()-t1))
+
+    t2 = time.time()
+    atrap = np.zeros_like(wfs)
+    for i, wf in enumerate(wfs):
+        atrap[i,:] = np.convolve(wf, kernel, 'same')
+
+    # atrap = np.array([np.convolve(wf, kernel, 'same') for wf in wfs])
+    # print(atrap.shape)
+
+    npad = rt + int(ft/2)
+    atrap = np.pad(atrap, ((0,0),(npad,0)), mode='constant')[:,:-npad]
+    print("np.convolve: {:.3f}".format(time.time()-t2))
+
+    t3 = time.time()
+    kernel = np.zeros(len(wfs[0]))
+    kernel[:rt] = 1 / rt
+    kernel[rt+ft:] = -1 / flt
+    kernel = np.array(wfs.shape[0] * (kernel,))
+    # atrap = signal.convolve(wfs, kernel, 'same')
+    atrap = signal.fftconvolve(wfs, kernel, 'same', axes=1)
+    print("convolve elapsed: {:.3f}".format(time.time()-t1))
+
+    t4 = time.time()
+    # check against the cumsum method.
+    # NOTE: this is faster, but doesn't work for the asymmetric trapezoid
+
+    # TODO (someday): change this method to be recursive
+    # https://www.sciencedirect.com/science/article/pii/0168900294910111
+
+    tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(wfs)
+    tr1[:, rt:] = wfs[:, :-rt]
+    tr2[:, (ft + rt):] = wfs[:, :-rt-ft]
+    tr3[:, (rt + ft + flt):] = wfs[:, :-rt-ft-flt]
+    scratch = (wfs - tr1) - (tr2 - tr3)
+    ctrap = np.cumsum(scratch, axis=1) / rt
+    print("cumsum elapsed: {:.3f}".format(time.time()-t4))
+
+    # # pole-zero correct the trapezoid
+    # if dt != 0:
+    #     rc = 1 / np.exp(1 / dt)
+    #     num, den = [1, -1], [1, -rc]
+    #     ptrap = signal.lfilter(den, num, atrap)
+
+    if test:
+
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit() : iwf = int(inp)-1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+
+            wf, ts = wfs[iwf], np.arange(len(wfs[iwf]))
+            plt.plot(ts, wf, '-b', alpha=0.5, label='raw wf')
+
+            # plt.plot(ts, scratch[iwf], '-k', label='scratch')
+            # plt.plot(ts, trap_wfs[iwf], '-g', lw=3, label='trap')
+            # plt.plot(ts, pz_wfs[iwf], '-b', label='pz_trap, {}'.format(dt))
+
+            # check against ben's function
+            # import pygama.sandbox.base_transforms as pt
+            # trapwf = pt.trap_filter(wfs[iwf], 400, 250, 7200)
+            # plt.plot(np.arange(len(trapwf)), trapwf, '-m', label='bentrap')
+
+            # -- simple loop-based trap
+            # reproduces the algorithm on p. 74 of clint's thesis.
+            # it works for symmetric traps, but is wrong for asym traps
+            looptrap = np.zeros(len(wf))
+            r1vals, r2vals = [], []
+            for i in range(len(wf) - (rt+ft+flt)):
+
+                # sum samples 0 --> rt
+                r1 = np.sum( wf[i : rt + i] ) / rt
+                # r1 = np.sum( wf[i : rt + i] )
+                r1vals.append(r1)
+
+                # sum samples rt+ft --> rt+ft+flt
+                r2 = np.sum( wf[(rt+ft) + i : (rt+ft+flt) + i] ) / flt
+                # r2 = np.sum( wf[(rt+ft) + i : (rt+ft+flt) + i] )
+                r2vals.append(r2)
+
+                looptrap[i+(rt+ft+flt)] = r2 - r1
+
+            r1vals, r2vals = np.array(r1vals), np.array(r2vals)
+            # plt.plot(np.arange(len(r1vals)) + rt, r1vals, '-r', lw=4, label='r1vals')
+            # plt.plot(np.arange(len(r2vals)) + rt + ft, r2vals, '-m', lw=4, label='r2vals')
+            plt.plot(ts, looptrap, '-k', lw=2, label="loop trap")
+
+            # -- asym trap, method 2, with cumsums
+            # atr1, atr2, atr3 = np.zeros(nwf), np.zeros(nwf), np.zeros(nwf)
+            # atr1[rt:] = wf[:nsamp-rt]
+            # atr2[rt+ft:] = wf[:nsamp-rt-ft]
+            # atr3[rt+ft+flt:] = wf[:nsamp-rt-ft-flt]
+            # tmp1 = np.cumsum(wf-atr1 - 2*atr2 + 2*atr3)
+            # tmp2 = np.cumsum(wf-atr1) / rt
+            # tmp3 = np.cumsum(atr2 + atr3)
+            # plt.plot(ts, tmp1, c='orange', label="w1")
+            # plt.plot(ts, tmp2, c='blue', label="w2")
+            # plt.plot(ts, np.cumsum(wf-atr1-2*atr2+2*atr3)/flt, c='cyan', label="w3")
+            #
+            # NOTE: the lin combinations of the cumsums
+            # seem to reproduce the shape of the trap, but they're much more
+            # susceptible to noise since they don't look like they use
+            # the moving window's average to smooth the output.
+
+            # -- WINNER! --
+            # -- asym trap, method 3, trying out np.convolve,
+            # with a trapezoidal (step-like) kernel.
+            # kernel = np.zeros(rt+ft+flt)
+            # kernel[:rt] = 1 / rt
+            # kernel[rt+ft:] = -1 / flt
+            # atrap = np.convolve(wf, kernel, 'valid')
+            # atrap = np.pad(atrap, (rt+ft+flt-1,0), mode='constant')
+            # print(atrap.shape, wf.shape)
+            # ---> perfect. moved this above to operate on the whole wf block.
+
+            plt.plot(ts, atrap[iwf], '-r', label='atrap')
+
+            # plot max point of trap on the wf (useful for trigger point stuff)
+            itrig = np.argmax(atrap[iwf])
+            plt.plot(ts[itrig], wf[itrig], '.m', ms=10, label="trig pt")
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.001)
+
+    exit()
+
+
+def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
+    """
+    do a speed test of the two peakdet methods
+    """
+    import time
+    from pygama.utils import peakdet as eli_peakdet
+
+    start = time.time()
+    print("sigma is", sigma)
+    tmp = peakdet(waves, calcs, delta, i_end, sigma)
+    tmp1 = tmp["wf_maxc"]
+    print(
+        "vectorized took {:.4f} sec.  tmp1 shape:".format(time.time() - start),
+        tmp1.shape)
+
+    start = time.time()
+    wfc = waves["wf_curr"]
+    tmp2 = np.zeros_like(wfc)
+    for i, wf in enumerate(wfc):
+
+        maxpks, minpks = eli_peakdet(wf, delta)
+
+        # could try np.vectorize here
+        # vfunc = np.vectorize(eli_peakdet)
+        # maxpks, minpks = vfunc(wf, delta) # this fails, i'm probably doing it wrong
+
+        if len(maxpks) > 0:
+            rows = np.full(len(maxpks), i)
+            cols = maxpks[:, 0].astype(int)
+            tmp2[rows, cols] = maxpks[:, 1]
+
+    print("regular took {:.4f} sec.  tmp2 shape:".format(time.time() - start),
+          tmp2.shape)
+
+    inomatch = np.where(tmp1 != tmp2)
+    print("num entries total: {}  not matching {}".format(
+        tmp1.size, len(inomatch[0])))
+
+    # print("vect values:")
+    # print(tmp1[inomatch])
+    # print("reg values:")
+    # print(tmp2[inomatch])
+
+    print("are they equal?", np.all(tmp1 == tmp2))
+
+    # so i find a few minor differences, but not really enough to be alarming.
+    # they're probably related to not matching the find_max condition
+    # quite correctly to the original peakdet function.
+    # for a wf block of (200,2999), i get ~0.6 seconds for old method,
+    # ~0.1 for the new one, so a factor 6 faster. probably even better on
+    # larger wf blocks.
+    # ok, i hereby bless the "partially vectorized" peakdet function.
+
+    exit()
+

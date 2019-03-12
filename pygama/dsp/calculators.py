@@ -148,6 +148,20 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
             plt.pause(0.01)
 
 
+def mjd_ftp(waves, calcs, test=False):
+    """
+    dependent on:
+    {"wfout":"wf_etrap", "rise":4, "flat":2.5, "decay":72, "clk":100e6},
+    {"wfout":"wf_strap", "rise":1, "flat":1.5, "decay":72, "clk":100e6},
+    {"wfout":"wf_atrap", "rise":0.04, "flat":0.1, "fall":2, "clk":100e6}
+
+    # todo: need to find the threshold crossing of the short/asym traps,
+    # not the maximums.
+    """
+    print("hi clint")
+    exit()
+
+
 def get_t0(waveform, baseline=0, median_kernel_size=51, max_t0_adc=100):
     """
     max t0 adc: maximum adc (above baseline) the wf can get to,
