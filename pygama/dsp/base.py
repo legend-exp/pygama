@@ -1,16 +1,51 @@
 import numpy as np
 import pandas as pd
-from abc import ABC
 from pprint import pprint
 import pygama.dsp.calculators as pc
 import pygama.dsp.transforms as pt
 from ..utils import update_progress
 
-
-class Tier1Processor(ABC):
+class Processor:
     """
-    Handle a list of Tier 1 calculators and transforms.
-    Keep an internal 'intercom' of calculator results and waveform transforms.
+    base class for Tier 1 processors.
+    - calculators.py - calculate single values from a waveform
+    - transforms.py - create a new waveform from a waveform
+    """
+    def __init__(self, function, fun_args={}):
+        """
+        save some argunemnts specific to this transform/calculator
+        """
+        self.function = function
+        self.fun_args = fun_args # so fun
+
+    def process_block(self, waves, calcs):
+        """
+        run the given calculation on the wf block in 'self.waves'.
+        can also use results from other calculations via calcs.
+        individual processor functions can decide if they want to use the
+        df axes, or convert to a numpy array for extra speed
+        """
+        return self.function(waves, calcs, **self.fun_args)
+
+
+class Calculator(Processor):
+    def __init__(self, function, fun_args={}):
+        super().__init__(function, fun_args)
+        # may want to declare Calculator-specific stuff here at some point
+
+
+class Transformer(Processor):
+    def __init__(self, function, fun_args={}):
+        super().__init__(function, fun_args)
+        # may want to declare Transformer-specific stuff here at some point
+
+
+class Intercom:
+    """
+    from a list of calculators and transforms, manage an 'intercom'
+    consisting of a dict of waveforms (self.waves) and
+    a DataFrame of single-valued calculations (self.calcs),
+    accessible to all the Processors.
     """
     def __init__(self, settings=None, default_list=False):
 
@@ -19,7 +54,7 @@ class Tier1Processor(ABC):
         self.waves = {} # wfs only, NxM arrays (unpacked)
         self.digitizer = None # may need for card-specifics like nonlinearity
 
-        # add a list of processors and options
+        # parse the JSON settings to create a list of processors and options
         if settings is not None:
             self.settings = settings
             for key in settings:
@@ -35,6 +70,9 @@ class Tier1Processor(ABC):
             self.set_default_list()
         else:
             print("Warning: no processors set!")
+
+        # trick to pass in settings to the Processors w/o an extra argument
+        self.waves["settings"] = self.settings
 
 
     def add(self, fun_name, settings={}):
@@ -55,7 +93,7 @@ class Tier1Processor(ABC):
 
 
     def set_default_list(self):
-        for proc in ["fit_baseline", "bl_subtract", "trap_filter", "get_max"]:
+        for proc in ["fit_bl", "bl_sub", "trap", "get_max"]:
             settings = self.settings[proc] if proc in self.settings else {}
             self.add(proc, settings)
 
@@ -91,7 +129,7 @@ class Tier1Processor(ABC):
             p_result = processor.process_block(self.waves, self.calcs)
 
             if isinstance(processor, Calculator):
-                # self.calcs is updated inside the functions rn
+                # self.calcs is updated inside the functions right now
                 pass
 
             elif isinstance(processor, Transformer):
@@ -105,36 +143,3 @@ class Tier1Processor(ABC):
         return self.calcs
 
 
-class ProcessorBase(ABC):
-    """
-    base class for Tier 1 processors.
-    - calculators.py - calculate single values from a waveform
-    - transforms.py - create a new waveform from a waveform
-    """
-    def __init__(self, function, fun_args={}):
-        """
-        save some argunemnts specific to this transform/calculator
-        """
-        self.function = function
-        self.fun_args = fun_args # so fun
-
-    def process_block(self, waves, calcs):
-        """
-        run the given calculation on the wf block in waves.
-        can also use results from other calculations via calcs.
-        individual processor functions can decide if they want to use the
-        df axes, or convert to a numpy array for extra speed
-        """
-        return self.function(waves, calcs, **self.fun_args)
-
-
-class Calculator(ProcessorBase):
-    def __init__(self, function, fun_args={}):
-        super().__init__(function, fun_args)
-        # may want to declare Calculator-specific stuff here at some point
-
-
-class Transformer(ProcessorBase):
-    def __init__(self, function, fun_args={}):
-        super().__init__(function, fun_args)
-        # may want to declare Transformer-specific stuff here at some point

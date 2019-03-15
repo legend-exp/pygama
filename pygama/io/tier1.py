@@ -16,7 +16,7 @@ from ..utils import *
 
 
 def ProcessTier1(t1_file,
-                 processor,
+                 intercom,
                  digitizers=None,
                  output_dir=None,
                  overwrite=True,
@@ -92,14 +92,15 @@ def ProcessTier1(t1_file,
                 "chunksize": CHUNKSIZE,
                 "nchunks": nchunks,
                 "key": d.decoder_name,
-                "processor": processor,
+                "intercom": intercom,
                 "verbose": verbose
             }
 
             global ichunk, pstart
             ichunk, pstart = 0, time.time()
             with mp.Pool(NCPU) as p:
-                result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
+                result_list = p.map(
+                    partial(process_chunk, **keywords), chunk_idxs)
 
             # debug: process chunks linearly
             # for idx in chunk_idxs:
@@ -127,7 +128,7 @@ def ProcessTier1(t1_file,
                 else:
                     exit()
 
-            t2_df = processor.process(t1_df, verbose)
+            t2_df = intercom.process(t1_df, verbose)
 
     update_progress(1)
 
@@ -151,7 +152,7 @@ def ProcessTier1(t1_file,
         elapsed = time.time() - start
         proc_rate = elapsed / len(t2_df)
         print("Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
-            elapsed/60, proc_rate))
+            elapsed / 60, proc_rate))
         print("Done.")
 
 
@@ -160,7 +161,7 @@ def process_chunk(chunk_idx,
                   chunksize,
                   nchunks,
                   key,
-                  processor,
+                  intercom,
                   verbose=False):
     """
     use hdf5 indexing, which is way faster than reading in the df first.
@@ -173,7 +174,7 @@ def process_chunk(chunk_idx,
 
     global ichunk, pstart
     update_progress(float(ichunk / nchunks))
-    ichunk += 4 # actually ncpu
+    ichunk += 4  # actually ncpu
     if ichunk == 40:
         ptime = nchunks * (time.time() - pstart) / 10 / 60 / 4
         print("Est. total processing time: {:.2f} minutes".format(ptime))
@@ -191,4 +192,4 @@ def process_chunk(chunk_idx,
         #           .format(chunk_idx, start, stop, stop - start),
         #           "df shape:", chunk.shape)
 
-    return processor.process(chunk)
+    return intercom.process(chunk)

@@ -36,21 +36,13 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     return {wfout: blsub_wfs}
 
 
-def trap(waves,
-         calcs,
-         rise,
-         flat,
-         clk,
-         fall=None,
-         decay=0,
-         wfin="wf_blsub",
-         wfout="wf_trap",
-         test=False):
+def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="wf_trap", test=False):
     """
     vectorized trapezoid filter.
-    inputs are in microsec (rise, flat, fall, decay), and Hz (clk).
+    inputs are in microsec (rise, flat, fall, decay)
     """
     wfs = waves[wfin]
+    clk = waves["settings"]["clk"] # Hz
 
     # convert params to units of [num samples, i.e. clock ticks]
     nsamp = 1e10 / clk
@@ -82,8 +74,9 @@ def trap(waves,
         atrap = np.zeros_like(wfs)  # faster than a list comprehension
         for i, wf in enumerate(wfs):
             atrap[i, :] = np.convolve(wf, kernel, 'same')
-        npad = rt + int(ft / 2)
+        npad = int((rt+ft+flt)/2)
         atrap = np.pad(atrap, ((0, 0), (npad, 0)), mode='constant')[:, :-npad]
+        # atrap[:, -(npad):] = 0
 
     # pole-zero correct the trapezoids
     if dt != 0:
@@ -123,12 +116,13 @@ def trap(waves,
         return {wfout: atrap}
 
 
-def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
+def pz(waves, calcs, decay, wfin="wf_blsub", wfout="wf_pz", test=False):
     """
     pole-zero correct a waveform
     decay is in us, clk is in Hz
     """
     wfs = waves[wfin]
+    clk = waves["settings"]["clk"]
 
     # get linear filter parameters, in units of [clock ticks]
     dt = decay * (1e10 / clk)
@@ -148,12 +142,12 @@ def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
         # the two transforms are equivalent!
 
         # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
-        tmp = trap({"wf_blsub": pz_wfs}, calcs, 4, 2.5, 100e6)
+        tmp = trap({"wf_blsub": pz_wfs, "settings":waves["settings"]}, calcs, 4, 2.5)
         wf_trap = tmp["wf_trap"][iwf]
         plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
 
         # compare to the PZ corrected trap on the RAW wf.
-        tmp = trap(waves, calcs, 4, 2.5, 100e6, decay=72)
+        tmp = trap(waves, calcs, 4, 2.5, decay=72)
         wf_trap2 = tmp["wf_trap"][iwf]
         plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
 
@@ -167,20 +161,14 @@ def pz(waves, calcs, decay, clk, wfin="wf_blsub", wfout="wf_pz", test=False):
     return {wfout: pz_wfs}
 
 
-def current(waves,
-            calcs,
-            sigma=3,
-            wfin="wf_blsub",
-            wfout="wf_curr",
-            test=False):
+def current(waves, calcs, sigma, wfin="wf_blsub", wfout="wf_current", test=False):
     """
     calculate the current trace,
     by convolving w/ first derivative of a gaussian.
     """
     wfs = waves[wfin]
 
-    wfc = ndimage.filters.gaussian_filter1d(
-        wfs, sigma=sigma, order=1)  # lol, so simple
+    wfc = ndimage.filters.gaussian_filter1d(wfs, sigma=sigma, order=1) # lol
 
     if test:
         iwf = 5
@@ -219,23 +207,10 @@ def current(waves,
     return {wfout: wfc}
 
 
-def peakdet(waves,
-            calcs,
-            delta,
-            i_end,
-            sigma=0,
-            wfin="wf_curr",
-            wfout="wf_maxc",
-            test=False):
+def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_current", wfout="wf_maxc", test=False):
     """
     find multiple maxima in the current wfs.
     this can be optimized for multi-site events, or pile-up events.
-
-    since this can find multiple values, we can't directly save to the calcs
-    dataframe (not single-valued).  For now, let's save to a sparse wf block.
-    alternately, we could encode the num/vals of the peaks we find into an
-    integer, to make this a calculator.  IDK if it would be a pain to decode
-    the output number.
 
     eli's algorithm (see pygama.utils.peakdet) is dependent on the previous
     value of the given wf, with multiple true/false statements.
@@ -243,8 +218,14 @@ def peakdet(waves,
     I think this is called a "forward-dependent" loop, but I'm not sure.
     So this version only vectorizes the operation on each column.
 
-    TODO: implement a threshold, where we ignore peaks within 2 sigma of
+    this routine also uses a threshold, where we ignore peaks within 2 sigma of
     the baseline noise of the current pulse
+
+    since this can find multiple values, we can't directly save to the calcs
+    dataframe (not single-valued).  For now, let's save to a sparse wf block.
+    alternately, we could encode the num/vals of the peaks we find into an
+    integer, to make this a calculator.  IDK if it would be a pain to decode
+    the output number.
     """
     # input and output blocks
     wfc = waves[wfin]
@@ -364,13 +345,7 @@ def peakdet(waves,
     return {wfout: wfmax}
 
 
-def savgol(waves,
-           calcs,
-           window=47,
-           order=2,
-           wfin="wf_blsub",
-           wfout="wf_savgol",
-           test=False):
+def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol", test=False):
     """
     apply a savitzky-golay filter to a wf.
     this is good for reducing noise on e.g. timepoint calculations
@@ -405,8 +380,9 @@ def psd(waves, calcs, nseg=100, test=False):
     nperseg = 1000 has more detail, but is slower
     """
     wfs = waves["wf_blsub"]
+    clk = waves["settings"]["clk"] # Hz
 
-    f, p = signal.welch(wfs, 100e6, nperseg=nseg)
+    f, p = signal.welch(wfs, clk, nperseg=nseg)
 
     if test:
 
@@ -425,18 +401,13 @@ def psd(waves, calcs, nseg=100, test=False):
     return {"psd": p, "f_psd": f}
 
 
-def notch(waves,
-          calcs,
-          f_notch,
-          Q,
-          clk,
-          wfin="wf_blsub",
-          wfout="wf_notch",
-          test=False):
+def notch(waves, calcs, f_notch, Q, wfin="wf_blsub", wfout="wf_notch", test=False):
     """
     apply notch filter with some quality factor Q
+    TODO: apply multiple notches (f_notch, Q could be lists)
     """
     wfs = waves[wfin]
+    clk = waves["settings"]["clk"] # Hz
 
     f_nyquist = 0.5 * clk
     num, den = signal.iirnotch(f_notch / f_nyquist, Q)
@@ -471,17 +442,10 @@ def notch(waves,
             plt.show(block=False)
             plt.pause(0.01)
 
-    return {wfout: wf_notch}
+    return {wfout : wf_notch}
 
 
-def center(waves,
-           calcs,
-           tp=50,
-           n_pre=150,
-           n_post=150,
-           wfin="wf_savgol",
-           wfout="wf_ctr",
-           test=False):
+def center(waves, calcs, tp=50, n_pre=150, n_post=150, wfin="wf_savgol", wfout="wf_ctr", test=False):
     """
     return a waveform centered (windowed) around i_ctr.
     default: center around the 50 pct timepoint
@@ -521,13 +485,7 @@ def center(waves,
     return {wfout: wf_ctr}
 
 
-def trim(waves,
-         calcs,
-         n_pre,
-         n_post,
-         wfin="wf_blsub",
-         wfout="wf_trim",
-         test=False):
+def trim(waves, calcs, n_pre, n_post, wfin="wf_blsub", wfout="wf_trim", test=False):
     """
     cut out the first n_pre and the last n_post samples.
     """
@@ -565,8 +523,10 @@ def interp(waveform, offset):
 
 def nlc(waveform, time_constant_samples, fNLCMap, fNLCMap2=None, n_bl=100):
     """
-    i guess ben had this working for some radford nonlinearity files
-    maybe they're in GAT or on NERSC somewhere
+    i guess ben had this working for some radford nonlinearity files,
+    maybe they're in GAT or on NERSC somewhere.
+    this just looks like a direct port of
+    https://github.com/mppmu/MGDO/blob/master/Transforms/MGWFNonLinearityCorrector.cc
     """
     map_offset = np.int((len(fNLCMap) - 1) / 2)
 
@@ -597,15 +557,14 @@ def nlc(waveform, time_constant_samples, fNLCMap, fNLCMap2=None, n_bl=100):
                 current_inl += (summand - current_inl) / time_constant_samples
                 if (fNLCMap2 is None): waveform[i] -= current_inl
                 else:
-                    waveform[i] -= fNLCMap2[wf_pt_int +
-                                            map_offset] + current_inl
                     # maybe needs to be +=! check
+                    waveform[i] -= fNLCMap2[wf_pt_int + map_offset] + current_inl
 
         except IndexError:
             print("\nadc value {} and int {}".format(waveform[i], wf_pt_int))
             print("wf_offset {}".format(map_offset))
-            print("looking for index {}/{}".format(wf_pt_int + map_offset,
-                                                   len(fNLCMap)))
+            print("looking for index {}/{}"
+                  .format(wf_pt_int + map_offset, len(fNLCMap)))
 
     return waveform
 
@@ -614,7 +573,6 @@ def trap_test(waves,
               calcs,
               rise,
               flat,
-              clk,
               decay=0,
               fall=None,
               wfin="wf_blsub",
@@ -625,6 +583,7 @@ def trap_test(waves,
     inputs are in Hz (clk) and microseconds (rise, flat, decay)
     """
     wfs = waves[wfin]
+    clk = waves["settings"]["clk"] # Hz
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
     # rise, flat, fall = 1, 1.5, 1 # fixed-time-pickoff for energy trapezoid
@@ -804,7 +763,7 @@ def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
         tmp1.shape)
 
     start = time.time()
-    wfc = waves["wf_curr"]
+    wfc = waves["wf_current"]
     tmp2 = np.zeros_like(wfc)
     for i, wf in enumerate(wfc):
 
