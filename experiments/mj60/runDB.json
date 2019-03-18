@@ -78,8 +78,8 @@
         "current" : {"sigma":5},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [
-            {"wfin:":"asdf", "wfout":"asdf", "window":47, "order":2},
-            {"wfin:":"asdf", "wfout":"asdf", "window":47, "order":2}
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
           {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
@@ -88,19 +88,16 @@
           {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
         ],
         "get_max" : [
-          {"wfin":"wf_etrap"},
-          {"wfin":"wf_strap"},
-          {"wfin":"wf_atrap"},
-          {"wfin":"wf_ttrap"},
-          {"wfin":"wf_current"},
-          {"wfin":"wf_savgol"}
+          {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+          {"wfin":"wf_ttrap"}, {"wfin":"wf_current"}, {"wfin":"wf_savgol"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
         "ftp" : {},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
         "peakdet" : {"delta":0.5, "sigma":5, "i_end":600},
         "num_peaks" : {},
         "overflow" : {},
-        "tail_fit" : {"test":1}
+        "psd" : {},
+        "tail_fit" : {"wfin":"wf_notsav", "test":1}
       },
       "unused":{
         "center": {},

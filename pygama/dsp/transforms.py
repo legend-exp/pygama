@@ -352,10 +352,6 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     """
     wfs = waves[wfin]
 
-    # silence harmless warning you get using savgol on old LAPACK
-    # import warnings
-    # warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
-
     wfsg = signal.savgol_filter(wfs, window, order)
 
     if test:

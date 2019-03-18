@@ -7,6 +7,7 @@ import pandas as pd
 from pprint import pprint
 from pygama import DataSet
 
+
 def main(argv):
     """
     Uses pygama's amazing DataSet class to process runs
@@ -16,17 +17,17 @@ def main(argv):
     metad = './runDB.json'
 
     # -- parse args --
-    par = argparse.ArgumentParser(description="pygama data processing suite for MJ60")
-    arg = par.add_argument
+    par = argparse.ArgumentParser(description="data processing suite for MJ60")
+    arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
-    arg("-r","--run", nargs=1, help="load a single run")
-    arg("-t0","--tier0", action="store_true", help="run ProcessTier0 on run list")
-    arg("-t1","--tier1", action="store_true", help="run ProcessTier1 on run list")
-    arg("-t","--test", action="store_true", help="test mode, don't run pygama routines")
-    arg("-n","--nevt", nargs='?', default=np.inf, help="limit max events per file")
-    arg("-v","--verbose", action="store_true", help="set verbose output")
-    arg("-o","--overwrite", action="store_true", help="overwrite existing files")
-    arg("-m","--nomp", action="store_false", help="don't use multiprocessing")
+    arg("-r", "--run", nargs=1, help="load a single run")
+    arg("-t0", "--tier0", action=st, help="run ProcessTier0 on list")
+    arg("-t1", "--tier1", action=st, help="run ProcessTier1 on list")
+    arg("-t", "--test", action=st, help="test mode, don't run")
+    arg("-n", "--nevt", nargs='?', default=np.inf, help="limit max num events")
+    arg("-v", "--verbose", action=st, help="set verbose output")
+    arg("-o", "--ovr", action=st, help="overwrite existing files")
+    arg("-m", "--nomp", action=sf, help="don't use multiprocessing")
     args = vars(par.parse_args())
 
     # -- declare the DataSet --
@@ -43,11 +44,11 @@ def main(argv):
 
     # -- start processing --
     if args["tier0"]:
-        tier0(ds, args["overwrite"], args["nevt"], args["verbose"], args["test"])
+        tier0(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
 
     if args["tier1"]:
-        tier1(ds, args["overwrite"], args["nevt"], args["nomp"],
-              args["verbose"], args["test"])
+        tier1(ds, args["ovr"], args["nevt"], args["nomp"], args["verbose"],
+              args["test"])
 
 
 def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
@@ -71,22 +72,29 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             print("test mode (dry run), processing Tier 0 file:", t0_file)
             continue
 
-        ProcessTier0(t0_file,
-                     verbose = v,
-                     output_dir = ds.tier_dir,
-                     overwrite = overwrite,
-                     n_max = nevt,
-                     settings = opts)
+        ProcessTier0(
+            t0_file,
+            verbose=v,
+            output_dir=ds.tier_dir,
+            overwrite=overwrite,
+            n_max=nevt,
+            settings=opts)
 
 
-def tier1(ds, overwrite=False, nevt=None, multiproc=True, verbose=False, test=False):
+def tier1(ds,
+          overwrite=False,
+          nevt=None,
+          multiproc=True,
+          verbose=False,
+          test=False):
     """
     Run ProcessTier1 on a set of runs.
+    [t1_run{}.h5] ---> [t2_run{}.h5]  (tier 2 file: DSP results, no waveforms)
+
     Can declare the processor list via:
-        - json configuration file
-        - Intercom(default_list=True)
-        - manually add with Intercom::add
-    [t1_run{}.h5] ---> [t2_run{}.h5] (tier 2 file: DSP results, no waveforms)
+    - json configuration file (recommended)
+    - Intercom(default_list=True)
+    - manually add with Intercom::add
     """
     from pygama.dsp.base import Intercom
     from pygama.io.tier1 import ProcessTier1
@@ -106,14 +114,16 @@ def tier1(ds, overwrite=False, nevt=None, multiproc=True, verbose=False, test=Fa
         proc_list = ds.runDB["build_options"][conf]["tier1_options"]
         proc = Intercom(proc_list)
 
-        ProcessTier1(t1_file, proc,
-                     output_dir = ds.tier_dir,
-                     overwrite = overwrite,
-                     verbose = verbose,
-                     multiprocess = multiproc,
-                     nevt = nevt,
-                     chunk = ds.runDB["chunksize"])
+        ProcessTier1(
+            t1_file,
+            proc,
+            output_dir=ds.tier_dir,
+            overwrite=overwrite,
+            verbose=verbose,
+            multiprocess=multiproc,
+            nevt=nevt,
+            chunk=ds.runDB["chunksize"])
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main(sys.argv[1:])

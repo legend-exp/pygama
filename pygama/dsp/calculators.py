@@ -1,3 +1,4 @@
+import time
 import numpy as np
 from pprint import pprint
 import matplotlib.pyplot as plt
@@ -45,6 +46,7 @@ def fit_bl(waves,
     # run polyfit
     wfs = wf_block[:, i_start:i_end].T
     x = np.arange(i_start, i_end)
+    # note: these coeffs are reversed from normal polyfit.  should change this
     pol = np.polynomial.polynomial.polyfit(x, wfs, order).T
 
     # get the rms noise
@@ -292,18 +294,14 @@ def num_peaks(waves, calcs, wfin="wf_maxc", test=False):
             wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
 
             plt.cla()
-            plt.plot(
-                ts, wf / np.amax(wf), '-k', lw=2, alpha=0.5, label='raw wf')
-            plt.plot(
-                ts,
-                wfc[iwf] / np.amax(wfc[iwf]),
-                '-b',
-                label='current wf, {} pks found'.format(npeaks[iwf]))
+            plt.plot(ts, wf / np.amax(wf), '-k', lw=2, alpha=0.5,
+                     label='raw wf')
+            plt.plot(ts, wfc[iwf] / np.amax(wfc[iwf]), '-b',
+                     label='current wf, {} pks found'.format(npeaks[iwf]))
 
             ipk = np.where(pks[iwf] > 0)
             for pk in ipk[0]:
-                plt.plot(
-                    ts[ipk], pks[iwf][ipk] / np.amax(wfc[iwf]), ".m", ms=20)
+                plt.plot(ts[ipk], pks[iwf][ipk] / np.amax(wfc[iwf]), ".m", ms=20)
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
@@ -347,31 +345,92 @@ def overflow(waves, calcs, wfin="wf_blsub", nbit=14, test=False):
             plt.pause(0.01)
 
 
-def tail_fit(waves, calcs, delta=1, wfin="wf_savgol", test=False):
+def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
     """
-    let's use the 100% timepoint to set where the tail starts.
-    delta is in microseconds
-
-    to start, i looked around for an exp version of np.polyfit.
-    i found we want to reduce to something that can be
-    done using polyfit, since "np.expofit" doesn't exist
-    https://stackoverflow.com/questions/3433486/how-to-do-exponential\
-    and-logarithmic-curve-fitting-in-python-i-found-only-poly
-
-    we also should compare performance to scipy.optimize.curve_fit
-
+    this is a "fast" wf fit, not a super duper accurate (slow) one.
+    since curve_fit can't be vectorized, try np.polyfit.
+    take the log of the wf tail, and fit to a polynomial.
+    y(t) = log(A exp(-t/tau)) = log(A)  + (-1/tau) * t
+                              = pfit[0] + pfit[1]  * t
+    amp = np.exp(pfit[0])
+    tau = -1 / pfit[1]
     """
+    wfin = "wf_notch"
+    vec = True
+    tp_thresh = 0.8
+    n_check = 3
+    order = 1
+
     wfs = waves[wfin]
+    ts = np.arange(wfs.shape[1])
 
     # add a delta to the 100 pct timepoint so we're sure we're on the tail
     nsamp = 1e10 / waves["settings"]["clk"] # Hz
     dt = int(nsamp * delta)
     tp100 = calcs["tp100"] + dt
 
-    # set out of range timepoints to 10 samples before the end of the wf
-    tp100[tp100 > wfs.shape[1]] == wfs.shape[1] - 10
+    # fix out of range timepoints (these can mess up the vectorized polyfit)
+    tp100[tp100 > tp_thresh * wfs.shape[1]] = 0
+
+    # create a masked array to handle the different-length wf tails
+    tails = np.full_like(wfs, np.nan)
+    for i, tp in enumerate(tp100):
+        tails[i, tp:] = wfs[i, tp:]
+    tails = np.ma.masked_invalid(tails)
+    block = np.ma.log(tails) # suppress neg value warnings
+
+    t_start = time.time()
+    if vec:
+        """
+        run the vectorized fit, which works great but is sensitive to timepoints
+        being too near the end of the waveform -- it throws off the whole matrix.
+        until we're sure this is fixed, check the fit results
+        against `n_check` random single tail fits.
+        """
+        pfit = np.ma.polyfit(ts, block.T, order).T
+
+        amps = np.exp(pfit[:,1])
+        taus = -1 / pfit[:,0]
+        calcs["tail_amp"] = amps
+        calcs["tail_tau"] = taus
+
+        # pol_fit = np.ma.polyfit(ts, block.T, 2).T
+        # calcs["tail_p0"] = pol_fit[:,2]
+        # calcs["tail_p1"] = pol_fit[:,1]
+        # calcs["tail_p2"] = pol_fit[:,0]
+
+        for iwf in np.random.choice(block.shape[0], n_check):
+            check_fit = np.ma.polyfit(ts, block[iwf], order)
+            ch_amp = np.exp(check_fit[1])
+            ch_tau = -1 / check_fit[0]
+
+            # if within 90%, they're fine. a polyfit mistake is OOM wrong
+            pct1 = 100 * (ch_amp - amps[iwf]) / amps[iwf]
+            pct2 = 100 * (ch_tau - taus[iwf]) / taus[iwf]
+            if (pct1 > 90) | (pct2 > 90):
+                print("WARNING: there are probably invalid tail values in this wf block.")
+                print("iwf {}, check amp: {:.3e}  tau: {:.3e}".format(iwf, ch_amp, ch_tau))
+                print("     original amp: {:.3e}  tau: {:.3e}".format(amps[iwf], taus[iwf]))
+                print("     pct1: {:.2f}  pct2: {:.2f}".format(pct1, pct2))
+    else:
+        """
+        run a non-vectorized fit with np.polyfit and np.apply_along_axis.
+        for 200 wfs, this is about half as fast as the vectorized mode.
+        """
+        def poly1d(ts, wf, ord):
+            return np.ma.polyfit(wf, ts, ord)
+
+        pfit = np.apply_along_axis(poly1d, 1, block, ts, order)
+
+        amps = np.exp(pfit[:,1])
+        taus = -1 / pfit[:,0]
+        calcs["tail_amp"] = amps
+        calcs["tail_tau"] = taus
+
+    print("Done.  Elapsed: {:.2e} sec.".format(time.time()-t_start))
 
     if test:
+        wfbl = waves["wf_blsub"]
         iwf = 2
         while True:
             if iwf != 2:
@@ -381,11 +440,33 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_savgol", test=False):
                 if inp.isdigit(): iwf = int(inp) - 1
             iwf += 1
             print(iwf)
-            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
-
             plt.cla()
-            plt.plot(ts, wf, '-k', label=wfin)
-            plt.plot(ts[tp100[iwf]:], wf[tp100[iwf]:], '-r', label='tail')
+            plt.plot(ts, wfs[iwf], '-k', label=wfin)
+            plt.plot(ts, wfbl[iwf], '-b', alpha=0.4, label="wf_blsub")
+
+            # get the wf tail
+            wf_tail = np.ma.filled(tails[iwf,:], fill_value = np.nan)
+            idx = np.where(~np.isnan(wf_tail))
+            wf_tail, ts_tail = wf_tail[idx], ts[idx]
+            plt.plot(ts_tail, wf_tail, '-g', label='tail')
+
+            # curve_fit, with exponential. (not easily vectorized)
+            from scipy.optimize import curve_fit
+            tmax = np.amax(wf_tail)
+            def gaus(t, a, tau):
+                return a * np.exp(-t/tau)
+            pars, pcov = curve_fit(gaus, ts_tail, wf_tail,
+                                   p0=(tmax,8000),
+                                   bounds=[[0.8*tmax, 5000],[1.2*tmax, 20000]])
+            perr = np.sqrt(np.diag(pcov))
+            dc, dc_err = pars[1] / 100, perr[1] / 100
+            plt.plot(ts_tail, gaus(ts_tail, *pars), '-m', lw=3,
+                     label="curve_fit dc: {:.1f} +/- {:.3f}".format(dc, dc_err))
+
+            # polyfit
+            amp, tau = amps[iwf], taus[iwf]
+            plt.plot(ts_tail, amp * np.exp(-ts_tail/tau), '-r',
+                     label="polyfit dc: {:.1f}".format(tau/100))
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
@@ -394,46 +475,24 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_savgol", test=False):
             plt.show(block=False)
             plt.pause(0.01)
 
-
-def dcr(waves, calcs, test=False):
-    """
-    nick says the parameter should be called "dcr_og"
-    """
-    print("hi clint")
-
-
-def gretina_overshoot(rc_us, pole_rel, freq=100E6):
-    """
-    """
-    zmag = np.exp(-1. / freq / (rc_us * 1E-6))
-    pmag = zmag - 10.**pole_rel
-
-    num = [1, -zmag]
-    den = [1, -pmag]
-
-    return (num, den)
-
-
 def cfd(waves, calcs, test=False):
     """
-    huh, not actually a lot of stuff on cfd in scipy.
+    huh, not really anything on cfd in scipy.
+    i guess it's a special case of a more general filter.
     the algorithm on wikipedia seems pretty straightforward to implement.
     the signal is split into two parts.  one part is time-delayed, and the
     other is low pass filtered, and inverted. (you can probably permute these)
     https://en.wikipedia.org/wiki/Constant_fraction_discriminator\
     #/media/File:Operation_of_a_CFD.png
-
-    "FIR the win"
-    https://docs.scipy.org/doc/scipy-1.2.1/reference/generated/scipy.signal.firwin.html
-
-    FIR FAQ
-    https://dspguru.com/dsp/faqs/fir/basics/
     """
-    frac = 0.5 # Threshold for CFD trigger
-    thresh = 0.4 #
-    delay = 10e-9 # Delay for CFD differentiation
-    length = 10
-    ratio = 0.75
+    print("hi clint")
+
+
+    # frac = 0.5 # Threshold for CFD trigger
+    # thresh = 0.4 #
+    # delay = 10e-9 # Delay for CFD differentiation
+    # length = 10
+    # ratio = 0.75
 
     # a, b = np.zeros(length), np.zeros(length)
     # b[0] = -1 * frac
@@ -462,28 +521,63 @@ def cfd(waves, calcs, test=False):
     #     filtered = signal.lfilter(self.b, self.a, data)
     # filtered = filtered.reshape(data.shape)
     # return filtered
-    #
-    # numtaps = 3
-    # f = 0.1
-    # signal.firwin(numtaps, f)
+
+    print('hi clint')
 
 
 def fir():
     """
-    FIR Filter
+    FIR Filter, fir the win ;-)
     https://docs.scipy.org/doc/scipy-1.2.1/reference/generated/scipy.signal.firwin.html
 
     This might be better than computing a whole bunch of notch filters.
     Just do a study on the MJ60 power spectrum, and create a multiband filter
+
+    FIR FAQ
+    https://dspguru.com/dsp/faqs/fir/basics/
+    """
+    print("hi clint")
+    numtaps = 3
+    f = 0.1
+    signal.firwin(numtaps, f)
+
+
+def dcr(waves, calcs, test=False):
+    """
+    nick says the parameter should be called "dcr_og"
     """
     print("hi clint")
 
 
-def drift_time():
+def gretina_overshoot(rc_us, pole_rel, freq=100E6):
     """
-    just calculate tp50 - t0.
-    could include this as a convenience ... but do you really want
-    to include things in a T2 dataframe that we don't need the waveforms
-    to calculate?  NO
+    for use with scipy.signal.lfilter
+    """
+    zmag = np.exp(-1. / freq / (rc_us * 1E-6))
+    pmag = zmag - 10.**pole_rel
+
+    num = [1, -zmag]
+    den = [1, -pmag]
+
+    return (num, den)
+
+
+def curve_fit():
+    """
+    a curve_fit apply_along_axis function might be good, for special cases
+    when we don't care about using more computation time
     """
     print("hi clint")
+
+    # # curve_fit, with exponential. (not easily vectorized)
+    # from scipy.optimize import curve_fit
+    # tmax = np.amax(wf_tail)
+    # def gaus(t, a, tau):
+    #     return a * np.exp(-t/tau)
+    # pars, pcov = curve_fit(gaus, ts_tail, wf_tail,
+    #                        p0=(tmax,8000),
+    #                        bounds=[[0.8*tmax, 5000],[1.2*tmax, 20000]])
+    # perr = np.sqrt(np.diag(pcov))
+    # dc, dc_err = pars[1] / 100, perr[1] / 100
+    # plt.plot(ts_tail, gaus(ts_tail, *pars), '-m', lw=3,
+    #          label="curve_fit dc: {:.1f} +/- {:.3f}".format(dc, dc_err))
