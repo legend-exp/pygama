@@ -378,6 +378,7 @@ def psd(waves, calcs, nseg=100, test=False):
     wfs = waves["wf_blsub"]
     clk = waves["settings"]["clk"] # Hz
 
+    nseg = 2999
     f, p = signal.welch(wfs, clk, nperseg=nseg)
 
     if test:

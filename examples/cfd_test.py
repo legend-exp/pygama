@@ -14,33 +14,40 @@ def main():
     cfd(waves, calcs)
 
 
-def cfd(waves, calcs, frac=0.1, delay=2, win=0.05, wfin="wf_blsub", test=False):
+def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False):
     """
     in a constant fraction discriminator, the signal is split into two parts.
     traditionally, one part is time-delayed, and the other is inverted and
     low-pass filtered.
-
     we use scipy.signal.lfilter, which is very general, and could be used
     to smooth/delay both wfs if we wanted to.
-
-    I kind of think that b/c our signals don't oscillate, the delay is not
-    very important, and finding the last crossing is going to be contaminated
-    by the baseline RMS noise.
     """
+    wfs = waves[wfin]
+
+    # internet settings
+    frac, delay, win = 0.5, 4, 0.01
+
     # convert to clock ticks
     nsamp = 1e10 / waves["settings"]["clk"]
     nd, nwin = int(nsamp * delay), int(nsamp * win)
-    print("nd:",nd,"nwin:",nwin)
 
-    wfs = waves[wfin]
-
+    # set up the kernel
     a, b = np.zeros(nd+nwin), np.zeros(nd+nwin)
-    # a[0], b[0], b[-1] = 1, -frac, 1 # internet settings
-    a[0] = 1
-    b[nd:nd+nwin] = -frac
+
+    # internet settings
+    frac, delay, win = 0.5, 4, 0.01
+    a[0], b[0], b[-1] = 1, -frac, 1
+    # hmm ... wfsub (below) w/ these settings creates a really interesting
+    # multi-site waveform ... maybe we could use those somehow.  it's a neat
+    # way to generate a fake pileup or multisite event, esp if we varied the
+    # parameters randomly.  you should spin this off into some other code,
+    # that generates a training set of fake multisite/pileup wfs.
+
+    # clint's settings
+    # a[0] = 1
+    # b[nd:nd+nwin] = -frac
 
     wf_cfd = signal.lfilter(b, a, wfs, axis=1)
-
     wfsub = wfs + wf_cfd
 
     # for i, wf in enumerate(wfs):
@@ -50,7 +57,6 @@ def cfd(waves, calcs, frac=0.1, delay=2, win=0.05, wfin="wf_blsub", test=False):
     #     # out = b[np.isclose(a[:,None],b).any(0)]
 
     if test:
-
         iwf = -1
         while True:
             if iwf != -1:
@@ -77,8 +83,6 @@ def cfd(waves, calcs, frac=0.1, delay=2, win=0.05, wfin="wf_blsub", test=False):
             plt.tight_layout()
             plt.show(block=False)
             plt.pause(0.01)
-
-
 
 
 if __name__=="__main__":

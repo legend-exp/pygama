@@ -27,7 +27,9 @@
     "13":["154,167", "Kr run 2, Jan 30 & 31 2019, 0x6 thresh"],
     "14":["168,176", "Kr run 2, 0x7 thresh"],
     "15":["177,185", "valve closed, bkg run"],
-    "16":["186,999", "bkg run, valve open, 2019/03/19"]
+    "16":["186,189", "bkg run, valve open, 2019/03/19"],
+    "17":["190,190", "thorium calibration, pos 1 (windowsill)"],
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
   },
 
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
@@ -97,12 +99,11 @@
         "peakdet" : {"delta":0.5, "sigma":5, "ihi":600},
         "num_peaks" : {},
         "overflow" : {},
-        "psd" : {},
-        "tail_fit" : {"wfin":"wf_notch", "order":2},
-        "cfd" : {"wfin":"wf_notch", "test":1}
+        "tail_fit" : {"wfin":"wf_notch", "order":2, "tp_thresh":0.9},
       },
       "unused":{
         "center": {},
+        "psd" : {"nseg":1000, "test":1},
         "trim": {"n_pre":100, "n_post":1000},
         "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
         "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
