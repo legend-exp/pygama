@@ -13,9 +13,9 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     wfs = waves[wfin]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
-    bl_0 = calcs["bl_int"].values[:, np.newaxis]
+    bl_0 = calcs["bl_p0"].values[:, np.newaxis]
 
-    slope_vals = calcs["bl_slope"].values[:, np.newaxis]
+    slope_vals = calcs["bl_p1"].values[:, np.newaxis]
     bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
 
     blsub_wfs = wfs - (bl_0 + bl_1)
@@ -207,7 +207,7 @@ def current(waves, calcs, sigma, wfin="wf_blsub", wfout="wf_current", test=False
     return {wfout: wfc}
 
 
-def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_current", wfout="wf_maxc", test=False):
+def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc", test=False):
     """
     find multiple maxima in the current wfs.
     this can be optimized for multi-site events, or pile-up events.
@@ -233,7 +233,7 @@ def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_current", wfout="wf_ma
     wfmin = np.zeros_like(wfc)
 
     # calculate the noise on each wf
-    wfstd = np.std(wfc[:, :i_end], axis=1)
+    wfstd = np.std(wfc[:, :ihi], axis=1)
 
     # column arrays
     find_max = np.ones(wfc.shape[0])  # 1: True, 0: False
@@ -318,7 +318,7 @@ def peakdet(waves, calcs, delta, i_end, sigma=0, wfin="wf_current", wfout="wf_ma
                     c='g',
                     lw=2,
                     label="{} sigma".format(sigma))
-            plt.axvline(i_end, c='r', alpha=0.7, label="bl avg window")
+            plt.axvline(ihi, c='r', alpha=0.7, label="bl avg window")
 
             # peakdet peaks
             for i, idx in enumerate(np.where(wfmax[iwf] > 0)[0]):
@@ -743,7 +743,7 @@ def trap_test(waves,
     exit()
 
 
-def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
+def peakdet_test(waves, calcs, delta, sigma, ihi, test=False):
     """
     do a speed test of the two peakdet methods
     """
@@ -752,7 +752,7 @@ def peakdet_test(waves, calcs, delta, sigma, i_end, test=False):
 
     start = time.time()
     print("sigma is", sigma)
-    tmp = peakdet(waves, calcs, delta, i_end, sigma)
+    tmp = peakdet(waves, calcs, delta, ihi, sigma)
     tmp1 = tmp["wf_maxc"]
     print(
         "vectorized took {:.4f} sec.  tmp1 shape:".format(time.time() - start),

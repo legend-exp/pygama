@@ -4,71 +4,54 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 
-
-def avg_bl(waves,
-           calcs,
-           i_start=0,
-           i_end=500,
-           wfin="waveform",
-           calc="bl_avg",
-           test=False):
+def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_avg", test=False):
     """
     simple mean, vectorized baseline calculator
     """
     wf_block = waves["waveform"]
 
     # find wf means
-    avgs = np.mean(wf_block[:, i_start:i_end], axis=1)
+    avgs = np.mean(wf_block[:, ilo:ihi], axis=1)
 
     # add the result as a new column
     calcs[calc] = avgs
 
 
-def fit_bl(waves,
-           calcs,
-           i_start=0,
-           i_end=500,
-           order=1,
-           wfin="waveform",
-           cnames=["bl_int", "bl_slope", "bl_rms"],
-           test=False):
+def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
     """
-    polynomial fit [order], vectorized baseline calculator
-    TODO:
-    - if we made this calculator a little more general, it could do arb. orders
-      on arbitary windows, so it could also be re-used to fit the wf tails.
-    - also discussed on a Feb 2019 legend S/A call that using a 2nd order term
-      in the baseline might be useful in high event-rate situations where the
-      baseline hasn't yet fully recovered to flat.
+    baseline calculator, uses np.polyfit
+    discussed on a Feb 2019 legend S/A call that using a 2nd order term
+    in the baseline might be useful in high event-rate situations where the
+    baseline hasn't yet fully recovered to flat.  it's also good to reject noise
     """
     wf_block = waves[wfin]
 
-    # run polyfit
-    wfs = wf_block[:, i_start:i_end].T
-    x = np.arange(i_start, i_end)
-    # note: these coeffs are reversed from normal polyfit.  should change this
-    pol = np.polynomial.polynomial.polyfit(x, wfs, order).T
+    # grab baselines
+    x = np.arange(ilo, ihi)
+    wfs = wf_block[:, ilo:ihi]
 
-    # get the rms noise
-    wfstd = np.std(wfs.T, axis=1)
+    # run polyfit
+    pol = np.polyfit(x, wfs.T, order).T
+    pol = np.flip(pol, 1) # col0:p0, col1:p1, col2:p2, etc.
+    wfstd = np.std(wfs, axis=1) # get the rms noise too
+
+    # save results
+    calcs["bl_rms"] = wfstd
+    for i, col in enumerate(pol.T):
+        calcs["bl_p{}".format(i)] = col
 
     if test:
         iwf = 5
-
         ts, wf = np.arange(len(wf_block[iwf])), wf_block[iwf]
-        plt.plot(ts, wf, c='b')
+        plt.plot(ts, wf, '-b')
 
         blwf, blts = wfs.T[iwf], np.arange(len(wfs.T[iwf]))
-        plt.plot(blts, blwf, c='r')
+        plt.plot(blts, blwf, '-r')
 
         b, m = pol[iwf]
         fit = lambda t: m * t + b
-        plt.plot(
-            blts,
-            fit(blts),
-            c='k',
-            lw=3,
-            label='baseline, pol1: \n{:.2e}*ts + {:.1f}'.format(m, b))
+        plt.plot(blts, fit(blts), c='k', lw=3,
+                 label='baseline, pol1: \n{:.2e}*ts + {:.1f}'.format(m, b))
 
         plt.xlim(0, 1100)
         plt.xlabel("clock ticks", ha='right', x=1)
@@ -77,12 +60,6 @@ def fit_bl(waves,
         plt.tight_layout()
         plt.show()
         exit()
-
-    # add the results as new columns
-    for i, c in enumerate(["bl_int", "bl_slope"]):
-        calcs[c] = pol[:, i]
-
-    calcs["bl_rms"] = wfstd
 
 
 def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
@@ -197,7 +174,7 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
 
     # "walk back" from the short trap's max to get t0.
     # this is less dependent on the trap's baseline noise.
-    # MJD uses a threshold of 2 ADC, hardcoded.
+    # Majorana uses a threshold of 2 ADC, hardcoded.
     thresh = 2
     short = wf2.split("_")[1]
     t0 = np.zeros(wfshort.shape[0], dtype=int)
@@ -345,22 +322,17 @@ def overflow(waves, calcs, wfin="wf_blsub", nbit=14, test=False):
             plt.pause(0.01)
 
 
-def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
+def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
+             order=1, vec=True, test=False):
     """
     this is a "fast" wf fit, not a super duper accurate (slow) one.
-    since curve_fit can't be vectorized, try np.polyfit.
-    take the log of the wf tail, and fit to a polynomial.
+    since curve_fit can't be vectorized, this uses np.polyfit.
+    we take the log of the wf tail, then fit to a 1st-order pol.
     y(t) = log(A exp(-t/tau)) = log(A)  + (-1/tau) * t
                               = pfit[0] + pfit[1]  * t
     amp = np.exp(pfit[0])
     tau = -1 / pfit[1]
     """
-    wfin = "wf_notch"
-    vec = True
-    tp_thresh = 0.8
-    n_check = 3
-    order = 1
-
     wfs = waves[wfin]
     ts = np.arange(wfs.shape[1])
 
@@ -369,7 +341,7 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
     dt = int(nsamp * delta)
     tp100 = calcs["tp100"] + dt
 
-    # fix out of range timepoints (these can mess up the vectorized polyfit)
+    # fix out of range timepoints
     tp100[tp100 > tp_thresh * wfs.shape[1]] = 0
 
     # create a masked array to handle the different-length wf tails
@@ -377,30 +349,31 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
     for i, tp in enumerate(tp100):
         tails[i, tp:] = wfs[i, tp:]
     tails = np.ma.masked_invalid(tails)
-    block = np.ma.log(tails) # suppress neg value warnings
+    log_tails = np.ma.log(tails) # suppress neg value warnings
 
     t_start = time.time()
     if vec:
         """
-        run the vectorized fit, which works great but is sensitive to timepoints
-        being too near the end of the waveform -- it throws off the whole matrix.
-        until we're sure this is fixed, check the fit results
-        against `n_check` random single tail fits.
+        run the vectorized fit, which is faster but sensitive to timepoints
+        being too near the end of the wfs -- it throws off the whole matrix.
+        so check the fit results against `n_check` random single tail fits.
         """
-        pfit = np.ma.polyfit(ts, block.T, order).T
+        pfit = np.ma.polyfit(ts, log_tails.T, 1).T
 
         amps = np.exp(pfit[:,1])
         taus = -1 / pfit[:,0]
         calcs["tail_amp"] = amps
         calcs["tail_tau"] = taus
 
-        # pol_fit = np.ma.polyfit(ts, block.T, 2).T
-        # calcs["tail_p0"] = pol_fit[:,2]
-        # calcs["tail_p1"] = pol_fit[:,1]
-        # calcs["tail_p2"] = pol_fit[:,0]
+        # run a second, higher-order fit to estimate error
+        # (i'm lazy and did this instead of returning the covariance matrix)
+        pol_fit = np.ma.polyfit(ts, log_tails.T, order).T
+        pol_fit = np.flip(pol_fit, axis=1)
+        for i, col in enumerate(pol_fit.T):
+            calcs["tail_p{}".format(i)] = col
 
-        for iwf in np.random.choice(block.shape[0], n_check):
-            check_fit = np.ma.polyfit(ts, block[iwf], order)
+        for iwf in np.random.choice(log_tails.shape[0], n_check):
+            check_fit = np.ma.polyfit(ts, log_tails[iwf], order)
             ch_amp = np.exp(check_fit[1])
             ch_tau = -1 / check_fit[0]
 
@@ -408,10 +381,10 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
             pct1 = 100 * (ch_amp - amps[iwf]) / amps[iwf]
             pct2 = 100 * (ch_tau - taus[iwf]) / taus[iwf]
             if (pct1 > 90) | (pct2 > 90):
-                print("WARNING: there are probably invalid tail values in this wf block.")
-                print("iwf {}, check amp: {:.3e}  tau: {:.3e}".format(iwf, ch_amp, ch_tau))
-                print("     original amp: {:.3e}  tau: {:.3e}".format(amps[iwf], taus[iwf]))
-                print("     pct1: {:.2f}  pct2: {:.2f}".format(pct1, pct2))
+                print("WARNING: there are probably invalid values in tails.")
+                print("iwf {}, check amp: {:.3e}   tau: {:.3e}".format(iwf, ch_amp, ch_tau))
+                print("     original amp: {:.3e}   tau: {:.3e}".format(amps[iwf], taus[iwf]))
+                print("     amp pct diff: {:.2f}%  tau: {:.2f}%".format(pct1, pct2))
     else:
         """
         run a non-vectorized fit with np.polyfit and np.apply_along_axis.
@@ -420,14 +393,15 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
         def poly1d(ts, wf, ord):
             return np.ma.polyfit(wf, ts, ord)
 
-        pfit = np.apply_along_axis(poly1d, 1, block, ts, order)
+        pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
 
         amps = np.exp(pfit[:,1])
         taus = -1 / pfit[:,0]
         calcs["tail_amp"] = amps
         calcs["tail_tau"] = taus
 
-    print("Done.  Elapsed: {:.2e} sec.".format(time.time()-t_start))
+    # print("Done.  Elapsed: {:.2e} sec.".format(time.time()-t_start))
+    # exit()
 
     if test:
         wfbl = waves["wf_blsub"]
@@ -450,7 +424,12 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
             wf_tail, ts_tail = wf_tail[idx], ts[idx]
             plt.plot(ts_tail, wf_tail, '-g', label='tail')
 
-            # curve_fit, with exponential. (not easily vectorized)
+            # show the np.polyfit result
+            amp, tau = amps[iwf], taus[iwf]
+            plt.plot(ts_tail, amp * np.exp(-ts_tail/tau), '-r',
+                     label="polyfit dc: {:.1f}".format(tau/100))
+
+            # compare against curve_fit, with exponential. (not easily vectorized)
             from scipy.optimize import curve_fit
             tmax = np.amax(wf_tail)
             def gaus(t, a, tau):
@@ -463,11 +442,6 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
             plt.plot(ts_tail, gaus(ts_tail, *pars), '-m', lw=3,
                      label="curve_fit dc: {:.1f} +/- {:.3f}".format(dc, dc_err))
 
-            # polyfit
-            amp, tau = amps[iwf], taus[iwf]
-            plt.plot(ts_tail, amp * np.exp(-ts_tail/tau), '-r',
-                     label="polyfit dc: {:.1f}".format(tau/100))
-
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
             plt.legend(loc=4)
@@ -475,54 +449,91 @@ def tail_fit(waves, calcs, delta=1, wfin="wf_blsub", vec=True, test=False):
             plt.show(block=False)
             plt.pause(0.01)
 
-def cfd(waves, calcs, test=False):
+
+def cfd(waves, calcs, frac=1.5, delay=2, win=0.005, wfin="wf_blsub", test=False):
     """
-    huh, not really anything on cfd in scipy.
-    i guess it's a special case of a more general filter.
-    the algorithm on wikipedia seems pretty straightforward to implement.
-    the signal is split into two parts.  one part is time-delayed, and the
-    other is low pass filtered, and inverted. (you can probably permute these)
-    https://en.wikipedia.org/wiki/Constant_fraction_discriminator\
-    #/media/File:Operation_of_a_CFD.png
+    in a constant fraction discriminator, the signal is split into two parts.
+    traditionally, one part is time-delayed, and the other is inverted and
+    low-pass filtered.
+
+    we use scipy.signal.lfilter, which is very general, and could be used
+    to smooth/delay both wfs if we wanted to.
+
+    I kind of think that b/c our signals don't oscillate, the delay is not
+    very important, and finding the last crossing is going to be contaminated
+    by the baseline RMS noise.
+
+    --> it really looks like if you set the cfd filter right,
+    you basically just recreate a trapezoid filter.  maybe this will convince
+    julieta that the MJD FTP is the best we can do.
+
+    should compare against ORTEC hardware settings
+    https://www.ortec-online.com/products/electronics/fast-timing-discriminators/584
+
+    another thing to consider is that there is also trigger walk on the
+    digitizer itself, which we can't avoid.
+    in the DT5725, it can trigger by leading edge OR cfd.
+    in the SIS3302, it triggers by leading edge (a trigger trapezoid)
+    and the Gretina4M also triggers by leading edge.
     """
-    print("hi clint")
+    wfs = waves[wfin]
 
+    # convert to clock ticks
+    nsamp = 1e10 / waves["settings"]["clk"]
+    nd, nwin = int(nsamp * delay), int(nsamp * win)
 
-    # frac = 0.5 # Threshold for CFD trigger
-    # thresh = 0.4 #
-    # delay = 10e-9 # Delay for CFD differentiation
-    # length = 10
-    # ratio = 0.75
+    # set up the kernel
+    a, b = np.zeros(nd+nwin), np.zeros(nd+nwin)
 
-    # a, b = np.zeros(length), np.zeros(length)
-    # b[0] = -1 * frac
-    # b[length - 1] = 1.
-    # a[0] = 1.
-    # # FirFilter.__init__(self, b, a, 'constant fraction discriminator')
-    # """
-    # Apply generic FIR filter to *data* using scipy.signal.lfilter()
-    # *data* 1D or 2D numpy array
-    # # scipy.signal.lfilter(b, a, x, axis=-1, zi=None)
-    # """
-    # length = max(len(self.a),len(self.b))-1
-    # if length > 0:
-    #     if ( data.ndim == 1):
-    #        initial = np.ones(length)
-    #        initial *= data[0]
-    #    elif ( data.ndim == 2):
-    #        initial = np.ones( (data.shape[0], length) )
-    #         for i in range(data.shape[0]):
-    #             initial[i,:] *= data[i,0]
-    #     else:
-    #         print 'HELP.'
-    #         pass
-    #     filtered, zf = signal.lfilter(self.b, self.a, data, zi=initial)
-    # else:
-    #     filtered = signal.lfilter(self.b, self.a, data)
-    # filtered = filtered.reshape(data.shape)
-    # return filtered
+    # internet settings
+    a[0], b[0], b[-1] = 1, -frac, 1
+    # whoa ... wfsub (below) w/ these settings creates a really interesting
+    # multi-site waveform ... maybe we could use those somehow.  it's a neat
+    # way to generate a fake pileup or multisite event, esp if we varied the
+    # parameters randomly.  you should spin this off into some other code,
+    # that generates a training set of fake multisite/pileup wfs.
 
-    print('hi clint')
+    # clint's settings
+    # a[:nwin] = 1
+    # a[0] = 1
+    # b[nd:nd+nwin] = -frac
+
+    wf_cfd = signal.lfilter(b, a, wfs, axis=1)
+    wfsub = wfs + wf_cfd
+
+    # for i, wf in enumerate(wfs):
+    #     # cross_pts =
+    #     tol = 1e-5 # tolerance (could use bl rms??)
+    #     out = b[(np.abs(a[:,None] - b) < tol).any(0)]
+    #     # out = b[np.isclose(a[:,None],b).any(0)]
+
+    if test:
+        iwf = -1
+        while True:
+            if iwf != -1:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            ts = np.arange(len(wfs[iwf]))
+
+            plt.cla()
+            plt.plot(ts, wfs[iwf], "-b", label='raw wf')
+            plt.plot(ts, wf_cfd[iwf], "-r", label="cfd wf")
+            plt.plot(ts, wfsub[iwf], "-g", label="sub wf")
+
+            # compare against the ftp
+
+            # plt.ylim(1.2*np.amin(wfs[iwf]), 1.2*np.amax(wfs[iwf]))
+            # plt.ylim(bottom=np.amin(wfs[iwf]))
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend(loc=2)
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
 
 def fir():
@@ -567,8 +578,6 @@ def curve_fit():
     a curve_fit apply_along_axis function might be good, for special cases
     when we don't care about using more computation time
     """
-    print("hi clint")
-
     # # curve_fit, with exponential. (not easily vectorized)
     # from scipy.optimize import curve_fit
     # tmax = np.amax(wf_tail)
@@ -581,3 +590,4 @@ def curve_fit():
     # dc, dc_err = pars[1] / 100, perr[1] / 100
     # plt.plot(ts_tail, gaus(ts_tail, *pars), '-m', lw=3,
     #          label="curve_fit dc: {:.1f} +/- {:.3f}".format(dc, dc_err))
+    print("hi clint")

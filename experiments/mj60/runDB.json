@@ -26,7 +26,8 @@
     "12":["151,153", "Close Kr valve, watch for decay"],
     "13":["154,167", "Kr run 2, Jan 30 & 31 2019, 0x6 thresh"],
     "14":["168,176", "Kr run 2, 0x7 thresh"],
-    "15":["177,185","valve closed, bkg run"]
+    "15":["177,185", "valve closed, bkg run"],
+    "16":["186,999", "bkg run, valve open, 2019/03/19"]
   },
 
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
@@ -59,7 +60,7 @@
         "n_blsamp":10000
       },
       "tier1_options":{
-        "fit_bl" : {"i_end":2000},
+        "fit_bl" : {"ihi":2000},
         "bl_sub" : {},
         "trap_filter" : {"decay_time":72},
         "get_max" : {}
@@ -72,7 +73,7 @@
       },
       "tier1_options":{
         "clk" : 100e6,
-        "fit_bl" : {"i_end":600},
+        "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
         "pz" : {"decay":72},
         "current" : {"sigma":5},
@@ -93,17 +94,17 @@
         ],
         "ftp" : {},
         "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
-        "peakdet" : {"delta":0.5, "sigma":5, "i_end":600},
+        "peakdet" : {"delta":0.5, "sigma":5, "ihi":600},
         "num_peaks" : {},
         "overflow" : {},
         "psd" : {},
-        "tail_fit" : {"wfin":"wf_notsav", "test":1}
+        "tail_fit" : {"wfin":"wf_notch", "order":2},
+        "cfd" : {"wfin":"wf_notch", "test":1}
       },
       "unused":{
         "center": {},
         "trim": {"n_pre":100, "n_post":1000},
-        "psd":{},
-        "peakdet_test":{"delta":1.5, "sigma":0, "i_end":600},
+        "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
         "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
       }
     }

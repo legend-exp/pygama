@@ -46,17 +46,17 @@ class Waveform:
         if i_upper > self.ns:
             i_upper = self.ns - 1
 
-        i_lower = i_ctr - n_samp // 2
-        if i_lower < 0:
-            i_lower = 0
+        ilower = i_ctr - n_samp // 2
+        if ilower < 0:
+            ilower = 0
 
         # window the waveform and timestamps
-        win_wf = self.data[i_lower:i_upper]
-        win_ts = self.ts[i_lower:i_upper]
+        win_wf = self.data[ilower:i_upper]
+        win_ts = self.ts[ilower:i_upper]
 
         # declare the waveform garbage if necessary
         if len(win_wf) != n_samp:
-            # print("ERROR", i_upper-i_lower, len(win_wf))
+            # print("ERROR", i_upper-ilower, len(win_wf))
             # test = True
             self.is_garbage = True
             # sys.exit()
