@@ -13,6 +13,7 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit
 from scipy.special import erfc
 from scipy.stats import crystalball
+import pygama.utils as pgu
 
 
 #unbinned max likelihood fit to data with given likelihood func
@@ -51,6 +52,24 @@ def fit_binned(likelihood_func,
     coeff, var_matrix = curve_fit(
         likelihood_func, bin_centers, hist_data, p0=start_guess, sigma=sigma, bounds=bounds)
     return coeff
+
+
+#regular old binned fit (nonlinear least squares)
+def fit_binned2(func, hist, bins, var=None, guess=None, bounds=(-np.inf, np.inf)):
+    # hist, bins, var as in return value of pgu.hist()
+    xvals = pgu.get_bin_centers(bins)
+    sigma = None
+    if var is not None: 
+        # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
+        # if bin content is non-zero but var = 0 let the user see the warning
+        zeros = (hist == 0)
+        zero_errors = (var == 0)
+        mask = ~(zeros & zero_errors)
+        sigma = np.sqrt(var)[mask]
+        hist = hist[mask]
+        xvals = xvals[mask]
+    coeff, cov_matrix = curve_fit(func, xvals, hist, p0=guess, sigma=sigma, bounds=bounds)
+    return coeff, cov_matrix
 
 
 #Wrapper to give me neg log likelihoods
