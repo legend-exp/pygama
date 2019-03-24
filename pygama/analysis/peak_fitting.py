@@ -58,16 +58,15 @@ def fit_binned(likelihood_func,
 def fit_hist(func, hist, bins, var=None, guess=None, bounds=(-np.inf, np.inf)):
     # hist, bins, var as in return value of pgu.hist()
     xvals = pgu.get_bin_centers(bins)
-    sigma = None
-    if var is not None: 
-        # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
-        # if bin content is non-zero but var = 0 let the user see the warning
-        zeros = (hist == 0)
-        zero_errors = (var == 0)
-        mask = ~(zeros & zero_errors)
-        sigma = np.sqrt(var)[mask]
-        hist = hist[mask]
-        xvals = xvals[mask]
+    if var is None: var = hist # assume Poisson stats if variances are not provided
+    # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
+    # if bin content is non-zero but var = 0 let the user see the warning
+    zeros = (hist == 0)
+    zero_errors = (var == 0)
+    mask = ~(zeros & zero_errors)
+    sigma = np.sqrt(var)[mask]
+    hist = hist[mask]
+    xvals = xvals[mask]
     coeff, cov_matrix = curve_fit(func, xvals, hist, p0=guess, sigma=sigma, bounds=bounds)
     return coeff, cov_matrix
 
