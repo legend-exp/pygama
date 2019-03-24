@@ -157,7 +157,7 @@ def hist(np_arr, bins=None, xrng=None, dx=None, wts=None):
     return hist, bins, var
 
 def get_bin_centers(bins):
-    return bins[:-1] + 0.5 * (bins[1] - bins[0])
+    return (bins[:-1] + bins[1:]) / 2.
 
 
 def sh(cmd, sh=False):
