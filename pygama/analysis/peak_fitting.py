@@ -35,10 +35,21 @@ def fit_binned(likelihood_func,
                hist_data,
                bin_centers,
                start_guess,
+               var=None,
                bounds=(-np.inf, np.inf)):
     #data should already be histogrammed.
+    sigma = None
+    if var is not None: 
+        # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
+        # if bin content is non-zero but var = 0 let the user see the warning
+        zeros = (hist_data == 0)
+        zero_errors = (var == 0)
+        mask = ~(zeros & zero_errors)
+        sigma = np.sqrt(var)[mask]
+        hist_data = hist_data[mask]
+        bin_centers = bin_centers[mask]
     coeff, var_matrix = curve_fit(
-        likelihood_func, bin_centers, hist_data, p0=start_guess, bounds=bounds)
+        likelihood_func, bin_centers, hist_data, p0=start_guess, sigma=sigma, bounds=bounds)
     return coeff
 
 
