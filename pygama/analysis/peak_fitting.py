@@ -55,7 +55,7 @@ def fit_binned(likelihood_func,
 
 
 #regular old binned fit (nonlinear least squares)
-def fit_binned2(func, hist, bins, var=None, guess=None, bounds=(-np.inf, np.inf)):
+def fit_hist(func, hist, bins, var=None, guess=None, bounds=(-np.inf, np.inf)):
     # hist, bins, var as in return value of pgu.hist()
     xvals = pgu.get_bin_centers(bins)
     sigma = None
