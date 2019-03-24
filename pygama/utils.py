@@ -147,6 +147,14 @@ def get_hist(np_arr, x_lo, x_hi, xpb, nb=None, shift=True, wts=None):
         x = x - xpb / 2.
     return x, y
 
+def hist(np_arr, bins=None, xrng=None, dx=None, wts=None):
+    """ quick wrapper to have more control of numpy's histogram """
+    # dx overrides bins setting! Note: have to specify a range
+    if dx is not None: bins = int((xrng[1]-xrng[0])/dx)
+    hist, bins = np.histogram(np_arr, bins=bins, range=xrng, weights=wts)
+    if wts is None: return hist, bins, hist
+    var, bins = np.histogram(np_arr, bins=bins, weights=wts*wts)
+    return hist, bins, var
 
 def get_bin_centers(bins):
     return bins[:-1] + 0.5 * (bins[1] - bins[0])
