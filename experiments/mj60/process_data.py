@@ -7,14 +7,13 @@ import pandas as pd
 from pprint import pprint
 from pygama import DataSet
 
-
 def main(argv):
     """
     Uses pygama's amazing DataSet class to process runs
     for different data sets and arbitrary configuration options
     defined in a JSON file.
     """
-    metad = './runDB.json'
+    run_db = './runDB.json'
 
     # -- parse args --
     par = argparse.ArgumentParser(description="data processing suite for MJ60")
@@ -37,10 +36,10 @@ def main(argv):
             ds_hi = int(args["ds"][1])
         except:
             ds_hi = None
-        ds = DataSet(ds_lo, ds_hi, md=metad, v=args["verbose"])
+        ds = DataSet(ds_lo, ds_hi, md=run_db, v=args["verbose"])
 
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]), md=metad, v=args["verbose"])
+        ds = DataSet(run=int(args["run"][0]), md=run_db, v=args["verbose"])
 
     # -- start processing --
     if args["tier0"]:
