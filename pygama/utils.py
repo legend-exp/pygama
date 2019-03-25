@@ -181,7 +181,7 @@ def print_fit_results(pars, cov, par_names=None):
         par_names = []
         for i in range(len(pars)): par_names.append("p"+str(i))
     for i in range(len(pars)):
-        print(par_names[i], pars[i], "+/-", np.sqrt(cov[i][i]))
+        print(par_names[i], "=", pars[i], "+/-", np.sqrt(cov[i][i]))
 
 def sh(cmd, sh=False):
     """ Wraps a shell command."""
