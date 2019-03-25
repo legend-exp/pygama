@@ -110,7 +110,7 @@ def gauss2(x, mu, sigma, A=1):
 
 
 #David's peak shape
-def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1)
+def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
     #make sure the fractional amplitude parameters stay reasonable...
     if htail < 0 or htail > 1: return np.zeros_like(x)
     if hstep < 0 or hstep > 1: return np.zeros_like(x)
@@ -126,7 +126,7 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1)
 
 
 # power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
-def xtalball(x, mu, sigma, A, beta, m)
+def xtalball(x, mu, sigma, A, beta, m):
     return A * crystalball.pdf(x, beta, m, loc=mu, scale=sigma)
 
 
