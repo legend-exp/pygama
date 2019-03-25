@@ -163,6 +163,10 @@ def get_bin_centers(bins):
 def get_bin_widths(bins):
     return (bins[1:] - bins[:-1])
 
+def set_plot_style(style):
+    path = __file__.rstrip('.utils.py')
+    plt.style.use(path+'/'+style+'.mpl')
+
 def plot_hist(hist, bins, var=None, **kwargs):
     if var is None: plt.step(bins, np.concatenate((hist,[0])), where="post")
     else:
@@ -176,16 +180,26 @@ def plot_func(func, pars, range=None, npx=None, **kwargs):
     xvals = np.linspace(range[0], range[1], npx)
     plt.plot(xvals, func(xvals, *pars), **kwargs)
 
-def print_fit_results(pars, cov, func=None):
-    par_names = []
+def get_par_names(func):
+    from scipy._lib._util import getargspec_no_self
+    args, varargs, varkw, defaults = getargspec_no_self(func)
+    return args[1:]
+
+def print_fit_results(pars, cov, func=None, title=None, pad=True):
+    # FIXME: when all fits return an OptimizeResult, send in OptimizeResult and
+    # just pull everything out of that.
+    if title is not None: print(title+":")
     if func is None:
         for i in range(len(pars)): par_names.append("p"+str(i))
-    else:
-        from scipy._lib._util import getargspec_no_self
-        args, varargs, varkw, defaults = getargspec_no_self(func)
-        par_names = args[1:]
+    else: par_names = get_par_names(func)
     for i in range(len(pars)):
-        print(par_names[i], "=", pars[i], "+/-", np.sqrt(cov[i][i]))
+        sigma = np.sqrt(cov[i][i])
+        sig_pos = int(np.floor(np.log10(abs(sigma))))
+        par_pos = int(np.floor(np.log10(abs(pars[i]))))
+        par_fmt = '%d' % (par_pos-sig_pos+2)
+        par_fmt = '%#.' + par_fmt + 'g'
+        print(par_names[i], "=", par_fmt % pars[i], "+/-", '%#.2g' % sigma)
+    if pad: print("")
 
 def sh(cmd, sh=False):
     """ Wraps a shell command."""
