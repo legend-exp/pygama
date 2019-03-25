@@ -163,18 +163,25 @@ def get_bin_centers(bins):
 def get_bin_widths(bins):
     return (bins[1:] - bins[:-1])
 
-def plot_hist(hist, bins, var=None):
+def plot_hist(hist, bins, var=None, **kwargs):
     if var is None: plt.step(bins, np.concatenate((hist,[0])), where="post")
     else:
-        plt.errorbar(get_bin_centers(bins), hist, xerr=get_bin_widths(bins)/2, yerr=np.sqrt(var), fmt='none')
+        plt.errorbar(get_bin_centers(bins), hist, 
+                     xerr=get_bin_widths(bins)/2, yerr=np.sqrt(var), 
+                     fmt='none', **kwargs)
 
-def plot_func(func, pars, range=None, npx=None):
+def plot_func(func, pars, range=None, npx=None, **kwargs):
     if npx is None: npx = 100
     if range is None: range = plt.xlim()
     xvals = np.linspace(range[0], range[1], npx)
-    plt.plot(xvals, func(xvals, *pars))
+    plt.plot(xvals, func(xvals, *pars), **kwargs)
 
-
+def print_fit_results(pars, cov, par_names=None):
+    if par_names is None:
+        par_names = []
+        for i in range(len(pars)): par_names.append("p"+str(i))
+    for i in range(len(pars)):
+        print(par_names[i], pars[i], "+/-", np.sqrt(cov[i][i]))
 
 def sh(cmd, sh=False):
     """ Wraps a shell command."""
