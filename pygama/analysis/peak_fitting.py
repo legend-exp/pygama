@@ -73,7 +73,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
             print("variances are not appropriate for a poisson-LL fit!")
             return
         result = minimize(neg_poisson_log_like, x0=guess, args=(func, hist, bins), method=method, bounds=bounds)
-        coeff, cov_matrix = result.x, result.hess_inv.todense()
+        pars, cov = result.x, result.hess_inv.todense()
     else: 
         if var is None: var = hist # assume Poisson stats if variances are not provided
         # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
@@ -85,8 +85,8 @@ def fit_hist(func, hist, bins, var=None, guess=None,
         hist = hist[mask]
         xvals = pgu.get_bin_centers(bins)[mask]
         if bounds is None: bounds=(-np.inf, np.inf)
-        coeff, cov_matrix = curve_fit(func, xvals, hist, p0=guess, sigma=sigma, bounds=bounds)
-    return coeff, cov_matrix
+        pars, cov = curve_fit(func, xvals, hist, p0=guess, sigma=sigma, bounds=bounds)
+    return pars, cov
 
 
 #Wrapper to give me neg log likelihoods
@@ -105,34 +105,12 @@ def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
 
 
 #Define a gaussian distribution and corresponding neg log likelihood
-def gauss(x, *p):
-    # print(p)
-    if len(p) == 2:
-        mu, sigma = p
-        A = 1
-    elif len(p) == 3:
-        mu, sigma, A = p
-    else:
-        print(
-            "Incorrect usage of gaussian function!  params: mu, sigma, area (optional).  You input: {}"
-            .format(p))
-        exit(0)
-    return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 /
-                                                          (2. * sigma**2))
+def gauss2(x, mu, sigma, A=1):
+    return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
 
 
 #David's peak shape
-def radford_peak(x, *p):
-    if len(p) == 6:
-        mu, sigma, hstep, htail, tau, bg0, = p
-        a = 1
-    elif len(p) == 7:
-        mu, sigma, hstep, htail, tau, bg0, a = p
-    else:
-        print("Incorrect usage of radford peak function!  You input: {}".format(
-            p))
-        exit(0)
-
+def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1)
     #make sure the fractional amplitude parameters stay reasonable...
     if htail < 0 or htail > 1: return np.zeros_like(x)
     if hstep < 0 or hstep > 1: return np.zeros_like(x)
@@ -148,14 +126,7 @@ def radford_peak(x, *p):
 
 
 # power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
-def xtalball(x, *p):
-    if len(p) == 5:
-        mu, sigma, A, beta, m = p
-    else:
-        print(
-            "Incorrect usage of crystal ball function!  params: mu, sigma, area, beta, m.  You input: {}"
-            .format(p))
-        exit(0)
+def xtalball(x, mu, sigma, A, beta, m)
     return A * crystalball.pdf(x, beta, m, loc=mu, scale=sigma)
 
 

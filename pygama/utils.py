@@ -176,10 +176,14 @@ def plot_func(func, pars, range=None, npx=None, **kwargs):
     xvals = np.linspace(range[0], range[1], npx)
     plt.plot(xvals, func(xvals, *pars), **kwargs)
 
-def print_fit_results(pars, cov, par_names=None):
-    if par_names is None:
-        par_names = []
+def print_fit_results(pars, cov, func=None):
+    par_names = []
+    if func is None:
         for i in range(len(pars)): par_names.append("p"+str(i))
+    else:
+        from scipy._lib._util import getargspec_no_self
+        args, varargs, varkw, defaults = getargspec_no_self(func)
+        par_names = args[1:]
     for i in range(len(pars)):
         print(par_names[i], "=", pars[i], "+/-", np.sqrt(cov[i][i]))
 
