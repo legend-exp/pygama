@@ -4,7 +4,7 @@ is it good practice to keep a file like this?
 """
 import sys
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def peakdet(v, delta, x = None):
     """
@@ -147,10 +147,41 @@ def get_hist(np_arr, x_lo, x_hi, xpb, nb=None, shift=True, wts=None):
         x = x - xpb / 2.
     return x, y
 
+def hist(np_arr, bins=None, range=None, dx=None, wts=None):
+    """ quick wrapper to have more control of numpy's histogram """
+    # dx overrides bins setting! Note: have to specify a range
+    if dx is not None: bins = int((range[1]-range[0])/dx)
+    if bins is None: bins = 100 #override np.histogram default of just 10
+    hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
+    if wts is None: return hist, bins, hist
+    var, bins = np.histogram(np_arr, bins=bins, weights=wts*wts)
+    return hist, bins, var
 
 def get_bin_centers(bins):
-    return bins[:-1] + 0.5 * (bins[1] - bins[0])
+    return (bins[:-1] + bins[1:]) / 2.
 
+def get_bin_widths(bins):
+    return (bins[1:] - bins[:-1])
+
+def plot_hist(hist, bins, var=None, **kwargs):
+    if var is None: plt.step(bins, np.concatenate((hist,[0])), where="post")
+    else:
+        plt.errorbar(get_bin_centers(bins), hist, 
+                     xerr=get_bin_widths(bins)/2, yerr=np.sqrt(var), 
+                     fmt='none', **kwargs)
+
+def plot_func(func, pars, range=None, npx=None, **kwargs):
+    if npx is None: npx = 100
+    if range is None: range = plt.xlim()
+    xvals = np.linspace(range[0], range[1], npx)
+    plt.plot(xvals, func(xvals, *pars), **kwargs)
+
+def print_fit_results(pars, cov, par_names=None):
+    if par_names is None:
+        par_names = []
+        for i in range(len(pars)): par_names.append("p"+str(i))
+    for i in range(len(pars)):
+        print(par_names[i], "=", pars[i], "+/-", np.sqrt(cov[i][i]))
 
 def sh(cmd, sh=False):
     """ Wraps a shell command."""

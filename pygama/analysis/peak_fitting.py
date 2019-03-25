@@ -13,6 +13,7 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit
 from scipy.special import erfc
 from scipy.stats import crystalball
+import pygama.utils as pgu
 
 
 #unbinned max likelihood fit to data with given likelihood func
@@ -35,16 +36,71 @@ def fit_binned(likelihood_func,
                hist_data,
                bin_centers,
                start_guess,
+               var=None,
                bounds=(-np.inf, np.inf)):
     #data should already be histogrammed.
+    sigma = None
+    if var is not None: 
+        # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
+        # if bin content is non-zero but var = 0 let the user see the warning
+        zeros = (hist_data == 0)
+        zero_errors = (var == 0)
+        mask = ~(zeros & zero_errors)
+        sigma = np.sqrt(var)[mask]
+        hist_data = hist_data[mask]
+        bin_centers = bin_centers[mask]
     coeff, var_matrix = curve_fit(
-        likelihood_func, bin_centers, hist_data, p0=start_guess, bounds=bounds)
+        likelihood_func, bin_centers, hist_data, p0=start_guess, sigma=sigma, bounds=bounds)
     return coeff
+
+
+#regular old binned fit (nonlinear least squares)
+def fit_hist(func, hist, bins, var=None, guess=None, 
+             poissonLL=False, method=None, bounds=None):
+    # hist, bins, var : as in return value of pgu.hist()
+    # guess : initial parameter guesses. Should be optional -- we can auto-guess
+    #         for many common functions. But not yet implemented.
+    # poissonLL : use Poisson stats instead of the Gaussian approximation in
+    #             each bin. Requires integer stats. You must use parameter
+    #             bounds to make sure that func does not go negative over the
+    #             x-range of the histogram.
+    # method, bounds : options to pass to scipy.optimize.minimize
+    if guess is None:
+        print("auto-guessing not yet implemented, you must supply a guess.")
+        return
+    if poissonLL: 
+        if var is not None and not np.array_equal(var,hist):
+            print("variances are not appropriate for a poisson-LL fit!")
+            return
+        result = minimize(neg_poisson_log_like, x0=guess, args=(func, hist, bins), method=method, bounds=bounds)
+        coeff, cov_matrix = result.x, result.hess_inv.todense()
+    else: 
+        if var is None: var = hist # assume Poisson stats if variances are not provided
+        # skip "okay" bins with content 0 +/- 0 to avoid div-by-0 error in curve_fit
+        # if bin content is non-zero but var = 0 let the user see the warning
+        zeros = (hist == 0)
+        zero_errors = (var == 0)
+        mask = ~(zeros & zero_errors)
+        sigma = np.sqrt(var)[mask]
+        hist = hist[mask]
+        xvals = pgu.get_bin_centers(bins)[mask]
+        if bounds is None: bounds=(-np.inf, np.inf)
+        coeff, cov_matrix = curve_fit(func, xvals, hist, p0=guess, sigma=sigma, bounds=bounds)
+    return coeff, cov_matrix
 
 
 #Wrapper to give me neg log likelihoods
 def neg_log_like(params, likelihood_func, data, **kwargs):
     lnl = -np.sum(np.log(likelihood_func(data, *params, **kwargs)))
+    return lnl
+
+#Wrapper to give me poisson neg log likelihoods of a histogram
+def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
+    # ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
+    # FIXME: bin expected mean mu estimated by f(bin_center)*bin_width. Should
+    # add option to integrate function over bin
+    mu = func(pgu.get_bin_centers(bins), *pars, **kwargs)*pgu.get_bin_widths(bins) 
+    lnl = np.sum(mu - hist*np.log(mu))
     return lnl
 
 
