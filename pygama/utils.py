@@ -60,6 +60,49 @@ def sizeof_fmt(num, suffix='B'):
     return "{:.1f} {} {}".format(num, 'Y', suffix)
 
 
+def set_plot_style(style):
+    path = __file__.rstrip('.utils.py')
+    plt.style.use(path+'/'+style+'.mpl')
+
+def get_par_names(func):
+    from scipy._lib._util import getargspec_no_self
+    args, varargs, varkw, defaults = getargspec_no_self(func)
+    return args[1:]
+
+def plot_func(func, pars, range=None, npx=None, **kwargs):
+    """
+    plot a function.  take care of the x-axis points automatically, or user can
+    specify via range and npx arguments.
+    """
+    if npx is None:
+        npx = 100
+    if range is None:
+        range = plt.xlim()
+    xvals = np.linspace(range[0], range[1], npx)
+    plt.plot(xvals, func(xvals, *pars), **kwargs)
+
+
+def print_fit_results(pars, cov, func=None, title=None, pad=True):
+    """
+    convenience function for scipy.optimize.curve_fit results
+    """
+    if title is not None: 
+        print(title+":")
+    if func is None:
+        for i in range(len(pars)): par_names.append("p"+str(i))
+    else: 
+        par_names = get_par_names(func)
+    for i in range(len(pars)):
+        sigma = np.sqrt(cov[i][i])
+        sig_pos = int(np.floor(np.log10(abs(sigma))))
+        par_pos = int(np.floor(np.log10(abs(pars[i]))))
+        par_fmt = '%d' % (par_pos-sig_pos+2)
+        par_fmt = '%#.' + par_fmt + 'g'
+        print(par_names[i], "=", par_fmt % pars[i], "+/-", '%#.2g' % sigma)
+    if pad: 
+        print("")
+
+
 def tree_draw(tree, vars, tcut):
     """
     if you have to debase yourself and use ROOT, this is an easy
