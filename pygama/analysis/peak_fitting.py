@@ -88,7 +88,7 @@ def fit_binned(f_likelihood, hist, bin_centers, start_guess, var=None, bounds=No
     """
     regular old binned fit (nonlinear least squares). data should already be
     histogrammed (see e.g. pygama.analysis.histograms.get_hist)
-    # jason says this is deprecated.
+    # jason says this is deprecated. Use pgh.fit_hist() instead.
     """
     sigma = None
     if bounds is None:
@@ -124,7 +124,6 @@ def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
 def gauss(x, mu, sigma, A=1):
     """
     define a gaussian distribution, w/ args: mu, sigma, area (optional).
-    TODO: return the corresponding neg log likelihood
     """
     return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
 

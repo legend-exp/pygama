@@ -60,10 +60,19 @@ def sizeof_fmt(num, suffix='B'):
 
 
 def set_plot_style(style):
+    """
+    Choose a pygama plot style. 
+    Current options: 'clint', 'root'
+    Or add your own [label].mpl file in the pygama directory!
+    """
     path = __file__.rstrip('.utils.py')
     plt.style.use(path+'/'+style+'.mpl')
 
 def get_par_names(func):
+    """
+    Return a list containing the names of the arguments of "func" other than the
+    first argument. In pygamaland, those are the function's "parameters."
+    """
     from scipy._lib._util import getargspec_no_self
     args, varargs, varkw, defaults = getargspec_no_self(func)
     return args[1:]
