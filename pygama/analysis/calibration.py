@@ -8,7 +8,7 @@ routines for automatic calibration.
 import sys
 import numpy as np
 from pygama.analysis.peak_fitting import *
-from pygama.utils import get_bin_centers
+from pygama.analysis.histograms import get_bin_centers
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy.signal import argrelextrema, medfilt, find_peaks_cwt

@@ -90,6 +90,20 @@ def plot_func(func, pars, range=None, npx=None, **kwargs):
     plt.plot(xvals, func(xvals, *pars), **kwargs)
 
 
+def get_formatted_stats(mean, sigma, ndigs=2):
+    """
+    convenience function for formatting mean +/- sigma to the right number of
+    significant figures.
+    """
+    sig_pos = int(np.floor(np.log10(abs(sigma))))
+    sig_fmt = '%d' % ndigs
+    sig_fmt = '%#.' + sig_fmt + 'g'
+    mean_pos = int(np.floor(np.log10(abs(mean))))
+    mean_fmt = '%d' % (mean_pos-sig_pos+ndigs)
+    mean_fmt = '%#.' + mean_fmt + 'g'
+    return mean_fmt % mean, sig_fmt % sigma
+
+
 def print_fit_results(pars, cov, func=None, title=None, pad=True):
     """
     convenience function for scipy.optimize.curve_fit results
@@ -101,12 +115,8 @@ def print_fit_results(pars, cov, func=None, title=None, pad=True):
     else: 
         par_names = get_par_names(func)
     for i in range(len(pars)):
-        sigma = np.sqrt(cov[i][i])
-        sig_pos = int(np.floor(np.log10(abs(sigma))))
-        par_pos = int(np.floor(np.log10(abs(pars[i]))))
-        par_fmt = '%d' % (par_pos-sig_pos+2)
-        par_fmt = '%#.' + par_fmt + 'g'
-        print(par_names[i], "=", par_fmt % pars[i], "+/-", '%#.2g' % sigma)
+        mean, sigma = get_formatted_stats(pars[i], np.sqrt(cov[i][i]))
+        print(par_names[i], "=", mean, "+/-", sigma)
     if pad: 
         print("")
 
