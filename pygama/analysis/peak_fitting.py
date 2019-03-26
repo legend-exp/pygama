@@ -124,7 +124,6 @@ def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
 def gauss(x, mu, sigma, A=1):
     """
     define a gaussian distribution, w/ args: mu, sigma, area (optional).
-    TODO: return the corresponding neg log likelihood
     """
     return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
 
