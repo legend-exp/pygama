@@ -154,7 +154,6 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
     return (1 - htail) * gauss(x, mu, sig, a) + bg_term + step + le_tail
 
 
-# power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
 def xtalball(x, mu, sigma, A, beta, m):
     """
     power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
