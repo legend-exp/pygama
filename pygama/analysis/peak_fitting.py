@@ -25,9 +25,6 @@ def fit_hist(func, hist, bins, var=None, guess=None,
         print("auto-guessing not yet implemented, you must supply a guess.")
         return
 
-    if bounds is None:
-        bounds = (-np.inf, np.inf)
-
     if poissonLL:
         if var is not None and not np.array_equal(var, hist):
             print("variances are not appropriate for a poisson-LL fit!")
@@ -54,6 +51,8 @@ def fit_hist(func, hist, bins, var=None, guess=None,
         sigma = np.sqrt(var)[mask]
         hist = hist[mask]
         xvals = pgh.get_bin_centers(bins)[mask]
+        if bounds is None:
+            bounds = (-np.inf, np.inf)
 
         coeff, cov_matrix = curve_fit(func, xvals, hist,
                                       p0=guess, sigma=sigma, bounds=bounds)
@@ -115,52 +114,33 @@ def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
     """
     Wrapper to give me poisson neg log likelihoods of a histogram
         ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
-    FIXME: bin expected mean mu estimated by f(bin_center)*bin_width. Should
+    Note: bin expected mean mu estimated by f(bin_center)*bin_width. Should
     TODO: add option to integrate function over bin
     """
     mu = func(pgh.get_bin_centers(bins), *pars, **kwargs) * pgh.get_bin_widths(bins)
     return np.sum(mu - hist*np.log(mu))
 
 
-def gauss(x, *args):
+def gauss(x, mu, sigma, A=1):
     """
     define a gaussian distribution, w/ args: mu, sigma, area (optional).
     TODO: return the corresponding neg log likelihood
     """
-    # check inputs
-    if len(args) == 2:
-        mu, sigma, A = args, 1
-    elif len(args) == 3:
-        mu, sigma, A = args
-    else:
-        print("Incorrect usage! You input: {}".format(args))
-        exit()
-
-    # calculate gaussian
-    norm = A / (sigma * np.sqrt(2 * np.pi))
-    return norm * np.exp(-(x - mu)**2 / (2. * sigma**2))
+    return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
 
 
-def radford_peak(x, *args):
+def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
     """
     David Radford's HPGe peak shape function
     """
-    if len(args) == 6:
-        mu, sig, hstep, htail, tau, bg0, a = args, 1
-    elif len(args) == 7:
-        mu, sig, hstep, htail, tau, bg0, a = args
-    else:
-        print("Incorrect usage!  You input: {}".format(args))
-        exit()
-
-    # make sure the fractional amplitude parameters are reasonable
-    if htail < 0 or htail > 1:
+    #make sure the fractional amplitude parameters stay reasonable...
+    if htail < 0 or htail > 1: 
         return np.zeros_like(x)
-    if hstep < 0 or hstep > 1:
+    if hstep < 0 or hstep > 1: 
         return np.zeros_like(x)
 
-    bg_term = bg0 # + x*bg1
-    if np.any(bg_term < 0):
+    bg_term = bg0  #+ x*bg1
+    if np.any(bg_term < 0): 
         return np.zeros_like(x)
 
     # compute the step and the low energy tail
@@ -174,16 +154,10 @@ def radford_peak(x, *args):
     return (1 - htail) * gauss(x, mu, sig, a) + bg_term + step + le_tail
 
 
-def xtalball(x, *args):
+def xtalball(x, mu, sigma, A, beta, m):
     """
     power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
     """
-    if len(args) == 5:
-        mu, sigma, A, beta, m = args
-    else:
-        print("Incorrect usage!  You input: {}".format(args))
-        exit()
-
     return A * crystalball.pdf(x, beta, m, loc=mu, scale=sigma)
 
 
