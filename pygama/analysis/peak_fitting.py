@@ -88,7 +88,7 @@ def fit_binned(f_likelihood, hist, bin_centers, start_guess, var=None, bounds=No
     """
     regular old binned fit (nonlinear least squares). data should already be
     histogrammed (see e.g. pygama.analysis.histograms.get_hist)
-    # jason says this is deprecated.
+    # jason says this is deprecated. Use pgh.fit_hist() instead.
     """
     sigma = None
     if bounds is None:
