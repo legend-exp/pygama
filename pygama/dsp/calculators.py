@@ -450,6 +450,24 @@ def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
             plt.pause(0.01)
 
 
+def dcr(waves, calcs, test=False):
+    """
+    nick says the parameter should be called "dcr_og"
+    """
+    print("hi clint")
+
+
+def gretina_overshoot(rc_us, pole_rel, freq=100E6):
+    """
+    for use with scipy.signal.lfilter
+    """
+    zmag = np.exp(-1. / freq / (rc_us * 1E-6))
+    pmag = zmag - 10.**pole_rel
+    num = [1, -zmag]
+    den = [1, -pmag]
+    return (num, den)
+
+
 def fir():
     """
     FIR Filter, fir the win ;-)
@@ -467,29 +485,10 @@ def fir():
     signal.firwin(numtaps, f)
 
 
-def dcr(waves, calcs, test=False):
+def cfit():
     """
-    nick says the parameter should be called "dcr_og"
-    """
-    print("hi clint")
-
-
-def gretina_overshoot(rc_us, pole_rel, freq=100E6):
-    """
-    for use with scipy.signal.lfilter
-    """
-    zmag = np.exp(-1. / freq / (rc_us * 1E-6))
-    pmag = zmag - 10.**pole_rel
-
-    num = [1, -zmag]
-    den = [1, -pmag]
-
-    return (num, den)
-
-
-def curve_fit():
-    """
-    a curve_fit apply_along_axis function might be good, for special cases
+    a curve_fit (or optimize.minimize, or lmfit)
+    apply_along_axis function might be good, for special cases
     when we don't care about using more computation time
     """
     # # curve_fit, with exponential. (not easily vectorized)
