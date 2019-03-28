@@ -77,7 +77,7 @@
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
-        "pz" : {"decay":72},
+        "pz" : {"decay":82},
         "current" : {"sigma":5},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [
@@ -85,21 +85,28 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-          {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
-          {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
-          {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
-          {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
         ],
         "get_max" : [
-          {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
-          {"wfin":"wf_ttrap"}, {"wfin":"wf_current"}, {"wfin":"wf_savgol"}
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_current"}, {"wfin":"wf_savgol"}
         ],
-        "ftp" : {"test":1},
+        "ftp" : {},
         "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
         "peakdet" : {"delta":0.5, "sigma":5, "ihi":600},
         "num_peaks" : {},
         "overflow" : {},
-        "tail_fit" : {"wfin":"wf_notch", "order":2, "tp_thresh":0.9, "vec":0}
+        "dcr" : [
+            {"wfin":"wf_savgol"},
+            {"wfin":"wf_pz"}
+        ],
+        "tail_fit" : [
+            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":1},
+            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":1, "test":1}
+        ]
       },
       "unused":{
         "center": {},

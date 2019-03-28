@@ -503,6 +503,15 @@ def trim(waves, calcs, n_pre, n_post, wfin="wf_blsub", wfout="wf_trim", test=Fal
     return {wfout: wf_trim}
 
 
+def wavelet():
+    """
+    placeholder.  this would be pretty cool.
+    can the pywavelets module be vectorized?
+    can it even be used with np.apply_along_axis?
+    """
+    print("hi clint")
+
+
 def interp(waveform, offset):
     """
     allows you to shift a waveform's timestamps by an amount

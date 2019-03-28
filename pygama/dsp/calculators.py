@@ -24,16 +24,16 @@ def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
     in the baseline might be useful in high event-rate situations where the
     baseline hasn't yet fully recovered to flat.  it's also good to reject noise
     """
-    wf_block = waves[wfin]
+    wfs = waves[wfin]
 
     # grab baselines
     x = np.arange(ilo, ihi)
-    wfs = wf_block[:, ilo:ihi]
+    wfbl = wfs[:, ilo:ihi]
 
     # run polyfit
-    pol = np.polyfit(x, wfs.T, order).T
+    pol = np.polyfit(x, wfbl.T, order).T
     pol = np.flip(pol, 1) # col0:p0, col1:p1, col2:p2, etc.
-    wfstd = np.std(wfs, axis=1) # get the rms noise too
+    wfstd = np.std(wfbl, axis=1) # get the rms noise too
 
     # save results
     calcs["bl_rms"] = wfstd
@@ -41,25 +41,34 @@ def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
         calcs["bl_p{}".format(i)] = col
 
     if test:
-        iwf = 5
-        ts, wf = np.arange(len(wf_block[iwf])), wf_block[iwf]
-        plt.plot(ts, wf, '-b')
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            ts = np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wfs[iwf], '-k', label=wfin)
 
-        blwf, blts = wfs.T[iwf], np.arange(len(wfs.T[iwf]))
-        plt.plot(blts, blwf, '-r')
+            blwf, blts = wfbl[iwf], np.arange(len(wfbl[iwf]))
+            plt.plot(blts, blwf, '-r')
 
-        b, m = pol[iwf]
-        fit = lambda t: m * t + b
-        plt.plot(blts, fit(blts), c='k', lw=3,
-                 label='baseline, pol1: \n{:.2e}*ts + {:.1f}'.format(m, b))
+            b, m = pol[iwf]
+            fit = lambda t: m * t + b
+            plt.plot(blts, fit(blts), c='k', lw=3,
+                     label='baseline, pol1: \n{:.2e}*ts + {:.1f}'.format(m, b))
 
-        plt.xlim(0, 1100)
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel("ADC", ha='right', y=1)
-        plt.legend(loc=2)
-        plt.tight_layout()
-        plt.show()
-        exit()
+            plt.xlim(0, 1100)
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend(loc=2)
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
 
 def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
@@ -79,23 +88,33 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
     calcs["{}_imax".format(cname)] = imaxes
 
     if test:
-        iwf = 5
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wfs[iwf], '-k', label=wfin)
 
-        # for reference, show the raw wf, but scale s/t it matches the given wf
-        wf = wfs[iwf]
-        raw_wf = waves["wf_blsub"][iwf]
-        raw_wf *= np.amax(wf) / np.amax(raw_wf)
-        ts = np.arange(len(wf))
+            raw_wf = waves["wf_blsub"][iwf]
+            raw_wf *= np.amax(wf) / np.amax(raw_wf)
+            ts = np.arange(len(wf))
 
-        plt.plot(ts, raw_wf, '-b', alpha=0.7, label="raw_wf, normd")
-        plt.plot(ts, wf, "-k", label=wfin)
-        plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", ms=20, label="max")
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel("arb", ha='right', y=1)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        exit()
+            plt.plot(ts, raw_wf, '-b', alpha=0.7, label="raw_wf, normd")
+            plt.plot(ts, wf, "-k", label=wfin)
+            plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", ms=20, label="max")
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend(loc=2)
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
 
 def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
@@ -450,9 +469,112 @@ def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
             plt.pause(0.01)
 
 
-def dcr(waves, calcs, test=False):
+def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol", test=False):
     """
-    nick says the parameter should be called "dcr_og"
+    calculate the slope of the wf tail from taking the average of two windows.
+    first one is a (tp100+delta), the second one is (t_win2).
+    (delta, t_win2, wlen) are in us.
+
+    TODO:
+    - try "true" pole zero correction: (applying de-convolution of the full
+      channel-specific electronic response function before searching for a
+      remaining slow component. i.e. use `wf_pz` as the input)
+    - charge trapping correction, v1 (ftp vs trap_max energy params, this
+      is the "effective pole zero" described in the DCR unidoc)
+    - charge trapping correction, v2 (use drift time (tp20-t0) to calculate
+      the expected amount of charge lost in the bulk.)
+    - add a "mode" option which selects the various improvements above.
+    """
+    wfs = waves[wfin]
+    ts = np.arange(wfs.shape[1])
+
+    # add a delta to the 100 pct timepoint so we're sure we're on the tail
+    nsamp = 1e10 / waves["settings"]["clk"] # Hz
+    win = int(nsamp * wlen)
+    dt = int(nsamp * delta)
+    tp100 = calcs["tp100"] + dt
+    iwin2 = int(nsamp * t_win2)
+
+    # fix out of range timepoints
+    tp100[tp100 > tp_thresh * wfs.shape[1]] = 0
+
+    # compute average in window 1 (use masked arrays)
+    win_1 = np.full_like(wfs, np.nan)
+    for i, ilo in enumerate(tp100):
+        win_1[i, ilo:ilo+win] = wfs[i, ilo:ilo+win]
+    win_1 = np.ma.masked_invalid(win_1)
+    avg_1 = np.sum(win_1, axis=1) / np.count_nonzero(win_1, axis=1)
+
+    # compute average in window 2  (always fixed)
+    win_2 = np.full_like(wfs, np.nan)
+    win_2[:, iwin2:iwin2+win] = wfs[:, iwin2:iwin2+win]
+    win_2 = np.ma.masked_invalid(win_2)
+    avg_2 = np.sum(win_2, axis=1) / np.count_nonzero(win_2, axis=1)
+
+    # get two-point tail slope
+    # sig = (y1 - y2) / (t1 - t2) # pg 4, dcr unidoc
+    y1, y2 = avg_1, avg_2
+    t1 = (tp100.values) + win/2
+    t2 = (iwin2 + win/2) * np.ones_like(tp100.values)
+    num, den = y1 - y2, t1 - t2
+    slope = np.divide(num, den)
+
+    # # apply charge trapping correction ("v1", pg. 12 of DCR unidoc).
+    # relies on input parameters A and \lambda.  Maybe better to do this
+    # in Tier 2 processing, or skip straight to the v2 algorithm
+    # e_max, e_ftp = calcs["etrap_max"], calcs["e_ftp"]
+
+    # # apply charge trapping correction ("v2")
+    # t0, t20 = calcs["t0"], calcs["tp50"]
+    # drift_time = t20 - t0
+
+    # name the output parameter based on the input wf name
+    wf_type = wfin.split("_")[-1]
+    calcs["tslope_{}".format(wf_type)] = slope
+
+    if test:
+        wfbl = waves["wf_blsub"]
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            plt.plot(ts, wfs[iwf], '-k', label=wfin)
+            plt.plot(ts, wfbl[iwf], '-b', alpha=0.4, label="wf_blsub")
+
+            idx1 = np.where(~np.isnan(win_1[iwf]))
+            idx2 = np.where(~np.isnan(win_2[iwf]))
+
+            plt.plot(ts[idx1], win_1[iwf][idx1], '-r', lw=10, alpha=0.5)
+            plt.plot(ts[idx2], win_2[iwf][idx2], '-r', lw=10, alpha=0.5)
+
+            plt.plot(t1[iwf], avg_1[iwf], ".g", ms=10)
+            plt.plot(t2[iwf], avg_2[iwf], ".g", ms=10)
+
+            slo = (avg_1[iwf] - avg_2[iwf]) / (t1[iwf] - t2[iwf])
+            xv = np.arange(t1[iwf], t2[iwf])
+            yv = slo * (xv - t1[iwf]) + avg_1[iwf]
+            plt.plot(xv, yv, '-r', label="slope: {:.2e}".format(slo))
+            plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend(loc=4)
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
+
+
+def drift_time(waves, calcs, test=False):
+    """
+    do the tp[pct] - t0 time.
+    could maybe also try a np polyfit to roughly
+    estimate the curvature? idk, maybe simpler is better
     """
     print("hi clint")
 
