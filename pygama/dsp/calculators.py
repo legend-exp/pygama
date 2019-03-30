@@ -483,6 +483,8 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
       is the "effective pole zero" described in the DCR unidoc)
     - charge trapping correction, v2 (use drift time (tp20-t0) to calculate
       the expected amount of charge lost in the bulk.)
+    - could try fitting each window to a line with np.polyfit, then comparing
+      the two slopes
     - add a "mode" option which selects the various improvements above.
     """
     wfs = waves[wfin]
@@ -559,6 +561,7 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
             slo = (avg_1[iwf] - avg_2[iwf]) / (t1[iwf] - t2[iwf])
             xv = np.arange(t1[iwf], t2[iwf])
             yv = slo * (xv - t1[iwf]) + avg_1[iwf]
+
             plt.plot(xv, yv, '-r', label="slope: {:.2e}".format(slo))
             plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
 

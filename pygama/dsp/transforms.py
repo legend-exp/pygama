@@ -295,7 +295,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             iwf += 1
             print(iwf)
 
-            ts = np.arange(len(wfs[iwf]))
+            ts = np.arange(len(wfc[iwf]))
             wf = wfs[iwf] / np.amax(wfs[iwf])
             awf = wfc[iwf] / np.amax(wfc[iwf])
 
@@ -309,7 +309,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             # ts, wf, awf = ts[tlo:thi], wf[tlo:thi], awf[tlo:thi]
 
             plt.cla()
-            plt.plot(ts, wf, '-b', alpha=0.7, label='data')
+            # plt.plot(ts, wf, '-b', alpha=0.7, label='data')
             plt.plot(ts, awf, '-k', label='current')
 
             if sigma != 0:

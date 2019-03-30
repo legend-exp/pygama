@@ -13,17 +13,16 @@ class Processor:
     """
     def __init__(self, function, fun_args={}):
         """
-        save some argunemnts specific to this transform/calculator
+        save some arguments specific to this transform/calculator
         """
         self.function = function
         self.fun_args = fun_args # so fun
 
     def process_block(self, waves, calcs):
         """
-        run the given calculation on the wf block in 'self.waves'.
-        can also use results from other calculations via calcs.
-        individual processor functions can decide if they want to use the
-        df axes, or convert to a numpy array for extra speed
+        run the given calculation. we always pass in:
+        `waves` : a dict of "waveform blocks", i.e. 2d numpy arrays
+        `calcs` : a pd.DataFrame with single-valued calculator results
         """
         return self.function(waves, calcs, **self.fun_args)
 
@@ -42,10 +41,15 @@ class Transformer(Processor):
 
 class Intercom:
     """
-    from a list of calculators and transforms, manage an 'intercom'
-    consisting of a dict of waveforms (self.waves) and
-    a DataFrame of single-valued calculations (self.calcs),
+    we input a list of calculators and transforms, and
+    this class manages an "intercom" consisting of:
+    `waves` : a dict of "waveform blocks", i.e. 2d numpy arrays
+    `calcs` : a pd.DataFrame with single-valued calculator results,
     accessible to all the Processors.
+
+    the processors are run on each wf block in the order you defined them,
+    so if you want one to depend on the result of another,
+    order your input list accordingly.
     """
     def __init__(self, settings=None, default_list=False):
 
@@ -58,13 +62,20 @@ class Intercom:
         if settings is not None:
             self.settings = settings
             for key in settings:
+
+                # handle 2nd pass processors
+                if "pass2" in key:
+                    name = "".join(key.split("_")[:-1])
+                else:
+                    name = key
+
                 if isinstance(settings[key], dict):
-                    self.add(key, settings[key])
+                    self.add(name, settings[key])
 
                 # handle multiple instances of a calculator w/ diff params
                 elif isinstance(settings[key], list):
                     for i, d2 in enumerate(settings[key]):
-                        self.add("{}-{}".format(key, i), d2)
+                        self.add("{}-{}".format(name, i), d2)
 
         elif default_list:
             self.set_default_list()
@@ -93,6 +104,9 @@ class Intercom:
 
 
     def set_default_list(self):
+        """
+        use a minimal sequence of processors
+        """
         for proc in ["fit_bl", "bl_sub", "trap", "get_max"]:
             settings = self.settings[proc] if proc in self.settings else {}
             self.add(proc, settings)
@@ -101,10 +115,6 @@ class Intercom:
     def set_intercom(self, data_df):
         """
         declare self.waves and self.calcs, our intercom data objects.
-        save waveforms as an ndarray into the dict self.waves.
-        then save the single-valued parts of the input dataframe separately
-        into self.calcs, which we build on to create a Tier 2 dataframe
-        (i.e. gatified single-valued.)
         """
         cols = data_df.columns.values
         wf_start = np.where(cols == 0)[0][0]
