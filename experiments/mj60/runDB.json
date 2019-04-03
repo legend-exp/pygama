@@ -1,8 +1,8 @@
 {
   "elog":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/",
 
-  "raw_dir":"$HOME/Data/MJ60/Data",
-  "tier_dir":"$HOME/Data/MJ60/pygama",
+  "raw_dir":"$DATADIR/MJ60/Data",
+  "tier_dir":"$DATADIR/MJ60/pygama",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
   "chunksize":1000,
