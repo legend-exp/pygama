@@ -464,6 +464,7 @@ def center(waves, calcs, tp=50, n_pre=150, n_post=150, wfin="wf_savgol", wfout="
         row_idxs[i, :] = i
 
     # apply the selection
+    # print(wfs.shape, row_idxs.shape, wf_idxs.shape)
     wf_ctr = wfs[row_idxs, wf_idxs]
 
     if test:

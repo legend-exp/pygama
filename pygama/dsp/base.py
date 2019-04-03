@@ -43,9 +43,8 @@ class Intercom:
     """
     we input a list of calculators and transforms, and
     this class manages an "intercom" consisting of:
-    `waves` : a dict of 2d numpy arrays holding the raw wf and its Transforms
+    `waves` : a dict of 2d np.array's holding the raw wfs and their Transforms
     `calcs` : a pd.DataFrame with single-valued calculator results,
-    accessible to all the Processors.
 
     the processors are run on each wf block in the order you defined them,
     so if you want one to depend on the result of another,

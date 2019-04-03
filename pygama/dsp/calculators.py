@@ -197,9 +197,19 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
     thresh = 2
     short = wf2.split("_")[1]
     t0 = np.zeros(wfshort.shape[0], dtype=int)
+
+    # print("WFSHAPE",wfshort.shape, short)
+    # print(calcs.columns)
+    # print(calcs)
+    # exit()
+
+    # damn, i guess i have to loop over the rows
     for i, wf in enumerate(wfshort):
-        # damn, i guess i have to loop over the rows
-        imax = calcs[short + "_imax"][i]
+        try:
+            imax = calcs[short + "_imax"].iloc[i]
+        except:
+            print("it happened again!")
+            exit()
         trunc = wfshort[i][:imax][::-1]
         t0[i] = len(trunc) - np.where(trunc < thresh)[0][0]
 
@@ -238,8 +248,8 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
             plt.plot(ts, wflong[iwf], '-r', label='long: ' + wf1)
             plt.plot(ts, wfshort[iwf], '-b', label='short: ' + wf2)
 
-            smax, simax = calcs[short + "_max"][iwf], calcs[short +
-                                                            "_imax"][iwf]
+            smax = calcs[short+"_max"].iloc[iwf]
+            simax = calcs[short+"_imax"].iloc[iwf]
             plt.plot(ts[simax], smax, ".k", ms=20, label="short trap max")
 
             # t0 and t_ftp

@@ -7,6 +7,7 @@ pygama tier 1 processing:
 import os, re, sys, time
 import numpy as np
 import pandas as pd
+import datetime
 import multiprocessing as mp
 from functools import partial
 
@@ -22,16 +23,19 @@ def ProcessTier1(t1_file,
                  overwrite=True,
                  verbose=False,
                  nevt=None,
+                 ioff=None,
                  multiprocess=True,
                  chunk=3000):
 
     print("Starting pygama Tier 1 processing ...")
-    print("   Input file: {}".format(t1_file))
+    print("  Date:", datetime.datetime.now())
+    print("  Input file:", t1_file)
+    print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
     t_start = time.time()
 
     # multiprocessing parameters
     CHUNKSIZE = chunk
-    NCPU = mp.cpu_count()
+    ncpu = mp.cpu_count()
 
     start = time.time()
     in_dir = os.path.dirname(t1_file)
@@ -91,6 +95,7 @@ def ProcessTier1(t1_file,
                 "t1_file": t1_file,
                 "chunksize": CHUNKSIZE,
                 "nchunks": nchunks,
+                "ncpu": ncpu,
                 "key": d.decoder_name,
                 "intercom": intercom,
                 "verbose": verbose
@@ -98,11 +103,11 @@ def ProcessTier1(t1_file,
 
             global ichunk, pstart
             ichunk, pstart = 0, time.time()
-            with mp.Pool(NCPU) as p:
+            with mp.Pool(ncpu) as p:
                 result_list = p.map(
                     partial(process_chunk, **keywords), chunk_idxs)
 
-            # debug: process chunks linearly
+            # debug: process chunks in series
             # for idx in chunk_idxs:
             # process_chunk(idx, **keywords)
             # exit()
@@ -116,10 +121,16 @@ def ProcessTier1(t1_file,
 
             if nevt is not np.inf:
                 print("limiting to {} events".format(nevt))
+
+                # print("nevt ioff", nevt, ioff)
+                nevt = int(nevt)
+                if ioff != 0:
+                    ioff = int(ioff)
+
                 t1_df = pd.read_hdf(
                     t1_file,
                     key=d.decoder_name,
-                    where="ievt < {}".format(nevt))
+                    where = "ievt > {} & ievt < {}".format(ioff, ioff+nevt))
             else:
                 print("WARNING: no event limit set (-n option)")
                 print("read the whole df into memory?  are you sure? (y/n)")
@@ -136,30 +147,34 @@ def ProcessTier1(t1_file,
 
     if verbose:
         print("Writing Tier 2 File:\n   {}".format(t2_file))
-        print("   Entries: {}".format(len(t2_df)))
-        print("Data columns:\n", t2_df.columns.values)
+        print("  Entries: {}".format(len(t2_df)))
+        print("  Data columns:\n", t2_df.columns.values)
 
     t2_df.to_hdf(
         t2_file,
         key="data",
         format='table',
         mode='w',
-        data_columns=t2_df.columns.tolist())
+        data_columns=t2_df.columns.tolist(),
+        complib="blosc:snappy",
+        complevel=2
+        )
 
-    if verbose:
-        statinfo = os.stat(t2_file)
-        print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-        elapsed = time.time() - start
-        proc_rate = elapsed / len(t2_df)
-        print("Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
-            elapsed / 60, proc_rate))
-        print("Done.")
+    statinfo = os.stat(t2_file)
+    print("  File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    proc_rate = elapsed / len(t2_df)
+    print("  Date:", datetime.datetime.now())
+    print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
+        elapsed / 60, proc_rate))
+    print("Done.")
 
 
 def process_chunk(chunk_idx,
                   t1_file,
                   chunksize,
                   nchunks,
+                  ncpu,
                   key,
                   intercom,
                   verbose=False):
@@ -174,10 +189,11 @@ def process_chunk(chunk_idx,
 
     global ichunk, pstart
     update_progress(float(ichunk / nchunks))
-    ichunk += 4  # actually ncpu
-    if ichunk == 40:
-        ptime = nchunks * (time.time() - pstart) / 10 / 60 / 4
-        print("Est. total processing time: {:.2f} minutes".format(ptime))
+    ichunk += ncpu
+    if ichunk == 4 * ncpu:
+        ptime = nchunks * (time.time() - pstart) / 10 / 60
+        print("Estimated time to completion: {:.2f} min".format(ptime))#, end='')
+        # sys.stdout.flush()
 
     with pd.HDFStore(t1_file, 'r') as store:
 

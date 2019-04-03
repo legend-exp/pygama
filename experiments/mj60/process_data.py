@@ -24,6 +24,7 @@ def main(argv):
     arg("-t1", "--tier1", action=st, help="run ProcessTier1 on list")
     arg("-t", "--test", action=st, help="test mode, don't run")
     arg("-n", "--nevt", nargs='?', default=np.inf, help="limit max num events")
+    arg("-i", "--ioff", nargs='?', default=0, help="start at index [i]")
     arg("-v", "--verbose", action=st, help="set verbose output")
     arg("-o", "--ovr", action=st, help="overwrite existing files")
     arg("-m", "--nomp", action=sf, help="don't use multiprocessing")
@@ -46,7 +47,7 @@ def main(argv):
         tier0(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
 
     if args["tier1"]:
-        tier1(ds, args["ovr"], args["nevt"], args["nomp"], args["verbose"],
+        tier1(ds, args["ovr"], args["nevt"], args["ioff"], args["nomp"], args["verbose"],
               args["test"])
 
 
@@ -83,6 +84,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
 def tier1(ds,
           overwrite=False,
           nevt=None,
+          ioff=None,
           multiproc=True,
           verbose=False,
           test=False):
@@ -121,6 +123,7 @@ def tier1(ds,
             verbose=verbose,
             multiprocess=multiproc,
             nevt=nevt,
+            ioff=ioff,
             chunk=ds.runDB["chunksize"])
 
 
