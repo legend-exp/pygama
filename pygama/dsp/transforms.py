@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import scipy.signal as signal
 import scipy.ndimage as ndimage
 
+# silence harmless warnings
+import warnings
+warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
+warnings.filterwarnings(action="ignore", module="scipy.signal", category=FutureWarning)
 
 def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     """

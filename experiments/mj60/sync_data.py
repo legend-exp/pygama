@@ -97,9 +97,8 @@ def daq_cleanup(keep_t1=True, keep_t2=True):
                 if any(ig in f for ig in ignore_list):
                     continue
 
-                print("gonna remove", f)
-
-                # os.remove(f)
+                print("Deleting:", f)
+                os.remove(f)
 
     now = datetime.now()
     print("Processing is up to date!", now.strftime("%Y-%m-%d %H:%M"))
