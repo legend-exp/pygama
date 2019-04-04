@@ -1,8 +1,11 @@
 {
   "elog":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/",
 
+  "loc_dir":"$DATADIR/MJ60",
   "raw_dir":"$DATADIR/MJ60/Data",
   "tier_dir":"$DATADIR/MJ60/pygama",
+  "rocks_dir":"/data/LEGEND/Data/MJ60",
+  "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
   "chunksize":1000,
