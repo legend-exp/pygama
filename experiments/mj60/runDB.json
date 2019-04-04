@@ -11,6 +11,8 @@
   "chunksize":1000,
   "clock":100e6,
   "rollover":1,
+  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
+  "det_mass_kg":0.739,
 
   "ds":{
     "note":"data sets",
@@ -35,21 +37,6 @@
     "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
   },
 
-  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
-  "det_mass_kg":0.739,
-
-  "thresholds":{
-    "note":"put a run range lookup here",
-    "note2":"scan all runs & paste output here",
-    "ds0":999,
-    "ds1":"0x8"
-  },
-
-  "cal_onboard": {
-    "note":"m, b",
-    "11":[0.0010555269899359561, -2.6681715462032116],
-    "13":[0.0010545621572212065, -2.3849931444240156]
-  },
 
   "t1_metadata":"ORSIS3302Model",
 
@@ -65,10 +52,43 @@
         "n_blsamp":10000
       },
       "tier1_options":{
-        "fit_bl" : {"ihi":2000},
-        "bl_sub" : {},
-        "trap_filter" : {"decay_time":72},
-        "get_max" : {}
+        "clk" : 100e6,
+        "fit_bl" : {"ihi":600, "order":1},
+        "blsub" : {},
+        "pz" : {"decay":82},
+        "notch" : {"f_notch":30e6, "Q":1},
+        "savgol" : [
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
+        ],
+        "trap" : [
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+        ],
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
+        "get_max" : [
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+        ],
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {},
+        "ftp" : {},
+        "overflow" : {},
+        "dcr" : [
+            {"wfin":"wf_savgol"},
+            {"wfin":"wf_pz"}
+        ],
+        "tail_fit" : [
+            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":0},
+            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":0}
+        ]
       }
     },
     "conf2":{
@@ -125,6 +145,19 @@
           "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
       }
     }
+  },
+
+  "thresholds":{
+    "note":"put a run range lookup here",
+    "note2":"scan all runs & paste output here",
+    "ds0":999,
+    "ds1":"0x8"
+  },
+
+  "cal_onboard": {
+    "note":"m, b",
+    "11":[0.0010555269899359561, -2.6681715462032116],
+    "13":[0.0010545621572212065, -2.3849931444240156]
   },
 
   "tests":{
