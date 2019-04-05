@@ -145,9 +145,10 @@ def ProcessTier1(t1_file,
 
     # ---------------- write Tier 2 output ----------------
 
+    print("Writing Tier 2 File:\n   {}".format(t2_file))
+    print("  Entries: {}".format(len(t2_df)))
+
     if verbose:
-        print("Writing Tier 2 File:\n   {}".format(t2_file))
-        print("  Entries: {}".format(len(t2_df)))
         print("  Data columns:\n", t2_df.columns.values)
 
     t2_df.to_hdf(
@@ -167,7 +168,7 @@ def ProcessTier1(t1_file,
     print("  Date:", datetime.datetime.now())
     print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
         elapsed / 60, proc_rate))
-    print("Done.")
+    print("Done.\n")
 
 
 def process_chunk(chunk_idx,

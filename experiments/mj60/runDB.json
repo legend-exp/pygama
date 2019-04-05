@@ -37,7 +37,6 @@
     "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
   },
 
-
   "t1_metadata":"ORSIS3302Model",
 
   "build_options":{
@@ -80,15 +79,7 @@
         ],
         "num_peaks" : {},
         "ftp" : {},
-        "overflow" : {},
-        "dcr" : [
-            {"wfin":"wf_savgol"},
-            {"wfin":"wf_pz"}
-        ],
-        "tail_fit" : [
-            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":0},
-            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":0}
-        ]
+        "overflow" : {}
       }
     },
     "conf2":{

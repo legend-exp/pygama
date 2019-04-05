@@ -4,6 +4,12 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 
+# silence harmless warnings
+import warnings
+warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarning)
+warnings.filterwarnings(action="ignore", category=RuntimeWarning)
+
+
 def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_avg", test=False):
     """
     simple mean, vectorized baseline calculator
@@ -419,7 +425,9 @@ def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
         run a non-vectorized fit with np.polyfit and np.apply_along_axis.
         for 200 wfs, this is about half as fast as the vectorized mode.
         """
-        def poly1d(ts, wf, ord):
+        def poly1d(wf, ts, ord):
+            if np.ma.count(wf)==0:
+                return np.array([1, 0])
             return np.ma.polyfit(wf, ts, ord)
 
         pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
