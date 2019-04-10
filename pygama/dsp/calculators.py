@@ -138,6 +138,8 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
 
         wfraw = waves["wf_blsub"]
 
+
+
         iwf = -1
         while True:
             if iwf != -1:
@@ -157,7 +159,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
             cmap = plt.cm.get_cmap('jet', len(pct) + 1)
             for i, tp in enumerate(pct):
 
-                idx = calcs["tp{}".format(tp)][iwf]
+                idx = calcs["tp{}".format(tp)].iloc[iwf]
                 print("tp{}: idx {}  val {:.2f}".format(tp, idx, wf[idx]))
 
                 plt.plot( idx, wf[idx], ".", c=cmap(i), ms=20,

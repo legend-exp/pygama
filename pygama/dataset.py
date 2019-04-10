@@ -131,7 +131,7 @@ class DataSet:
         if self.runDB is not None:
             cov = {}
             for conf in self.runDB["build_options"]:
-                cov[conf] = self.runDB["build_options"][conf]["coverage"]
+                cov[conf] = self.runDB["build_options"][conf]["run_coverage"]
 
             for run in runs:
                 for conf, ranges in cov.items():
