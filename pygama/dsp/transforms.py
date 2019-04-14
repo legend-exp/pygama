@@ -137,30 +137,39 @@ def pz(waves, calcs, decay, wfin="wf_blsub", wfout="wf_pz", test=False):
     pz_wfs = signal.lfilter(den, num, wfs)
 
     if test:
-        iwf = 5
-        ts = np.arange(len(wfs[iwf]))
-        plt.plot(ts, wfs[iwf], '-r', label='raw')
-        plt.plot(ts, pz_wfs[iwf], '-b', label='pz_corr')
+        iwf = -1
+        while True:
+            if iwf != -1:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+            iwf += 1
+            print(iwf)
 
-        # let's try calling the trapezoid w/ no decay time & make sure
-        # the two transforms are equivalent!
+            plt.cla()
+            ts = np.arange(len(wfs[iwf]))
+            plt.plot(ts, wfs[iwf], '-r', label='raw')
+            plt.plot(ts, pz_wfs[iwf], '-b', label='pz_corr')
 
-        # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
-        tmp = trap({"wf_blsub": pz_wfs, "settings":waves["settings"]}, calcs, 4, 2.5)
-        wf_trap = tmp["wf_trap"][iwf]
-        plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
+            # let's try calling the trapezoid w/ no decay time & make sure
+            # the two transforms are equivalent!
 
-        # compare to the PZ corrected trap on the RAW wf.
-        tmp = trap(waves, calcs, 4, 2.5, decay=72)
-        wf_trap2 = tmp["wf_trap"][iwf]
-        plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
+            # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
+            tmp = trap({"wf_blsub": pz_wfs, "settings":waves["settings"]}, calcs, 4, 2.5)
+            wf_trap = tmp["wf_trap"][iwf]
+            plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
 
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel("ADC", ha='right', y=1)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        exit()
+            # compare to the PZ corrected trap on the RAW wf.
+            tmp = trap(waves, calcs, 4, 2.5, decay=72)
+            wf_trap2 = tmp["wf_trap"][iwf]
+            plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
     return {wfout: pz_wfs}
 
@@ -175,38 +184,52 @@ def current(waves, calcs, sigma, wfin="wf_blsub", wfout="wf_current", test=False
     wfc = ndimage.filters.gaussian_filter1d(wfs, sigma=sigma, order=1) # lol
 
     if test:
-        iwf = 5
-        ts = np.arange(len(wfs[iwf]))
-        wf = wfs[iwf] / np.amax(wfs[iwf])
-        curr = wfc[iwf] / np.amax(wfc[iwf])
+        iwf = -1
+        while True:
+            if iwf != -1:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+            iwf += 1
+            print(iwf)
+            plt.cla()
 
-        plt.plot(ts, wf, c='r', alpha=0.7, label='raw wf')
-        plt.plot(ts, curr, c='b', label='current')
+            ts = np.arange(len(wfs[iwf]))
+            wf = wfs[iwf] / np.amax(wfs[iwf])
+            curr = wfc[iwf] / np.amax(wfc[iwf])
 
-        # compare w/ MGDO current, using GAT WFA parameters
-        from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
-        tsf = MGWFTrapSlopeFilter()
-        tsf.SetPeakingTime(1)
-        tsf.SetIntegrationTime(10)
-        tsf.SetEvaluateMode(7)
-        mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
-        tmp = std.vector("double")(len(wf))
-        for i in range(len(wf)):
-            tmp[i] = wf[i]
-        mgwf_in.SetData(tmp)
-        tmp = mgwf_in.GetVectorData()
-        tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
-        out = mgwf_out.GetVectorData()
-        mgawf = np.fromiter(out, dtype=np.double, count=out.size())
-        mgawf = mgawf / np.amax(mgawf)
-        plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+            # plt.plot(ts, wf, c='r', alpha=0.7, label='raw wf')
+            # plt.plot(ts, curr, c='b', label='current')
 
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel('ADC', ha='right', y=1)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        exit()
+            # super crude window
+            idx = np.where((ts > 800) & (ts < 1200))
+            plt.plot(ts[idx], wf[idx], c='r', alpha=0.7, label='raw wf')
+            plt.plot(ts[idx], curr[idx], c='b', label='current')
+
+            # # compare w/ MGDO current, using GAT WFA parameters
+            # from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
+            # tsf = MGWFTrapSlopeFilter()
+            # tsf.SetPeakingTime(1)
+            # tsf.SetIntegrationTime(10)
+            # tsf.SetEvaluateMode(7)
+            # mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
+            # tmp = std.vector("double")(len(wf))
+            # for i in range(len(wf)):
+            #     tmp[i] = wf[i]
+            # mgwf_in.SetData(tmp)
+            # tmp = mgwf_in.GetVectorData()
+            # tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
+            # out = mgwf_out.GetVectorData()
+            # mgawf = np.fromiter(out, dtype=np.double, count=out.size())
+            # mgawf = mgawf / np.amax(mgawf)
+            # plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
     return {wfout: wfc}
 

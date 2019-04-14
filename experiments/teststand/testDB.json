@@ -39,13 +39,13 @@
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
         ],
         "current" : [
-            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5, "test":1}
         ],
         "get_max" : [
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100], "test":1},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
         "peakdet" : [
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
