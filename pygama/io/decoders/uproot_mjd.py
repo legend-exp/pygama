@@ -199,14 +199,16 @@ def load_root(file, ttname, ilo=None, ihi=None, brlist=None):
 
 def compress_dvi(wfarr):
     """
-    implement diff-var-int compression on the given waveform.
-    https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
+    run diff-var-int compression on a wf. corresponds to "writeVLSigned"
+    - MGTWaveform: https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
+    - zigzag encoding: https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba
     """
     comp_arr = []
     last = 0
     for samp in wfarr:
         diff = int(samp - last)
-        rest = int(((diff << 1) ^ (diff >> 31))) # zzEnc
+        rest = ((diff >> 31) ^ (diff << 1)) # zzEnc
+        print(diff, rest)
         if rest < 0:
             print("error! exiting...")
             return
@@ -221,41 +223,34 @@ def compress_dvi(wfarr):
 
 def unpack_dvi(cwf):
     """
-    unpack a diff-var-int waveform
-    note: 0xFF = 255 = 1111 1111 (max value of 8 bit int)
+    unpack a diff-var-int waveform. corresponds to "readVLSigned"
+    - MGTWaveform: https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
     """
     new_wf = []
+    max_pos = 8
     acc = 0
-    max_pos = 8 # assuming 8 bit int
     for samp in cwf:
-        diff = 0 # this is what we want
-        x, pos = 0, 0
+        diff, x, pos = 0, 0, 0
         while True:
             if pos > max_pos:
                 print("error, gonna bail")
                 return
 
-            val = samp & 0x7F
-            sign = val << pos
-            if sign:
-                diff = ((val >> 1) & -(val & 1)) # flip pos to neg
-            else:
-                pos += 7
-            # x = x | b
-            #
-            # if samp != x:
-            #     print("{:>9} {:>9} {:>9} {:>9}".format(bin(a)[2:], bin(b)[2:], bin(x)[2:], bin(samp)[2:]))
-            #     # print("samp: {:5} {:5}  anded w/{:5} : {:5} {:5}".format(hex(samp), bin(samp), bin(0x7F), hex(x), bin(x)))
-            #
-            # # 0x80 is '1000 0000', so this is where the neg sign is handled
-            # if ((x & 0x80) == 0):
-            #     diff = ((x >> 1) & -(x & 1)) # zzDec
-            #     break
-            # else:
-            #     print("we never get here")
-            #     pos += 7
+            a = samp & 0x7F
+            b = a << pos
+            x = x | b
 
-        # print("diff is", diff, "acc is", acc)
+            # print("samp {}  a {}  b {}  x {}".format(samp, a, b, x))
+            print("samp {}  samp {:>9}  a {:>9}  b {:>9}  x {:>9}"
+                  .format(samp, bin(samp), bin(a), bin(b), bin(x)))
+
+            if (x & 0x80) == 0:
+                diff = ((x >> 1) ^ -(x & 1))
+                break
+            else:
+                print("i got here")
+                pos += 7
+
         acc += diff
         new_wf.append(float(acc))
 
@@ -285,28 +280,31 @@ def test_dvi(run):
             if inp == "p": iwf -= 2
             if inp.isdigit(): iwf = int(inp) - 1
         iwf += 1
-        print(iwf)
+        # print(iwf)
 
-        rwf = rarrs['fWaveforms'][iwf]
-        rwf = rwf[rwf != 0xDEADBEEF]
+        rwf = rarrs['fAuxWaveforms'][iwf]
+        rwf = rwf[rwf != 0xDEADBEEF] # can use this to event-build
 
         noff = 154 # idk why the uproot wfs have junk at the beginning
-        uwf = uarrs['fWaveforms'][iwf][noff:]
+        uwf = uarrs['fAuxWaveforms'][iwf][noff:]
 
         # try to encode the rwf to match the uwf
         cwf = compress_dvi(rwf)
+        exit()
 
         # now try to unpack the cwf to get the rwf back
         # cwf2 = unpack_dvi(cwf)
+        # exit()
 
         plt.cla()
-        # plt.plot(np.arange(len(rwf)), rwf, '-b')
-        # plt.plot(np.arange(len(cwf2)), cwf2, '-r')
 
-        plt.plot(np.arange(len(uwf)), uwf, '-r',
-                 label="uproot, len {}, noff {}".format(len(uwf), noff))
-        plt.plot(np.arange(len(cwf)), cwf, '-b',
-                 label="dvi, len {}".format(len(cwf)))
+        plt.plot(np.arange(len(rwf)), rwf, '-b', label="aux wf")
+        plt.plot(np.arange(len(cwf2)), cwf2, '-r', label="unpack_dvi")
+
+        # plt.plot(np.arange(len(uwf)), uwf, '-r',
+        #          label="uproot, len {}, noff {}".format(len(uwf), noff))
+        # plt.plot(np.arange(len(cwf)), cwf, '-b',
+        #          label="dvi, len {}".format(len(cwf)))
 
         plt.legend()
         plt.show(block=False)
