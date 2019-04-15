@@ -21,16 +21,18 @@ def main():
     hfile2 = "~/Data/uproot/root_run{}.h5".format(run)
 
     # explore_file(bfile)
+    # debug(bfile)
+    # exit()
 
     # -- read root file with uproot
     ihi = 100
 
     # uarrs = load_uproot(bfile, "MGTree", ihi=ihi)
-    uarrs = load_uproot(bfile, "MGTree", ihi=ihi,
-                        brlist=['fWaveforms', 'fAuxWaveforms'])
+    # uarrs = load_uproot(bfile, "MGTree", ihi=ihi,
+                        # brlist=['fWaveforms', 'fAuxWaveforms'])
 
     # -- read/write uproot hdf5 files
-    write_h5(hfile, uarrs)
+    # write_h5(hfile, uarrs)
     # h5arrs = load_h5(hfile)
 
     # -- read/write ROOT hdf5 files directly
@@ -82,6 +84,34 @@ def explore_file(file):
 
         else:
             print("Couldn't parse type for:", name)
+
+
+def debug(file):
+    """
+    fWaveforms is a custom class.  can we get uproot to read it,
+    a little better than just reading out .content directly?
+    - https://github.com/scikit-hep/uproot/issues/124
+    """
+    ufile = uproot.open(file)
+    utree = ufile["MGTree"]
+
+    # for c in ufile.allclasses():
+        # print(c)
+    # utree.show() # print class and streamer types
+
+    # # -- some fancy pivarski array calls
+    # from uproot import interpret, asjagged, astable, asdtype
+    # arr1 = utree["class1"].array(interpret(utree["class1"], cntvers=True))
+    # arr2 = utree["class2"].array(interpret(utree["class2"], tobject=False))
+    # arr3 = utree["arr3"].array(asjagged(astable(asdtype([("id", "i4"), ("pmt", "u1"), ("tdc", "u4"), ("tot", "u1")])),skipbytes=10))
+    # arr4 = utree["arr4"].array(asjagged(astable(asdtype([("id", "i4"), ("pmt", "u1"), ("tdc", "u4"), ("tot", "u1"),(" cnt", "u4"), (" vers", "u2"), ("trigger_mask", "u8")])), skipbytes=10))
+    # print(arr1.columns)
+
+    wfs = utree["fWaveforms"].array(entrystop=100)
+    # wfs = utree.arrays([b'fWaveforms'], entrystop=100)
+    # print(dir(wfs))
+    wfc = wfs[b'fWaveforms'].content
+    print(wfc[0])
 
 
 def load_uproot(file, ttname=None, ilo=None, ihi=None, brlist=None):
@@ -266,6 +296,17 @@ def decompress_dvi(cwf):
 def test_dvi(run):
     """
     load hdf5 files and test the DiffVarInt compression
+
+    NOTE: these are written before the MGTWaveform compressor runs
+    - UInt_t R__c = R__b.WriteVersion(MGTWaveform::Class(), kTRUE);
+    - R__b.WriteDouble(fSampFreq);
+    - R__b.WriteDouble(fTOffset);
+    - R__b.WriteInt(fWFType);
+    - R__b.WriteULong64(fData.size());
+    - R__b.WriteInt(fWFEncScheme);
+    - R__b.WriteInt(fID);
+    - R__b.SetByteCount(R__c, kTRUE);
+    Hmm, how are they encoded?
     """
     f1 = "~/Data/uproot/root_run{}.h5".format(run) # root (uncomp.) file
     f2 = "~/Data/uproot/up_run{}.h5".format(run) # uproot (dvi) file
@@ -289,22 +330,22 @@ def test_dvi(run):
         iwf += 1
         print("iwf:", iwf)
 
+        # wf_type = 'fWaveforms'
+        wf_type = 'fAuxWaveforms'
+
         # encode and decode the "true" root waveform - checks DVI algorithm
-        # rwf = rarrs['fAuxWaveforms'][iwf]
-        rwf = rarrs['fWaveforms'][iwf]
+        rwf = rarrs[wf_type][iwf]
         # rwf = rarrs['fMSWaveforms'][iwf]
         rwf = rwf[rwf != 0xDEADBEEF] # can use this to event-build ...
         crwf = compress_dvi(rwf)
         drwf = decompress_dvi(crwf)
 
-        # decode the uproot waveform -- can we reproduce the original?
-
-        # idk why the uproot wfs have junk at the beginning
-        noff = 143 # this gets the baseline and rising edge in the right place
-        uwf = uarrs['fWaveforms'][iwf][noff:]
+        # decode the uproot waveform
+        # this gets the baseline and rising edge in the right place
+        # for ONE PARTICULAR TEST WAVEFORM, i=20
+        noff = 143
+        uwf = uarrs[wf_type][iwf][noff:]
         duwf = decompress_dvi(uwf)
-
-        # peel off
 
         # show waveforms
         p[0].cla()
