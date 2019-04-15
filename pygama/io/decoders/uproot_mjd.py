@@ -26,11 +26,11 @@ def main():
     ihi = 100
 
     # uarrs = load_uproot(bfile, "MGTree", ihi=ihi)
-    # uarrs = load_uproot(bfile, "MGTree", ihi=ihi,
-    #                     brlist=['fWaveforms', 'fAuxWaveforms'])
+    uarrs = load_uproot(bfile, "MGTree", ihi=ihi,
+                        brlist=['fWaveforms', 'fAuxWaveforms'])
 
     # -- read/write uproot hdf5 files
-    # write_h5(hfile, uarrs)
+    write_h5(hfile, uarrs)
     # h5arrs = load_h5(hfile)
 
     # -- read/write ROOT hdf5 files directly
@@ -202,59 +202,65 @@ def compress_dvi(wfarr):
     run diff-var-int compression on a wf. corresponds to "writeVLSigned"
     - MGTWaveform: https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
     - zigzag encoding: https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba
+      [signed]=[encoded] : 0=0, -1=1, 1=2, -2=3, 2=4, -3=5, 3=6 ....
     """
+    # print("\nrunning compressor...")
     comp_arr = []
-    last = 0
-    for samp in wfarr:
-        diff = int(samp - last)
-        rest = ((diff >> 31) ^ (diff << 1)) # zzEnc
-        print(diff, rest)
-        if rest < 0:
-            print("error! exiting...")
-            return
-        while rest > 0:
-            new_rest = rest >> 7
-            comp_val = (rest & 0x7F) if new_rest == 0 else ((rest & 0x7F) | 0x80)
-            comp_arr.append(comp_val)
-            rest = new_rest
-        last = samp
+    prev_samp = 0
+    for i, samp in enumerate(wfarr):
+
+        # take difference and zzencode it
+        diff = int(samp - prev_samp)
+        zdiff = ((diff >> 32) ^ (diff << 1)) # zigzag encode: assume 32-bit ints
+        if zdiff < 0:
+            print("error! exiting ...")
+            exit()
+
+        # write out the encoded value, 7 bits at a time
+        while zdiff > 0:
+            znext = zdiff >> 7
+            if znext == 0:
+                cint8 = zdiff & 0x7F
+            else:
+                cint8 = zdiff & 0x7F | 0x80
+            comp_arr.append(cint8)
+            zdiff = znext
+
+        prev_samp = samp
+
     return np.array(comp_arr)
 
 
-def unpack_dvi(cwf):
+def decompress_dvi(cwf):
     """
     unpack a diff-var-int waveform. corresponds to "readVLSigned"
     - MGTWaveform: https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
+    Basically we read in a series of 7-bit integers.
     """
-    new_wf = []
-    max_pos = 8
-    acc = 0
-    for samp in cwf:
-        diff, x, pos = 0, 0, 0
-        while True:
-            if pos > max_pos:
-                print("error, gonna bail")
-                return
+    # print("\nrunning decompressor...")
+    wf = []
+    wf_val, prev7 = 0, 0
 
-            a = samp & 0x7F
-            b = a << pos
-            x = x | b
+    for i, cint8 in enumerate(cwf):
 
-            # print("samp {}  a {}  b {}  x {}".format(samp, a, b, x))
-            print("samp {}  samp {:>9}  a {:>9}  b {:>9}  x {:>9}"
-                  .format(samp, bin(samp), bin(a), bin(b), bin(x)))
+        # get current value, OR it with any previous value
+        if prev7 == 0:
+            cint7 = cint8 & 0x7F
+        else:
+            cint7 = (cint8 << 7) | prev7
 
-            if (x & 0x80) == 0:
-                diff = ((x >> 1) ^ -(x & 1))
-                break
-            else:
-                print("i got here")
-                pos += 7
+        # if bit 8 is 0, we've reached the end of this decoded value
+        if cint8 & 0x80 == 0:
+            diff = (cint7 >> 1) ^ -(cint7 & 1)
+            wf_val += diff
+            wf.append(float(wf_val))
+            prev7 = 0 # reset
 
-        acc += diff
-        new_wf.append(float(acc))
+        # if not, save this cint7 to be OR'd with the next one
+        else:
+            prev7 = cint7
 
-    return np.array(new_wf)
+    return np.array(wf)
 
 
 def test_dvi(run):
@@ -272,6 +278,7 @@ def test_dvi(run):
     mem = sizeof_fmt(psutil.Process(pid).memory_info().rss)
     print("PID: {}, current mem usage: {}".format(pid, mem))
 
+    f, p = plt.subplots(2, 1, figsize=(10, 7))
     iwf = 19
     while True:
         if iwf != 19:
@@ -280,33 +287,39 @@ def test_dvi(run):
             if inp == "p": iwf -= 2
             if inp.isdigit(): iwf = int(inp) - 1
         iwf += 1
-        # print(iwf)
+        print("iwf:", iwf)
 
-        rwf = rarrs['fAuxWaveforms'][iwf]
-        rwf = rwf[rwf != 0xDEADBEEF] # can use this to event-build
+        # encode and decode the "true" root waveform - checks DVI algorithm
+        # rwf = rarrs['fAuxWaveforms'][iwf]
+        rwf = rarrs['fWaveforms'][iwf]
+        # rwf = rarrs['fMSWaveforms'][iwf]
+        rwf = rwf[rwf != 0xDEADBEEF] # can use this to event-build ...
+        crwf = compress_dvi(rwf)
+        drwf = decompress_dvi(crwf)
 
-        noff = 154 # idk why the uproot wfs have junk at the beginning
-        uwf = uarrs['fAuxWaveforms'][iwf][noff:]
+        # decode the uproot waveform -- can we reproduce the original?
 
-        # try to encode the rwf to match the uwf
-        cwf = compress_dvi(rwf)
-        exit()
+        # idk why the uproot wfs have junk at the beginning
+        noff = 143 # this gets the baseline and rising edge in the right place
+        uwf = uarrs['fWaveforms'][iwf][noff:]
+        duwf = decompress_dvi(uwf)
 
-        # now try to unpack the cwf to get the rwf back
-        # cwf2 = unpack_dvi(cwf)
-        # exit()
+        # peel off
 
-        plt.cla()
+        # show waveforms
+        p[0].cla()
+        p[0].plot(np.arange(len(rwf)), rwf, '-b', lw=6, label="root, original")
+        p[0].plot(np.arange(len(drwf)), drwf, '-m', lw=4, label="root, rconst")
+        p[0].plot(np.arange(len(duwf)), duwf, '-c', lw=2, label="uproot, rconst")
+        p[0].legend()
 
-        plt.plot(np.arange(len(rwf)), rwf, '-b', label="aux wf")
-        plt.plot(np.arange(len(cwf2)), cwf2, '-r', label="unpack_dvi")
+        # show compressed wfs
+        p[1].cla()
+        p[1].plot(np.arange(len(crwf)), crwf, '-b', label='root, compressed')
+        p[1].plot(np.arange(len(uwf)), uwf, '-g', label='uproot, compressed')
+        p[1].legend()
 
-        # plt.plot(np.arange(len(uwf)), uwf, '-r',
-        #          label="uproot, len {}, noff {}".format(len(uwf), noff))
-        # plt.plot(np.arange(len(cwf)), cwf, '-b',
-        #          label="dvi, len {}".format(len(cwf)))
-
-        plt.legend()
+        plt.tight_layout()
         plt.show(block=False)
         plt.pause(0.001)
 
