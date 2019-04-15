@@ -239,9 +239,18 @@ def compress_dvi(wfarr):
     prev_samp = 0
     for i, samp in enumerate(wfarr):
 
-        # take difference and zzencode it
-        diff = int(samp - prev_samp)
-        zdiff = ((diff >> 32) ^ (diff << 1)) # zigzag encode: assume 32-bit ints
+        # take difference
+        diff = int(samp) - int(prev_samp)
+
+        if i < 10:
+            print("samp {}  prev {}  diff {}".format(samp, prev_samp, diff))
+
+        if diff == 0:
+            comp_arr.append(0)
+            continue
+
+        # zzencode the diff, assuming 32-bit ints
+        zdiff = ((diff >> 32) ^ (diff << 1))
         if zdiff < 0:
             print("error! exiting ...")
             exit()
@@ -253,6 +262,10 @@ def compress_dvi(wfarr):
                 cint8 = zdiff & 0x7F
             else:
                 cint8 = zdiff & 0x7F | 0x80
+
+            if i < 10:
+                print("{}  {}  {}  {}".format(i, diff, zdiff, cint8))
+
             comp_arr.append(cint8)
             zdiff = znext
 
@@ -297,7 +310,7 @@ def test_dvi(run):
     """
     load hdf5 files and test the DiffVarInt compression
 
-    NOTE: these are written before the MGTWaveform compressor runs
+    NOTE -- these are written before the MGTWaveform compressor runs:
     - UInt_t R__c = R__b.WriteVersion(MGTWaveform::Class(), kTRUE);
     - R__b.WriteDouble(fSampFreq);
     - R__b.WriteDouble(fTOffset);
@@ -306,7 +319,7 @@ def test_dvi(run):
     - R__b.WriteInt(fWFEncScheme);
     - R__b.WriteInt(fID);
     - R__b.SetByteCount(R__c, kTRUE);
-    Hmm, how are they encoded?
+    Hmm, how does uproot encode these?
     """
     f1 = "~/Data/uproot/root_run{}.h5".format(run) # root (uncomp.) file
     f2 = "~/Data/uproot/up_run{}.h5".format(run) # uproot (dvi) file
@@ -319,7 +332,7 @@ def test_dvi(run):
     mem = sizeof_fmt(psutil.Process(pid).memory_info().rss)
     print("PID: {}, current mem usage: {}".format(pid, mem))
 
-    f, p = plt.subplots(2, 1, figsize=(10, 7))
+    f, p = plt.subplots(3, 1, figsize=(10, 7))
     iwf = 19
     while True:
         if iwf != 19:
@@ -328,14 +341,13 @@ def test_dvi(run):
             if inp == "p": iwf -= 2
             if inp.isdigit(): iwf = int(inp) - 1
         iwf += 1
-        print("iwf:", iwf)
+        print("iwf:", iwf,"\n")
 
         # wf_type = 'fWaveforms'
         wf_type = 'fAuxWaveforms'
 
         # encode and decode the "true" root waveform - checks DVI algorithm
         rwf = rarrs[wf_type][iwf]
-        # rwf = rarrs['fMSWaveforms'][iwf]
         rwf = rwf[rwf != 0xDEADBEEF] # can use this to event-build ...
         crwf = compress_dvi(rwf)
         drwf = decompress_dvi(crwf)
@@ -347,18 +359,44 @@ def test_dvi(run):
         uwf = uarrs[wf_type][iwf][noff:]
         duwf = decompress_dvi(uwf)
 
+        # ah, so the reconstructed wf is dropping entries that are duplicated
+        # i guess because the diff is zero?
+        print("idx  original   reconst")
+        for i in range(10):
+            print("{}  {:8}  {:8}".format(i, rwf[i], drwf[i]))
+
+        print("len(original) {}  len(reconst) {}".format(len(rwf), len(drwf)))
+
+        # compress/decomp a 2nd time, just for fun
+        cwf2 = compress_dvi(duwf)
+        dwf2 = decompress_dvi(cwf2)
+
+        # exit()
+
         # show waveforms
         p[0].cla()
-        p[0].plot(np.arange(len(rwf)), rwf, '-b', lw=6, label="root, original")
-        p[0].plot(np.arange(len(drwf)), drwf, '-m', lw=4, label="root, rconst")
-        p[0].plot(np.arange(len(duwf)), duwf, '-c', lw=2, label="uproot, rconst")
+        p[0].plot(np.arange(len(drwf)), drwf, '.g', ms=8, label="root, rconst")
+        p[0].plot(np.arange(len(rwf)), rwf, '.b', ms=8, label="root, original")
+        # p[0].plot(np.arange(len(dwf2)), dwf2, '.r', label="root, doubled")
+        p[0].plot(np.arange(len(duwf)), duwf, '.r', ms=4, label="uproot, rconst")
+        # p[0].set_xlim(0, 40)
+        # p[0].set_ylim(-900, -850)
         p[0].legend()
 
         # show compressed wfs
         p[1].cla()
-        p[1].plot(np.arange(len(crwf)), crwf, '-b', label='root, compressed')
-        p[1].plot(np.arange(len(uwf)), uwf, '-g', label='uproot, compressed')
+        p[1].plot(np.arange(len(crwf)), crwf, '.b', ms=8, label='root, compressed')
+        p[1].plot(np.arange(len(uwf)), uwf, '.r', ms=4, label='uproot, compressed')
+        # p[1].set_xlim(0, 40)
+        # p[1].set_ylim(-5,15)
         p[1].legend()
+
+        # # show residuals
+        p[2].cla()
+        ts = np.arange(len(drwf))
+        p[2].plot(ts, rwf - drwf, ".k", label="orig - reconst")
+        # p[2].set_xlim(0, 40)
+        p[2].legend()
 
         plt.tight_layout()
         plt.show(block=False)
