@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 import matplotlib.pyplot as plt
-#plt.style.use('clint.mpl')
 
 from pygama import DataSet
 from pygama.analysis.calibration import *
-from pygama.utils import get_hist
+from pygama.analysis.histograms import *
+from pygama.utils import set_plot_style
+set_plot_style("clint")
 
 def main():
     """
@@ -24,10 +25,10 @@ def main():
     # -- analysis routines --
     # quick_gat()
     # compare_spectra()
-    get_spectra()
+    # get_spectra()
     # get_multiple_spectra()
     # check_hist()
-    # calibrate()
+    calibrate()
     # resolution()
 
 
@@ -177,6 +178,7 @@ def check_hist():
     plt.legend()
     plt.show()
 
+
 def calibrate():
     """
     do a rough energy calibration
@@ -188,18 +190,19 @@ def calibrate():
     pks_lit = [239, 911, 1460.820, 1764, 2614.511]
 
     # ds = DataSet(11, md='./runDB.json', tier_dir=tier_dir)
-    ds = DataSet(run=155, md='./runDB.json', tier_dir=tier_dir)
+    ds = DataSet(run=204, md='./runDB.json', tier_dir=tier_dir)
 
     t2df = ds.get_t2df()
     rt = ds.get_runtime() / 3600 # hrs
 
-    ene = t2df["energy"]
-    xlo, xhi, xpb = 0, 2700000, 1000 # damn, need to remove the overflow peak
+    ene = t2df["e_ftp"]
 
-    # ene = t2df["trap_max"]
-    # xlo, xhi, xpb = 100, 7000, 10
+    xlo, xhi, xpb = 0, 10000, 10 # damn, need to remove the overflow peak
+    nbins = int((xhi-xlo)/xpb)
 
-    xE, hE = get_hist(ene, xlo, xhi, xpb)
+    hE, xE, _ = get_hist(ene, nbins, (xlo, xhi))
+
+    # xE, hE = get_hist(ene, xlo, xhi, xpb)
 
     # -- pygama's cal routine needs some work ... --
     # need to manually remove the overflow peak?
@@ -269,9 +272,10 @@ def calibrate():
 
     # # check calibrated spectrum
     xlo, xhi, xpb = 0, 3000, 1
-    xC, hC = get_hist(ecal, xlo, xhi, xpb)
-    plt.semilogy(xC, hC / rt, c='b', ls='steps', lw=1,
-                 label="MJ60 data, {:.2f} hrs".format(rt))
+    hC, xC, _ = get_hist(ecal, int((xhi-xlo)/xpb), (xlo, xhi))
+    hC = np.concatenate((hC, [0])) # FIXME: annoying - have to add an extra zero
+
+    plt.semilogy(xC, hC / rt, c='b', ls='steps', lw=1,label="MJ60 data, {:.2f} hrs".format(rt))
     plt.axvline(pks_lit[2], c='r', lw=3, alpha=0.7, label="40K, 1460.820 keV")
     plt.axvline(pks_lit[4], c='m', lw=3, alpha=0.7, label="208Tl, 2614.511 keV")
     plt.xlabel("Energy (keV)", ha='right', x=1)
@@ -285,7 +289,8 @@ def calibrate():
     # check low-e spectrum
     plt.figure()
     xlo, xhi, xpb = 0, 50, 0.1
-    xC, hC = get_hist(ecal, xlo, xhi, xpb)
+    hC, xC, _ = get_hist(ecal, int((xhi-xlo)/xpb), (xlo, xhi))
+    hC = np.concatenate((hC, [0])) # FIXME: annoying - have to add an extra zero
     plt.plot(xC, hC, c='b', ls='steps', lw=1, label="Kr83 data")
     plt.axvline(9.4057, color='r', lw=1.5, alpha=0.6, label="9.4057 keV") # kr83 lines
     plt.axvline(12.651, color='g', lw=1.5, alpha=0.6, label="12.651 keV") # kr83 lines
