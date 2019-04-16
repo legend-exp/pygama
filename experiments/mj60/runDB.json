@@ -41,7 +41,11 @@
     "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
   },
 
-
+  "cal":{
+      "mj60":[2614.5, 1460.8, 20],
+      "cage":[],
+      "mjd":[]
+  },
 
   "build_options":{
     "conf1":{
