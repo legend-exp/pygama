@@ -74,10 +74,11 @@ def compare_spectra():
 
 
 def bias_tests():
-
-    # only need to do this for the test data, not generally
-    # parse special test data into dataframes
-    # (access with runDB["df_test_[num]"])
+    """
+    only need to do this for the test data, not generally
+    parse special test data into dataframes
+    (access with runDB["df_test_[num]"])
+    """
 
     test_list = [k for k in runDB["tests"] if "test" in k]
     for t in test_list:
