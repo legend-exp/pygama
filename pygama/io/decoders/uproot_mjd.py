@@ -22,13 +22,14 @@ def main():
 
     # explore_file(bfile)
     # debug(bfile)
-    # exit()
+    quick_gat(gfile)
+    exit()
 
     # -- read root file with uproot
     ihi = 100
 
-    # uarrs = load_uproot(bfile, "MGTree", ihi=ihi)
-    # uarrs = load_uproot(bfile, "MGTree", ihi=ihi,
+    # uarrs = run_uproot(bfile, "MGTree", ihi=ihi)
+    # uarrs = run_uproot(bfile, "MGTree", ihi=ihi,
                         # brlist=['fWaveforms', 'fAuxWaveforms'])
 
     # -- read/write uproot hdf5 files
@@ -114,7 +115,39 @@ def debug(file):
     print(wfc[0])
 
 
-def load_uproot(file, ttname=None, ilo=None, ihi=None, brlist=None):
+def quick_gat(file):
+    """
+    uproot has a rad auto-dataframe method that should work for
+    single-valued gatified files.
+    """
+    ufile = uproot.open(file)
+    utree = ufile["mjdTree"]
+    # df = ufile["mjdTree"].pandas.df() # this fails, probably on the MG objects
+    df = ufile["mjdTree"].pandas.df(["trapENFCal","trapENAF"]) # this works, fast!
+
+    # # try to filter out the bad objects
+    # cols = []
+    # arrtmp = utree.arrays(entrystop=10)
+    # for key in arrtmp.keys():
+    #     # print(key, type(arrtmp[key]))
+    #     if isinstance(arrtmp[key], awkward.ObjectArray):
+    #         continue
+    #     cols.append(key)
+
+    # can try manually creating the df
+    # utree = ufile["threshTree"].arrays()
+    # cols = []
+    # for k in utree:
+    #     if not isinstance(utree[k][0], np.ndarray):
+    #         continue
+    #     cols.append(pd.Series(utree[k][0], name=k.decode('utf-8')))
+    # df = pd.concat(cols, axis=1)
+
+    # df = ufile["mjdTree"].pandas.df(cols, flatten=True)
+    print(df)
+
+
+def run_uproot(file, ttname=None, ilo=None, ihi=None, brlist=None):
     """
     load uproot data into awkward arrays
     """
@@ -198,6 +231,7 @@ def load_root(file, ttname, ilo=None, ihi=None, brlist=None):
         # concat each hit into a single array
         ewf, ewfa, ewfms = [], [], []
         for j in range(nwf):
+
             if is_ms:
                 wf = tt.event.GetWaveform(j)
                 wfa = tt.event.GetAuxWaveform(j)
@@ -242,15 +276,12 @@ def compress_dvi(wfarr):
         # take difference
         diff = int(samp) - int(prev_samp)
 
-        if i < 10:
-            print("samp {}  prev {}  diff {}".format(samp, prev_samp, diff))
-
         if diff == 0:
             comp_arr.append(0)
             continue
 
         # zzencode the diff, assuming 32-bit ints
-        zdiff = ((diff >> 32) ^ (diff << 1))
+        zdiff = ((diff >> 32-1) ^ (diff << 1))
         if zdiff < 0:
             print("error! exiting ...")
             exit()
@@ -262,9 +293,6 @@ def compress_dvi(wfarr):
                 cint8 = zdiff & 0x7F
             else:
                 cint8 = zdiff & 0x7F | 0x80
-
-            if i < 10:
-                print("{}  {}  {}  {}".format(i, diff, zdiff, cint8))
 
             comp_arr.append(cint8)
             zdiff = znext
@@ -310,7 +338,8 @@ def test_dvi(run):
     """
     load hdf5 files and test the DiffVarInt compression
 
-    NOTE -- these are written before the MGTWaveform compressor runs:
+    NOTE:
+    these are written before the MGTWaveform compressor runs:
     - UInt_t R__c = R__b.WriteVersion(MGTWaveform::Class(), kTRUE);
     - R__b.WriteDouble(fSampFreq);
     - R__b.WriteDouble(fTOffset);
@@ -319,7 +348,9 @@ def test_dvi(run):
     - R__b.WriteInt(fWFEncScheme);
     - R__b.WriteInt(fID);
     - R__b.SetByteCount(R__c, kTRUE);
-    Hmm, how does uproot encode these?
+
+    Need to implement:
+    - ReadDouble, ReadInt, ReadULong64
     """
     f1 = "~/Data/uproot/root_run{}.h5".format(run) # root (uncomp.) file
     f2 = "~/Data/uproot/up_run{}.h5".format(run) # uproot (dvi) file
@@ -332,7 +363,7 @@ def test_dvi(run):
     mem = sizeof_fmt(psutil.Process(pid).memory_info().rss)
     print("PID: {}, current mem usage: {}".format(pid, mem))
 
-    f, p = plt.subplots(3, 1, figsize=(10, 7))
+    f, p = plt.subplots(2, 1, figsize=(10, 7))
     iwf = 19
     while True:
         if iwf != 19:
@@ -352,30 +383,54 @@ def test_dvi(run):
         crwf = compress_dvi(rwf)
         drwf = decompress_dvi(crwf)
 
-        # decode the uproot waveform
-        # this gets the baseline and rising edge in the right place
-        # for ONE PARTICULAR TEST WAVEFORM, i=20
-        noff = 143
-        uwf = uarrs[wf_type][iwf][noff:]
+        # # compress/decomp a 2nd time, just for fun
+        # cwf2 = compress_dvi(duwf)
+        # dwf2 = decompress_dvi(cwf2)
+
+        # -- decode the uproot waveform & metadata.
+        # ilo and ihi are empirical for one waveform
+        ilo, ihi = 143, -5
+        uarr = uarrs[wf_type][iwf]
+        header = uarr[:ilo]
+        uwf = uarr[ilo:ihi]
+        footer = uarr[ihi:]
         duwf = decompress_dvi(uwf)
 
-        # ah, so the reconstructed wf is dropping entries that are duplicated
-        # i guess because the diff is zero?
-        print("idx  original   reconst")
-        for i in range(10):
-            print("{}  {:8}  {:8}".format(i, rwf[i], drwf[i]))
+        # -- decode the metadata --
+        # ISSUE: Until we can decode the entire header, it's not safe
+        # to run this routine on arbitrary built files -- the header length
+        # might change.
 
-        print("len(original) {}  len(reconst) {}".format(len(rwf), len(drwf)))
+        # # decode the header to unicode chars
+        # print("Header is:")
+        # print(header,"\n")
+        # print([(chr(v).encode()).decode() for v in header])
+        # print("\n", "".join([(chr(v).encode()).decode() for v in header]))
+        # print("\nFooter is:", "".join([(chr(v).encode()).decode() for v in footer]))
 
-        # compress/decomp a 2nd time, just for fun
-        cwf2 = compress_dvi(duwf)
-        dwf2 = decompress_dvi(cwf2)
+        fSampFreq = header[-32:-24] # 64 bit double?
+        fTOffset = header[-24:-16] # 64 bit double?
+        fWFType = header[-16:-12] # 32 bit int
+        fDataSize = header[-12:-4] # 64 bit int
+        fWFEncScheme = header[-4:] # 32 bit int
+
+        # ian says each value is an 8 bit int.
+        fID = (footer[-3] << 8) + footer[-2]
+
+        # print("remaining header:",header[:-32])
+        # NOTE: to get the rest, ian suggests starting here:
+        # https://github.com/root-project/root/blob/331efa4c00fefc38980eaa\
+        # f7b41b8e95fcd1a23b/io/io/src/TBufferFile.cxx#L2975
+
+        # converting to unicode chars i get:
+        # @ ÿÿÿÿMGTClonesArray@	@ MGTWaveform;5@Î@@?¹@DWaveforms
+        # MGTClonesArray --> MGTWaveform --> Waveforms (a TClonesArray thing)
 
         # exit()
 
         # show waveforms
         p[0].cla()
-        p[0].plot(np.arange(len(drwf)), drwf, '.g', ms=8, label="root, rconst")
+        p[0].plot(np.arange(len(drwf)), drwf, '.g', ms=12, label="root, rconst")
         p[0].plot(np.arange(len(rwf)), rwf, '.b', ms=8, label="root, original")
         # p[0].plot(np.arange(len(dwf2)), dwf2, '.r', label="root, doubled")
         p[0].plot(np.arange(len(duwf)), duwf, '.r', ms=4, label="uproot, rconst")
@@ -389,14 +444,14 @@ def test_dvi(run):
         p[1].plot(np.arange(len(uwf)), uwf, '.r', ms=4, label='uproot, compressed')
         # p[1].set_xlim(0, 40)
         # p[1].set_ylim(-5,15)
-        p[1].legend()
+        p[1].legend(loc=2)
 
-        # # show residuals
-        p[2].cla()
-        ts = np.arange(len(drwf))
-        p[2].plot(ts, rwf - drwf, ".k", label="orig - reconst")
-        # p[2].set_xlim(0, 40)
-        p[2].legend()
+        # # # show residuals
+        # p[2].cla()
+        # ts = np.arange(len(drwf))
+        # p[2].plot(ts, rwf - drwf, ".k", label="orig - reconst")
+        # # p[2].set_xlim(0, 40)
+        # p[2].legend()
 
         plt.tight_layout()
         plt.show(block=False)
