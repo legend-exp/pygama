@@ -6,17 +6,13 @@
   "tier_dir":"$DATADIR/MJ60/pygama",
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
-
-  "digitizer":"ORSIS3302Model",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
-
   "chunksize":1000,
   "clock":100e6,
   "rollover":1,
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
   "det_mass_kg":0.739,
-
 
   "ds":{
     "note":"data sets",
@@ -41,11 +37,11 @@
     "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
   },
 
-
+  "t1_metadata":"ORSIS3302Model",
 
   "build_options":{
     "conf1":{
-      "run_coverage":[0,74],
+      "coverage":[0,74],
       "tier0_options":{
         "clk" : 100e6,
         "digitizer":"ORSIS3302DecoderForEnergy",
@@ -87,7 +83,7 @@
       }
     },
     "conf2":{
-      "run_coverage":[75,999],
+      "coverage":[75,999],
       "tier0_options":{
         "digitizer":"ORSIS3302DecoderForEnergy"
       },

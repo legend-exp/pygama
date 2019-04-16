@@ -14,7 +14,6 @@ def main(argv):
     defined in a JSON file.
     """
     run_db = './runDB.json'
-
     # -- parse args --
     par = argparse.ArgumentParser(description="data processing suite for MJ60")
     arg, st, sf = par.add_argument, "store_true", "store_false"
@@ -45,7 +44,7 @@ def main(argv):
     # -- start processing --
     if args["tier0"]:
         tier0(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
-
+    
     if args["tier1"]:
         tier1(ds, args["ovr"], args["nevt"], args["ioff"], args["nomp"], args["verbose"],
               args["test"])

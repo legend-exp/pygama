@@ -68,7 +68,6 @@ def set_plot_style(style):
     path = __file__.rstrip('.utils.py')
     plt.style.use(path+'/'+style+'.mpl')
 
-
 def get_par_names(func):
     """
     Return a list containing the names of the arguments of "func" other than the
@@ -77,7 +76,6 @@ def get_par_names(func):
     from scipy._lib._util import getargspec_no_self
     args, varargs, varkw, defaults = getargspec_no_self(func)
     return args[1:]
-
 
 def plot_func(func, pars, range=None, npx=None, **kwargs):
     """
@@ -171,7 +169,7 @@ def peakdet(v, delta, x=None):
     maxes, mins = [], []
     min, max = np.inf, -np.inf
     find_max = True
-    for i in x:
+    for i in range(len(x)):
 
         # for i=0, all 4 of these get set
         if v[i] > max:
