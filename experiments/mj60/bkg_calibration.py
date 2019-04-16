@@ -46,7 +46,7 @@ def spectrum_medfilt_peaks():
         plt.plot(pk[0],pk[1], '.m', ms=10)
 
     plt.xlim(0,9000)
-    #plt.ylim(0,plt.ylim()[1])
+    plt.ylim(0,plt.ylim()[1])
     #plt.semilogy()
     colors = ['black', 'red', 'blue']
     lines = [Line2D([0], [0], color=c) for c in colors]
@@ -64,17 +64,17 @@ def energy_spectrum():
 
     m = np.array(df['e_ftp'])
 
-    xlo, xhi, xpb = 0, 10000, 1
+    xlo, xhi, xpb = 0, 10000, 10
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
     hist = np.pad(hist, (1,0), 'constant')
     bins = bins + (bins[1] - bins[0])/2    
 
-    hmed = medfilt(hist, 91)
+    hmed = medfilt(hist, 15)
     hpks = hist - hmed
 
-    maxes, mins = pgu.peakdet(hpks, 20) 
+    maxes, mins = pgu.peakdet(hpks, 20, bins) 
     
     x_maxes = []    
     for i in range(len(maxes)):
