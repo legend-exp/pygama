@@ -8,7 +8,7 @@ import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pga
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-plt.style.use('~/Documents/Coding/scanner/style.mplstyle')
+plt.style.use('style.mplstyle')
 np.set_printoptions(threshold=np.inf)
 
 def main():
