@@ -39,7 +39,7 @@
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
         ],
         "current" : [
-            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5, "test":1}
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
         ],
         "get_max" : [
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},

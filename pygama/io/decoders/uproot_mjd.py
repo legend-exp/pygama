@@ -1,264 +1,365 @@
-#!/usr/bin/env python
-import sys, time, os
-import numpy as np
-import matplotlib.pyplot as plt
+#!/usr/bin/env python3
+import sys, os
+import argparse
+import time
 import uproot
 import awkward
 import h5py
 import psutil
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from pprint import pprint
-from pygama.utils import sizeof_fmt
+from pygama.utils import update_progress
 
 def main():
     """
-    uproot tutorial:
-    https://hub.mybinder.org/user/scikit-hep-uproot-0ldc9pe0/lab
+    Convert Majorana skim, gatified, and built data files to HDF5, using uproot,
+    awkward-array, pandas, and PyROOT.  Can also retrieve waveform data.
+    ** Requires $MJDDATADIR contain three folders: `gatified`, `built`, `hdf5`
+    Usage:
+    $ python uproot_mjd.py -r 23578  (finds files by run number with GATDataSet)
+    $ python uproot_mjd.py -f skimDS6_1.root (run directly on any ROOT file)
     """
-    run = 25789
-    gfile = "~/Data/mjddatadir/gatified/mjd_run{}.root".format(run)
-    bfile = "~/Data/mjddatadir/built/OR_run{}.root".format(run)
-    hfile = "~/Data/uproot/up_run{}.h5".format(run)
-    hfile2 = "~/Data/uproot/root_run{}.h5".format(run)
+    par = argparse.ArgumentParser(description="Majorana ROOT/HDF5 conversion")
+    arg = par.add_argument
+    arg("-r", "--run", nargs=1, help="access a run number (gatified/built)")
+    arg("-f", "--file", nargs=1, help="access a filename (skim or gatified)")
+    arg("-m", "--mode", nargs=1, help="HDF5: `pandas` (default), or `awkward`")
+    arg("-n", "--nevt", nargs=1, help="limit number of events")
+    arg("-w", "--wfs", action="store_true", help="save waveforms")
+    arg("-o", "--wfopts", nargs='*', help="set waveform mode options")
+    arg("-s", "--skip", action="store_true", help="skip to waveform saving")
+    arg("-t", "--test", action="store_true", help="test mode")
+    args = vars(par.parse_args())
 
-    # explore_file(bfile)
-    # debug(bfile)
-    quick_gat(gfile)
-    exit()
+    run = int(args["run"][0]) if args["run"] else None
+    infile = args["file"][0] if args["file"] else None
+    mode = args["mode"][0] if args["mode"] else "pandas"
+    nevt = int(args["nevt"][0]) if args["nevt"] else None
 
-    # -- read root file with uproot
-    ihi = 100
+    if args["test"]:
+        # test_dvi(run)
+        if mode=="pandas": read_pandas(run, infile)
+        if mode=="awkward": read_awkward(run)
+        exit()
 
-    # uarrs = run_uproot(bfile, "MGTree", ihi=ihi)
-    # uarrs = run_uproot(bfile, "MGTree", ihi=ihi,
-                        # brlist=['fWaveforms', 'fAuxWaveforms'])
+    # -- default: save single and vector-valued data into hdf5 groups
+    if not args["skip"]:
+        write_HDF5(run, infile, mode, nevt)
 
-    # -- read/write uproot hdf5 files
-    # write_h5(hfile, uarrs)
-    # h5arrs = load_h5(hfile)
-
-    # -- read/write ROOT hdf5 files directly
-    # uarrs = load_root(bfile, "MGTree", ihi=ihi)
-    # write_h5(hfile2, uarrs)
-    # h5arrs = load_h5(hfile2)
-
-    # -- uproot reads in kDiffVarInt-compressed wfs,
-    # so compare to our uncompressed output & make sure we can reproduce it.
-    test_dvi(run)
+    # -- optional: add a group to the hdf5 file for waveform data
+    if args["wfs"]:
+        wf_mode = args["wfopts"][0] if args["wfopts"] else "root"
+        write_waveforms(run, infile, wf_mode)
 
 
-def explore_file(file):
+def write_HDF5(run=None, infile=None, mode="pandas", nevt=None):
     """
-    access a file, print branches, convert a small amount of data
-    to numpy arrays with 'awkward' and check the resulting datatypes
+    primary writer function.  contains several Majorana-specific choices.
+    works on gatified or skim data.  (TODO: simulation data?)
     """
-    ufile = uproot.open(file) # uproot.rootio.ROOTDirectory
-    utree = ufile["MGTree"]   # uproot.rootio.TTree
+    if run is None and infile is None:
+        print("You must specify either a run number or input filename.")
+        exit()
 
-    # pprint(ufile.allclasses()) # various uproot types
-    # pprint(utree.allkeys())    # TBranchElement - don't use these directly
+    # declare inputs and outputs
+    if run is not None:
+        from ROOT import GATDataSet
+        gds = GATDataSet()
+        gfile = gds.GetPathToRun(run, GATDataSet.kGatified)
+        infile, tname = gfile, "mjdTree"
+        ufile = uproot.open(infile)
 
-    nevt = 100
-    uarrs = utree.arrays(entrystop = nevt) # dict.  can use this for chunking!
-    # pprint(list(uarrs.keys())) # same as allkeys
+    if infile is not None:
+        ufile = uproot.open(infile)
+        # auto-detect and use the name of the first TTree we find
+        for uc in ufile.allclasses():
+            cname, ctype = uc[0], str(uc[1])
+            if "TTree" in ctype:
+                tname = cname.decode("utf-8").split(";")[0]
+                print("Found TTree:", tname)
+                break
 
+    # strip the path and extension off the filename to create the hfile
+    if run is None:
+        label = infile.split("/")[-1].split(".root")[0]
+        hfile = "{}/hdf5/{}.h5".format(os.environ["MJDDATADIR"], label)
+    else:
+        hfile = "{}/hdf5/mjd_run{}.h5".format(os.environ["MJDDATADIR"], run)
+
+    # these MGDO object members don't have the same number of entries
+    # as the rest of the vector-valued branches, so skip them for now
+    skip_names = ["i","iH","iL","j","jH","jL","rawRun","c0Channels"]
+
+    # get all relevant TTree branches & sort by data type
+    event_names, hit_names = [], []
+
+    utree = ufile[tname]
+    uarrs = utree.arrays(entrystop=1)
     for k in sorted(uarrs.keys()):
         name = k.decode('utf-8')
         vals = uarrs[k]
 
         if isinstance(vals, np.ndarray):
-            # print(name, type(vals), vals.shape)
-            # print(vals) # works 100%
-            continue
-
-        elif isinstance(vals, awkward.ObjectArray):
-            # print(name, type(vals), vals.shape)
-            # if "Waveforms" in name:
-            #     continue
-            # else:
-            #     print(vals) # fails on fWaveforms
-            continue
+            event_names.append(k)
 
         elif isinstance(vals, awkward.JaggedArray):
-            # print(name, type(vals), vals.shape)
-            # print(vals) # works 100%
+            if name in skip_names:
+                continue
+            hit_names.append(k)
+
+        elif isinstance(vals, awkward.ObjectArray):
+            # print("Skipping branch:", name)
             continue
 
+    # write to pandas HDF5 (pytables)
+    if mode=="pandas":
+        print("writing pandas hdf5.\n  input:{}\n  output:{}".format(infile, hfile))
+
+        df_events = ufile[tname].pandas.df(event_names, entrystop=nevt)
+        df_hits = ufile[tname].pandas.df(hit_names, entrystop=nevt)
+
+        if os.path.isfile(hfile):
+            os.remove(hfile)
+
+        opts = {
+            "mode":"a", # 'r', 'r+', 'a' and 'w'
+            "format":"table", # "fixed" can't be indexed w/ data_columns
+            "complib":"blosc:snappy",
+            "complevel":2,
+            # "data_columns":["ievt"] # used for pytables' fast HDF5 dataset indexing
+            }
+
+        df_events.to_hdf(hfile, key="events", **opts)
+        df_hits.to_hdf(hfile, key="hits", **opts)
+
+    # -- write to awkward.hdf5 --
+    elif mode=="awkward":
+        print("Writing awkward hdf5.\n  input:{}\n  output:{}".format(infile, hfile))
+        print("Warning: this mode is not well-developed and needs work")
+
+        # FIXME: separate values, as above
+        uarrs = utree.arrays(entrystop=nevt)
+
+        # set awkward hdf5 options
+        opts = {
+            # "compression":2 # hmm, doesn't work?
+        }
+        with h5py.File(os.path.expanduser(hfile), "w") as hf:
+            awk_h5 = awkward.hdf5(hf, **opts)
+            for ds in uarrs:
+                if isinstance(uarrs[ds], awkward.ObjectArray):
+                    print("skipping dataset:", ds.decode('utf-8'))
+                    continue
+                awk_h5[ds.decode('utf-8')] = uarrs[ds]
+
+        # ehhh, it's a work in progress.  probably won't need this until LEGEND
+
+    # check the groups saved into the file
+    with pd.HDFStore(hfile, 'r') as f:
+        print("Keys:", f.keys())
+
+
+def write_waveforms(run, infile, wf_mode="root", compression=None):
+    """
+    retrieve MGTWaveform objects & add them as a group to an HDF5 file.
+    options:
+    - wf_mode: root, uproot (modes for accessing a built file)
+    - skim: T/F (access multiple built files & retrieve specific wfs)
+    - compression: dvi ("diff-var-int")
+    TODO:
+    - cythonize compression functions (right now they're too slow to be useful)
+    - apply nonlinearity correction (requires NLC input files)
+    - try out david's compression algorithm
+    """
+    from ROOT import GATDataSet
+    gds = GATDataSet()
+    bfiles = {} # {run1:file1, ...}
+    skim_mode = False
+
+    # declare inputs and outputs
+    if run is not None:
+        bfile = gds.GetPathToRun(run, GATDataSet.kBuilt)
+        infile, tname = bfile, "MGTree"
+        bfiles[run] = bfile
+
+    if infile is not None:
+        if "skim" not in infile:
+            bfiles[run] = infile
         else:
-            print("Couldn't parse type for:", name)
+            skim_mode = True
+            ufile = uproot.open(infile)
+            utree = ufile["skimTree"]
+            runs = utree["run"].array()
+            run_set = sorted(list(set(runs)))
+            for r in run_set:
+                bfiles[r] = gds.GetPathToRun(int(r), GATDataSet.kBuilt)
 
-
-def debug(file):
-    """
-    fWaveforms is a custom class.  can we get uproot to read it,
-    a little better than just reading out .content directly?
-    - https://github.com/scikit-hep/uproot/issues/124
-    """
-    ufile = uproot.open(file)
-    utree = ufile["MGTree"]
-
-    # for c in ufile.allclasses():
-        # print(c)
-    # utree.show() # print class and streamer types
-
-    # # -- some fancy pivarski array calls
-    # from uproot import interpret, asjagged, astable, asdtype
-    # arr1 = utree["class1"].array(interpret(utree["class1"], cntvers=True))
-    # arr2 = utree["class2"].array(interpret(utree["class2"], tobject=False))
-    # arr3 = utree["arr3"].array(asjagged(astable(asdtype([("id", "i4"), ("pmt", "u1"), ("tdc", "u4"), ("tot", "u1")])),skipbytes=10))
-    # arr4 = utree["arr4"].array(asjagged(astable(asdtype([("id", "i4"), ("pmt", "u1"), ("tdc", "u4"), ("tot", "u1"),(" cnt", "u4"), (" vers", "u2"), ("trigger_mask", "u8")])), skipbytes=10))
-    # print(arr1.columns)
-
-    wfs = utree["fWaveforms"].array(entrystop=100)
-    # wfs = utree.arrays([b'fWaveforms'], entrystop=100)
-    # print(dir(wfs))
-    wfc = wfs[b'fWaveforms'].content
-    print(wfc[0])
-
-
-def quick_gat(file):
-    """
-    uproot has a rad auto-dataframe method that should work for
-    single-valued gatified files.
-    """
-    ufile = uproot.open(file)
-    utree = ufile["mjdTree"]
-    # df = ufile["mjdTree"].pandas.df() # this fails, probably on the MG objects
-    df = ufile["mjdTree"].pandas.df(["trapENFCal","trapENAF"]) # this works, fast!
-
-    # # try to filter out the bad objects
-    # cols = []
-    # arrtmp = utree.arrays(entrystop=10)
-    # for key in arrtmp.keys():
-    #     # print(key, type(arrtmp[key]))
-    #     if isinstance(arrtmp[key], awkward.ObjectArray):
-    #         continue
-    #     cols.append(key)
-
-    # can try manually creating the df
-    # utree = ufile["threshTree"].arrays()
-    # cols = []
-    # for k in utree:
-    #     if not isinstance(utree[k][0], np.ndarray):
-    #         continue
-    #     cols.append(pd.Series(utree[k][0], name=k.decode('utf-8')))
-    # df = pd.concat(cols, axis=1)
-
-    # df = ufile["mjdTree"].pandas.df(cols, flatten=True)
-    print(df)
-
-
-def run_uproot(file, ttname=None, ilo=None, ihi=None, brlist=None):
-    """
-    load uproot data into awkward arrays
-    """
-    ufile = uproot.open(file)
-    utree = ufile[ttname]
-
-    # call uproot's 'arrays' function
-    if brlist is None:
-        uarrs = utree.arrays(entrystart=ilo, entrystop=ihi)
+    # create new output file (should match write_HDF5)
+    if run is None:
+        label = infile.split("/")[-1].split(".root")[0]
+        hfile = "{}/hdf5/{}.h5".format(os.environ["MJDDATADIR"], label)
     else:
-        uarrs = utree.arrays(branches=brlist, entrystart=ilo, entrystop=ihi)
-        for br in brlist:
-            tmp = bytes(br, 'utf-8')
-            if isinstance(uarrs[tmp], awkward.ObjectArray):
-                # cast to awkward.JaggedArray, with a 1-d np shape: (nevt, )
-                uarrs[tmp] = uarrs[tmp].content
+        hfile = "{}/hdf5/mjd_run{}.h5".format(os.environ["MJDDATADIR"], run)
 
-    # change the keys to str()
-    for bkey in list(uarrs.keys()):
-        skey = bkey.decode('utf-8')
-        uarrs[skey] = uarrs.pop(bkey)
+    print("Saving waveforms.\n  input: {}\n  output: {}".format(infile, hfile))
 
-    return uarrs
+    # -- create "skim --> built" lookup dataframe to grab waveforms --
+    # (assumes pandas hdf5)
+    df_evts = pd.read_hdf(hfile, key='events')
+    df_hits = pd.read_hdf(hfile, key='hits')
+    if skim_mode:
+        df1 = df_evts[["run", "mH", "iEvent"]]
+        df2 = df_hits[["iHit", "channel"]]
+        tmp = df1.align(df2, axis=0)
+        df_skim = pd.concat(tmp, axis=1)
+    else:
+        tmp = df_evts.align(df_hits, axis=0)
+        df_skim = pd.concat(tmp, axis=1)
 
+    # -- loop over entries and pull waveforms --
 
-def write_h5(file, uarrs, mode="w"):
-    """
-    write an hdf5 file created by awkward, from awkward.JaggedArrays.
-    - awkward/awkward/persist.py
-    - awkward/tests/test_hdf5.py
-    """
-    file = os.path.expanduser(file)
-    with h5py.File(file, mode) as hf:
-        ah5 = awkward.hdf5(hf)
-        for ds in uarrs:
-            awk = awkward.JaggedArray.fromiter(uarrs[ds])
-            ah5[ds] = awk
+    wf_list = [] # fill this with ndarrays
+    isave = 10000 # how often to write to the hdf5 output file
+    nevt = df_skim.shape[0] # total entries
+    prev_run = 0
+    print("Scanning {} entries.  Skim mode? {}".format(nevt, skim_mode))
 
+    for idx, ((entry, subentry), row) in enumerate(df_skim.iterrows()):
 
-def load_h5(file):
-    """
-    read an hdf5 file created by awkward
-    """
-    h5arrs = {}
-    file = os.path.expanduser(file)
-    with h5py.File(file) as hf:
-        ah5 = awkward.hdf5(hf)
-        for ds in ah5:
-            h5arrs[ds] = ah5[ds]
-    return h5arrs
+        if idx % 1000 == 0:
+            update_progress(float(idx/nevt))
+        if idx == nevt-1:
+            update_progress(1)
 
+        iE = int(row["iEvent"]) if skim_mode else entry
+        iH = int(row["iHit"]) if skim_mode else subentry
+        run = int(row["run"])
 
-def load_root(file, ttname, ilo=None, ihi=None, brlist=None):
-    """
-    use pyroot to save decoded (uncompressed) MGTWaveforms,
-    into awkward's hdf5 file object.
-    this is to compare against uproot, which reads compressed wfs.
-    """
-    from ROOT import TFile, TTree, MGTWaveform, MJTMSWaveform
+        # detect run boundaries and load built files
+        if run != prev_run:
+            if wf_mode == "root":
+                from ROOT import TFile, TTree, MGTWaveform, MJTMSWaveform
+                tf = TFile(bfiles[run])
+                tt = tf.Get("MGTree")
+                tt.GetEntry(0)
+                is_ms = tt.run.GetUseMultisampling()
+            elif wf_mode == "uproot":
+                ufile = uproot.open(bfiles[run])
+                utree = ufile["MGTree"]
+            prev_run = run
 
-    tf = TFile(file)
-    tt = tf.Get(ttname)
-    nevt = tt.GetEntries()
-    tt.GetEntry(0)
-    is_ms = tt.run.GetUseMultisampling()
-
-    # build w/ python primitive types and convert to JaggedArray after the loop.
-    # JaggedArray requires one entry per event (have to handle multi-detector).
-    br_list = ['fWaveforms', 'fAuxWaveforms', 'fMSWaveforms'] if is_ms else ['fWaveforms']
-    pyarrs = {br:[] for br in br_list}
-    delim = 0xDEADBEEF
-
-    # loop over tree
-    ilo = 0 if ilo == None else ilo
-    ihi = nevt if ihi == None else ihi
-
-    for i in range(ilo, ihi):
-        tt.GetEntry(i)
-        nwf = tt.channelData.GetEntries()
-
-        # concat each hit into a single array
-        ewf, ewfa, ewfms = [], [], []
-        for j in range(nwf):
-
+        # get waveform with ROOT
+        if wf_mode == "root":
+            tt.GetEntry(iE)
             if is_ms:
-                wf = tt.event.GetWaveform(j)
-                wfa = tt.event.GetAuxWaveform(j)
-                wfms = MJTMSWaveform(wf, wfa)
-                ewf.extend([wf[i] for i in range(wf.GetLength())])
-                ewfa.extend([wfa[i] for i in range(wfa.GetLength())])
-                ewfms.extend(wfms[i] for i in range(wfms.GetLength()))
-                ewf.append(delim)
-                ewfa.append(delim)
-                ewfms.append(delim)
+                wfdown = tt.event.GetWaveform(iH) # downsampled
+                wffull = tt.event.GetAuxWaveform(iH) # fully sampled
+                wf = MJTMSWaveform(wfdown, wffull)
             else:
-                wf = tt.event.GetWaveform(j)
-                ewf.extend([wf[i] for i in range(wf.GetLength())])
-                ewf.append(delim)
+                wf = tt.event.GetWaveform(iH)
 
-        if is_ms:
-            pyarrs['fWaveforms'].append(ewf)
-            pyarrs['fAuxWaveforms'].append(ewfa)
-            pyarrs['fMSWaveforms'].append(ewfms)
-        else:
-            pyarrs['fWaveforms'].append(ewf)
+            wfarr = np.asarray(wf.GetVectorData()) # fastest dump to ndarray
 
-    uarrs = {}
-    for wf in pyarrs.keys():
-        uarrs[wf] = awkward.fromiter(pyarrs[wf])
+            if compression == "dvi":
+                # not quite ready.  need to cythonize this
+                # will also need to do more work to shrink the #cols in wfdf
+                wfarr = compress_dvi(wfarr)
 
-    return uarrs
+        # get waveform with uproot
+        elif wf_mode == "uproot":
+            print("direct uproot wf retrieval isn't supported yet.  Exiting ...")
+            exit()
+
+        # add the wf to the list
+        wf_list.append(wfarr)
+
+        # periodically write to the hdf5 output file to relieve memory pressure.
+        # this runs compression algorithms so we don't want to do it too often.
+        if (idx % isave == 0 and idx!=0) or idx == nevt-1:
+
+            print("Saving waveforms ...")
+            wfdf = pd.DataFrame(wf_list) # empty vals are NaN when rows are jagged
+
+            opts = {
+                "mode":"a",
+                "format":"table",
+                "complib":"blosc:snappy",
+                "complevel":1,
+                }
+            wfdf.to_hdf(hfile, key="waves", mode="a", append=True)
+
+            # we might want this if we implement an awkward hdf5 mode
+            # jag = awkward.JaggedArray.fromiter(wf_list)
+            # print(jag.shape)
+
+            # reset the wf list
+            wf_list = []
+
+
+def read_pandas(run, infile):
+    """
+    reads files created by write_HDF5.  also gives a couple examples
+    of aligning ('friending') and skimming DataFrames of different shapes.
+    I think all Majorana DataFrames should use "tables" mode because it
+    allows appending to an active file, and HDF5 indexing for fast lookups
+    """
+    if infile is None:
+        hfile = "{}/hdf5/mjd_run{}.h5".format(os.environ["MJDDATADIR"], run)
+    else:
+        hfile = infile
+
+    with pd.HDFStore(hfile,'r') as f:
+        keys = f.keys()
+
+    print("Reading file: {}\nFound keys: {}".format(hfile, keys))
+
+    df_evts = pd.read_hdf(hfile, key="events") # event-level data
+    df_hits = pd.read_hdf(hfile, key="hits")   # hit-level data
+    df_waves = pd.read_hdf(hfile, key="waves") # waveform data
+    df_waves.reset_index(inplace=True) # required step -- fix hdf5 "append"
+
+    print(df_evts)
+    print(df_hits)
+    print(df_waves)
+    # print(df_evts.columns)
+
+    # align skim file dataframes to create a "lookup list"
+    if infile is not None and "skim" in infile:
+        df1 = df_evts[["run", "mH", "iEvent"]]
+        df2 = df_hits[["iHit", "channel"]]
+        tmp = df1.align(df2, axis=0) # returns a tuple
+        df_skim = pd.concat(tmp, axis=1)
+        # df_skim = pd.merge(df_evts, df_hits) # doesn't work, no common columns
+    else:
+        # align gatified dataframes
+        tmp = df_evts.align(df_hits, axis=0)
+        df_skim = pd.concat(tmp, axis=1)
+
+
+def read_awkward(run):
+    """
+    build the awkward hdf5 file into pd.DataFrames, matching read_pandas.
+    NOTE:
+    this route is necessary when we want load RAW data where we can't enforce
+    that everything must use pandas.  This is how LEGEND tier0 data will be.
+    For Majorana, nobody will care about this and we can just use pytables.
+    """
+    mjdir = os.environ["MJDDATADIR"]
+    hfile = "{}/hdf5/mjd_run{}.h5".format(mjdir, run)
+
+    # # method 1 -- read in with h5py & awkward (requires a loop to convert to DF)
+    # h5arrs = {}
+    # with h5py.File(os.path.expanduser(file)) as hf:
+    #     ah5 = awkward.hdf5(hf)
+    #     for ds in ah5:
+    #         h5arrs[ds] = ah5[ds]
+
+    # # method 2 -- try reading in with pd.HDFStore, instead of h5py+loop,
+    # # since you want to convert to pandas anyway
+    # with pd.HDFStore(hfile, 'r') as store:
+    #     print("hi clint")
 
 
 def compress_dvi(wfarr):
@@ -267,6 +368,10 @@ def compress_dvi(wfarr):
     - MGTWaveform: https://github.com/mppmu/MGDO/blob/master/Root/MGTWaveform.cc
     - zigzag encoding: https://gist.github.com/mfuerstenau/ba870a29e16536fdbaba
       [signed]=[encoded] : 0=0, -1=1, 1=2, -2=3, 2=4, -3=5, 3=6 ....
+
+    TODO:
+    this requires a loop over the array, which is way too slow in python.
+    move the compression to a library function and cythonize it.
     """
     # print("\nrunning compressor...")
     comp_arr = []
@@ -359,6 +464,7 @@ def test_dvi(run):
     uarrs = load_h5(f2)
 
     # check memory usage
+    from pygama.utils import sizeof_fmt
     pid = os.getpid()
     mem = sizeof_fmt(psutil.Process(pid).memory_info().rss)
     print("PID: {}, current mem usage: {}".format(pid, mem))

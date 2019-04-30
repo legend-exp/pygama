@@ -37,10 +37,10 @@ def update_progress(progress, run=None):
     block = int(round(barLength * progress))
 
     if run is None:
-        text = "\rPROGRESS : [{}] {:0.1f}% {}".format(
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
             "#" * block + "-" * (barLength - block), progress * 100, status)
     else:
-        text = "\rPROGRESS : [{}] {:0.1f}% {} (Run {})".format(
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
             "#" * block + "-" * (barLength - block), progress * 100, status,
             run)
 
