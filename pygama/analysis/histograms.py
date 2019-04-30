@@ -17,14 +17,14 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
     - bins=N, range=(x_lo, x_hi) : N bins over the specified range (or leave
       range=None for auto-detected range)
     - bins=[str] : use one of np.histogram's automatic binning algorithms
-    - bins=bin_edges_array : array lower bin edges, supports non-uniform binning 
+    - bins=bin_edges_array : array lower bin edges, supports non-uniform binning
     - dx=dx, range=(x_lo, x_hi): bins of width dx over the specified range.
       Note: dx overrides the bins argument!
     """
     if dx is not None:
         bins = int((range[1] - range[0]) / dx)
 
-    if bins is None: 
+    if bins is None:
         bins = 100 #override np.histogram default of just 10
 
     hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
@@ -34,6 +34,14 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
     else:
         var, bins = np.histogram(np_arr, bins=bins, weights=wts*wts)
         return hist, bins, var
+
+
+def get_bin_centers(bins):
+    """
+    Returns an array of bin centers from an input array of bin edges.
+    Works for non-uniform binning.
+    """
+    return (bins[:-1] + bins[1:]) / 2.
 
 
 def get_fwhm(hist, bin_centers):
@@ -46,17 +54,9 @@ def get_fwhm(hist, bin_centers):
     return (last_energy - first_energy)
 
 
-def get_bin_centers(bins):
-    """
-    Returns an array of bin centers from an input array of bin edges. 
-    Works for non-uniform binning.
-    """
-    return (bins[:-1] + bins[1:]) / 2.
-
-
 def get_bin_widths(bins):
     """
-    Returns an array of bin widths from an input array of bin edges. 
+    Returns an array of bin widths from an input array of bin edges.
     Works for non-uniform binning.
     """
     return (bins[1:] - bins[:-1])

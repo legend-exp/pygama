@@ -37,10 +37,10 @@ def update_progress(progress, run=None):
     block = int(round(barLength * progress))
 
     if run is None:
-        text = "\rPROGRESS : [{}] {:0.1f}% {}".format(
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
             "#" * block + "-" * (barLength - block), progress * 100, status)
     else:
-        text = "\rPROGRESS : [{}] {:0.1f}% {} (Run {})".format(
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
             "#" * block + "-" * (barLength - block), progress * 100, status,
             run)
 
@@ -169,7 +169,7 @@ def peakdet(v, delta, x=None):
     maxes, mins = [], []
     min, max = np.inf, -np.inf
     find_max = True
-    for i in x:
+    for i in range(len(x)):
 
         # for i=0, all 4 of these get set
         if v[i] > max:
