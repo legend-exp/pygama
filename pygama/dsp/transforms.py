@@ -396,13 +396,15 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     return {wfout: wfsg}
 
 
-def psd(waves, calcs, nseg=100, test=False):
+def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
     """
     calculate the psd of a bunch of wfs, and output them as a block,
     so some analysis can add them all together.
     nperseg = 1000 has more detail, but is slower
     """
     wfs = waves["wf_blsub"]
+    if ilo is not None and ihi is not None:
+        wfs = wfs[:, ilo:ihi]
     clk = waves["settings"]["clk"] # Hz
 
     nseg = 2999
