@@ -42,7 +42,7 @@
     "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
     "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
     "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
-    "21":["220", "1400 V, threshold 0x10, noise issues on wfs"]
+    "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"]
   },
 
   "cal":{
