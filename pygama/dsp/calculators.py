@@ -10,7 +10,7 @@ warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarn
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
-def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_avg", test=False):
+def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_p0", test=False):
     """
     simple mean, vectorized baseline calculator
     """

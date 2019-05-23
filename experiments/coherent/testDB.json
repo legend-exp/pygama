@@ -1,0 +1,30 @@
+{
+  "loc_dir":"$DATADIR",
+  "raw_dir":"$DATADIR/raw",
+  "tier_dir":"$DATADIR/pygama",
+  "digitizer":"ORSIS3302Model",
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+  "chunksize":1000,
+  "clock":100e6,
+  "rollover":1,
+
+  "ds":{
+    "note":"data sets",
+    "0":["2879","coherent background run"]
+  },
+
+  "build_options":{
+    "conf1":{
+      "run_coverage":[0,9999999],
+      "tier0_options":{
+        "digitizer":"ORSIS3302DecoderForEnergy"
+      },
+      "tier1_options":{
+        "clk" : 100e6,
+        "avg_bl": {"ihi":200},
+        "blsub" : {}
+      }
+    }
+  }
+}

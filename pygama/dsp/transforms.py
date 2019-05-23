@@ -19,10 +19,12 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
 
     bl_0 = calcs["bl_p0"].values[:, np.newaxis]
 
-    slope_vals = calcs["bl_p1"].values[:, np.newaxis]
-    bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
-
-    blsub_wfs = wfs - (bl_0 + bl_1)
+    if "bl_p1" in calcs.keys():
+        slope_vals = calcs["bl_p1"].values[:, np.newaxis]
+        bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
+        blsub_wfs = wfs - (bl_0 + bl_1)
+    else:
+        blsub_wfs = wfs - bl_0
 
     if test:
         iwf = 1
