@@ -14,13 +14,33 @@ def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_p0", test=Fal
     """
     simple mean, vectorized baseline calculator
     """
-    wf_block = waves["waveform"]
+    wfs = waves["waveform"]
 
     # find wf means
-    avgs = np.mean(wf_block[:, ilo:ihi], axis=1)
+    avgs = np.mean(wfs[:, ilo:ihi], axis=1)
 
     # add the result as a new column
     calcs[calc] = avgs
+
+    if test:
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wf, '-b', lw=2, alpha=0.7, label='raw wf')
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.001)
 
 
 def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
