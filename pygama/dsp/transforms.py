@@ -414,7 +414,7 @@ def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
 
     if test:
 
-        plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
+        # plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
 
         ptot = np.sum(p, axis=0)
         plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
