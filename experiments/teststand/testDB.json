@@ -1,7 +1,7 @@
 {
-  "loc_dir":"$DATADIR/MJ60",
-  "raw_dir":"$DATADIR/MJ60/Data",
-  "tier_dir":"$DATADIR/MJ60/pygama",
+  "loc_dir":"$DATADIR/C1",
+  "raw_dir":"$DATADIR/C1/Data",
+  "tier_dir":"$DATADIR/C1/pygama",
   "digitizer":"ORSIS3302Model",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
@@ -13,7 +13,8 @@
 
   "ds":{
     "note":"data sets",
-    "0":["191,204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"]
+    "0":["191,204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"],
+    "1":["3226,3226", "C1 test run for Alejandro"]
   },
 
   "build_options":{
@@ -33,7 +34,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_blsub", "rise":4, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
@@ -50,7 +51,7 @@
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
         "num_peaks" : {},
-        "ftp" : {},
+        "ftp" : {"test":1},
         "overflow" : {},
         "dcr" : [
             {"wfin":"wf_savgol"},

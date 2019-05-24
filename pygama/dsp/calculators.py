@@ -135,11 +135,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
         calcs["tp{}".format(p)] = tp_idx
 
     if test:
-
         wfraw = waves["wf_blsub"]
-
-
-
         iwf = -1
         while True:
             if iwf != -1:
@@ -162,7 +158,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
                 idx = calcs["tp{}".format(tp)].iloc[iwf]
                 print("tp{}: idx {}  val {:.2f}".format(tp, idx, wf[idx]))
 
-                plt.plot( idx, wf[idx], ".", c=cmap(i), ms=20,
+                plt.plot(idx, wf[idx], ".", c=cmap(i), ms=20,
                          label="tp{}".format(tp))
 
             plt.xlabel("clock ticks", ha='right', x=1)
@@ -556,6 +552,8 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
 
     if test:
         wfbl = waves["wf_blsub"]
+        # from pygama.utils import set_plot_style
+        # set_plot_style("clint")
         iwf = 2
         while True:
             if iwf != 2:
@@ -575,17 +573,17 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
             plt.plot(ts[idx1], win_1[iwf][idx1], '-r', lw=10, alpha=0.5)
             plt.plot(ts[idx2], win_2[iwf][idx2], '-r', lw=10, alpha=0.5)
 
-            plt.plot(t1[iwf], avg_1[iwf], ".g", ms=10)
-            plt.plot(t2[iwf], avg_2[iwf], ".g", ms=10)
-
             slo = (avg_1[iwf] - avg_2[iwf]) / (t1[iwf] - t2[iwf])
             xv = np.arange(t1[iwf], t2[iwf])
             yv = slo * (xv - t1[iwf]) + avg_1[iwf]
 
             plt.plot(xv, yv, '-r', label="slope: {:.2e}".format(slo))
-            plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
+            # plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
 
-            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.plot(t1[iwf], avg_1[iwf], ".g", ms=20)
+            plt.plot(t2[iwf], avg_2[iwf], ".g", ms=20)
+
+            plt.xlabel("Clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
             plt.legend(loc=4)
             plt.tight_layout()

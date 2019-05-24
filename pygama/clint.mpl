@@ -1,7 +1,7 @@
 # https://matplotlib.org/users/customizing.html
 
 #figure.titlesize : small        # size of the figure title (Figure.suptitle())
-figure.figsize   : 8, 5         # figure size in inches
+figure.figsize   : 7, 5         # figure size in inches
 #figure.dpi       : 200          # figure dots per inch
 figure.facecolor : white
 figure.edgecolor : white

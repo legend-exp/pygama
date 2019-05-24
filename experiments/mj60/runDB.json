@@ -126,7 +126,7 @@
         "ftp" : {},
         "overflow" : {},
         "dcr" : [
-            {"wfin":"wf_savgol"},
+            {"wfin":"wf_savgol", "test":1},
             {"wfin":"wf_pz"}
         ],
         "tail_fit" : [
