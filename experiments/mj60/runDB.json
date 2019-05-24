@@ -17,7 +17,6 @@
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
   "det_mass_kg":0.739,
 
-
   "ds":{
     "note":"data sets",
     "0":["27,58", "biasing test 1, 2018/09/30"],
@@ -44,8 +43,11 @@
     "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
     "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
     "22":["223,241", "Noise study during bias"],
-    "23":["246,248", "Noise study during bias pt2"],
-    "24":["249", "Background run at 1400 V, thresh=0x2"]
+    "23":["246,248", "Noise study during bias continued"],
+    "24":["249", "Background run at 1400 V, thresh=0x2"],
+    "25":["250, 271", "Noise Study take 2"],
+    "26":["272", "Background run at 1400 V, thresh=0x2"],
+    "27":["273", "Background run at 1400 V, thresh=0x3"]
   },
 
   "cal":{
@@ -133,7 +135,7 @@
         "ftp" : {},
         "overflow" : {},
         "dcr" : [
-            {"wfin":"wf_savgol", "test":1},
+            {"wfin":"wf_savgol"},
             {"wfin":"wf_pz"}
         ],
         "tail_fit" : [
@@ -145,7 +147,7 @@
           "center": {"wfin":"wf_notch"},
           "current_pass2" : {"wfin":"wf_ctr", "wfout":"wf_current_ctr", "sigma":5},
           "test_peakdet" : {"wfin":"wf_current_ctr", "delta":0.1, "sigma":5, "ihi":600, "test":1},
-          "psd" : {"nseg":100,"test":1},
+          "psd" : {"nseg":100,"test":1,"note":"this one is slow, use w/ -m mode only"},
           "trim": {"n_pre":100, "n_post":1000},
           "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
           "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
