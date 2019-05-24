@@ -14,7 +14,7 @@ np.set_printoptions(threshold=np.inf)
 def main():
 
     if(len(sys.argv) != 2):
-        print('Usage: make_spectrum_from_tier_2.py [run number]')
+        print('Usage: thorium_calibration.py [run number]')
         sys.exit()
 
     #spectrum_medfilt_peaks()
@@ -70,8 +70,9 @@ def energy_spectrum():
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    hist = np.pad(hist, (1,0), 'constant')
+    #hist = np.pad(hist, (1,0), 'constant')
     bins = bins + (bins[1] - bins[0])/2    
+    bins = bins[0:(len(bins)-1)]
 
     hmed = medfilt(hist, 51)
     hpks = hist - hmed
@@ -125,6 +126,8 @@ def energy_spectrum():
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     df['e_cal'] = df['e_ftp']*A+B
 
+    df.to_hdf('Spectrum_'+str(sys.argv[1])+'.hdf5', key='df', mode='w')
+
     pks_lit_all = [238.6, 338.3, 463.0, 511,0, 583.2, 727.3, 794.9, 860.6, 911.2, 969, 1460.8, 1592.5, 2103.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=338.3, ymin=0, ymax=30, color='aqua', linestyle='--', lw=1, zorder=1)
@@ -141,7 +144,7 @@ def energy_spectrum():
     plt.axvline(x=2103.5, ymin=0, ymax=30, color='olive', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=2614.5, ymin=0, ymax=30, color='indigo', linestyle='--', lw=1, zorder=1)
     n = np.array(df['e_cal'])
-    plt.hist(n, np.arange(0,9500,1.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n))) 
+    plt.hist(n, np.arange(0,9500,0.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n))) 
     plt.xlim(0,4000)
     plt.ylim(0,plt.ylim()[1]) 
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
