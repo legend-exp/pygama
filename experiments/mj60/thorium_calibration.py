@@ -1,5 +1,7 @@
 import pandas as pd
 import sys
+import json
+import os
 import numpy as np
 import scipy as sp
 from scipy.signal import medfilt, find_peaks
@@ -18,11 +20,16 @@ def main():
         sys.exit()
 
     #spectrum_medfilt_peaks()
-    energy_spectrum()
+    linear_calibration()
 
 def spectrum_medfilt_peaks():
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
 
@@ -58,11 +65,16 @@ def spectrum_medfilt_peaks():
     plt.legend(lines, labels, frameon=True, loc='upper right', fontsize='x-small')
     plt.show()
 
-def energy_spectrum():
+def linear_calibration():
 
     pks_lit = [238.6, 583.2]
  
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
 
@@ -126,7 +138,7 @@ def energy_spectrum():
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     df['e_cal'] = df['e_ftp']*A+B
 
-    df.to_hdf('Spectrum_'+str(sys.argv[1])+'.hdf5', key='df', mode='w')
+    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
 
     pks_lit_all = [238.6, 338.3, 463.0, 511,0, 583.2, 727.3, 794.9, 860.6, 911.2, 969, 1460.8, 1592.5, 2103.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
