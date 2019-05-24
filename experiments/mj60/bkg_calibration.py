@@ -8,7 +8,7 @@ import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pga
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-plt.style.use('~/Documents/Coding/scanner/style.mplstyle')
+plt.style.use('style.mplstyle')
 np.set_printoptions(threshold=np.inf)
 
 def main():
@@ -17,8 +17,8 @@ def main():
         print('Usage: make_spectrum_from_tier_2.py [run number]')
         sys.exit()
 
-    spectrum_medfilt_peaks()
-    #energy_spectrum()
+    #spectrum_medfilt_peaks()
+    energy_spectrum()
 
 def spectrum_medfilt_peaks():
 
@@ -33,24 +33,29 @@ def spectrum_medfilt_peaks():
     hist = np.pad(hist, (1,0), 'constant')
     bins = np.array(bins + (bins[1] - bins[0])/2, dtype=np.int)
 
-    hmed = medfilt(hist, 15)
+    hmed = medfilt(hist, 5)
     hpks = hist - hmed
 
-    plt.plot(bins, hist, '-k', ls="steps", label='uncalibrated energy spectrum')
+    plt.plot(bins, hist, '-k', ls="steps", label='uncalibrated energy spectrum, run '+str(sys.argv[1]))
     plt.plot(bins, hmed, '-r', ls='steps', label="peakless spectrum (medfilt)")
     plt.plot(bins, hpks, '-b', ls='steps', label='peaks only (spectrum - medfilt)')
 
-    maxes, mins = pgu.peakdet(hpks, 20, bins)
+    thresholds = np.arange(5,10000,5, dtype=int)
+
+    for i in range(len(thresholds)):
+        maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
+        if len(maxes) == 5:
+            break
 
     for pk in maxes:
         plt.plot(pk[0],pk[1], '.m', ms=10)
 
     plt.xlim(0,9000)
-    #plt.ylim(0,plt.ylim()[1])
+    plt.ylim(0,plt.ylim()[1])
     #plt.semilogy()
     colors = ['black', 'red', 'blue']
     lines = [Line2D([0], [0], color=c) for c in colors]
-    labels = ['uncalibrated energy spectrum', 'peakless spectrum (medfilt)', 'peaks only (spectrum - medfilt)']
+    labels = ['uncalibrated energy spectrum, run '+str(sys.argv[1]), 'peakless spectrum (medfilt)', 'peaks only (spectrum - medfilt)']
     #plt.title('Energy Spectrum')
     plt.legend(lines, labels, frameon=True, loc='upper right', fontsize='x-small')
     plt.show()
@@ -58,23 +63,28 @@ def spectrum_medfilt_peaks():
 
 def energy_spectrum():
 
-    pks_lit = [583.2, 2614.5]
+    pks_lit = [609.3, 1460.8]
  
     df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
 
     m = np.array(df['e_ftp'])
 
-    xlo, xhi, xpb = 0, 10000, 1
+    xlo, xhi, xpb = 0, 10000, 10
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
     hist = np.pad(hist, (1,0), 'constant')
     bins = bins + (bins[1] - bins[0])/2    
 
-    hmed = medfilt(hist, 91)
+    hmed = medfilt(hist, 5)
     hpks = hist - hmed
 
-    maxes, mins = pgu.peakdet(hpks, 20) 
+    thresholds = np.arange(50,750,10, dtype=int)
+
+    for i in range(len(thresholds)):
+        maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
+        if len(maxes) == 5:
+            break
     
     x_maxes = []    
     for i in range(len(maxes)):
@@ -114,14 +124,10 @@ def energy_spectrum():
     #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV) 
     # E = A(e_ftp) + B 
     A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
-    B = float((2614.511 - adc_values[1]*A))
+    B = float((pks_lit[1] - adc_values[1]*A))
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
-    E_FTP = []
-    for index, row in df.iterrows():
-        e_ftp = row['e_ftp']
-        E_FTP.append(A*e_ftp+B)
-    df.insert(31, "calibrated_energy", E_FTP)
 
+    df["e_cal"] = A * df['e_ftp'] + B  
 
     pks_lit_all = [238.6, 351.9, 511.0, 583.2, 609.3, 911.2, 969, 1120.3, 1460.8, 1764.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
@@ -135,7 +141,7 @@ def energy_spectrum():
     plt.axvline(x=1460.8, ymin=0, ymax=30, color='olive', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=1764.5, ymin=0, ymax=30, color='indigo', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=2614.5, ymin=0, ymax=30, color='limegreen', linestyle='--', lw=1, zorder=1)
-    n = np.array(df['calibrated_energy'])
+    n = np.array(df['e_cal'])
     plt.hist(n, np.arange(0,9500,1.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n))) 
     plt.xlim(0,4000)
     plt.ylim(0,plt.ylim()[1]) 
@@ -145,14 +151,14 @@ def energy_spectrum():
     E_1 = 'E=238.6 keV (212Pb peak)'
     E_2 = 'E=351.9 keV (214Pb peak)'
     E_3 = 'E=511.0 keV (beta+ peak)'
-    E_4 = 'E=583.2 keV (208Tl peak)*'
-    E_5 = 'E=609.3 keV (214Bi peak)'    
+    E_4 = 'E=583.2 keV (208Tl peak)'
+    E_5 = 'E=609.3 keV (214Bi peak)*'    
     E_6 = 'E=911.2 keV (228Ac peak)'
     E_7 = 'E=969 keV (228Ac peak)'
     E_8 = 'E=1120.3 keV (214Bi peak)'
-    E_9 = 'E=1460.8 keV (40K peak)'
+    E_9 = 'E=1460.8 keV (40K peak)*'
     E_10 = 'E=1764.5 keV (214Bi peak)'
-    E_11 = 'E=2614.5 keV (208Tl peak)*'
+    E_11 = 'E=2614.5 keV (208Tl peak)'
     colors = ['black', 'red', 'aqua', 'darkgreen', 'darkorange', 'gray', 'brown', 'saddlebrown', 'navy', 'olive', 'indigo', 'limegreen']
     lines = [Line2D([0], [0], color=c) for c in colors]
     labels = [E_cal, E_1, E_2, E_3, E_4, E_5, E_6, E_7, E_8, E_9, E_10, E_11]

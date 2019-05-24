@@ -19,10 +19,12 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
 
     bl_0 = calcs["bl_p0"].values[:, np.newaxis]
 
-    slope_vals = calcs["bl_p1"].values[:, np.newaxis]
-    bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
-
-    blsub_wfs = wfs - (bl_0 + bl_1)
+    if "bl_p1" in calcs.keys():
+        slope_vals = calcs["bl_p1"].values[:, np.newaxis]
+        bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
+        blsub_wfs = wfs - (bl_0 + bl_1)
+    else:
+        blsub_wfs = wfs - bl_0
 
     if test:
         iwf = 1
@@ -396,13 +398,15 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     return {wfout: wfsg}
 
 
-def psd(waves, calcs, nseg=100, test=False):
+def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
     """
     calculate the psd of a bunch of wfs, and output them as a block,
     so some analysis can add them all together.
     nperseg = 1000 has more detail, but is slower
     """
     wfs = waves["wf_blsub"]
+    if ilo is not None and ihi is not None:
+        wfs = wfs[:, ilo:ihi]
     clk = waves["settings"]["clk"] # Hz
 
     nseg = 2999
@@ -410,7 +414,7 @@ def psd(waves, calcs, nseg=100, test=False):
 
     if test:
 
-        plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
+        # plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
 
         ptot = np.sum(p, axis=0)
         plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
