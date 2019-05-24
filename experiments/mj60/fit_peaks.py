@@ -2,6 +2,8 @@ import pandas as pd
 import sys
 import numpy as np
 import scipy as sp
+import json
+import os
 from decimal import Decimal
 import scipy.optimize as opt
 from scipy.optimize import minimize, curve_fit
@@ -22,15 +24,19 @@ def main():
 
     #peak_2615()
     peak_1460()
-    #peak_969()
-    #peak_911()
+    peak_969()
+    peak_911()
     peak_583()
     #peak_511()
     #peak_239()
 
 def peak_2615():
     
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -103,7 +109,11 @@ def peak_2615():
 
 def peak_1460():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -175,7 +185,11 @@ def peak_1460():
 
 def peak_969():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -247,7 +261,11 @@ def peak_969():
 
 def peak_911():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -319,7 +337,11 @@ def peak_911():
 
 def peak_583():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -391,7 +413,11 @@ def peak_583():
 
 def peak_511():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -463,7 +489,11 @@ def peak_511():
 
 def peak_239():
 
-    df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """

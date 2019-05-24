@@ -1,5 +1,7 @@
 import pandas as pd
 import sys
+import json
+import os
 import numpy as np
 import scipy as sp
 import scipy.optimize as opt
@@ -14,10 +16,14 @@ plt.style.use('style.mplstyle')
 
 # this code uses the values from the results of fit_peaks.py to make a second-pass calibration.
 
+with open("runDB.json") as f:
+    runDB = json.load(f)
+meta_dir = os.path.expandvars(runDB["meta_dir"])
+
 def func(x, a, b, c):
     return a + b*x + c*(x**2)
 
-df =  pd.read_hdf("Spectrum_203.hdf5", key="df")
+df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
 
 E_rough = [510.22, 582.89, 910.82, 968.44, 1460.96, 2613.78]
 E_real = [511.0, 583.2, 911.2, 969.0, 1460.8, 2614.5]
@@ -27,7 +33,7 @@ popt, pcov = opt.curve_fit(func, E_rough, E_real, sigma = errors)
 
 df['e_real'] = popt[0] + popt[1]*df['e_cal'] + popt[2]*(df['e_cal']**2)
 
-df.to_hdf('Spectrum_203_Calibrated.hdf5', key='df', mode='w')
+df.to_hdf('{}/Spectrum_203_Calibrated.hdf5'.format(meta_dir), key='df', mode='w')
 
 pks_lit_all = [238.6, 338.3, 463.0, 511,0, 583.2, 727.3, 794.9, 860.6, 911.2, 969, 1460.8, 1592.5, 2103.5, 2614.5]
 plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)

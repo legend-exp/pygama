@@ -4,6 +4,7 @@
   "loc_dir":"$DATADIR/MJ60",
   "raw_dir":"$DATADIR/MJ60/Data",
   "tier_dir":"$DATADIR/MJ60/pygama",
+  "meta_dir":"$DATADIR/MJ60/metadata",
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 

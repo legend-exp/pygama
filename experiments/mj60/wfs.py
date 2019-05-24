@@ -22,14 +22,18 @@ def main():
         print('Usage: wfs.py [run number]')
         sys.exit()
 
-    plot_wfs()
-    #flip_through_wfs()   
+    #plot_wfs()
+    flip_through_wfs()   
 
 def plot_wfs():
 
     start = time.time()
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t1_run'+sys.argv[1]+'.h5', '/ORSIS3302DecoderForEnergy')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+
+    df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
 
     runtime = ds.DataSet(run=int(sys.argv[1]), md='./runDB.json').get_runtime()
     counts_per_second = (len(df))/runtime
@@ -63,7 +67,11 @@ def plot_wfs():
 
 def flip_through_wfs():
     
-    df = pd.read_hdf('~/Data/MJ60/pygama/t1_run'+sys.argv[1]+'.h5', '/ORSIS3302DecoderForEnergy')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+
+    df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
     df = df.reset_index(drop=True)
     del df['energy']
     del df['channel']

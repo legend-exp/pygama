@@ -2,6 +2,8 @@ import numpy as np
 import h5py
 import pandas as pd
 import sys
+import json
+import os
 from pygama import DataSet
 import pygama.dataset as ds
 import matplotlib.pyplot as plt
@@ -9,37 +11,40 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    Kr_and_BKG_Data()
-    #Collimator_Simulations()
+    #Kr_and_BKG_Data()
+    Collimator_Simulations()
 
 def Kr_and_BKG_Data():
 
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
     
-    BKG1 =  pd.read_hdf("Spectrum_101.hdf5", key="df")
-    BKG2 =  pd.read_hdf("Spectrum_105.hdf5", key="df")
-    BKG3 =  pd.read_hdf("Spectrum_106.hdf5", key="df")
-    BKG4 =  pd.read_hdf("Spectrum_107.hdf5", key="df")
+    BKG1 =  pd.read_hdf("{}/Spectrum_101.hdf5".format(meta_dir), key="df")
+    BKG2 =  pd.read_hdf("{}/Spectrum_105.hdf5".format(meta_dir), key="df")
+    BKG3 =  pd.read_hdf("{}/Spectrum_106.hdf5".format(meta_dir), key="df")
+    BKG4 =  pd.read_hdf("{}/Spectrum_107.hdf5".format(meta_dir), key="df")
 
-    Kr1 =  pd.read_hdf("Spectrum_103.hdf5", key="df")
-    Kr2 =  pd.read_hdf("Spectrum_104.hdf5", key="df")
-    Kr3 =  pd.read_hdf("Spectrum_109.hdf5", key="df")
-    Kr4 =  pd.read_hdf("Spectrum_110.hdf5", key="df")
-    Kr5 =  pd.read_hdf("Spectrum_111.hdf5", key="df")
-    Kr6 =  pd.read_hdf("Spectrum_112.hdf5", key="df")
-    Kr7 =  pd.read_hdf("Spectrum_143.hdf5", key="df")
-    Kr8 =  pd.read_hdf("Spectrum_144.hdf5", key="df")
-    Kr9 =  pd.read_hdf("Spectrum_145.hdf5", key="df")
-    Kr10 =  pd.read_hdf("Spectrum_146.hdf5", key="df")
-    Kr11 =  pd.read_hdf("Spectrum_147.hdf5", key="df")
-    Kr12 =  pd.read_hdf("Spectrum_148.hdf5", key="df")
-    Kr13 =  pd.read_hdf("Spectrum_149.hdf5", key="df")
-    Kr14 =  pd.read_hdf("Spectrum_150.hdf5", key="df")
-    Kr15 =  pd.read_hdf("Spectrum_152.hdf5", key="df")
-    Kr16 =  pd.read_hdf("Spectrum_153.hdf5", key="df")
-    Kr17 =  pd.read_hdf("Spectrum_154.hdf5", key="df")
-    Kr18 =  pd.read_hdf("Spectrum_155.hdf5", key="df")
-    Kr19 =  pd.read_hdf("Spectrum_160.hdf5", key="df")
-    Kr20 =  pd.read_hdf("Spectrum_168.hdf5", key="df")
+    Kr1 =  pd.read_hdf("{}/Spectrum_103.hdf5".format(meta_dir), key="df")
+    Kr2 =  pd.read_hdf("{}/Spectrum_104.hdf5".format(meta_dir), key="df")
+    Kr3 =  pd.read_hdf("{}/Spectrum_109.hdf5".format(meta_dir), key="df")
+    Kr4 =  pd.read_hdf("{}/Spectrum_110.hdf5".format(meta_dir), key="df")
+    Kr5 =  pd.read_hdf("{}/Spectrum_111.hdf5".format(meta_dir), key="df")
+    Kr6 =  pd.read_hdf("{}/Spectrum_112.hdf5".format(meta_dir), key="df")
+    Kr7 =  pd.read_hdf("{}/Spectrum_143.hdf5".format(meta_dir), key="df")
+    Kr8 =  pd.read_hdf("{}/Spectrum_144.hdf5".format(meta_dir), key="df")
+    Kr9 =  pd.read_hdf("{}/Spectrum_145.hdf5".format(meta_dir), key="df")
+    Kr10 =  pd.read_hdf("{}/Spectrum_146.hdf5".format(meta_dir), key="df")
+    Kr11 =  pd.read_hdf("{}/Spectrum_147.hdf5".format(meta_dir), key="df")
+    Kr12 =  pd.read_hdf("{}/Spectrum_148.hdf5".format(meta_dir), key="df")
+    Kr13 =  pd.read_hdf("{}/Spectrum_149.hdf5".format(meta_dir), key="df")
+    Kr14 =  pd.read_hdf("{}/Spectrum_150.hdf5".format(meta_dir), key="df")
+    Kr15 =  pd.read_hdf("{}/Spectrum_152.hdf5".format(meta_dir), key="df")
+    Kr16 =  pd.read_hdf("{}/Spectrum_153.hdf5".format(meta_dir), key="df")
+    Kr17 =  pd.read_hdf("{}/Spectrum_154.hdf5".format(meta_dir), key="df")
+    Kr18 =  pd.read_hdf("{}/Spectrum_155.hdf5".format(meta_dir), key="df")
+    Kr19 =  pd.read_hdf("{}/Spectrum_160.hdf5".format(meta_dir), key="df")
+    Kr20 =  pd.read_hdf("{}/Spectrum_168.hdf5".format(meta_dir), key="df")
 
     xlo, xhi, xpb = 0, 4000, 0.5
     nbins = int((xhi - xlo)/xpb)
@@ -107,6 +112,10 @@ def Collimator_Simulations():
         print('Usage: spectra.py [run number] [source]')
         sys.exit()
 
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
     # A_0 = activity of source in mCi
     A_0 = .01
 
@@ -117,8 +126,8 @@ def Collimator_Simulations():
     # B = number of primaries ran in g4simple
     B = 10000000
 
-    df1 =  pd.read_hdf("Spectrum_"+str(sys.argv[1])+".hdf5", key="df")
-    df2 =  pd.read_hdf("processed.hdf5", key="procdf")
+    df1 =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df2 =  pd.read_hdf("{}/processed.hdf5".format(meta_dir), key="procdf")
 
     runtime = ds.DataSet(run=int(sys.argv[1]), md='./runDB.json').get_runtime()
     print('total runtime = {} seconds'.format(runtime))

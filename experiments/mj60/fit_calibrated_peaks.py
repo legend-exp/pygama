@@ -1,5 +1,7 @@
 import pandas as pd
 import sys
+import json
+import os
 import numpy as np
 import scipy as sp
 from decimal import Decimal
@@ -20,16 +22,20 @@ def main():
 
     ## this code takes the peaks from the non-linear calibration and fits them. this code is not advanced enough to do things automatically yet.
 
-    #peak_2615()
+    peak_2615()
     peak_1460()
     #peak_969()
-    #peak_911()
-    #peak_583()
-    #peak_511()
+    peak_911()
+    peak_583()
+    peak_511()
 
 def peak_2615():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -102,7 +108,11 @@ def peak_2615():
 
 def peak_1460():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -174,7 +184,11 @@ def peak_1460():
 
 def peak_969():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -247,7 +261,11 @@ def peak_969():
 
 def peak_911():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -319,7 +337,11 @@ def peak_911():
 
 def peak_583():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -391,7 +413,11 @@ def peak_583():
 
 def peak_511():
 
-    df =  pd.read_hdf("Spectrum_203_Calibrated.hdf5", key="df")
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df =  pd.read_hdf("{}/Spectrum_203_Calibrated.hdf5".format(meta_dir), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """

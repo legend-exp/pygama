@@ -1,4 +1,6 @@
 import pandas as pd
+import json
+import os
 import sys
 import numpy as np
 import scipy as sp
@@ -25,7 +27,12 @@ def main():
 
 def plot_raw():
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
    
@@ -39,7 +46,12 @@ def plot_raw():
 
 def spectrum_medfilt_peaks():
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
 
@@ -81,7 +93,12 @@ def linear_calibration():
 
     pks_lit = [609.3, 1460.8]
  
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')  
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
  
     m = np.array(df['e_ftp'])
 
@@ -146,7 +163,7 @@ def linear_calibration():
 
     df["e_cal"] = A * df['e_ftp'] + B
     
-    df.to_hdf('Spectrum_'+str(sys.argv[1])+'.hdf5', key='df', mode='w')
+    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
 
     pks_lit_all = [238.6, 351.9, 511.0, 583.2, 609.3, 911.2, 969, 1120.3, 1460.8, 1764.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
