@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 plt.style.use('style.mplstyle')
 
+# for this code to work you need the tier1, tier2, and spectrum files for the run of interest.
 
 def main():
 
