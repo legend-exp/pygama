@@ -1,12 +1,12 @@
 import numpy as np
 from scipy.optimize import minimize, curve_fit
-from scipy.special import erfc
+from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
 import pygama.analysis.histograms as pgh
 
 
 def fit_hist(func, hist, bins, var=None, guess=None,
-             poissonLL=False, method=None, bounds=None):
+             poissonLL=False, integral=None, method=None, bounds=None):
     """
     do a binned fit to a histogram (nonlinear least squares).
     can either do a poisson log-likelihood fit (jason's fave) or
@@ -34,7 +34,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
             method = "L-BFGS-B"
 
         result = minimize(neg_poisson_log_like, x0=guess,
-                          args=(func, hist, bins),
+                          args=(func, hist, bins, integral),
                           method=method, bounds=bounds)
 
         coeff, cov_matrix = result.x, result.hess_inv.todense()
@@ -110,22 +110,50 @@ def fit_binned(f_likelihood, hist, bin_centers, start_guess, var=None, bounds=No
     return coeff
 
 
-def neg_poisson_log_like(pars, func, hist, bins, **kwargs):
+def get_bin_estimates(pars, func, hist, bins, integral=None, **kwargs):
+    """
+    Bin expected means are estimated by f(bin_center)*bin_width. Supply an
+    integrating function to compute the integral over the bin instead.
+    TODO: make default integrating function a numerical method that is off by
+    default.
+    """
+    if integral is None:
+        return func(pgh.get_bin_centers(bins), *pars, **kwargs) * pgh.get_bin_widths(bins)
+    else:
+        return integral(bins[1:], *pars, **kwargs) - integral(bins[:-1], *pars, **kwargs)
+
+def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
     """
     Wrapper to give me poisson neg log likelihoods of a histogram
         ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
-    Note: bin expected mean mu estimated by f(bin_center)*bin_width. Should
-    TODO: add option to integrate function over bin
     """
-    mu = func(pgh.get_bin_centers(bins), *pars, **kwargs) * pgh.get_bin_widths(bins)
-    return np.sum(mu - hist*np.log(mu))
+    mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
+    # func and/or integral should never give a negative value: let negative
+    # values cause errors that get passed to the user. However, mu=0 is okay,
+    # but causes problems for np.log(). When mu is zero there had better not be
+    # any counts in the bins. So use this to pull the fit like crazy.
+    return np.sum(mu - hist*np.log(mu+1.e-99))
 
+def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
+    # The Poisson likelihood does not give a good GOF until the counts are very
+    # high and all the poisson stats are roughly guassian and you don't need it
+    # anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
+    # it here.
+    mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
+    return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 def gauss(x, mu, sigma, A=1):
     """
     define a gaussian distribution, w/ args: mu, sigma, area (optional).
     """
     return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
+
+
+def gauss_int(x, mu, sigma, A=1):
+    """
+    integral of a gaussian from 0 to x, w/ args: mu, sigma, area (optional).
+    """
+    return A/2 * (1 + erf((x - mu)/sigma/np.sqrt(2)))
 
 
 def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
