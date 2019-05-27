@@ -171,14 +171,14 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
         return np.zeros_like(x)
 
     # compute the step and the low energy tail
-    step = a * hstep * erfc((x - mu) / (sig * np.sqrt(2)))
-    le_tail = h * htail
-    le_tail *= erfc((x - mu) / (sig * np.sqrt(2)) + sig / (tau * np.sqrt(2)))
+    step = a * hstep * erfc((x - mu) / (sigma * np.sqrt(2)))
+    le_tail = a * htail
+    le_tail *= erfc((x - mu) / (sigma * np.sqrt(2)) + sigma / (tau * np.sqrt(2)))
     le_tail *= np.exp((x - mu) / tau)
-    le_tail /= (2 * tau * np.exp(-(sig / (np.sqrt(2) * tau))**2))
+    le_tail /= (2 * tau * np.exp(-(sigma / (np.sqrt(2) * tau))**2))
 
     # add up all the peak shape components
-    return (1 - htail) * gauss(x, mu, sig, a) + bg_term + step + le_tail
+    return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
 
 
 def xtalball(x, mu, sigma, A, beta, m):

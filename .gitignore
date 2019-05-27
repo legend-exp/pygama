@@ -1,5 +1,9 @@
 # New additions go at the top!
 *.c
+.DS_Store
+*.png
+*.pdf
+*.swp
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files

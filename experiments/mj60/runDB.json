@@ -1,13 +1,22 @@
 {
   "elog":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/",
 
-  "raw_dir":"$HOME/Data/MJ60/Data",
-  "tier_dir":"$HOME/Data/MJ60/pygama",
+  "loc_dir":"$DATADIR/MJ60",
+  "raw_dir":"$DATADIR/MJ60/Data",
+  "tier_dir":"$DATADIR/MJ60/pygama",
+  "meta_dir":"$DATADIR/MJ60/metadata",
+  "rocks_dir":"/data/LEGEND/Data/MJ60",
+  "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
+
+  "digitizer":"ORSIS3302Model",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
+
   "chunksize":1000,
   "clock":100e6,
   "rollover":1,
+  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
+  "det_mass_kg":0.739,
 
   "ds":{
     "note":"data sets",
@@ -29,11 +38,123 @@
     "15":["177,185", "valve closed, bkg run"],
     "16":["186,189", "bkg run, valve open, 2019/03/19"],
     "17":["190,190", "thorium calibration, pos 1 (windowsill)"],
-    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
+    "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
+    "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
+    "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
+    "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
+    "22":["223,241", "Noise study during bias"],
+    "23":["246,248", "Noise study during bias continued"],
+    "24":["249", "Background run at 1400 V, thresh=0x2"],
+    "25":["250, 271", "Noise Study take 2"],
+    "26":["272", "Background run at 1400 V, thresh=0x2"],
+    "27":["273", "Background run at 1400 V, thresh=0x3"]
   },
 
-  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
-  "det_mass_kg":0.739,
+  "cal":{
+      "mj60":[2614.5, 1460.8, 20],
+      "cage":[],
+      "mjd":[]
+  },
+
+  "build_options":{
+    "conf1":{
+      "run_coverage":[0,74],
+      "tier0_options":{
+        "clk" : 100e6,
+        "digitizer":"ORSIS3302DecoderForEnergy",
+        "buffer_wrap":1,
+        "window":"max",
+        "n_samp":2000,
+        "n_blsamp":10000
+      },
+      "tier1_options":{
+        "clk" : 100e6,
+        "fit_bl" : {"ihi":600, "order":1},
+        "blsub" : {},
+        "pz" : {"decay":82},
+        "notch" : {"f_notch":30e6, "Q":1},
+        "savgol" : [
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
+        ],
+        "trap" : [
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+        ],
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
+        "get_max" : [
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+        ],
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {},
+        "ftp" : {},
+        "overflow" : {}
+      }
+    },
+    "conf2":{
+      "run_coverage":[75,999],
+      "tier0_options":{
+        "digitizer":"ORSIS3302DecoderForEnergy"
+      },
+      "tier1_options":{
+        "clk" : 100e6,
+        "fit_bl" : {"ihi":600, "order":1},
+        "blsub" : {},
+        "pz" : {"decay":82},
+        "notch" : {"f_notch":30e6, "Q":1},
+        "savgol" : [
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
+        ],
+        "trap" : [
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+        ],
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
+        "get_max" : [
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+        ],
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {},
+        "ftp" : {},
+        "overflow" : {},
+        "dcr" : [
+            {"wfin":"wf_savgol"},
+            {"wfin":"wf_pz"}
+        ],
+        "tail_fit" : [
+            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":0},
+            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":0}
+        ]
+      },
+      "unused":{
+          "center": {"wfin":"wf_notch"},
+          "current_pass2" : {"wfin":"wf_ctr", "wfout":"wf_current_ctr", "sigma":5},
+          "test_peakdet" : {"wfin":"wf_current_ctr", "delta":0.1, "sigma":5, "ihi":600, "test":1},
+          "psd" : {"nseg":100,"test":1,"note":"this one is slow, use w/ -m mode only"},
+          "trim": {"n_pre":100, "n_post":1000},
+          "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
+          "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
+      }
+    }
+  },
 
   "thresholds":{
     "note":"put a run range lookup here",
@@ -46,69 +167,6 @@
     "note":"m, b",
     "11":[0.0010555269899359561, -2.6681715462032116],
     "13":[0.0010545621572212065, -2.3849931444240156]
-  },
-
-  "t1_metadata":"ORSIS3302Model",
-
-  "build_options":{
-    "conf1":{
-      "coverage":[0,74],
-      "tier0_options":{
-        "clk" : 100e6,
-        "digitizer":"ORSIS3302DecoderForEnergy",
-        "buffer_wrap":1,
-        "window":"max",
-        "n_samp":2000,
-        "n_blsamp":10000
-      },
-      "tier1_options":{
-        "fit_bl" : {"ihi":2000},
-        "bl_sub" : {},
-        "trap_filter" : {"decay_time":72},
-        "get_max" : {}
-      }
-    },
-    "conf2":{
-      "coverage":[75,999],
-      "tier0_options":{
-        "digitizer":"ORSIS3302DecoderForEnergy"
-      },
-      "tier1_options":{
-        "clk" : 100e6,
-        "fit_bl" : {"ihi":600, "order":1},
-        "blsub" : {},
-        "pz" : {"decay":72},
-        "current" : {"sigma":5},
-        "notch" : {"f_notch":30e6, "Q":1},
-        "savgol" : [
-            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
-            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
-        ],
-        "trap" : [
-          {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
-          {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
-          {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
-          {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
-        ],
-        "get_max" : [
-          {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
-          {"wfin":"wf_ttrap"}, {"wfin":"wf_current"}, {"wfin":"wf_savgol"}
-        ],
-        "ftp" : {"test":1},
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
-        "peakdet" : {"delta":0.5, "sigma":5, "ihi":600},
-        "num_peaks" : {},
-        "overflow" : {},
-        "tail_fit" : {"wfin":"wf_notch", "order":2, "tp_thresh":0.9, "vec":0}
-      },
-      "unused":{
-        "center": {},
-        "psd" : {"nseg":1000, "test":1},
-        "trim": {"n_pre":100, "n_post":1000},
-        "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
-        "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
-      }
-    }
   },
 
   "tests":{

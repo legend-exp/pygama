@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import scipy.signal as signal
 import scipy.ndimage as ndimage
 
+# silence harmless warnings
+import warnings
+warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
+warnings.filterwarnings(action="ignore", module="scipy.signal", category=FutureWarning)
 
 def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     """
@@ -15,10 +19,12 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
 
     bl_0 = calcs["bl_p0"].values[:, np.newaxis]
 
-    slope_vals = calcs["bl_p1"].values[:, np.newaxis]
-    bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
-
-    blsub_wfs = wfs - (bl_0 + bl_1)
+    if "bl_p1" in calcs.keys():
+        slope_vals = calcs["bl_p1"].values[:, np.newaxis]
+        bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
+        blsub_wfs = wfs - (bl_0 + bl_1)
+    else:
+        blsub_wfs = wfs - bl_0
 
     if test:
         iwf = 1
@@ -133,30 +139,39 @@ def pz(waves, calcs, decay, wfin="wf_blsub", wfout="wf_pz", test=False):
     pz_wfs = signal.lfilter(den, num, wfs)
 
     if test:
-        iwf = 5
-        ts = np.arange(len(wfs[iwf]))
-        plt.plot(ts, wfs[iwf], '-r', label='raw')
-        plt.plot(ts, pz_wfs[iwf], '-b', label='pz_corr')
+        iwf = -1
+        while True:
+            if iwf != -1:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+            iwf += 1
+            print(iwf)
 
-        # let's try calling the trapezoid w/ no decay time & make sure
-        # the two transforms are equivalent!
+            plt.cla()
+            ts = np.arange(len(wfs[iwf]))
+            plt.plot(ts, wfs[iwf], '-r', label='raw')
+            plt.plot(ts, pz_wfs[iwf], '-b', label='pz_corr')
 
-        # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
-        tmp = trap({"wf_blsub": pz_wfs, "settings":waves["settings"]}, calcs, 4, 2.5)
-        wf_trap = tmp["wf_trap"][iwf]
-        plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
+            # let's try calling the trapezoid w/ no decay time & make sure
+            # the two transforms are equivalent!
 
-        # compare to the PZ corrected trap on the RAW wf.
-        tmp = trap(waves, calcs, 4, 2.5, decay=72)
-        wf_trap2 = tmp["wf_trap"][iwf]
-        plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
+            # call the trapezoid w/ no PZ correction, on THIS PZ-corrected wf
+            tmp = trap({"wf_blsub": pz_wfs, "settings":waves["settings"]}, calcs, 4, 2.5)
+            wf_trap = tmp["wf_trap"][iwf]
+            plt.plot(ts, wf_trap, '-g', lw=3, label='trap on pzcorr wf')
 
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel("ADC", ha='right', y=1)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        exit()
+            # compare to the PZ corrected trap on the RAW wf.
+            tmp = trap(waves, calcs, 4, 2.5, decay=72)
+            wf_trap2 = tmp["wf_trap"][iwf]
+            plt.plot(ts, wf_trap2, '-m', label="pz trap on raw wf")
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
     return {wfout: pz_wfs}
 
@@ -171,38 +186,52 @@ def current(waves, calcs, sigma, wfin="wf_blsub", wfout="wf_current", test=False
     wfc = ndimage.filters.gaussian_filter1d(wfs, sigma=sigma, order=1) # lol
 
     if test:
-        iwf = 5
-        ts = np.arange(len(wfs[iwf]))
-        wf = wfs[iwf] / np.amax(wfs[iwf])
-        curr = wfc[iwf] / np.amax(wfc[iwf])
+        iwf = -1
+        while True:
+            if iwf != -1:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+            iwf += 1
+            print(iwf)
+            plt.cla()
 
-        plt.plot(ts, wf, c='r', alpha=0.7, label='raw wf')
-        plt.plot(ts, curr, c='b', label='current')
+            ts = np.arange(len(wfs[iwf]))
+            wf = wfs[iwf] / np.amax(wfs[iwf])
+            curr = wfc[iwf] / np.amax(wfc[iwf])
 
-        # compare w/ MGDO current, using GAT WFA parameters
-        from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
-        tsf = MGWFTrapSlopeFilter()
-        tsf.SetPeakingTime(1)
-        tsf.SetIntegrationTime(10)
-        tsf.SetEvaluateMode(7)
-        mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
-        tmp = std.vector("double")(len(wf))
-        for i in range(len(wf)):
-            tmp[i] = wf[i]
-        mgwf_in.SetData(tmp)
-        tmp = mgwf_in.GetVectorData()
-        tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
-        out = mgwf_out.GetVectorData()
-        mgawf = np.fromiter(out, dtype=np.double, count=out.size())
-        mgawf = mgawf / np.amax(mgawf)
-        plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+            # plt.plot(ts, wf, c='r', alpha=0.7, label='raw wf')
+            # plt.plot(ts, curr, c='b', label='current')
 
-        plt.xlabel("clock ticks", ha='right', x=1)
-        plt.ylabel('ADC', ha='right', y=1)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
-        exit()
+            # super crude window
+            idx = np.where((ts > 800) & (ts < 1200))
+            plt.plot(ts[idx], wf[idx], c='r', alpha=0.7, label='raw wf')
+            plt.plot(ts[idx], curr[idx], c='b', label='current')
+
+            # # compare w/ MGDO current, using GAT WFA parameters
+            # from ROOT import std, MGTWaveform, MGWFTrapSlopeFilter
+            # tsf = MGWFTrapSlopeFilter()
+            # tsf.SetPeakingTime(1)
+            # tsf.SetIntegrationTime(10)
+            # tsf.SetEvaluateMode(7)
+            # mgwf_in, mgwf_out = MGTWaveform(), MGTWaveform()
+            # tmp = std.vector("double")(len(wf))
+            # for i in range(len(wf)):
+            #     tmp[i] = wf[i]
+            # mgwf_in.SetData(tmp)
+            # tmp = mgwf_in.GetVectorData()
+            # tsf.TransformOutOfPlace(mgwf_in, mgwf_out)
+            # out = mgwf_out.GetVectorData()
+            # mgawf = np.fromiter(out, dtype=np.double, count=out.size())
+            # mgawf = mgawf / np.amax(mgawf)
+            # plt.plot(ts, mgawf, '-g', alpha=0.7, label='mgdo')
+
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
 
     return {wfout: wfc}
 
@@ -295,7 +324,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             iwf += 1
             print(iwf)
 
-            ts = np.arange(len(wfs[iwf]))
+            ts = np.arange(len(wfc[iwf]))
             wf = wfs[iwf] / np.amax(wfs[iwf])
             awf = wfc[iwf] / np.amax(wfc[iwf])
 
@@ -309,7 +338,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             # ts, wf, awf = ts[tlo:thi], wf[tlo:thi], awf[tlo:thi]
 
             plt.cla()
-            plt.plot(ts, wf, '-b', alpha=0.7, label='data')
+            # plt.plot(ts, wf, '-b', alpha=0.7, label='data')
             plt.plot(ts, awf, '-k', label='current')
 
             if sigma != 0:
@@ -369,13 +398,15 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     return {wfout: wfsg}
 
 
-def psd(waves, calcs, nseg=100, test=False):
+def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
     """
     calculate the psd of a bunch of wfs, and output them as a block,
     so some analysis can add them all together.
     nperseg = 1000 has more detail, but is slower
     """
     wfs = waves["wf_blsub"]
+    if ilo is not None and ihi is not None:
+        wfs = wfs[:, ilo:ihi]
     clk = waves["settings"]["clk"] # Hz
 
     nseg = 2999
@@ -383,7 +414,7 @@ def psd(waves, calcs, nseg=100, test=False):
 
     if test:
 
-        plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
+        # plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
 
         ptot = np.sum(p, axis=0)
         plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
@@ -464,6 +495,7 @@ def center(waves, calcs, tp=50, n_pre=150, n_post=150, wfin="wf_savgol", wfout="
         row_idxs[i, :] = i
 
     # apply the selection
+    # print(wfs.shape, row_idxs.shape, wf_idxs.shape)
     wf_ctr = wfs[row_idxs, wf_idxs]
 
     if test:
@@ -501,6 +533,15 @@ def trim(waves, calcs, n_pre, n_post, wfin="wf_blsub", wfout="wf_trim", test=Fal
         exit()
 
     return {wfout: wf_trim}
+
+
+def wavelet():
+    """
+    placeholder.  this would be pretty cool.
+    can the pywavelets module be vectorized?
+    can it even be used with np.apply_along_axis?
+    """
+    print("hi clint")
 
 
 def interp(waveform, offset):

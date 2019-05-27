@@ -37,10 +37,10 @@ def update_progress(progress, run=None):
     block = int(round(barLength * progress))
 
     if run is None:
-        text = "\rPROGRESS : [{}] {:0.3f}% {}".format(
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
             "#" * block + "-" * (barLength - block), progress * 100, status)
     else:
-        text = "\rPROGRESS : [{}] {:0.3f}% {} (Run {})".format(
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
             "#" * block + "-" * (barLength - block), progress * 100, status,
             run)
 
@@ -61,7 +61,7 @@ def sizeof_fmt(num, suffix='B'):
 
 def set_plot_style(style):
     """
-    Choose a pygama plot style. 
+    Choose a pygama plot style.
     Current options: 'clint', 'root'
     Or add your own [label].mpl file in the pygama directory!
     """
@@ -115,16 +115,16 @@ def print_fit_results(pars, cov, func=None, title=None, pad=True):
     """
     convenience function for scipy.optimize.curve_fit results
     """
-    if title is not None: 
+    if title is not None:
         print(title+":")
     if func is None:
         for i in range(len(pars)): par_names.append("p"+str(i))
-    else: 
+    else:
         par_names = get_par_names(func)
     for i in range(len(pars)):
         mean, sigma = get_formatted_stats(pars[i], np.sqrt(cov[i][i]))
         print(par_names[i], "=", mean, "+/-", sigma)
-    if pad: 
+    if pad:
         print("")
 
 
@@ -176,7 +176,7 @@ def peakdet(v, delta, x=None):
     maxes, mins = [], []
     min, max = np.inf, -np.inf
     find_max = True
-    for i in x:
+    for i in range(len(x)):
 
         # for i=0, all 4 of these get set
         if v[i] > max:
