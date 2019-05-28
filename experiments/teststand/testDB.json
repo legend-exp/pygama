@@ -1,7 +1,7 @@
 {
-  "loc_dir":"$DATADIR/C1",
-  "raw_dir":"$DATADIR/C1/Data",
-  "tier_dir":"$DATADIR/C1/pygama",
+  "loc_dir":"$DATADIR/MJ60",
+  "raw_dir":"$DATADIR/MJ60/Data",
+  "tier_dir":"$DATADIR/MJ60/pygama",
   "digitizer":"ORSIS3302Model",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
@@ -12,9 +12,7 @@
   "det_mass_kg":0.739,
 
   "ds":{
-    "note":"data sets",
-    "0":["191,204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"],
-    "1":["3226,3226", "C1 test run for Alejandro"]
+    "0":["204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"]
   },
 
   "build_options":{
@@ -51,7 +49,7 @@
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
         "num_peaks" : {},
-        "ftp" : {"test":1},
+        "ftp" : {},
         "overflow" : {},
         "dcr" : [
             {"wfin":"wf_savgol"},

@@ -84,6 +84,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, **kwargs):
         plt.text(0.95, 0.95, stats, transform=plt.gca().transAxes,
                  verticalalignment='top', horizontalalignment='right')
 
+
 def get_gaussian_guess(hist, bin_centers):
     """
     given a hist, gives guesses for mu, sigma, and amplitude
