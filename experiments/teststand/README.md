@@ -6,7 +6,7 @@ mkdir pygama
 optional:
 change Docker to run on 4 CPUs (whale icon/Preferences/Advanced)
 
-### start the container and (re)install pygama:
+### start the container, (re)install pygama, and set DATADIR
 NOTE: the reinstallation step is temporary, we will fix this soon
 https://github.com/legend-exp/legendexp_legend-base_img
 ```docker run -it --rm \
@@ -22,6 +22,8 @@ pip install -e pygama
 python
 from pygama import DataSet
 (ctrl-c)
+
+export DATADIR=/home/user/Data
 
 ### start the tutorial:
 jupyter lab --ip 0.0.0.0 --port 8888 --allow-root --no-browser

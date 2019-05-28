@@ -27,23 +27,20 @@
         "blsub" : {},
         "pz" : {"decay":82},
         "notch" : {"f_notch":30e6, "Q":1},
-        "savgol" : [
-            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
-            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
-        ],
+        "savgol" : {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
         "trap" : [
             {"wfout":"wf_etrap", "wfin":"wf_blsub", "rise":4, "flat":2.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2}
         ],
-        "current" : [
-            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
-        ],
+        "current" : {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5},
         "get_max" : [
-            {"wfin":"wf_etrap"}, {"wfin":"wf_atrap"}
+            {"wfin":"wf_etrap"}, {"wfin":"wf_atrap"}, {"wfin":"wf_current"},
+            {"wfin":"wf_savgol"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
-        "ftp" : {}
-    }
+        "ftp" : {},
+        "timepoint" : {"wfin":"wf_blsub", "pct":[5,10,50,100]},
+        "dcr" : {"wfin":"wf_savgol"}
+      }
     }
   }
 }
