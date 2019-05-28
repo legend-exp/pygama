@@ -1,7 +1,7 @@
 {
-  "loc_dir":"$DATADIR/MJ60",
-  "raw_dir":"$DATADIR/MJ60/Data",
-  "tier_dir":"$DATADIR/MJ60/pygama",
+  "loc_dir":"$DATADIR/LNGS",
+  "raw_dir":"$DATADIR/LNGS",
+  "tier_dir":"$DATADIR/LNGS/pygama",
   "digitizer":"ORSIS3302Model",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
@@ -33,42 +33,16 @@
         ],
         "trap" : [
             {"wfout":"wf_etrap", "wfin":"wf_blsub", "rise":4, "flat":2.5, "decay":72},
-            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
-            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
         ],
         "current" : [
             {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
         ],
         "get_max" : [
-            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
-            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+            {"wfin":"wf_etrap"}, {"wfin":"wf_atrap"}
         ],
         "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
-        "peakdet" : [
-            {"delta":0.5, "sigma":5, "ihi":600}
-        ],
-        "num_peaks" : {},
-        "ftp" : {},
-        "overflow" : {},
-        "dcr" : [
-            {"wfin":"wf_savgol"},
-            {"wfin":"wf_pz"}
-        ],
-        "tail_fit" : [
-            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":0},
-            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":0}
-        ]
-      },
-      "unused":{
-          "center": {"wfin":"wf_notch"},
-          "current_pass2" : {"wfin":"wf_ctr", "wfout":"wf_current_ctr", "sigma":5},
-          "test_peakdet" : {"wfin":"wf_current_ctr", "delta":0.1, "sigma":5, "ihi":600, "test":1},
-          "psd" : {"nseg":100,"test":1,"note":"this one is slow, use w/ -m mode only"},
-          "trim": {"n_pre":100, "n_post":1000},
-          "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
-          "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
-      }
+        "ftp" : {}
     }
   }
 }
