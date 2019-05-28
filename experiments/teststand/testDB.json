@@ -33,7 +33,7 @@
         ],
         "trap" : [
             {"wfout":"wf_etrap", "wfin":"wf_blsub", "rise":4, "flat":2.5, "decay":72},
-            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2}
         ],
         "current" : [
             {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
@@ -43,6 +43,7 @@
         ],
         "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
         "ftp" : {}
+    }
     }
   }
 }
