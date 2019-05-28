@@ -1,8 +1,12 @@
 import pandas as pd
+import json
+import os
 import sys
 import numpy as np
 import scipy as sp
+import scipy.optimize as opt
 from scipy.signal import medfilt, find_peaks
+from pygama import DataSet
 import pygama.analysis.histograms as pgh
 import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pga
@@ -14,15 +18,40 @@ np.set_printoptions(threshold=np.inf)
 def main():
 
     if(len(sys.argv) != 2):
-        print('Usage: make_spectrum_from_tier_2.py [run number]')
+        print('Usage: bkg_calibration.py [run number]')
         sys.exit()
 
+    #plot_raw()
     #spectrum_medfilt_peaks()
-    energy_spectrum()
+    linear_calibration()
+
+def plot_raw():
+
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+
+    m = np.array(df['e_ftp'])
+   
+    plt.hist(m, np.arange(0,9500,1.5), histtype='step', color = 'black', label='non-calibrated spectrum')
+    plt.xlabel('e_ftp', ha='right', x=1.0)
+    plt.ylabel('Counts', ha='right', y=1.0)
+    plt.xlim(1,9500)
+    plt.ylim(0,4000)
+    plt.legend(frameon=True, loc='upper right', fontsize='small')
+    plt.show()
 
 def spectrum_medfilt_peaks():
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
 
@@ -30,8 +59,8 @@ def spectrum_medfilt_peaks():
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    hist = np.pad(hist, (1,0), 'constant')
-    bins = np.array(bins + (bins[1] - bins[0])/2, dtype=np.int)
+    bins = bins + (bins[1] - bins[0])/2
+    bins = bins[0:(len(bins)-1)]
 
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
@@ -44,7 +73,7 @@ def spectrum_medfilt_peaks():
 
     for i in range(len(thresholds)):
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
-        if len(maxes) == 5:
+        if len(maxes) == 4:
             break
 
     for pk in maxes:
@@ -56,25 +85,29 @@ def spectrum_medfilt_peaks():
     colors = ['black', 'red', 'blue']
     lines = [Line2D([0], [0], color=c) for c in colors]
     labels = ['uncalibrated energy spectrum, run '+str(sys.argv[1]), 'peakless spectrum (medfilt)', 'peaks only (spectrum - medfilt)']
-    #plt.title('Energy Spectrum')
     plt.legend(lines, labels, frameon=True, loc='upper right', fontsize='x-small')
     plt.show()
 
 
-def energy_spectrum():
+def linear_calibration():
 
     pks_lit = [609.3, 1460.8]
  
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
 
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+ 
     m = np.array(df['e_ftp'])
 
     xlo, xhi, xpb = 0, 10000, 10
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    hist = np.pad(hist, (1,0), 'constant')
-    bins = bins + (bins[1] - bins[0])/2    
+    bins = bins + (bins[1] - bins[0])/2
+    bins = bins[0:(len(bins)-1)]
 
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
@@ -83,9 +116,9 @@ def energy_spectrum():
 
     for i in range(len(thresholds)):
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
-        if len(maxes) == 5:
-            break
-    
+        if len(maxes) == 4:
+            break    
+
     x_maxes = []    
     for i in range(len(maxes)):
         x_value = maxes[i][0]
@@ -111,7 +144,8 @@ def energy_spectrum():
     
     closeness = np.absolute(ratios_array - real_ratio_array)
 
-    relevant_entry = int(np.where(closeness == np.amin(closeness))[0])
+    relevant_entry = np.where(closeness == np.amin(closeness))[0]
+    relevant_entry = int(relevant_entry[len(relevant_entry)-1])
 
     adc_2_peak_combinations = []
     for i in range(len(x_maxes)):
@@ -119,15 +153,17 @@ def energy_spectrum():
             adc_2_peak_combinations.append([x_maxes[j], x_maxes[i]])
 
     #ADC Values Corresponding to Energy Peaks 1460.820 keV and 2614.511 keV 
-    adc_values = adc_2_peak_combinations[relevant_entry]
-    
+    adc_values = adc_2_peak_combinations[relevant_entry]   
+ 
     #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV) 
     # E = A(e_ftp) + B 
     A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
     B = float((pks_lit[1] - adc_values[1]*A))
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
 
-    df["e_cal"] = A * df['e_ftp'] + B  
+    df["e_cal"] = A * df['e_ftp'] + B
+    
+    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
 
     pks_lit_all = [238.6, 351.9, 511.0, 583.2, 609.3, 911.2, 969, 1120.3, 1460.8, 1764.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
