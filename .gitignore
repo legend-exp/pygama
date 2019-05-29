@@ -1,6 +1,7 @@
 # New additions go at the top!
 *.c
 .DS_Store
+*.npz
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files

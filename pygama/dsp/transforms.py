@@ -415,6 +415,7 @@ def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
         # plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
 
         ptot = np.sum(p, axis=0)
+        y = ptot / wfs.shape[0]
         plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
 
         plt.xlabel('Frequency (Hz)', ha='right', x=0.9)
