@@ -67,7 +67,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, **kwargs):
     plot a step histogram, with optional error bars
     """
     if var is None:
-        plt.step(bins, np.concatenate((hist, [0])), where="post")
+        plt.step(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), where="post")
     else:
         plt.errorbar(get_bin_centers(bins), hist,
                      xerr=get_bin_widths(bins) / 2, yerr=np.sqrt(var),
@@ -75,14 +75,19 @@ def plot_hist(hist, bins, var=None, show_stats=False, **kwargs):
     if show_stats is True:
         bin_centers = get_bin_centers(bins)
         N = np.sum(hist)
+        if N <= 1: 
+            print("can't compute sigma for N =", N)
+            return
         mean = np.sum(hist*bin_centers)/N
         x2ave = np.sum(hist*bin_centers*bin_centers)/N
         stddev = np.sqrt(N/(N-1) * (x2ave - mean*mean))
+        dmean = stddev/np.sqrt(N)
 
-        mean, stddev = pgu.get_formatted_stats(mean, stddev, 3)
-        stats = '$\mu=%s$\n$\sigma=%s$' % (mean, stddev)
+        mean, dmean = pgu.get_formatted_stats(mean, dmean, 2)
+        stats = '$\mu=%s \pm %s$\n$\sigma=%#.3g$' % (mean, dmean, stddev)
         plt.text(0.95, 0.95, stats, transform=plt.gca().transAxes,
                  verticalalignment='top', horizontalalignment='right')
+
 
 def get_gaussian_guess(hist, bin_centers):
     """

@@ -10,17 +10,37 @@ warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarn
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
-def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_avg", test=False):
+def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_p0", test=False):
     """
     simple mean, vectorized baseline calculator
     """
-    wf_block = waves["waveform"]
+    wfs = waves["waveform"]
 
     # find wf means
-    avgs = np.mean(wf_block[:, ilo:ihi], axis=1)
+    avgs = np.mean(wfs[:, ilo:ihi], axis=1)
 
     # add the result as a new column
     calcs[calc] = avgs
+
+    if test:
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wf, '-b', lw=2, alpha=0.7, label='raw wf')
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.001)
 
 
 def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
@@ -135,11 +155,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
         calcs["tp{}".format(p)] = tp_idx
 
     if test:
-
         wfraw = waves["wf_blsub"]
-
-
-
         iwf = -1
         while True:
             if iwf != -1:
@@ -162,7 +178,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
                 idx = calcs["tp{}".format(tp)].iloc[iwf]
                 print("tp{}: idx {}  val {:.2f}".format(tp, idx, wf[idx]))
 
-                plt.plot( idx, wf[idx], ".", c=cmap(i), ms=20,
+                plt.plot(idx, wf[idx], ".", c=cmap(i), ms=20,
                          label="tp{}".format(tp))
 
             plt.xlabel("clock ticks", ha='right', x=1)
@@ -556,6 +572,8 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
 
     if test:
         wfbl = waves["wf_blsub"]
+        # from pygama.utils import set_plot_style
+        # set_plot_style("clint")
         iwf = 2
         while True:
             if iwf != 2:
@@ -575,17 +593,17 @@ def dcr(waves, calcs, delta=1, t_win2=25, wlen=2, tp_thresh=0.8, wfin="wf_savgol
             plt.plot(ts[idx1], win_1[iwf][idx1], '-r', lw=10, alpha=0.5)
             plt.plot(ts[idx2], win_2[iwf][idx2], '-r', lw=10, alpha=0.5)
 
-            plt.plot(t1[iwf], avg_1[iwf], ".g", ms=10)
-            plt.plot(t2[iwf], avg_2[iwf], ".g", ms=10)
-
             slo = (avg_1[iwf] - avg_2[iwf]) / (t1[iwf] - t2[iwf])
             xv = np.arange(t1[iwf], t2[iwf])
             yv = slo * (xv - t1[iwf]) + avg_1[iwf]
 
             plt.plot(xv, yv, '-r', label="slope: {:.2e}".format(slo))
-            plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
+            # plt.plot(np.nan, np.nan, ".w", label="main: {:.2e}".format(slope[iwf]))
 
-            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.plot(t1[iwf], avg_1[iwf], ".g", ms=20)
+            plt.plot(t2[iwf], avg_2[iwf], ".g", ms=20)
+
+            plt.xlabel("Clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
             plt.legend(loc=4)
             plt.tight_layout()
