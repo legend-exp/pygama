@@ -1,7 +1,5 @@
 import pandas as pd
 import sys
-import json
-import os
 import numpy as np
 import scipy as sp
 from scipy.signal import medfilt, find_peaks
@@ -16,20 +14,15 @@ np.set_printoptions(threshold=np.inf)
 def main():
 
     if(len(sys.argv) != 2):
-        print('Usage: thorium_calibration.py [run number]')
+        print('Usage: make_spectrum_from_tier_2.py [run number]')
         sys.exit()
 
     #spectrum_medfilt_peaks()
-    linear_calibration()
+    energy_spectrum()
 
 def spectrum_medfilt_peaks():
 
-    with open("runDB.json") as f:
-        runDB = json.load(f)
-    tier_dir = os.path.expandvars(runDB["tier_dir"])
-    meta_dir = os.path.expandvars(runDB["meta_dir"])
-
-    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
 
     m = np.array(df['e_ftp'])
 
@@ -65,16 +58,11 @@ def spectrum_medfilt_peaks():
     plt.legend(lines, labels, frameon=True, loc='upper right', fontsize='x-small')
     plt.show()
 
-def linear_calibration():
+def energy_spectrum():
 
     pks_lit = [238.6, 583.2]
- 
-    with open("runDB.json") as f:
-        runDB = json.load(f)
-    tier_dir = os.path.expandvars(runDB["tier_dir"])
-    meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
 
     m = np.array(df['e_ftp'])
 
@@ -82,9 +70,8 @@ def linear_calibration():
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    #hist = np.pad(hist, (1,0), 'constant')
-    bins = bins + (bins[1] - bins[0])/2    
-    bins = bins[0:(len(bins)-1)]
+    hist = np.pad(hist, (1,0), 'constant')
+    bins = bins + (bins[1] - bins[0])/2
 
     hmed = medfilt(hist, 51)
     hpks = hist - hmed
@@ -95,11 +82,11 @@ def linear_calibration():
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
         if len(maxes) == 5:
             break
-     
-    x_maxes = []    
+
+    x_maxes = []
     for i in range(len(maxes)):
         x_value = maxes[i][0]
-        x_maxes.append(x_value)            
+        x_maxes.append(x_value)
 
     ratios = []
     for i in range(len(maxes)):
@@ -118,7 +105,7 @@ def linear_calibration():
 
     ratios_array = np.array(ratios)
     real_ratio_array = np.array(real_ratio)
-    
+
     closeness = np.absolute(ratios_array - real_ratio_array)
 
     relevant_entry = int(np.where(closeness == np.amin(closeness))[0])
@@ -128,17 +115,15 @@ def linear_calibration():
         for j in range(len(x_maxes)):
             adc_2_peak_combinations.append([x_maxes[j], x_maxes[i]])
 
-    #ADC Values Corresponding to Energy Peaks 1460.820 keV and 2614.511 keV 
+    #ADC Values Corresponding to Energy Peaks 1460.820 keV and 2614.511 keV
     adc_values = adc_2_peak_combinations[relevant_entry]
-    
-    #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV) 
-    # E = A(e_ftp) + B 
+
+    #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV)
+    # E = A(e_ftp) + B
     A = float((pks_lit[1] - pks_lit[0])/(adc_values[1]-adc_values[0]))
     B = float((pks_lit[1] - adc_values[1]*A))
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     df['e_cal'] = df['e_ftp']*A+B
-
-    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
 
     pks_lit_all = [238.6, 338.3, 463.0, 511,0, 583.2, 727.3, 794.9, 860.6, 911.2, 969, 1460.8, 1592.5, 2103.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
@@ -156,18 +141,18 @@ def linear_calibration():
     plt.axvline(x=2103.5, ymin=0, ymax=30, color='olive', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=2614.5, ymin=0, ymax=30, color='indigo', linestyle='--', lw=1, zorder=1)
     n = np.array(df['e_cal'])
-    plt.hist(n, np.arange(0,9500,0.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n))) 
+    plt.hist(n, np.arange(0,9500,1.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n)))
     plt.xlim(0,4000)
-    plt.ylim(0,plt.ylim()[1]) 
+    plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
-    plt.ylabel('Counts', ha='right', y=1.0)   
+    plt.ylabel('Counts', ha='right', y=1.0)
     E_cal = 'calibrated energy spectrum, run '+str(sys.argv[1])
     E_1 = 'E=238.6 keV (212Pb peak)*'
     E_2 = 'E=338.3 keV (228Ac peak)'
     E_3 = 'E=463.0 keV (228Ac peak)'
     E_4 = 'E=511.0 keV (beta+ peak)'
     E_5 = 'E=583.2 keV (208Tl peak)*'
-    E_6 = 'E=727.3 keV (212Bi peak)'    
+    E_6 = 'E=727.3 keV (212Bi peak)'
     E_7 = 'E=794.9 keV (228Ac peak)'
     E_8 = 'E=860.6 keV (208Tl peak)'
     E_9 = 'E=911.2 keV (228Ac peak)'
