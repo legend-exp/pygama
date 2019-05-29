@@ -48,7 +48,10 @@
     "24":["249", "Background run at 1400 V, thresh=0x2"],
     "25":["250, 271", "Noise Study take 2"],
     "26":["272", "Background run at 1400 V, thresh=0x2"],
-    "27":["273", "Background run at 1400 V, thresh=0x3"]
+    "27":["273", "Background run at 1400 V, thresh=0x3"],
+    "28":["274", "Background run at 1400 V, thresh=0x3"],
+    "29":["275", "Cesium Run See Elog-cesium source run with mj60"],
+    "30":["276,277", "Background run at 1400 V, see Elog-data taking campaign - MJ60 "]
   },
 
   "cal":{
@@ -148,7 +151,7 @@
           "center": {"wfin":"wf_notch"},
           "current_pass2" : {"wfin":"wf_ctr", "wfout":"wf_current_ctr", "sigma":5},
           "test_peakdet" : {"wfin":"wf_current_ctr", "delta":0.1, "sigma":5, "ihi":600, "test":1},
-          "psd" : {"nseg":100,"test":1,"note":"this one is slow, use w/ -m mode only"},
+          "psd" : {"nseg":100,"test":1, "ilo":0, "ihi":500},
           "trim": {"n_pre":100, "n_post":1000},
           "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
           "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
