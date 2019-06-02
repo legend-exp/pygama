@@ -51,7 +51,9 @@
     "27":["273", "Background run at 1400 V, thresh=0x3"],
     "28":["274", "Background run at 1400 V, thresh=0x3"],
     "29":["275", "Cesium Run See Elog-cesium source run with mj60"],
-    "30":["276,277", "Background run at 1400 V, see Elog-data taking campaign - MJ60 "]
+    "30":["276,277", "Background run at 1400 V, see Elog-data taking campaign - MJ60 "],
+    "31":["278", "Thorium run at 1400 V, 0x3 threshold, see Elog-data taking campaign - MJ60 "],
+    "32":["279", "Thorium run at 1400 V, 0x3 threshold, see Elog-data taking campaign - MJ60 "]
   },
 
   "cal":{
