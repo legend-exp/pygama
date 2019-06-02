@@ -23,8 +23,8 @@ def main():
 
     #plot_wfs()
     #flip_through_wfs()
-    ADC_difference()   
-    #ADC_difference_cut()
+    #ADC_difference()   
+    ADC_difference_cut()
 
 def plot_wfs():
 
@@ -45,7 +45,6 @@ def plot_wfs():
     counts_per_second = (len(df))/runtime
     
     df = df.reset_index(drop=True)
-    print(df_2['e_cal'][0])
     del df['energy']
     del df['channel']
     del df['energy_first']
@@ -62,7 +61,7 @@ def plot_wfs():
  
     xvals = np.arange(0,nsamp)
 
-    for i in range(6,12):
+    for i in range(0,10000):
         plt.plot(xvals, bl_sub(i), lw=1)
     plt.xlabel('Sample Number', ha='right', x=1.0)
     plt.ylabel('ADC Value', ha='right', y=1.0)
@@ -170,9 +169,9 @@ def ADC_difference():
     df_2['ratio'] = df_2['diff']/df_2['e_cal']
     print('python script time = {:.0f} seconds'.format(time.time() - start))
 
-    plt.hist2d(df_2['e_cal'], df_2['ratio'], np.arange(-10,40,0.1), norm=LogNorm())
-    plt.xlim(0,40)
-    plt.ylim(-2.5,5)
+    plt.hist2d(df_2['e_cal'], df_2['diff'], np.arange(-5,100,0.1), norm=LogNorm())
+    plt.xlim(0,50)
+    plt.ylim(-5,100)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('dADC/E', ha='right', y=1.0)
     cbar = plt.colorbar()
@@ -217,12 +216,12 @@ def ADC_difference_cut():
     df_2['diff'] = df.iloc[:,1499:3000].mean(axis=1) - df.iloc[:,0:500].mean(axis=1)
     df_2['ratio'] = df_2['diff']/df_2['e_cal']
     
-    df_2 = df_2.loc[(df_2.ratio>1)&(df_2.e_cal>=5)]
+    df_2 = df_2.loc[(df_2['diff']>3)&(df_2.e_cal>5)]
     print('python script time = {:.0f} seconds'.format(time.time() - start))
 
-    plt.hist2d(df_2['e_cal'], df_2['ratio'], np.arange(-10,40,0.1), norm=LogNorm())
-    plt.xlim(0,40)
-    plt.ylim(-2.5,5)
+    plt.hist2d(df_2['e_cal'], df_2['diff'], np.arange(-5,100,0.1), norm=LogNorm())
+    plt.xlim(0,50)
+    plt.ylim(-5,100)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('dADC/E', ha='right', y=1.0)
     cbar = plt.colorbar()
