@@ -33,8 +33,7 @@ def plot_raw():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
-    print(df.keys())
-    exit()
+
     m = np.array(df['e_ftp'])
    
     plt.hist(m, np.arange(0,9500,1.5), histtype='step', color = 'black', label='non-calibrated spectrum')
@@ -70,7 +69,7 @@ def spectrum_medfilt_peaks():
     plt.plot(bins, hmed, '-r', ls='steps', label="peakless spectrum (medfilt)")
     plt.plot(bins, hpks, '-b', ls='steps', label='peaks only (spectrum - medfilt)')
 
-    thresholds = np.arange(5,10000,1, dtype=int)
+    thresholds = np.arange(5,10000,5, dtype=int)
 
     for i in range(len(thresholds)):
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
