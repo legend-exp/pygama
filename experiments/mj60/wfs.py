@@ -21,10 +21,10 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    #plot_wfs()
+    plot_wfs()
     #flip_through_wfs()
     #ADC_difference()   
-    ADC_difference_cut()
+    #ADC_difference_cut()
 
 def plot_wfs():
 
@@ -37,7 +37,6 @@ def plot_wfs():
     with open("runDB.json") as f:
         runDB = json.load(f)
     tier_dir = os.path.expandvars(runDB["tier_dir"])
-    meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
 
@@ -61,7 +60,7 @@ def plot_wfs():
  
     xvals = np.arange(0,nsamp)
 
-    for i in range(0,10000):
+    for i in range(0,1):
         plt.plot(xvals, bl_sub(i), lw=1)
     plt.xlabel('Sample Number', ha='right', x=1.0)
     plt.ylabel('ADC Value', ha='right', y=1.0)

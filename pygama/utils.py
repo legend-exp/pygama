@@ -95,19 +95,14 @@ def get_formatted_stats(mean, sigma, ndigs=2):
     convenience function for formatting mean +/- sigma to the right number of
     significant figures.
     """
-    if sigma == 0: 
-        sig_pos = -1
-        sig_fmt = '%.1f'
-    else:
-        sig_pos = int(np.floor(np.log10(np.abs(sigma))))
-        sig_fmt = '%d' % ndigs
-        sig_fmt = '%#.' + sig_fmt + 'g'
-    if mean == 0:
-        mean_fmt = '%.1f'
-    else:
-        mean_pos = int(np.floor(np.log10(np.abs(mean))))
-        mean_fmt = '%d' % (mean_pos-sig_pos+ndigs)
-        mean_fmt = '%#.' + mean_fmt + 'g'
+    sig_pos = int(np.floor(np.log10(abs(sigma))))
+    sig_fmt = '%d' % ndigs
+    sig_fmt = '%#.' + sig_fmt + 'g'
+    mean_pos = int(np.floor(np.log10(abs(mean))))
+    mdigs = mean_pos-sig_pos+ndigs
+    if mdigs < ndigs-1: mdigs = ndigs - 1
+    mean_fmt = '%d' % mdigs
+    mean_fmt = '%#.' + mean_fmt + 'g'
     return mean_fmt % mean, sig_fmt % sigma
 
 
