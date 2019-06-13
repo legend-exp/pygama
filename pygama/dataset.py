@@ -2,6 +2,7 @@
 import os, json
 import numpy as np
 import pandas as pd
+import tinydb as db
 from pprint import pprint
 
 class DataSet:
@@ -11,12 +12,14 @@ class DataSet:
     can also load a JSON file to get a dict of metadata.
     """
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None,
-                 opt=None, v=False, md=None, raw_dir=None, tier_dir=None):
+                 opt=None, v=False, md=None, cal=None, raw_dir=None, tier_dir=None):
 
         # load metadata and set paths to data folders
-        self.runDB = None
+        self.runDB, self.calDB = None, None
         if md is not None:
-            self.load_metadata(md)
+            self.load_metadata(md) # pure JSON
+        if cal is not None:
+            self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
             self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
             self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
@@ -28,21 +31,33 @@ class DataSet:
             self.tier_dir = tier_dir
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
+            
+        # match ds number to run numbers
+        self.ds_run_table = {}
+        for ds in self.runDB["ds"]:
+            try:
+                dsnum = int(ds)
+            except:
+                continue
+            run_cov = self.runDB["ds"][ds][0].split(",")
+            self.ds_run_table[int(ds)] = [int(r) for r in run_cov]
 
-        # create the internal list of run numbers
-        self.runs = []
+        # create the internal lists of run numbers and ds's
+        self.runs, self.ds_list = [], []
         if ds_lo is not None:
             self.runs.extend(self.get_runs(ds_lo, ds_hi, v))
         if run is not None:
             self.runs.append(run)
+            self.ds_list.append(self.lookup_ds(run))
         if runlist is not None:
             self.runs.extend(runlist)
+            self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
-
+            
         # filenames for every run
         self.get_paths(self.runs, v)
-
+        
         # could store concatenated dfs here, like a TChain
         self.df = None
 
@@ -52,7 +67,7 @@ class DataSet:
         """
         with open(fname) as f:
             self.runDB = json.load(f)
-
+            
     def add_run(self, runs):
         """
         can add single run numbers, or a list
@@ -72,22 +87,20 @@ class DataSet:
             print("Error, runDB not set.")
             return []
 
-        ds_list = []
-
         # load all data
         if ds_lo is None and ds_hi is None:
-            ds_list.extend([d for d in self.runDB["ds"] if d != "note"])
+            self.ds_list.extend([d for d in self.runDB["ds"] if d != "note"])
 
         # load single ds
         elif ds_hi is None:
-            ds_list.append(ds_lo)
+            self.ds_list.append(ds_lo)
 
         # load ds range
         else:
-            ds_list.extend([str(d) for d in range(ds_lo, ds_hi+1)])
+            self.ds_list.extend([str(d) for d in range(ds_lo, ds_hi+1)])
 
         run_list = []
-        for ds in ds_list:
+        for ds in self.ds_list:
             tmp = self.runDB["ds"][str(ds)][0].split(",")
             r1 = int(tmp[0])
             r2 = int(tmp[1]) if len(tmp)>1 else None
@@ -97,11 +110,11 @@ class DataSet:
                 run_list.extend([r for r in range(r1, r2+1)]) # inclusive
 
         if verbose:
-            print("Data Sets:",ds_list)
+            print("Data Sets:",self.ds_list)
             print("Runs:",run_list)
 
         return run_list
-
+    
     def get_paths(self, runs, verbose=False):
         """
         collect path info and flag nonexistent files.
@@ -150,6 +163,40 @@ class DataSet:
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
 
+    def lookup_ds(self, run):
+        """
+        given a run number, figure out what data set it belongs to.
+        """
+        for ds in self.ds_run_table:
+            runlist = self.ds_run_table[ds]
+            if len(runlist) == 1 and run == runlist[0]:
+                return ds
+            elif len(runlist) > 1 and runlist[0] <= run <= runlist[-1]:
+                return ds
+        
+        # if we get to here, we haven't found the run
+        print("Error, couldn't find a ds for run {run}.")
+        exit()
+
+    def get_p1cal_pars(self, etype):
+        """
+        return the pass-1 initial guess parameters for an energy estimator.
+        """
+        for key in self.runDB["ecal"]:
+            tmp = key.split(",")
+            if len(tmp) == 1:
+                continue
+            ds_lo, ds_hi = int(tmp[0]), int(tmp[1])
+            
+            tmp2 = np.array(self.ds_list)
+            iout = np.where((tmp2 < ds_lo) | (tmp2 > ds_hi))
+            if len(iout[0]) > 0:
+                print("Error, we don't currently support multiple p1 cal pars.")
+                exit()
+            pars = self.runDB["ecal"][key][etype]
+            # pprint(pars)
+            return pars
+            
     def get_t1df(self):
         """
         concat tier 1 df's.
