@@ -60,14 +60,13 @@
     "28":["274", "Bkg run @ 1400 V, thresh=0x3"],
     "29":["275", "Cesium Run (elog: cesium source run with mj60)"],
     "30":["276,277", "Bkg run @ 1400 V, (elog: data taking campaign - MJ60)"],
-    "31":["278", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
-    "32":["279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
-    "33":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "34":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "35":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "36":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
-    "37":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
-    "38":["380,395", "Dead time study (elog: using external pulser to determine ...)"]
+    "31":["278,279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
+    "32":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "33":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "34":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "35":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "36":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "37":["380,395", "Dead time study (elog: using external pulser to determine ...)"]
   },
 
   "ecal":{
