@@ -1,5 +1,3 @@
-import pandas as pd
-import sys
 import time
 import numpy as np
 import scipy as sp

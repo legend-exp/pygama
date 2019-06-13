@@ -160,6 +160,8 @@ def linear_calibration():
     A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
     B = float((pks_lit[1] - adc_values[1]*A))
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
+    print(A)
+    print(B)
 
     df["e_cal"] = A * df['e_ftp'] + B
     
