@@ -5,19 +5,18 @@ figure.figsize   : 7, 5         # figure size in inches
 #figure.dpi       : 200          # figure dots per inch
 figure.facecolor : white
 figure.edgecolor : white
-# figure.autolayout : True        # Automatically apply 'plt.tight_layout'
+figure.autolayout : True        # Automatically apply 'plt.tight_layout'
 
 lines.linewidth : 3
 lines.markersize : 10
-
-legend.fontsize : 15
 legend.handlelength : 1
 
-axes.titlesize : 17
-axes.labelsize : 17
-
-xtick.labelsize : 14 # font size of tick labels
-ytick.labelsize : 14
+# font sizes
+legend.fontsize : 13
+axes.titlesize : 13
+axes.labelsize : 13
+xtick.labelsize : 13 # font size of tick labels
+ytick.labelsize : 13
 
 xtick.major.size     : 6      # major tick size in points
 xtick.minor.size     : 4      # minor tick size in points

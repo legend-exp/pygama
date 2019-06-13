@@ -67,6 +67,11 @@ def get_legend_dtype(dtstr):
     """
     dt = {}
     
+    # TODO: oliver gave me these, we should update the function below
+    # to use them instead of all that messy string splitting
+    # datatype_regexp = r"""^(([A-Za-z_]*)(<([0-9,]*)>)?)(\{(.*)\})?$"""
+    # arraydims_regexp = r"""^<([0-9,]*)>$"""
+    
     sp1 = dtstr.split("{")[0]
     dt["format"] = sp1 # scalar, array, struct, or table
     
@@ -197,6 +202,7 @@ def write_h5():
     read an MJ60 raw file and convert to Oliver's format.
     this is a test function on the way to changing tier0.py in pygama.
     """
+    print("hi clint")
     
     
     
