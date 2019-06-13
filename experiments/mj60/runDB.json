@@ -121,7 +121,7 @@
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,90,100]},
         "peakdet" : [
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
