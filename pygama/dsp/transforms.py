@@ -1,4 +1,5 @@
 import time
+import sys, os
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as signal
@@ -418,13 +419,14 @@ def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
 
         ptot = np.sum(p, axis=0)
         y = ptot / wfs.shape[0]
-        plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
+        plt.semilogy(f, y, '-b', label='all wfs')
 
         plt.xlabel('Frequency (Hz)', ha='right', x=0.9)
         plt.ylabel('PSD (ADC^2 / Hz)', ha='right', y=1)
         plt.legend(loc=1)
         plt.tight_layout()
         plt.show()
+        np.savez("./psd_stuff1.npz", f, y)
         exit()
 
     return {"psd": p, "f_psd": f}

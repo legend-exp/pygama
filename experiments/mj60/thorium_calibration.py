@@ -1,5 +1,7 @@
 import pandas as pd
 import sys
+import json
+import os
 import numpy as np
 import scipy as sp
 from scipy.signal import medfilt, find_peaks
@@ -8,21 +10,26 @@ import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pga
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-plt.style.use('style.mplstyle')
+# plt.style.use('style.mplstyle')
 np.set_printoptions(threshold=np.inf)
 
 def main():
 
     if(len(sys.argv) != 2):
-        print('Usage: make_spectrum_from_tier_2.py [run number]')
+        print('Usage: thorium_calibration.py [run number]')
         sys.exit()
 
     #spectrum_medfilt_peaks()
-    energy_spectrum()
+    linear_calibration()
 
 def spectrum_medfilt_peaks():
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
 
     m = np.array(df['e_ftp'])
 
@@ -58,7 +65,9 @@ def spectrum_medfilt_peaks():
     plt.legend(lines, labels, frameon=True, loc='upper right', fontsize='x-small')
     plt.show()
 
-def energy_spectrum():
+def linear_calibration():
+
+    pks_lit = [238.6, 583.2]
 
     pks_lit = [238.6, 583.2]
 
