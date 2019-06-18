@@ -18,7 +18,7 @@ def main():
     with open("runDB.json") as f:
         runDB = json.load(f)
 
-    # run_rsync()
+    #run_rsync()
     daq_cleanup()
 
 
@@ -30,7 +30,8 @@ def run_rsync(test=False):
         print("Error, we're not on the MJ60 DAQ machine.  Exiting ...")
         exit()
 
-    raw_dir = runDB["loc_dir"] + "/"
+    #raw_dir = runDB["loc_dir"] + "/"
+    raw_dir = os.path.expandvars(runDB["loc_dir"] + "/")
     raw_rocks = "{}:{}/".format(runDB["rocks_login"], runDB["rocks_dir"])
 
     if test:
@@ -40,7 +41,7 @@ def run_rsync(test=False):
     sh(cmd)
 
 
-def daq_cleanup(keep_t1=True, keep_t2=True):
+def daq_cleanup(keep_t1=False, keep_t2=False):
     """
     build a list of files on the DAQ and rocks, check integrity,
     and delete files on the DAQ only if we're sure the transfer was successful.

@@ -50,8 +50,16 @@
     "26":["272", "Background run at 1400 V, thresh=0x2"],
     "27":["273", "Background run at 1400 V, thresh=0x3"],
     "28":["274", "Background run at 1400 V, thresh=0x3"],
-    "29":["275", "Cesium Run See Elog-cesium source run with mj60"],
-    "30":["276,277", "Background run at 1400 V, see Elog-data taking campaign - MJ60 "]
+    "29":["275", "Cesium Run at 1400 V, 0x3 threshold See Elog-cesium source run with mj60"],
+    "30":["276,277", "Background run at 1400 V, 0x3 threshold, see Elog-data taking campaign - MJ60 "],
+    "31":["278", "Thorium run at 1400 V, 0x3 threshold, see Elog-data taking campaign - MJ60 "],
+    "32":["279", "Thorium run at 1400 V, 0x3 threshold, see Elog-data taking campaign - MJ60 "],
+    "33":["280,295", "Data Taking Campaign, BKG -- See Elog-data taking campaign - MJ60"],
+    "34":["296,315", "Data Taking Campaign, BKG -- See Elog-data taking campaign - MJ60"],
+    "35":["316,329", "Data Taking Campaign, BKG -- See Elog-data taking campaign - MJ60"],
+    "36":["330,353", "Data Taking Campaign, Kr -- See Elog-data taking campaign - MJ60"],
+    "37":["354,379", "Data Taking Campaign, Kr -- See Elog-data taking campaign - MJ60"],
+    "38":["380,395", "Dead time study -- See Elog-using external pulser to determine ... "]
   },
 
   "cal":{
