@@ -69,12 +69,9 @@ def linear_calibration():
 
     pks_lit = [238.6, 583.2]
 
-    with open("runDB.json") as f:
-        runDB = json.load(f)
-    tier_dir = os.path.expandvars(runDB["tier_dir"])
-    meta_dir = os.path.expandvars(runDB["meta_dir"])
+    pks_lit = [238.6, 583.2]
 
-    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
 
     m = np.array(df['e_ftp'])
 
@@ -82,9 +79,8 @@ def linear_calibration():
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    #hist = np.pad(hist, (1,0), 'constant')
+    hist = np.pad(hist, (1,0), 'constant')
     bins = bins + (bins[1] - bins[0])/2
-    bins = bins[0:(len(bins)-1)]
 
     hmed = medfilt(hist, 51)
     hpks = hist - hmed
@@ -138,8 +134,6 @@ def linear_calibration():
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     df['e_cal'] = df['e_ftp']*A+B
 
-    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
-
     pks_lit_all = [238.6, 338.3, 463.0, 511,0, 583.2, 727.3, 794.9, 860.6, 911.2, 969, 1460.8, 1592.5, 2103.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=338.3, ymin=0, ymax=30, color='aqua', linestyle='--', lw=1, zorder=1)
@@ -156,7 +150,7 @@ def linear_calibration():
     plt.axvline(x=2103.5, ymin=0, ymax=30, color='olive', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=2614.5, ymin=0, ymax=30, color='indigo', linestyle='--', lw=1, zorder=1)
     n = np.array(df['e_cal'])
-    plt.hist(n, np.arange(0,9500,0.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n)))
+    plt.hist(n, np.arange(0,9500,1.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n)))
     plt.xlim(0,4000)
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)

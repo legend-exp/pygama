@@ -18,6 +18,14 @@
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
   "det_mass_kg":0.739,
 
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "511.0":"beta+",
+    "583.2":"208Tl", "609.3":"214Bi", "911.2":"228Ac",
+    "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
+    "1764.5":"214Bi", "2614.5":"208Tl"
+  },
+  "expected_peaks":[2614.5, 1764.5, 1460.8, 583.2],
+
   "ds":{
     "note":"data sets",
     "0":["27,58", "biasing test 1, 2018/09/30"],
@@ -37,7 +45,7 @@
     "14":["168,176", "Kr run 2, 0x7 thresh"],
     "15":["177,185", "valve closed, bkg run"],
     "16":["186,189", "bkg run, valve open, 2019/03/19"],
-    "17":["190,190", "thorium calibration, pos 1 (windowsill)"],
+    "17":["190", "thorium calibration, pos 1 (windowsill)"],
     "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
     "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
     "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
@@ -45,16 +53,38 @@
     "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
     "22":["223,241", "Noise study during bias"],
     "23":["246,248", "Noise study during bias continued"],
-    "24":["249", "Background run at 1400 V, thresh=0x2"],
+    "24":["249", "Bkg run @ 1400 V, thresh=0x2"],
     "25":["250, 271", "Noise Study take 2"],
-    "26":["272", "Background run at 1400 V, thresh=0x2"],
-    "27":["273", "Background run at 1400 V, thresh=0x3"]
+    "26":["272", "Bkg run @ 1400 V, thresh=0x2"],
+    "27":["273", "Bkg run @ 1400 V, thresh=0x3"],
+    "28":["274", "Bkg run @ 1400 V, thresh=0x3"],
+    "29":["275", "Cesium Run (elog: cesium source run with mj60)"],
+    "30":["276,277", "Bkg run @ 1400 V, (elog: data taking campaign - MJ60)"],
+    "31":["278,279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
+    "32":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "33":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "34":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "35":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "36":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "37":["380,395", "Dead time study (elog: using external pulser to determine ...)"]
   },
 
-  "cal":{
-      "mj60":[2614.5, 1460.8, 20],
-      "cage":[],
-      "mjd":[]
+  "ecal":{
+    "note":"inputs for each energy estimator are organized by ds",
+    "0,999": {
+      "e_ftp": {
+        "ds_coverage":"0, 99",
+        "xlims":[0, 10000, 10],
+        "peakdet_thresh":100,
+        "match_thresh":0.01
+      },
+      "energy": {
+        "ds_coverage":"0, 99",
+        "xlims":[0, 3000000, 3000],
+        "peakdet_thresh":100,
+        "match_thresh":0.01
+      }
+    }
   },
 
   "build_options":{
@@ -91,7 +121,7 @@
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,90,100]},
         "peakdet" : [
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
@@ -161,12 +191,6 @@
     "note2":"scan all runs & paste output here",
     "ds0":999,
     "ds1":"0x8"
-  },
-
-  "cal_onboard": {
-    "note":"m, b",
-    "11":[0.0010555269899359561, -2.6681715462032116],
-    "13":[0.0010545621572212065, -2.3849931444240156]
   },
 
   "tests":{

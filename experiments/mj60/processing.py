@@ -44,7 +44,7 @@ def main(argv):
     # -- start processing --
     if args["tier0"]:
         tier0(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
-    
+
     if args["tier1"]:
         tier1(ds, args["ovr"], args["nevt"], args["ioff"], args["nomp"], args["verbose"],
               args["test"])

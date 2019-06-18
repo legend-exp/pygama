@@ -37,10 +37,10 @@ def update_progress(progress, run=None):
     block = int(round(barLength * progress))
 
     if run is None:
-        text = "\rPROGRESS : [{}] {:0.1f}% {}".format(
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
             "#" * block + "-" * (barLength - block), progress * 100, status)
     else:
-        text = "\rPROGRESS : [{}] {:0.1f}% {} (Run {})".format(
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
             "#" * block + "-" * (barLength - block), progress * 100, status,
             run)
 
@@ -99,7 +99,9 @@ def get_formatted_stats(mean, sigma, ndigs=2):
     sig_fmt = '%d' % ndigs
     sig_fmt = '%#.' + sig_fmt + 'g'
     mean_pos = int(np.floor(np.log10(abs(mean))))
-    mean_fmt = '%d' % (mean_pos-sig_pos+ndigs)
+    mdigs = mean_pos-sig_pos+ndigs
+    if mdigs < ndigs-1: mdigs = ndigs - 1
+    mean_fmt = '%d' % mdigs
     mean_fmt = '%#.' + mean_fmt + 'g'
     return mean_fmt % mean, sig_fmt % sigma
 
