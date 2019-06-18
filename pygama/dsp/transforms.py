@@ -1,4 +1,5 @@
 import time
+import sys, os
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as signal
@@ -396,13 +397,15 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     return {wfout: wfsg}
 
 
-def psd(waves, calcs, nseg=100, test=False):
+def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
     """
     calculate the psd of a bunch of wfs, and output them as a block,
     so some analysis can add them all together.
     nperseg = 1000 has more detail, but is slower
     """
     wfs = waves["wf_blsub"]
+    if ilo is not None and ihi is not None:
+        wfs = wfs[:, ilo:ihi]
     clk = waves["settings"]["clk"] # Hz
 
     nseg = 2999
@@ -410,16 +413,18 @@ def psd(waves, calcs, nseg=100, test=False):
 
     if test:
 
-        plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
+        # plt.semilogy(f, p[3], '-k', alpha=0.4, label='one wf')
 
         ptot = np.sum(p, axis=0)
-        plt.semilogy(f, ptot / wfs.shape[0], '-b', label='all wfs')
+        y = ptot / wfs.shape[0]
+        plt.semilogy(f, y, '-b', label='all wfs')
 
         plt.xlabel('Frequency (Hz)', ha='right', x=0.9)
         plt.ylabel('PSD (ADC^2 / Hz)', ha='right', y=1)
         plt.legend(loc=1)
         plt.tight_layout()
         plt.show()
+        np.savez("./psd_stuff1.npz", f, y)
         exit()
 
     return {"psd": p, "f_psd": f}

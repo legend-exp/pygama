@@ -4,6 +4,7 @@
   "loc_dir":"$DATADIR/MJ60",
   "raw_dir":"$DATADIR/MJ60/Data",
   "tier_dir":"$DATADIR/MJ60/pygama",
+  "meta_dir":"$DATADIR/MJ60/metadata",
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 
@@ -16,7 +17,6 @@
   "rollover":1,
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
   "det_mass_kg":0.739,
-
 
   "ds":{
     "note":"data sets",
@@ -38,7 +38,17 @@
     "15":["177,185", "valve closed, bkg run"],
     "16":["186,189", "bkg run, valve open, 2019/03/19"],
     "17":["190,190", "thorium calibration, pos 1 (windowsill)"],
-    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"]
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
+    "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
+    "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
+    "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
+    "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
+    "22":["223,241", "Noise study during bias"],
+    "23":["246,248", "Noise study during bias continued"],
+    "24":["249", "Background run at 1400 V, thresh=0x2"],
+    "25":["250, 271", "Noise Study take 2"],
+    "26":["272", "Background run at 1400 V, thresh=0x2"],
+    "27":["273", "Background run at 1400 V, thresh=0x3"]
   },
 
   "cal":{
