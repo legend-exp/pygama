@@ -11,8 +11,49 @@ plt.style.use('style.mplstyle')
 
 def main():
 
+    #Campaign_Data()
     #Kr_and_BKG_Data()
     Collimator_Simulations()
+
+def Campaign_Data():
+
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    BKG1 =  pd.read_hdf("{}/Spectrum_280-289.hdf5".format(meta_dir))
+    Kr1 = pd.read_hdf("{}/Spectrum_330-339.hdf5".format(meta_dir))
+
+    xlo, xhi, xpb = 0, 4000, 0.5
+    nbins = int((xhi - xlo)/xpb)
+
+    BKGhist, bins = np.histogram(BKG1['e_cal'], nbins, (xlo,xhi))
+    Krhist, bins = np.histogram(Kr1['e_cal'], nbins, (xlo,xhi))
+
+    bins = bins[0:(len(bins)-1)]
+    bin_centers = bins - (bins[1] - bins[0])/2
+
+    integral1 = xpb * sum(BKGhist[40:2600])
+    integral2 = xpb * sum(Krhist[40:2600])
+
+    hist_01 = BKGhist * integral2/integral1
+    hist3 = Krhist - hist_01
+    errors = np.sqrt(Krhist + hist_01*integral2/integral1)
+
+    plt.plot(bins, hist_01, color='red', ls='steps', label='Background Data')
+    plt.plot(bins, Krhist, color='black', ls='steps', label='Kr83m Data')
+    plt.plot(bins, hist3, color='aqua', ls='steps', label='Kr83m Spectrum (Kr83m Data - Background Data)')
+    plt.errorbar(bin_centers, hist3, errors, color='black', fmt='o', markersize=3, capsize=3)
+
+    plt.xlim(0,4000)
+    #plt.ylim(0,plt.ylim()[1])
+    plt.xlabel('Energy (keV)', ha='right', x=1.0)
+    plt.ylabel('Counts', ha='right', y=1.0)
+    plt.title('Energy Spectrum (Kr83m Source)')
+    plt.legend(frameon=True, loc='upper right', fontsize='small')
+    plt.tight_layout()
+    #plt.semilogy()
+    plt.show()
 
 def Kr_and_BKG_Data():
 
@@ -117,7 +158,7 @@ def Collimator_Simulations():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     # A_0 = activity of source in mCi
-    A_0 = .01
+    A_0 = .05
 
     # A = activity of source in bequerel (decays/second)
     A = A_0*37000000  
@@ -165,4 +206,3 @@ def Collimator_Simulations():
 
 if __name__ == '__main__':
         main()
-
