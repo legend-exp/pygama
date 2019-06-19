@@ -21,9 +21,9 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    plot_wfs()
-    #flip_through_wfs()
-    #ADC_difference()   
+    # plot_wfs()
+    flip_through_wfs()
+    #ADC_difference()
     #ADC_difference_cut()
 
 def plot_wfs():
@@ -42,7 +42,7 @@ def plot_wfs():
 
     runtime = ds.DataSet(run=int(sys.argv[1]), md='./runDB.json').get_runtime()
     counts_per_second = (len(df))/runtime
-    
+
     df = df.reset_index(drop=True)
     del df['energy']
     del df['channel']
@@ -55,9 +55,9 @@ def plot_wfs():
 
     def bl_sub(wf):
         return df.loc[wf,:]-df.iloc[wf,0:850].mean()
-        
+
     nsamp = 3000
- 
+
     xvals = np.arange(0,nsamp)
 
     for i in range(0,1):
@@ -75,16 +75,16 @@ def flip_through_wfs():
     if(len(sys.argv) != 4):
         print('Usage: wfs.py [run number] [lower energy limit (keV)] [upper energy limit (keV)]')
         sys.exit()
-    
+
     with open("runDB.json") as f:
         runDB = json.load(f)
     tier_dir = os.path.expandvars(runDB["tier_dir"])
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
-    df_2 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df_2 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
-    df_2 = df_2.reset_index(drop=True)
+    #df_2 = df_2.reset_index(drop=True)
     df = df.reset_index(drop=True)
     del df['energy']
     del df['channel']
@@ -95,11 +95,11 @@ def flip_through_wfs():
     del df['ts_hi']
     del df['ts_lo']
 
-    df['e_cal'] = df_2['e_cal']
-    df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
-    df = df.reset_index(drop=True)
-    df_3 = pd.DataFrame(df['e_cal'])
-    del df['e_cal']  
+    #df['e_cal'] = df_2['e_cal']
+    #df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
+    #df = df.reset_index(drop=True)
+    #df_3 = pd.DataFrame(df['e_cal'])
+    #del df['e_cal']
 
     def bl_sub(wf):
         return df.loc[wf,:]-df.iloc[wf,0:500].mean()
@@ -121,7 +121,7 @@ def flip_through_wfs():
         print(i)
 
         plt.cla()
-        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}, E = {:.03f} keV".format(str(sys.argv[1]), df_3['e_cal'][i]))
+        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}".format(str(sys.argv[1])))
         plt.plot(xvals, savgol(i), color="red", lw=1, label="Savitzky-Golay Filter")
         plt.xlabel('Sample Number', ha='right', x=1.0)
         plt.ylabel('ADC Value', ha='right', y=1.0)
@@ -160,7 +160,7 @@ def ADC_difference():
 
     #def dADC(wf):
         #return df.iloc[wf,1499:3000].mean()-df.iloc[wf,0:500].mean()
- 
+
     #for i in range(len(df)):
         #df_2['diff'][i] = dADC(i)
 
@@ -214,7 +214,7 @@ def ADC_difference_cut():
 
     df_2['diff'] = df.iloc[:,1499:3000].mean(axis=1) - df.iloc[:,0:500].mean(axis=1)
     df_2['ratio'] = df_2['diff']/df_2['e_cal']
-    
+
     df_2 = df_2.loc[(df_2['diff']>3)&(df_2.e_cal>5)]
     print('python script time = {:.0f} seconds'.format(time.time() - start))
 
@@ -230,4 +230,3 @@ def ADC_difference_cut():
 
 if __name__ == '__main__':
         main()
-
