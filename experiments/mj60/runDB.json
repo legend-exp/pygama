@@ -9,6 +9,7 @@
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 
   "digitizer":"ORSIS3302Model",
+  "daq":"ORCA",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
 
@@ -91,6 +92,7 @@
     "conf1":{
       "run_coverage":[0,74],
       "tier0_options":{
+        "daq":"ORCA",
         "clk" : 100e6,
         "digitizer":"ORSIS3302DecoderForEnergy",
         "buffer_wrap":1,
@@ -133,6 +135,7 @@
     "conf2":{
       "run_coverage":[75,999],
       "tier0_options":{
+        "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
       },
       "tier1_options":{

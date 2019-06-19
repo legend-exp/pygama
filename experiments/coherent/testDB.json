@@ -3,6 +3,7 @@
   "raw_dir":"$DATADIR/raw",
   "tier_dir":"$DATADIR",
   "digitizer":"ORSIS3302Model",
+  "daq":"ORCA",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
   "chunksize":1000,
@@ -18,6 +19,7 @@
     "conf1":{
       "run_coverage":[0,9999999],
       "tier0_options":{
+        "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
       },
       "tier1_options":{
