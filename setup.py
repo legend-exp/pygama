@@ -42,11 +42,11 @@ if __name__ == "__main__":
 
     setup(
         name="pygama",
-        version="0.1.0",
-        author="Ben Shanks",
-        author_email="benjamin.shanks@gmail.com",
+        version="0.2",
+        author="Clint Wiseman",
+        author_email="wisecg.neontetra@gmail.com",
         packages=find_packages(),
         ext_modules=exts,
         install_requires=[
-            "numpy", "scipy", "pandas", "tables", "future", "cython"
+            "numpy", "scipy", "pandas", "tables", "future", "cython", "tinydb"
         ])

@@ -9,14 +9,13 @@ from pygama import DataSet
 
 def main(argv):
     """
-    Uses pygama's amazing DataSet class to process runs for different
-    data sets, with arbitrary configuration options defined in a JSON file.
-    C. Wiseman, 2019/04/09
+    Uses pygama's amazing DataSet class to process runs
+    for different data sets and arbitrary configuration options
+    defined in a JSON file.
     """
-    run_db = './testDB.json'
-
+    run_db = './runDB.json'
     # -- parse args --
-    par = argparse.ArgumentParser(description="test data processing suite")
+    par = argparse.ArgumentParser(description="data processing suite for MJ60")
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
     arg("-r", "--run", nargs=1, help="load a single run")
@@ -72,12 +71,8 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             print("test mode (dry run), processing Tier 0 file:", t0_file)
             continue
 
-        if nevt != np.inf:
-            nevt = int(nevt)
-
         ProcessTier0(
             t0_file,
-            run,
             verbose=v,
             output_dir=ds.tier_dir,
             overwrite=overwrite,

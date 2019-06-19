@@ -9,6 +9,7 @@
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 
   "digitizer":"ORSIS3302Model",
+  "daq":"ORCA",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
 
@@ -45,8 +46,8 @@
     "14":["168,176", "Kr run 2, 0x7 thresh"],
     "15":["177,185", "valve closed, bkg run"],
     "16":["186,189", "bkg run, valve open, 2019/03/19"],
-    "17":["190,190", "Thorium run, pos 1 (windowsill)"],
-    "17":["191,204", "Thorium run, pos 2 (corner of rm)"],
+    "17":["190", "thorium calibration, pos 1 (windowsill)"],
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
     "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
     "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
     "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
@@ -92,6 +93,7 @@
     "conf1":{
       "run_coverage":[0,74],
       "tier0_options":{
+        "daq":"ORCA",
         "clk" : 100e6,
         "digitizer":"ORSIS3302DecoderForEnergy",
         "buffer_wrap":1,
@@ -134,6 +136,7 @@
     "conf2":{
       "run_coverage":[75,999],
       "tier0_options":{
+        "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
       },
       "tier1_options":{
