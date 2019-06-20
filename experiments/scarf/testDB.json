@@ -12,7 +12,7 @@
   "det_mass_kg":0.739,
 
   "ds":{
-    "0":["000", "2019/06/18 Trigger on triple SiPM coincidences"]
+    "0":["204", "2019/06/18 Trigger on triple SiPM coincidences"]
   },
 
   "build_options":{

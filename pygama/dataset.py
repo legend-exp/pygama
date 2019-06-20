@@ -14,6 +14,7 @@ class DataSet:
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None,
                  opt=None, v=False, md=None, cal=None, raw_dir=None, tier_dir=None):
 
+        # print("hi there!")
         # load metadata and set paths to data folders
         self.runDB, self.calDB = None, None
         if md is not None:
