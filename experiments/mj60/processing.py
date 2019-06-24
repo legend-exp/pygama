@@ -62,6 +62,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
         t0_file = ds.paths[run]["t0_path"]
         t1_file = ds.paths[run]["t1_path"]
         if t1_file is not None and overwrite is False:
+            print("file exists, overwrite flag isn't set.  continuing ...")
             continue
 
         conf = ds.paths[run]["build_opt"]
@@ -73,6 +74,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
 
         ProcessTier0(
             t0_file,
+            run,
             verbose=v,
             output_dir=ds.tier_dir,
             overwrite=overwrite,

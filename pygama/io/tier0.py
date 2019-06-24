@@ -17,8 +17,8 @@ from ..io.decoders.data_loading import *
 from ..io.decoders.xml_parser import *
 from ..dsp.base import *
 
-
 def ProcessTier0(t0_file,
+                 run,
                  output_prefix="t1",
                  chan_list=None,
                  n_max=np.inf,
@@ -34,10 +34,40 @@ def ProcessTier0(t0_file,
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
 
+    # declare Tier 1 output file
+    output_dir = os.getcwd() if output_dir is None else output_dir
+    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+    if os.path.isfile(t1_file):
+        if overwrite:
+            print("Overwriting existing file...")
+            os.remove(t1_file)
+        else:
+            print("File already exists, continuing ...")
+            return
+        
+    # set max number of events (useful for debugging)
+    if n_max is not np.inf:
+        n_max = int(n_max)
+
+    # get the DAQ mode
+    if settings["daq"] == "ORCA":
+        ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
+    elif settings["daq"] == "FlashCam":
+        ProcessFlashCam()
+    else:
+        print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
+        exit()
+    
+    
+def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
+    """
+    handle ORCA raw files
+    """
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
+    # TODO: pass this option in from the 'settings' dict
     ROW_LIMIT = 5e4
-
+    
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
     if f_in == None:
@@ -59,7 +89,7 @@ def ProcessTier0(t0_file,
     file_size_MB = file_size / 1e6
     print("Total file size: {:.3f} MB".format(file_size_MB))
 
-    run = get_run_number(header_dict)
+    # run = get_run_number(header_dict)
     print("Run number: {}".format(run))
 
     id_dict = get_decoder_for_id(header_dict)
@@ -93,18 +123,7 @@ def ProcessTier0(t0_file,
             # pprint(d.df_metadata.columns)
             # exit()
 
-    # declare Tier 1 output file
-    output_dir = os.getcwd() if output_dir is None else output_dir
-    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
-
-    if os.path.isfile(t1_file):
-        if overwrite:
-            print("Overwriting existing file...")
-            os.remove(t1_file)
-        else:
-            print("File already exists, continuing ...")
-            return
-
+    
     # ------------ scan over raw data starts here -----------------
 
     print("Beginning Tier 0 processing ...")
@@ -219,3 +238,6 @@ def get_next_event(f_in):
     return event_data, data_id
 
 
+def ProcessFlashCam():
+    # placeholder
+    print("Hi Yoann")

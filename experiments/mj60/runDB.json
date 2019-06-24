@@ -9,6 +9,7 @@
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 
   "digitizer":"ORSIS3302Model",
+  "daq":"ORCA",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
 
@@ -66,7 +67,8 @@
     "34":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
     "35":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
     "36":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
-    "37":["380,395", "Dead time study (elog: using external pulser to determine ...)"]
+    "37":["380,395", "Dead time study (elog: using external pulser to determine ...)"],
+    "38":["400,999", "Pulser energy study (elog: mj60 pulser study)"]
   },
 
   "ecal":{
@@ -91,6 +93,7 @@
     "conf1":{
       "run_coverage":[0,74],
       "tier0_options":{
+        "daq":"ORCA",
         "clk" : 100e6,
         "digitizer":"ORSIS3302DecoderForEnergy",
         "buffer_wrap":1,
@@ -133,6 +136,7 @@
     "conf2":{
       "run_coverage":[75,999],
       "tier0_options":{
+        "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
       },
       "tier1_options":{

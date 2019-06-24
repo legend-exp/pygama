@@ -1,25 +1,25 @@
 {
-  "loc_dir":"$DATADIR/LNGS",
-  "raw_dir":"$DATADIR/LNGS",
-  "tier_dir":"$DATADIR/LNGS/pygama",
-  "digitizer":"ORSIS3302Model",
+  "loc_dir":"$DATADIR/NCSU",
+  "raw_dir":"$DATADIR/NCSU",
+  "tier_dir":"$DATADIR/NCSU/pygama",
+  "digitizer":"ORSIS3316Model",
+  "daq":"ORCA",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
   "chunksize":1000,
   "clock":100e6,
   "rollover":1,
-  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
-  "det_mass_kg":0.739,
 
   "ds":{
-    "0":["204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"]
+    "0":["12", "test run, ORCA/3316 decoder"]
   },
 
   "build_options":{
     "conf1":{
-      "run_coverage":[75,99999],
+      "run_coverage":[0,99999],
       "tier0_options":{
-        "digitizer":"ORSIS3302DecoderForEnergy"
+        "daq":"ORCA",
+        "digitizer":"ORSIS3316DecoderForEnergy"
       },
       "tier1_options":{
         "clk" : 100e6,

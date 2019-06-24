@@ -22,8 +22,8 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    plot_wfs()
-    #flip_through_wfs()
+    # plot_wfs()
+    flip_through_wfs()
     #ADC_difference()
     #ADC_difference_cut()
 
@@ -83,9 +83,9 @@ def flip_through_wfs():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
-    df_2 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df_2 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
-    df_2 = df_2.reset_index(drop=True)
+    #df_2 = df_2.reset_index(drop=True)
     df = df.reset_index(drop=True)
     del df['energy']
     del df['channel']
@@ -96,11 +96,11 @@ def flip_through_wfs():
     del df['ts_hi']
     del df['ts_lo']
 
-    df['e_cal'] = df_2['e_cal']
-    df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
-    df = df.reset_index(drop=True)
-    df_3 = pd.DataFrame(df['e_cal'])
-    del df['e_cal']
+    #df['e_cal'] = df_2['e_cal']
+    #df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
+    #df = df.reset_index(drop=True)
+    #df_3 = pd.DataFrame(df['e_cal'])
+    #del df['e_cal']
 
     def bl_sub(wf):
         return df.loc[wf,:]-df.iloc[wf,0:500].mean()
@@ -122,7 +122,7 @@ def flip_through_wfs():
         print(i)
 
         plt.cla()
-        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}, E = {:.03f} keV".format(str(sys.argv[1]), df_3['e_cal'][i]))
+        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}".format(str(sys.argv[1])))
         plt.plot(xvals, savgol(i), color="red", lw=1, label="Savitzky-Golay Filter")
         plt.xlabel('Sample Number', ha='right', x=1.0)
         plt.ylabel('ADC Value', ha='right', y=1.0)
