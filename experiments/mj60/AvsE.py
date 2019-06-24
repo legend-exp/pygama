@@ -30,26 +30,22 @@ def main():
     global meta_dir
     meta_dir = runDB["meta_dir"]
 
-    # Which run number  is the being analyzed
+    # Which run number is the being analyzed
     # run = 249
     # run = 214
     # run = 204
     run = 278
 
-
-    # histograms(cutwf, t2cut, run)
     histograms(run)
 
-# def histograms(t1df, t2df, run):
 def histograms(run):
+
     ds = DataSet(runlist=[run], md='./runDB.json', tier_dir=tier_dir)
     t2 = ds.get_t2df()
     t2df = os.path.expandvars('{}/Spectrum_{}.hdf5'.format(meta_dir,run))
     t2df = pd.read_hdf(t2df, key="df")
     t2df = t2df.reset_index(drop=True)
     t2 = t2.reset_index(drop=True)
-    # print(t2.columns)
-    # exit()
 
     n = "current_max"
     e = "e_cal"
@@ -58,9 +54,8 @@ def histograms(run):
     y0 = np.asarray(t2df[n])
     y = y0 * e_over_unc / x
 
-
-
     hist, bins = np.histogram(x, bins=500, range=[1500,1700])
+
 
     def gauss(x, *params):
         y = np.zeros_like(x)
@@ -72,7 +67,7 @@ def histograms(run):
         y = y + params[-1]
         return y
 
-    p0_list= [1590, 31, 3, 4]
+    p0_list = [1590, 31, 3, 4]
 
     par, pcov = curve_fit(
         gauss, bins[1:], hist, p0=p0_list)
@@ -82,37 +77,58 @@ def histograms(run):
 
     mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
     print("Scanning peak ", n, " at energy", mu)
-    ans = quad(gauss, mu - 5 * sig, mu + 5 * sig, args=(mu, amp, sig, bkg))
-    answer = ans[0]
+    ans = quad(gauss, 1586, 1597, args=(mu, amp, sig, bkg))
+    answer = ans[0] - ((1597-1586)*bkg)
     print("Counts in ", mu, " peak is ", answer)
 
-    plt.plot(bins[1:], hist, ls="steps", linewidth=2, label='Calibrated Energy: Run {}'.format(run))
-    plt.plot(bins[1:], gauss(bins[1:], *par), '-r')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    cut = answer
+    line = .012
 
-    y1 = y[np.where(.021 < y)]
-    x1 = x[np.where(.021 < y)]
+    y1 = y[np.where(line < y)]
+    x1 = x[np.where(line < y)]
+    hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
 
+    while cut >= .9 * answer:
 
+        y1 = y[np.where(line < y)]
+        x1 = x[np.where(line < y)]
 
+        hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
 
+        par1, pcov1 = curve_fit(
+            gauss, bins1[1:], hist1, p0=p0_list)
+        print(par1)
+        perr1 = np.sqrt(np.diag(pcov))
+        print(perr1)
 
-    plt.clf()
-    plt.hist2d(x1, y1, bins=[1000,200], range=[[0, 2000], [0, .1]], norm=LogNorm(), cmap='jet')
+        mu1, amp1, sig1, bkg1 = par1[0], par1[1], par1[2], par1[-1]
+        print("Scanning cut peak ", n, " at energy", mu1)
+        ans1 = quad(gauss, 1586, 1597, args=(mu1, amp1, sig1, bkg1))
+        cut = ans1[0] - ((1597-1586)*bkg1)
+        print("Counts in ", mu1, " peak is ", cut)
+
+        line = line + .0001
+
+    plt.hist2d(x, y, bins=[1000,200], range=[[0, 2000], [0, .05]], norm=LogNorm(), cmap='jet')
+    plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
     cbar = plt.colorbar()
     plt.title("Run {}".format(run))
     plt.xlabel("Energy (keV)", ha='right', x=1)
-    plt.ylabel("A*E/Eunc", ha='right', y=1)
+    plt.ylabel("A/Eunc", ha='right', y=1)
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
     plt.show()
 
 
-
-
-
+    plt.clf()
+    plt.plot(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Run {}'.format(run))
+    plt.plot(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Run {}'.format(run))
+    # plt.plot(bins[1:], gauss(bins[1:], *par), '-r')
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
 if __name__=="__main__":
     main()
