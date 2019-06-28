@@ -35,6 +35,10 @@ def ProcessTier0(t0_file,
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
     print("  Digitizer:", settings["digitizer"])
+    if settings["digitizer"] == "SIS3316":
+        print("found SIS3316, forking")
+    else:
+        print("found other decoder, forcing to orca")
 
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
