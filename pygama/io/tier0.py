@@ -16,6 +16,7 @@ from ..io.decoders.pollers import *
 from ..io.decoders.data_loading import *
 from ..io.decoders.xml_parser import *
 from ..dsp.base import *
+from ..io.decoders.SIS3316File import *
 
 
 def ProcessTier0(t0_file,
@@ -36,7 +37,8 @@ def ProcessTier0(t0_file,
     print("  Input file:", t0_file)
     print("  Digitizer:", settings["digitizer"])
     if settings["digitizer"] == "SIS3316":
-        print("found SIS3316, forking")
+        print("found SIS3316, förking")
+        #file = SIS3316File()
     else:
         print("found other decoder, forcing to orca")
 
@@ -49,6 +51,8 @@ def ProcessTier0(t0_file,
     if f_in == None:
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
+        
+    file = SIS3316File(f_in,2) #test
 
     # parse the header
     reclen, reclen2, header_dict = parse_header(t0_file)
