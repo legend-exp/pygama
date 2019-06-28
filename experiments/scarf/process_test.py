@@ -67,6 +67,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
 
         conf = ds.paths[run]["build_opt"]
         opts = ds.runDB["build_options"][conf]["tier0_options"]
+        pprint(opts)
 
         if test:
             print("test mode (dry run), processing Tier 0 file:", t0_file)

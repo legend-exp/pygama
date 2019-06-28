@@ -1,0 +1,21 @@
+ /crate/addfadc ethernet 10.152.159.171
+/fadc/choose 0
+/fadc/setup/openChannels 0x0007
+/fadc/setup/trigger/mode auto
+/fadc/setup/trigger/onExternal 0x007
+ /fadc/setup/trigger/feedbackChannels 0x0000
+/fadc/setup/trigger/enable 0x0000
+/fadc/setup/memory/evtsPerBank 4
+ /fadc/setup/pass
+
+#/root/display/init 
+# /root/display/channel 1
+/fadc/setup/memory/sampleLength 256
+/fadc/setup/memory/preTriggerDelay 128
+/fadc/setup/pass
+
+/io/save unprocessed eberhard.bin
+
+/crate/ethernet/packetsPerRequest 32
+
+/fadc/sampling/start 12

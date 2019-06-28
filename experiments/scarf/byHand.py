@@ -32,7 +32,7 @@ pprint(testDB["ds"])
 
 # ds = DataSet(0, 3, md=db_file, v=True) # can use a range of datasets
 
-ds = DataSet(run=204, md=db_file, v=True) # can also use a list of run numbers
+ds = DataSet(run=111, md=db_file, v=True) # can also use a list of run numbers
 
 #somehow, the program doesn't find a file named testSCARF137, but
 # 2019-3-18-BackgroundRun204 seems to be ok ...
@@ -45,6 +45,8 @@ print("t2 file prefix :", ds.t2pre)
 print("current run list :", ds.runs)
 print("current file paths :")
 pprint(ds.paths)
+
+print("IF YOUR t0_path IS EMPTY, CROSS-CHECK $DATADIR AND FILE NAMING")
 
 
 
