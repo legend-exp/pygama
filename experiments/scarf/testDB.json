@@ -12,7 +12,7 @@
   "det_mass_kg":0.739,
 
   "ds":{
-    "0":["204", "2019/06/18 Trigger on triple SiPM coincidences"]
+    "0":["111", "2019/06/27 Just Empty Baselines"]
   },
 
   "build_options":{
