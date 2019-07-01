@@ -20,10 +20,15 @@ class SIS3316File:
         self.f_in = file_binary
         self.verbose = verbosity
         flag = self.parse_fileheader()
-        self.parse_channelConfigs()
-        idx, nrx = self.__read_chunk_header()
-        print("head1: ID: {}, nr: {}".format(idx, nrx))
+        # chConf = self.parse_channelConfigs()
         
+        #idx, nrx = self.__read_chunk_header()
+        #print("head1: ID: {}, nr: {}".format(idx, nrx))
+        #flag = True
+        #while flag:
+        #    fi, ci, da = self.read_next_event(chConf)
+        #    if da is None:
+        #        flag = False
         
     def parse_fileheader(self):
         """
@@ -35,6 +40,7 @@ class SIS3316File:
         length in bytes of channel configurations (information for every channel, following the file header)
         returns true, if magic bytes match, false if not
         """
+        self.f_in.seek(0)    #should be there anyhow, but re-set if not
         header = self.f_in.read(16)
         evt_data_32 = np.fromstring(header, dtype=np.uint32)
         evt_data_16 = np.fromstring(header, dtype=np.uint16)
@@ -96,7 +102,7 @@ class SIS3316File:
             
             if fadcIndex in channelConfigs:
                 #print("pre-existing fadc")
-                w = 21
+                pass
             else:
                 #print("new fadc #{}".format(fadcIndex))
                 channelConfigs[fadcIndex] = {}
@@ -122,6 +128,7 @@ class SIS3316File:
             channelConfigs[fadcIndex][channelIndex]["MAW3Offset"] = evt_data_32[15]
             channelConfigs[fadcIndex][channelIndex]["SampleOffset"] = evt_data_32[16]
             
+            
         
         if self.verbose > 0:
             pprint(channelConfigs)
@@ -143,6 +150,9 @@ class SIS3316File:
         returns FADCID, nr of events in chunk
         """
         header = self.f_in.read(8)
+        if len(header) < 8:
+            raise BinaryReadException(8, len(header))
+        
         header_data_32 = np.fromstring(header, dtype=np.uint32)
         
         self.currentEventIndex=0   #points to first event of chunk
@@ -150,17 +160,36 @@ class SIS3316File:
         return header_data_32[0], header_data_32[1]
     
     
-    def __read_next_event(self, eventLength8, nrEventsPerChunk):
+    def __read_next_event(self, fadcID, channelConfigs, nrEventsPerChunk):
         """
-        returns a chunk of data containing event data (event header and samples)
+        reads a chunk of data containing event data (event header and samples)
         file pointer has to be on beginning of event, NOT on chunk header
+        Returns the channelID of the Event, as well as the chunk of data
         """
         
         if self.currentEventIndex == -1:
             print("ERROR: pointing at chunk header!")
             return None
+            
+        if self.verbose > 1:
+            print("Reading chunk #{} event #{}".format(self.currentChunkIndex, self.currentEventIndex))
+        
+        position = self.f_in.tell()     #save position of the event header's 1st byte
+        data1 = self.f_in.read(4)       #read the first (32 bit) word of the event's header: channelID & format bits
+        if len(data1) < 4:
+            raise BinaryReadException(4, len(data1))
+        self.f_in.seek(position)        #go back to 1st position of event header
+        
+        header_data_32 = np.fromstring(data1, dtype=np.uint32)
+        channelID = (header_data_32[0] >> 4) & 0x00000fff
+        if self.verbose > 1:
+            print("Event is from FADC #{}, channel #{}".format(fadcID, channelID))
+        eventLength8 = channelConfigs[fadcID][channelID]["EventLength"]
+        eventLength8 *= 4 #EventLength is in 32 bit
         
         data = self.f_in.read(eventLength8)
+        if len(data) < eventLength8:
+            raise BinaryReadException(eventLength8, len(data))
     
         self.currentEventIndex += 1     #move to next event
         if(self.currentEventIndex == nrEventsPerChunk): #if this event was the last of the chunk
@@ -168,28 +197,48 @@ class SIS3316File:
             self.currentChunkIndex += 1     #points to next chunk of file
     
     
-        return data
+        return channelID, data
     
     def read_next_event(self, channelConfigs):
         """
+        This should be the main method to call when parsing the file for events.
+        returns the current FADC index, the channel ID and the binary data of the event if a valid event is found
+        Returns -1, -1, None when after the last event in the file.
         automatically goes to the next event in the file, calling __read_chunk_header and __read_next_event
         when appropriate.
         returns FADCindex, channelIndex, binaryEventData
         """
         
+        # have to extract channel index from binary, since we need the length of the event, which can change between channels
+        
         if self.currentEventIndex == -1:     #points to header of next chunk, not to event
             try:
-                self.currentFADC, self.currentChunkSize = __read_chunk_header()
-            except Exception as e:
-                print("  No more data...\n")
-                return None
+                self.currentFADC, self.currentChunkSize = self.__read_chunk_header()
+            except BinaryReadException as e:
+                #print("  No more data...\n")
+                return -1,-1,None
+                
+        try:
+            channelID, binary_data = self.__read_next_event(self.currentFADC, channelConfigs, self.currentChunkSize)
+        except BinaryReadException as e:
+            #print("  No more data...\n")
+            return -1,-1,None
+            
+        return self.currentFADC, channelID, binary_data
         
     
         #ToDo !!!!!!!!!!!
     
     
     
+class BinaryReadException(Exception):
+
+    def __init__(self, requestedNrOfBytes, gotNrOfBytes):
+        self.reqNOB = requestedNrOfBytes
+        self.gotNOB = gotNrOfBytes
     
+    def printMessage(self):
+        print("Exception: tried to read {} bytes, got {} bytes".format(self.reqNOB, self.gotNOB))
     
     
     

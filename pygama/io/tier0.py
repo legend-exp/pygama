@@ -18,6 +18,14 @@ from ..io.decoders.xml_parser import *
 from ..dsp.base import *
 from ..io.decoders.SIS3316File import *
 
+#here I declare a mode to identify whether the data comes in ORCA format (with header and so on)
+#or in SIS3316 format.
+#I guess, this can be also enlarged in the future
+from enum import Enum, auto
+class ModeEnum(Enum):
+    ORCA = auto()
+    SIS3316 = auto()
+
 
 def ProcessTier0(t0_file,
                  output_prefix="t1",
@@ -35,12 +43,14 @@ def ProcessTier0(t0_file,
     """
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
-    print("  Digitizer:", settings["digitizer"])
+    #print("  Digitizer:", settings["digitizer"])
     if settings["digitizer"] == "SIS3316":
-        print("found SIS3316, förking")
+        print("found SIS3316")
+        mode = ModeEnum.SIS3316
         #file = SIS3316File()
     else:
         print("found other decoder, forcing to orca")
+        mode = ModeEnum.ORCA
 
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
@@ -52,14 +62,21 @@ def ProcessTier0(t0_file,
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
         
-    file = SIS3316File(f_in,2) #test
+    #file = SIS3316File(f_in,2) #test
 
     # parse the header
-    reclen, reclen2, header_dict = parse_header(t0_file)
-    # print("   {} longs in plist header".format(reclen))
-    # print("   {} bytes in the header".format(reclen2))
-    # pprint(header_dict)
-    # exit()
+    if mode is ModeEnum.ORCA:
+        reclen, reclen2, header_dict = parse_header(t0_file)
+        # print("   {} longs in plist header".format(reclen))
+        # print("   {} bytes in the header".format(reclen2))
+        # pprint(header_dict)
+        # exit()
+    elif mode is ModeEnum.SIS3316:
+        verbosity = 1 if verbose else 0     # 2 is for debug
+        sisfile = SIS3316File(f_in, verbosity)
+    else:
+        print("ERROR: unrecognized mode!")
+        raise Exception("Mode cannot be identified!")
 
     # figure out the total size
     SEEK_END = 2
@@ -68,32 +85,37 @@ def ProcessTier0(t0_file,
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
     print("Total file size: {:.3f} MB".format(file_size_MB))
+    
+    if mode is ModeEnum.SIS3316:
+        header_dict = sisfile.parse_channelConfigs()
+        decoders = [SIS3316Decoder(),]  #just allow this single guy
+    elif mode is ModeEnum.ORCA:
+        run = get_run_number(header_dict)
+        print("Run number: {}".format(run))
 
-    run = get_run_number(header_dict)
-    print("Run number: {}".format(run))
+        id_dict = get_decoder_for_id(header_dict)
+        if verbose:
+            print("Data IDs present in this header are:")
+            for id in id_dict:
+                print("    {}: {}".format(id, id_dict[id]))
+        used_decoder_names = set([id_dict[id] for id in id_dict])
 
-    id_dict = get_decoder_for_id(header_dict)
-    if verbose:
-        print("Data IDs present in this header are:")
-        for id in id_dict:
-            print("    {}: {}".format(id, id_dict[id]))
-    used_decoder_names = set([id_dict[id] for id in id_dict])
+        # get all available pygama decoders, then remove unused ones
+        if decoders is None:
+            decoders = get_decoders(header_dict)
+            decoder_names = [d.decoder_name for d in decoders]
 
-    # get all available pygama decoders, then remove unused ones
-    if decoders is None:
-        decoders = get_decoders(header_dict)
-        decoder_names = [d.decoder_name for d in decoders]
+        final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
+        decoders = [d for d in decoders if d.decoder_name in final_decoder_list]
+        decoder_to_id = {d.decoder_name: d for d in decoders}
 
-    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
-    decoders = [d for d in decoders if d.decoder_name in final_decoder_list]
-    decoder_to_id = {d.decoder_name: d for d in decoders}
-
-    print("pygama will run these decoders:")
-    for name in final_decoder_list:
-        for id in id_dict:
-            if id_dict[id] == name:
-                this_data_id = id
-        print("    {}: {}".format(this_data_id, name))
+        print("pygama will run these decoders:")
+        for name in final_decoder_list:
+            for id in id_dict:
+                if id_dict[id] == name:
+                    this_data_id = id
+            print("    {}: {}".format(this_data_id, name))
+    # END elif ORCA
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:

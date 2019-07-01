@@ -265,3 +265,21 @@ class SIS3302Decoder(Digitizer):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
+        
+        
+        
+        
+        
+        
+ 
+        
+        
+class SIS3316Decoder(Digitizer):
+    """ handle Struck 3316 digitizer """
+
+    def __init__(self, *args, **kwargs):
+        pass
+        
+        
+        
+        
