@@ -123,7 +123,7 @@ class DataSet:
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
         """
         self.paths = {r:{} for r in runs}
-
+        
         # search data directories for extant files
         for p, d, files in os.walk(self.raw_dir):
             for f in files:

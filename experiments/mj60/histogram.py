@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+# this code is not complete. still want to make more general using pygama functions.
+
 file1 = np.load("./psd_214_bl.npz")
 file2 = np.load("./psd_249_bl.npz")
 
