@@ -19,7 +19,8 @@
     "conf1":{
       "run_coverage":[75,99999],
       "tier0_options":{
-        "digitizer":"SIS3316"
+        "digitizer":"SIS3316Decoder",
+        "daq":"SIS3316"
       },
       "tier1_options":{
         "clk" : 250e6,
