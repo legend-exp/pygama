@@ -22,11 +22,11 @@ def main():
 
     ## this code takes the peaks from thorium's first-pass calibration and fits them. the values from these fits are used to then do a non-linear, second-pass calibration.
 
-    #peak_2615()
-    #peak_1765()
+    peak_2615()
+    peak_1765()
     peak_1460()
-    #peak_609()
-    #peak_352()
+    peak_609()
+    peak_352()
 
 def peak_2615():
     
@@ -84,7 +84,7 @@ def peak_2615():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    residual = '%.2f' % abs(2614.51 - float(peak))    
+    residual = '%.2f' % (2614.51 - float(peak))    
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -105,7 +105,7 @@ def peak_2615():
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('Counts', ha='right', y=1.0)
-
+    plt.title('Fit of First-Pass Kr83m Calibration Peak')
     plt.tight_layout()
     #plt.semilogy()
     plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
@@ -167,7 +167,7 @@ def peak_1765():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    residual = '%.2f' % abs(1764.49 - float(peak))
+    residual = '%.2f' % (1764.49 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -204,9 +204,13 @@ def peak_1460():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
     #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
     df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+
+    #df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    #df['e_cal'] = 0.4054761904761905 * df['e_ftp'] + 3.113095238095184
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -250,7 +254,7 @@ def peak_1460():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    residual = '%.2f' % abs(1460.82 - float(peak))
+    residual = '%.2f' % (1460.82 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -332,7 +336,7 @@ def peak_609():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    residual = '%.2f' % abs(609.32 - float(peak))
+    residual = '%.2f' % (609.32 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -415,7 +419,7 @@ def peak_352():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    residual = '%.2f' % abs(351.93 - float(peak))
+    residual = '%.2f' % (351.93 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):

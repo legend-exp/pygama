@@ -29,13 +29,17 @@ def func(x, a, b, c):
 
 df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
-E_rough = [2607.02, 1761.35, 1458.91, 610.05, 353.57]
+E_rough = [2607.42, 1761.51, 1459.07, 610.06, 353.56]
 E_real = [2614.51, 1764.49, 1460.82, 609.32, 351.93]
-errors = [0.05, 0.07, 0.01, 0.06, 0.01]
+errors = [0.06, 0.07, 0.01, 0.05, 0.01]
 
 popt, pcov = opt.curve_fit(func, E_rough, E_real, sigma = errors)
 
 df['e_cal'] = popt[0] + popt[1]*df['e_cal'] + popt[2]*(df['e_cal']**2)
+
+print('a = '+str(popt[0])+' +/- '+str(pcov[0][0]))
+print('b = '+str(popt[1])+' +/- '+str(pcov[1][1]))
+print('c = '+str(popt[2])+' +/- '+str(pcov[2][2]))
 
 df.to_hdf('{}/Spectrum_{}_2.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
 

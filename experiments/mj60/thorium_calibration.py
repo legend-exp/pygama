@@ -14,7 +14,7 @@ np.set_printoptions(threshold=np.inf)
 def main():
 
     if(len(sys.argv) != 2):
-        print('Usage: make_spectrum_from_tier_2.py [run number]')
+        print('Usage: thorium_calibration.py [run number]')
         sys.exit()
 
     #spectrum_medfilt_peaks()

@@ -1,3 +1,5 @@
+import pandas as pd
+import sys
 import time
 import numpy as np
 import scipy as sp
@@ -19,9 +21,9 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    plot_wfs()
+    #plot_wfs()
     #flip_through_wfs()
-    #ADC_difference()   
+    ADC_difference()   
     #ADC_difference_cut()
 
 def plot_wfs():
@@ -94,10 +96,12 @@ def flip_through_wfs():
     del df['ts_lo']
 
     df['e_cal'] = df_2['e_cal']
-    df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
+    df['rise'] = df_2['tp50'] - df_2['t0']
+    df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))&(df.rise<0)]
     df = df.reset_index(drop=True)
     df_3 = pd.DataFrame(df['e_cal'])
     del df['e_cal']  
+    del df['rise'] 
 
     def bl_sub(wf):
         return df.loc[wf,:]-df.iloc[wf,0:500].mean()
@@ -120,6 +124,7 @@ def flip_through_wfs():
 
         plt.cla()
         plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}, E = {:.03f} keV".format(str(sys.argv[1]), df_3['e_cal'][i]))
+        #plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}".format(str(sys.argv[1])))
         plt.plot(xvals, savgol(i), color="red", lw=1, label="Savitzky-Golay Filter")
         plt.xlabel('Sample Number', ha='right', x=1.0)
         plt.ylabel('ADC Value', ha='right', y=1.0)
@@ -170,7 +175,7 @@ def ADC_difference():
     plt.xlim(0,50)
     plt.ylim(-5,100)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
-    plt.ylabel('dADC/E', ha='right', y=1.0)
+    plt.ylabel('dADC', ha='right', y=1.0)
     cbar = plt.colorbar()
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
@@ -220,7 +225,7 @@ def ADC_difference_cut():
     plt.xlim(0,50)
     plt.ylim(-5,100)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
-    plt.ylabel('dADC/E', ha='right', y=1.0)
+    plt.ylabel('dADC', ha='right', y=1.0)
     cbar = plt.colorbar()
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()

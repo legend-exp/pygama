@@ -23,10 +23,10 @@ def main():
     ## this code takes the peaks from thorium's first-pass calibration and fits them. the values from these fits are used to then do a non-linear, second-pass calibration.
 
     peak_2615()
-    peak_1765()
-    peak_1460()
-    peak_609()
-    peak_352()
+    #peak_1765()
+    #peak_1460()
+    #peak_609()
+    #peak_352()
 
 def peak_2615():
 
@@ -37,8 +37,13 @@ def peak_2615():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    df['e_cal'] = 0.7737343486 + 0.4062061155*df['e_ftp'] + 1.14210704e-07*(df['e_ftp']**2)
+
+    df = df.loc[(df.index>1000)&(df.index<500000)]
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -73,7 +78,7 @@ def peak_2615():
 
     hist, bins, var = pgh.get_hist(df['e_cal'], range=(2540,2680), dx=0.5)
     pgh.plot_hist(hist, bins, var=hist, label="data")
-    pars, cov = pga.fit_hist(radford_peak, hist, bins, var=hist, guess=[2614.5, 1.05, 0.001, 0.02, 5, 1, 4000])
+    pars, cov = pga.fit_hist(radford_peak, hist, bins, var=hist, guess=[2614.5, 1.05, 0.001, 0.02, 5, 1, 0.00032445844843158816*len(df)])
     pgu.print_fit_results(pars, cov, radford_peak)
     pgu.plot_func(radford_peak, pars, label="chi2 fit", color='red')
     #x_vals = np.arange(2540,2680,0.5)
@@ -119,9 +124,11 @@ def peak_1765():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
-    df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    df['e_cal'] = 0.7737343486 + 0.4062061155*df['e_ftp'] + 1.14210704e-07*(df['e_ftp']**2)
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -203,9 +210,11 @@ def peak_1460():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
-    df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    df['e_cal'] = 0.7737343486 + 0.4062061155*df['e_ftp'] + 1.14210704e-07*(df['e_ftp']**2)
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -285,9 +294,11 @@ def peak_609():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
-    df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    df['e_cal'] = 0.7737343486 + 0.4062061155*df['e_ftp'] + 1.14210704e-07*(df['e_ftp']**2)
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -367,9 +378,11 @@ def peak_352():
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
-    df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    df['e_cal'] = 0.7737343486 + 0.4062061155*df['e_ftp'] + 1.14210704e-07*(df['e_ftp']**2)
 
     def gauss(x, mu, sigma, A=1):
         """
