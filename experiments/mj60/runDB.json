@@ -108,6 +108,7 @@
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
+        "dADC" : {},
         "pz" : {"decay":82},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [
@@ -146,6 +147,7 @@
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
+        "dADC": {},
         "pz" : {"decay":82},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [
