@@ -279,7 +279,6 @@ class SIS3316Decoder(Digitizer):
     #       most metadata of Struck header (energy, ...)
 
     def __init__(self, *args, **kwargs):
-        print("constrüctor")
         
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'

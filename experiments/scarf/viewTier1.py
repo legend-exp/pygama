@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [12, 7] # make a bigger default figure
 plt.rcParams['font.size'] = 18
 
+import sys
 import json
 import numpy as np
 import pandas as pd
@@ -26,8 +27,12 @@ for key in testDB:
 print("-- Data set definitions -- ")
 pprint(testDB["ds"])
 
-
-ds = DataSet(run=111, md=db_file, v=True) # can also use a list of run number
+try:
+    xrun = int(sys.argv[1])
+except:
+    print("You have to give a run number as argument!")
+    exit(0)
+ds = DataSet(run=xrun, md=db_file, v=True) # can also use a list of run number
 
 # print some of the DataSet attributes
 print("raw dir : ", ds.raw_dir)
