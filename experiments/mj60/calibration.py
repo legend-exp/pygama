@@ -18,7 +18,7 @@ def main():
     save results in a JSON database for access by other routines.
     """
     run_db, cal_db = "runDB.json", "calDB.json"
-    
+
     par = argparse.ArgumentParser(description="calibration suite for MJ60")
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
@@ -31,7 +31,7 @@ def main():
     arg("-db", "--writeDB", action=st, help="store results in DB")
     arg("-pr", "--printDB", action=st, help="print calibration results in DB")
     args = vars(par.parse_args())
-    
+
     # -- declare the DataSet --
     if args["ds"]:
         ds_lo = int(args["ds"][0])
@@ -39,25 +39,29 @@ def main():
             ds_hi = int(args["ds"][1])
         except:
             ds_hi = None
-        ds = DataSet(ds_lo, ds_hi, 
+        ds = DataSet(ds_lo, ds_hi,
                      md=run_db, cal=cal_db, v=args["test"])
-    
+
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]), 
+        ds = DataSet(run=int(args["run"][0]),
                      md=run_db, cal=cal_db, v=args["test"])
-    
-    # -- start calibration routines -- 
+
+    # -- start calibration routines --
     etype = args["etype"][0] if args["etype"] else "e_ftp"
-    
+
     if args["spec"]:
         show_spectrum(ds, etype)
-        
+
     if args["pass1"]:
         calibrate_pass1(ds, etype, args["writeDB"], args["test"])
-        
+
+    if args["pass2"]:
+        calibrate_pass2(ds)
+
     if args["printDB"]:
         show_calDB(cal_db)
-    
+
+
 
 def show_spectrum(ds, etype="e_ftp"):
     """
@@ -69,19 +73,19 @@ def show_spectrum(ds, etype="e_ftp"):
     print(df.columns)
     df.hist(etype)
     plt.show()
-    
+
     # need to display an estimate for the peakdet threshold
     # based on the number of counts in each bin or something
-    
+
 
 def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     """
     Run a "first guess" calibration of an arbitrary energy estimator.
-    
+
     Uses a peak matching algorithm based on finding ratios of uncalibrated
     and "true" (keV) energies.  We run peakdet to find the maxima
     in the spectrum, then compute all ratios e1/e2, u1/u2, ..., u29/u30 etc.
-    We find the subset of uncalibrated ratios (u7/u8, ... etc) that 
+    We find the subset of uncalibrated ratios (u7/u8, ... etc) that
     match the "true" ratios, and compute a calibration constant for each.
     Then for each uncalibrated ratio, we assume it to be true, then loop
     over the expected peak positions.
@@ -100,18 +104,18 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     pk_thresh = calpars["peakdet_thresh"]
     match_thresh = calpars["match_thresh"]
     xlo, xhi, xpb = calpars["xlims"]
-    
+
     # make energy histogram
     df = ds.get_t2df()
     ene = df[etype]
     nb = int((xhi-xlo)/xpb)
     h, bins = np.histogram(ene, nb, (xlo, xhi))
     b = (bins[:-1] + bins[1:]) / 2.
-    
+
     # run peakdet to identify the uncalibrated maxima
     maxes, mins = peakdet(h, pk_thresh, b)
     umaxes = np.array(sorted([x[0] for x in maxes], reverse=True))
-    
+
     # compute all ratios
     ecom = [c for c in it.combinations(epeaks, 2)]
     ucom = [c for c in it.combinations(umaxes, 2)]
@@ -119,23 +123,23 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     uratios = np.array([x[0] / x[1] for x in ucom])
 
     # match peaks to true energies
-    cals = {} 
+    cals = {}
     for i, er in enumerate(eratios):
-        
+
         umatch = np.where( np.isclose(uratios, er, rtol=match_thresh) )
         e1, e2 = ecom[i][0], ecom[i][1]
         if test:
             print(f"\nratio {i} -- e1 {e1:.0f}  e2 {e2:.0f} -- {er:.3f}")
-        
+
         if len(umatch[0]) == 0:
             continue
-        
+
         caldists = []
         for ij, j in enumerate(umatch[0]):
             u1, u2 = ucom[j][0], ucom[j][1]
-            cal = (e2 - e1) / (u2 - u1) 
+            cal = (e2 - e1) / (u2 - u1)
             cal_maxes = cal * umaxes
-            
+
             # shift peaks by the amount we would expect if this const were true.
             # compute the distance (in "keV") of the peak that minimizes this.
             dist = 0
@@ -143,69 +147,76 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
                 idx = np.abs(cal_maxes - e_true).argmin()
                 dist += np.abs(cal_maxes[idx] - e_true)
             caldists.append([cal, dist])
-            
+
             if test:
                 dev = er - uratios[j] # set by match_thresh parameter
                 print(f"{ij}  {u1:-5.0f}  {u2:-5.0f}  {dev:-7.3f}  {cal:-5.2f}")
-            
+
         # get the cal ratio with the smallest total dist
         caldists = np.array(caldists)
         imin = caldists[:,1].argmin()
         cals[i] = caldists[imin, :]
-        
-        if test: 
+
+        if test:
             print(f"best: {imin}  {caldists[imin, 0]:.4f}  {caldists[imin, 1]:.4f}")
-        
+
     if test:
         print("\nSummary:")
         for ipk in cals:
             e1, e2 = ecom[ipk][0], ecom[ipk][1]
             print(f"{ipk}  {e1:-6.1f}  {e2:-6.1f}  cal {cals[ipk][0]:.5f}")
-            
+
     # get first-pass const for this DataSet
     cal_vals = np.array([c[1][0] for c in cals.items()])
     ds_cal = np.median(cal_vals)
     ds_std = np.std(cal_vals)
     print(f"Pass-1 cal for {etype}: {ds_cal:.5e} pm {ds_std:.5e}")
-    
+
     if test:
-        plt.semilogy(b * ds_cal, h, ls='steps', lw=1.5, c='b', 
+        plt.semilogy(b * ds_cal, h, ls='steps', lw=1.5, c='b',
                      label=f"{etype}, {sum(h)} cts")
         for x,y in maxes:
             plt.plot(x * ds_cal, y, "m.", ms=10)
-        
-        pks = ds.runDB["pks"] 
+
+        pks = ds.runDB["pks"]
         cmap = plt.cm.get_cmap('jet', len(pks) + 1)
         for i, pk in enumerate(pks):
             plt.axvline(float(pk), c=cmap(i), linestyle="--", lw=1, label=f"{pks[pk]}: {pk} keV")
-        
+
         plt.xlabel("Energy (keV)", ha='right', x=1)
         plt.ylabel("Counts", ha='right', y=1)
         plt.legend(fontsize=9)
         plt.show()
-        
+
     if write_db:
-        calDB = ds.calDB 
-        query = db.Query() 
+        calDB = ds.calDB
+        query = db.Query()
         table = calDB.table("cal_pass1")
-        
+
         # write an entry for every dataset.  if we've chained together
         # multiple datasets, the values will be the same.
         # use "upsert" to avoid writing duplicate entries.
         for dset in ds.ds_list:
             row = {"ds":dset, "p1cal":ds_cal, "p1std":ds_std}
             table.upsert(row, query.ds == dset)
-        
-        
+
+
 def calibrate_pass2(ds):
     """
     load first-pass constants from the calDB for this DataSet,
-    and the list of peaks we want to fit from the runDB, and 
+    and the list of peaks we want to fit from the runDB, and
     fit the radford peak to each one.
     make a new table in the calDB, "cal_pass2" that holds all
     the important results, like mu, sigma, errors, etc.
     """
     print("yes!")
+
+    calDB = ds.calDB
+    query = db.Query()
+    table = calDB.table("cal_pass1")
+    vals = table.all()
+    df = pd.DataFrame(vals) # <<---- omg awesome
+    print(df.loc[df.ds==18])
 
 
 def show_calDB(fdb):
@@ -217,7 +228,7 @@ def show_calDB(fdb):
     table = calDB.table("cal_pass1")
     df = pd.DataFrame(table.all())
     print(df)
-    
-    
+
+
 if __name__=="__main__":
     main()
