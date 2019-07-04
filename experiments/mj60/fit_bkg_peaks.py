@@ -26,16 +26,20 @@ def main():
     peak_1765()
     peak_1460()
     peak_609()
-    #peak_583()
-    #peak_352()
+    peak_352()
 
 def peak_2615():
     
+    if(len(sys.argv) != 2):
+        print('Usage: fit_bkg_peaks.py [run number]')
+        sys.exit()
+
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -80,7 +84,8 @@ def peak_2615():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
-    
+    residual = '%.2f' % (2614.51 - float(peak))    
+
     #chi_2_element_list = []
     #for i in range(len(hist)):
         #chi_2_element = abs((radford_peak(bins[i], *pars) - hist[i])**2/radford_peak(bins[i], *pars))
@@ -88,31 +93,36 @@ def peak_2615():
     #chi_2 = sum(chi_2_element_list)
     #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
 
-    label_01 = '2614.5 keV peak fit'
+    label_01 = '2614.51 keV peak fit'
     label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
     label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
-    #label_04 = r'Reduced $\chi^2 = $'+str(reduced_chi_2)
-    colors = ['red', 'red','red']
+    label_04 = 'Residual = '+str(residual)+r' $\pm$ '+str(peak_uncertainty)
+    colors = ['red', 'red','red', 'red']
     lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
-    labels = [label_01, label_02, label_03]
+    labels = [label_01, label_02, label_03, label_04]
     
     plt.xlim(2540,2680)
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('Counts', ha='right', y=1.0)
-
+    plt.title('Fit of First-Pass Kr83m Calibration Peak')
     plt.tight_layout()
     #plt.semilogy()
     plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
     plt.show()
 
 def peak_1765():
+  
+    if(len(sys.argv) != 2):
+        print('Usage: fit_bkg_peaks.py [run number]')
+        sys.exit()
 
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -157,6 +167,7 @@ def peak_1765():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    residual = '%.2f' % (1764.49 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -165,13 +176,13 @@ def peak_1765():
     #chi_2 = sum(chi_2_element_list)
     #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
 
-    label_01 = '1764.5 keV peak fit'
+    label_01 = '1764.49 keV peak fit'
     label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
     label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
-    #label_04 = r'Reduced $\chi^2 = $'+str(reduced_chi_2)
-    colors = ['red', 'red','red']
+    label_04 = 'Residual = '+str(residual)+r' $\pm$ '+str(peak_uncertainty)
+    colors = ['red', 'red','red', 'red']
     lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
-    labels = [label_01, label_02, label_03]
+    labels = [label_01, label_02, label_03, label_04]
 
     plt.xlim(1740,1780)
     plt.ylim(0,plt.ylim()[1])
@@ -186,11 +197,20 @@ def peak_1765():
 
 def peak_1460():
 
+    if(len(sys.argv) != 2):
+        print('Usage: fit_bkg_peaks.py [run number]')
+        sys.exit()
+
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+
+    #df =  pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))
+    #df['e_cal'] = 0.4054761904761905 * df['e_ftp'] + 3.113095238095184
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -234,6 +254,7 @@ def peak_1460():
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    residual = '%.2f' % (1460.82 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -242,13 +263,13 @@ def peak_1460():
     #chi_2 = sum(chi_2_element_list)
     #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
 
-    label_01 = '1460.8 keV peak fit'
+    label_01 = '1460.82 keV peak fit'
     label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
     label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
-    #label_04 = r'Reduced $\chi^2 = $'+str(reduced_chi_2)
-    colors = ['red', 'red','red']
+    label_04 = 'Residual = '+str(residual)+r' $\pm$ '+str(peak_uncertainty)
+    colors = ['red', 'red','red', 'red']
     lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
-    labels = [label_01, label_02, label_03]
+    labels = [label_01, label_02, label_03, label_04]
 
     plt.xlim(1420,1500)
     plt.ylim(0,plt.ylim()[1])
@@ -262,11 +283,16 @@ def peak_1460():
 
 def peak_609():
 
+    if(len(sys.argv) != 2):
+        print('Usage: fit_bkg_peaks.py [run number]')
+        sys.exit()
+
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -306,10 +332,11 @@ def peak_609():
     #x_vals = np.arange(590,630,0.5)
     #plt.plot(x_vals, radford_peak(x_vals, 610, .95, .01, 0.03, 950, 1800, 15000))
 
-    #FWHM = '%.2f' % Decimal(pars[1]*2)
-    #FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
-    #peak = '%.2f' % Decimal(pars[0])
-    #peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    FWHM = '%.2f' % Decimal(pars[1]*2)
+    FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
+    peak = '%.2f' % Decimal(pars[0])
+    peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    residual = '%.2f' % (609.32 - float(peak))
 
     #chi_2_element_list = []
     #for i in range(len(hist)):
@@ -318,31 +345,36 @@ def peak_609():
     #chi_2 = sum(chi_2_element_list)
     #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
 
-    #label_01 = '609.3 keV peak fit'
-    #label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
-    #label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
-    #label_04 = r'Reduced $\chi^2 = $'+str(reduced_chi_2)
-    #colors = ['red', 'red','red']
-    #lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
-    #labels = [label_01, label_02, label_03]
+    label_01 = '609.32 keV peak fit'
+    label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
+    label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
+    label_04 = 'Residual = '+str(residual)+r' $\pm$ '+str(peak_uncertainty)
+    colors = ['red', 'red','red', 'red']
+    lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
+    labels = [label_01, label_02, label_03, label_04]
 
-    plt.xlim(590,630)
+    plt.xlim(600,620)
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('Counts', ha='right', y=1.0)
 
     plt.tight_layout()
-    #plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
+    plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
     #plt.semilogy()
     plt.show()
 
-def peak_583():
+def peak_352():
+
+    if(len(sys.argv) != 2):
+        print('Usage: fit_bkg_peaks.py [run number]')
+        sys.exit()
 
     with open("runDB.json") as f:
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    df =  pd.read_hdf("{}/Spectrum_203.hdf5".format(meta_dir), key="df")
+    #df =  pd.read_hdf("{}/Spectrum_280-329.hdf5".format(meta_dir), key="df")
+    df =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
 
     def gauss(x, mu, sigma, A=1):
         """
@@ -374,47 +406,45 @@ def peak_583():
         # add up all the peak shape components
         return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
 
-    hist, bins, var = pgh.get_hist(df['e_cal'], range=(560,600), dx=0.5)
+
+    hist, bins, var = pgh.get_hist(df['e_cal'], range=(345,360), dx=0.5)
     pgh.plot_hist(hist, bins, var=hist, label="data")
-    pars, cov = pga.fit_hist(radford_peak, hist, bins, var=hist, guess=[583.2, 1.89, 0.005, 0.1, 2, 34, 1171])
+    pars, cov = pga.fit_hist(radford_peak, hist, bins, var=hist, guess=[352, 1.05, 0.001, 0.02, 500, 1000, 40000])
     pgu.print_fit_results(pars, cov, radford_peak)
     pgu.plot_func(radford_peak, pars, label="chi2 fit", color='red')
-    #x_vals = np.arange(560,600,0.5)
-    #plt.plot(x_vals, radford_peak(x_vals, 583.2, 1.89, .005, 0.1, 2, 34, 1171))
+    #x_vals = np.arange(345,360,0.5)
+    #plt.plot(x_vals, radford_peak(x_vals, 353, 1.05, .001, 0.02, 500, 1000, 40000))
 
     FWHM = '%.2f' % Decimal(pars[1]*2)
     FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    residual = '%.2f' % (351.93 - float(peak))
 
-    chi_2_element_list = []
-    for i in range(len(hist)):
-        chi_2_element = abs((radford_peak(bins[i], *pars) - hist[i])**2/radford_peak(bins[i], *pars))
-        chi_2_element_list.append(chi_2_element)
-    chi_2 = sum(chi_2_element_list)
-    reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
+    #chi_2_element_list = []
+    #for i in range(len(hist)):
+        #chi_2_element = abs((radford_peak(bins[i], *pars) - hist[i])**2/radford_peak(bins[i], *pars))
+        #chi_2_element_list.append(chi_2_element)
+    #chi_2 = sum(chi_2_element_list)
+    #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
 
-    label_01 = '583.2 keV peak fit'
+    label_01 = '351.93 keV peak fit'
     label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
     label_03 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
-    label_04 = r'Reduced $\chi^2 = $'+str(reduced_chi_2)
-    colors = ['red', 'red','red','red']
+    label_04 = 'Residual = '+str(residual)+r' $\pm$ '+str(peak_uncertainty)
+    colors = ['red', 'red','red', 'red']
     lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
     labels = [label_01, label_02, label_03, label_04]
 
-    plt.xlim(560,600)
+    plt.xlim(345,360)
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('Counts', ha='right', y=1.0)
 
     plt.tight_layout()
-    plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
     #plt.semilogy()
+    plt.legend(lines, labels, frameon=False, loc='upper right', fontsize='small')
     plt.show()
-
-def peak_352():
-
-    print('hi')
 
 if __name__ == '__main__':
         main()

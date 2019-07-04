@@ -38,7 +38,8 @@ def linear_calibration():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
-
+    print(df.keys())
+    exit()
     m = np.array(df['e_ftp'])
 
     xlo, xhi, xpb = 0, 10000, 10
@@ -51,7 +52,7 @@ def linear_calibration():
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
 
-    thresholds = np.arange(50,750,10, dtype=int)
+    thresholds = np.arange(50,1000000,10, dtype=int)
 
     for i in range(len(thresholds)):
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
@@ -133,16 +134,16 @@ def linear_calibration():
     plt.ylabel('Counts', ha='right', y=1.0)
     E_cal = 'calibrated energy spectrum, run '+str(sys.argv[1])
     E_1 = 'E=238.6 keV (212Pb peak)'
-    E_2 = 'E=351.9 keV (214Pb peak)'
+    E_2 = 'E=351.93 keV (214Pb peak)'
     E_3 = 'E=511.0 keV (beta+ peak)'
-    E_4 = 'E=583.2 keV (208Tl peak)'
-    E_5 = 'E=609.3 keV (214Bi peak)*'
+    E_4 = 'E=583.19 keV (208Tl peak)'
+    E_5 = 'E=609.32 keV (214Bi peak)*'
     E_6 = 'E=911.2 keV (228Ac peak)'
     E_7 = 'E=969 keV (228Ac peak)'
     E_8 = 'E=1120.3 keV (214Bi peak)'
-    E_9 = 'E=1460.8 keV (40K peak)*'
-    E_10 = 'E=1764.5 keV (214Bi peak)'
-    E_11 = 'E=2614.5 keV (208Tl peak)'
+    E_9 = 'E=1460.82 keV (40K peak)*'
+    E_10 = 'E=1764.49 keV (214Bi peak)'
+    E_11 = 'E=2614.51 keV (208Tl peak)'
     colors = ['black', 'red', 'aqua', 'darkgreen', 'darkorange', 'gray', 'brown', 'saddlebrown', 'navy', 'olive', 'indigo', 'limegreen']
     lines = [Line2D([0], [0], color=c) for c in colors]
     labels = [E_cal, E_1, E_2, E_3, E_4, E_5, E_6, E_7, E_8, E_9, E_10, E_11]
@@ -162,8 +163,8 @@ def BKG_Subtraction():
         runDB = json.load(f)
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
-    BKG1 =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]))
-    Kr1 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[2]))
+    BKG1 =  pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[1]))
+    Kr1 = pd.read_hdf("{}/Spectrum_{}_2.hdf5".format(meta_dir,sys.argv[2]))
 
     xlo, xhi, xpb = 0, 4000, 0.5
     nbins = int((xhi - xlo)/xpb)
@@ -193,7 +194,7 @@ def BKG_Subtraction():
     plt.title('Energy Spectrum (Kr83m Source)')
     plt.legend(frameon=True, loc='upper right', fontsize='small')
     plt.tight_layout()
-    #plt.semilogy()
+    plt.semilogy()
     plt.show()
 
 def dADC():

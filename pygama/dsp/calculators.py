@@ -43,6 +43,39 @@ def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_p0", test=Fal
             plt.pause(0.001)
 
 
+def dADC(waves, calcs, ilo_1=0, ihi_1=500, ilo_2=1499, ihi_2=3000, wfin="waveform", calc="dADC", test=False):
+    """
+    subtracting average inside a window on baseline from average inside window on tail
+    """
+    wfs = waves["waveform"]
+
+    # find wf means
+    dADC = np.mean(wfs[:, ilo_2:ihi_2], axis=1) - np.mean(wfs[:, ilo_1:ihi_1], axis=1)
+
+    # add the result as a new column
+    calcs[calc] = dADC
+
+    if test:
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            plt.cla()
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wf, '-b', lw=2, alpha=0.7, label='raw wf')
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.001)
+
+
 def fit_bl(waves, calcs, ilo=0, ihi=500, order=1, wfin="waveform", test=False):
     """
     baseline calculator, uses np.polyfit
