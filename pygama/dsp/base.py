@@ -121,6 +121,9 @@ class Intercom:
         self.waves["waveform"] = data_df.iloc[:, wf_start:wf_stop].values
         self.calcs = data_df.iloc[:, 0: wf_start-1].copy()
 
+        if "blest" in self.waves["settings"]["blsub"]:
+          if self.waves["settings"]["blsub"]["blest"] == "fcdaq":
+            self.waves["fcdaq"] = data_df.bl.values
 
     def process(self, data_df, verbose=False, wfnames_out=None):
         """
