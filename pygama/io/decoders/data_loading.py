@@ -4,7 +4,7 @@ base class for reading raw data, usually 32-bit data words,
 from different `data takers`.
 contains methods to save pandas dataframes to files.
 subclasses:
-     - digitizers.py -- Gretina4M, SIS3302, etc.
+     - digitizers.py -- Gretina4M, SIS3302, FlashCam, etc.
      - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
 """
 import sys
@@ -105,8 +105,11 @@ class DataLoader(ABC):
                 if is_garbage:
                     self.garbage_values[key].append(vals[key])
                 else:
-                    self.decoded_values[key].append(vals[key])
-
+                    # Need to make this fix, otherwise waveform array overwritten at each event
+                    if type(vals[key])==np.ndarray:
+                        self.decoded_values[key].append(vals[key].copy())
+                    else:
+                        self.decoded_values[key].append(vals[key])
 
     def create_df(self, get_garbage=False):
         """
@@ -230,6 +233,9 @@ class DataLoader(ABC):
             self.df_metadata.to_hdf(file_name, key=self.class_name,
                                     mode='a',
                                     format="fixed")
+        elif(self.decoder_name=='FlashCamWaveformDecoder'):
+            df_data.to_hdf(file_name, key=self.class_name, **hdf_kwargs)
+
 
         # ------------- save garbage data -------------
         if self.garbage_count > 0:
