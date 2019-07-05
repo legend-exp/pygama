@@ -77,6 +77,7 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
         
+    # parse the header
     reclen, reclen2, header_dict = parse_header(t0_file)
     # print("   {} longs in plist header".format(reclen))
     # print("   {} bytes in the header".format(reclen2))
