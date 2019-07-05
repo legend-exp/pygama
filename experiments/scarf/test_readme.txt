@@ -18,8 +18,7 @@ seems to work somehow...
 anyway, you can use:
 python3 process_test.py -t0 --verbose -r <runNr>
 
-
-good octal dump: use od -A x -t x1z -v
+od -A x4 -t x4z -v 20190703-165002-Sipm3_Run1001 | less
 
 viewing waveforms from a run:
 
