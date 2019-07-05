@@ -233,9 +233,6 @@ class DataLoader(ABC):
             self.df_metadata.to_hdf(file_name, key=self.class_name,
                                     mode='a',
                                     format="fixed")
-        elif(self.decoder_name=='FlashCamWaveformDecoder'):
-            df_data.to_hdf(file_name, key=self.class_name, **hdf_kwargs)
-
 
         # ------------- save garbage data -------------
         if self.garbage_count > 0:

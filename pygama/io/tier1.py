@@ -71,7 +71,7 @@ def ProcessTier1(t1_file,
         with pd.HDFStore(t1_file, 'r') as store:
 
             s = store.get_storer(d.decoder_name)
-            object_info = store.get(d.class_name)
+            object_info = store.get(d.decoder_name)
             d.load_metadata(object_info)
 
             if isinstance(s, pd.io.pytables.AppendableFrameTable):
