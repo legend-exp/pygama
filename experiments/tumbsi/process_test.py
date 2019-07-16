@@ -13,7 +13,7 @@ def main(argv):
   data sets, with arbitrary configuration options defined in a JSON file.
   C. Wiseman, 2019/04/09
   """
-  run_db = './testDB.json'
+  run_db = './runDB.json'
 
   # -- parse args --
   par = argparse.ArgumentParser(description="test data processing suite")

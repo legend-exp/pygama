@@ -19,7 +19,7 @@ def main():
     command line options to specify the DataSet are the same as in processing.py
     save results in a JSON database for access by other routines.
     """
-    run_db, cal_db = "testDB.json", "calDB.json"
+    run_db, cal_db = "runDB.json", "calDB.json"
 
     par = argparse.ArgumentParser(description="calibration suite for MJ60")
     arg, st, sf = par.add_argument, "store_true", "store_false"
@@ -247,7 +247,7 @@ def show_calspectrum(ds, fdb, etype="e_ftp"):
     
     df = ds.get_t2df()
     energy = df[etype]*vals[0]['p1cal']
-    hist, bins, var = pgh.get_hist(energy,range=[0,4000],dx=0.5)
+    hist, bins, var = pgh.get_hist(energy,range=[0,4000],dx=1)
     plt.plot(hist)
     plt.yscale('log')
     plt.show()
