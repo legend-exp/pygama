@@ -33,16 +33,28 @@ def blsub(waves, calcs, blest="", wfin="waveform", wfout="wf_blsub", test=False)
             blsub_wfs = wfs - bl_0
 
     if test:
-        iwf = 1
+      iwf = 2
+      while True:
+        if iwf != 2:
+          inp = input()
+          if inp == "q": exit()
+          if inp == "p": iwf -= 2
+          if inp.isdigit(): iwf = int(inp) - 1
+        iwf += 1
+        print(iwf)
+        plt.cla()
+
         plt.plot(np.arange(nsamp), wfs[iwf], '-g', label="raw")
         plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
         # plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
+
         plt.xlabel("clock ticks", ha='right', x=1)
         plt.ylabel("ADC", ha='right', y=1)
         plt.legend()
         plt.tight_layout()
-        plt.show()
-        exit()
+        plt.show(block=False)
+        plt.grid(True)
+        plt.pause(0.01)
 
     # note, floats are gonna take up more memory
     return {wfout: blsub_wfs}
