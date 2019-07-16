@@ -132,7 +132,7 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
             plt.legend()
             plt.tight_layout()
             plt.show(block=False)
-            plt.pause(0.001)
+            plt.pause(0.00001)
 
     if dt != 0:
         return {wfout: ptrap}
@@ -387,7 +387,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             plt.legend()
             plt.tight_layout()
             plt.show(block=False)
-            plt.pause(0.01)
+            plt.pause(0.001)
 
     return {wfout: wfmax}
 
@@ -402,7 +402,16 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     wfsg = signal.savgol_filter(wfs, window, order)
 
     if test:
-        iwf = 4
+      iwf = -1
+      while True:
+        if iwf != -1:
+          inp = input()
+          if inp == "q": exit()
+          if inp == "p": iwf -= 2
+        iwf += 1
+        print(iwf)
+        plt.cla()
+
         ts = np.arange(len(wfs[iwf]))
         plt.plot(ts, wfs[iwf], '-b', label='raw')
         plt.plot(ts, wfsg[iwf], '-r', label='savgol')
@@ -410,9 +419,9 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
         plt.ylabel("adc", ha='right', y=1)
         plt.legend()
         plt.tight_layout()
-        plt.show()
-        exit()
-
+        plt.show(block=False)
+        plt.pause(0.001)
+            
     return {wfout: wfsg}
 
 

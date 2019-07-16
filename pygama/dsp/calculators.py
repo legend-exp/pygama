@@ -181,7 +181,8 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
     for an estimate of where the wf tail starts, just use pct = 100 + (delta).
     """
     wfs = waves[wfin]
-    smax = calcs["savgol_max"].values
+    max = wfin.split('_')[1] + "_max"
+    smax = calcs[max].values
 
     for p in pct:
         tp_idx = np.argmax(wfs >= smax[:, None] * (p / 100.), axis=1)
