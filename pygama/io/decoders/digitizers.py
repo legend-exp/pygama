@@ -274,9 +274,10 @@ class SIS3316Decoder(Digitizer):
     #       most metadata of Struck header (energy, ...)
 
     def __init__(self, *args, **kwargs):
-        
-        self.decoder_name = 'SIS3316Decoder'
-        self.class_name = 'SIS3316'
+        print("Warning! Assuming SIS3316 Sample Period of 10ns, this should found by initializing the digitizer...")
+        print("Warning! Waveform length checker is disabled")
+        self.decoder_name = 'ORSIS3316WaveformDecoder'
+        self.class_name = 'ORSIS3316Model'
 
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
@@ -324,21 +325,23 @@ class SIS3316Decoder(Digitizer):
         self.sample_period = sample_period
         self.gain = gain
         
+
     def decode_event(self,
                      event_data_bytes,
                      packet_id,
                      header_dict,
-                     fadcIndex, 
-                     channelIndex,
+                     #TODO temp cut these
+                     #fadcIndex, 
+                     #channelIndex,
                      verbose=False):
         """
         see the llamaDAQ documentation for data word diagrams
         """
         
-        if self.sample_period == 0:
-            print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
-            raise Exception ("Sample period not set")
-        
+        #if self.sample_period == 0:
+        #    print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
+        #    raise Exception ("Sample period not set")
+        self.sample_period = 10 # assuming sample period of 10 ns
         #print ("hey, let's decöde!") 
         
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
@@ -375,8 +378,8 @@ class SIS3316Decoder(Digitizer):
             offset += 2
         wf_length_32 = (evt_data_32[offset+0]) & 0x03ffffff
         offset += 1 #now the offset points to the wf data
-        fadcID = fadcIndex
-        channel = channelIndex
+        #fadcID = fadcIndex
+        #channel = channelIndex
         
         
         # compute expected and actual array dimensions
@@ -385,11 +388,11 @@ class SIS3316Decoder(Digitizer):
         expected_wf_length = len(evt_data_16) - header_length16
 
         # error check: waveform size must match expectations
-        if wf_length16 != expected_wf_length:
-            print(len(evt_data_16), header_length)
-            print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
-            exit()
+        #if wf_length16 != expected_wf_length:
+        #    print(len(evt_data_16), header_length16)
+        #    print("ERROR: Waveform size %d doesn't match expected size %d." %
+        #          (wf_length16, expected_wf_length))
+        #    exit()
 
         # indexes of stuff (all referring to the 16 bit array)
         i_wf_start = header_length16
@@ -398,11 +401,11 @@ class SIS3316Decoder(Digitizer):
         # handle the waveform(s)
         if wf_length_32 > 0:
             wf_data = evt_data_16[i_wf_start:i_wf_stop]
-
-        if len(wf_data) != expected_wf_length:
-            print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                  (ievt, expected_wf_length, len(wf_data)))
-            exit()
+        #TODO , fix expected length
+        #if len(wf_data) != expected_wf_length:
+        #    print("ERROR: event %d, we expected %d WF samples and only got %d" %
+        #          (ievt, expected_wf_length, len(wf_data)))
+        #    exit()
 
         # final raw wf array
         waveform = wf_data
