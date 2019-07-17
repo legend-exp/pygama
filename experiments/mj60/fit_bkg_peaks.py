@@ -23,10 +23,10 @@ def main():
     ## this code takes the peaks from thorium's first-pass calibration and fits them. the values from these fits are used to then do a non-linear, second-pass calibration.
 
     peak_2615()
-    peak_1765()
-    peak_1460()
-    peak_609()
-    peak_352()
+    #peak_1765()
+    #peak_1460()
+    #peak_609()
+    #peak_352()
 
 def peak_2615():
     
@@ -86,12 +86,13 @@ def peak_2615():
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
     residual = '%.2f' % (2614.51 - float(peak))    
 
-    #chi_2_element_list = []
-    #for i in range(len(hist)):
-        #chi_2_element = abs((radford_peak(bins[i], *pars) - hist[i])**2/radford_peak(bins[i], *pars))
-        #chi_2_element_list.append(chi_2_element)
-    #chi_2 = sum(chi_2_element_list)
-    #reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
+    chi_2_element_list = []
+    for i in range(len(hist)):
+        chi_2_element = abs((radford_peak(bins[i], *pars) - hist[i])**2/radford_peak(bins[i], *pars))
+        chi_2_element_list.append(chi_2_element)
+    chi_2 = sum(chi_2_element_list)
+    reduced_chi_2 = '%.2f' % Decimal(chi_2/len(hist))
+    print(reduced_chi_2)
 
     label_01 = '2614.51 keV peak fit'
     label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
