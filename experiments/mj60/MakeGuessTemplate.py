@@ -14,7 +14,7 @@ def make_template():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     fout = ROOT.TFile("{}/run_280_329_template.root".format(meta_dir), "RECREATE")
-    fitter = ROOT.GATMultiPeakFitter("run_280_329_template")
+    fitter = ROOT.GATMultiPeakFitter("fit_template")
 
     # add regions and peaks
     x, x[0] = ROOT.vector('double')(1), 583.187
@@ -77,9 +77,9 @@ def draw_template():
 
     # set up I/O files and templates
     histfile = "{}/run_280_329_hist.root".format(meta_dir)
-    histname = "run_280_329_hist"
+    histname = "root_hist"
     templatefile = "{}/run_280_329_template.root".format(meta_dir)
-    templatename = "run_280_329_template"
+    templatename = "fit_template"
 
     # identify what peak will be used for normalization
     Enorm = 2614.511 #true energy of peak

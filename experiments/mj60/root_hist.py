@@ -25,12 +25,12 @@ hist, bins = np.histogram(np.array(df['e_ftp']), nbins, (xlo, xhi))
 
 hist = np.array(hist, dtype=np.float)
 
-run_280_329_hist = ROOT.TH1F("run_280_329_hist", "", nbins, xlo, xhi)
-root_numpy.array2hist(hist, run_280_329_hist, errors=None)
-run_280_329_hist.Draw()
+root_hist = ROOT.TH1F("root_hist", "", nbins, xlo, xhi)
+root_numpy.array2hist(hist, root_hist, errors=None)
+root_hist.Draw()
 
 out_hist_file = ROOT.TFile.Open("{}/run_280_329_hist.root".format(meta_dir), "RECREATE")
 out_hist_file.cd()
-run_280_329_hist.Write()
+root_hist.Write()
 out_hist_file.Close()
 
