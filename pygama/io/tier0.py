@@ -9,7 +9,6 @@ import h5py
 from future.utils import iteritems
 from functools import partial
 from pprint import pprint
-from fcutils import fcio
 
 from ..utils import *
 from ..io.decoders.digitizers import *
@@ -245,6 +244,8 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
     # Start of FlashCam data specific decoding #
     ############################################
 
+    from fcutils import fcio
+
     ROW_LIMIT = 5e4
     start = time.time()
 
@@ -271,7 +272,7 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
       decoders = []
       decoders.append(FlashCamDecoder())
       decoder_names = []
-      decoder_names.append('FlashCamWaveformDecoder')
+      decoder_names.append('FlashCam')
 
     final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
     decoder_to_id = {d.decoder_name: d for d in decoders}
@@ -306,7 +307,7 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
       # sends data to the pandas dataframe
       # specific FlashCam formatting
       for d in decoders:
-        if d.decoder_name == 'FlashCamWaveformDecoder':
+        if d.decoder_name == 'FlashCam':
           d.decode_event(io, packet_id)
         else:
           print("ERROR: Specific FlashCam event decoder provided to ",d.decoder_name)
