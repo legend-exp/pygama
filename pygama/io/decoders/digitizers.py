@@ -266,16 +266,18 @@ class SIS3302Decoder(Digitizer):
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
 
+
+
 class SIS3316Decoder(Digitizer):
     """ handle Struck 3316 digitizer """
     #toDo: handle per-channel data (gain, ...)
     #       most metadata of Struck header (energy, ...)
-    
+
     def __init__(self, *args, **kwargs):
-      
+
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
-        
+
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
           "packet_id": [],
