@@ -274,7 +274,7 @@ class SIS3316Decoder(Digitizer):
     #       most metadata of Struck header (energy, ...)
 
     def __init__(self, *args, **kwargs):
-
+      
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
@@ -304,7 +304,7 @@ class SIS3316Decoder(Digitizer):
           "waveform": [],
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
-        
+
         # self.event_header_length = 1 #?
         self.sample_period = 0  # ns, I will set this later, according to header info
         self.gain = 0
@@ -313,7 +313,7 @@ class SIS3316Decoder(Digitizer):
         self.ievt = 0       #event number
         self.ievtg = 0      #garbage event number
         self.window = False
-  
+        
     def initialize(self, sample_period, gain):
         """
          sets certain global values from a run, like:
@@ -331,16 +331,16 @@ class SIS3316Decoder(Digitizer):
                      fadcIndex,
                      channelIndex,
                      verbose=False):
-        """
+         """
          see the llamaDAQ documentation for data word diagrams
          """
-          
+        
         if self.sample_period == 0:
             print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
             raise Exception ("Sample period not set")
-              
+        
         #print ("hey, let's decöde!")
-              
+        
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
         evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
@@ -377,8 +377,8 @@ class SIS3316Decoder(Digitizer):
         offset += 1 #now the offset points to the wf data
         fadcID = fadcIndex
         channel = channelIndex
-                                      
-                                      
+        
+        
         # compute expected and actual array dimensions
         wf_length16 = 2 * wf_length_32
         header_length16 = offset * 2
@@ -436,6 +436,10 @@ class SIS3316Decoder(Digitizer):
           
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
+
+
+
+
 
 class FlashCamDecoder(Digitizer):
   """ handle FlashCam Ge digitizer """
