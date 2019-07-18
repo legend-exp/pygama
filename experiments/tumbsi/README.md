@@ -11,11 +11,6 @@
 # Tier2 production
 ./process_test.py -ds 0 -r 000 --tier1 -o -v -m -n 1000000
 
-# Plot traces and energy spectra
-open 'jupyter notebook'
-run 'analysis.ipynb'
-
 # Perform two-steps energy calibration + PSA
 run 'python calibration.py -ds 0 -r 000 -db -p1 -p2 -sc'
-run 'python fit_calibrated_peaks.py 0'
-run 'python AvsE.py -ds 0'
+run 'python PSA.py -ds 0'
