@@ -1,7 +1,7 @@
 {
-  "loc_dir":".",
-  "raw_dir":".",
-  "tier_dir":".",
+  "loc_dir":"$DATADIR/NCSU",
+  "raw_dir":"$DATADIR/NCSU",
+  "tier_dir":"$DATADIR/NCSU/pygama",
   "digitizer":"ORSIS3316Model",
   "daq":"ORCA",
   "t1_prefix":"t1_run",
@@ -11,7 +11,7 @@
   "rollover":1,
 
   "ds":{
-    "0":["6", "test run, ORCA/3316 decoder"]
+    "0":["0, 999999", "test run, ORCA/3316 decoder"]
   },
 
   "build_options":{
