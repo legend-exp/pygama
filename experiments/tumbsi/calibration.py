@@ -82,6 +82,7 @@ def show_spectrum(ds, etype="e_ftp"):
     print(df.columns)
     df.hist(etype,bins=1000)
     plt.yscale('log')
+    plt.savefig('./plots/rawEnergy_spectrum.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
     # need to display an estimate for the peakdet threshold
@@ -254,6 +255,7 @@ def calibrate_pass2(ds, write_db=False):
     plt.subplot(212)
     plt.plot(true_peaks,res,marker='o',linestyle='--',color='blue')
     plt.grid(True)
+    plt.savefig('./plots/energyScale.pdf', bbox_inches='tight', transparent=True)
 
     def pol1(x,a,b):
       return a * x + b
@@ -277,7 +279,7 @@ def calibrate_pass2(ds, write_db=False):
     plt.plot(peaks,fwhms,marker='o',linestyle='--',color='blue')
     plt.plot(peaks,model,'-',color='red')
     plt.grid(True)
-
+    plt.savefig('./plots/energyResolution_curve.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
     if write_db:
@@ -386,6 +388,7 @@ def show_calspectrum(ds, fdb, etype="e_ftp",p1=True,p2=False):
     hist, bins, var = pgh.get_hist(energy,range=[0,4000],dx=1)
     plt.plot(hist)
     plt.yscale('log')
+    plt.savefig('./plots/calEnergy_spectrum.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
 # need to display an estimate for the peakdet threshold

@@ -26,7 +26,7 @@ def main():
     tumbsi analysis suite
     """
     global display
-    display = 0 # allow displaying intermediate distributions for control
+    display = 1 # allow displaying intermediate distributions for control
     
     run_db, cal_db = "runDB.json", "calDB.json"
 
@@ -156,6 +156,7 @@ def psa(run, dataset, ecal, eres, peaks_of_interest):
     plt.ylabel("A/E (a.u.)", ha='right', y=1)
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
+    plt.savefig('./plots/aoe_versus_energy.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
     plt.figure(3)
@@ -168,6 +169,7 @@ def psa(run, dataset, ecal, eres, peaks_of_interest):
     plt.xlabel('Energy (keV)', ha='right', x=1)
     plt.legend(title='Calibrated Energy')
     plt.yscale('log')
+    plt.savefig('./plots/calEnergy_spectrum_after_psa.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
     print("")
@@ -323,7 +325,7 @@ def AoEcorrection(e,aoe):
       plt.legend()
       plt.xlabel("raw A/E (a.u.)", ha='right', x=1)
       plt.ylabel("counts ", ha='right', y=1)
-    plt.show()
+      plt.show()
 
   def pol1(x,a,b):
     return a * x + b
@@ -343,6 +345,7 @@ def AoEcorrection(e,aoe):
     plt.legend(title='A/E energy dependence')
     plt.xlabel("Energy (keV)", ha='right', x=1)
     plt.ylabel("raw A/E (a.u.)", ha='right', y=1)
+    plt.savefig('./plots/aoe_energy_dependence.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
   return pars
