@@ -107,7 +107,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     by the second pass, and other codes.
     """
     # get a list of peaks we assume are always present
-    epeaks = sorted(ds.runDB["expected_peaks"], reverse=True)
+    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
 
     # get initial parameters for this energy estimator
     calpars = ds.get_p1cal_pars(etype)
@@ -229,8 +229,7 @@ def calibrate_pass2(ds, write_db=False):
 
     df = ds.get_t2df()
 
-    #epeaks = sorted(ds.runDB["expected_peaks"], reverse=True)
-    true_peaks = np.array([238.4,583.191,860.564,2103.533,2614.533])
+    true_peaks = sorted(ds.runDB["cal_peaks"], reverse=True)
     iter = 0
     
     plt.figure(1)
@@ -249,26 +248,35 @@ def calibrate_pass2(ds, write_db=False):
     res = np.subtract(true_peaks,peaks)
 
     plt.figure(2)
-    plt.plot(peaks,fwhms,marker='o',linestyle='--',color='blue')
-    plt.grid(True)
-
-    plt.figure(3)
     plt.subplot(211)
-    plt.plot(true_peaks,peaks,marker='o',linestyle='--',color='red')
+    plt.plot(true_peaks,peaks,marker='o',linestyle='--',color='blue')
     plt.grid(True)
     plt.subplot(212)
-    plt.plot(true_peaks,res,marker='o',linestyle='--',color='red')
+    plt.plot(true_peaks,res,marker='o',linestyle='--',color='blue')
     plt.grid(True)
 
     def pol1(x,a,b):
       return a * x + b
 
-    pars, cov = opt.curve_fit(pol1,true_peaks,peaks)
+    pars1, cov1 = opt.curve_fit(pol1,true_peaks,peaks)
+    errs1 = np.sqrt(np.diag(cov1))
+    print("Calibration curve: ",pars1,errs1)
 
-    errs = np.sqrt(np.diag(cov))
-    print("Calibration curve: ",pars,errs)
-#pars = pars.tolist()
-#   errs = errs.tolist()
+    def sqrt_fit(x,a,b):
+      return np.sqrt(a*x+b)
+
+    pars2, cov2 = opt.curve_fit(sqrt_fit,peaks,fwhms,p0=[1e-3,0.05])
+    errs2 = np.sqrt(np.diag(cov2))
+    print("Energy resolution curve: ",pars2,errs2)
+    
+    model = np.zeros(len(peaks))
+    for i,bin in enumerate(peaks):
+      model[i] = sqrt_fit(bin,pars2[0],pars2[1])
+    
+    plt.figure(3)
+    plt.plot(peaks,fwhms,marker='o',linestyle='--',color='blue')
+    plt.plot(peaks,model,'-',color='red')
+    plt.grid(True)
 
     plt.show()
 
@@ -281,7 +289,23 @@ def calibrate_pass2(ds, write_db=False):
       # multiple datasets, the values will be the same.
       # use "upsert" to avoid writing duplicate entries.
       for dset in ds.ds_list:
-        row = {"ds":dset, "p2acal":pars[0], "p2astd":errs[0], "p2bcal":pars[1], "p2bstd":errs[1]}
+        row = {
+          "ds":dset,
+          "p2acal":pars1[0],
+          "p2astd":errs1[0],
+          "p2bcal":pars1[1],
+          "p2bstd":errs1[1]
+        }
+        table.upsert(row, query.ds == dset)
+
+        table = calDB.table("eres_curve")
+        row = {
+          "ds":dset,
+          "acal":pars2[0],
+          "astd":errs2[0],
+          "bcal":pars2[1],
+          "bstd":errs2[1]
+        }
         table.upsert(row, query.ds == dset)
 
 def peak(df,runDB,calDB,line):
