@@ -535,3 +535,4 @@ class SIS3316ORCADecoder(Digitizer):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
+        
