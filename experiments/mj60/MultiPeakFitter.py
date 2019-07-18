@@ -14,9 +14,9 @@ def do_fit():
 
     # set up I/O files and templates
     histfile = "{}/run_280_329_hist.root".format(meta_dir)
-    histname = "run_280_329_hist"
+    histname = "root_hist"
     templatefile = "{}/run_280_329_template.root".format(meta_dir)
-    templatename = "run_280_329_template"
+    templatename = "fit_template"
     outputfile = "{}/run_280_329_fit_results.root".format(meta_dir)
 
     # identify what peak will be used for normalization
@@ -28,6 +28,7 @@ def do_fit():
     hist = infile.Get(histname)
     hist.SetDirectory(0)
     infile.Close()
+    #hist.Draw()
 
     # get fit template
     infile = ROOT.TFile.Open(templatefile, "READ")
@@ -78,6 +79,15 @@ def do_fit():
     # perform a minuit fit using the most likely parameters found during the HMC as the initial parameters. Use minos error estimation
     fitter.FitToHists(0,1,0,1)
     fitter.Write("results")
+    hist.Draw()
+    hist.GetXaxis().SetTitle("ADC")
+    hist.GetYaxis().SetTitle("Counts")
+    fitter.DrawRegions()
+
+    A = 1/(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[1])
+    B = -(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[0])/(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[1])
+    print(A)
+    print(B)
 
     print('If the fit failed, try it a few more times. The steps in the fit are based on choosing a random seed, and this can often lead to it failing one time and succeeding another.')
 

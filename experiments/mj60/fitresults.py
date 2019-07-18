@@ -1,6 +1,6 @@
 import ROOT
 import numpy as np
-import json, os
+import json, os, sys
 
 def main():
 
@@ -8,13 +8,17 @@ def main():
 
 def get_calibration():
 
+    if(len(sys.argv) != 2):
+        print('Usage: fitresults.py [fit results root file]')
+        sys.exit()
+
     with open("runDB.json") as f:
         runDB = json.load(f)
     tier_dir = os.path.expandvars(runDB["tier_dir"])
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     # input and get the fit results of interest
-    fitresultsfile = "{}/run_280_329_fit_results.root".format(meta_dir)
+    fitresultsfile = "{}/{}".format(meta_dir,sys.argv[1])
     fitresultsname = "hmcResults"
     infile = ROOT.TFile.Open(fitresultsfile, "READ")
     results = infile.Get(fitresultsname)
