@@ -54,6 +54,8 @@ def ProcessTier0(t0_file,
         ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
     elif settings["daq"] == "FlashCam":
         ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose)
+    elif settings["daq"] == "SIS3316":
+        ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
     else:
         print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
         exit()
