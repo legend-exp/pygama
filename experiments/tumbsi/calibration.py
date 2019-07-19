@@ -252,9 +252,13 @@ def calibrate_pass2(ds, write_db=False):
     plt.subplot(211)
     plt.plot(true_peaks,peaks,marker='o',linestyle='--',color='blue')
     plt.grid(True)
+    plt.xlabel("True energy (keV)", ha='right', x=1)
+    plt.ylabel("Energy (keV)", ha='right', y=1)
     plt.subplot(212)
     plt.plot(true_peaks,res,marker='o',linestyle='--',color='blue')
     plt.grid(True)
+    plt.xlabel("True energy (keV)", ha='right', x=1)
+    plt.ylabel("Residuals (keV)", ha='right', y=1)
     plt.savefig('./plots/energyScale.pdf', bbox_inches='tight', transparent=True)
 
     def pol1(x,a,b):
@@ -279,6 +283,8 @@ def calibrate_pass2(ds, write_db=False):
     plt.plot(peaks,fwhms,marker='o',linestyle='--',color='blue')
     plt.plot(peaks,model,'-',color='red')
     plt.grid(True)
+    plt.xlabel("Energy (keV)", ha='right', x=1)
+    plt.ylabel("FWHM resolution (keV) (keV)", ha='right', y=1)
     plt.savefig('./plots/energyResolution_curve.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
@@ -337,8 +343,8 @@ def peak(df,runDB,calDB,line):
     pgu.print_fit_results(pars, cov, gauss)
     pgu.plot_func(gauss, pars, label="chi2 fit", color='red')
     
-    FWHM = '%.2f' % Decimal(pars[1]*2)
-    FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2)
+    FWHM = '%.2f' % Decimal(pars[1]*2.*np.sqrt(2.*np.ln(2))) # convert sigma to FWHM
+    FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2.*np.sqrt(2.*np.ln(2))
     peak = '%.2f' % Decimal(pars[0])
     peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
     residual = '%.2f' % abs(line - float(peak))
