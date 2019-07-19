@@ -3,7 +3,7 @@
   "raw_dir": "$DATADIR/tumbsi/raw/",
   "tier_dir": "$DATADIR/tumbsi/tier",
   "meta_dir":"$DATADIR/tumbsi/metadata",
-  "digitizer": "FlashCamModel",
+  "digitizer": "FlashCam",
   "daq": "FlashCam",
   "t1_prefix": "t1_run",
   "t2_prefix": "t2_run",
@@ -22,7 +22,8 @@
     "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
     "1764.5":"214Bi", "2614.5":"208Tl"
   },
-  "expected_peaks":[2614.5,583.2, 511,238.6],
+  "cal_peaks":[238.4,300.087,583.191,860.564,1620.50,2614.533],
+  "peaks_of_interest":[238.4,300.087,583.191,860.564,1592.533,1620.50,2039,2103.533,2614.533],
   "ecal":{
     "note":"inputs for each energy estimator are organized by ds",
     "0,999": {
