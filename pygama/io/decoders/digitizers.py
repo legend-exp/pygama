@@ -331,7 +331,7 @@ class SIS3316Decoder(Digitizer):
                      fadcIndex,
                      channelIndex,
                      verbose=False):
-         """
+        """
          see the llamaDAQ documentation for data word diagrams
          """
         

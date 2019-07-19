@@ -482,12 +482,13 @@ def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
                 return np.array([1, 0])
             return np.ma.polyfit(wf, ts, ord)
 
-        pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
+        if len(log_tails):
+          pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
 
-        amps = np.exp(pfit[:,1])
-        taus = -1 / pfit[:,0]
-        calcs["tail_amp"] = amps
-        calcs["tail_tau"] = taus
+          amps = np.exp(pfit[:,1])
+          taus = -1 / pfit[:,0]
+          calcs["tail_amp"] = amps
+          calcs["tail_tau"] = taus
 
     # print("Done.  Elapsed: {:.2e} sec.".format(time.time()-t_start))
     # exit()
