@@ -9,7 +9,7 @@
 ./process_test.py -ds 0 -r 000 --tier0 -o -v -n 1000000
 
 # Tier2 production
-./process_test.py -ds 0 -r 000 --tier1 -o -v -m -n 1000000
+./process_test.py -ds 0 -r 000 --tier1 -o -v -n 1000000
 
 # Perform two-steps energy calibration + PSA
 run 'python calibration.py -ds 0 -r 000 -db -p1 -p2 -sc'

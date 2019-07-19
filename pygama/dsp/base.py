@@ -123,7 +123,7 @@ class Intercom:
 
         if "blest" in self.waves["settings"]["blsub"]:
           if self.waves["settings"]["blsub"]["blest"] == "fcdaq":
-            self.waves["fcdaq"] = data_df.bl.values
+            self.calcs["fcdaq"] = data_df.bl.values
 
     def process(self, data_df, verbose=False, wfnames_out=None):
         """
