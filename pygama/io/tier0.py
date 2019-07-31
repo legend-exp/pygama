@@ -58,7 +58,7 @@ def ProcessTier0(t0_file,
     elif settings["daq"] == "SIS3316":
         ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
     elif settings["daq"] == "CAENDT57XX":
-        ProcessCompass(t0_file, t1_file, )
+        ProcessCompass(t0_file, t1_file, decoders, output_dir)
     else:
         print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
         exit()
@@ -363,14 +363,13 @@ def ProcessSIS3316(t0_file,
     print("Done.\n")
 
 
-def ProcessCompass(t0_file, t1_file, digitizer, energy_type="uncalibrated", output_dir=None):
+def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
     """
     Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs a .h5 file named t1_file
 
     t0_file: input file name, string type
     t1_file: output file name, string type
     digitizer: CAEN digitizer, Digitizer type
-    energy_type: CoMPASS can output uncalibrated energy in ADC or calibrated energy in keV or MeV
     options are uncalibrated or calibrated.  Select the one that was outputted by CoMPASS, string type
     output_dir: path to output directory string type
 
@@ -396,7 +395,7 @@ def ProcessCompass(t0_file, t1_file, digitizer, energy_type="uncalibrated", outp
     with open(t0_file, "rb") as metadata_file:
         event_data_bytes = metadata_file.read(event_size)
         while event_data_bytes != b"":
-            event, waveform = digitizer.get_event(event_data_bytes, energy_type)
+            event, waveform = digitizer.get_event(event_data_bytes)
             event_rows.append(event)
             waveform_rows.append(waveform)
             event_data_bytes = metadata_file.read(event_size)
