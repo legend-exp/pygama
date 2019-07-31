@@ -535,4 +535,99 @@ class SIS3316ORCADecoder(Digitizer):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
-        
+
+
+class CAENDT57XX(Digitizer):
+    """
+    Handles CAENDT5725 or CAENDT5730 digitizers
+    setting the model_name will set the appropriate sample_rate
+
+    Use the input_settings function to set certain variables by passing
+    a dictionary, this will most importantly assemble the file header used
+    by CAEN CoMPASS to label output files.
+
+    """
+    def __init__(self, model_name, *args, **kwargs):
+        self.id = None
+        self.model_name = model_name
+        self.file_header = None
+        self.adc_bitcount = 14
+        self.sample_rates = {"DT5725": 250e6, "DT5730": 500e6}
+        self.sample_rate = None
+        if self.model_name in self.sample_rates.keys():
+            self.sample_rate = self.sample_rates[self.model_name]
+        else:
+            raise TypeError("Unidentified digitizer type: "+str(model_name))
+        self.v_range = 2.0
+
+        self.e_cal = None
+        self.e_type = None
+        self.int_window = None
+        self.parameters = ["TIMETAG", "ENERGY", "E_SHORT", "FLAGS"]
+
+        self.decoded_values = {
+            "board": None,
+            "channel": None,
+            "timestamp": None,
+            "energy": None,
+            "energy_short": None,
+            "flags": None,
+            "num_samples": None,
+            "waveform": []
+        }
+        super().__init__(*args, **kwargs)
+
+    def input_settings(self, settings):
+        self.id = settings["id"]
+        self.v_range = settings["v_range"]
+        self.e_cal = settings["e_cal"]
+        self.e_type = settings["e_type"]
+        self.int_window = settings["int_window"]
+        self.file_header = "CH_"+str(settings["channel"])+"@"+self.model_name+"_"+str(settings["id"])+"_Data_"
+
+    def get_event_size(self, t0_file):
+        with open(t0_file, "rb") as file:
+            if self.e_type == "uncalibrated":
+                first_event = file.read(24)
+                [num_samples] = np.frombuffer(first_event[20:24], dtype=np.uint16)
+                return 24 + 2*num_samples
+            elif self.e_type == "calibrated":
+                first_event = file.read(30)
+                [num_samples] = np.frombuffer(first_event[26:30], dtype=np.uint32)
+                return 30 + 2 * num_samples  # number of bytes / 2
+            else:
+                raise TypeError("Invalid e_type! Valid e_type's: uncalibrated, calibrated")
+
+    def get_event(self, event_data_bytes):
+        self.decoded_values["board"] = np.frombuffer(event_data_bytes[0:2], dtype=np.uint16)[0]
+        self.decoded_values["channel"] = np.frombuffer(event_data_bytes[2:4], dtype=np.uint16)[0]
+        self.decoded_values["timestamp"] = np.frombuffer(event_data_bytes[4:12], dtype=np.uint64)[0]
+        if self.e_type == "uncalibrated":
+            self.decoded_values["energy"] = np.frombuffer(event_data_bytes[12:14], dtype=np.uint16)[0]
+            self.decoded_values["energy_short"] = np.frombuffer(event_data_bytes[14:16], dtype=np.uint16)[0]
+            self.decoded_values["flags"] = np.frombuffer(event_data_bytes[16:20], np.uint32)[0]
+            self.decoded_values["num_samples"] = np.frombuffer(event_data_bytes[20:24], dtype=np.uint32)[0]
+            self.decoded_values["waveform"] = np.frombuffer(event_data_bytes[24:], dtype=np.uint16)
+        elif self.e_type == "calibrated":
+            self.decoded_values["energy"] = np.frombuffer(event_data_bytes[12:20], dtype=np.float64)[0]
+            self.decoded_values["energy_short"] = np.frombuffer(event_data_bytes[20:22], dtype=np.uint16)[0]
+            self.decoded_values["flags"] = np.frombuffer(event_data_bytes[22:26], np.uint32)[0]
+            self.decoded_values["num_samples"] = np.frombuffer(event_data_bytes[26:30], dtype=np.uint32)[0]
+            self.decoded_values["waveform"] = np.frombuffer(event_data_bytes[30:], dtype=np.uint16)
+        else:
+            raise TypeError("Invalid e_type! Valid e_type's: uncalibrated, calibrated")
+        return self._assemble_data_row()
+
+    def _assemble_data_row(self):
+        timestamp = self.decoded_values["timestamp"]
+        energy = self.decoded_values["energy"]
+        energy_short = self.decoded_values["energy_short"]
+        flags = self.decoded_values["flags"]
+        waveform = self.decoded_values["waveform"]
+        return [timestamp, energy, energy_short, flags], waveform
+
+    def create_dataframe(self, array):
+        waveform_labels = [str(item) for item in list(range(self.decoded_values["num_samples"]-1))]
+        column_labels = self.parameters + waveform_labels
+        dataframe = pd.DataFrame(data=array, columns=column_labels, dtype=float)
+        return dataframe
