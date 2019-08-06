@@ -181,7 +181,8 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
     for an estimate of where the wf tail starts, just use pct = 100 + (delta).
     """
     wfs = waves[wfin]
-    smax = calcs["savgol_max"].values
+    max = wfin.split('_')[1] + "_max"
+    smax = calcs[max].values
 
     for p in pct:
         tp_idx = np.argmax(wfs >= smax[:, None] * (p / 100.), axis=1)
@@ -481,12 +482,13 @@ def tail_fit(waves, calcs, wfin="wf_blsub", delta=1, tp_thresh=0.8, n_check=3,
                 return np.array([1, 0])
             return np.ma.polyfit(wf, ts, ord)
 
-        pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
+        if len(log_tails):
+          pfit = np.apply_along_axis(poly1d, 1, log_tails, ts, order)
 
-        amps = np.exp(pfit[:,1])
-        taus = -1 / pfit[:,0]
-        calcs["tail_amp"] = amps
-        calcs["tail_tau"] = taus
+          amps = np.exp(pfit[:,1])
+          taus = -1 / pfit[:,0]
+          calcs["tail_amp"] = amps
+          calcs["tail_tau"] = taus
 
     # print("Done.  Elapsed: {:.2e} sec.".format(time.time()-t_start))
     # exit()

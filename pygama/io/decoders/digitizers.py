@@ -265,8 +265,7 @@ class SIS3302Decoder(Digitizer):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
-        
-        
+
         
 class SIS3316Decoder(Digitizer):
     """ handle Struck 3316 digitizer """
@@ -274,7 +273,6 @@ class SIS3316Decoder(Digitizer):
     #       most metadata of Struck header (energy, ...)
 
     def __init__(self, *args, **kwargs):
-        
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
@@ -338,8 +336,6 @@ class SIS3316Decoder(Digitizer):
         if self.sample_period == 0:
             print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
             raise Exception ("Sample period not set")
-        
-        #print ("hey, let's decöde!") 
         
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
@@ -438,7 +434,88 @@ class SIS3316Decoder(Digitizer):
         self.format_data(locals())
 
 
-class SIS3316ORCADecoder(Digitizer):
+class FlashCamDecoder(Digitizer):
+  """ handle FlashCam Ge digitizer """
+
+  def __init__(self, *args, **kwargs):
+
+    self.decoder_name = 'FlashCam'
+    self.class_name = 'FlashCam'
+
+    # store an entry for every event -- this is what goes into pandas
+    self.decoded_values = {
+      "packet_id": [],
+      "ievt": [],
+      "energy": [],
+      "bl" : [],
+      "bl0" : [],
+      "bl1" : [],
+      "timestamp": [],
+      "channel": [],
+      "waveform": [],
+    }
+    super().__init__(*args, **kwargs) # also initializes the garbage df
+        
+    self.event_header_length = 1
+    self.sample_period = 16  # ns
+    self.h5_format = "table"
+    self.n_blsamp = 500
+    self.window = False
+    self.ievt = 0
+    self.ievtg = 0
+          
+  def decode_event(self,
+                   io,
+                   packet_id,
+                   verbose=False):
+      """
+      see README for the 32-bit data word diagram
+      """
+      # start reading the binary
+      crate = 0   # To be set up later
+      card = 0    #
+      channel = 0 # for test phase only
+      crate_card_chan = 0
+      wf_length_32 = io.nsamples
+      timestamp = io.eventtime
+      bl = float(io.average_prebaselines)
+      bl0 = int(io.prebaselines0)
+      bl1 = int(io.prebaselines1)
+      energy = 0 # currently not stored but can be in the future?
+
+      # final raw wf array
+      waveform = io.traces
+      waveform.astype(float)
+      
+      # if the wf is too big for pytables, we can window it,
+      # but we might get some garbage
+      if self.window:
+        wf = Waveform(wf_data, self.sample_period, self.decoder_name)
+        win_wf, win_ts = wf.window_waveform(self.win_type,self.n_samp,self.n_blsamp,test=False)
+        ts_lo, ts_hi = win_ts[0], win_ts[-1]
+
+        waveform = win_wf # modify final wf array
+
+        if wf.is_garbage:
+          ievt = self.ievtg
+          self.ievtg += 1
+          self.format_data(locals(), wf.is_garbage)
+          return
+
+      if len(waveform) > self.pytables_col_limit and self.h5_format == "table":
+        print("WARNING: too many columns for tables output,\n",
+        "         reverting to saving as fixed hdf5 ...")
+        self.h5_format = "fixed"
+
+      # set the event number (searchable HDF5 column)
+      ievt = self.ievt
+      self.ievt += 1
+
+      # send any variable with a name in "decoded_values" to the pandas output
+      self.format_data(locals())  
+
+
+  class SIS3316ORCADecoder(Digitizer):
     """ handle ORCA Struck 3316 digitizer """
     #toDo: handle per-channel data (gain, ...)
     #       most metadata of Struck header (energy, ...)

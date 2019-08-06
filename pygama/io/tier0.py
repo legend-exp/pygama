@@ -54,7 +54,7 @@ def ProcessTier0(t0_file,
     if settings["daq"] == "ORCA":
         ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
     elif settings["daq"] == "FlashCam":
-        ProcessFlashCam()
+        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose)
     elif settings["daq"] == "SIS3316":
         ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
     else:
@@ -363,6 +363,109 @@ def ProcessSIS3316(t0_file,
 
 
 
-def ProcessFlashCam():
-    # placeholder
-    print("Hi Yoann")
+def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
+
+    ############################################
+    # Start of FlashCam data specific decoding #
+    ############################################
+
+    from fcutils import fcio
+
+    ROW_LIMIT = 5e4
+    start = time.time()
+
+    print("Lets process amazing FlashCam data")
+    
+    # The fcio class is used to open the datafile
+    io = fcio(t0_file)
+    
+    # no run info in FC header yet - get_run_number(header_dict)
+    print("Run number: {}".format(run))
+    
+    # no decoder info in FC header yet - get_decoder_for_id(header_dict)
+    id_dict = {"decoder":"FlashCam"}
+    
+    if verbose:
+      print("Data IDs present in this header are:")
+      for id in id_dict:
+        print(" {}: {}".format(id, id_dict[id]))
+    used_decoder_names = set([id_dict[id] for id in id_dict])
+    
+    #Currently no decoder name provide by the FC file header
+    #Set by hand - get_decoder()
+    if decoders is None:
+      decoders = []
+      decoders.append(FlashCamDecoder())
+      decoder_names = []
+      decoder_names.append('FlashCam')
+
+    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
+    decoder_to_id = {d.decoder_name: d for d in decoders}
+
+    # pass in specific decoder options (windowing, multisampling, etc.)
+    for d in decoders:
+      d.apply_settings(settings)
+
+    if os.path.isfile(t1_file):
+      if overwrite:
+        print("Overwriting existing file...")
+        os.remove(t1_file)
+      else:
+        print("File already exists, continuing ...")
+        return
+
+    packet_id = 0 # number of events decoded
+    unrecognized_data_ids = []
+    
+    while io.next_event() and packet_id<n_max:
+      packet_id += 1
+      if packet_id % 10000 == 0:
+        print(packet_id,io.eventtime)
+      #if verbose and packet_id % 1000 == 0:
+      #update_progress(float(io.telid) / file_size)
+      
+      # write periodically to the output file instead of writing all at once
+      if packet_id % ROW_LIMIT == 0:
+        for d in decoders:
+          d.to_file(t1_file, verbose=True)
+      
+      # sends data to the pandas dataframe
+      # specific FlashCam formatting
+      for d in decoders:
+        if d.decoder_name == 'FlashCam':
+          d.decode_event(io, packet_id)
+        else:
+          print("ERROR: Specific FlashCam event decoder provided to ",d.decoder_name)
+          sys.exit()
+
+    ##########################################
+    # End of FlashCam data specific decoding #
+    ##########################################
+
+    # final write to file
+    for d in decoders:
+      if verbose:
+        print("tier0 - write in decoder ",d.decoder_name)
+      d.to_file(t1_file, verbose=True)
+
+    if verbose:
+      update_progress(1)
+  
+    if len(unrecognized_data_ids) > 0:
+      print("WARNING, Found the following unknown data IDs:")
+      for id in unrecognized_data_ids:
+        print(" {}".format(id))
+      print("hopefully they weren't important!\n")
+
+    # --------- summary ------------
+
+    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    with pd.HDFStore(t1_file,'r') as store:
+      print(store.keys())
+      # print(store.info())
+  
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")

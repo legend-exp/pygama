@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings(action="ignore", module="scipy", message="^internal gelsd")
 warnings.filterwarnings(action="ignore", module="scipy.signal", category=FutureWarning)
 
-def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
+def blsub(waves, calcs, blest="", wfin="waveform", wfout="wf_blsub", test=False):
     """
     return an ndarray of baseline-subtracted waveforms,
     using the results from the fit_bl calculator
@@ -18,26 +18,42 @@ def blsub(waves, calcs, wfin="waveform", wfout="wf_blsub", test=False):
     wfs = waves[wfin]
     nwfs, nsamp = wfs.shape[0], wfs.shape[1]
 
-    bl_0 = calcs["bl_p0"].values[:, np.newaxis]
-
-    if "bl_p1" in calcs.keys():
-        slope_vals = calcs["bl_p1"].values[:, np.newaxis]
-        bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
-        blsub_wfs = wfs - (bl_0 + bl_1)
-    else:
+    if blest == "fcdaq":
+        bl_0 = calcs["fcdaq"].values[:, np.newaxis]
         blsub_wfs = wfs - bl_0
+    
+    else:
+        bl_0 = calcs["bl_p0"].values[:, np.newaxis]
+        if "bl_p1" in calcs.keys():
+            slope_vals = calcs["bl_p1"].values[:, np.newaxis]
+            bl_1 = np.tile(np.arange(nsamp), (nwfs, 1)) * slope_vals
+            blsub_wfs = wfs - (bl_0 + bl_1)
+        else:
+            blsub_wfs = wfs - bl_0
 
     if test:
-        iwf = 1
+      iwf = 2
+      while True:
+        if iwf != 2:
+          inp = input()
+          if inp == "q": exit()
+          if inp == "p": iwf -= 2
+          if inp.isdigit(): iwf = int(inp) - 1
+        iwf += 1
+        print(iwf)
+        plt.cla()
+
         plt.plot(np.arange(nsamp), wfs[iwf], '-g', label="raw")
         plt.plot(np.arange(nsamp), blsub_wfs[iwf], '-b', label="bl_sub")
         # plt.plot(np.arange(nsamp), blsub_avgs[iwf], '-g', label="bl_avg")
+
         plt.xlabel("clock ticks", ha='right', x=1)
         plt.ylabel("ADC", ha='right', y=1)
         plt.legend()
         plt.tight_layout()
-        plt.show()
-        exit()
+        plt.show(block=False)
+        plt.grid(True)
+        plt.pause(0.01)
 
     # note, floats are gonna take up more memory
     return {wfout: blsub_wfs}
@@ -115,7 +131,7 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
             plt.legend()
             plt.tight_layout()
             plt.show(block=False)
-            plt.pause(0.001)
+            plt.pause(0.00001)
 
     if dt != 0:
         return {wfout: ptrap}
@@ -370,7 +386,7 @@ def peakdet(waves, calcs, delta, ihi, sigma=0, wfin="wf_current", wfout="wf_maxc
             plt.legend()
             plt.tight_layout()
             plt.show(block=False)
-            plt.pause(0.01)
+            plt.pause(0.001)
 
     return {wfout: wfmax}
 
@@ -385,7 +401,16 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
     wfsg = signal.savgol_filter(wfs, window, order)
 
     if test:
-        iwf = 4
+      iwf = -1
+      while True:
+        if iwf != -1:
+          inp = input()
+          if inp == "q": exit()
+          if inp == "p": iwf -= 2
+        iwf += 1
+        print(iwf)
+        plt.cla()
+
         ts = np.arange(len(wfs[iwf]))
         plt.plot(ts, wfs[iwf], '-b', label='raw')
         plt.plot(ts, wfsg[iwf], '-r', label='savgol')
@@ -393,9 +418,9 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
         plt.ylabel("adc", ha='right', y=1)
         plt.legend()
         plt.tight_layout()
-        plt.show()
-        exit()
-
+        plt.show(block=False)
+        plt.pause(0.001)
+            
     return {wfout: wfsg}
 
 
