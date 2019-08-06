@@ -16,6 +16,7 @@ from ..io.decoders.pollers import *
 from ..io.decoders.data_loading import *
 from ..io.decoders.xml_parser import *
 from ..dsp.base import *
+from ..io.decoders.SIS3316File import *
 
 def ProcessTier0(t0_file,
                  run,
@@ -238,6 +239,128 @@ def get_next_event(f_in):
         raise EOFError
 
     return event_data, data_id
+    
+
+
+def ProcessSIS3316(t0_file, 
+                    t1_file, 
+                    run,
+                    n_max, 
+                    settings, 
+                    verbose):
+    """
+    My implementation for the Struck SIS3316 digitizer.
+    Use the llamaDAQ program for producing compatible input files.
+    """                    
+    
+    #now the ugly code duplication starts ... 
+    
+    # num. rows between writes.  larger eats more memory
+    # smaller does more writes and takes more time to finish
+    # TODO: pass this option in from the 'settings' dict
+    ROW_LIMIT = 5e4
+    
+    start = time.time()
+    f_in = open(t0_file.encode('utf-8'), "rb")
+    if f_in == None:
+        print("Couldn't find the file %s" % t0_file)
+        sys.exit(0)
+        
+    #file = SIS3316File(f_in,2) #test
+
+    verbosity = 1 if verbose else 0     # 2 is for debug
+    sisfile = SIS3316File(f_in, verbosity)
+
+    # figure out the total size
+    SEEK_END = 2
+    f_in.seek(0, SEEK_END)
+    file_size = float(f_in.tell())
+    f_in.seek(0, 0)  # rewind
+    file_size_MB = file_size / 1e6
+    print("Total file size: {:.3f} MB".format(file_size_MB))
+    
+    header_dict = sisfile.parse_channelConfigs()    # parse the header dict after manipulating position in file
+
+    # run = get_run_number(header_dict)
+    print("Run number: {}".format(run))
+
+    #see pygama/pygama/io/decoders/data_loading.py
+    decoders = []
+    decoders.append(SIS3316Decoder())   #we just have that one
+    channelOne = list(list(header_dict.values())[0].values())[0]
+    decoders[0].initialize(1000./channelOne["SampleFreq"], channelOne["Gain"])
+        # FIXME: gain set according to first found channel, but gain can change!
+
+    print("pygama will run this fancy decoder: SIS3316Decoder")
+
+    # pass in specific decoder options (windowing, multisampling, etc.)
+    for d in decoders:
+        d.apply_settings(settings)
+
+    # ------------ scan over raw data starts here -----------------
+    # more code duplication
+
+    print("Beginning Tier 0 processing ...")
+
+    packet_id = 0  # number of events decoded
+    unrecognized_data_ids = []
+
+    # header is already skipped by SIS3316File
+
+    # start scanning
+    while (packet_id < n_max and f_in.tell() < file_size):
+        packet_id += 1
+
+        if verbose and packet_id % 1000 == 0:
+            update_progress(float(f_in.tell()) / file_size)
+
+        # write periodically to the output file instead of writing all at once
+        if packet_id % ROW_LIMIT == 0:
+            for d in decoders:
+                d.to_file(t1_file, verbose=True)
+
+        try:
+            fadcID, channelID, event_data = sisfile.read_next_event(header_dict)
+        except Exception as e:
+            print("Failed to get the next event ... Exception:",e)
+            break
+        if event_data is None:      #EOF
+            break
+            
+        decoder = decoders[0]       #well, ...
+        # sends data to the pandas dataframe
+        decoder.decode_event(event_data, packet_id, header_dict, fadcID, channelID)
+
+    print("done.  last packet ID:", packet_id)
+    f_in.close()
+
+    # final write to file
+    for d in decoders:
+        d.to_file(t1_file, verbose=True)
+
+    if verbose:
+        update_progress(1)
+
+    if len(unrecognized_data_ids) > 0:
+        print("WARNING, Found the following unknown data IDs:")
+        for id in unrecognized_data_ids:
+            print("  {}".format(id))
+        print("hopefully they weren't important!\n")
+
+    # ---------  summary ------------
+
+    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    with pd.HDFStore(t1_file,'r') as store:
+        print(store.keys())
+        # print(store.info())
+
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")
+
+
 
 
 def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):

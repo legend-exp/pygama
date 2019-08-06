@@ -266,48 +266,46 @@ class SIS3302Decoder(Digitizer):
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
 
-
-
+        
 class SIS3316Decoder(Digitizer):
     """ handle Struck 3316 digitizer """
     #toDo: handle per-channel data (gain, ...)
     #       most metadata of Struck header (energy, ...)
 
     def __init__(self, *args, **kwargs):
-      
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
         # store an entry for every event -- this is what goes into pandas
         self.decoded_values = {
-          "packet_id": [],
-          "ievt": [],
-          "energy_first": [],
-          "energy": [],
-          "timestamp": [],
-          "peakhigh_index": [],
-          "peakhigh_value": [],
-          "information": [],
-          "accumulator1": [],
-          "accumulator2": [],
-          "accumulator3": [],
-          "accumulator4": [],
-          "accumulator5": [],
-          "accumulator6": [],
-          "accumulator7": [],
-          "accumulator8": [],
-          "mawMax": [],
-          "maw_before": [],
-          "maw_after": [],
-          "fadcID": [],
-          "channel": [],
-          "waveform": [],
+            "packet_id": [],
+            "ievt": [],
+            "energy_first": [],
+            "energy": [],
+            "timestamp": [],
+            "peakhigh_index": [],
+            "peakhigh_value": [],
+            "information": [],
+            "accumulator1": [],
+            "accumulator2": [],
+            "accumulator3": [],
+            "accumulator4": [],
+            "accumulator5": [],
+            "accumulator6": [],
+            "accumulator7": [],
+            "accumulator8": [],
+            "mawMax": [],
+            "maw_before": [],
+            "maw_after": [],
+            "fadcID": [],
+            "channel": [],
+            "waveform": [],
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
 
         # self.event_header_length = 1 #?
         self.sample_period = 0  # ns, I will set this later, according to header info
-        self.gain = 0
+        self.gain = 0           
         self.h5_format = "table"
         #self.n_blsamp = 2000
         self.ievt = 0       #event number
@@ -316,35 +314,33 @@ class SIS3316Decoder(Digitizer):
         
     def initialize(self, sample_period, gain):
         """
-         sets certain global values from a run, like:
-         sample_period: time difference btw 2 samples in ns
-         gain: multiply the integer sample value with the gain to get the voltage in V
-         Method has to be called before the actual decoding work starts !
-         """
+        sets certain global values from a run, like:
+        sample_period: time difference btw 2 samples in ns
+        gain: multiply the integer sample value with the gain to get the voltage in V
+        Method has to be called before the actual decoding work starts !
+        """
         self.sample_period = sample_period
         self.gain = gain
-    
+        
     def decode_event(self,
                      event_data_bytes,
                      packet_id,
                      header_dict,
-                     fadcIndex,
+                     fadcIndex, 
                      channelIndex,
                      verbose=False):
         """
-         see the llamaDAQ documentation for data word diagrams
-         """
+        see the llamaDAQ documentation for data word diagrams
+        """
         
         if self.sample_period == 0:
             print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
             raise Exception ("Sample period not set")
         
-        #print ("hey, let's decöde!")
-        
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
         evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
-            
+        
         # e sti gran binaries non ce li metti
         timestamp = ((evt_data_32[0] & 0xffff0000) << 16) + evt_data_32[1]
         format_bits = (evt_data_32[0]) & 0x0000000f
@@ -388,7 +384,7 @@ class SIS3316Decoder(Digitizer):
         if wf_length16 != expected_wf_length:
             print(len(evt_data_16), header_length)
             print("ERROR: Waveform size %d doesn't match expected size %d." %
-                 (wf_length16, expected_wf_length))
+                  (wf_length16, expected_wf_length))
             exit()
 
         # indexes of stuff (all referring to the 16 bit array)
@@ -427,18 +423,15 @@ class SIS3316Decoder(Digitizer):
 
         if len(waveform) > self.pytables_col_limit and self.h5_format == "table":
             print("WARNING: too many columns for tables output,\n",
-                 "         reverting to saving as fixed hdf5 ...")
+                  "         reverting to saving as fixed hdf5 ...")
             self.h5_format = "fixed"
 
         # set the event number (searchable HDF5 column)
         ievt = self.ievt
         self.ievt += 1
-          
+
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
-
-
-
 
 
 class FlashCamDecoder(Digitizer):
@@ -519,4 +512,104 @@ class FlashCamDecoder(Digitizer):
       self.ievt += 1
 
       # send any variable with a name in "decoded_values" to the pandas output
-      self.format_data(locals())
+      self.format_data(locals())  
+
+
+  class SIS3316ORCADecoder(Digitizer):
+    """ handle ORCA Struck 3316 digitizer """
+    #toDo: handle per-channel data (gain, ...)
+    #       most metadata of Struck header (energy, ...)
+
+    def __init__(self, *args, **kwargs):
+        
+        self.decoder_name = 'ORSIS3316WaveformDecoder'
+        self.class_name = 'ORSIS3316Model'
+
+        # store an entry for every event -- this is what goes into pandas
+        self.decoded_values = {
+            "packet_id": [],
+            "ievt": [],
+            "energy_first": [],
+            "energy": [],
+            "timestamp": [],
+            "channel": [],
+            "waveform": [],
+        }
+        super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
+
+        # self.event_header_length = 1 #?
+        self.sample_period = 10  # ns, I will set this later, according to header info
+        self.gain = 0           
+        self.h5_format = "table"
+        self.ievt = 0       #event number
+        self.ievtg = 0      #garbage event number
+        self.window = False
+        
+        
+    def decode_event(self,
+                     event_data_bytes,
+                     packet_id,
+                     header_dict,
+                     verbose=False):
+        
+        
+        # parse the raw event data into numpy arrays of 16 and 32 bit ints
+        evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
+        evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
+
+        #TODO Figure out the header, particularly card/crate/channel/timestamp
+        n_lost_msb = 0
+        n_lost_lsb = 0
+        n_lost_records = 0
+        crate = evt_data_32[3]
+        card = evt_data_32[4]
+        channel = evt_data_32[4]
+        buffer_wrap = 0
+        crate_card_chan = crate + card + channel
+        wf_length_32 = 0
+        ene_wf_length = evt_data_32[4]
+        evt_header_id = 0
+        timestamp = 0
+
+        # compute expected and actual array dimensions
+        wf_length16 = 1024
+        orca_header_length16 = 52
+        header_length16 = orca_header_length16
+        ene_wf_length16 = 2 * ene_wf_length
+        footer_length16 = 0
+
+        expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)/2
+
+        if wf_length16 != expected_wf_length:
+            print("ERROR: Waveform size %d doesn't match expected size %d." %
+                  (wf_length16, expected_wf_length))
+            #exit()
+
+        # indexes of stuff (all referring to the 16 bit array)
+        i_wf_start = header_length16
+        i_wf_stop = i_wf_start + wf_length16
+        i_ene_start = i_wf_stop + 1
+        i_ene_stop = i_ene_start + ene_wf_length16
+
+
+        # handle the waveform(s)
+        if wf_length16 > 0:
+            wf_data = evt_data_16[i_wf_start:i_wf_stop]
+
+
+        #TODO check if number of events matches expected
+        #if len(wf_data) != expected_wf_length:
+        #    print("ERROR: We expected %d WF samples and only got %d" %
+        #          (expected_wf_length, len(wf_data)))
+        #    exit()
+
+        # final raw wf array
+        waveform = wf_data
+
+        # set the event number (searchable HDF5 column)
+        ievt = self.ievt
+        self.ievt += 1
+
+        # send any variable with a name in "decoded_values" to the pandas output
+        self.format_data(locals())
+        
