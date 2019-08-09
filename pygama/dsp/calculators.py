@@ -141,7 +141,7 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
 
     maxes = np.amax(wfs, axis=1)
     imaxes = np.argmax(wfs, axis=1)
-
+    
     cname = wfin.split("_")[-1]
     calcs["{}_max".format(cname)] = maxes
     calcs["{}_imax".format(cname)] = imaxes
@@ -181,7 +181,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
     for an estimate of where the wf tail starts, just use pct = 100 + (delta).
     """
     wfs = waves[wfin]
-    max = wfin.split('_')[1] + "_max"
+    max = wfin.split('_')[-1] + "_max"
     smax = calcs[max].values
 
     for p in pct:
