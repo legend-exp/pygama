@@ -253,7 +253,7 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
     # this is less dependent on the trap's baseline noise.
     # Majorana uses a threshold of 2 ADC, hardcoded.
     thresh = 2
-    short = wf2.split("_")[1]
+    short = wf2.split("_")[-1]
     t0 = np.zeros(wfshort.shape[0], dtype=int)
 
     # print("WFSHAPE",wfshort.shape, short)
