@@ -25,7 +25,7 @@
     "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
     "1764.5":"214Bi", "2614.5":"208Tl"
   },
-  "expected_peaks":[2614.5, 1764.5, 1460.8, 583.2],
+  "expected_peaks":[2614.5, 1460.8, 583.2],
 
   "ds":{
     "note":"data sets",
@@ -78,7 +78,9 @@
         "ds_coverage":"0, 99",
         "xlims":[0, 10000, 10],
         "peakdet_thresh":100,
-        "match_thresh":0.01
+        "match_thresh":0.01,
+        "width_thresh":180,
+        "width_lims":[-30, 30, 0, 10, 49, 60]
       },
       "energy": {
         "ds_coverage":"0, 99",

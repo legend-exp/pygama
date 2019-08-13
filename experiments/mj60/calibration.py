@@ -56,7 +56,11 @@ def main():
         calibrate_pass1(ds, etype, args["writeDB"], args["test"])
 
     if args["pass2"]:
-        calibrate_pass2(ds)
+        calibrate_pass2(ds, args["test"])
+
+    # fit to germanium peakshape function goes here -- take from matthew's code
+    # if args["pass3"]:
+    #     calibrate_pass3(ds)
 
     if args["printDB"]:
         show_calDB(cal_db)
@@ -201,7 +205,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
             table.upsert(row, query.ds == dset)
 
 
-def calibrate_pass2(ds):
+def calibrate_pass2(ds, test=False):
     """
     load first-pass constants from the calDB for this DataSet,
     and the list of peaks we want to fit from the runDB, and
@@ -209,14 +213,72 @@ def calibrate_pass2(ds):
     make a new table in the calDB, "cal_pass2" that holds all
     the important results, like mu, sigma, errors, etc.
     """
-    print("yes!")
+
+    """
+    This function is mainly being used to estimate the FWHM of the calibration
+    peaks
+    """
+    epeaks = sorted(ds.runDB["expected_peaks"])
+    calpars = ds.get_p1cal_pars("e_ftp")
+    xlo, xhi, xpb = calpars["xlims"]
+    pk_thresh = calpars["width_thresh"]
+    width_lo, width_hi, wlo1, whi1, wlo2, whi2 = calpars["width_lims"]
 
     calDB = ds.calDB
     query = db.Query()
     table = calDB.table("cal_pass1")
     vals = table.all()
-    df = pd.DataFrame(vals) # <<---- omg awesome
-    print(df.loc[df.ds==18])
+    df_cal = pd.DataFrame(vals) # <<---- omg awesome
+    df_cal = df_cal.loc[df_cal.ds.isin(ds.ds_list)]
+    p1cal = df_cal.iloc[0]["p1cal"]
+
+    t2 = ds.get_t2df()
+    ene = t2["e_ftp"] * p1cal
+
+    for i in range(len(epeaks)):
+        ehi = epeaks[i] + width_hi
+        elo = epeaks[i] + width_lo
+        xpb = 1
+        nb = int((ehi-elo)/xpb)
+        h, bins = np.histogram(ene, nb, (elo, ehi))
+        b = (bins[:-1] + bins[1:]) / 2
+
+        # subract background
+        mean_upper = np.mean(np.array(h[wlo1:whi1]))
+        mean_lower = np.mean(np.array(h[wlo2:whi2]))
+        h = h - ( mean_upper + mean_lower ) / 2
+
+        max, min = peakdet(h, pk_thresh, b)
+        print(max)
+
+        binr = np.where(b == max[0][0])
+        binl = np.where(b == max[0][0])
+        binr, binl = binr[0], binl[0]
+        peakh = max[0][1]
+        fwhmr = h[binr]
+        fwhml = h[binl]
+
+        while fwhmr > 0.5 * peakh or fwhml > 0.5 * peakh:
+            binr += 1
+            binl += -1
+            fwhmr = h[binr]
+            fwhml = h[binl]
+
+        print("FWHM is kind of in the ball park of: ", (b[binr]-b[binl]))
+
+        if test:
+            plt.plot(b, h, ls="steps", linewidth=1.5)
+            plt.axvline(float(max[0][0]), c='red', linestyle="--", lw=1)
+            plt.axvline(float(b[binr]), c='black', linestyle="--", lw=1)
+            plt.axvline(float(b[binl]), c='green', linestyle="--", lw=1)
+            plt.title("Peak: {}".format(epeaks[i]))
+            plt.xlabel("keV")
+            plt.ylabel("Counts/keV")
+            plt.show()
+    exit()
+
+    # maxes, mins = peakdet(h, pk_thresh, b)
+
 
 
 def show_calDB(fdb):
