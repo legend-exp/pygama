@@ -68,7 +68,10 @@
     "36":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
     "37":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
     "38":["380,395", "Dead time study (elog: using external pulser to determine ...)"],
-    "39":["400,999", "Pulser energy study (elog: mj60 pulser study)"]
+    "39":["400,415", "Pulser energy study bkg (elog: mj60 pulser study)"],
+    "40":["416,429", "Overnight background runs, (elog: mj60 pulser study)"],
+    "41":["430", "Forced acquisition data"],
+    "42":["431,445", "Pulser energy study (elog: mj60 pulser study)"]
   },
 
   "ecal":{
