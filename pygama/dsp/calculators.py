@@ -141,7 +141,7 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
 
     maxes = np.amax(wfs, axis=1)
     imaxes = np.argmax(wfs, axis=1)
-
+    
     cname = wfin.split("_")[-1]
     calcs["{}_max".format(cname)] = maxes
     calcs["{}_imax".format(cname)] = imaxes
@@ -181,7 +181,7 @@ def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
     for an estimate of where the wf tail starts, just use pct = 100 + (delta).
     """
     wfs = waves[wfin]
-    max = wfin.split('_')[1] + "_max"
+    max = wfin.split('_')[-1] + "_max"
     smax = calcs[max].values
 
     for p in pct:
@@ -253,7 +253,7 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
     # this is less dependent on the trap's baseline noise.
     # Majorana uses a threshold of 2 ADC, hardcoded.
     thresh = 2
-    short = wf2.split("_")[1]
+    short = wf2.split("_")[-1]
     t0 = np.zeros(wfshort.shape[0], dtype=int)
 
     # print("WFSHAPE",wfshort.shape, short)
