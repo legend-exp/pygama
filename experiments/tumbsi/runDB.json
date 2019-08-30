@@ -1,0 +1,94 @@
+{
+  "loc_dir": "$DATADIR/tumbsi/",
+  "raw_dir": "$DATADIR/tumbsi/raw/",
+  "tier_dir": "$DATADIR/tumbsi/tier",
+  "meta_dir":"$DATADIR/tumbsi/metadata",
+  "digitizer": "FlashCam",
+  "daq": "FlashCam",
+  "t1_prefix": "t1_run",
+  "t2_prefix": "t2_run",
+  "chunksize": 1000,
+  "clock": 62500000.0,
+  "rollover": 1,
+  "mass_note": "(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
+  "det_mass_kg": 2,
+  "ds": {
+    "note": "data sets",
+    "0": ["000", "2018/09 thorium calibration with BSI ICPC at TUM "]
+  },
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "511.0":"beta+",
+    "583.2":"208Tl", "609.3":"214Bi", "911.2":"228Ac",
+    "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
+    "1764.5":"214Bi", "2614.5":"208Tl"
+  },
+  "cal_peaks":[238.4,300.087,583.191,860.564,1620.50,2614.533],
+  "peaks_of_interest":[238.4,300.087,583.191,860.564,1592.533,1620.50,2039,2103.533,2614.533],
+  "ecal":{
+    "note":"inputs for each energy estimator are organized by ds",
+    "0,999": {
+      "e_ftp": {
+        "ds_coverage":"0",
+        "xlims":[2000, 50000, 10],
+        "peakdet_thresh":10,
+        "match_thresh":0.1
+      },
+      "energy": {
+        "ds_coverage":"0",
+        "xlims":[0, 50000, 10],
+        "peakdet_thresh":10,
+        "match_thresh":0.1
+      }
+    }
+  },
+  "build_options": {
+    "conf1": {
+      "run_coverage": [0, 99999],
+      "tier0_options": {
+        "daq": "FlashCam",
+        "digitizer": "FlashCamWaveformDecoder"
+      },
+      "tier1_options": {
+        "clk": 62500000.0,
+        "fit_bl": {
+          "ihi": 100,
+          "order": 1
+        },
+        "blsub": {
+          "blest": "fcdaq",
+          "test":0
+        },
+        "pz":{
+          "decay": 35,
+          "test":0
+        },
+        "trap": [{
+          "wfout": "wf_etrap",
+          "wfin": "wf_blsub",
+          "rise": 3,
+          "flat": 1,
+          "decay": 35,
+          "test":0
+        },
+        {"wfout": "wf_strap", "wfin": "wf_blsub", "rise": 1, "flat": 1.5, "decay": 35},
+        {"wfout": "wf_atrap", "wfin": "wf_blsub", "rise": 0.04, "flat": 0.1, "fall": 2},
+        {"wfout": "wf_ttrap", "wfin": "wf_blsub", "rise": 1, "flat": 0, "fall": 1
+        }],
+        "current": [{
+          "wfin": "wf_pz", "wfout": "wf_current", "sigma": 5
+        }],
+        "get_max": [{"wfin": "wf_etrap"}, {"wfin": "wf_strap"}, {"wfin": "wf_atrap"}, {"wfin": "wf_ttrap"}, {"wfin": "wf_blsub"}, {"wfin": "wf_current"
+        }],
+        "timepoint": {"wfin": "wf_blsub", "pct": [5, 10, 50, 100]},
+        "peakdet": [{"delta": 0.5, "sigma": 5, "ihi": 600}],
+        "num_peaks": {},
+        "ftp": {},
+        "overflow": {},
+        "dcr": [{"wfin": "wf_blsub"}, {"wfin": "wf_pz"}],
+        "tail_fit": [{"wfin": "wf_blsub", "order": 1, "tp_thresh": 0.8, "vec": 0}, {"wfin": "wf_pz", "order": 1, "tp_thresh": 0.8, "vec": 0}
+        ]
+      }
+    }
+  },
+  "_default": {}
+}

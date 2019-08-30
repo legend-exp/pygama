@@ -11,7 +11,7 @@
   "rollover":1,
 
   "ds":{
-    "0":["12", "test run, ORCA/3316 decoder"]
+    "0":["0, 999999", "test run, ORCA/3316 decoder"]
   },
 
   "build_options":{
@@ -19,7 +19,7 @@
       "run_coverage":[0,99999],
       "tier0_options":{
         "daq":"ORCA",
-        "digitizer":"ORSIS3316DecoderForEnergy"
+        "digitizer":"ORSIS3316WaveformDecoder"
       },
       "tier1_options":{
         "clk" : 100e6,
