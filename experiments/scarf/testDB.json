@@ -39,7 +39,7 @@
         "current" : {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5},
         "get_max" : [
             {"wfin":"wf_etrap"}, {"wfin":"wf_atrap"}, {"wfin":"wf_current"},
-            {"wfin":"wf_savgol"}
+            {"wfin":"wf_savgol"},{"wfin":"wf_blsub"}
         ],
         "ftp" : {},
         "timepoint" : {"wfin":"wf_blsub", "pct":[5,10,50,100]},
