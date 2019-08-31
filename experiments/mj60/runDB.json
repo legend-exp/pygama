@@ -110,6 +110,7 @@
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
+        "dADC" : {},
         "pz" : {"decay":82},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [
@@ -117,7 +118,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
@@ -148,6 +149,7 @@
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
+        "dADC": {},
         "pz" : {"decay":82},
         "notch" : {"f_notch":30e6, "Q":1},
         "savgol" : [

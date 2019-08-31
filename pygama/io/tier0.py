@@ -16,6 +16,7 @@ from ..io.decoders.pollers import *
 from ..io.decoders.data_loading import *
 from ..io.decoders.xml_parser import *
 from ..dsp.base import *
+from ..io.decoders.SIS3316File import *
 
 def ProcessTier0(t0_file,
                  run,
@@ -53,7 +54,11 @@ def ProcessTier0(t0_file,
     if settings["daq"] == "ORCA":
         ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
     elif settings["daq"] == "FlashCam":
-        ProcessFlashCam()
+        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose)
+    elif settings["daq"] == "SIS3316":
+        ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
+    elif settings["daq"] == "CAENDT57XX":
+        ProcessCompass(t0_file, t1_file, decoders, output_dir)
     else:
         print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
         exit()
@@ -236,8 +241,286 @@ def get_next_event(f_in):
         raise EOFError
 
     return event_data, data_id
+    
 
 
-def ProcessFlashCam():
-    # placeholder
-    print("Hi Yoann")
+def ProcessSIS3316(t0_file, 
+                    t1_file, 
+                    run,
+                    n_max, 
+                    settings, 
+                    verbose):
+    """
+    My implementation for the Struck SIS3316 digitizer.
+    Use the llamaDAQ program for producing compatible input files.
+    """                    
+    
+    #now the ugly code duplication starts ... 
+    
+    # num. rows between writes.  larger eats more memory
+    # smaller does more writes and takes more time to finish
+    # TODO: pass this option in from the 'settings' dict
+    ROW_LIMIT = 5e4
+    
+    start = time.time()
+    f_in = open(t0_file.encode('utf-8'), "rb")
+    if f_in == None:
+        print("Couldn't find the file %s" % t0_file)
+        sys.exit(0)
+        
+    #file = SIS3316File(f_in,2) #test
+
+    verbosity = 1 if verbose else 0     # 2 is for debug
+    sisfile = SIS3316File(f_in, verbosity)
+
+    # figure out the total size
+    SEEK_END = 2
+    f_in.seek(0, SEEK_END)
+    file_size = float(f_in.tell())
+    f_in.seek(0, 0)  # rewind
+    file_size_MB = file_size / 1e6
+    print("Total file size: {:.3f} MB".format(file_size_MB))
+    
+    header_dict = sisfile.parse_channelConfigs()    # parse the header dict after manipulating position in file
+
+    # run = get_run_number(header_dict)
+    print("Run number: {}".format(run))
+
+    #see pygama/pygama/io/decoders/data_loading.py
+    decoders = []
+    decoders.append(SIS3316Decoder())   #we just have that one
+    channelOne = list(list(header_dict.values())[0].values())[0]
+    decoders[0].initialize(1000./channelOne["SampleFreq"], channelOne["Gain"])
+        # FIXME: gain set according to first found channel, but gain can change!
+
+    print("pygama will run this fancy decoder: SIS3316Decoder")
+
+    # pass in specific decoder options (windowing, multisampling, etc.)
+    for d in decoders:
+        d.apply_settings(settings)
+
+    # ------------ scan over raw data starts here -----------------
+    # more code duplication
+
+    print("Beginning Tier 0 processing ...")
+
+    packet_id = 0  # number of events decoded
+    unrecognized_data_ids = []
+
+    # header is already skipped by SIS3316File
+
+    # start scanning
+    while (packet_id < n_max and f_in.tell() < file_size):
+        packet_id += 1
+
+        if verbose and packet_id % 1000 == 0:
+            update_progress(float(f_in.tell()) / file_size)
+
+        # write periodically to the output file instead of writing all at once
+        if packet_id % ROW_LIMIT == 0:
+            for d in decoders:
+                d.to_file(t1_file, verbose=True)
+
+        try:
+            fadcID, channelID, event_data = sisfile.read_next_event(header_dict)
+        except Exception as e:
+            print("Failed to get the next event ... Exception:",e)
+            break
+        if event_data is None:      #EOF
+            break
+            
+        decoder = decoders[0]       #well, ...
+        # sends data to the pandas dataframe
+        decoder.decode_event(event_data, packet_id, header_dict, fadcID, channelID)
+
+    print("done.  last packet ID:", packet_id)
+    f_in.close()
+
+    # final write to file
+    for d in decoders:
+        d.to_file(t1_file, verbose=True)
+
+    if verbose:
+        update_progress(1)
+
+    if len(unrecognized_data_ids) > 0:
+        print("WARNING, Found the following unknown data IDs:")
+        for id in unrecognized_data_ids:
+            print("  {}".format(id))
+        print("hopefully they weren't important!\n")
+
+    # ---------  summary ------------
+
+    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    with pd.HDFStore(t1_file,'r') as store:
+        print(store.keys())
+        # print(store.info())
+
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")
+
+
+def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
+    """
+    Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs a .h5 file named t1_file
+
+    t0_file: input file name, string type
+    t1_file: output file name, string type
+    digitizer: CAEN digitizer, Digitizer type
+    options are uncalibrated or calibrated.  Select the one that was outputted by CoMPASS, string type
+    output_dir: path to output directory string type
+
+    """
+    start = time.time()
+    f_in = open(t0_file.encode("utf-8"), "rb")
+    if f_in is None:
+        raise LookupError("Couldn't find the file %s" % t0_file)
+    SEEK_END = 2
+    f_in.seek(0, SEEK_END)
+    file_size = float(f_in.tell())
+    f_in.seek(0, 0)
+    file_size_MB = file_size / 1e6
+    print("Total file size: {:.3f} MB".format(file_size_MB))
+
+    # ------------- scan over raw data starts here ----------------
+
+    print("Beginning Tier 0 processing ...")
+
+    event_rows = []
+    waveform_rows = []
+    event_size = digitizer.get_event_size(t0_file)
+    with open(t0_file, "rb") as metadata_file:
+        event_data_bytes = metadata_file.read(event_size)
+        while event_data_bytes != b"":
+            event, waveform = digitizer.get_event(event_data_bytes)
+            event_rows.append(event)
+            waveform_rows.append(waveform)
+            event_data_bytes = metadata_file.read(event_size)
+    all_data = np.concatenate((event_rows, waveform_rows), axis=1)
+    output_dataframe = digitizer.create_dataframe(all_data)
+    f_in.close()
+
+    output_dataframe.to_hdf(path_or_buf=output_dir+"/"+t1_file, key="dataset", mode="w", table=True)
+    print("Wrote Tier 1 File:\n  {}\nFILE INFO:".format(t1_file))
+
+    # --------- summary -------------
+
+    with pd.HDFStore(t1_file, "r") as store:
+        print(store.keys())
+
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")
+
+
+def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
+
+    ############################################
+    # Start of FlashCam data specific decoding #
+    ############################################
+
+    from fcutils import fcio
+
+    ROW_LIMIT = 5e4
+    start = time.time()
+
+    print("Lets process amazing FlashCam data")
+    
+    # The fcio class is used to open the datafile
+    io = fcio(t0_file)
+    
+    # no run info in FC header yet - get_run_number(header_dict)
+    print("Run number: {}".format(run))
+    
+    # no decoder info in FC header yet - get_decoder_for_id(header_dict)
+    id_dict = {"decoder":"FlashCam"}
+    
+    if verbose:
+      print("Data IDs present in this header are:")
+      for id in id_dict:
+        print(" {}: {}".format(id, id_dict[id]))
+    used_decoder_names = set([id_dict[id] for id in id_dict])
+    
+    #Currently no decoder name provide by the FC file header
+    #Set by hand - get_decoder()
+    if decoders is None:
+      decoders = []
+      decoders.append(FlashCamDecoder())
+      decoder_names = []
+      decoder_names.append('FlashCam')
+
+    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
+    decoder_to_id = {d.decoder_name: d for d in decoders}
+
+    # pass in specific decoder options (windowing, multisampling, etc.)
+    for d in decoders:
+      d.apply_settings(settings)
+
+    if os.path.isfile(t1_file):
+      if overwrite:
+        print("Overwriting existing file...")
+        os.remove(t1_file)
+      else:
+        print("File already exists, continuing ...")
+        return
+
+    packet_id = 0 # number of events decoded
+    unrecognized_data_ids = []
+    
+    while io.next_event() and packet_id<n_max:
+      packet_id += 1
+      if packet_id % 10000 == 0:
+        print(packet_id,io.eventtime)
+      #if verbose and packet_id % 1000 == 0:
+      #update_progress(float(io.telid) / file_size)
+      
+      # write periodically to the output file instead of writing all at once
+      if packet_id % ROW_LIMIT == 0:
+        for d in decoders:
+          d.to_file(t1_file, verbose=True)
+      
+      # sends data to the pandas dataframe
+      # specific FlashCam formatting
+      for d in decoders:
+        if d.decoder_name == 'FlashCam':
+          d.decode_event(io, packet_id)
+        else:
+          print("ERROR: Specific FlashCam event decoder provided to ",d.decoder_name)
+          sys.exit()
+
+    ##########################################
+    # End of FlashCam data specific decoding #
+    ##########################################
+
+    # final write to file
+    for d in decoders:
+      if verbose:
+        print("tier0 - write in decoder ",d.decoder_name)
+      d.to_file(t1_file, verbose=True)
+
+    if verbose:
+      update_progress(1)
+  
+    if len(unrecognized_data_ids) > 0:
+      print("WARNING, Found the following unknown data IDs:")
+      for id in unrecognized_data_ids:
+        print(" {}".format(id))
+      print("hopefully they weren't important!\n")
+
+    # --------- summary ------------
+
+    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    with pd.HDFStore(t1_file,'r') as store:
+      print(store.keys())
+      # print(store.info())
+  
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")

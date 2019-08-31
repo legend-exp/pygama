@@ -11,7 +11,7 @@ def main():
     """
     """
     run_db, cal_db = "runDB.json", "calDB.json"
-    ds = DataSet(run=279, md=run_db, cal=cal_db)
+    ds = DataSet(run=0, md=run_db, cal=cal_db)
     optimize(ds)
 
     
@@ -46,7 +46,7 @@ def optimize(ds):
         overwrite=True,
         verbose=False,
         multiprocess=True,
-        nevt=20000,
+        nevt=None,
         chunk=ds.runDB["chunksize"])
     
     

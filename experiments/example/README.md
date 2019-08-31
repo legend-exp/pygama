@@ -1,8 +1,9 @@
 ### get the test data file:
 ```
-copy data file into: ~/Data/LNGS
-bzip2 -d 2019-3-18-BackgroundRun204.bz2
-mkdir pygama
+on NERSC, file is located at: `/global/project/projectdirs/legend/data/test_data`
+copy data file into: `~/Data/LNGS`
+`bzip2 -d 2019-3-18-BackgroundRun204.bz2`
+`mkdir pygama`
 ```
 
 optional:
