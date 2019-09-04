@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#/usr/bin/env python3
 
 #%matplotlib inline
 # %load_ext snakeviz
@@ -98,9 +98,9 @@ wfs = t1df[icols].values
 #np.arange: start, stop, step
 ts = np.arange(0, len(wfs[0]), 1)
 
-
-# i don't get any interactive plotting to work here on this shitty 
-# server, so I just use pdf files.
+#plotting with TkAgg on Kali works now, but I still like the pdf 
+#solution more...
+#one could remove all plt.show() calls to reduce spam...
 import matplotlib
 matplotlib.use('pdf')
 f = plt.figure()
@@ -108,13 +108,13 @@ f = plt.figure()
 # rendering depends on options in ~/.config/matplotlib/matplotlibrc
 # one waveform
 plt.plot(ts, wfs[0])
-
+plt.show()
 
 # 50 waveforms
 #for row in wfs[:10]:
 #    plt.plot(ts, row)
 
-#plt.show()
+plt.show()
 
 f.savefig("temp.pdf")
 
@@ -134,6 +134,7 @@ while True:
             plt.plot(ts, wfList[i])
         f.savefig("temp.pdf") #overwrite; evince should be intelligent 
                                 #enough to re-print
+        plt.show()
         index += 1
     elif user == "exit" or user == "quit" or user == ".q":
         break

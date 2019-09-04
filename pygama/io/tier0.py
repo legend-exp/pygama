@@ -288,7 +288,10 @@ def ProcessSIS3316(t0_file,
 
     #see pygama/pygama/io/decoders/data_loading.py
     decoders = []
-    decoders.append(SIS3316Decoder())   #we just have that one
+    decoders.append(SIS3316Decoder(pd.DataFrame.from_dict(header_dict)))   #we just have that one
+                    # fix: saving metadata using data_loadings ctor
+                    # have to convert to dataframe here in order to avoid 
+                    # passing to xml_header.get_object_info in data_loading.load_metadata
     channelOne = list(list(header_dict.values())[0].values())[0]
     decoders[0].initialize(1000./channelOne["SampleFreq"], channelOne["Gain"])
         # FIXME: gain set according to first found channel, but gain can change!
