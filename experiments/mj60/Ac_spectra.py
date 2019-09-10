@@ -76,11 +76,11 @@ def find_cut(ds, ds_lo, write_db=False):
 
     hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
     b = (bins[:-1] + bins[1:]) / 2
-    np.savez('ds{}'.format(ds_lo), cal)
-    np.savez('bins_ds{}'.format(ds_lo), b)
+    # np.savez('ds{}'.format(ds_lo), cal)
+    # np.savez('bins_ds{}'.format(ds_lo), b)
 
 
-    plt.clf()
+    # plt.clf()
     plt.title('DS{}'.format(ds_lo))
     plt.plot(b, hist, ls="steps", linewidth=1.5)
     plt.ylabel('Counts')
