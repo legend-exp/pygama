@@ -1,0 +1,324 @@
+{
+  "elog":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/",
+
+  "loc_dir":"$DATADIR/MJ60",
+  "raw_dir":"$DATADIR/MJ60/Data",
+  "tier_dir":"$DATADIR/MJ60/pygama",
+  "meta_dir":"$DATADIR/MJ60/metadata",
+  "rocks_dir":"/data/LEGEND/Data/MJ60",
+  "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
+
+  "digitizer":"ORSIS3302Model",
+  "daq":"ORCA",
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+
+  "chunksize":1000,
+  "clock":100e6,
+  "rollover":1,
+  "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
+  "det_mass_kg":0.739,
+
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "511.0":"beta+",
+    "583.2":"208Tl", "609.3":"214Bi", "911.2":"228Ac",
+    "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
+    "1764.5":"214Bi", "2614.5":"208Tl"
+  },
+  "expected_peaks":[2614.5, 1764.5, 1460.8, 583.2],
+
+  "ds":{
+    "note":"data sets",
+    "0":["27,58", "biasing test 1, 2018/09/30"],
+    "1":["59,63", "biasing test 2, 2018/09/30"],
+    "2":["64,74", "biasing test 3, 2018/09/30"],
+    "3":["75,98", "biasing test 4, 2018/11/26"],
+    "4":["101", "bkg data"],
+    "5":["102", "transition run, opening Kr valve"],
+    "6":["103,104", "Kr data, source 1"],
+    "7":["105,108", "bkg data"],
+    "8":["109,114", "Kr data, source 1"],
+    "9":["115,142", "biasing test 5, 2018/12/10"],
+    "10":["143,145", "Kr data, source 2"],
+    "11":["146,150", "Kr data, source 2, no pumping"],
+    "12":["151,153", "Close Kr valve, watch for decay"],
+    "13":["154,167", "Kr run 2, Jan 30 & 31 2019, 0x6 thresh"],
+    "14":["168,176", "Kr run 2, 0x7 thresh"],
+    "15":["177,185", "valve closed, bkg run"],
+    "16":["186,189", "bkg run, valve open, 2019/03/19"],
+    "17":["190", "thorium calibration, pos 1 (windowsill)"],
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
+    "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
+    "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
+    "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
+    "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
+    "22":["223,241", "Noise study during bias"],
+    "23":["246,248", "Noise study during bias continued"],
+    "24":["249", "Bkg run @ 1400 V, thresh=0x2"],
+    "25":["250, 271", "Noise Study take 2"],
+    "26":["272", "Bkg run @ 1400 V, thresh=0x2"],
+    "27":["273", "Bkg run @ 1400 V, thresh=0x3"],
+    "28":["274", "Bkg run @ 1400 V, thresh=0x3"],
+    "29":["275", "Cesium Run (elog: cesium source run with mj60)"],
+    "30":["276,277", "Bkg run @ 1400 V, (elog: data taking campaign - MJ60)"],
+    "31":["278,279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
+    "32":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "33":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "34":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "35":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "36":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "37":["380,399", "Dead time study (elog: using external pulser to determine ...)"],
+    "38":["400,415", "Pulser energy study bkg (elog: mj60 pulser study)"],
+    "39":["416,429", "Overnight background runs, (elog: mj60 pulser study)"],
+    "40":["430", "Forced acquisition data"],
+    "41":["431,445", "Pulser energy study (elog: mj60 pulser study)"],
+    "42":["446,448", "Bad IR runs, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/513"],
+    "43":["449", "changes to IR shield, 1400 V bias, 0x3 threshold"],
+    "44":["450,452", "133Ba runs, 1600 V bias, 0x3 threshold, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/516"],
+    "45":["453,460", "tuning pre-amp capacitor, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/517"]
+  },
+
+  "ecal":{
+    "note":"inputs for each energy estimator are organized by ds",
+    "0,999": {
+      "e_ftp": {
+        "ds_coverage":"0, 99",
+        "xlims":[0, 10000, 10],
+        "peakdet_thresh":100,
+        "match_thresh":0.01
+      },
+      "energy": {
+        "ds_coverage":"0, 99",
+        "xlims":[0, 3000000, 3000],
+        "peakdet_thresh":100,
+        "match_thresh":0.01
+      }
+    }
+  },
+
+  "build_options":{
+    "conf1":{
+      "run_coverage":[0,74],
+      "tier0_options":{
+        "daq":"ORCA",
+        "clk" : 100e6,
+        "digitizer":"ORSIS3302DecoderForEnergy",
+        "buffer_wrap":1,
+        "window":"max",
+        "n_samp":2000,
+        "n_blsamp":10000
+      },
+      "tier1_options":{
+        "clk" : 100e6,
+        "fit_bl" : {"ihi":600, "order":1},
+        "blsub" : {},
+        "dADC" : {},
+        "pz" : {"decay":82},
+        "notch" : {"f_notch":30e6, "Q":1},
+        "savgol" : [
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
+        ],
+        "trap" : [
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+        ],
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
+        "get_max" : [
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+        ],
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,90,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {},
+        "ftp" : {},
+        "overflow" : {}
+      }
+    },
+    "conf2":{
+      "run_coverage":[75,999],
+      "tier0_options":{
+        "daq":"ORCA",
+        "digitizer":"ORSIS3302DecoderForEnergy"
+      },
+      "tier1_options":{
+        "clk" : 100e6,
+        "fit_bl" : {"ihi":600, "order":1},
+        "blsub" : {},
+        "dADC": {},
+        "pz" : {"decay":82},
+        "notch" : {"f_notch":30e6, "Q":1},
+        "savgol" : [
+            {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
+            {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
+        ],
+        "trap" : [
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
+            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
+        ],
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
+        "get_max" : [
+            {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
+            {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
+        ],
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {},
+        "ftp" : {},
+        "overflow" : {},
+        "dcr" : [
+            {"wfin":"wf_savgol"},
+            {"wfin":"wf_pz"}
+        ],
+        "tail_fit" : [
+            {"wfin":"wf_savgol", "order":1, "tp_thresh":0.8, "vec":0},
+            {"wfin":"wf_pz", "order":1, "tp_thresh":0.8, "vec":0}
+        ]
+      },
+      "unused":{
+          "center": {"wfin":"wf_notch"},
+          "current_pass2" : {"wfin":"wf_ctr", "wfout":"wf_current_ctr", "sigma":5},
+          "test_peakdet" : {"wfin":"wf_current_ctr", "delta":0.1, "sigma":5, "ihi":600, "test":1},
+          "psd" : {"nseg":100,"test":1,"note":"this one is slow, use w/ -m mode only"},
+          "trim": {"n_pre":100, "n_post":1000},
+          "peakdet_test":{"delta":1.5, "sigma":0, "ihi":600},
+          "trap_test":{"rise":4, "flat":2, "fall":4, "decay":72}
+      }
+    }
+  },
+
+  "thresholds":{
+    "note":"put a run range lookup here",
+    "note2":"scan all runs & paste output here",
+    "ds0":999,
+    "ds1":"0x8"
+  },
+
+  "tests":{
+    "note":"capacitance and leakage curr tests",
+    "elog_1":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/488",
+    "elog_2":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/492",
+    "elog_3":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/494",
+    "test_1":[
+      "V_HV  V_BL  V_out  RT  Run",
+      "1000  -3.7  980  3800  27",
+      "1100  -3.9  620  4250  32",
+      "1120  -4.0  568  4300  33",
+      "1140  -4.1  504  4100  34 ",
+      "1160  -4.1  448  4200  35",
+      "1180  -4.1  380  4700  36",
+      "1200  -4.1  312  5300  37",
+      "1220  -3.9  244  14800  38",
+      "1230  -3.8  72  770  40",
+      "1240  -3.8  70  900  41",
+      "1260  -3.98  68  800  42",
+      "1270  -3.79  66  860  43",
+      "1275  -3.80  68  770  44",
+      "1280  -3.83  68  760  45",
+      "1285  -3.91  66  840  46",
+      "1290  -3.87  68  730  47",
+      "1300  -3.90  66  820  48",
+      "1320  -4.11  72  730  49",
+      "1340  -4.14  96  830  50",
+      "1360  -4.35  68  830  51",
+      "1380  -4.35  68  900  52",
+      "1400  -4.43  80  810  53",
+      "1420  -4.54  68  855  54",
+      "1440  -4.80  66  1060  55",
+      "1460  -5.25  68  820  56",
+      "1480  -5.68  66  740  57",
+      "1500  -6.37  68  740  58"
+    ],
+    "test_2":[
+      "V_HV  Run",
+      "1500  59",
+      "1450  60",
+      "1400  61",
+      "1350  62",
+      "1300  63"
+    ],
+    "test_3":[
+      "V_HV  Thresh  Run",
+      "1300  0x0  64",
+      "1300  0x5  65",
+      "1300  0x7  66",
+      "1300  0x9  67",
+      "1300  0x11  68",
+      "1300  0x9  70",
+      "1400  0x9  71",
+      "1450  0x9  72",
+      "1450  0x9  73",
+      "0  0x9  74"
+    ],
+    "test_4":[
+      "V_HV  V_BL  V_out(mV)  RT(us)  Run",
+      "1000  -4.0 1940  3.3  75",
+      "1100  -3.9  760  2.8  76",
+      "1120  -4.2  720  2.3  77 ",
+      "1140  -4.0  660  2.6  78",
+      "1160  -4.2  620  2.5  79",
+      "1180  -4.2  540  2.1  80",
+      "1200  -4.0  480  1.9  81",
+      "1220  -3.9  368  2.5  82",
+      "1230  -4.2  352  2.3  83",
+      "1240  -3.8  304  2.3  84",
+      "1260  -3.9  220  2.5  85",
+      "1270  -3.8  180  3.0  86",
+      "1275  -3.8  148  3.4  87",
+      "1280  -3.8  148  4.7  88",
+      "1285  -3.8  68  1.64  89",
+      "1290  -4.0  66  0.84  90",
+      "1300  -3.9  68  0.89  91",
+      "1320  -4.1  68  0.75  92",
+      "1340  -4.0  68  0.82  93",
+      "1360  -4.1  66  0.79  94",
+      "1380  -4.2  68  0.78  95",
+      "1400  -4.2  66  0.85  96",
+      "1420  -4.3  68  0.84  97",
+      "1440  -4.1  68  0.79  98"
+    ],
+    "test_5":[
+      "V_HV  V_BL  V_out(mV)  RT(us)  Run",
+      "1000  -3.2  1004  3.52  115",
+      "1100  -4.0  800  2.6  116",
+      "1120  -3.8  740  2.2  117",
+      "1140  -4.0  700  2.2  118",
+      "1160  -3.8  640  2.3  119",
+      "1180  -3.8  600  1.9  120",
+      "1200  -3.8  540  1.7  121",
+      "1220  -3.8  430  1.8  122",
+      "1230  -3.6  400  1.7  123",
+      "1240  -3.6  360  1.7  124",
+      "1260  -3.8  320  1.8  125",
+      "1270  -3.6  270  1.6  126",
+      "1275  -3.6  240  1.5  127",
+      "1280  -3.4  208  1.7  128",
+      "1285  -3.6  188  1.7  129",
+      "1290  -3.4  164  1.8  130",
+      "1300  -3.6  120  1.6  131",
+      "1320  -3.8  108  0.8  132",
+      "1340  -3.6  68  0.85  133",
+      "1360  -3.6  68  0.82  134",
+      "1380  -3.8  68  0.76  135",
+      "1400  -4.0  70  0.85  136",
+      "1420  -4.2  68  0.77  137",
+      "1440  -4.4  70  0.80  138",
+      "1460  -4.4  70  0.70  139",
+      "1480  -4.8  70  0.83  140",
+      "1500  -5.8  72  0.83  141",
+      "1520  -6.4  72  0.73  142"
+    ]
+  }
+}
