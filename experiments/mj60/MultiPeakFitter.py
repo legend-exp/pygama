@@ -1,6 +1,14 @@
 import ROOT
 import numpy as np
-import json, os
+import json, os, sys
+
+with open("runDB.json") as f:
+    runDB = json.load(f)
+meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+if(len(sys.argv) != 4):
+    print('Usage: MultiPeakFitter.py [input root histogram file] [input template guesses file] [output fit results file]')
+    sys.exit()
 
 def main():
 
@@ -8,20 +16,16 @@ def main():
 
 def do_fit():
 
-    with open("runDB.json") as f:
-        runDB = json.load(f)
-    meta_dir = os.path.expandvars(runDB["meta_dir"])
-
     # set up I/O files and templates
-    histfile = "{}/run_280_329_hist.root".format(meta_dir)
+    histfile = "{}/{}".format(meta_dir,sys.argv[1])
     histname = "root_hist"
-    templatefile = "{}/run_280_329_template.root".format(meta_dir)
+    templatefile = "{}/{}".format(meta_dir,sys.argv[2])
     templatename = "fit_template"
-    outputfile = "{}/run_280_329_fit_results.root".format(meta_dir)
+    outputfile = "{}/{}".format(meta_dir,sys.argv[3])
 
     # identify what peak will be used for normalization
-    Enorm = 2614.511 #true energy of peak
-    Elow_norm, Ehigh_norm = 6350, 6500 #uncalibrated range of ADC values in which the peak should be found
+    Enorm = 583.187 #true energy of peak
+    Elow_norm, Ehigh_norm = 1415, 1450 #uncalibrated range of ADC values in which the peak should be found
 
     # open histogram
     infile = ROOT.TFile.Open(histfile, "READ")
@@ -86,11 +90,16 @@ def do_fit():
 
     A = 1/(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[1])
     B = -(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[0])/(fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[1])
+    mu0 = fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[0]
+    mu1 = fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[1]
+    mu2 = fitter.GetParsForPar(ROOT.GATMultiPeakFitter.kMu)[2]
     print(A)
     print(B)
+    print(mu0)
+    print(mu1)
+    print(mu2)
 
-    print('If the fit failed, try it a few more times. The steps in the fit are based on choosing a random seed, and this can often lead to it failing one time and succeeding another.')
-
+    print('If the fit failed, try it a few more times. The steps in the fit are based on choosing a random seed, and this can often lead to it failing one time and succeeding another. If the fit continues to fail, look into limiting some of your parameters, such as your background terms. Sometimes the fit can try to make the background negative, and this can cause it to fail. If you continue to have issues, you can look into the hmcResults to figure out where the fit is going wrong.')
 
 if __name__ == '__main__':
         main()

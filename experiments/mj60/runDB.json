@@ -71,7 +71,11 @@
     "38":["400,415", "Pulser energy study bkg (elog: mj60 pulser study)"],
     "39":["416,429", "Overnight background runs, (elog: mj60 pulser study)"],
     "40":["430", "Forced acquisition data"],
-    "41":["431,445", "Pulser energy study (elog: mj60 pulser study)"]
+    "41":["431,445", "Pulser energy study (elog: mj60 pulser study)"],
+    "42":["446,448", "Bad IR runs, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/513"],
+    "43":["449", "changes to IR shield, 1400 V bias, 0x3 threshold"],
+    "44":["450,452", "133Ba runs, 1600 V bias, 0x3 threshold, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/516"],
+    "45":["453,460", "tuning pre-amp capacitor, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/517"]
   },
 
   "ecal":{
