@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 import argparse
+import json
+import sys
+import os
+from decimal import Decimal
 import numpy as np
 import pandas as pd
 import tinydb as db
 import matplotlib.pyplot as plt
 import itertools as it
 from scipy.stats import mode
+import scipy.optimize as opt
 from pprint import pprint
 from pygama import DataSet
-from pygama.utils import set_plot_style, peakdet
-set_plot_style('clint')
+import pygama.utils as pgu
+import pygama.analysis.histograms as pgh
+import pygama.analysis.peak_fitting as pga
 
 def main():
     """
@@ -19,11 +25,12 @@ def main():
     """
     run_db, cal_db = "runDB.json", "calDB.json"
 
-    par = argparse.ArgumentParser(description="calibration suite for MJ60")
+    par = argparse.ArgumentParser(description="calibration suite for tumbsi")
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
     arg("-r", "--run", nargs=1, help="load a single run")
     arg("-s", "--spec", action=st, help="print simple spectrum")
+    arg("-sc", "--cal", action=st, help="print calibrated spectrum")
     arg("-p1", "--pass1", action=st, help="run pass-1 (linear) calibration")
     arg("-p2", "--pass2", action=st, help="run pass-2 (peakfit) calibration")
     arg("-e", "--etype", nargs=1, help="custom energy param (default is e_ftp)")
@@ -56,15 +63,13 @@ def main():
         calibrate_pass1(ds, etype, args["writeDB"], args["test"])
 
     if args["pass2"]:
-        calibrate_pass2(ds, args["test"])
-
-    # fit to germanium peakshape function goes here -- take from matthew's code
-    # if args["pass3"]:
-    #     calibrate_pass3(ds)
+        calibrate_pass2(ds,args["writeDB"],)
 
     if args["printDB"]:
         show_calDB(cal_db)
 
+    if args["cal"]:
+        show_calspectrum(ds, cal_db,etype,args["pass1"],args["pass2"])
 
 
 def show_spectrum(ds, etype="e_ftp"):
@@ -75,7 +80,9 @@ def show_spectrum(ds, etype="e_ftp"):
     """
     df = ds.get_t2df()
     print(df.columns)
-    df.hist(etype)
+    df.hist(etype,bins=1000)
+    plt.yscale('log')
+    plt.savefig('./plots/rawEnergy_spectrum.pdf', bbox_inches='tight', transparent=True)
     plt.show()
 
     # need to display an estimate for the peakdet threshold
@@ -101,7 +108,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     by the second pass, and other codes.
     """
     # get a list of peaks we assume are always present
-    epeaks = sorted(ds.runDB["expected_peaks"], reverse=True)
+    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
 
     # get initial parameters for this energy estimator
     calpars = ds.get_p1cal_pars(etype)
@@ -117,7 +124,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     b = (bins[:-1] + bins[1:]) / 2.
 
     # run peakdet to identify the uncalibrated maxima
-    maxes, mins = peakdet(h, pk_thresh, b)
+    maxes, mins = pgu.peakdet(h, pk_thresh, b)
     umaxes = np.array(sorted([x[0] for x in maxes], reverse=True))
 
     # compute all ratios
@@ -205,7 +212,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
             table.upsert(row, query.ds == dset)
 
 
-def calibrate_pass2(ds, test=False):
+def calibrate_pass2(ds, write_db=False):
     """
     load first-pass constants from the calDB for this DataSet,
     and the list of peaks we want to fit from the runDB, and
@@ -214,71 +221,147 @@ def calibrate_pass2(ds, test=False):
     the important results, like mu, sigma, errors, etc.
     """
 
-    """
-    This function is mainly being used to estimate the FWHM of the calibration
-    peaks
-    """
-    epeaks = sorted(ds.runDB["expected_peaks"])
-    calpars = ds.get_p1cal_pars("e_ftp")
-    xlo, xhi, xpb = calpars["xlims"]
-    pk_thresh = calpars["width_thresh"]
-    width_lo, width_hi, wlo1, whi1, wlo2, whi2 = calpars["width_lims"]
+    # take calibration parameter for the 'calibration.py' output
+    with open("calDB.json") as f:
+      calDB = json.load(f)
+    
+    with open("runDB.json") as f:
+      runDB = json.load(f)
 
-    calDB = ds.calDB
-    query = db.Query()
-    table = calDB.table("cal_pass1")
-    vals = table.all()
-    df_cal = pd.DataFrame(vals) # <<---- omg awesome
-    df_cal = df_cal.loc[df_cal.ds.isin(ds.ds_list)]
-    p1cal = df_cal.iloc[0]["p1cal"]
+    df = ds.get_t2df()
 
-    t2 = ds.get_t2df()
-    ene = t2["e_ftp"] * p1cal
+    true_peaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    iter = 0
+    
+    plt.figure(1)
+    peaks = []
+    fwhms = []
+    
+    for true_peak in true_peaks:
+      iter = iter+1
+      ax = plt.subplot(3,2,iter)
+      out1, out2 = peak(df,runDB,calDB,true_peak)
+      peaks.append(out1)
+      fwhms.append(out2)
 
-    for i in range(len(epeaks)):
-        ehi = epeaks[i] + width_hi
-        elo = epeaks[i] + width_lo
-        xpb = 1
-        nb = int((ehi-elo)/xpb)
-        h, bins = np.histogram(ene, nb, (elo, ehi))
-        b = (bins[:-1] + bins[1:]) / 2
+    peaks = np.array(peaks,dtype=float)
+    fwhms = np.array(fwhms,dtype=float)
+    res = np.subtract(true_peaks,peaks)
 
-        # subract background
-        mean_upper = np.mean(np.array(h[wlo1:whi1]))
-        mean_lower = np.mean(np.array(h[wlo2:whi2]))
-        h = h - ( mean_upper + mean_lower ) / 2
+    plt.figure(2)
+    plt.subplot(211)
+    plt.plot(true_peaks,peaks,marker='o',linestyle='--',color='blue')
+    plt.grid(True)
+    plt.xlabel("True energy (keV)", ha='right', x=1)
+    plt.ylabel("Energy (keV)", ha='right', y=1)
+    plt.subplot(212)
+    plt.plot(true_peaks,res,marker='o',linestyle='--',color='blue')
+    plt.grid(True)
+    plt.xlabel("True energy (keV)", ha='right', x=1)
+    plt.ylabel("Residuals (keV)", ha='right', y=1)
+    plt.savefig('./plots/energyScale.pdf', bbox_inches='tight', transparent=True)
 
-        max, min = peakdet(h, pk_thresh, b)
-        print(max)
+    def pol1(x,a,b):
+      return a * x + b
 
-        binr = np.where(b == max[0][0])
-        binl = np.where(b == max[0][0])
-        binr, binl = binr[0], binl[0]
-        peakh = max[0][1]
-        fwhmr = h[binr]
-        fwhml = h[binl]
+    pars1, cov1 = opt.curve_fit(pol1,true_peaks,peaks)
+    errs1 = np.sqrt(np.diag(cov1))
+    print("Calibration curve: ",pars1,errs1)
 
-        while fwhmr > 0.5 * peakh or fwhml > 0.5 * peakh:
-            binr += 1
-            binl += -1
-            fwhmr = h[binr]
-            fwhml = h[binl]
+    def sqrt_fit(x,a,b):
+      return np.sqrt(a*x+b)
 
-        print("FWHM is kind of in the ball park of: ", (b[binr]-b[binl]))
+    pars2, cov2 = opt.curve_fit(sqrt_fit,peaks,fwhms,p0=[1e-3,0.05])
+    errs2 = np.sqrt(np.diag(cov2))
+    print("Energy resolution curve: ",pars2,errs2)
+    
+    model = np.zeros(len(peaks))
+    for i,bin in enumerate(peaks):
+      model[i] = sqrt_fit(bin,pars2[0],pars2[1])
+    
+    plt.figure(3)
+    plt.plot(peaks,fwhms,marker='o',linestyle='--',color='blue')
+    plt.plot(peaks,model,'-',color='red')
+    plt.grid(True)
+    plt.xlabel("Energy (keV)", ha='right', x=1)
+    plt.ylabel("FWHM resolution (keV) (keV)", ha='right', y=1)
+    plt.savefig('./plots/energyResolution_curve.pdf', bbox_inches='tight', transparent=True)
+    plt.show()
 
-        if test:
-            plt.plot(b, h, ls="steps", linewidth=1.5)
-            plt.axvline(float(max[0][0]), c='red', linestyle="--", lw=1)
-            plt.axvline(float(b[binr]), c='black', linestyle="--", lw=1)
-            plt.axvline(float(b[binl]), c='green', linestyle="--", lw=1)
-            plt.title("Peak: {}".format(epeaks[i]))
-            plt.xlabel("keV")
-            plt.ylabel("Counts/keV")
-            plt.show()
-    exit()
+    if write_db:
+      calDB = ds.calDB
+      query = db.Query()
+      table = calDB.table("cal_pass2")
+        
+      # write an entry for every dataset.  if we've chained together
+      # multiple datasets, the values will be the same.
+      # use "upsert" to avoid writing duplicate entries.
+      for dset in ds.ds_list:
+        row = {
+          "ds":dset,
+          "p2acal":pars1[0],
+          "p2astd":errs1[0],
+          "p2bcal":pars1[1],
+          "p2bstd":errs1[1]
+        }
+        table.upsert(row, query.ds == dset)
 
-    # maxes, mins = peakdet(h, pk_thresh, b)
+        table = calDB.table("eres_curve")
+        row = {
+          "ds":dset,
+          "acal":pars2[0],
+          "astd":errs2[0],
+          "bcal":pars2[1],
+          "bstd":errs2[1]
+        }
+        table.upsert(row, query.ds == dset)
 
+def peak(df,runDB,calDB,line):
+
+    cal = calDB["cal_pass1"]["1"]["p1cal"]
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+
+    df['e_cal'] = cal*df['e_ftp']
+
+    df = df.loc[(df.index>1000)&(df.index<500000)]
+
+    def gauss(x, mu, sigma, A=1):
+      """
+       define a gaussian distribution, w/ args: mu, sigma, area (optional).
+       """
+      return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
+        
+    line_min = 0.995*line
+    line_max = 1.005*line
+    nbin = 60
+    res = 6.3e-4*line+0.85 # empirical energy resolution curve from experience
+              
+    hist, bins, var = pgh.get_hist(df['e_cal'], range=(line_min,line_max), dx=(line_max-line_min)/nbin)
+    pgh.plot_hist(hist, bins, var=hist, label="data", color='blue')
+    pars, cov = pga.fit_hist(gauss, hist, bins, var=hist, guess=[line, res, 50])
+    pgu.print_fit_results(pars, cov, gauss)
+    pgu.plot_func(gauss, pars, label="chi2 fit", color='red')
+    
+    FWHM = '%.2f' % Decimal(pars[1]*2.*np.sqrt(2.*np.ln(2))) # convert sigma to FWHM
+    FWHM_uncertainty = '%.2f' % Decimal(np.sqrt(cov[1][1])*2.*np.sqrt(2.*np.ln(2))
+    peak = '%.2f' % Decimal(pars[0])
+    peak_uncertainty = '%.2f' % Decimal(np.sqrt(cov[0][0]))
+    residual = '%.2f' % abs(line - float(peak))
+    
+    label_01 = 'Peak = '+str(peak)+r' $\pm$ '+str(peak_uncertainty)
+    label_02 = 'FWHM = '+str(FWHM)+r' $\pm$ '+str(FWHM_uncertainty)
+    labels = [label_01, label_02,]
+    
+    plt.xlim(line_min,line_max)
+    plt.xlabel('Energy (keV)', ha='right', x=1.0)
+    plt.ylabel('Counts', ha='right', y=1.0)
+    
+    plt.tight_layout()
+    plt.hist(df['e_cal'],range=(line_min,line_max), bins=nbin)
+    plt.legend(labels, frameon=False, loc='upper right', fontsize='small')
+    
+    return peak, FWHM
 
 
 def show_calDB(fdb):
@@ -290,6 +373,32 @@ def show_calDB(fdb):
     table = calDB.table("cal_pass1")
     df = pd.DataFrame(table.all())
     print(df)
+
+def show_calspectrum(ds, fdb, etype="e_ftp",p1=True,p2=False):
+    """
+    display the linearly calibrated energy spectrum
+    """
+      
+    calDB = db.TinyDB(fdb)
+    query = db.Query()
+    table = calDB.table("cal_pass1")
+    vals1 = table.all()
+    if(p2):
+      table = calDB.table("cal_pass2")
+      vals2 = table.all()
+
+    df = ds.get_t2df()
+    energy = df[etype]*vals1[0]['p1cal']
+    if(p2):
+      energy = energy/vals2[0]['p2acal'] - vals2[0]['p2bcal']
+    hist, bins, var = pgh.get_hist(energy,range=[0,4000],dx=1)
+    plt.plot(hist)
+    plt.yscale('log')
+    plt.savefig('./plots/calEnergy_spectrum.pdf', bbox_inches='tight', transparent=True)
+    plt.show()
+
+# need to display an estimate for the peakdet threshold
+# based on the number of counts in each bin or something
 
 
 if __name__=="__main__":

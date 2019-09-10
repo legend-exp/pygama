@@ -6,10 +6,15 @@ import numpy as np
 import scipy as sp
 from scipy.signal import medfilt, find_peaks
 import pygama.analysis.histograms as pgh
-import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pga
 import matplotlib.pyplot as plt
+
+from pygama import DataSet
+from pygama.analysis.calibration import *
+from pygama.analysis.histograms import *
+import pygama.utils as pgu
 from matplotlib.lines import Line2D
+from pygama.utils import set_plot_style
 # plt.style.use('style.mplstyle')
 np.set_printoptions(threshold=np.inf)
 
@@ -67,12 +72,18 @@ def spectrum_medfilt_peaks():
 
 def linear_calibration():
 
-    pks_lit = [238.6, 583.2]
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     pks_lit = [238.6, 583.2]
 
-    df = pd.read_hdf('~/Data/MJ60/pygama/t2_run'+sys.argv[1]+'.h5')
+    pks_lit = [238.6, 583.2]
 
+    df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+    # ds = DataSet(runlist=[278, 279], md='./runDB.json', tier_dir=tier_dir)
+    # df = ds.get_t2df()
     m = np.array(df['e_ftp'])
 
     xlo, xhi, xpb = 0, 10000, 1

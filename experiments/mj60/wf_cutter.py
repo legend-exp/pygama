@@ -47,13 +47,12 @@ def histograms(run):
     t2 = ds.get_t2df()
     t2df = os.path.expandvars('{}/Spectrum_{}.hdf5'.format(meta_dir,run))
     t2df = pd.read_hdf(t2df, key="df")
-    print(t2.columns)
-    exit()
+
 
     # n = "tslope_savgol"
-    n = "current_max"
+    # n = "current_max"
     # n = "tslope_pz"
-    # n = "tail_tau"
+    n = "tail_tau"
     # n = "tail_amp"
 
     e = "e_cal"
@@ -64,7 +63,7 @@ def histograms(run):
 
     plt.clf()
     # H, xedges, yedges = np.histogram2d(t2df["tail_tau"], t2df["e_ftp"], bins=[2000,200], range=[[0, 6600], [0, 5]])
-    plt.hist2d(x, y, bins=[1000,200], range=[[0, 2000], [0, .1]], norm=LogNorm(), cmap='jet')
+    plt.hist2d(x, y, bins=[1000,200], range=[[0, 200], [0, .001]], norm=LogNorm(), cmap='jet')
     # plt.hist2d(x, y, bins=[1000,1000], norm=LogNorm())
     # plt.scatter(H[0],H[1])
 
@@ -83,9 +82,9 @@ def histograms(run):
     # plt.xscale('symlog')
     # plt.yscale('symlog')
 
-    # plt.title("Run {}".format(run))
-    # plt.xlabel("Energy (keV)", ha='right', x=1)
-    # plt.ylabel(n, ha='right', y=1)
+    plt.title("Run {}".format(run))
+    plt.xlabel("Energy (keV)", ha='right', x=1)
+    plt.ylabel(n, ha='right', y=1)
     # cbar.ax.set_ylabel('Counts')
     # plt.ylabel("tslope_savgol", ha='right', y=1)
     # plt.ylabel("A/E_ftp", ha='right', y=1)
