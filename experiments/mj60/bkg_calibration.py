@@ -21,9 +21,9 @@ def main():
         print('Usage: bkg_calibration.py [run number]')
         sys.exit()
 
-    #plot_raw()
+    plot_raw()
     #spectrum_medfilt_peaks()
-    linear_calibration()
+    #linear_calibration()
 
 def plot_raw():
 
@@ -163,7 +163,7 @@ def linear_calibration():
     # E = A(e_ftp) + B
     #A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
     #B = float((pks_lit[1] - adc_values[1]*A))
-    A=0.407
+    A=1460.8/3444.5
     B=0
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     print('E = {}(e_ftp) + {}'.format(A,B))

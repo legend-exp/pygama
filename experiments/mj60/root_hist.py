@@ -27,7 +27,7 @@ nbins = int((xhi-xlo)/xpb)
 
 hist, bins = np.histogram(np.array(df['e_ftp']), nbins, (xlo, xhi))
 
-hist = np.array(hist, dtype=np.float)
+hist = np.array(hist, dtype=np.float)/(xpb*sum(hist[1640:1720]))
 
 #integral = xpb * sum(hist[6350:6500])
 #hist = hist/integral

@@ -24,8 +24,8 @@ def do_fit():
     outputfile = "{}/{}".format(meta_dir,sys.argv[3])
 
     # identify what peak will be used for normalization
-    Enorm = 583.187 #true energy of peak
-    Elow_norm, Ehigh_norm = 1415, 1450 #uncalibrated range of ADC values in which the peak should be found
+    Enorm = 356.013 #true energy of peak
+    Elow_norm, Ehigh_norm = 820, 860 #uncalibrated range of ADC values in which the peak should be found
 
     # open histogram
     infile = ROOT.TFile.Open(histfile, "READ")
@@ -67,8 +67,8 @@ def do_fit():
     hmc.SetParameters(x)
 
     # Set the HMC parameters. Step size is leapfrog step size. Step length is number of leapfrog steps for each MCMC step. NSteps is number of MCMC steps. Adapt step size and parameter scales will automatically adjust step size and individual parameter scales for each step
-    hmc.SetStepSize(0.02)
-    hmc.SetStepLength(50)
+    hmc.SetStepSize(0.01)
+    hmc.SetStepLength(100)
     hmc.SetNSteps(200)
     hmc.SetAdaptStepSize()
     hmc.SetAdaptParScales()
