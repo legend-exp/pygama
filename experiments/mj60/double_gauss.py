@@ -80,8 +80,8 @@ def find_cut(ds, ds_lo, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
-    # double_gauss_issue(cal, a_over_e)
-    # exit()
+    double_gauss_issue(cal, y, ds_lo)
+    exit()
 
 
     dep_range = [1530,1620]
@@ -203,13 +203,14 @@ def linear_correction(energy, a_over):
 
     return a_over
 
-def double_gauss_issue(energy, a_over_e):
+def double_gauss_issue(energy, a_over_e, ds_lo):
 
     # file1 = np.load('./ds18.npz')
     # file2 = np.load('./bins_ds18.npz')
     # counts = file1['arr_0']
     # energy = file2['arr_0']
 
+    #FWHM of nearby peaks is 2.5
     dep_range = [1530,1620]
     hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]), range=dep_range)
     b = (bins[:-1] + bins[1:]) / 2
@@ -224,22 +225,93 @@ def double_gauss_issue(energy, a_over_e):
         y = y + params[-1]
         return y
 
-    p0_list = [1588, 400, 2.5, 1592, 400, 2.5, 157]
-    bnds = ([1587.8, 100, .6*p0_list[2], 1591.8, 100, .6*p0_list[5], 0],
-            [1588.2, 700, 1.4*p0_list[2], 1592.2, 700, 1.4*p0_list[5], 300])
+    p0_list = [1588.2, 400, 2.5, 1592.5, 400, 2.5, 157]
+    bnds = ([1588, 0, .9*p0_list[2], 1592.5, 0, .9*p0_list[5], 0],
+            [1589, 700, 1.1*p0_list[2], 1593, 700, 1.1*p0_list[5], 300])
 
     par, pcov = curve_fit(gauss, b, hist, p0=p0_list, bounds=bnds)
     print(par)
     perr = np.sqrt(np.diag(pcov))
     print(perr)
 
-    np.savez('double_gauss_params', par)
+    # np.savez('double_gauss_params', par)
 
-    plt.title('Finding FWHM of roe')
+    plt.title('Peak 1590 combined')
     plt.plot(b, hist, color='black')
     plt.plot(b, gauss(b, *par), '-r')
     plt.tight_layout()
     plt.show()
+
+    ac_peak_height = par[1]
+    th_peak_height = par[4]
+    cut_ac_peak_height = par[1]
+    cut_th_peak_height = par[4]
+    ss_eff_array = []
+    ms_eff_array = []
+    cut_line_list = []
+
+    line = .4
+    print("Finding optimal cut, keeping 90% of 1592 DEP")
+
+    while cut_th_peak_height > .9 * th_peak_height:
+
+        y = a_over_e[np.where(line < a_over_e)]
+        e1 = energy[np.where(line < a_over_e)]
+
+        hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]), range=dep_range)
+
+        par1, pcov1 = curve_fit(
+            gauss, b, hist1, p0=p0_list, bounds=bnds)
+        perr1 = np.sqrt(np.diag(pcov1))
+        print(par1)
+
+        cut_ac_peak_height = par1[1]
+        cut_th_peak_height = par1[4]
+        ss_eff = cut_th_peak_height / th_peak_height
+        ms_eff = cut_ac_peak_height / ac_peak_height
+        ss_eff_array.append(ss_eff)
+        ms_eff_array.append(ms_eff)
+        cut_line_list.append(line)
+        print(cut_th_peak_height)
+
+        line += .001
+
+    print(line)
+
+    plt.clf()
+    plt.hist2d(energy, a_over_e, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
+    plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
+    plt.xlabel("Energy (keV)", ha='right', x=1)
+    plt.ylabel("A/Eunc", ha='right', y=1)
+    cbar = plt.colorbar()
+    cbar.ax.set_ylabel('Counts')
+    plt.tight_layout()
+    plt.show()
+
+    plt.clf()
+    plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
+    plt.plot(cut_line_list, ms_eff_array, label='ms_eff')
+    plt.ylabel('eff')
+    plt.xlabel('AoverE_normalized')
+    plt.legend()
+    plt.show()
+
+    hist, bins = np.histogram(energy, bins=2000, range=[0,2000])
+    hist1, bins1 = np.histogram(e1, bins=2000, range=[0,2000])
+
+    plt.clf()
+    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
+    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    #b + a1e^-(alphaE-1588.2 +delta)+ a2e^-(alphaE-1592.5 +delta) fit this with
+    #same delta or alpha for each one
+
+
 
     #fit whole 1590 peak region with two gaussians
 
