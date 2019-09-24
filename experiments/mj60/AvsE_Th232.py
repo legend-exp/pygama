@@ -263,7 +263,6 @@ def double_gauss_issue(energy, a_over_e, ds_lo):
         par1, pcov1 = curve_fit(
             gauss, b, hist1, p0=p0_list, bounds=bnds)
         perr1 = np.sqrt(np.diag(pcov1))
-        print(par1)
 
         cut_ac_peak_height = par1[1]
         cut_th_peak_height = par1[4]
@@ -272,7 +271,6 @@ def double_gauss_issue(energy, a_over_e, ds_lo):
         ss_eff_array.append(ss_eff)
         ms_eff_array.append(ms_eff)
         cut_line_list.append(line)
-        print(cut_th_peak_height)
 
         line += .001
 
@@ -286,6 +284,15 @@ def double_gauss_issue(energy, a_over_e, ds_lo):
     cbar = plt.colorbar()
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
+    plt.show()
+
+    plt.clf()
+    a1 = a_over_e[np.where((1589 < energy) & (energy < 1595))]
+    hist, bins = np.histogram(a_over_e, bins = 200, range=[.4,1.5])
+    plt.vlines(line, 0, 300000, color='r', linewidth=1.5)
+    plt.plot(bins[1:], hist)
+    plt.xlabel('A over E normalized')
+    plt.ylabel('Counts')
     plt.show()
 
     plt.clf()
