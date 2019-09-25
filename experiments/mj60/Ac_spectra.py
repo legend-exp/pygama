@@ -56,6 +56,7 @@ def main():
                      md=run_db, cal=cal_db)
 
     find_cut(ds, ds_lo, args["writeDB"])
+    # ac_spectra()
 
 #Code to find and record the optimal A/E cut
 def find_cut(ds, ds_lo, write_db=False):
@@ -73,6 +74,22 @@ def find_cut(ds, ds_lo, write_db=False):
     p1cal = df_cal.iloc[0]["p1cal"]
     cal = p1cal * np.asarray(t2["e_ftp"])
 
+    hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
+    b = (bins[:-1] + bins[1:]) / 2
+    # np.savez('ds{}'.format(ds_lo), cal)
+    # np.savez('bins_ds{}'.format(ds_lo), b)
+
+
+    # plt.clf()
+    plt.title('DS{}'.format(ds_lo))
+    plt.plot(b, hist, ls="steps", linewidth=1.5)
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
+    plt.tight_layout()
+    plt.show()
+    exit()
+
+
     current = "current_max"
     e_over_unc = cal / np.asarray(t2["e_ftp"])
     y0 = np.asarray(t2[current])
@@ -80,14 +97,10 @@ def find_cut(ds, ds_lo, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
-    # double_gauss_issue(cal, a_over_e)
-    # exit()
-
-
-    dep_range = [1530,1620]
-    hist, bins = np.histogram(cal, bins=450, range=dep_range)
-    hist = hist * 5
-
+    # dep_range = [1530,1620]
+    # hist, bins = np.histogram(cal, bins=450, range=dep_range)
+    # hist = hist * 5
+    #
     def gauss(x, *params):
         y = np.zeros_like(x)
         for i in range(0, len(params) - 1, 3):
@@ -97,51 +110,59 @@ def find_cut(ds, ds_lo, write_db=False):
             y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
         y = y + params[-1]
         return y
+    #
+    # p0_list = [1591, 200, 3, 4]
+    #
+    # par, pcov = curve_fit(
+    #     gauss, bins[1:], hist, p0=p0_list)
+    # print(par)
+    # perr = np.sqrt(np.diag(pcov))
+    # print(perr)
+    #
+    # mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
+    # print("Scanning ", mu, " peak")
+    # ans = quad(gauss, 1583, 1600, args=(mu, amp, sig, bkg))
+    # counts = ans[0] - ((1600-1583)*bkg)
+    # print("Counts in ", mu, " peak is ", counts)
+    #
+    # cut = counts
+    # line = .4
+    #
+    # y1 = y[np.where(line < y)]
+    # x1 = cal[np.where(line < y)]
+    # # hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
+    # hist1, bins1 = np.histogram(x1, bins=450, range=[1530,1620])
+    # hist1 = hist1*5
+    #
+    # print("Finding optimal cut, keeping 90% of 1592 DEP")
+    # while cut > .9 * counts:
+    #
+    #     y1 = y[np.where(line < y)]
+    #     x1 = cal[np.where(line < y)]
+    #
+    #     hist1, bins1 = np.histogram(x1, bins=450, range=dep_range)
+    #     hist1 = hist1*5
+    #
+    #     par1, pcov1 = curve_fit(
+    #         gauss, bins1[1:], hist1, p0=p0_list)
+    #     perr1 = np.sqrt(np.diag(pcov1))
+    #
+    #     mu1, amp1, sig1, bkg1 = par1[0], par1[1], par1[2], par1[-1]
+    #     ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
+    #     cut = ans1[0] - ((1600-1583)*bkg1)
+    #
+    #     line += .0005
 
-    p0_list = [1591, 200, 3, 4]
-
-    par, pcov = curve_fit(
-        gauss, bins[1:], hist, p0=p0_list)
-    print(par)
-    perr = np.sqrt(np.diag(pcov))
-    print(perr)
-
-    mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
-    print("Scanning ", mu, " peak")
-    ans = quad(gauss, 1583, 1600, args=(mu, amp, sig, bkg))
-    counts = ans[0] - ((1600-1583)*bkg)
-    print("Counts in ", mu, " peak is ", counts)
-
-    cut = counts
-    line = .4
+    line = .95
 
     y1 = y[np.where(line < y)]
     x1 = cal[np.where(line < y)]
-    # hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
-    hist1, bins1 = np.histogram(x1, bins=450, range=[1530,1620])
-    hist1 = hist1*5
+    y2 = y[np.where(line > y)]
+    x2 = cal[np.where(line > y)]
+    np.savez('thorium', x1)
+    np.savez('Ac', x2)
 
-    print("Finding optimal cut, keeping 90% of 1592 DEP")
-    while cut > .9 * counts:
-
-        y1 = y[np.where(line < y)]
-        x1 = cal[np.where(line < y)]
-
-        hist1, bins1 = np.histogram(x1, bins=450, range=dep_range)
-        hist1 = hist1*5
-
-        par1, pcov1 = curve_fit(
-            gauss, bins1[1:], hist1, p0=p0_list)
-        perr1 = np.sqrt(np.diag(pcov1))
-
-        mu1, amp1, sig1, bkg1 = par1[0], par1[1], par1[2], par1[-1]
-        ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
-        cut = ans1[0] - ((1600-1583)*bkg1)
-
-        line += .0005
-
-
-    print(line, cut)
+    # print(line, cut)
     plt.hist2d(cal, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
     plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
     cbar = plt.colorbar()
@@ -155,12 +176,30 @@ def find_cut(ds, ds_lo, write_db=False):
     hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
     hist1, bins1 = np.histogram(x1, bins=2000, range=[0,2000])
 
+    hist2, bins2 = np.histogram(x2, bins=2000, range=[0,2000])
+
+    p0_list = [1593, 200, 3, 4]
+
+    par, pcov = curve_fit(
+        gauss, bins1[1:], hist1, p0=p0_list)
+    print(par)
+    perr = np.sqrt(np.diag(pcov))
+    print(perr)
+
     plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
+    # plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
     plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
     plt.ylabel('Counts')
     plt.xlabel('keV')
     plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    plt.clf()
+    plt.semilogy(bins2[1:], hist2, ls="steps", linewidth=1.5)
+    plt.title('Ac spectra')
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
     plt.tight_layout()
     plt.show()
 
@@ -203,16 +242,13 @@ def linear_correction(energy, a_over):
 
     return a_over
 
-def double_gauss_issue(energy, a_over_e):
+def ac_spectra():
 
-    # file1 = np.load('./ds18.npz')
-    # file2 = np.load('./bins_ds18.npz')
-    # counts = file1['arr_0']
-    # energy = file2['arr_0']
+    file1 = np.load('./Ac.npz')
+    file2 = np.load('./thorium.npz')
+    x2 = file1['arr_0']
+    x1 = file2['arr_0']
 
-    dep_range = [1530,1620]
-    hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]), range=dep_range)
-    b = (bins[:-1] + bins[1:]) / 2
 
     def gauss(x, *params):
         y = np.zeros_like(x)
@@ -224,29 +260,41 @@ def double_gauss_issue(energy, a_over_e):
         y = y + params[-1]
         return y
 
-    p0_list = [1588, 400, 2.5, 1592, 400, 2.5, 157]
-    bnds = ([1587.8, 100, .6*p0_list[2], 1591.8, 100, .6*p0_list[5], 0],
-            [1588.2, 700, 1.4*p0_list[2], 1592.2, 700, 1.4*p0_list[5], 300])
+    hist1, bins1 = np.histogram(x1, bins=2000, range=[1530,1620])
+    hist2, bins2 = np.histogram(x2, bins=2000, range=[1530,1620])
 
-    par, pcov = curve_fit(gauss, b, hist, p0=p0_list, bounds=bnds)
-    print(par)
-    perr = np.sqrt(np.diag(pcov))
-    print(perr)
+    p0_list1 = [1593, 200, 3, 4]
+    p0_list2 = [1589, 200, 3, 4]
 
-    np.savez('double_gauss_params', par)
+    par1, pcov1 = curve_fit(
+        gauss, bins1[1:], hist1, p0=p0_list1)
+    print(par1)
+    perr1 = np.sqrt(np.diag(pcov1))
+    print(perr1)
 
-    plt.title('Finding FWHM of roe')
-    plt.plot(b, hist, color='black')
-    plt.plot(b, gauss(b, *par), '-r')
+    par2, pcov2 = curve_fit(
+        gauss, bins2[1:], hist2, p0=p0_list2)
+    print(par2)
+    perr2 = np.sqrt(np.diag(pcov2))
+    print(perr2)
+
+    plt.clf()
+    plt.title('Thorium spectra')
+    plt.plot(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5)
+    plt.plot(bins1[1:], gauss(bins1[1:], *par1))
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
     plt.tight_layout()
     plt.show()
 
-    #fit whole 1590 peak region with two gaussians
-
-    #start cutting up AoverE line, and fitting region on ms and ss, find the efficiency
-    # of both ms and ss, find where there is 90% of the counts left from the original
-    #1592 gaussian from above
-
+    plt.clf()
+    plt.plot(bins2[1:], hist2, ls="steps", linewidth=1.5)
+    plt.plot(bins2[1:], gauss(bins2[1:], *par2), '-r')
+    plt.title('Ac spectra')
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
+    plt.tight_layout()
+    plt.show()
 
 
 

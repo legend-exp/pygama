@@ -38,7 +38,8 @@ def linear_calibration():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
-
+    print(df.keys())
+    exit()
     m = np.array(df['e_ftp'])
 
     xlo, xhi, xpb = 0, 10000, 10
@@ -51,7 +52,7 @@ def linear_calibration():
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
 
-    thresholds = np.arange(50,750,10, dtype=int)
+    thresholds = np.arange(50,1000000,10, dtype=int)
 
     for i in range(len(thresholds)):
         maxes, mins = pgu.peakdet(hpks, thresholds[i], bins)
@@ -133,16 +134,16 @@ def linear_calibration():
     plt.ylabel('Counts', ha='right', y=1.0)
     E_cal = 'calibrated energy spectrum, run '+str(sys.argv[1])
     E_1 = 'E=238.6 keV (212Pb peak)'
-    E_2 = 'E=351.9 keV (214Pb peak)'
+    E_2 = 'E=351.93 keV (214Pb peak)'
     E_3 = 'E=511.0 keV (beta+ peak)'
-    E_4 = 'E=583.2 keV (208Tl peak)'
-    E_5 = 'E=609.3 keV (214Bi peak)*'
+    E_4 = 'E=583.19 keV (208Tl peak)'
+    E_5 = 'E=609.32 keV (214Bi peak)*'
     E_6 = 'E=911.2 keV (228Ac peak)'
     E_7 = 'E=969 keV (228Ac peak)'
     E_8 = 'E=1120.3 keV (214Bi peak)'
-    E_9 = 'E=1460.8 keV (40K peak)*'
-    E_10 = 'E=1764.5 keV (214Bi peak)'
-    E_11 = 'E=2614.5 keV (208Tl peak)'
+    E_9 = 'E=1460.82 keV (40K peak)*'
+    E_10 = 'E=1764.49 keV (214Bi peak)'
+    E_11 = 'E=2614.51 keV (208Tl peak)'
     colors = ['black', 'red', 'aqua', 'darkgreen', 'darkorange', 'gray', 'brown', 'saddlebrown', 'navy', 'olive', 'indigo', 'limegreen']
     lines = [Line2D([0], [0], color=c) for c in colors]
     labels = [E_cal, E_1, E_2, E_3, E_4, E_5, E_6, E_7, E_8, E_9, E_10, E_11]
@@ -165,33 +166,40 @@ def BKG_Subtraction():
     BKG1 =  pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]))
     Kr1 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[2]))
 
-    xlo, xhi, xpb = 0, 4000, 0.5
+    xlo, xhi, xpb = -0.25, 3000.25, 0.5
     nbins = int((xhi - xlo)/xpb)
 
     BKGhist, bins = np.histogram(BKG1['e_cal'], nbins, (xlo,xhi))
     Krhist, bins = np.histogram(Kr1['e_cal'], nbins, (xlo,xhi))
 
     bins = bins[0:(len(bins)-1)]
-    bin_centers = bins - (bins[1] - bins[0])/2
+    bin_centers = bins + xpb/2
 
-    integral1 = xpb * sum(BKGhist[40:2600])
-    integral2 = xpb * sum(Krhist[40:2600])
+    integral1 = xpb * sum(BKGhist[50:2650])
+    integral2 = xpb * sum(Krhist[50:2650])
 
     hist_01 = BKGhist * integral2/integral1
     hist3 = Krhist - hist_01
-    errors = np.sqrt(Krhist + hist_01*integral2/integral1)
+    #errors = np.sqrt(Krhist + hist_01*integral2/integral1)
+    sigma_integral1 = xpb*np.sqrt(sum(BKGhist[50:2650]))
+    sigma_integral2 = xpb*np.sqrt(sum(Krhist[50:2650]))
+    errors = np.sqrt(Krhist+(integral2/integral1)**2*BKGhist+(BKGhist/integral1)**2*sigma_integral2**2+(BKGhist*integral2/integral1**2)**2*sigma_integral1**2)
 
-    plt.plot(bins, hist_01, color='red', ls='steps', label='Background Data')
-    plt.plot(bins, Krhist, color='black', ls='steps', label='Kr83m Data')
-    plt.plot(bins, hist3, color='aqua', ls='steps', label='Kr83m Spectrum (Kr83m Data - Background Data)')
-    plt.errorbar(bin_centers, hist3, errors, color='black', fmt='o', markersize=3, capsize=3)
+    for i in range(len(hist3)):
+        print('E = {} : {} +/- {}'.format(bin_centers[i],hist_01[i],errors[i]))
 
-    plt.xlim(0,4000)
-    #plt.ylim(0,plt.ylim()[1])
+    #plt.plot(bin_centers, hist_01, color='red', ls='steps', label='Background Data')
+    #plt.plot(bin_centers, Krhist, color='black', ls='steps', label='Kr83m Data')
+    plt.plot(bin_centers, hist3/hist_01, color='black', ls='steps', label='Percent Error [(Kr - BKG)/BKG]')
+    #plt.errorbar(bins, hist3, errors, color='black', fmt='o', markersize=3, capsize=3, label='Kr83m Spectrum Data Points')
+    #plt.hlines(0, 0, 2650, color='red', linestyles='solid')
+
+    plt.xlim(42,3500)
+    #plt.ylim(-875,1000)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
-    plt.ylabel('Counts', ha='right', y=1.0)
-    plt.title('Energy Spectrum (Kr83m Source)')
-    plt.legend(frameon=True, loc='upper right', fontsize='small')
+    plt.ylabel('Residuals', ha='right', y=1.0)
+    plt.title('Background Subtraction Percent Error')
+    plt.legend(frameon=True, loc='best', fontsize='small')
     plt.tight_layout()
     #plt.semilogy()
     plt.show()
@@ -210,7 +218,7 @@ def dADC():
 
     plt.hist2d(df['e_cal'], df['dADC'], np.arange(-5,1000,0.2), norm=LogNorm())
     plt.xlim(0,500)
-    plt.ylim(-5,1000)
+    plt.ylim(-5,100)
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
     plt.ylabel('dADC', ha='right', y=1.0)
     cbar = plt.colorbar()

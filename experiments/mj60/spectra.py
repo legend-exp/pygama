@@ -158,7 +158,7 @@ def Collimator_Simulations():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     # A_0 = activity of source in mCi
-    A_0 = .05
+    A_0 = .005
 
     # A = activity of source in bequerel (decays/second)
     A = A_0*37000000  

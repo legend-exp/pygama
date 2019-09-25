@@ -36,11 +36,11 @@ def plot_raw():
 
     m = np.array(df['e_ftp'])
 
-    plt.hist(m, np.arange(0,9500,1.5), histtype='step', color = 'black', label='non-calibrated spectrum')
+    plt.hist(m, np.arange(0,9500,0.5), histtype='step', color = 'black', label='non-calibrated spectrum')
     plt.xlabel('e_ftp', ha='right', x=1.0)
     plt.ylabel('Counts', ha='right', y=1.0)
-    plt.xlim(1,9500)
-    plt.ylim(0,4000)
+    plt.xlim(0,9500)
+    #plt.ylim(0,4000)
     plt.legend(frameon=True, loc='upper right', fontsize='small')
     plt.show()
 
@@ -59,8 +59,9 @@ def spectrum_medfilt_peaks():
     nbins = int((xhi-xlo)/xpb)
 
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
-    bins = bins + (bins[1] - bins[0])/2
-    bins = bins[0:(len(bins)-1)]
+    #bins = bins + (bins[1] - bins[0])/2
+    #bins = bins[0:(len(bins)-1)]
+    hist = np.append(hist, 0)
 
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
@@ -91,7 +92,7 @@ def spectrum_medfilt_peaks():
 
 def linear_calibration():
 
-    pks_lit = [609.3, 1460.8]
+    pks_lit = [609.32, 1460.82]
 
     with open("runDB.json") as f:
         runDB = json.load(f)
@@ -108,6 +109,7 @@ def linear_calibration():
     hist, bins = np.histogram(m, nbins, (xlo, xhi))
     bins = bins + (bins[1] - bins[0])/2
     bins = bins[0:(len(bins)-1)]
+    #hist = np.append(hist, 0)
 
     hmed = medfilt(hist, 5)
     hpks = hist - hmed
@@ -128,6 +130,8 @@ def linear_calibration():
     for i in range(len(maxes)):
         for j in range(len(maxes)):
             ratios.append(x_maxes[i]/x_maxes[j])
+
+    print(x_maxes)    
 
     #another way to do the block above
     #import itertools
@@ -157,14 +161,18 @@ def linear_calibration():
 
     #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV)
     # E = A(e_ftp) + B
-    A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
-    B = float((pks_lit[1] - adc_values[1]*A))
+    #A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
+    #B = float((pks_lit[1] - adc_values[1]*A))
+    A=1460.8/3444.5
+    B=0
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     print('E = {}(e_ftp) + {}'.format(A,B))
+    print(A)
+    print(B)
 
     df["e_cal"] = A * df['e_ftp'] + B
 
-    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
+    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')   
 
     pks_lit_all = [238.6, 351.9, 511.0, 583.2, 609.3, 911.2, 969, 1120.3, 1460.8, 1764.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)
@@ -179,7 +187,7 @@ def linear_calibration():
     plt.axvline(x=1764.5, ymin=0, ymax=30, color='indigo', linestyle='--', lw=1, zorder=1)
     plt.axvline(x=2614.5, ymin=0, ymax=30, color='limegreen', linestyle='--', lw=1, zorder=1)
     n = np.array(df['e_cal'])
-    plt.hist(n, np.arange(0,9500,1.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n)))
+    plt.hist(n, np.arange(0,9500,0.5), histtype='step', color = 'black', zorder=2, label='{} entries'.format(len(n)))
     plt.xlim(0,4000)
     plt.ylim(0,plt.ylim()[1])
     plt.xlabel('Energy (keV)', ha='right', x=1.0)
