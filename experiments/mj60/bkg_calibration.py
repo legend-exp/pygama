@@ -21,9 +21,9 @@ def main():
         print('Usage: bkg_calibration.py [run number]')
         sys.exit()
 
-    #plot_raw()
+    plot_raw()
     #spectrum_medfilt_peaks()
-    linear_calibration()
+    #linear_calibration()
 
 def plot_raw():
 

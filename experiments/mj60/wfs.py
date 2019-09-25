@@ -22,8 +22,8 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    # plot_wfs()
-    flip_through_wfs()
+    plot_wfs()
+    #flip_through_wfs()
     #ADC_difference()
     #ADC_difference_cut()
 
