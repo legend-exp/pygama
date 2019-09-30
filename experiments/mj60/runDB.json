@@ -76,7 +76,8 @@
     "43":["449", "changes to IR shield, 1400 V bias, 0x3 threshold"],
     "44":["450,452", "133Ba runs, 1600 V bias, 0x3 threshold, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/516"],
     "45":["453,460", "tuning pre-amp capacitor, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/517"],
-    "46":["461,476", "133Ba runs, 0x5 threshold, 1600 V bias"]
+    "46":["461,538", "133Ba runs, 0x5 threshold, 1600 V bias"],
+    "47":["539,554", "Background runs, 0x5"]
   },
 
   "ecal":{
