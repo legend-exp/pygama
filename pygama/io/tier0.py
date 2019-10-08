@@ -243,7 +243,6 @@ def get_next_event(f_in):
     return event_data, data_id
     
 
-
 def ProcessSIS3316(t0_file, 
                     t1_file, 
                     run,

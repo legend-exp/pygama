@@ -1,0 +1,26 @@
+{
+  "loc_dir":"$DATADIR",
+  "raw_dir":"$DATADIR/raw",
+  "tier_dir":"$DATADIR",
+  "digitizer":"FlashCam",
+  "daq":"FlashCam",
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+  "ds":{
+    "note":"data sets",
+    "0":["0","multi-detector test file from UNC"]
+  },
+  "build_options":{
+    "conf1":{
+      "run_coverage":[0,9999999],
+      "tier0_options":{
+        "daq":"FlashCam",
+        "digitizer":"FlashCam"
+      },
+      "tier1_options":{
+        "avg_bl": {"ihi":20},
+        "blsub" : {}
+      }
+    }
+  }
+}
