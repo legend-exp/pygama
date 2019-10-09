@@ -13,15 +13,16 @@ import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
 from pprint import pprint
-from .xml_parser import get_object_info
+from .orca_header import get_object_info
 
 
 def get_decoders(object_info=None):
-    """ Find all the active pygama data takers that inherit from DataLoader.
+    """ 
+    Find all the active pygama data takers that inherit from DataTaker.
     This only works if the subclasses have been imported.
     """
     decoders = []
-    for sub in DataLoader.__subclasses__():
+    for sub in DataTaker.__subclasses__():
         for subsub in sub.__subclasses__():
             try:
                 decoder = subsub(object_info) # initialize the decoder
@@ -32,7 +33,7 @@ def get_decoders(object_info=None):
     return decoders
 
 
-class DataLoader(ABC):
+class DataTaker(ABC):
     """
     NOTE:
     all subclasses should save entries into pandas dataframes
@@ -41,46 +42,23 @@ class DataLoader(ABC):
     This sends any variable whose name is a key in
     `self.decoded_values` to the output (create_df) function.
     """
-    def __init__(self, df_metadata=None):
+    def __init__(self, config=None):
         """
-        when you initialize this from a derived class with 'super',
-        you should have already declared:
-        self.decoder_name, self.class_name, and self.decoded_values
+        Set counters for records we find, and load arbitrary JSON configuration
+        When you initialize this from a derived class with:
+            `super().__init__(*args, **kwargs)`
+        you need to have already declared:
+            -- `self.digitizer_type`: a string naming the digitizer t
+            -- self.decoded_values.`
         """
         self.total_count = 0
         self.garbage_count = 0 # never leave any data behind
         self.garbage_values = {key:[] for key in self.decoded_values}
+        self.h5_format = "lh5"
 
-        # every DataLoader should set this (affects if we can chunk the output)
-        self.h5_format = "table"
-        self.pytables_col_limit = 3100
-
-        # need the decoder name and the class name
-        if df_metadata is not None:
-            self.load_metadata(df_metadata)
-        else:
-            self.df_metadata = None
-
-
-    def load_metadata(self, df_metadata):
-        """ Load metadata for this data taker """
-
-        # print('trying this', self.class_name)
-        # pprint(df_metadata)
-
-        if isinstance(df_metadata, dict):
-            self.df_metadata = get_object_info(df_metadata, self.class_name)
-
-        elif isinstance(df_metadata, pd.core.frame.DataFrame):
-            self.df_metadata = df_metadata
-
-        elif isinstance(df_metadata, str):
-            self.df_metadata = pd.read_hdf(df_metadata, self.class_name)
-
-        else:
-            raise TypeError(
-                "Wrong DataLoader metadata type:"
-                .format(type(df_metadata)))
+        if config is not None and isinstance(config, str):
+            with open(config) as f:
+                self.config = json.load(f)
 
 
     def format_data(self, vals, is_garbage=False):
@@ -114,7 +92,7 @@ class DataLoader(ABC):
     def create_df(self, get_garbage=False):
         """
         Base dataframe creation method.
-        Classes inheriting from DataLoader (like digitizers or pollers) can
+        Classes inheriting from DataTaker (like digitizers or pollers) can
         overload this if necessary for more complicated use cases.
         Try to avoid pickling to 'object' types if possible.
         """

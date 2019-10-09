@@ -8,7 +8,7 @@ from ..decoders.data_loading import *
 from ..decoders.digitizers import *
 from ..utils import *
 
-def ProcessTier1Vec(t1_file,
+def RunDSPVec(t1_file,
                     vec_process=None,
                     digitizer_list=None,
                     out_prefix="t2",

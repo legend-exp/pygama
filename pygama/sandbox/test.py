@@ -193,7 +193,7 @@ def main():
 
         #TODO: it feels like the wf can be probabilistically too early or too late in the record?
         #for now, just trim 4 off each side to make length 2010 wfs?
-        # SJM: This needs to happen in a tier1 processing, but not here
+        # SJM: This needs to happen in a raw_to_dsp processing, but not here
         wf_arr = np.array(wf_data, dtype=np.uint16)
         # sig_arr = sig_arr[4:-4]
 
@@ -214,7 +214,7 @@ def main():
     t1_file_name = os.path.join(
         output_dir, output_file_string + '_run{}.h5'.format(runNumber))
     if verbose:
-        print("Writing {} to tier1 file {}...".format(filename, t1_file_name))
+        print("Writing {} to raw_to_dsp file {}...".format(filename, t1_file_name))
 
     board_ids = df_channels['channel'].map(board_id_map)
     df_channels = df_channels.assign(board_id=board_ids)

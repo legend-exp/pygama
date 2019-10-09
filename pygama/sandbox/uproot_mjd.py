@@ -343,7 +343,7 @@ def read_awkward(run):
     build the awkward hdf5 file into pd.DataFrames, matching read_pandas.
     NOTE:
     this route is necessary when we want load RAW data where we can't enforce
-    that everything must use pandas.  This is how LEGEND tier0 data will be.
+    that everything must use pandas.  This is how LEGEND daq_to_raw data will be.
     For Majorana, nobody will care about this and we can just use pytables.
     """
     mjdir = os.environ["MJDDATADIR"]

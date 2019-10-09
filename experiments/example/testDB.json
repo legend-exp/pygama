@@ -18,11 +18,11 @@
   "build_options":{
     "conf1":{
       "run_coverage":[75,99999],
-      "tier0_options":{
+      "daq_to_raw_options":{
         "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
       },
-      "tier1_options":{
+      "raw_to_dsp_options":{
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},

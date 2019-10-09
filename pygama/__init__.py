@@ -45,7 +45,7 @@ warnings.filterwarnings(action='ignore', module="scipy.stats", category=FutureWa
 # bring key functions to the primary API, e.g. pygama.process_tier_0
 # i don't really like how i have to specify everything here
 # from .processing.processing import *
-# from .processing.base_classes import *
+# from .processing.dsp_base_classes import *
 # from .decoders.digitizers import *
 # from .processing.vectorized import *
 # from .waveform import *
@@ -60,7 +60,7 @@ from .dataset import DataSet
 # from .decoders.pollers import ISegHVDecoder
 # from .processing.processing import process_tier_0
 # from .processing.processing import process_tier_1
-# from .processing.base_classes import Calculator
-# from .processing.base_classes import Transformer
-# from .processing.base_classes import DatabaseLookup
+# from .processing.dsp_base_classes import Calculator
+# from .processing.dsp_base_classes import Transformer
+# from .processing.dsp_base_classes import DatabaseLookup
 # from .analysis.calibration import get_most_prominent_peaks

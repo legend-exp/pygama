@@ -1,23 +1,25 @@
 {
-  "loc_dir":"$DATADIR",
-  "raw_dir":"$DATADIR/raw",
-  "tier_dir":"$DATADIR",
-  "digitizer":"FlashCam",
-  "daq":"FlashCam",
+  "raw_dir":"$DATADIR/L200",
+  "tier_dir":"$DATADIR/L200",
+
+  "t0_prefix":"protothppmco_",
+  "t0_suffix":".fcio",
+
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
-  "ds":{
-    "note":"data sets",
+
+  "daq":"FlashCam",
+  "datasets":{
     "0":["0","multi-detector test file from UNC"]
   },
-  "build_options":{
-    "conf1":{
+
+  "processing":{
+    "cycle_1":{
       "run_coverage":[0,9999999],
-      "tier0_options":{
-        "daq":"FlashCam",
-        "digitizer":"FlashCam"
+      "daq_to_raw":{
+        "digitizer":"FlashCam16"
       },
-      "tier1_options":{
+      "raw_to_dsp":{
         "avg_bl": {"ihi":20},
         "blsub" : {}
       }

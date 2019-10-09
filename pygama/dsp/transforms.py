@@ -741,7 +741,7 @@ def trap_test(waves,
             # plt.plot(ts, pz_wfs[iwf], '-b', label='pz_trap, {}'.format(dt))
 
             # check against ben's function
-            # import pygama.sandbox.base_transforms as pt
+            # import pygama.sandbox.dsp_base_transforms as pt
             # trapwf = pt.trap_filter(wfs[iwf], 400, 250, 7200)
             # plt.plot(np.arange(len(trapwf)), trapwf, '-m', label='bentrap')
 

@@ -6,8 +6,8 @@ from multiprocessing import Pool, cpu_count
 from functools import partial
 import cProfile
 
-from .tier0 import ProcessTier0
-from .tier1 import ProcessTier1
+from .daq_to_raw import ProcessRaw
+from .raw_to_dsp import RunDSP
 from .processor_base import TierOneProcessorList
 from .calculators import *
 
@@ -18,7 +18,7 @@ def process_tier_0(datadir,
                    output_dir=None,
                    chan_list=None,
                    n_max=np.inf):
-    """ Wrapper function for ProcessTier0 """
+    """ Wrapper function for ProcessRaw """
 
     for run in run_list:
 
@@ -35,7 +35,7 @@ def process_tier_0(datadir,
         filename = filenameList[0]
         filepath = os.path.join(datadir, filename)
 
-        ProcessTier0(
+        ProcessRaw(
             filepath,
             verbose=verbose,
             output_dir=output_dir,
@@ -51,7 +51,7 @@ def process_tier_1(datadir,
                    output_file_string="t2",
                    num_threads=1,
                    overwrite=True):
-    """ Wrapper function for ProcessTier1.
+    """ Wrapper function for RunDSP.
     If run_list is > 1 run, can try processing each run on a separate thread
     with num_threads > 1.  Careful, it's a lot to load in RAM ...
     TODO: try out the multiprocessing in Tier 0 as well
@@ -72,7 +72,7 @@ def process_tier_1(datadir,
                 continue
 
         if num_threads == 1:
-            ProcessTier1(
+            RunDSP(
                 filepath,
                 processor_list,
                 verbose=verbose,
@@ -86,10 +86,10 @@ def process_tier_1(datadir,
         # careful, it's a lot to load in RAM...
         max_proc = cpu_count()
         num_threads = num_threads if num_threads < max_proc else max_proc
-        print("Running ProcessTier1 with {} threads ...".format(num_threads))
+        print("Running RunDSP with {} threads ...".format(num_threads))
         p = Pool(num_threads)
-        # p.starmap( partial(ProcessTier0, **keywords), t0_args)
-        p.starmap(partial(ProcessTier1, **keywords), t1_args)
+        # p.starmap( partial(ProcessRaw, **keywords), t0_args)
+        p.starmap(partial(RunDSP, **keywords), t1_args)
 
 
 def get_default_processor_list():
