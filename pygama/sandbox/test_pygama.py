@@ -86,7 +86,7 @@ def process_MJD():
 
     # this class reads the "ORGretina4MWaveformDecoder" dataframe
     ft1 = "%s/t1_run%d.h5" % (data_dir, run)
-    dc = pygama.Gretina4MDecoder(ft1)
+    dc = pygama.Gretina4M(ft1)
     df_events = pd.read_hdf(ft1, key=dc.decoder_name)
 
     # plot a few waveforms

@@ -54,7 +54,7 @@ from .dataset import DataSet
 # from .decoders.dataloading import get_decoders
 # from .decoders.dataloading import get_next_event
 # from .decoders.digitizers import get_digitizers
-# from .decoders.digitizers import Gretina4MDecoder
+# from .decoders.digitizers import Gretina4M
 # from .decoders.digitizers import SIS3302Decoder
 # from .decoders.pollers import MJDPreampDecoder
 # from .decoders.pollers import ISegHVDecoder

@@ -2,28 +2,24 @@
 pygama tier 0 processing
 raw daq data --> pandas dfs saved to hdf5 file (tier 1)
 """
-import numpy as np
 import os, re, sys, glob, time
-import pandas as pd
+import numpy as np
 import h5py
-from future.utils import iteritems
-from functools import partial
+import pandas as pd
 from pprint import pprint
 
 from ..utils import *
-from ..io.decoders.digitizers import *
-from ..io.decoders.pollers import *
-from ..io.decoders.data_loading import *
-from ..io.decoders.orca_header import *
-from ..dsp.dsp_base import *
-from ..io.decoders.llama3316 import *
+from ..io.digitizers import *
+from ..io.pollers import *
+from ..io.io_base import *
+
 
 def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
                verbose=False, output_dir=None, overwrite=True, decoders=None,
                config={}):
     """
     """
-    print("Starting pygama Tier 0 processing ...")
+    print("Starting pygama daq_to_raw processing ...")
     print("  Input file:", t0_file)
 
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -63,29 +59,28 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
 
     # get the DAQ mode
     if config["daq"] == "ORCA":
-        ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose)
+        process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose)
     
     elif config["daq"] == "FlashCam":
-        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, config, verbose)
+        process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
     
     elif config["daq"] == "SIS3316":
-        ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose)
+        process_llama_3316(t0_file, t1_file, run, n_max, config, verbose)
     
-    elif config["daq"] == "CAENDT57XX":
-        ProcessCompass(t0_file, t1_file, decoders, output_dir)
+    elif config["daq"] == "CAENDT57XXDecoder":
+        process_compass(t0_file, t1_file, decoders, output_dir)
     
     else:
         print(f"DAQ: {config['daq']} not recognized.  Exiting ...")
         exit()
     
     
-def ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose):
+def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
-    handle ORCA raw files
+    convert ORCA DAQ data to pygama "raw" lh5
     """
-    # num. rows between writes.  larger eats more memory
-    # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'config' dict
+    from ..io.orca_header import *
+    
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -96,10 +91,6 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose):
 
     # parse the header
     reclen, reclen2, header_dict = parse_header(t0_file)
-    # print("   {} longs in plist header".format(reclen))
-    # print("   {} bytes in the header".format(reclen2))
-    # pprint(header_dict)
-    # exit()
 
     # figure out the total size
     SEEK_END = 2
@@ -138,10 +129,6 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose):
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
         d.apply_config(config)
-
-        # if d.class_name=="ORSIS3302Model":
-            # pprint(d.df_metadata.columns)
-            # exit()
 
     
     # ------------ scan over raw data starts here -----------------
@@ -226,8 +213,8 @@ def get_next_event(f_in):
     # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
     """
     try:
-        head = np.fromstring(
-            f_in.read(4), dtype=np.uint32)  # event header is 8 bytes (2 longs)
+        # event header is 8 bytes (2 longs)
+        head = np.fromstring(f_in.read(4), dtype=np.uint32)  
     except Exception as e:
         print(e)
         raise Exception("Failed to read in the event orca header.")
@@ -258,11 +245,15 @@ def get_next_event(f_in):
     return event_data, data_id
     
 
-def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
+def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     """
+    convert llama DAQ data to pygama "raw" lh5
+    
     Mario's implementation for the Struck SIS3316 digitizer.
     Requires the llamaDAQ program for producing compatible input files.
-    """                    
+    """       
+    from ..io.llama_3316 import *             
+    
     #now the ugly code duplication starts ... 
     
     # num. rows between writes.  larger eats more memory
@@ -276,10 +267,10 @@ def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
         
-    #file = llama3316(f_in,2) #test
+    #file = llama_3316(f_in,2) #test
 
     verbosity = 1 if verbose else 0     # 2 is for debug
-    sisfile = llama3316(f_in, verbosity)
+    sisfile = llama_3316(f_in, verbosity)
 
     # figure out the total size
     SEEK_END = 2
@@ -294,12 +285,12 @@ def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
     # run = get_run_number(header_dict)
     print("Run number: {}".format(run))
 
-    #see pygama/pygama/io/decoders/data_loading.py
+    #see pygama/pygama/io/decoders/io_base.py
     decoders = []
     decoders.append(SIS3316Decoder(pd.DataFrame.from_dict(header_dict)))   #we just have that one
-                    # fix: saving metadata using data_loadings ctor
+                    # fix: saving metadata using io_bases ctor
                     # have to convert to dataframe here in order to avoid 
-                    # passing to xml_header.get_object_info in data_loading.load_metadata
+                    # passing to xml_header.get_object_info in io_base.load_metadata
     channelOne = list(list(header_dict.values())[0].values())[0]
     decoders[0].initialize(1000./channelOne["SampleFreq"], channelOne["Gain"])
         # FIXME: gain set according to first found channel, but gain can change!
@@ -318,7 +309,7 @@ def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
 
-    # header is already skipped by llama3316
+    # header is already skipped by llama_3316
 
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
@@ -374,7 +365,7 @@ def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
     print("Done.\n")
 
 
-def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
+def process_compass(t0_file, t1_file, digitizer, output_dir=None):
     """
     Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs a .h5 file named t1_file
 
@@ -429,7 +420,7 @@ def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
     print("Done.\n")
 
 
-def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, config, verbose):
+def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
     Start of FlashCam data specific decoding
     """

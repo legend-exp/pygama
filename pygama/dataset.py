@@ -17,8 +17,8 @@ class DataSet:
 
         # load config file (user-generated)
         self.config, self.calDB = None, None
-        if md is not None:
-            with open(md) as f:
+        if config is not None:
+            with open(config) as f:
                 self.config = json.load(f)
         
         # load analysis parameters (code-generated)
@@ -357,11 +357,12 @@ class DataSet:
         return total_rt
 
     
-    def daq_to_raw(self):
+    def daq_to_raw(self, overwrite=False, test=False):
         """
         convenience function for calling the main daq_to_raw function.
         right now, this processes runs sequentially.
         """
+        from pygama.io.daq_to_raw import daq_to_raw
         for run in self.runs:
             t0_file = self.paths[run]["t0_path"]
             t1_file = self.paths[run]["t1_path"]

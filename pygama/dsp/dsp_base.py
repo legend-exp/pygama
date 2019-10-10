@@ -18,6 +18,7 @@ class Processor:
         self.function = function
         self.fun_args = fun_args # so fun
 
+
     def process_block(self, waves, calcs):
         """
         run the given calculation. we always pass in:
@@ -124,6 +125,7 @@ class Intercom:
         if "blest" in self.waves["settings"]["blsub"]:
           if self.waves["settings"]["blsub"]["blest"] == "fcdaq":
             self.calcs["fcdaq"] = data_df.bl.values
+
 
     def process(self, data_df, verbose=False, wfnames_out=None):
         """
