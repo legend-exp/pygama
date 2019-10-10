@@ -11,7 +11,7 @@ import datetime
 import multiprocessing as mp
 from functools import partial
 
-from ..io.decoders.data_loading import *
+from ..io.decoders.io_base import *
 from ..io.decoders.digitizers import *
 from ..utils import *
 

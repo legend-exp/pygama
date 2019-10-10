@@ -34,7 +34,7 @@ def daq_to_raw(raw_file, n_evt=None):
 
 def raw_to_dsp(t1_file):
 
-    digitizer = pygama.decoders.digitizers.Gretina4MDecoder(
+    digitizer = pygama.decoders.digitizers.Gretina4M(
         correct_presum = False,
         split_waveform = False,
         )

@@ -17,7 +17,7 @@
     "cycle_1":{
       "run_coverage":[0,9999999],
       "daq_to_raw":{
-        "digitizer":"FlashCam16"
+        "digitizer":"FlashCam"
       },
       "raw_to_dsp":{
         "avg_bl": {"ihi":20},

@@ -4,7 +4,7 @@ import multiprocessing as mp
 from functools import partial
 
 from .vector import *
-from ..decoders.data_loading import *
+from ..decoders.io_base import *
 from ..decoders.digitizers import *
 from ..utils import *
 

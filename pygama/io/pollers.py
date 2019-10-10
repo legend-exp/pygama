@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 
-from .data_loading import DataTaker
+from .io_base import DataTaker
 
 class MJDPreampDecoder(DataTaker):
     """

@@ -6,10 +6,10 @@ import itertools
 import array
 from pprint import pprint
 
-from .data_loading import DataTaker
+from .io_base import DataTaker
 from .waveform import Waveform
 
-class llama3316:
+class llama_3316:
     """ 
     A parser file for the sis3316 able to decode header and events.
     The inputs are files produced by the llamaDAQ sis3316 readout program
