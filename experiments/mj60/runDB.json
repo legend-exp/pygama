@@ -77,7 +77,11 @@
     "44":["450,452", "133Ba runs, 1600 V bias, 0x3 threshold, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/516"],
     "45":["453,460", "tuning pre-amp capacitor, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/517"],
     "46":["461,538", "133Ba runs, 0x5 threshold, 1600 V bias"],
-    "47":["539,554", "Background runs, 0x5"]
+    "47":["539,554", "Background runs, 0x5"],
+    "48":["555", "Test bkg run with new preamp 1"],
+    "49":["556", "Test  bkg run with new preamp 2"],
+    "50":["558", "Test 133Ba run with new preamp 2"],
+    "51":["559, 560", "Test 133Ba run with new varcap in preamp 1, 0x3 thr, 1600V"]
   },
 
   "ecal":{
@@ -144,7 +148,7 @@
       }
     },
     "conf2":{
-      "run_coverage":[75,999],
+      "run_coverage":[75,999999],
       "tier0_options":{
         "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
@@ -173,7 +177,7 @@
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,90,100]},
         "peakdet" : [
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
