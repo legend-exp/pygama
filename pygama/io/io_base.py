@@ -6,6 +6,15 @@ contains methods to save pandas dataframes to files.
 subclasses:
      - digitizers.py -- Gretina4M, SIS3302, FlashCam, etc.
      - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
+     
+Notes on writing new DataTaker objects:
+
+I recommend you save entries to the output file by using 
+`self.format_data(locals())` as the last line of `decode_event`.
+
+DataTakers require you declare these before calling `super().__init__()`:
+    * `self.digitizer_type`: a string naming the digitizer
+    * `self.decoded_values`: the Python lists to convert to HDF5
 """
 import sys
 import numpy as np
@@ -13,43 +22,11 @@ import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
 from pprint import pprint
-from .orca_header import get_object_info
-
-
-def get_decoders(object_info=None):
-    """ 
-    Find all the active pygama data takers that inherit from DataTaker.
-    This only works if the subclasses have been imported.
-    """
-    decoders = []
-    for sub in DataTaker.__subclasses__():
-        for subsub in sub.__subclasses__():
-            try:
-                decoder = subsub(object_info) # initialize the decoder
-                decoders.append(decoder)
-            except Exception as e:
-                print(e)
-                pass
-    return decoders
-
+from ..utils import get_object_info
 
 class DataTaker(ABC):
-    """
-    NOTE:
-    all subclasses should save entries into pandas dataframes
-    by putting this as the last line of their decode_event:
-        self.format_data(locals())
-    This sends any variable whose name is a key in
-    `self.decoded_values` to the output (create_df) function.
-    """
     def __init__(self, config=None):
         """
-        Set counters for records we find, and load arbitrary JSON configuration
-        When you initialize this from a derived class with:
-            `super().__init__(*args, **kwargs)`
-        you need to have already declared:
-            -- `self.digitizer_type`: a string naming the digitizer t
-            -- self.decoded_values.`
         """
         self.total_count = 0
         self.garbage_count = 0 # never leave any data behind
@@ -88,6 +65,7 @@ class DataTaker(ABC):
                         self.decoded_values[key].append(vals[key].copy())
                     else:
                         self.decoded_values[key].append(vals[key])
+
 
     def create_df(self, get_garbage=False):
         """
