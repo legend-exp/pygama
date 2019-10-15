@@ -73,6 +73,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
 
         ProcessTier0(
             t0_file,
+            run,
             verbose=v,
             output_dir=ds.tier_dir,
             overwrite=overwrite,
