@@ -81,7 +81,8 @@
     "48":["555", "Test bkg run with new preamp 1"],
     "49":["556", "Test  bkg run with new preamp 2"],
     "50":["558", "Test 133Ba run with new preamp 2"],
-    "51":["559, 560", "Test 133Ba run with new varcap in preamp 1, 0x3 thr, 1600V"]
+    "51":["559, 560", "Test 133Ba run with new varcap in preamp 1, 0x3 thr, 1600V"],
+    "52":["561, 605", "Capacitance measurements.  elog UWMJlab 524, 0x10 thr."]
   },
 
   "ecal":{
