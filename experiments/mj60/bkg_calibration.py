@@ -161,10 +161,10 @@ def linear_calibration():
 
     #Now we model a linear equation to go from ADC value (e_ftp) to real energy using the points (adc_values[0], 1460.820) and (adc_values[1], 2614.511 keV)
     # E = A(e_ftp) + B
-    #A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
-    #B = float((pks_lit[1] - adc_values[1]*A))
-    A=1460.8/3444.5
-    B=0
+    A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
+    B = float((pks_lit[1] - adc_values[1]*A))
+    A = 0.4074162679425837
+    B = 0.23267942583743206
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     print('E = {}(e_ftp) + {}'.format(A,B))
     print(A)

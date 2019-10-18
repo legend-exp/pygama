@@ -67,8 +67,8 @@ def get_spectra():
              label="Rise Time, Preamp 2".format(sum(hP)))
     plt.semilogy(xP3[:-1]*0.423, hP3, ls='steps', lw=1.5, c='0.5',
              label="Rise Time, Preamp 0".format(sum(hP)))
-    # plt.xlabel("Energy (uncal)", ha='right', x=1)
-    # plt.ylabel("Counts", ha='right', y=1)
+    plt.xlabel("Rise Time", ha='right', x=1)
+    plt.ylabel("Counts", ha='right', y=1)
     plt.legend()
     plt.tight_layout()
     plt.show()

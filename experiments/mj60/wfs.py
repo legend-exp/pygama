@@ -26,7 +26,7 @@ def main():
     #flip_through_wfs()
     #ADC_difference()
     #ADC_difference_cut()
-    superpulse()
+    #superpulse()
     #samples_scatter()
     #samples_hist()
     #baseline_hist()
@@ -46,7 +46,13 @@ def plot_wfs():
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
 
     runtime = ds.DataSet(run=int(sys.argv[1]), md='./runDB.json').get_runtime()
+    counts = len(df)
     counts_per_second = (len(df))/runtime
+
+    print('total runtime = {} seconds'.format(runtime))
+    print('counts = {}'.format(counts))
+    print('counting rate = {} counts/second'.format(counts_per_second))
+    exit()
 
     df = df.reset_index(drop=True)
     del df['energy']
@@ -70,8 +76,6 @@ def plot_wfs():
     plt.xlabel('Sample Number', ha='right', x=1.0)
     plt.ylabel('ADC Value', ha='right', y=1.0)
     plt.tight_layout()
-    print('total runtime = {} seconds'.format(runtime))
-    print('counting rate = {} counts/second'.format(counts_per_second))
     print('python script time = {} seconds'.format(time.time() - start))
     plt.show()
 
