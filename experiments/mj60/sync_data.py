@@ -18,7 +18,7 @@ def main():
     with open("runDB.json") as f:
         runDB = json.load(f)
 
-    # run_rsync()
+    #run_rsync()
     daq_cleanup()
 
 

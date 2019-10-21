@@ -85,8 +85,14 @@
     "52":["561, 605", "Capacitance measurements.  elog UWMJlab 524, 0x10 thr."],
     "53":["606", "Background runs, 0x3 threshold, rate too high"],
     "54":["607, 611", "Background runs, 0x4 threshold, 2019.10.15"],
-    "55":["612, 618", "Background runs, 0x4, 2019.10.16.  no sources in room"],
-    "56":["619, 624", "Background runs, 0x4, 2019.10.17.  valve closed"]
+    "55":["612, 618", "Background runs, 0x4, 2019.10.16., no sources in room, valve open"],
+    "56":["619, 624", "Background runs, 0x4, 2019.10.17., no sources in room,  valve closed"],
+    "57":["625,675", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "58":["676,725", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "59":["726,775", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "60":["776,825", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "61":["826,879", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "62":["880,", "Bkg runs for C2, vac valve open, 2019.10.21"]
   },
 
   "ecal":{
