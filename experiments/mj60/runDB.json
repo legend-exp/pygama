@@ -92,7 +92,9 @@
     "59":["726,775", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
     "60":["776,825", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
     "61":["826,879", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
-    "62":["880,", "Bkg runs for C2, vac valve open, 2019.10.21"]
+    "62":["880, 890", "Bkg runs for C2, vac valve open, 2019.10.21.  Higher noise (bad HV cable, microdischarge evts)"],
+    "63":["891, 892", "Bkg runs, heater tape off, 2GB ORCA constraint removed."],
+    "64":["893,", "Bkg runs after bias-down, with new HV cable. "]
   },
 
   "ecal":{
@@ -137,7 +139,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
@@ -176,7 +178,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
