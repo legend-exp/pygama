@@ -109,7 +109,7 @@ class DataSet:
             else:
                 run_list.extend([r for r in range(r1, r2+1)]) # inclusive
 
-        if 1:
+        if verbose:
             print("Data Sets:",self.ds_list)
             print("Runs:",run_list)
 
