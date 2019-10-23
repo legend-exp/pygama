@@ -20,6 +20,7 @@ from ..io.decoders.SIS3316File import *
 
 def ProcessTier0(t0_file,
                  run,
+		 subrun,
                  output_prefix="t1",
                  chan_list=None,
                  n_max=np.inf,
@@ -37,7 +38,7 @@ def ProcessTier0(t0_file,
 
     # declare Tier 1 output file
     output_dir = os.getcwd() if output_dir is None else output_dir
-    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+    t1_file = "{}/{}_run{}-{}.h5".format(output_dir, output_prefix, run, subrun)
     if os.path.isfile(t1_file):
         if overwrite:
             print("Overwriting existing file...")
@@ -433,10 +434,8 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
     start = time.time()
 
     print("Lets process amazing FlashCam data")
-    
     # The fcio class is used to open the datafile
     io = fcio(t0_file)
-    
     # no run info in FC header yet - get_run_number(header_dict)
     print("Run number: {}".format(run))
     

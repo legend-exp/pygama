@@ -11,7 +11,7 @@ class DataSet:
     can initialize with data sets, a single run, or lists of runs.
     can also load a JSON file to get a dict of metadata.
     """
-    def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None,
+    def __init__(self, sub,ds_lo=None, ds_hi=None, run=None, runlist=None,
                  opt=None, v=False, md=None, cal=None, raw_dir=None, tier_dir=None):
 
         # load metadata and set paths to data folders
@@ -54,9 +54,9 @@ class DataSet:
             self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
-            
+        print(self.runs)    
         # filenames for every run
-        self.get_paths(self.runs, v)
+        self.get_paths(self.runs,sub, v)
         
         # could store concatenated dfs here, like a TChain
         self.df = None
@@ -109,13 +109,13 @@ class DataSet:
             else:
                 run_list.extend([r for r in range(r1, r2+1)]) # inclusive
 
-        if verbose:
+        if 1:
             print("Data Sets:",self.ds_list)
             print("Runs:",run_list)
 
         return run_list
     
-    def get_paths(self, runs, verbose=False):
+    def get_paths(self, runs, subfile, verbose=False):
         """
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
@@ -123,21 +123,42 @@ class DataSet:
         """
         self.paths = {r:{} for r in runs}
         
+
+        """
+        I don't really like my approach but it works for me...
+        So we have Subfiles and I added a "subfile" variable to deal with that.
+        Our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
+        "char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.fcio"
+        Also the are ".log" files in the same directory 
+        I take a counter and take the subfile which is provided with "subfile"
+        """
+
         # search data directories for extant files
+        counter = 1 
         for p, d, files in os.walk(self.raw_dir):
             for f in files:
-                if any("Run{}".format(r) in f for r in runs):
-                    run = int(f.split("Run")[-1])
-                    self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                #if any("run000{}".format(r) in f for r in runs) or any("run00{}".format(r) in f for r in runs):
+                for r in runs:
+                    if f.endswith(".fcio"):
+                        if int(f.split("run")[-1].split("-")[0]) == r:
+                            if counter==subfile:
+                               run = int(f.split("run")[-1].split("-")[0])
+                               self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                            counter+=1
+        """
+        Dirty hack to allow subfiles.
+        Tier1 Files will be named "t1_runX-Y.h5
+        Tier2 Files will be named "t2_runX-Y.h5
 
+        I think it would be nice to reuse the raw file name: "data_file.end" -> "data_file-t1.h5"
+        """
         for p, d, files in os.walk(self.tier_dir):
             for f in files:
-                if any("t1_run{}".format(r) in f for r in runs):
-                    run = int(f.split("run")[-1].split(".h5")[0])
+                if any("t1_run{}-{}".format(r,subfile) in f for r in runs):
+                    run = int(f.split("run")[-1].split("-")[0]) 
                     self.paths[run]["t1_path"] = "{}/{}".format(p,f)
-
-                if any("t2_run{}".format(r) in f for r in runs):
-                    run = int(f.split("run")[-1].split(".h5")[0])
+                if any("t2_run{}-{}".format(r,subfile) in f for r in runs):
+                    run = int(f.split("run")[-1].split("-")[0])
                     self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
