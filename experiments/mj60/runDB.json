@@ -97,7 +97,8 @@
     "64":["893,907", "Bkg runs after bias-down, with new HV cable. "],
     "64":["908,910", "908 HV pulser run, 910 Preamp pulser run."],
     "65":["913, 945", "Barium runs, 913,914 shorter duration (7.5 min), 915 onward 15 min."],
-    "66":["946, ", "Kr runs"]
+    "66":["946, 993", "Kr runs"],
+    "67":["994, ", "Bkg runs, 10/27.  Started 3:20p"]
   },
 
   "ecal":{
