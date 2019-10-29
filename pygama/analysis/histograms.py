@@ -6,6 +6,7 @@ it encourages users to understand what their code is actually doing.
 import numpy as np
 import matplotlib.pyplot as plt
 import pygama.utils as pgu
+from pylab import rcParams
 
 
 def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
@@ -62,7 +63,7 @@ def get_bin_widths(bins):
     return (bins[1:] - bins[:-1])
 
 
-def plot_hist(hist, bins, var=None, show_stats=False, **kwargs):
+def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, **kwargs):
     """
     plot a step histogram, with optional error bars
     """
@@ -85,8 +86,8 @@ def plot_hist(hist, bins, var=None, show_stats=False, **kwargs):
 
         mean, dmean = pgu.get_formatted_stats(mean, dmean, 2)
         stats = '$\mu=%s \pm %s$\n$\sigma=%#.3g$' % (mean, dmean, stddev)
-        plt.text(0.95, 0.95, stats, transform=plt.gca().transAxes,
-                 verticalalignment='top', horizontalalignment='right')
+        stats_fontsize = rcParams['legend.fontsize']
+        plt.text(stats_hloc, stats_vloc, stats, transform=plt.gca().transAxes, fontsize = stats_fontsize)
 
 
 def get_gaussian_guess(hist, bin_centers):
