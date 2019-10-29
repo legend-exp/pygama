@@ -22,11 +22,11 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
     - dx=dx, range=(x_lo, x_hi): bins of width dx over the specified range.
       Note: dx overrides the bins argument!
     """
+    if bins is None:
+        bins = 100 # override np.histogram default of just 10
+
     if dx is not None:
         bins = int((range[1] - range[0]) / dx)
-
-    if bins is None:
-        bins = 100 #override np.histogram default of just 10
 
     hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
 
@@ -76,7 +76,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
     if show_stats is True:
         bin_centers = get_bin_centers(bins)
         N = np.sum(hist)
-        if N <= 1: 
+        if N <= 1:
             print("can't compute sigma for N =", N)
             return
         mean = np.sum(hist*bin_centers)/N

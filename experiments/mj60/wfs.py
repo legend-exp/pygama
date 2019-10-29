@@ -22,14 +22,14 @@ plt.style.use('style.mplstyle')
 
 def main():
 
-    #plot_wfs()
+    plot_wfs()
     #flip_through_wfs()
-    #ADC_difference()   
+    #ADC_difference()
     #ADC_difference_cut()
     #superpulse()
     #samples_scatter()
     #samples_hist()
-    baseline_hist()
+    #baseline_hist()
 
 def plot_wfs():
 
@@ -46,7 +46,13 @@ def plot_wfs():
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
 
     runtime = ds.DataSet(run=int(sys.argv[1]), md='./runDB.json').get_runtime()
+    counts = len(df)
     counts_per_second = (len(df))/runtime
+
+    print('total runtime = {} seconds'.format(runtime))
+    print('counts = {}'.format(counts))
+    print('counting rate = {} counts/second'.format(counts_per_second))
+    exit()
 
     df = df.reset_index(drop=True)
     del df['energy']
@@ -70,8 +76,6 @@ def plot_wfs():
     plt.xlabel('Sample Number', ha='right', x=1.0)
     plt.ylabel('ADC Value', ha='right', y=1.0)
     plt.tight_layout()
-    print('total runtime = {} seconds'.format(runtime))
-    print('counting rate = {} counts/second'.format(counts_per_second))
     print('python script time = {} seconds'.format(time.time() - start))
     plt.show()
 
@@ -88,9 +92,9 @@ def flip_through_wfs():
     meta_dir = os.path.expandvars(runDB["meta_dir"])
 
     df = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
-    df_2 = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")
+    df['e_cal'] = pd.read_hdf("{}/Spectrum_{}.hdf5".format(meta_dir,sys.argv[1]), key="df")['e_cal']
+    df['AoverE'] = (pd.read_hdf("{}/t2_run{}.h5".format(tier_dir,sys.argv[1]))['current_max'])/df['e_cal']
 
-    df_2 = df_2.reset_index(drop=True)
     df = df.reset_index(drop=True)
     del df['energy']
     del df['channel']
@@ -101,15 +105,12 @@ def flip_through_wfs():
     del df['ts_hi']
     del df['ts_lo']
 
-    df['e_cal'] = df_2['e_cal']
+    df = df.loc[(df.AoverE>=0.05)&(df.AoverE<=0.06)]
     df = df.loc[(df.e_cal>int(sys.argv[2]))&(df.e_cal<int(sys.argv[3]))]
     df = df.reset_index(drop=True)
-    df_3 = pd.DataFrame(df['e_cal'])
+    df_2 = pd.DataFrame(df['e_cal'])
     del df['e_cal']
-    df['e_cal'] = df_2['e_cal']
-    df = df.reset_index(drop=True)
-    df_3 = pd.DataFrame(df['e_cal'])
-    del df['e_cal']
+    del df['AoverE']
 
     def bl_sub(wf):
         return df.loc[wf,:]-df.iloc[wf,0:500].mean()
@@ -131,7 +132,7 @@ def flip_through_wfs():
         print(i)
 
         plt.cla()
-        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}, E = {:.03f} keV".format(str(sys.argv[1]), df_3['e_cal'][i]))
+        plt.plot(xvals, bl_sub(i), color="black", lw=2, label="raw wf, run {}, E = {:.03f} keV".format(str(sys.argv[1]), df_2['e_cal'][i]))
         plt.plot(xvals, savgol(i), color="red", lw=1, label="Savitzky-Golay Filter")
         plt.xlabel('Sample Number', ha='right', x=1.0)
         plt.ylabel('ADC Value', ha='right', y=1.0)
@@ -279,12 +280,18 @@ def superpulse():
 
         return superpulse['superpulse'].values
 
+    a = pulse(sys.argv[2],sys.argv[3],sys.argv[4])
+    #b = pulse(sys.argv[1],sys.argv[3],sys.argv[4])
+
+    #b = b*sum(a[2500:2999])/sum(b[2500:2999])
+
+
     nsamp = 3000
     xvals = np.arange(0,nsamp)
-    plt.plot(xvals, pulse(sys.argv[2],sys.argv[3],sys.argv[4]), lw=4, color='black', label='superpulse -- run {}, {}<E<{} keV'.format(sys.argv[2],sys.argv[3],sys.argv[4]))
-    plt.plot(xvals, pulse(sys.argv[1],sys.argv[3],sys.argv[4]), lw=2, color='purple', label='superpulse -- run {}, {}<E<{} keV'.format(sys.argv[1],sys.argv[3],sys.argv[4]))
-    #plt.plot(xvals, signal.savgol_filter(pulse(sys.argv[1],sys.argv[3],sys.argv[4]), 47, 2), lw=1, color='blue', label='savgol filtered superpulse -- run {}, {}<E<{} keV'.format(sys.argv[1],sys.argv[3],sys.argv[4]))
-    #plt.plot(xvals, signal.savgol_filter(pulse(sys.argv[2],sys.argv[3],sys.argv[4]), 47, 2), lw=1, color='red', label='savgol filtered superpulse -- run {}, {}<E<{} keV'.format(sys.argv[2],sys.argv[3],sys.argv[4]))
+    plt.plot(xvals, a, lw=1, color='black', label='superpulse -- run {}, {}<E<{} keV'.format(sys.argv[2],sys.argv[3],sys.argv[4]))
+    #plt.plot(xvals, b, lw=1, color='purple', label='superpulse -- run {}, {}<E<{} keV'.format(sys.argv[1],sys.argv[3],sys.argv[4]))
+    #plt.plot(xvals, signal.savgol_filter(b, 47, 2), lw=1, color='blue', label='savgol filtered superpulse -- run {}, {}<E<{} keV'.format(sys.argv[1],sys.argv[3],sys.argv[4]))
+    plt.plot(xvals, signal.savgol_filter(a, 47, 2), lw=1, color='red', label='savgol filtered superpulse -- run {}, {}<E<{} keV'.format(sys.argv[2],sys.argv[3],sys.argv[4]))
     plt.xlabel('Sample Number', ha='right', x=1.0)
     plt.ylabel('ADC Value', ha='right', y=1.0)
     plt.legend(frameon=True, loc='best', fontsize='small')

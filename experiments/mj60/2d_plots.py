@@ -22,7 +22,8 @@ def main():
     #ttrap_max_vs_energy()
     #rise()
     #rise_diff()
-    test()
+    AoverE_vs_E()
+    #test()
 
 def ttrap_max_vs_energy():
 
@@ -120,6 +121,53 @@ def rise_diff():
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
     plt.show()
+
+
+def AoverE_vs_E():
+
+    if(len(sys.argv) != 3):
+        print('Usage: 2d_plots.py [run number 1] [run number 2]')
+        sys.exit()
+
+    start = time.time()
+
+    with open("runDB.json") as f:
+        runDB = json.load(f)
+    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    meta_dir = os.path.expandvars(runDB["meta_dir"])
+
+    # make 2D plot
+    def plot_2D_hist():
+        df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+        df['e_cal'] = pd.read_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]))['e_cal']
+        plt.hist2d(df['e_cal'], (df['current_max']/df['e_cal']), bins=[100,200], range=[[0, 50], [0, .1]], normed=True, cmap='jet')
+        plt.xlim(5,50)
+        plt.xlabel('E (keV)', ha='right', x=1.0)
+        plt.ylabel('A/E', ha='right', y=1.0)
+        plt.title("Run {}".format(sys.argv[1]))
+        cbar = plt.colorbar()
+        cbar.ax.set_ylabel('Counts (normalized)')
+        plt.tight_layout()
+        plt.show() 
+
+    # make 1D hist
+    def plot_1D_hist(a,b):
+        df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]))
+        df['e_cal'] = pd.read_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]))['e_cal']
+        df = df.loc[(df.e_cal>=float(a))&(df.e_cal<=float(b))]
+        df_2 = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[2]))
+        df_2['e_cal'] = pd.read_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[2]))['e_cal']
+        df_2 = df_2.loc[(df_2.e_cal>=float(a))&(df_2.e_cal<=float(b))]
+        plt.hist(df['current_max']/df['e_cal'], np.arange(0,.2,.0010), histtype='step', density=True, label='run {}, {} < E < {} keV'.format(sys.argv[1],a,b))
+        plt.hist(df_2['current_max']/df_2['e_cal'], np.arange(0,.2,.0010), histtype='step', density=True, label='run {}, {} < E < {} keV'.format(sys.argv[2],a,b))
+        plt.xlabel('A/E', ha='right', x=1.0)
+        plt.ylabel('Counts (normalized)', ha='right', y=1.0)
+        plt.legend(frameon=True, loc='best', fontsize='small')
+        plt.show()
+
+    #plot_2D_hist()
+    plot_1D_hist(a=25,b=30)
+
 
 def test():
 

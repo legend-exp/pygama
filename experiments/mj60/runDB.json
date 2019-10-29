@@ -25,7 +25,7 @@
     "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
     "1764.5":"214Bi", "2614.5":"208Tl"
   },
-  "expected_peaks":[2614.5, 1460.8, 583.2],
+  "expected_peaks":[2614.5, 1764.5, 1460.8, 583.2],
 
   "ds":{
     "note":"data sets",
@@ -47,31 +47,58 @@
     "15":["177,185", "valve closed, bkg run"],
     "16":["186,189", "bkg run, valve open, 2019/03/19"],
     "17":["190", "thorium calibration, pos 1 (windowsill)"],
-    "18":["191,204", "thorium calibration, pos 2 (corner of rm)"],
-    "19":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
-    "20":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
-    "21":["218,219", "No Kr, valve closed, thermal short 1300V"],
-    "22":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
-    "23":["223,241", "Noise study during bias"],
-    "24":["246,248", "Noise study during bias continued"],
-    "25":["249", "Bkg run @ 1400 V, thresh=0x2"],
-    "26":["250, 271", "Noise Study take 2"],
-    "27":["272", "Bkg run @ 1400 V, thresh=0x2"],
-    "28":["273", "Bkg run @ 1400 V, thresh=0x3"],
-    "29":["274", "Bkg run @ 1400 V, thresh=0x3"],
-    "30":["275", "Cesium Run (elog: cesium source run with mj60)"],
-    "31":["276,277", "Bkg run @ 1400 V, (elog: data taking campaign - MJ60)"],
-    "32":["278,279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
-    "33":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "34":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "35":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
-    "36":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
-    "37":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
-    "38":["380,395", "Dead time study (elog: using external pulser to determine ...)"],
-    "39":["400,415", "Pulser energy study bkg (elog: mj60 pulser study)"],
-    "40":["416,429", "Overnight background runs, (elog: mj60 pulser study)"],
-    "41":["430", "Forced acquisition data"],
-    "42":["431,445", "Pulser energy study (elog: mj60 pulser study)"]
+    "17":["191,204", "thorium calibration, pos 2 (corner of rm)"],
+    "18":["205,211", "Todo: Need valve and Kr value post PT1000 4/11"],
+    "19":["212,217", "Todo: Need valve and Kr value post PT1000 4/12"],
+    "20":["218,219", "No Kr, valve closed, thermal short 1300V"],
+    "21":["220,221", "1400 V, thresh 0x10 (220), 0x12 (221), noise issues"],
+    "22":["223,241", "Noise study during bias"],
+    "23":["246,248", "Noise study during bias continued"],
+    "24":["249", "Bkg run @ 1400 V, thresh=0x2"],
+    "25":["250, 271", "Noise Study take 2"],
+    "26":["272", "Bkg run @ 1400 V, thresh=0x2"],
+    "27":["273", "Bkg run @ 1400 V, thresh=0x3"],
+    "28":["274", "Bkg run @ 1400 V, thresh=0x3"],
+    "29":["275", "Cesium Run (elog: cesium source run with mj60)"],
+    "30":["276,277", "Bkg run @ 1400 V, (elog: data taking campaign - MJ60)"],
+    "31":["278,279", "Thorium @ 1400 V, 0x3, (elog: data taking campaign - MJ60) "],
+    "32":["280,295", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "33":["296,315", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "34":["316,329", "Campaign1 BKG (elog: data taking campaign - MJ60)"],
+    "35":["330,353", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "36":["354,379", "Campaign1 Kr (elog: data taking campaign - MJ60)"],
+    "37":["380,399", "Dead time study (elog: using external pulser to determine ...)"],
+    "38":["400,415", "Pulser energy study bkg (elog: mj60 pulser study)"],
+    "39":["416,429", "Overnight background runs, (elog: mj60 pulser study)"],
+    "40":["430", "Forced acquisition data"],
+    "41":["431,445", "Pulser energy study (elog: mj60 pulser study)"],
+    "42":["446,448", "Bad IR runs, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/513"],
+    "43":["449", "changes to IR shield, 1400 V bias, 0x3 threshold"],
+    "44":["450,452", "133Ba runs, 1600 V bias, 0x3 threshold, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/516"],
+    "45":["453,460", "tuning pre-amp capacitor, see https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/517"],
+    "46":["461,538", "133Ba runs, 0x5 threshold, 1600 V bias"],
+    "47":["539,554", "Background runs, 0x5"],
+    "48":["555", "Test bkg run with new preamp 1"],
+    "49":["556", "Test  bkg run with new preamp 2"],
+    "50":["558", "Test 133Ba run with new preamp 2"],
+    "51":["559, 560", "Test 133Ba run with new varcap in preamp 1, 0x3 thr, 1600V"],
+    "52":["561, 605", "Capacitance measurements.  elog UWMJlab 524, 0x10 thr."],
+    "53":["606", "Background runs, 0x3 threshold, rate too high"],
+    "54":["607, 611", "Background runs, 0x4 threshold, 2019.10.15"],
+    "55":["612, 618", "Background runs, 0x4, 2019.10.16., no sources in room, valve open"],
+    "56":["619, 624", "Background runs, 0x4, 2019.10.17., no sources in room,  valve closed"],
+    "57":["625,675", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "58":["676,725", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "59":["726,775", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "60":["776,825", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "61":["826,879", "Barium runs for Campaign 2 calibration, 0x4, 1600 V bias, 2019.10.19."],
+    "62":["880, 890", "Bkg runs for C2, vac valve open, 2019.10.21.  Higher noise (bad HV cable, microdischarge evts)"],
+    "63":["891, 892", "Bkg runs, heater tape off, 2GB ORCA constraint removed."],
+    "64":["893,907", "Bkg runs after bias-down, with new HV cable. "],
+    "64":["908,910", "908 HV pulser run, 910 Preamp pulser run."],
+    "65":["913, 945", "Barium runs, 913,914 shorter duration (7.5 min), 915 onward 15 min."],
+    "66":["946, 993", "Kr runs"],
+    "67":["994, ", "Bkg runs, 10/27.  Started 3:20p"]
   },
 
   "ecal":{
@@ -81,9 +108,7 @@
         "ds_coverage":"0, 99",
         "xlims":[0, 10000, 10],
         "peakdet_thresh":100,
-        "match_thresh":0.01,
-        "width_thresh":180,
-        "width_lims":[-30, 30, 0, 10, 49, 60]
+        "match_thresh":0.01
       },
       "energy": {
         "ds_coverage":"0, 99",
@@ -118,7 +143,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
@@ -140,7 +165,7 @@
       }
     },
     "conf2":{
-      "run_coverage":[75,999],
+      "run_coverage":[75,999999],
       "tier0_options":{
         "daq":"ORCA",
         "digitizer":"ORSIS3302DecoderForEnergy"
@@ -157,7 +182,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":4, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
@@ -169,7 +194,7 @@
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}
         ],
-        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,100]},
+        "timepoint" : {"wfin":"wf_savgol", "pct":[5,10,50,90,100]},
         "peakdet" : [
             {"delta":0.5, "sigma":5, "ihi":600}
         ],
