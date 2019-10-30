@@ -18,8 +18,8 @@ def main():
     with open("runDB.json") as f:
         runDB = json.load(f)
 
-    #run_rsync()
-    daq_cleanup()
+    run_rsync()
+    #daq_cleanup()
 
 
 def run_rsync(test=False):

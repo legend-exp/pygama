@@ -98,7 +98,8 @@
     "64":["908,910", "908 HV pulser run, 910 Preamp pulser run."],
     "65":["913, 945", "Barium runs, 913,914 shorter duration (7.5 min), 915 onward 15 min."],
     "66":["946, 993", "Kr runs"],
-    "67":["994, ", "Bkg runs, 10/27.  Started 3:20p"]
+    "67":["994, 1041", "Bkg runs, 10/27.  Started 3:20p, stopped 3:02p next day"],
+    "68":["1042, 1090", "Kr runs, 10/28.  Started 7:01p, stopped 7:02p next day"]
   },
 
   "ecal":{
@@ -182,7 +183,7 @@
             {"wfin":"wf_notch", "wfout":"wf_notsav", "window":47, "order":2}
         ],
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.75, "flat":2.5, "decay":72},
             {"wfout":"wf_strap", "wfin":"wf_notch", "rise":1, "flat":1.5, "decay":72},
             {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2},
             {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1}
