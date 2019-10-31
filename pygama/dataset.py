@@ -159,15 +159,11 @@ class DataSet:
         counter = 1
         for p, d, files in os.walk(self.tier1_dir):
             for f in files:
-                print("File: ", f)
                 if any("{}-".format(r) in f for r in runs):
-                    print("Right run: ", r)
                     if counter == subfile:
-                       print("Correct Subrun: ", counter)
                        run = int(f.split("run")[-1].split("-")[0]) 
                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
                 counter += 1
-                print("Counter ++")
 
         for p, d, files in os.walk(self.tier2_dir):
             for f in files:
