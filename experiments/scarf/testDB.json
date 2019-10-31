@@ -15,7 +15,10 @@
     "0":["111", "2019/06/27 Just Empty Baselines"],
     "1":["1000", "2019/07/03 Triple coincidences with three SiPMs and 2 PMTs"],
     "2":["1001", "2019/07/03 Triple coincidences with three SiPMs"],
-    "3":["1002", "2019/07/03 Triple coincidences, long run"]
+    "3":["1002", "2019/07/03 Triple coincidences, long run"],
+    "4":["1005", "schmarn"],
+    "5":["2001", "first 500M package, broken @ evt 6?"],
+    "6":["2002", "second 500M package"]
   },
 
   "build_options":{
