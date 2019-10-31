@@ -194,18 +194,23 @@ class DataLoader(ABC):
                       "data_columns":["ievt"]} # cols for hdf5 fast file indexing
 
         def check_and_append(file_name, key, df_data):
-            with pd.HDFStore(file_name, 'r') as store:
-                try:
-                    extant_df = store.get(key)
-                    df_data = pd.concat([extant_df, df_data]).reset_index(drop=True)
-                    if verbose:
-                        print(key, df_data.shape)
-                except KeyError:
-                    pass
+            try:
+                with pd.HDFStore(file_name, 'r') as store:
+                    try:
+                        extant_df = store.get(key)
+                        df_data = pd.concat([extant_df, df_data]).reset_index(drop=True)
+                        if verbose:
+                            print(key, df_data.shape)
+                    except KeyError:
+                        pass
+            except IOError:
+               print("sees that the file is not yet open, which is normal for 1st call??")
             return df_data
 
         #  ------------- save primary data -------------
         df_data = self.create_df()
+        #print(df_data)
+        #print(df_data.head())
 
         if not append:
             # make a copy of the df already in the file and manually append

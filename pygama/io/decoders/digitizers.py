@@ -306,7 +306,7 @@ class SIS3316Decoder(Digitizer):
         # self.event_header_length = 1 #?
         self.sample_period = 0  # ns, I will set this later, according to header info
         self.gain = 0           
-        self.h5_format = "table"
+        self.h5_format = "table"	#was table
         #self.n_blsamp = 2000
         self.ievt = 0       #event number
         self.ievtg = 0      #garbage event number
@@ -356,19 +356,34 @@ class SIS3316Decoder(Digitizer):
             accumulator5 = evt_data_32[offset+6]
             accumulator6 = evt_data_32[offset+7]
             offset += 7
+        else:
+            peakhigh_value = 0
+            peakhigh_index = 0  
+            information = 0
+            accumulator1 = accumulator2 = accumulator3 = accumulator4 = accumulator5 = accumulator6 = 0
+            pass
         if format_bits & 0x2:
             accumulator7 = evt_data_32[offset+0]
             accumulator8 = evt_data_32[offset+1]
             offset += 2
+        else:
+            accumulator7 = accumulator8 = 0
+            pass
         if format_bits & 0x4:
             mawMax = evt_data_32[offset+0]
             maw_before = evt_data_32[offset+1]
             maw_after = evt_data_32[offset+2]
             offset += 3
+        else:
+            mawMax = maw_before = maw_after = 0
+            pass
         if format_bits & 0x8:
             energy_first = evt_data_32[offset+0]
             energy = evt_data_32[offset+1]
             offset += 2
+        else:
+            energy_first = energy = 0
+            pass
         wf_length_32 = (evt_data_32[offset+0]) & 0x03ffffff
         offset += 1 #now the offset points to the wf data
         fadcID = fadcIndex
@@ -382,7 +397,7 @@ class SIS3316Decoder(Digitizer):
 
         # error check: waveform size must match expectations
         if wf_length16 != expected_wf_length:
-            print(len(evt_data_16), header_length)
+            print(len(evt_data_16), header_length16)
             print("ERROR: Waveform size %d doesn't match expected size %d." %
                   (wf_length16, expected_wf_length))
             exit()

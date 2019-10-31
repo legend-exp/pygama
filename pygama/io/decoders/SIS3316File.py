@@ -156,6 +156,10 @@ class SIS3316File:
         header_data_32 = np.fromstring(header, dtype=np.uint32)
         
         self.currentEventIndex=0   #points to first event of chunk
+ 
+        if header_data_32[1] == 0:
+            if self.verbose > 1:
+                print("Warning: having a chunk with 0 events")
         
         return header_data_32[0], header_data_32[1]
     
@@ -212,8 +216,10 @@ class SIS3316File:
         # have to extract channel index from binary, since we need the length of the event, which can change between channels
         
         if self.currentEventIndex == -1:     #points to header of next chunk, not to event
+            self.currentChunkSize = 0
             try:
-                self.currentFADC, self.currentChunkSize = self.__read_chunk_header()
+                while self.currentChunkSize == 0:   #apparently needed, as there can be 0-size chunks in the file
+                    self.currentFADC, self.currentChunkSize = self.__read_chunk_header()
             except BinaryReadException as e:
                 #print("  No more data...\n")
                 return -1,-1,None
@@ -226,8 +232,6 @@ class SIS3316File:
             
         return self.currentFADC, channelID, binary_data
         
-    
-        #ToDo !!!!!!!!!!!
     
     
     

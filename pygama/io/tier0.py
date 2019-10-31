@@ -260,7 +260,7 @@ def ProcessSIS3316(t0_file,
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
     # TODO: pass this option in from the 'settings' dict
-    ROW_LIMIT = 5e4
+    ROW_LIMIT = 5e4# was 5e4
     
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -308,13 +308,21 @@ def ProcessSIS3316(t0_file,
     print("Beginning Tier 0 processing ...")
 
     packet_id = 0  # number of events decoded
+    row_id = 0      #index of written rows
     unrecognized_data_ids = []
 
     # header is already skipped by SIS3316File
 
+    def toFile(digitizer, filename_raw, rowID, verbose):
+        numb = str(rowID).zfill(4)
+        filename_mod = filename_raw + "." + numb
+        print("redirecting output file to packetfile "+filename_mod)
+        digitizer.to_file(filename_mod, verbose)
+
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
         packet_id += 1
+        #print("MDO We are at packet", packet_id, "and in file", f_in.tell()/4)
 
         if verbose and packet_id % 1000 == 0:
             update_progress(float(f_in.tell()) / file_size)
@@ -322,7 +330,9 @@ def ProcessSIS3316(t0_file,
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file, verbose=True)
+                #d.to_file(t1_file, verbose=True)
+                toFile(d, t1_file, row_id, True)
+            row_id += 1
 
         try:
             fadcID, channelID, event_data = sisfile.read_next_event(header_dict)
@@ -341,7 +351,8 @@ def ProcessSIS3316(t0_file,
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file, verbose=True)
+        #d.to_file(t1_file, verbose=True)
+        toFile(d, t1_file, row_id, True)
 
     if verbose:
         update_progress(1)
@@ -354,12 +365,19 @@ def ProcessSIS3316(t0_file,
 
     # ---------  summary ------------
 
-    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
-    with pd.HDFStore(t1_file,'r') as store:
+    #print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    #with pd.HDFStore(t1_file,'r') as store:
+    #    print(store.keys())
+    #    # print(store.info())
+
+    #statinfo = os.stat(t1_file)
+    #print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    print("Wrote {} Tier 1 Files:\n    {}.xxxx\nFILE INFO of 1st file:".format(row_id, t1_file))
+    with pd.HDFStore(t1_file+".0000",'r') as store:
         print(store.keys())
         # print(store.info())
 
-    statinfo = os.stat(t1_file)
+    statinfo = os.stat(t1_file+".0000")
     print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
     elapsed = time.time() - start
     print("Time elapsed: {:.2f} sec".format(elapsed))
