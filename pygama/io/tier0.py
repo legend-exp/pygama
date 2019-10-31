@@ -38,7 +38,9 @@ def ProcessTier0(t0_file,
 
     # declare Tier 1 output file
     output_dir = os.getcwd() if output_dir is None else output_dir
-    t1_file = "{}/{}_run{}-{}.h5".format(output_dir, output_prefix, run, subrun)
+    #t1_file = "{}/{}_run{}-{}.h5".format(output_dir, output_prefix, run, subrun)
+    file_body = t0_file.split("/")[-1].replace("fcio","h5")
+    t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
     if os.path.isfile(t1_file):
         if overwrite:
             print("Overwriting existing file...")

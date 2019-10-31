@@ -12,7 +12,7 @@ class DataSet:
     can also load a JSON file to get a dict of metadata.
     """
     def __init__(self, sub,ds_lo=None, ds_hi=None, run=None, runlist=None,
-                 opt=None, v=False, md=None, cal=None, raw_dir=None, tier_dir=None):
+                 opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
 
         # load metadata and set paths to data folders
         self.runDB, self.calDB = None, None
@@ -22,13 +22,15 @@ class DataSet:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
             self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
-            self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
+            self.tier1_dir = os.path.expandvars(self.runDB["tier1_dir"])
+            self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
             self.t1pre = self.runDB["t1_prefix"]
             self.t2pre = self.runDB["t2_prefix"]
         except:
             print("Bad metadata, reverting to defaults ...")
             self.raw_dir = raw_dir
-            self.tier_dir = tier_dir
+            self.tier1_dir = tier1_dir
+            self.tier2_dir = tier2_dir
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
             
@@ -151,15 +153,29 @@ class DataSet:
         Tier2 Files will be named "t2_runX-Y.h5
 
         I think it would be nice to reuse the raw file name: "data_file.end" -> "data_file-t1.h5"
+
+        t1_char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.h5
         """
-        for p, d, files in os.walk(self.tier_dir):
+        counter = 1
+        for p, d, files in os.walk(self.tier1_dir):
             for f in files:
-                if any("t1_run{}-{}".format(r,subfile) in f for r in runs):
-                    run = int(f.split("run")[-1].split("-")[0]) 
-                    self.paths[run]["t1_path"] = "{}/{}".format(p,f)
-                if any("t2_run{}-{}".format(r,subfile) in f for r in runs):
-                    run = int(f.split("run")[-1].split("-")[0])
-                    self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                print("File: ", f)
+                if any("{}-".format(r) in f for r in runs):
+                    print("Right run: ", r)
+                    if counter == subfile:
+                       print("Correct Subrun: ", counter)
+                       run = int(f.split("run")[-1].split("-")[0]) 
+                       self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+                counter += 1
+                print("Counter ++")
+
+        for p, d, files in os.walk(self.tier2_dir):
+            for f in files:
+                if any("{}-".format(r) in f for r in runs):
+                    if counter == subfile:
+                       run = int(f.split("run")[-1].split("-")[0])
+                       self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                counter += 1
 
         # get pygama build options for each run
         if self.runDB is not None:
@@ -214,6 +230,7 @@ class DataSet:
             if len(iout[0]) > 0:
                 print("Error, we don't currently support multiple p1 cal pars.")
                 exit()
+            print(key,etype)
             pars = self.runDB["ecal"][key][etype]
             # pprint(pars)
             return pars
