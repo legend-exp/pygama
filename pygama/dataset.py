@@ -165,6 +165,7 @@ class DataSet:
                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
                 counter += 1
 
+        counter = 1
         for p, d, files in os.walk(self.tier2_dir):
             for f in files:
                 if any("{}-".format(r) in f for r in runs):
