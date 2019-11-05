@@ -17,9 +17,9 @@ from ..utils import *
 
 
 def ProcessTier1(t1_file,
-                 subrun,
                  intercom,
                  digitizers=None,
+                 ftype="default",
                  output_dir=None,
                  output_prefix="t2",
                  overwrite=True,
@@ -48,11 +48,20 @@ def ProcessTier1(t1_file,
     run = int(''.join(filter(str.isdigit, run_str)))
 
     # declare output file
-#    t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
     output_dir = os.getcwd() if output_dir is None else output_dir
-    #t2_file = "{}/{}_run{}-{}.h5".format(output_dir, output_prefix, run, subrun)
-    file_body = t1_file.split("/")[-1].replace("t1","t2")
-    t2_file = "{}/{}".format(output_dir, file_body)
+
+
+    #################################################################
+    """
+    Change for HADES style data structre
+    """ 
+    if ftype == "hades_char":
+       file_body = t1_file.split("/")[-1].replace("t1","t2")
+       t2_file = "{}/{}".format(output_dir, file_body)
+    #################################################################
+    
+    else:
+       t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
 
     if os.path.isfile(t2_file):
         if overwrite:

@@ -26,7 +26,7 @@ class DataSet:
             self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
             self.t1pre = self.runDB["t1_prefix"]
             self.t2pre = self.runDB["t2_prefix"]
-            self.ftype = self.runDB["filetype"]
+           
         except:
             print("Bad metadata, reverting to defaults ...")
             self.raw_dir = raw_dir
@@ -34,7 +34,25 @@ class DataSet:
             self.tier2_dir = tier2_dir
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
-            
+ 
+        try:
+            self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
+            self.tier1_dir=None
+            self.tier2_dir=None
+            print("Tier1 and Tier2 will be taken/stored from/to ", self.tier_dir)
+        except:
+            self.tier_dir=None
+            self.tier1_dir =  os.path.expandvars(self.runDB["tier1_dir"])
+            self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
+           
+               
+        try:
+            self.ftype = self.runDB["filetype"]
+            print("Processing ", self.ftype, " data")
+        except:
+            self.ftype = "default"
+            print("Processing default data")
+  
         # match ds number to run numbers
         self.ds_run_table = {}
         for ds in self.runDB["ds"]:
@@ -174,7 +192,7 @@ class DataSet:
                           self.paths[run]["t2_path"] = "{}/{}".format(p,f)
                    counter += 1
 
-        elif self.type == "legend200":
+        elif self.ftype == "legend200":
             print("Read  awsome LEGEND200 Data. But not ready yet...")
 
         ##############################################################################################
