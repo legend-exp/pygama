@@ -26,6 +26,7 @@ class DataSet:
             self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
             self.t1pre = self.runDB["t1_prefix"]
             self.t2pre = self.runDB["t2_prefix"]
+            self.ftype = self.runDB["filetype"]
         except:
             print("Bad metadata, reverting to defaults ...")
             self.raw_dir = raw_dir
@@ -126,53 +127,75 @@ class DataSet:
         self.paths = {r:{} for r in runs}
         
 
+        ##############################################################################################
         """
-        I don't really like my approach but it works for me...
-        So we have Subfiles and I added a "subfile" variable to deal with that.
-        Our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
+        A new filetype flag in the runDB:
+        In the HADES characterization campaign we have a different filestructure and we have Subfiles.
+        e.g. our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
         "char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.fcio"
         Also the are ".log" files in the same directory 
-        I take a counter and take the subfile which is provided with "subfile"
+        To deal with different filenames I added a filteype flag in the runDB. If it is hades_char I look for HADES structure.
+        Other structure are not implemented. If no filetype flag is given, the original files earch is done.
+        What I still don't like is that I use counter for the subfiles. I have to think about something better.
         """
-
+        if self.ftype == "hades_char":
         # search data directories for extant files
-        counter = 1 
-        for p, d, files in os.walk(self.raw_dir):
-            for f in files:
-                #if any("run000{}".format(r) in f for r in runs) or any("run00{}".format(r) in f for r in runs):
-                for r in runs:
-                    if f.endswith(".fcio"):
-                        if int(f.split("run")[-1].split("-")[0]) == r:
-                            if counter==subfile:
-                               run = int(f.split("run")[-1].split("-")[0])
-                               self.paths[run]["t0_path"] = "{}/{}".format(p,f)
-                            counter+=1
-        """
-        Dirty hack to allow subfiles.
-        Tier1 Files will be named "t1_runX-Y.h5
-        Tier2 Files will be named "t2_runX-Y.h5
 
-        I think it would be nice to reuse the raw file name: "data_file.end" -> "data_file-t1.h5"
+           # Check for raw Data
+           counter = 1 
+           for p, d, files in os.walk(self.raw_dir):
+               for f in files:
+                   for r in runs:
+                       if f.endswith(".fcio"):
+                           if int(f.split("run")[-1].split("-")[0]) == r:
+                               if counter==subfile:
+                                  run = int(f.split("run")[-1].split("-")[0])
+                                  self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                               counter+=1
 
-        t1_char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.h5
-        """
-        counter = 1
-        for p, d, files in os.walk(self.tier1_dir):
-            for f in files:
-                if any("{}-".format(r) in f for r in runs):
-                    if counter == subfile:
-                       run = int(f.split("run")[-1].split("-")[0]) 
+           # Check for tier1 Data
+           counter = 1
+           for p, d, files in os.walk(self.tier1_dir):
+               for f in files:
+                   if any("{}-".format(r) in f for r in runs):
+                       if counter == subfile:
+                          run = int(f.split("run")[-1].split("-")[0]) 
+                          self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+                   counter += 1
+
+
+           # Check for tier2 Data
+           counter = 1
+           for p, d, files in os.walk(self.tier2_dir):
+               for f in files:
+                   if any("{}-".format(r) in f for r in runs):
+                       if counter == subfile:
+                          run = int(f.split("run")[-1].split("-")[0])
+                          self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                   counter += 1
+
+        elif self.type == "legend200":
+            print("Read  awsome LEGEND200 Data. But not ready yet...")
+
+        ##############################################################################################
+        
+        else:
+        # search data directories for extant files
+           for p, d, files in os.walk(self.raw_dir):
+               for f in files:
+                   if any("Run{}".format(r) in f for r in runs):
+                       run = int(f.split("Run")[-1])
+                       self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+
+           for p, d, files in os.walk(self.tier_dir):
+               for f in files:
+                   if any("t1_run{}".format(r) in f for r in runs):
+                       run = int(f.split("run")[-1].split(".h5")[0])
                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
-                counter += 1
 
-        counter = 1
-        for p, d, files in os.walk(self.tier2_dir):
-            for f in files:
-                if any("{}-".format(r) in f for r in runs):
-                    if counter == subfile:
-                       run = int(f.split("run")[-1].split("-")[0])
+                   if any("t2_run{}".format(r) in f for r in runs):
+                       run = int(f.split("run")[-1].split(".h5")[0])
                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
-                counter += 1
 
         # get pygama build options for each run
         if self.runDB is not None:

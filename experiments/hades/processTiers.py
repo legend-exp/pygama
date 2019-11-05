@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3.6
 import sys, os, io
 import json
 import argparse
@@ -76,7 +76,6 @@ def tier0(ds,sub,overwrite=False, nevt=np.inf, v=False, test=False):
       t1_file = ds.paths[run]["t1_path"]
       if t1_file is not None and overwrite is False:
         continue
-        
       print("In/Out files:",t0_file,t1_file)
       
       conf = ds.paths[run]["build_opt"]
