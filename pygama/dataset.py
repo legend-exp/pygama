@@ -22,16 +22,12 @@ class DataSet:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
             self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
-            self.tier1_dir = os.path.expandvars(self.runDB["tier1_dir"])
-            self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
             self.t1pre = self.runDB["t1_prefix"]
             self.t2pre = self.runDB["t2_prefix"]
            
         except:
             print("Bad metadata, reverting to defaults ...")
             self.raw_dir = raw_dir
-            self.tier1_dir = tier1_dir
-            self.tier2_dir = tier2_dir
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
  
@@ -39,7 +35,6 @@ class DataSet:
             self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
             self.tier1_dir=None
             self.tier2_dir=None
-            print("Tier1 and Tier2 will be taken/stored from/to ", self.tier_dir)
         except:
             self.tier_dir=None
             self.tier1_dir =  os.path.expandvars(self.runDB["tier1_dir"])

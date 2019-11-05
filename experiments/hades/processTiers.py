@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3.7
 import sys, os, io
 import json
 import argparse
@@ -93,7 +93,7 @@ def tier0(ds,sub,overwrite=False, nevt=np.inf, v=False, test=False):
     ProcessTier0(
                    t0_file,
                    run,
-		   sub,
+		   ftype=ds.ftype,
                    verbose=v,
                    output_dir=ds.tier1_dir,
                    overwrite=overwrite,
@@ -138,8 +138,8 @@ def tier1(ds,
 
         ProcessTier1(
             t1_file,
-            sub,
             proc,
+            ftype=ds.ftype,
             output_dir=ds.tier2_dir,
             overwrite=overwrite,
             verbose=verbose,
