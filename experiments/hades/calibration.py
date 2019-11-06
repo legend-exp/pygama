@@ -30,6 +30,7 @@ def main():
     arg("-r", "--run", nargs=1, help="load a single run")
     arg("-s", "--spec", action=st, help="print simple spectrum")
     arg("-sc", "--cal", action=st, help="print calibrated spectrum")
+    arg("-p0","--pass0",action=st,help="run pass0 (single peak) calibration")
     arg("-p1", "--pass1", action=st, help="run pass-1 (linear) calibration")
     arg("-p2", "--pass2", action=st, help="run pass-2 (peakfit) calibration")
     arg("-e", "--etype", nargs=1, help="custom energy param (default is e_ftp)")
@@ -76,7 +77,7 @@ def main():
                         t2_file = t2_file.append(pd.read_hdf(fp+f))
                 counter += 1
 
-
+    print("Whaat")
 
     if args["spec"]:
         his = t2_file.hist("e_ftp", bins = 2000)
@@ -84,11 +85,13 @@ def main():
         plt.savefig(path_to_files+'plots/Raw.png',bbox_inches='tight',transperent=True)
         plt.show()
     
+    if args["pass0"]:
+        calibrate_pass0(ds, t2_file,etype,  args["writeDB"])
     if args["pass1"]:
         calibrate_pass1(ds, t2_file,etype,  args["writeDB"], args["test"])
   
     if args["pass2"]:
-        calibrate_pass2(ds,t2_file, run, args["writeDB"])
+        calibrate_pass2(ds,t2_file, run, cal_db, run_db,args["writeDB"])
 
     if args["printDB"]:
         show_calDB(cal_db)
@@ -101,6 +104,55 @@ def main():
     # -- declare the DataSet --
 
 
+def calibrate_pass0(ds, df, etype="e_ftp", write_db=False, test=False):
+
+    print("Calibration on single peak")
+ 
+
+    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    pu = epeaks[0]
+    # get initial parameters for this energy estimator
+    calpars = ds.get_p1cal_pars("e_ftp")
+    pk_thresh = calpars["peakdet_thresh"]
+    match_thresh = calpars["match_thresh"]
+    xlo, xhi, xpb = calpars["xlims"]
+    ene = df[etype]
+    nb = int((xhi-xlo)/xpb)
+    h, bins = np.histogram(ene, nb, (xlo, xhi))
+    b = (bins[:-1] + bins[1:]) / 2.
+
+    # run peakdet to identify the uncalibrated maxima
+    maxes, mins = pgu.peakdet(h, pk_thresh, b)
+    calVal = maxes[-1][0]
+    fcal = pu/calVal
+    firstcal = ene * fcal
+    h1, bins1 = np.histogram(firstcal,1600,(1400,3000))
+    b1 = (bins1[:-1] + bins1[1:]) / 2.
+    maxes1, mins1 = pgu.peakdet(h1, pk_thresh, b1)
+    print(maxes1)    
+#    plt.plot(h1)
+#    plt.show()
+    iter = 0
+    if len(maxes1) == len(epeaks):
+       peaks = sorted(maxes1[:,0], reverse=True)
+
+    else:
+       print("found more or less peaks then expected! Have a look at the raw spectrum again...")
+       peaks = maxes1[:,0]
+
+    peaks = np.array(peaks,dtype=float)
+    print("Peaks = " , peaks)
+    def pol1(x,a,b):
+      return a * x + b
+
+    pars1, cov1 = opt.curve_fit(pol1,peaks,epeaks)
+    errs1 = np.sqrt(np.diag(cov1))
+    print("Calibration curve: ",pars1)
+    
+    ecal = firstcal*pars1[0]+pars1[1]
+    hcal, bins2 = np.histogram(ecal,3000,(0,3000))
+    plt.plot(hcal)
+    plt.show()
 
 
 def calibrate_pass1(ds, df, etype="e_ftp", write_db=False, test=False):
@@ -137,10 +189,15 @@ def calibrate_pass1(ds, df, etype="e_ftp", write_db=False, test=False):
     nb = int((xhi-xlo)/xpb)
     h, bins = np.histogram(ene, nb, (xlo, xhi))
     b = (bins[:-1] + bins[1:]) / 2.
-
+    print(pk_thresh, " / ", b)
+    print("")
+    print(bins)
+    plt.plot(h)
+    plt.show()
     # run peakdet to identify the uncalibrated maxima
     maxes, mins = pgu.peakdet(h, pk_thresh, b)
     print(maxes)
+   
     umaxes = np.array(sorted([x[0] for x in maxes], reverse=True))
 
     # compute all ratios
@@ -227,7 +284,7 @@ def calibrate_pass1(ds, df, etype="e_ftp", write_db=False, test=False):
             table.upsert(row, query.ds == dset)
 
 
-def calibrate_pass2(ds,df,run, write_db=False):
+def calibrate_pass2(ds,df,run, cal_db,run_db,write_db=False):
     """
     load first-pass constants from the calDB for this DataSet,
     and the list of peaks we want to fit from the runDB, and
@@ -235,15 +292,15 @@ def calibrate_pass2(ds,df,run, write_db=False):
     make a new table in the calDB, "cal_pass2" that holds all
     the important results, like mu, sigma, errors, etc.
     """
-
+    print("Cal2")
     # take calibration parameter for the 'calibration.py' output
-    with open("calDB.json") as f:
+    with open(cal_db) as f:
       calDB = json.load(f)
     
-    with open("runDB.json") as f:
+    with open(run_db) as f:
       runDB = json.load(f)
 
-    path_to_files = "/lfs/l1/legend/users/zschocke/Meta/HADES/I02160A/"
+    path_to_files =  os.path.expandvars(runDB["meta_dir"]) 
     true_peaks = sorted(ds.runDB["cal_peaks"], reverse=True)
     iter = 0
     
@@ -254,7 +311,7 @@ def calibrate_pass2(ds,df,run, write_db=False):
     for true_peak in true_peaks:
       iter = iter+1
       ax = plt.subplot(3,2,iter)
-      out1, out2 = peak(df,runDB,calDB,run,true_peak)
+      out1, out2 = peak(df,runDB,calDB,run,true_peak, plotit=True)
       peaks.append(out1)
       fwhms.append(out2)
 
@@ -277,7 +334,7 @@ def calibrate_pass2(ds,df,run, write_db=False):
     for true_peak in true_peaks:
       iter = iter+1
       ax = plt.subplot(3,2,iter)
-      out1, out2 = peak(df,runDB,calDB,run, true_peak,p=pars1, plotit =True)
+      out1, out2 = peak(df,runDB,calDB,run, true_peak,p=pars1, plotit =False)
       peaks_1.append(out1)
       fwhms_1.append(out2)
 
@@ -316,7 +373,7 @@ def calibrate_pass2(ds,df,run, write_db=False):
     plt.xlabel("Energy (keV)", ha='right', x=1)
     plt.ylabel("FWHM resolution (keV) ", ha='right', y=1)
     plt.savefig(path_to_files+'plots/energyResolution_curve_'+str(run)+'.pdf', bbox_inches='tight', transparent=True)
-#    plt.show()
+    plt.show()
 
     if write_db:
       calDB = ds.calDB
@@ -348,10 +405,10 @@ def calibrate_pass2(ds,df,run, write_db=False):
 
 def peak(df,runDB,calDB, r,line,p=[1,0], plotit = False):
 
-    path_to_files = "/lfs/l1/legend/users/zschocke/Meta/HADES/I02160A/"
-    cal = calDB["cal_pass1"]["1"]["p1cal"]
+     
+    cal = 0.04998# calDB["cal_pass1"]["1"]["p1cal"]
     meta_dir = os.path.expandvars(runDB["meta_dir"])
-    tier_dir = os.path.expandvars(runDB["tier_dir"])
+    tier_dir = os.path.expandvars(runDB["tier2_dir"])
 
     df['e_cal'] = p[0]*(cal*df['e_ftp']) + p[1]
     #h = df.hist('e_cal',bins=2000)
@@ -396,7 +453,7 @@ def peak(df,runDB,calDB, r,line,p=[1,0], plotit = False):
         plt.hist(df['e_cal'],range=(line_min,line_max), bins=nbin)
         plt.legend(labels, frameon=False, loc='upper right', fontsize='small')
 
-        plt.savefig(path_to_files+'plots/lineFit_'+str(r)+'.png')    
+        plt.savefig(meta_dir+'/plots/lineFit_'+str(r)+'.png')    
     return peak, FWHM
 
 

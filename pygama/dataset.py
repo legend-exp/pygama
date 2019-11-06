@@ -174,7 +174,7 @@ class DataSet:
                        if counter == subfile:
                           run = int(f.split("run")[-1].split("-")[0]) 
                           self.paths[run]["t1_path"] = "{}/{}".format(p,f)
-                   counter += 1
+                       counter += 1
 
 
            # Check for tier2 Data
@@ -185,7 +185,7 @@ class DataSet:
                        if counter == subfile:
                           run = int(f.split("run")[-1].split("-")[0])
                           self.paths[run]["t2_path"] = "{}/{}".format(p,f)
-                   counter += 1
+                       counter += 1
 
         elif self.ftype == "legend200":
             print("Read  awsome LEGEND200 Data. But not ready yet...")
