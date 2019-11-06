@@ -28,7 +28,7 @@ def show_h5():
 
         # skip bool columns for now (see test_bool below)
         if any(x in path for x in ["inverted", "muveto"]):
-            print("  skipping bool dataset:", path)
+            # print("  skipping bool dataset:", path)
             continue
         
         dt = dset.dtype
@@ -36,12 +36,12 @@ def show_h5():
         at = dset.attrs
         ldtype = get_legend_dtype(dset.attrs['datatype']) 
 
-        print(f"  type: {dt}  size: {ds}")
-        for name in dset.attrs:
-            print(f"  attr: {name}  value: {dset.attrs[name]}")
-        for d in ldtype:
-            print(f"    {d} : {ldtype[d]}")
-        print("")
+        # print(f"  type: {dt}  size: {ds}")
+        # for name in dset.attrs:
+        #     print(f"  attr: {name}  value: {dset.attrs[name]}")
+        # for d in ldtype:
+        #     print(f"    {d} : {ldtype[d]}")
+        # print("")
 
 
 def h5iter(g, prefix=''):

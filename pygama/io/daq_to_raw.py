@@ -12,6 +12,8 @@ from ..utils import *
 from ..io.digitizers import *
 from ..io.pollers import *
 from ..io.io_base import *
+from ..io.orca_header import *
+from ..io.llama_3316 import *             
 
 
 def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
@@ -54,7 +56,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
                return
     
     # set max number of events (useful for debugging)
-    if n_max is not np.inf:
+    if n_max is not np.inf and n_max is not None:
         n_max = int(n_max)
 
     # get the DAQ mode
@@ -79,7 +81,7 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    from ..io.orca_header import *
+    
     
     ROW_LIMIT = 5e4
     
@@ -152,7 +154,7 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file, verbose=True)
+                d.save_to_pytables(t1_file, verbose=True)
 
         try:
             event_data, data_id = get_next_event(f_in)
@@ -176,7 +178,7 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file, verbose=True)
+        d.save_to_pytables(t1_file, verbose=True)
 
     if verbose:
         update_progress(1)
@@ -252,13 +254,6 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     Mario's implementation for the Struck SIS3316 digitizer.
     Requires the llamaDAQ program for producing compatible input files.
     """       
-    from ..io.llama_3316 import *             
-    
-    #now the ugly code duplication starts ... 
-    
-    # num. rows between writes.  larger eats more memory
-    # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'config' dict
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -321,7 +316,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file, verbose=True)
+                d.save_to_pytables(t1_file, verbose=True)
 
         try:
             fadcID, channelID, event_data = sisfile.read_next_event(header_dict)
@@ -340,7 +335,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file, verbose=True)
+        d.save_to_pytables(t1_file, verbose=True)
 
     if verbose:
         update_progress(1)
@@ -422,101 +417,41 @@ def process_compass(t0_file, t1_file, digitizer, output_dir=None):
 
 def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
-    Start of FlashCam data specific decoding
+    decode FlashCam data, using the fcutils package to handle file access,
+    and the FlashCam DataTaker to save the results and write to output.
     """
     import fcutils
 
-    ROW_LIMIT = 5e4
-    start = time.time()
-
-    # The fcio class is used to open the datafile
-    io = fcutils.fcio(t0_file)
+    fcio = fcutils.fcio(t0_file)
+    decoder = FlashCam()
+    decoder.get_file_config(fcio)
     
-    # no run info in FC header yet - get_run_number(header_dict)
-    print("Run number: {}".format(run))
-    
-    # no decoder info in FC header yet - get_decoder_for_id(header_dict)
-    id_dict = {"decoder":"FlashCam"}
-    
-    if verbose:
-      print("Data IDs present in this header are:")
-      for id in id_dict:
-        print(" {}: {}".format(id, id_dict[id]))
-    used_decoder_names = set([id_dict[id] for id in id_dict])
-    
-    #Currently no decoder name provide by the FC file header
-    #Set by hand - get_decoder()
-    if decoders is None:
-      decoders = []
-      decoders.append(FlashCamDecoder())
-      decoder_names = []
-      decoder_names.append('FlashCam')
+    # ROW_LIMIT = 5e4
+    ROW_LIMIT = 1000
 
-    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
-    decoder_to_id = {d.decoder_name: d for d in decoders}
-
-    # pass in specific decoder options (windowing, multisampling, etc.)
-    for d in decoders:
-      d.apply_config(config)
-
-    if os.path.isfile(t1_file):
-      if overwrite:
-        print("Overwriting existing file...")
-        os.remove(t1_file)
-      else:
-        print("File already exists, continuing ...")
-        return
-
-    packet_id = 0 # number of events decoded
-    unrecognized_data_ids = []
-    
-    while io.next_event() and packet_id<n_max:
+    # loop over raw data packets
+    packet_id = 0
+    while fcio.next_event() and packet_id < n_max:
       packet_id += 1
-      if packet_id % 10000 == 0:
-        print(packet_id,io.eventtime)
-      #if verbose and packet_id % 1000 == 0:
-      #update_progress(float(io.telid) / file_size)
+      if verbose and packet_id % 1000 == 0:
+          update_progress(float(fcio.telid) / file_size)
       
-      # write periodically to the output file instead of writing all at once
+      # write periodically to the output file
       if packet_id % ROW_LIMIT == 0:
-        for d in decoders:
-          d.to_file(t1_file, verbose=True)
-      
-      # sends data to the pandas dataframe
-      # specific FlashCam formatting
-      for d in decoders:
-        if d.decoder_name == 'FlashCam':
-          d.decode_event(io, packet_id)
-        else:
-          print("ERROR: Specific FlashCam event decoder provided to ",d.decoder_name)
-          sys.exit()
+          # decoder.save_to_pytables(t1_file, verbose=True)
+          decoder.save_to_lh5(t1_file, verbose=True)
+          break # debug, deleteme
 
-    ##########################################
-    # End of FlashCam data specific decoding #
-    ##########################################
+      decoder.decode_event(fcio, packet_id)
 
-    # final write to file
-    for d in decoders:
-      if verbose:
-        print("daq_to_raw - write in decoder ",d.decoder_name)
-      d.to_file(t1_file, verbose=True)
+    # end of loop, write to file once more
+    decoder.save_to_pytables(t1_file, verbose=True)
 
     if verbose:
       update_progress(1)
-  
-    if len(unrecognized_data_ids) > 0:
-      print("WARNING, Found the following unknown data IDs:")
-      for id in unrecognized_data_ids:
-        print(" {}".format(id))
-      print("hopefully they weren't important!\n")
 
     # --------- summary ------------
 
-    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
-    with pd.HDFStore(t1_file,'r') as store:
-      print(store.keys())
-      # print(store.info())
-  
     statinfo = os.stat(t1_file)
     print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
     elapsed = time.time() - start

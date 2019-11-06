@@ -13,7 +13,7 @@ class DataSet:
     """
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None,
                  opt=None, v=False, config=None, cal=None, raw_dir=None, 
-                 tier_dir=None):
+                 tier_dir=None, n_max=np.inf):
 
         # load config file (user-generated)
         self.config, self.calDB = None, None
@@ -27,6 +27,10 @@ class DataSet:
         
         self.raw_dir = os.path.expandvars(self.config["raw_dir"])
         self.tier_dir = os.path.expandvars(self.config["tier_dir"])
+        
+        # verbosity
+        self.v = v
+        self.n_max = n_max
         
         # file prefixes
         self.t0pre = self.config["t0_prefix"]
@@ -373,4 +377,4 @@ class DataSet:
                 print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
                 continue
             daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
-                       overwrite=overwrite, n_max=nevt, config=opts)
+                       overwrite=overwrite, n_max=self.n_max, config=self.config)
