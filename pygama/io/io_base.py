@@ -22,51 +22,53 @@ import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
 from pprint import pprint
-from ..utils import get_object_info
+from .orca_header import get_object_info
+import h5py
 
 class DataTaker(ABC):
-    def __init__(self, config=None):
+    def __init__(self, user_config=None):
         """
+        all DataTakers should count the total number of events, and track
+        garbage values separately.  To properly initialize self.garbage_values,
+        you should declare self.decoded_values in your DataTaker before calling:
+            super().__init__(*args, **kwargs)
         """
         self.total_count = 0
         self.garbage_count = 0 # never leave any data behind
         self.garbage_values = {key:[] for key in self.decoded_values}
-        self.h5_format = "lh5"
 
-        if config is not None and isinstance(config, str):
-            with open(config) as f:
-                self.config = json.load(f)
-
+        if user_config is not None:
+            with open(user_config) as f:
+                self.user_config = json.load(f)
 
     def format_data(self, vals, is_garbage=False):
         """
-        for every single event in the raw DAQ data, we send
-        any variable with a name in "self.decoded_values"
-        to the pandas output with:
-        self.format_data(locals())
+        for every event in the raw DAQ data, we send any local variable with a 
+        name in "self.decoded_values" to the output with the line:
+            self.format_data(locals())
         """
         self.total_count += 1
-
         if is_garbage:
             self.garbage_count += 1
 
         for key in vals:
             if key is not "self" and key in self.decoded_values:
-
-                # print(key, vals[key], type(vals[key]))
-                # if isinstance(vals[key], np.ndarray):
-                    # print(len(vals[key]))
-
                 if is_garbage:
                     self.garbage_values[key].append(vals[key])
                 else:
-                    # Need to make this fix, otherwise waveform array overwritten at each event
-                    if type(vals[key])==np.ndarray:
+                    if type(vals[key]) == np.ndarray:
                         self.decoded_values[key].append(vals[key].copy())
                     else:
                         self.decoded_values[key].append(vals[key])
 
+    def clear_data(self):
+        """ clear out standard objects when we do a write to file """
+        self.total_count = 0
+        self.garbage_count = 0
+        self.decoded_values = {key:[] for key in self.decoded_values}
+        self.garbage_values = {key:[] for key in self.garbage_values}
 
+    # === PANDAS HDF5 I/O ======================================================
     def create_df(self, get_garbage=False):
         """
         Base dataframe creation method.
@@ -132,10 +134,10 @@ class DataTaker(ABC):
         else:
             return df
 
-
-    def to_file(self, file_name, verbose=False, write_option="a"):
-        """ save primary data, garbage data, and metadata to hdf5 """
-
+    def save_to_pytables(self, file_name, verbose=False, write_option="a"):
+        """ 
+        save primary data, garbage data, and metadata to hdf5 
+        """
         if verbose:
             print("Writing {}".format(self.decoder_name))
 
@@ -212,10 +214,58 @@ class DataTaker(ABC):
         self.clear_data()
 
 
-    def clear_data(self):
-        """ clear out standard objects when we do a write to file """
-        self.total_count = 0
-        self.garbage_count = 0
-        self.decoded_values = {key:[] for key in self.decoded_values}
-        self.garbage_values = {key:[] for key in self.garbage_values}
-
+    # === LH5 HDF5 I/O =========================================================
+    def save_to_lh5(self, file_name, verbose=False, append=False):
+        """
+        TODO: append mode:
+        https://stackoverflow.com/questions/25655588/incremental-writes-to-hdf5-with-h5py
+        TODO: handle units with attributes?  or dimension scales (Ch8 Collette?)
+        """
+        file_mode = "a" if append else "w"
+        hf = h5py.File(file_name, file_mode)
+        
+        # create the header, saving everything in attributes (like a dict)
+        hf.create_group('header')
+        for c in self.file_config:
+            hf["/header"].attrs[c] = self.file_config[c]
+        hf["/header"].attrs["file_name"] = file_name
+        
+        # create datasets for each member of self.decoded_values
+        for col in self.decoded_values:
+            
+            # decompose waveforms: [dt, t0, cumulative_length[:], flattened_data[:]]
+            if "waveform" in col:
+                
+                wf_group = f"/daqdata/{col}/"
+                nwfs = len(self.decoded_values[col])
+                nsamp = self.file_config['nsamples']
+                wf_idxs = np.arange(0, nsamp*nwfs-1, nsamp)
+                wfs = np.hstack(self.decoded_values[col])
+                
+                wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
+                wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                
+                wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
+                                          data=wfs)
+                wf_idx_ds = hf.create_dataset(f"{wf_group}/cumulative_length", 
+                                              data=wf_idxs)
+                # exit()
+                continue
+            
+            # handle single-valued data
+            else:
+                npa = np.asarray(self.decoded_values[col]) # dtype is automatic
+                dset = hf.create_dataset(f"/daqdata/{col}", data=npa)
+                
+                # set default attributes
+                dset.attrs["units"] = "none"
+                dset.attrs["datatype"] = "array<1>{real}"
+                
+                # overwrite attributes if they exist
+                if col in self.lh5_spec:
+                    if "units" in self.lh5_spec[col]: 
+                        dset.attrs["units"] = self.lh5_spec[col]["units"]
+            
+        # write stuff to the file
+        hf.flush()
+        hf.close()

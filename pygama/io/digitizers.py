@@ -4,6 +4,8 @@ import itertools
 import numpy as np
 import pandas as pd
 from scipy import signal
+import matplotlib.pyplot as plt
+from pprint import pprint
 
 from .io_base import DataTaker
 from .waveform import Waveform
@@ -26,7 +28,7 @@ class ORCAStruck3302(DataTaker):
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.class_name = 'ORSIS3302Model'
 
-        # store an entry for every event -- this is what goes into pandas
+        # store an entry for every event
         self.decoded_values = {
             "packet_id": [],
             "ievt": [],
@@ -46,7 +48,7 @@ class ORCAStruck3302(DataTaker):
         self.h5_format = "table"
         self.n_blsamp = 2000
         self.ievt = 0
-        self.ievtg = 0
+        self.ievt_gbg = 0
 
     def decode_event(self,
                      event_data_bytes,
@@ -130,8 +132,7 @@ class ORCAStruck3302(DataTaker):
         # final raw wf array
         waveform = wf_data
 
-        # if the wf is too big for pytables, we can window it,
-        # but we might get some garbage
+        # if the wf is too big for pytables, we can window it
         if self.window:
             wf = Waveform(wf_data, self.sample_period, self.decoder_name)
             win_wf, win_ts = wf.window_waveform(self.win_type,
@@ -143,8 +144,8 @@ class ORCAStruck3302(DataTaker):
             waveform = win_wf # modify final wf array
 
             if wf.is_garbage:
-                ievt = self.ievtg
-                self.ievtg += 1
+                ievt = self.ievt_gbg
+                self.ievt_gbg += 1
                 self.format_data(locals(), wf.is_garbage)
                 return
 
@@ -173,7 +174,7 @@ class ORCAStruck3316(DataTaker):
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
-        # store an entry for every event -- this is what goes into pandas
+        # store an entry for every event
         self.decoded_values = {
             "packet_id": [],
             "ievt": [],
@@ -206,7 +207,7 @@ class ORCAStruck3316(DataTaker):
         self.h5_format = "table"
         #self.n_blsamp = 2000
         self.ievt = 0       #event number
-        self.ievtg = 0      #garbage event number
+        self.ievt_gbg = 0      #garbage event number
         self.window = False
         
         
@@ -296,8 +297,7 @@ class ORCAStruck3316(DataTaker):
         # final raw wf array
         waveform = wf_data
 
-        # if the wf is too big for pytables, we can window it,
-        # but we might get some garbage
+        # if the wf is too big for pytables, we can window it
         if self.window:
             wf = Waveform(wf_data, self.sample_period, self.decoder_name)
             win_wf, win_ts = wf.window_waveform(self.win_type,
@@ -309,8 +309,8 @@ class ORCAStruck3316(DataTaker):
             waveform = win_wf # modify final wf array
 
             if wf.is_garbage:
-                ievt = self.ievtg
-                self.ievtg += 1
+                ievt = self.ievt_gbg
+                self.ievt_gbg += 1
                 self.format_data(locals(), wf.is_garbage)
                 return
 
@@ -430,11 +430,8 @@ class ORCAGretina4M(DataTaker):
     https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
     """
     def __init__(self, *args, **kwargs):
-
         self.decoder_name = 'ORGretina4MWaveformDecoder'
         self.class_name = 'ORGretina4MModel'
-
-        # store an entry for every event -- this is what we convert to pandas
         self.decoded_values = {
             "packet_id": [],
             "ievt": [],
@@ -444,8 +441,7 @@ class ORCAGretina4M(DataTaker):
             "board_id": [],
             "waveform": [],
         }
-        super().__init__(*args, **kwargs) # also initializes the garbage df
-
+        super().__init__(*args, **kwargs)
         self.chan_list = None
         self.active_channels = self.find_active_channels()
         self.is_multisampled = True
@@ -498,8 +494,7 @@ class ORCAGretina4M(DataTaker):
             # should store this in a garbage data frame
             return
 
-        # if the wf is too big for pytables, we can window it,
-        # but we might get some garbage
+        # if the wf is too big for pytables, we can window it
         if self.window:
             wf = Waveform(wf_data, self.sample_period, self.decoder_name)
             waveform = wf.window_waveform(self.win_type,
@@ -507,8 +502,8 @@ class ORCAGretina4M(DataTaker):
                                           self.n_blsamp,
                                           test=False)
             if wf.is_garbage:
-                ievt = self.ievtg
-                self.ievtg += 1
+                ievt = self.ievt_gbg
+                self.ievt_gbg += 1
                 self.garbage_count += 1
 
         if len(wf_data) > 2500 and self.h5_format == "table":
@@ -526,87 +521,7 @@ class ORCAGretina4M(DataTaker):
         self.format_data(locals())
 
 
-class FlashCam(DataTaker):
-  """ 
-  decode FlashCam digitizer data
-  """
-  def __init__(self, *args, **kwargs):
-
-    self.decoder_name = 'FlashCam'
-    self.class_name = 'FlashCam'
-
-    # store an entry for every event -- this is what goes into pandas
-    self.decoded_values = {
-      "packet_id": [],
-      "ievt": [],
-      "energy": [],
-      "bl" : [],
-      "bl0" : [],
-      "bl1" : [],
-      "timestamp": [],
-      "channel": [],
-      "waveform": [],
-    }
-    super().__init__(*args, **kwargs) # also initializes the garbage df
-        
-    self.event_header_length = 1
-    self.sample_period = 16  # ns
-    self.h5_format = "table"
-    self.n_blsamp = 500
-    self.window = False
-    self.ievt = 0
-    self.ievtg = 0
-          
-          
-  def decode_event(self, io, packet_id, verbose=False):
-      """
-      see README for the 32-bit data word diagram
-      """
-      # start reading the binary
-      crate = 0   # To be set up later
-      card = 0    #
-      channel = 0 # for test phase only
-      crate_card_chan = 0
-      wf_length_32 = io.nsamples
-      timestamp = io.eventtime
-      bl = float(io.average_prebaselines)
-      bl0 = int(io.prebaselines0)
-      bl1 = int(io.prebaselines1)
-      energy = 0 # currently not stored but can be in the future?
-
-      # final raw wf array
-      waveform = io.traces
-      waveform.astype(float)
-      
-      # if the wf is too big for pytables, we can window it,
-      # but we might get some garbage
-      if self.window:
-        wf = Waveform(wf_data, self.sample_period, self.decoder_name)
-        win_wf, win_ts = wf.window_waveform(self.win_type,self.n_samp,self.n_blsamp,test=False)
-        ts_lo, ts_hi = win_ts[0], win_ts[-1]
-
-        waveform = win_wf # modify final wf array
-
-        if wf.is_garbage:
-          ievt = self.ievtg
-          self.ievtg += 1
-          self.format_data(locals(), wf.is_garbage)
-          return
-
-      if len(waveform) > self.pytables_col_limit and self.h5_format == "table":
-        print("WARNING: too many columns for tables output,\n",
-        "         reverting to saving as fixed hdf5 ...")
-        self.h5_format = "fixed"
-
-      # set the event number (searchable HDF5 column)
-      ievt = self.ievt
-      self.ievt += 1
-
-      # send any variable with a name in "decoded_values" to the pandas output
-      self.format_data(locals())  
-
-
-  class SIS3316ORCADecoder(DataTaker):
+class SIS3316ORCADecoder(DataTaker):
     """ 
     handle ORCA Struck 3316 digitizer 
     
@@ -619,7 +534,7 @@ class FlashCam(DataTaker):
         self.decoder_name = 'ORSIS3316WaveformDecoder'
         self.class_name = 'ORSIS3316Model'
 
-        # store an entry for every event -- this is what goes into pandas
+        # store an entry for every event
         self.decoded_values = {
             "packet_id": [],
             "ievt": [],
@@ -636,7 +551,7 @@ class FlashCam(DataTaker):
         self.gain = 0           
         self.h5_format = "table"
         self.ievt = 0       #event number
-        self.ievtg = 0      #garbage event number
+        self.ievt_gbg = 0      #garbage event number
         self.window = False
         
         
@@ -702,4 +617,92 @@ class FlashCam(DataTaker):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
+
+
+class FlashCam(DataTaker):
+    """ 
+    decode FlashCam digitizer data.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        """
+        self.decoder_name = "FlashCam"
+        
+        # these are read for every event (decode_event)
+        self.decoded_values = {
+          "ievt": [], # index of event
+          "timestamp": [], # time since beginning of file
+          "channel": [], # right now, index of the trigger (trace)
+          "baseline" : [], # averages prebaseline0 and prebaseline1
+          "wf_max": [], # ultra-simple np.max energy estimation
+          "wf_std": [], # ultra-simple np.std noise estimation
+          "waveform": [] # digitizer data
+        }
+        
+        # these are read for every file (get_file_config)
+        self.config_names = [
+            "nsamples", # samples per channel
+            "nadcs", # number of adc channels
+            "ntriggers", # number of triggertraces
+            "telid", # id of telescope
+            "adcbits", # bit range of the adc channels
+            "sumlength", # length of the fpga integrator
+            "blprecision", # precision of the fpga baseline
+            "mastercards", # number of attached mastercards
+            "triggercards", # number of attached triggercards
+            "adccards", # number of attached fadccards
+            "gps", # gps mode (0: not used, 1: external pps and 10MHz)
+            ]
+        
+        # put add'l info useful for LH5 specification
+        # default structure is array<1>{real}, default unit is None.
+        # here we only specify columns if they are non-default.
+        self.lh5_spec = {
+            "timestamp":{"units":"sec"},
+            "baseline":{"units":"adc"},
+            "wf_max":{"units":"adc"},
+            "wf_std":{"units":"adc"},
+        }
+        
+        super().__init__(*args, **kwargs)
+        
+        
+    def get_file_config(self, fcio):
+        """
+        access FCIOConfig members once when each file is opened
+        """
+        self.file_config = {c:getattr(fcio, c) for c in self.config_names}
+
+          
+    def decode_event(self, fcio, packet_id, verbose=False):
+        """
+        access FCIOEvent members for each event in the raw file
+        """
+        ievt = fcio.eventnumber # the eventnumber since the beginning of the file
+        timestamp = fcio.eventtime  # the time since the beginning of the file in seconds
+        traces = fcio.traces # the full traces for the event: (nadcs, nsamples)
+        baselines = fcio.baselines # the fpga baseline values for each channel in LSB
+        # baselines = fcio.average_prebaselines # equivalent?
+        
+        # these are empty in my test file
+        integrals = fcio.integrals # the fpga integrator values for each channel in LSB
+        triggertraces = fcio.triggertraces # the triggersum traces: (ntriggers, nsamples)
+        
+        # all channels are read out simultaneously for each event
+        for iwf in range(self.file_config["nadcs"]):
+            channel = iwf
+            waveform = traces[iwf]
+            baseline = baselines[iwf]
+            wf_max = np.amax(waveform)
+            wf_std = np.std(waveform)
+            self.total_count += 1
+            
+            # i don't know what indicates a garbage event yet
+            # if wf.is_garbage:
+            #     self.garbage_count += 1
+            #     self.format_data(locals(), wf.is_garbage)
+            #     return
+            
+            # send any variable with a name in "decoded_values" to the output
+            self.format_data(locals())  
 
