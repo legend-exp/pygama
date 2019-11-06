@@ -20,6 +20,7 @@ from ..io.decoders.SIS3316File import *
 
 def ProcessTier0(t0_file,
                  run,
+                 ftype="default",
                  output_prefix="t1",
                  chan_list=None,
                  n_max=np.inf,
@@ -35,17 +36,37 @@ def ProcessTier0(t0_file,
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
 
-    # declare Tier 1 output file
     output_dir = os.getcwd() if output_dir is None else output_dir
-    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
-    if os.path.isfile(t1_file):
-        if overwrite:
-            print("Overwriting existing file...")
-            os.remove(t1_file)
-        else:
-            print("File already exists, continuing ...")
-            return
-        
+
+    ###############################################################
+    """
+    Change for HADES style output
+    """
+
+    if ftype == "hades_char":
+    # declare Tier 1 output file
+
+       file_body = t0_file.split("/")[-1].replace("fcio","h5")
+       t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
+       if os.path.isfile(t1_file):
+           if overwrite:
+               print("Overwriting existing file...")
+               os.remove(t1_file)
+           else:
+               print("File already exists, continuing ...")
+               return
+    ################################################################ 
+    
+    else:
+       t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+       if os.path.isfile(t1_file):
+           if overwrite:
+               print("Overwriting existing file...")
+               os.remove(t1_file)
+           else:
+               print("File already exists, continuing ...")
+               return
+    
     # set max number of events (useful for debugging)
     if n_max is not np.inf:
         n_max = int(n_max)
@@ -433,10 +454,8 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
     start = time.time()
 
     print("Lets process amazing FlashCam data")
-    
     # The fcio class is used to open the datafile
     io = fcio(t0_file)
-    
     # no run info in FC header yet - get_run_number(header_dict)
     print("Run number: {}".format(run))
     

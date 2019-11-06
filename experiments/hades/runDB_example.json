@@ -1,0 +1,109 @@
+{
+  "loc_dir":"/lfs/l1/legend/users/zschocke/Meta/HADES/test",
+  "raw_dir":"/lfs/l1/legend/detector_char/enr/hades/char_data/I02160A/tier0/co_HS5_top_hvs",
+  "tier1_dir":"/lfs/l1/legend/detector_char/enr/hades/char_data/I02160A/tier1/co_HS5_top_hvs/pygama",
+  "tier2_dir":"/lfs/l1/legend/detector_char/enr/hades/char_data/I02160A/tier2/co_HS5_top_hvs/pygama",
+  "meta_dir":"/lfs/l1/legend/users/zschocke/Meta/HADES/test",
+  "digitizer": "FlashCam",
+  "daq": "FlashCam",
+  "t1_prefix": "t1_run",
+  "t2_prefix": "t2_run",
+  "chunksize": 1000,
+  "clock": 62500000.0,
+  "rollover": 1,
+  "mass_note": "(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
+  "det_mass_kg": 2,
+  "ds": {
+    "note": "data sets",
+    "23": ["23", "2019 HADES HV scan 60Co "],
+    "24": ["24", "2019 HADES HV scan 60Co "],
+    "25": ["25", "2019 HADES HV scan 60Co "],
+    "26": ["26", "2019 HADES HV scan 60Co "],
+    "27": ["27", "2019 HADES HV scan 60Co "],
+    "28": ["28", "2019 HADES HV scan 60Co "],
+    "29": ["29", "2019 HADES HV scan 60Co "],
+    "30": ["30", "2019 HADES HV scan 60Co "],
+    "35": ["35", "2019 HADES HV scan 60Co "],
+    "36": ["36", "2019 HADES HV scan 60Co "],
+    "37": ["37", "2019 HADES HV scan 60Co "],
+    "38": ["38", "2019 HADES HV scan 60Co "],
+    "39": ["39", "2019 HADES HV scan 60Co "],
+    "40": ["40", "2019 HADES HV scan 60Co "],
+    "41": ["41", "2019 HADES HV scan 60Co "],
+    "42": ["42", "2019 HADES HV scan 60Co "],
+    "43": ["43", "2019 HADES HV scan 60Co "],
+    "44": ["44", "2019 HADES HV scan 60Co "],
+    "45": ["45", "2019 HADES HV scan 60Co "]
+  },
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "511.0":"beta+",
+    "583.2":"208Tl", "609.3":"214Bi", "911.2":"228Ac",
+    "969.0":"228Ac", "1173.3":"60Co1", "1120.3":"214Bi", 
+    "1332.5":"60Co2","1460.8":"40K", "1764.5":"214Bi", 
+    "2505.7":"60CoSum","2614.5":"208Tl"
+  },
+  "cal_peaks":[1332.5,1173.3],
+  "peaks_of_interest":[1332.5,1173.3],
+  "ecal":{
+    "note":"inputs for each energy estimator are organized by ds",
+    "0,999": {
+      "e_ftp": {
+        "ds_coverage":"1",
+        "xlims":[16000, 23000, 2],
+        "peakdet_thresh":50,
+        "match_thresh":0.8
+      },
+      "energy": {
+        "ds_coverage":"0",
+        "xlims":[21000, 260000, 5],
+        "peakdet_thresh":8,
+        "match_thresh":0.4
+      }
+    }
+  },
+  "build_options": {
+    "conf1": {
+      "run_coverage": [0, 99999],
+      "tier0_options": {
+        "daq": "FlashCam",
+        "digitizer": "FlashCamWaveformDecoder"
+      },
+      "tier1_options": {
+        "clk": 62500000.0,
+        "fit_bl": {
+          "ihi": 100,
+          "order": 1
+        },
+        "blsub": {
+          "blest": "fcdaq",
+          "test":0
+        },
+        "pz":{
+          "decay": 44,
+          "test":0
+        },
+        "trap": [{"wfout": "wf_etrap",
+                  "wfin": "wf_blsub",
+          	  "rise": 3,
+                  "flat": 1,
+          	  "decay": 17,
+                  "test":0},
+        {"wfout": "wf_strap","wfin": "wf_blsub", "rise": 1, "flat": 1.5, "decay": 17},
+        {"wfout": "wf_atrap", "wfin": "wf_blsub", "rise": 0.04, "flat": 0.1, "fall": 2},
+        {"wfout": "wf_ttrap", "wfin": "wf_blsub", "rise": 1, "flat": 0, "fall": 1
+        }],
+        "current": [{"wfin": "wf_pz", "wfout": "wf_current", "sigma": 5 }],
+        "get_max": [{"wfin": "wf_etrap"}, {"wfin": "wf_strap"}, {"wfin": "wf_atrap"}, {"wfin": "wf_ttrap"}, {"wfin": "wf_blsub"}, {"wfin": "wf_current"}],
+        "timepoint": {"wfin": "wf_blsub", "pct": [5, 10, 50, 100]},
+        "peakdet": [{"delta": 0.5, "sigma": 5, "ihi": 600}],
+        "num_peaks": {},
+        "ftp": {},
+        "overflow": {},
+        "dcr": [{"wfin": "wf_blsub"}, {"wfin": "wf_pz"}],
+        "tail_fit": [{"wfin": "wf_blsub", "order": 1, "tp_thresh": 0.8, "vec": 0}, {"wfin": "wf_pz", "order": 1, "tp_thresh": 0.8, "vec": 0}
+        ]
+      }
+    }
+  },
+  "_default": {}
+}
