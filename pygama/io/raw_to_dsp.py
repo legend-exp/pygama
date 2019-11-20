@@ -16,7 +16,7 @@ from ..io.decoders.digitizers import *
 from ..utils import *
 
 
-def ProcessTier1(t1_file,
+def RunDSP(t1_file,
                  intercom,
                  digitizers=None,
                  ftype="default",

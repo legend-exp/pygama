@@ -78,7 +78,7 @@ t1_file = ds.paths[run]["t1_path"]
 
 # remind ourselves the name of the HDF5 group key using the DB.
 # pprint(testDB['build_options'])
-t1_key = testDB['build_options']['conf1']['tier0_options']['digitizer']
+t1_key = testDB['build_options']['conf1']['daq_to_raw_options']['digitizer']
 
 # load a small dataframe
 t1df = pd.read_hdf(t1_file, stop=200, key=t1_key)

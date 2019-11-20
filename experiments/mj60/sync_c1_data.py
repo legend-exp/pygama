@@ -11,7 +11,7 @@ def main():
     """
     sync C1 data with cenpa-rocks.
     - rsync the entire Data/C1 directory using the $DATADIR variable
-    - set flags to then remove raw/tier1/tier2 files
+    - set flags to then remove raw/raw_to_dsp/tier2 files
     """
     global runDB
     with open("runDB.json") as f:

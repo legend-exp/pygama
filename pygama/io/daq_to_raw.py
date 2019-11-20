@@ -14,24 +14,14 @@ from ..utils import *
 from ..io.decoders.digitizers import *
 from ..io.decoders.pollers import *
 from ..io.decoders.data_loading import *
-from ..io.decoders.xml_parser import *
-from ..dsp.base import *
-from ..io.decoders.SIS3316File import *
+from ..io.decoders.orca_header import *
+from ..dsp.dsp_base import *
+from ..io.decoders.llama3316 import *
 
-def ProcessTier0(t0_file,
-                 run,
-                 ftype="default",
-                 output_prefix="t1",
-                 chan_list=None,
-                 n_max=np.inf,
-                 verbose=False,
-                 output_dir=None,
-                 overwrite=True,
-                 decoders=None,
-                 settings={}):
+def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
+               verbose=False, output_dir=None, overwrite=True, decoders=None,
+               config={}):
     """
-    for now, reads ORCA data and turns it into pandas DataFrames,
-    and saves to HDF5 using pytables
     """
     print("Starting pygama Tier 0 processing ...")
     print("  Input file:", t0_file)
@@ -72,26 +62,30 @@ def ProcessTier0(t0_file,
         n_max = int(n_max)
 
     # get the DAQ mode
-    if settings["daq"] == "ORCA":
-        ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
-    elif settings["daq"] == "FlashCam":
-        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose)
-    elif settings["daq"] == "SIS3316":
-        ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
-    elif settings["daq"] == "CAENDT57XX":
+    if config["daq"] == "ORCA":
+        ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose)
+    
+    elif config["daq"] == "FlashCam":
+        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, config, verbose)
+    
+    elif config["daq"] == "SIS3316":
+        ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose)
+    
+    elif config["daq"] == "CAENDT57XX":
         ProcessCompass(t0_file, t1_file, decoders, output_dir)
+    
     else:
-        print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
+        print(f"DAQ: {config['daq']} not recognized.  Exiting ...")
         exit()
     
     
-def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
+def ProcessORCA(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
     handle ORCA raw files
     """
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'settings' dict
+    # TODO: pass this option in from the 'config' dict
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -143,7 +137,7 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
-        d.apply_settings(settings)
+        d.apply_config(config)
 
         # if d.class_name=="ORSIS3302Model":
             # pprint(d.df_metadata.columns)
@@ -264,22 +258,16 @@ def get_next_event(f_in):
     return event_data, data_id
     
 
-def ProcessSIS3316(t0_file, 
-                    t1_file, 
-                    run,
-                    n_max, 
-                    settings, 
-                    verbose):
+def ProcessSIS3316(t0_file, t1_file, run, n_max, config, verbose):
     """
-    My implementation for the Struck SIS3316 digitizer.
-    Use the llamaDAQ program for producing compatible input files.
+    Mario's implementation for the Struck SIS3316 digitizer.
+    Requires the llamaDAQ program for producing compatible input files.
     """                    
-    
     #now the ugly code duplication starts ... 
     
     # num. rows between writes.  larger eats more memory
     # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'settings' dict
+    # TODO: pass this option in from the 'config' dict
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -288,10 +276,10 @@ def ProcessSIS3316(t0_file,
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
         
-    #file = SIS3316File(f_in,2) #test
+    #file = llama3316(f_in,2) #test
 
     verbosity = 1 if verbose else 0     # 2 is for debug
-    sisfile = SIS3316File(f_in, verbosity)
+    sisfile = llama3316(f_in, verbosity)
 
     # figure out the total size
     SEEK_END = 2
@@ -320,7 +308,7 @@ def ProcessSIS3316(t0_file,
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
-        d.apply_settings(settings)
+        d.apply_config(config)
 
     # ------------ scan over raw data starts here -----------------
     # more code duplication
@@ -330,7 +318,7 @@ def ProcessSIS3316(t0_file,
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
 
-    # header is already skipped by SIS3316File
+    # header is already skipped by llama3316
 
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
@@ -441,20 +429,18 @@ def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
     print("Done.\n")
 
 
-def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
-
-    ############################################
-    # Start of FlashCam data specific decoding #
-    ############################################
-
-    from fcutils import fcio
+def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, config, verbose):
+    """
+    Start of FlashCam data specific decoding
+    """
+    import fcutils
 
     ROW_LIMIT = 5e4
     start = time.time()
 
-    print("Lets process amazing FlashCam data")
     # The fcio class is used to open the datafile
-    io = fcio(t0_file)
+    io = fcutils.fcio(t0_file)
+    
     # no run info in FC header yet - get_run_number(header_dict)
     print("Run number: {}".format(run))
     
@@ -480,7 +466,7 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
-      d.apply_settings(settings)
+      d.apply_config(config)
 
     if os.path.isfile(t1_file):
       if overwrite:
@@ -521,7 +507,7 @@ def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
     # final write to file
     for d in decoders:
       if verbose:
-        print("tier0 - write in decoder ",d.decoder_name)
+        print("daq_to_raw - write in decoder ",d.decoder_name)
       d.to_file(t1_file, verbose=True)
 
     if verbose:

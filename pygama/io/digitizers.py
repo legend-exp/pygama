@@ -5,33 +5,38 @@ from scipy import signal
 import itertools
 import array
 
-from .data_loading import DataLoader
+from .data_loading import DataTaker
 from .waveform import Waveform
 
 
-class Digitizer(DataLoader):
+class Digitizer(DataTaker):
     """ handle any data loader which contains waveform data """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def apply_settings(self, settings):
-        """ apply user settings specific to this card and run """
+    def apply_config(self, config):
+        """ apply user config specific to this card and run """
 
-        if settings["digitizer"] == self.decoder_name:
+        if config["digitizer"] == self.decoder_name:
 
             self.window = False
-            sk = settings.keys()
+            sk = config.keys()
             if "window" in sk:
                 self.window = True
-                self.win_type = settings["window"]
+                self.win_type = config["window"]
             if "n_samp" in sk:
-                self.n_samp = settings["n_samp"]
+                self.n_samp = config["n_samp"]
             if "n_blsamp" in sk:
-                self.n_blsamp = settings["n_blsamp"]
+                self.n_blsamp = config["n_blsamp"]
 
 
 class Gretina4MDecoder(Digitizer):
-    """ handle MJD Gretina digitizers """
+    """ 
+    handle MJD Gretina digitizers 
+    
+    NOTE: Tom Caldwell made some nice new summary slides on a 2019 LEGEND call
+    https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
+    """
     def __init__(self, *args, **kwargs):
 
         self.decoder_name = 'ORGretina4MWaveformDecoder'
@@ -619,10 +624,9 @@ class CAENDT57XX(Digitizer):
     Handles CAENDT5725 or CAENDT5730 digitizers
     setting the model_name will set the appropriate sample_rate
 
-    Use the input_settings function to set certain variables by passing
+    Use the input_config function to set certain variables by passing
     a dictionary, this will most importantly assemble the file header used
     by CAEN CoMPASS to label output files.
-
     """
     def __init__(self, model_name, *args, **kwargs):
         self.id = None
@@ -654,13 +658,13 @@ class CAENDT57XX(Digitizer):
         }
         super().__init__(*args, **kwargs)
 
-    def input_settings(self, settings):
-        self.id = settings["id"]
-        self.v_range = settings["v_range"]
-        self.e_cal = settings["e_cal"]
-        self.e_type = settings["e_type"]
-        self.int_window = settings["int_window"]
-        self.file_header = "CH_"+str(settings["channel"])+"@"+self.model_name+"_"+str(settings["id"])+"_Data_"
+    def input_config(self, config):
+        self.id = config["id"]
+        self.v_range = config["v_range"]
+        self.e_cal = config["e_cal"]
+        self.e_type = config["e_type"]
+        self.int_window = config["int_window"]
+        self.file_header = "CH_"+str(config["channel"])+"@"+self.model_name+"_"+str(config["id"])+"_Data_"
 
     def get_event_size(self, t0_file):
         with open(t0_file, "rb") as file:

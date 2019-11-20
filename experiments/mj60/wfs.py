@@ -18,7 +18,7 @@ from matplotlib.colors import LogNorm
 from tqdm import tqdm
 plt.style.use('style.mplstyle')
 
-# for this code to work you need the tier1, tier2, and spectrum files for the run of interest.
+# for this code to work you need the raw_to_dsp, tier2, and spectrum files for the run of interest.
 
 def main():
 

@@ -11,51 +11,36 @@ class DataSet:
     can initialize with data sets, a single run, or lists of runs.
     can also load a JSON file to get a dict of metadata.
     """
-    def __init__(self, sub,ds_lo=None, ds_hi=None, run=None, runlist=None,
-                 opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
+    def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None,
+                 opt=None, v=False, config=None, cal=None, raw_dir=None, 
+                 tier_dir=None):
 
-        # load metadata and set paths to data folders
-        self.runDB, self.calDB = None, None
+        # load config file (user-generated)
+        self.config, self.calDB = None, None
         if md is not None:
-            self.load_metadata(md) # pure JSON
+            with open(md) as f:
+                self.config = json.load(f)
+        
+        # load analysis parameters (code-generated)
         if cal is not None:
-            self.calDB = db.TinyDB(cal) # TinyDB JSON
-        try:
-            self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
-            self.t1pre = self.runDB["t1_prefix"]
-            self.t2pre = self.runDB["t2_prefix"]
-           
-        except:
-            print("Bad metadata, reverting to defaults ...")
-            self.raw_dir = raw_dir
-            self.t1pre = "t1_run"
-            self.t2pre = "t2_run"
- 
-        try:
-            self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
-            self.tier1_dir=None
-            self.tier2_dir=None
-        except:
-            self.tier_dir=None
-            self.tier1_dir =  os.path.expandvars(self.runDB["tier1_dir"])
-            self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
-           
-               
-        try:
-            self.ftype = self.runDB["filetype"]
-            print("Processing ", self.ftype, " data")
-        except:
-            self.ftype = "default"
-            print("Processing default data")
-  
+            self.calDB = db.TinyDB(cal)
+        
+        self.raw_dir = os.path.expandvars(self.config["raw_dir"])
+        self.tier_dir = os.path.expandvars(self.config["tier_dir"])
+        
+        # file prefixes
+        self.t0pre = self.config["t0_prefix"]
+        self.t1pre = self.config["t1_prefix"]
+        self.t2pre = self.config["t2_prefix"]
+
         # match ds number to run numbers
         self.ds_run_table = {}
-        for ds in self.runDB["ds"]:
+        for ds in self.config["datasets"]:
             try:
                 dsnum = int(ds)
             except:
                 continue
-            run_cov = self.runDB["ds"][ds][0].split(",")
+            run_cov = self.config["datasets"][ds][0].split(",")
             self.ds_run_table[int(ds)] = [int(r) for r in run_cov]
 
         # create the internal lists of run numbers and ds's
@@ -77,12 +62,6 @@ class DataSet:
         # could store concatenated dfs here, like a TChain
         self.df = None
 
-    def load_metadata(self, fname):
-        """
-        load a JSON file into a dict
-        """
-        with open(fname) as f:
-            self.runDB = json.load(f)
             
     def add_run(self, runs):
         """
@@ -93,19 +72,20 @@ class DataSet:
         if isinstance(runs, list):
             self.runs.extend(runs)
 
+
     def get_runs(self, ds_lo=None, ds_hi=None, verbose=False):
         """
-        using the runDB,
+        using the config,
         create a list of data sets to process,
         then return a list of the included run numbers
         """
-        if self.runDB is None:
-            print("Error, runDB not set.")
+        if self.config is None:
+            print("Error, config not set.")
             return []
 
         # load all data
         if ds_lo is None and ds_hi is None:
-            self.ds_list.extend([d for d in self.runDB["ds"] if d != "note"])
+            self.ds_list.extend([d for d in self.config["ds"] if d != "note"])
 
         # load single ds
         elif ds_hi is None:
@@ -117,7 +97,7 @@ class DataSet:
 
         run_list = []
         for ds in self.ds_list:
-            tmp = self.runDB["ds"][str(ds)][0].split(",")
+            tmp = self.config["ds"][str(ds)][0].split(",")
             r1 = int(tmp[0])
             r2 = int(tmp[1]) if len(tmp)>1 else None
             if r2 is None:
@@ -131,7 +111,8 @@ class DataSet:
 
         return run_list
     
-    def get_paths(self, runs, subfile, verbose=False):
+    
+    def get_paths(self, runs, verbose=False):
         """
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
@@ -211,10 +192,10 @@ class DataSet:
                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
-        if self.runDB is not None:
+        if self.config is not None:
             cov = {}
-            for conf in self.runDB["build_options"]:
-                cov[conf] = self.runDB["build_options"][conf]["run_coverage"]
+            for conf in self.config["processing"]:
+                cov[conf] = self.config["processing"][conf]["run_coverage"]
 
             for run in runs:
                 for conf, ranges in cov.items():
@@ -233,6 +214,7 @@ class DataSet:
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
 
+
     def lookup_ds(self, run):
         """
         given a run number, figure out what data set it belongs to.
@@ -248,11 +230,12 @@ class DataSet:
         print("Error, couldn't find a ds for run {run}.")
         exit()
 
+
     def get_p1cal_pars(self, etype):
         """
         return the pass-1 initial guess parameters for an energy estimator.
         """
-        for key in self.runDB["ecal"]:
+        for key in self.config["ecal"]:
             tmp = key.split(",")
             if len(tmp) == 1:
                 continue
@@ -263,10 +246,10 @@ class DataSet:
             if len(iout[0]) > 0:
                 print("Error, we don't currently support multiple p1 cal pars.")
                 exit()
-            print(key,etype)
-            pars = self.runDB["ecal"][key][etype]
+            pars = self.config["ecal"][key][etype]
             # pprint(pars)
             return pars
+
             
     def get_t1df(self):
         """
@@ -280,6 +263,7 @@ class DataSet:
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
+
     def get_t2df(self):
         """
         concat tier 2 dfs.
@@ -289,6 +273,7 @@ class DataSet:
             p = self.paths[run]["t2_path"]
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
+
 
     def get_ts(self, df=None, clock=1e8, rollover=False, test=False):
         """
@@ -344,6 +329,7 @@ class DataSet:
 
         return ts_wrapped
 
+
     def get_runtime(self, clock=None, rollover=None):
         """
         get the runtime (in seconds)
@@ -353,9 +339,9 @@ class DataSet:
         This is wrong by a factor ~2*tau (dt between events).
         """
         if clock is None:
-            clock = self.runDB["clock"]
+            clock = self.config["clock"]
         if rollover is None:
-            rollover = self.runDB["rollover"]
+            rollover = self.config["rollover"]
 
         total_rt = 0
         for run in self.runs:
@@ -369,3 +355,21 @@ class DataSet:
             total_rt += rt
 
         return total_rt
+
+    
+    def daq_to_raw(self):
+        """
+        convenience function for calling the main daq_to_raw function.
+        right now, this processes runs sequentially.
+        """
+        for run in self.runs:
+            t0_file = self.paths[run]["t0_path"]
+            t1_file = self.paths[run]["t1_path"]
+            if t1_file is not None and overwrite is False:
+                print("file exists, overwrite flag isn't set.  continuing ...")
+                continue
+            if test:
+                print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
+                continue
+            daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
+                       overwrite=overwrite, n_max=nevt, config=opts)

@@ -4,8 +4,8 @@ import tinydb as db
 import pandas as pd
 from pprint import pprint
 from pygama import DataSet
-from pygama.dsp.base import Intercom
-from pygama.io.tier1 import ProcessTier1
+from pygama.dsp.dsp_base import Intercom
+from pygama.io.raw_to_dsp import RunDSP
 
 def main():
     """
@@ -23,7 +23,7 @@ def optimize(ds):
     t2_file = ds.paths[run]["t2_path"]
     conf = ds.paths[run]["build_opt"]
     
-    # proc_list = ds.runDB["build_options"][conf]["tier1_options"]
+    # proc_list = ds.runDB["build_options"][conf]["raw_to_dsp_options"]
 
     # short as as possible proc list
     proc_list = {
@@ -39,7 +39,7 @@ def optimize(ds):
         }
     # pprint(proc_list)
     proc = Intercom(proc_list)
-    ProcessTier1(
+    RunDSP(
         t1_file,
         proc,
         output_dir=ds.tier_dir,

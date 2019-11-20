@@ -28,12 +28,12 @@ def main():
 
     # ------- TIER 0 -------
 
-    # tier0(run, n_evt=50000) # np.inf by default
-    # tier0_check(run)
+    # daq_to_raw(run, n_evt=50000) # np.inf by default
+    # daq_to_raw_check(run)
 
     # ------- TIER 1 -------
 
-    # tier1(run)
+    # raw_to_dsp(run)
 
     # ------- TIER 2 -------
 
@@ -42,23 +42,23 @@ def main():
     # ----------------------
 
 
-def tier0(run, n_evt=None):
+def daq_to_raw(run, n_evt=None):
 
-    from pygama.processing.tier0 import ProcessTier0
+    from pygama.processing.daq_to_raw import ProcessRaw
 
     raw_file = glob.glob("{}/*Run{}".format(data_dir, run))[0]
 
     if n_evt is None:
         n_evt = np.inf
 
-    ProcessTier0(raw_file,
+    ProcessRaw(raw_file,
                  verbose=True,
                  output_dir=data_dir,
                  n_max=n_evt,
                  settings=t0_options[run])
 
 
-def tier0_check(run):
+def daq_to_raw_check(run):
 
     t1_file = glob.glob("{}/t1_run{}.h5".format(data_dir, run))[0]
 
@@ -81,10 +81,10 @@ def tier0_check(run):
         print("found {} rows".format(nrows))
 
 
-def tier1(run):
+def raw_to_dsp(run):
 
-    from pygama.processing.base import Tier1Processor
-    from pygama.processing.tier1 import ProcessTier1
+    from pygama.processing.dsp_base import Tier1Processor
+    from pygama.processing.raw_to_dsp import RunDSP
 
     t1_file = glob.glob("{}/t1_run{}.h5".format(data_dir, run))[0]
 
@@ -99,7 +99,7 @@ def tier1(run):
     # NOTE: using {'test':True} displays a plot,
     # won't work when multiprocessing is enabled
 
-    ProcessTier1(t1_file,
+    RunDSP(t1_file,
                  proc,
                  out_prefix="t2",
                  out_dir=data_dir,

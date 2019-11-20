@@ -6,16 +6,15 @@ import itertools
 import array
 from pprint import pprint
 
-from .data_loading import DataLoader
+from .data_loading import DataTaker
 from .waveform import Waveform
 
-class SIS3316File:
+class llama3316:
     """ 
     A parser file for the sis3316 able to decode header and events.
     The inputs are files produced by the llamaDAQ sis3316 readout program
     magic bytes: "LArU"
     """
-
     def __init__(self, file_binary, verbosity=0):
         self.f_in = file_binary
         self.verbose = verbosity
@@ -141,7 +140,6 @@ class SIS3316File:
         return channelConfigs
         
         
-        
     def __read_chunk_header(self):
         """
         reads the header of the chunk
@@ -199,6 +197,7 @@ class SIS3316File:
     
         return channelID, data
     
+    
     def read_next_event(self, channelConfigs):
         """
         This should be the main method to call when parsing the file for events.
@@ -230,7 +229,6 @@ class SIS3316File:
         #ToDo !!!!!!!!!!!
     
     
-    
 class BinaryReadException(Exception):
 
     def __init__(self, requestedNrOfBytes, gotNrOfBytes):
@@ -240,9 +238,3 @@ class BinaryReadException(Exception):
     def printMessage(self):
         print("Exception: tried to read {} bytes, got {} bytes".format(self.reqNOB, self.gotNOB))
     
-    
-    
-
-
-
-
