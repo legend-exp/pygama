@@ -179,21 +179,21 @@ class DataSet:
         
         else:
         # search data directories for extant files
-           for p, d, files in os.walk(self.raw_dir):
-               for f in files:
-                   if any("Run{}".format(r) in f for r in runs):
-                       run = int(f.split("Run")[-1])
-                       self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+        for p, d, files in os.walk(self.raw_dir):
+            for f in files:
+                if any(f"{self.t0pre}" in f for r in runs):
+                    run = int(f.split(self.t0pre)[-1].split(".")[0])
+                    self.paths[run]["t0_path"] = "{}/{}".format(p,f)
 
-           for p, d, files in os.walk(self.tier_dir):
-               for f in files:
-                   if any("t1_run{}".format(r) in f for r in runs):
-                       run = int(f.split("run")[-1].split(".h5")[0])
-                       self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+        for p, d, files in os.walk(self.tier_dir):
+            for f in files:
+                if any("t1_run{}".format(r) in f for r in runs):
+                    run = int(f.split("run")[-1].split(".h5")[0])
+                    self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
-                   if any("t2_run{}".format(r) in f for r in runs):
-                       run = int(f.split("run")[-1].split(".h5")[0])
-                       self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                if any("t2_run{}".format(r) in f for r in runs):
+                    run = int(f.split("run")[-1].split(".h5")[0])
+                    self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
         if self.config is not None:
