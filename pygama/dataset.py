@@ -36,6 +36,12 @@ class DataSet:
         self.t0pre = self.config["t0_prefix"]
         self.t1pre = self.config["t1_prefix"]
         self.t2pre = self.config["t2_prefix"]
+        
+        # read in file prefix from config file
+        try:
+            self.ftype = self.runDB["filetype"]
+        except:
+            self.ftype = "default"
 
         # match ds number to run numbers
         self.ds_run_table = {}
@@ -59,13 +65,11 @@ class DataSet:
             self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
-        print(self.runs)    
-        # filenames for every run
-        self.get_paths(self.runs,sub, v)
-        
-        # could store concatenated dfs here, like a TChain
-        self.df = None
 
+        # filenames for every run
+        # self.get_paths(self.runs,sub, v)
+        self.get_paths(self.runs, v)
+        
             
     def add_run(self, runs):
         """
@@ -124,17 +128,19 @@ class DataSet:
         """
         self.paths = {r:{} for r in runs}
         
-
-        ##############################################################################################
+        #######################################################################
         """
         A new filetype flag in the runDB:
-        In the HADES characterization campaign we have a different filestructure and we have Subfiles.
-        e.g. our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
-        "char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.fcio"
-        Also the are ".log" files in the same directory 
-        To deal with different filenames I added a filteype flag in the runDB. If it is hades_char I look for HADES structure.
-        Other structure are not implemented. If no filetype flag is given, the original files earch is done.
-        What I still don't like is that I use counter for the subfiles. I have to think about something better.
+        In the HADES characterization campaign we have a different filestructure 
+        and we have Subfiles.  e.g. our HADES HV-Scan data consists of 5 Files 
+        per Run and the file names are structured like:
+            "char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.fcio"
+        Also the are ".log" files in the same directory.  To deal with different 
+        filenames I added a filteype flag in the runDB. If it is hades_char I 
+        look for HADES structure. Other structure are not implemented. If no 
+        filetype flag is given, the original files earch is done. What I still 
+        don't like is that I use counter for the subfiles. I have to think about 
+        something better.
         """
         if self.ftype == "hades_char":
         # search data directories for extant files
@@ -173,38 +179,37 @@ class DataSet:
                        counter += 1
 
         elif self.ftype == "legend200":
-            print("Read  awsome LEGEND200 Data. But not ready yet...")
+            print("Read awsome LEGEND200 Data. But not ready yet...")
 
-        ##############################################################################################
-        
+        #######################################################################
         else:
-        # search data directories for extant files
-        for p, d, files in os.walk(self.raw_dir):
-            for f in files:
-                if any(f"{self.t0pre}" in f for r in runs):
-                    run = int(f.split(self.t0pre)[-1].split(".")[0])
-                    self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+            # search data directories for extant files
+            for p, d, files in os.walk(self.raw_dir):
+                for f in files:
+                    if any(f"{self.t0pre}" in f for r in runs):
+                        run = int(f.split(self.t0pre)[-1].split(".")[0])
+                        self.paths[run]["t0_path"] = "{}/{}".format(p,f)
 
-        for p, d, files in os.walk(self.tier_dir):
-            for f in files:
-                if any("t1_run{}".format(r) in f for r in runs):
-                    run = int(f.split("run")[-1].split(".h5")[0])
-                    self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+            for p, d, files in os.walk(self.tier_dir):
+                for f in files:
+                    if any("t1_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
-                if any("t2_run{}".format(r) in f for r in runs):
-                    run = int(f.split("run")[-1].split(".h5")[0])
-                    self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                    if any("t2_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
-        # get pygama build options for each run
-        if self.config is not None:
-            cov = {}
-            for conf in self.config["processing"]:
-                cov[conf] = self.config["processing"][conf]["run_coverage"]
+            # get pygama build options for each run
+            if self.config is not None:
+                cov = {}
+                for conf in self.config["processing"]:
+                    cov[conf] = self.config["processing"][conf]["run_coverage"]
 
-            for run in runs:
-                for conf, ranges in cov.items():
-                    if ranges[0] <= run <= ranges[1]:
-                        self.paths[run]["build_opt"] = conf
+                for run in runs:
+                    for conf, ranges in cov.items():
+                        if ranges[0] <= run <= ranges[1]:
+                            self.paths[run]["build_opt"] = conf
 
         # check for missing entries
         # TODO: get lists of unprocessed runs?

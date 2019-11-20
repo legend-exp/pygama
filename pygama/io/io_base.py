@@ -16,7 +16,7 @@ DataTakers require you declare these before calling `super().__init__()`:
     * `self.digitizer_type`: a string naming the digitizer
     * `self.decoded_values`: the Python lists to convert to HDF5
 """
-import sys
+import sys, os
 import numpy as np
 import pandas as pd
 from abc import ABC
@@ -215,25 +215,26 @@ class DataTaker(ABC):
 
 
     # === LH5 HDF5 I/O =========================================================
-    def save_to_lh5(self, file_name, verbose=False, append=False):
+    def save_to_lh5(self, file_name):
         """
-        TODO: append mode:
-        https://stackoverflow.com/questions/25655588/incremental-writes-to-hdf5-with-h5py
-        TODO: handle units with attributes?  or dimension scales (Ch8 Collette?)
         """
+        append = os.path.exists(file_name)
         file_mode = "a" if append else "w"
+        
+        # open the output file
         hf = h5py.File(file_name, file_mode)
         
         # create the header, saving everything in attributes (like a dict)
-        hf.create_group('header')
-        for c in self.file_config:
-            hf["/header"].attrs[c] = self.file_config[c]
-        hf["/header"].attrs["file_name"] = file_name
+        if not append:
+            hf.create_group('header')
+            for c in self.file_config:
+                hf["/header"].attrs[c] = self.file_config[c]
+            hf["/header"].attrs["file_name"] = file_name
         
         # create datasets for each member of self.decoded_values
         for col in self.decoded_values:
             
-            # decompose waveforms: [dt, t0, cumulative_length[:], flattened_data[:]]
+            # create waveform datasets
             if "waveform" in col:
                 
                 wf_group = f"/daqdata/{col}/"
@@ -244,30 +245,57 @@ class DataTaker(ABC):
                 
                 # NOTE: could apply compression here, and wf_idxs would vary
                 
-                # create the waveform datasets
-                wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
-                                          data=wfs)
-                wf_idx_ds = hf.create_dataset(f"{wf_group}/cumulative_length", 
-                                              data=wf_idxs)
+                # write first time
+                if not append:
+                    wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
+                                              data=wfs, maxshape=(None,))
+                    wf_idxs_ds = hf.create_dataset(f"{wf_group}/cumulative_length",
+                                                  data=wf_idxs, maxshape=(None,))
                 
-                # placeholders to match Oliver's spec
-                wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
-                wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                    # placeholders to match Oliver's spec
+                    wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
+                    wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                
+                # append
+                else:
+                    print("appending ...")
+                    wf_ds = hf[f"{wf_group}/flattened_data"]
+                    wf_ds.resize(wf_ds.shape[0] + wfs.shape[0], axis=0)   
+                    wf_ds[-wfs.shape[0]:] = wfs
+                    
+                    wf_idxs_ds = hf[f"{wf_group}/cumulative_length"]
+                    wf_idxs_ds.resize(wf_idxs_ds.shape[0] + wf_idxs.shape[0], axis=0)
+                    wf_idxs_ds[-wf_idxs.shape[0]:] = wf_idxs
 
-            # handle single-valued data
+            # create single-valued datasets
             else:
                 npa = np.asarray(self.decoded_values[col]) # dtype is automatic
-                dset = hf.create_dataset(f"/daqdata/{col}", data=npa)
                 
-                # set default attributes
-                dset.attrs["units"] = "none"
-                dset.attrs["datatype"] = "array<1>{real}"
+                # write first time
+                if not append:
+                    dset = hf.create_dataset(f"/daqdata/{col}", data=npa, maxshape=(None,))
+                    print("first one:", npa.shape[0], col)
                 
-                # overwrite attributes if they exist
-                if col in self.lh5_spec:
-                    if "units" in self.lh5_spec[col]: 
-                        dset.attrs["units"] = self.lh5_spec[col]["units"]
+                    # set default attributes
+                    dset.attrs["units"] = "none"
+                    dset.attrs["datatype"] = "array<1>{real}"
+                
+                    # overwrite attributes if they exist
+                    if col in self.lh5_spec:
+                        if "units" in self.lh5_spec[col]: 
+                            dset.attrs["units"] = self.lh5_spec[col]["units"]
+                
+                # append
+                else:
+                    dset = hf[f"/daqdata/{col}"]
+                    dset.resize(dset.shape[0] + npa.shape[0], axis=0)
+                    dset[-npa.shape[0]:] = npa
             
         # write stuff to the file
         hf.flush()
         hf.close()
+        
+        # finally, clear out existing data (relieve memory pressure)
+        self.clear_data()
+        
+        print('wrote stuff once')

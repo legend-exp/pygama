@@ -26,34 +26,34 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
 
     output_dir = os.getcwd() if output_dir is None else output_dir
 
-    ###############################################################
-    """
-    Change for HADES style output
-    """
-
-    if ftype == "hades_char":
-    # declare Tier 1 output file
-
-       file_body = t0_file.split("/")[-1].replace("fcio","h5")
-       t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
-       if os.path.isfile(t1_file):
-           if overwrite:
-               print("Overwriting existing file...")
-               os.remove(t1_file)
-           else:
-               print("File already exists, continuing ...")
-               return
-    ################################################################ 
-    
-    else:
-       t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
-       if os.path.isfile(t1_file):
-           if overwrite:
-               print("Overwriting existing file...")
-               os.remove(t1_file)
-           else:
-               print("File already exists, continuing ...")
-               return
+    # ###############################################################
+    # # Change for HADES style output
+    # # TODO: as vince would say, i need to do something smart here
+    # 
+    # if ftype == "hades_char":
+    # # declare Tier 1 output file
+    # 
+    #    file_body = t0_file.split("/")[-1].replace("fcio","h5")
+    #    t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
+    #    if os.path.isfile(t1_file):
+    #        if overwrite:
+    #            print("Overwriting existing file...")
+    #            os.remove(t1_file)
+    #        else:
+    #            print("File already exists, continuing ...")
+    #            return
+    # ################################################################ 
+    # else:
+    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+    if os.path.isfile(t1_file):
+       if overwrite:
+           print("Overwriting existing file...")
+           os.remove(t1_file)
+       else:
+           print("File already exists, continuing ...")
+           return
+       
+    t_start = time.time()
     
     # set max number of events (useful for debugging)
     if n_max is not np.inf and n_max is not None:
@@ -75,6 +75,14 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
     else:
         print(f"DAQ: {config['daq']} not recognized.  Exiting ...")
         exit()
+        
+    # --------- summary ------------
+
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - t_start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")
     
     
 def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
@@ -193,12 +201,6 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     with pd.HDFStore(t1_file,'r') as store:
         print(store.keys())
         # print(store.info())
-
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
 
 
 def get_next_event(f_in):
@@ -351,12 +353,6 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
         print(store.keys())
         # print(store.info())
 
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
-
 
 def process_compass(t0_file, t1_file, digitizer, output_dir=None):
     """
@@ -406,12 +402,6 @@ def process_compass(t0_file, t1_file, digitizer, output_dir=None):
     with pd.HDFStore(t1_file, "r") as store:
         print(store.keys())
 
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
-
 
 def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
@@ -430,7 +420,6 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
     # loop over raw data packets
     i_debug = 0
     
-    
     packet_id = 0
     while fcio.next_event() and packet_id < n_max:
       packet_id += 1
@@ -441,10 +430,11 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
       if packet_id % ROW_LIMIT == 0:
           
           # decoder.save_to_pytables(t1_file, verbose=True)
-          decoder.save_to_lh5(t1_file, verbose=True)
+          decoder.save_to_lh5(t1_file)
           i_debug += 1
           
-          if i_debug == 2:
+          if i_debug == 5:
+              print("breaking early")
               break # debug, deleteme
 
       decoder.decode_event(fcio, packet_id)
@@ -455,11 +445,3 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
 
     if verbose:
       update_progress(1)
-
-    # --------- summary ------------
-
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
