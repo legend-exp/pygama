@@ -61,8 +61,6 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    
-    
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -410,6 +408,9 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
     ROW_LIMIT = 1000
 
     # loop over raw data packets
+    i_debug = 0
+    
+    
     packet_id = 0
     while fcio.next_event() and packet_id < n_max:
       packet_id += 1
@@ -418,14 +419,19 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
       
       # write periodically to the output file
       if packet_id % ROW_LIMIT == 0:
+          
           # decoder.save_to_pytables(t1_file, verbose=True)
           decoder.save_to_lh5(t1_file, verbose=True)
-          break # debug, deleteme
+          i_debug += 1
+          
+          if i_debug == 2:
+              break # debug, deleteme
 
       decoder.decode_event(fcio, packet_id)
 
     # end of loop, write to file once more
-    decoder.save_to_pytables(t1_file, verbose=True)
+    # decoder.save_to_pytables(t1_file, verbose=True)
+    # decoder.save_to_lh5(t1_file, verbose=True)
 
     if verbose:
       update_progress(1)

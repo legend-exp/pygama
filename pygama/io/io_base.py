@@ -242,16 +242,18 @@ class DataTaker(ABC):
                 wf_idxs = np.arange(0, nsamp*nwfs-1, nsamp)
                 wfs = np.hstack(self.decoded_values[col])
                 
-                wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
-                wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                # NOTE: could apply compression here, and wf_idxs would vary
                 
+                # create the waveform datasets
                 wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
                                           data=wfs)
                 wf_idx_ds = hf.create_dataset(f"{wf_group}/cumulative_length", 
                                               data=wf_idxs)
-                # exit()
-                continue
-            
+                
+                # placeholders to match Oliver's spec
+                wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
+                wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+
             # handle single-valued data
             else:
                 npa = np.asarray(self.decoded_values[col]) # dtype is automatic
