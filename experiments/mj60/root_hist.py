@@ -27,10 +27,8 @@ nbins = int((xhi-xlo)/xpb)
 
 hist, bins = np.histogram(np.array(df['e_ftp']), nbins, (xlo, xhi))
 
+# The MultiPeakFitter normalizes to one's peak of choice. For Ba I am normalizing to the 356.013 keV peak, which is between 820, and 860 ADC. The binning is 0.5 ADC, hence the factor in the division that sums the histogram counts from entry 1640 (820/0.5) to 1720 (860/0.5). 
 hist = np.array(hist, dtype=np.float)/(xpb*sum(hist[1640:1720]))
-
-#integral = xpb * sum(hist[6350:6500])
-#hist = hist/integral
 
 root_hist = ROOT.TH1F("root_hist", "", nbins, xlo, xhi)
 root_numpy.array2hist(hist, root_hist, errors=None)

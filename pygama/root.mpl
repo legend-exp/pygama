@@ -1,12 +1,12 @@
 # https://matplotlib.org/users/customizing.html
 
 #figure.titlesize : small        # size of the figure title (Figure.suptitle())
-figure.dpi       : 200          # figure dots per inch
+figure.dpi       : 120          # figure dots per inch
 
 lines.linewidth : 2
 lines.markersize : 10
 
-legend.fontsize : 15
+legend.fontsize : 14
 legend.handlelength : 1
 
 axes.titlesize : 17

@@ -9,30 +9,31 @@ from pygama.utils import *
 
 def main():
     """
-    sync MJ60 data with cenpa-rocks.
-    - rsync the entire Data/MJ60 directory using the $DATADIR variable
+    sync C1 data with cenpa-rocks.
+    - rsync the entire Data/C1 directory using the $DATADIR variable
     - set flags to then remove raw/tier1/tier2 files
-    Hopefully we can reuse this script for C1.
     """
     global runDB
     with open("runDB.json") as f:
         runDB = json.load(f)
 
-    run_rsync()
-    #daq_cleanup()
+    # run_rsync()
+    daq_cleanup()
 
 
 def run_rsync(test=False):
     """
-    run rsync on the entire $DATADIR/MJ60 folder (can take a while ...)
+    run rsync on the entire $DATADIR/C1 folder (can take a while ...)
     """
     if "mjcenpa" not in os.environ["USER"]:
-        print("Error, we're not on the MJ60 DAQ machine.  Exiting ...")
+        print("Error, we're not on the C1 DAQ machine.  Exiting ...")
         exit()
 
-    #raw_dir = runDB["loc_dir"] + "/"
-    raw_dir = os.path.expandvars(runDB["loc_dir"] + "/")
-    raw_rocks = "{}:{}/".format(runDB["rocks_login"], runDB["rocks_dir"])
+    loc_dir = '$DATADIR/C1/'
+    rocks_dir = '/data/eliza1/atmon/C1'
+
+    raw_dir = os.path.expandvars(loc_dir)
+    raw_rocks = "{}:{}/".format(runDB["rocks_login"], rocks_dir)
 
     if test:
         cmd = "rsync -avh --dry-run {} {}".format(raw_dir, raw_rocks)
@@ -48,17 +49,20 @@ def daq_cleanup(keep_t1=False, keep_t2=False):
     MJ60 and C1 ORCA raw files have "BackgroundRun" in the filenames
     """
     if "mjcenpa" not in os.environ["USER"]:
-        print("Error, we're not on the MJ60 DAQ machine.  Exiting ...")
+        print("Error, we're not on the C1 DAQ machine.  Exiting ...")
         exit()
 
+    loc_dir = '$DATADIR/C1/'
+    rocks_dir = '/data/eliza1/atmon/C1'
+
     # local (DAQ) list
-    datadir_loc = os.path.expandvars(runDB["loc_dir"] + "/")
+    datadir_loc = os.path.expandvars(loc_dir)
     filelist_loc = glob.glob(datadir_loc + "/**", recursive=True)
     # for f in filelist_loc:
         # print(f)
 
     # remote list
-    args = ['ssh', runDB['rocks_login'], 'ls -R '+runDB["rocks_dir"]]
+    args = ['ssh', runDB['rocks_login'], 'ls -R '+ rocks_dir]
     ls = sp.Popen(args, stdout=sp.PIPE, stderr=sp.PIPE)
     out, err = ls.communicate()
     out = out.decode('utf-8')
