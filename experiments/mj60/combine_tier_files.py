@@ -28,18 +28,24 @@ def combine_tier_files():
     print('Reading in tier1 and tier2 files:')
 
     #df_tier1 = pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,sys.argv[1]), '/ORSIS3302DecoderForEnergy')
-    df_tier2 = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]), columns=['e_ftp', 'current_max'])
+    df_tier2 = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,sys.argv[1]), columns=['e_ftp', 'energy', 'ttrap_max', 'dADC', 'fS', 'bl_p0'])
+    df_tier2['run'] = np.full(len(df_tier2), sys.argv[1])
     print(sys.argv[1])
 
     for i in range(int(sys.argv[1])+1,int(sys.argv[2])+1):
         #df_tier1 = df_tier1.append(pd.read_hdf('{}/t1_run{}.h5'.format(tier_dir,i), '/ORSIS3302DecoderForEnergy'), ignore_index=True)
-        df_tier2 = df_tier2.append(pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,i), columns=['e_ftp', 'current_max']), ignore_index=True)
+        df = pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,i), columns=['e_ftp', 'energy', 'ttrap_max', 'dADC', 'fS', 'bl_p0'])
+        df['run'] = np.full(len(df), i)
+        #df_tier2 = df_tier2.append(pd.read_hdf('{}/t2_run{}.h5'.format(tier_dir,i), columns=['e_ftp', 'energy']), ignore_index=True)
+        df_tier2 = df_tier2.append(df, ignore_index=True)
         print(i)
 
     print('Resetting indices on tier1 and tier2 files ...')
     #df_tier1 = df_tier1.reset_index(drop=True)
     df_tier2 = df_tier2.reset_index(drop=True)
 
+    print(df_tier2)
+    
     #print('Removing unnecessary columns from tier1 file ...')
     #del df_tier1['energy']
     #del df_tier1['channel']
@@ -54,7 +60,7 @@ def combine_tier_files():
     #df_tier2['dADC'] = df_tier1.iloc[:,1499:3000].mean(axis=1) - df_tier1.iloc[:,0:500].mean(axis=1)
 
     print('Saving combined tier2 file ...')
-    df_tier2.to_hdf('{}/t2_run{}-{}.h5'.format(tier_dir,sys.argv[1],sys.argv[2]), key='df_tier2', mode='w')
+    df_tier2.to_hdf('./t2_run{}-{}.h5'.format(sys.argv[1],sys.argv[2]), key='df_tier2', mode='w')
 
     print('tier2: {} rows'.format(len(df_tier2)))
     print('The script has finished running! The run time was {:.0f} seconds'.format(time.time() - start))

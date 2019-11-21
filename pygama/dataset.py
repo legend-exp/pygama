@@ -70,9 +70,15 @@ class DataSet:
             self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
+<<<<<<< HEAD
 
         # filenames for every run
         self.get_paths(self.runs, v)
+=======
+        print(self.runs)
+        # filenames for every run
+        self.get_paths(self.runs,sub, v)
+>>>>>>> 776b7cc71435258e4de8294ef9b710bb46b382c5
 
         # could store concatenated dfs here, like a TChain
         self.df = None

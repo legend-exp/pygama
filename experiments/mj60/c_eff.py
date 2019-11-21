@@ -16,11 +16,17 @@ table_5 = pd.read_csv('./biasingVtable.txt')
 # will be in units of pF, and I will neglect the factor of 1
 # as that does not change the magnitude of the calculation
 
-C_eff_1 = (table_1['V1_out'][0:19] / 1000) / table_1['V_HV'][0:19]
-C_eff_2 = table_2['V1_out'] / table_2['V_HV']
-C_eff_3 = (table_3['V_out'] / 1000) / table_3['V_HV']
-C_eff_4 = (table_4['V_out'] / 1000) / table_4['V_HV']
-C_eff_5 = (table_5['V_out'] / 1000) / table_5['V_HV']
+# C_eff_1 = (table_1['V1_out'][0:19] / 1000) / table_1['V_HV'][0:19]
+# C_eff_2 = table_2['V1_out'] / table_2['V_HV']
+# C_eff_3 = (table_3['V_out'] / 1000) / table_3['V_HV']
+# C_eff_4 = (table_4['V_out'] / 1000) / table_4['V_HV']
+# C_eff_5 = (table_5['V_out'] / 1000) / table_5['V_HV']
+
+C_eff_1 = table_1['V1_out'][0:19] / 50
+C_eff_2 = (table_2['V1_out'] * 1000) / 200
+C_eff_3 = table_3['V_out'] / 100
+C_eff_4 = table_4['V_out'] / 100
+C_eff_5 = table_5['V_out'] / 100
 
 voltage_1 = table_1['V_HV'][0:19]
 voltage_2 = table_2['V_HV']
@@ -39,3 +45,5 @@ plt.tight_layout()
 plt.legend(fontsize='8')
 
 plt.show()
+
+# print(C_eff_2)

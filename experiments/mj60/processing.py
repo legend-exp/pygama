@@ -39,7 +39,7 @@ def main(argv):
         ds = DataSet(ds_lo, ds_hi, md=run_db, v=args["verbose"])
 
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]), md=run_db, v=args["verbose"])
+        ds = DataSet(run=int(args["run"][0]), sub="none", md=run_db, v=args["verbose"])
 
     # -- start processing --
     if args["tier0"]:
