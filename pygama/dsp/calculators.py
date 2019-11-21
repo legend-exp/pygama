@@ -10,6 +10,19 @@ warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarn
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
+def fS(waves, calcs,  wfin="wf_trap", calc="fS"):
+    """
+    grab first ADC sample of each trap-filtered waveform
+    """
+    wfs = waves[wfin]
+
+    # grab first samle
+    first_sample = wfs[:, 0]
+
+    # add the result as a new column
+    calcs[calc] = first_sample
+
+
 def avg_bl(waves, calcs, ilo=0, ihi=500, wfin="waveform", calc="bl_p0", test=False):
     """
     simple mean, vectorized baseline calculator

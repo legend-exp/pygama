@@ -103,7 +103,8 @@
     "69":["1091,1139", "Bkg runs, 10/30.  Started 8:58a, stopped 9:05a next day"],
     "70":["1140,1156 ", "Ba runs, 10/31.  Started 9:12a."],
     "71":["1157,1164", "15 min threshold runs. See elog 525 for values"],
-    "72":["1165,1173", "Bkg runs, 0x3, 1500V bias, for checking resolution & leakage curr."]
+    "72":["1165,1173", "Bkg runs, 0x3, 1500V bias, for checking resolution & leakage curr."],
+    "73":["1174,1176", "Varying bias runs.  elog uwmjlab 526"]
   },
 
   "ecal":{
@@ -177,7 +178,7 @@
       },
       "tier1_options":{
         "clk" : 100e6,
-        "fit_bl" : {"ihi":600, "order":1},
+        "fit_bl" : {"ihi":500, "order":1},
         "blsub" : {},
         "dADC": {},
         "pz" : {"decay":82},
@@ -195,6 +196,7 @@
         "current" : [
             {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
         ],
+        "fS" : {"wfin":"wf_ttrap"},
         "get_max" : [
             {"wfin":"wf_etrap"}, {"wfin":"wf_strap"}, {"wfin":"wf_atrap"},
             {"wfin":"wf_ttrap"}, {"wfin":"wf_savgol"}, {"wfin":"wf_current"}

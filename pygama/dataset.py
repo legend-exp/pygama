@@ -31,7 +31,7 @@ class DataSet:
             self.tier_dir = tier_dir
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
-            
+
         # match ds number to run numbers
         self.ds_run_table = {}
         for ds in self.runDB["ds"]:
@@ -54,10 +54,10 @@ class DataSet:
             self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
-            
+
         # filenames for every run
         self.get_paths(self.runs, v)
-        
+
         # could store concatenated dfs here, like a TChain
         self.df = None
 
@@ -67,7 +67,7 @@ class DataSet:
         """
         with open(fname) as f:
             self.runDB = json.load(f)
-            
+
     def add_run(self, runs):
         """
         can add single run numbers, or a list
@@ -114,7 +114,7 @@ class DataSet:
             print("Runs:",run_list)
 
         return run_list
-    
+
     def get_paths(self, runs, verbose=False):
         """
         collect path info and flag nonexistent files.
@@ -122,22 +122,28 @@ class DataSet:
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
         """
         self.paths = {r:{} for r in runs}
-        
+
         # search data directories for extant files
         for p, d, files in os.walk(self.raw_dir):
             for f in files:
                 if any("Run{}".format(r) in f for r in runs):
                     run = int(f.split("Run")[-1])
+                    if run not in self.paths.keys():
+                        continue
                     self.paths[run]["t0_path"] = "{}/{}".format(p,f)
 
         for p, d, files in os.walk(self.tier_dir):
             for f in files:
                 if any("t1_run{}".format(r) in f for r in runs):
                     run = int(f.split("run")[-1].split(".h5")[0])
+                    if run not in self.paths.keys():
+                        continue
                     self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
                 if any("t2_run{}".format(r) in f for r in runs):
                     run = int(f.split("run")[-1].split(".h5")[0])
+                    if run not in self.paths.keys():
+                        continue
                     self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
@@ -173,7 +179,7 @@ class DataSet:
                 return ds
             elif len(runlist) > 1 and runlist[0] <= run <= runlist[-1]:
                 return ds
-        
+
         # if we get to here, we haven't found the run
         print("Error, couldn't find a ds for run {run}.")
         exit()
@@ -187,7 +193,7 @@ class DataSet:
             if len(tmp) == 1:
                 continue
             ds_lo, ds_hi = int(tmp[0]), int(tmp[1])
-            
+
             tmp2 = np.array(self.ds_list)
             iout = np.where((tmp2 < ds_lo) | (tmp2 > ds_hi))
             if len(iout[0]) > 0:
@@ -196,7 +202,7 @@ class DataSet:
             pars = self.runDB["ecal"][key][etype]
             # pprint(pars)
             return pars
-            
+
     def get_t1df(self):
         """
         concat tier 1 df's.
