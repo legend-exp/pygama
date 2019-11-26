@@ -11,7 +11,7 @@ class DataSet:
     can initialize with data sets, a single run, or lists of runs.
     can also load a JSON file to get a dict of metadata.
     """
-    def __init__(self, sub,ds_lo=None, ds_hi=None, run=None, runlist=None,
+    def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None, sub=None,
                  opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
 
         # load metadata and set paths to data folders
@@ -31,22 +31,15 @@ class DataSet:
             self.t1pre = "t1_run"
             self.t2pre = "t2_run"
 
-        try:
-            self.tier_dir = os.path.expandvars(self.runDB["tier_dir"])
-            self.tier1_dir=None
-            self.tier2_dir=None
-        except:
-            self.tier_dir=None
-            self.tier1_dir =  os.path.expandvars(self.runDB["tier1_dir"])
-            self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
-
+        self.tier_dir = None
+        self.tier1_dir = os.path.expandvars(self.runDB["tier1_dir"])
+        self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
 
         try:
             self.ftype = self.runDB["filetype"]
             print("Processing ", self.ftype, " data")
         except:
             self.ftype = "default"
-            print("Processing default data")
 
         # match ds number to run numbers
         self.ds_run_table = {}
@@ -70,7 +63,10 @@ class DataSet:
             self.ds_list.extend([self.lookup_ds(r) for r in runlist])
         if opt == "-all":
             self.runs.extend(self.get_runs(verbose=v))
-        print(self.runs)
+
+        if v:
+            print("Found run numbers:", self.runs)
+
         # filenames for every run
         self.get_paths(self.runs,sub, v)
 
@@ -152,7 +148,7 @@ class DataSet:
         What I still don't like is that I use counter for the subfiles. I have to think about something better.
         """
         if self.ftype == "hades_char":
-        # search data directories for extant files
+            # search data directories for extant files
 
            # Check for raw Data
            counter = 1
@@ -188,27 +184,32 @@ class DataSet:
                        counter += 1
 
         elif self.ftype == "legend200":
-            print("Read  awsome LEGEND200 Data. But not ready yet...")
+            print("Read awsome LEGEND200 Data. But not ready yet...")
 
         ##############################################################################################
 
         else:
-        # search data directories for extant files
-           for p, d, files in os.walk(self.raw_dir):
-               for f in files:
-                   if any("Run{}".format(r) in f for r in runs):
-                       run = int(f.split("Run")[-1])
-                       self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+            # search data directories for extant files
+            for p, d, files in os.walk(self.raw_dir):
+                for f in files:
+                    if any("Run{}".format(r) in f for r in runs):
+                        run = f.split("Run")[-1]
+                        if ".log" in run:
+                            continue
+                        else:
+                            run = int(run)
+                        self.paths[run]["t0_path"] = "{}/{}".format(p,f)
 
-           for p, d, files in os.walk(self.tier_dir):
-               for f in files:
-                   if any("t1_run{}".format(r) in f for r in runs):
-                       run = int(f.split("run")[-1].split(".h5")[0])
-                       self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+            for p, d, files in os.walk(self.tier1_dir):
+                for f in files:
+                    if any("t1_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
-                   if any("t2_run{}".format(r) in f for r in runs):
-                       run = int(f.split("run")[-1].split(".h5")[0])
-                       self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+            for p, d, files in os.walk(self.tier2_dir):
+                    if any("t2_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
         if self.runDB is not None:
