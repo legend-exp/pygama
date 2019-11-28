@@ -51,7 +51,7 @@ class Intercom:
     so if you want one to depend on the result of another,
     order your input list accordingly.
     """
-    def __init__(self, settings=None, default_list=False):
+    def __init__(self, settings=None, default_list=False, go_fast=False):
 
         self.proc_list = []
         self.calcs = None # df for calculation results (no wfs)
@@ -157,3 +157,6 @@ class Intercom:
         return self.calcs
 
 
+    def fast_add():
+        from pygama.cygama import fast_add
+        

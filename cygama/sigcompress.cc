@@ -1,5 +1,5 @@
 // sigcompress.cc
-// pybind11 adaptation by Clint Wiseman
+// pybind11 adaptation by Clint 
 // 
 // based on radware-sigcompress, v1.0
 // This code is licensed under the MIT License (MIT).
@@ -9,11 +9,7 @@
 namespace py = pybind11;
 
 int compress_signal(short *sig_in, unsigned short *sig_out, int sig_len_in) {
-
-  std::cout << "hi clint, compressing" << std::endl;
-  return 20;
-
-  /*
+  
   int   i, j, max1, max2, min1, min2, ds, nb1, nb2;
   int   iso, nw, bp, dd1, dd2;
   unsigned short db[2];
@@ -26,9 +22,13 @@ int compress_signal(short *sig_in, unsigned short *sig_out, int sig_len_in) {
 
   // ------------ do compression of signal ------------ 
   j = iso = bp = 0;
+  
+  return sig_out;
 
   sig_out[iso++] = sig_len_in;     // signal length
+  
   while (j < sig_len_in) {         // j = starting index of section of signal
+    
     // find optimal method and length for compression of next section of signal 
     max1 = min1 = sig_in[j];
     max2 = -16000;
@@ -71,6 +71,7 @@ int compress_signal(short *sig_in, unsigned short *sig_out, int sig_len_in) {
     }
 
     if (bp > 0) iso++;
+    
     //  -----  do actual compression  -----  
     sig_out[iso++] = nw;  // compressed signal data, first byte = # samples
     bp = 0;               // bit pointer
@@ -114,18 +115,11 @@ int compress_signal(short *sig_in, unsigned short *sig_out, int sig_len_in) {
   if (bp > 0) iso++;
   if (iso%2) iso++;     // make sure iso is even for 4-byte padding
   return iso;           // number of shorts in compressed signal data
-
-  */
-
 } 
 
 
 int decompress_signal(unsigned short *sig_in, short *sig_out, int sig_len_in) {
-
-  std::cout << "hi clint, decompressing" << std::endl;
-  return 30;
-
-  /*
+  
   int   i, j, min, nb, isi, iso, nw, bp, siglen;
   unsigned short db[2];
   unsigned int   *dd = (unsigned int *) db;
@@ -192,7 +186,27 @@ int decompress_signal(unsigned short *sig_in, short *sig_out, int sig_len_in) {
 } 
 
 
-// ============================================================================
+
+
+py::array_t<int> py_compress_signal(py::array_t<double, py::array::c_style | py::array::forcecast> array)
+{
+  std::vector<double> array_vec(array.size());
+
+  std::memcpy(array_vec.data(),array.data(),array.size()*sizeof(double));
+
+  std::vector<int> result_vec = multiply(array_vec);
+
+  auto result        = py::array_t<int>(array.size());
+  auto result_buffer = result.request();
+  int *result_ptr    = (int *) result_buffer.ptr;
+
+  std::memcpy(result_ptr,result_vec.data(),result_vec.size()*sizeof(int));
+
+  return result;
+}
+
+
+// === include a few simple examples of C++/Numpy I/O ========================
 
 std::vector<int> multiply(const std::vector<double>& input)
 {
@@ -206,9 +220,11 @@ std::vector<int> multiply(const std::vector<double>& input)
 
 
 
-// wrap C++ function with NumPy array IO
 py::array_t<int> py_multiply(py::array_t<double, py::array::c_style | py::array::forcecast> array)
 {
+  /*
+  wrap C++ function with NumPy array IO
+  */
   // allocate std::vector (to pass to the C++ function)
   std::vector<double> array_vec(array.size());
 
@@ -227,4 +243,25 @@ py::array_t<int> py_multiply(py::array_t<double, py::array::c_style | py::array:
   std::memcpy(result_ptr,result_vec.data(),result_vec.size()*sizeof(int));
 
   return result;
+}
+
+
+py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::forecast> array){
+  /*
+  for compress_signal.  with a little work could maybe make this more general
+  */
+  std::vector<int> array_vec(array.size());
+
+  std::memcpy(array_vec.data(), array.data(), array.size()*sizeof(int));
+
+  std::vector<int> result_vec = compress_signal(array_vec);
+
+  auto result        = py::array_t<int>(array.size());
+  auto result_buffer = result.request();
+  int *result_ptr    = (int *) result_buffer.ptr;
+
+  std::memcpy(result_ptr,result_vec.data(),result_vec.size()*sizeof(int));
+
+  return result;
+  
 }

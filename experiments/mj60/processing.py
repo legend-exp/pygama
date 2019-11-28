@@ -114,18 +114,21 @@ def raw_to_dsp(ds,
 
         conf = ds.paths[run]["build_opt"]
         proc_list = ds.runDB["build_options"][conf]["raw_to_dsp_options"]
-        proc = Intercom(proc_list)
-
-        RunDSP(
-            t1_file,
-            proc,
-            output_dir=ds.tier_dir,
-            overwrite=overwrite,
-            verbose=verbose,
-            multiprocess=multiproc,
-            nevt=nevt,
-            ioff=ioff,
-            chunk=ds.runDB["chunksize"])
+        proc = Intercom(proc_list, fast_add=True)
+        
+        if fast_add:
+            RunFastDSP()
+        else:
+            RunDSP(
+                t1_file,
+                proc,
+                output_dir=ds.tier_dir,
+                overwrite=overwrite,
+                verbose=verbose,
+                multiprocess=multiproc,
+                nevt=nevt,
+                ioff=ioff,
+                chunk=ds.runDB["chunksize"])
 
 
 if __name__ == "__main__":

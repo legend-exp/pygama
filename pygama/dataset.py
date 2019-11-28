@@ -383,3 +383,9 @@ class DataSet:
                 continue
             daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
                        overwrite=overwrite, n_max=self.n_max, config=self.config)
+
+    
+    def run_dsp(self):
+        # output a file with dsp parameters, optionally use the guinntercom
+        from pygama.cygama import my_thing
+        print('hi clint')
