@@ -73,12 +73,14 @@ class DataSet:
         # could store concatenated dfs here, like a TChain
         self.df = None
 
+
     def load_metadata(self, fname):
         """
         load a JSON file into a dict
         """
         with open(fname) as f:
             self.runDB = json.load(f)
+
 
     def add_run(self, runs):
         """
@@ -88,6 +90,7 @@ class DataSet:
             self.runs.append(runs)
         if isinstance(runs, list):
             self.runs.extend(runs)
+
 
     def get_runs(self, ds_lo=None, ds_hi=None, verbose=False):
         """
@@ -126,6 +129,7 @@ class DataSet:
             print("Runs:",run_list)
 
         return run_list
+
 
     def get_paths(self, runs, subfile, verbose=False):
         """
@@ -207,6 +211,7 @@ class DataSet:
                         self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
             for p, d, files in os.walk(self.tier2_dir):
+                for f in files:
                     if any("t2_run{}".format(r) in f for r in runs):
                         run = int(f.split("run")[-1].split(".h5")[0])
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
@@ -234,6 +239,7 @@ class DataSet:
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
 
+
     def lookup_ds(self, run):
         """
         given a run number, figure out what data set it belongs to.
@@ -248,6 +254,7 @@ class DataSet:
         # if we get to here, we haven't found the run
         print("Error, couldn't find a ds for run {run}.")
         exit()
+
 
     def get_p1cal_pars(self, etype):
         """
@@ -264,10 +271,11 @@ class DataSet:
             if len(iout[0]) > 0:
                 print("Error, we don't currently support multiple p1 cal pars.")
                 exit()
-            print(key,etype)
+            # print(key,etype)
             pars = self.runDB["ecal"][key][etype]
             # pprint(pars)
             return pars
+
 
     def get_t1df(self):
         """
@@ -281,6 +289,7 @@ class DataSet:
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
+
     def get_t2df(self):
         """
         concat tier 2 dfs.
@@ -290,6 +299,7 @@ class DataSet:
             p = self.paths[run]["t2_path"]
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
+
 
     def get_ts(self, df=None, clock=1e8, rollover=False, test=False):
         """
@@ -345,6 +355,7 @@ class DataSet:
 
         return ts_wrapped
 
+
     def get_runtime(self, clock=None, rollover=None):
         """
         get the runtime (in seconds)
@@ -370,3 +381,56 @@ class DataSet:
             total_rt += rt
 
         return total_rt
+    
+    
+    def daq_to_raw(self, overwrite=False, test=False):
+        """
+        convenience function for calling the main daq_to_raw function.
+        right now, this processes runs sequentially.
+        """
+        from pygama.io.daq_to_raw import daq_to_raw
+        for run in self.runs:
+            t0_file = self.paths[run]["t0_path"]
+            t1_file = self.paths[run]["t1_path"]
+            if t1_file is not None and overwrite is False:
+                print("file exists, overwrite flag isn't set.  continuing ...")
+                continue
+            if test:
+                print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
+                continue
+            daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
+                       overwrite=overwrite, n_max=self.n_max, config=self.config)
+
+    
+    def run_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
+                verbose=False, multiproc=True):
+        """
+        output a file with dsp parameters
+        """
+        from pygama.dsp.base import Intercom
+        from pygama.io.tier1 import ProcessTier1
+
+        for run in self.runs:
+            t1_file = self.paths[run]["t1_path"]
+            t2_file = self.paths[run]["t2_path"]
+            if t2_file is not None and overwrite is False:
+                continue
+
+            if test:
+                print("test mode (dry run), processing Tier 1 file:", t1_file)
+                continue
+
+            conf = self.paths[run]["build_opt"]
+            
+            if proc_list is None:
+                proc_list = self.runDB['build_options'][conf]['tier1_options']
+
+            proc = Intercom(proc_list)
+
+            out_dir = self.tier2_dir if out_dir is None else out_dir
+
+            ProcessTier1(t1_file, proc, output_dir=out_dir, 
+                         overwrite=overwrite, verbose=verbose, 
+                         multiprocess=False, nevt=np.inf, 
+                         ioff=0, chunk=self.runDB["chunksize"])
+

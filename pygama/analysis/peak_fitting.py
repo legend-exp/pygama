@@ -2,7 +2,8 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
-import pygama.analysis.histograms as pgh
+
+import pygama.analysis.histograms as ph
 
 
 def fit_hist(func, hist, bins, var=None, guess=None,
@@ -12,7 +13,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
     can either do a poisson log-likelihood fit (jason's fave) or
     use curve_fit w/ an arbitrary function.
 
-    - hist, bins, var : as in return value of pygama.utils.get_hist()
+    - hist, bins, var : as in return value of pygama.histograms.get_hist()
     - guess : initial parameter guesses. Should be optional -- we can auto-guess
               for many common functions. But not yet implemented.
     - poissonLL : use Poisson stats instead of the Gaussian approximation in
@@ -50,7 +51,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
         mask = ~(zeros & zero_errors)
         sigma = np.sqrt(var)[mask]
         hist = hist[mask]
-        xvals = pgh.get_bin_centers(bins)[mask]
+        xvals = ph.get_bin_centers(bins)[mask]
         if bounds is None:
             bounds = (-np.inf, np.inf)
 
@@ -88,7 +89,7 @@ def fit_binned(f_likelihood, hist, bin_centers, start_guess, var=None, bounds=No
     """
     regular old binned fit (nonlinear least squares). data should already be
     histogrammed (see e.g. pygama.analysis.histograms.get_hist)
-    # jason says this is deprecated. Use pgh.fit_hist() instead.
+    # jason says this is deprecated. Use ph.fit_hist() instead.
     """
     sigma = None
     if bounds is None:
@@ -118,9 +119,10 @@ def get_bin_estimates(pars, func, hist, bins, integral=None, **kwargs):
     default.
     """
     if integral is None:
-        return func(pgh.get_bin_centers(bins), *pars, **kwargs) * pgh.get_bin_widths(bins)
+        return func(ph.get_bin_centers(bins), *pars, **kwargs) * ph.get_bin_widths(bins)
     else:
         return integral(bins[1:], *pars, **kwargs) - integral(bins[:-1], *pars, **kwargs)
+
 
 def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
     """
@@ -128,39 +130,52 @@ def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
         ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
     """
     mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
+    
     # func and/or integral should never give a negative value: let negative
     # values cause errors that get passed to the user. However, mu=0 is okay,
     # but causes problems for np.log(). When mu is zero there had better not be
     # any counts in the bins. So use this to pull the fit like crazy.
     return np.sum(mu - hist*np.log(mu+1.e-99))
 
+
 def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
-    # The Poisson likelihood does not give a good GOF until the counts are very
-    # high and all the poisson stats are roughly guassian and you don't need it
-    # anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
-    # it here.
+    """
+    The Poisson likelihood does not give a good GOF until the counts are very
+    high and all the poisson stats are roughly guassian and you don't need it
+    anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
+    it here.
+    """
     mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
-def gauss(x, mu, sigma, A=1):
+
+def gauss(x, mu, sigma, A=1, C=0):
     """
-    define a gaussian distribution, w/ args: mu, sigma, area (optional).
+    define a gaussian distribution, w/ args: mu, sigma, area, const.
     """
-    return A * (1. / sigma / np.sqrt(2 * np.pi)) * np.exp(-(x - mu)**2 / (2. * sigma**2))
+    norm = A / sigma / np.sqrt(2 * np.pi)
+    return norm * np.exp(-(x - mu)**2 / (2. * sigma**2)) + C
 
 
 def gauss_int(x, mu, sigma, A=1):
     """
-    integral of a gaussian from 0 to x, w/ args: mu, sigma, area (optional).
+    integral of a gaussian from 0 to x, w/ args: mu, sigma, area, const.
     """
     return A/2 * (1 + erf((x - mu)/sigma/np.sqrt(2)))
 
 
-def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
+def gauss_lin(x, mu, sigma, a, b, m):
+    """
+    gaussian + linear background function
+    """
+    return m * x + b + gauss(x, mu, sigma, a)
+
+
+def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     """
     David Radford's HPGe peak shape function
     """
-    #make sure the fractional amplitude parameters stay reasonable...
+    # make sure the fractional amplitude parameters stay reasonable
     if htail < 0 or htail > 1: 
         return np.zeros_like(x)
     if hstep < 0 or hstep > 1: 
@@ -177,8 +192,12 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1):
     le_tail *= np.exp((x - mu) / tau)
     le_tail /= (2 * tau * np.exp(-(sigma / (np.sqrt(2) * tau))**2))
 
-    # add up all the peak shape components
-    return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
+    if not components:
+        # add up all the peak shape components
+        return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
+    else:
+        # return individually to make a pretty plot
+        return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
 
 
 def xtalball(x, mu, sigma, A, beta, m):

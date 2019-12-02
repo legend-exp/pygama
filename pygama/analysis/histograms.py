@@ -9,7 +9,7 @@ import pygama.utils as pgu
 from pylab import rcParams
 
 
-def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
+def get_hist(np_arr, bins=None, range=None, dx=None, wts=None, trim=True):
     """
     Wrapper for numpy.histogram, with optional weights for each element.
     Note: there are no overflow / underflow bins.
@@ -28,9 +28,12 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None):
     if dx is not None:
         bins = int((range[1] - range[0]) / dx)
 
+    # bins includes left edge of first bin and right edge of last bin
     hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
 
-    if wts is None:
+    if wts is None and trim:
+        return hist, bins[1:] # return only right edges
+    elif wts is None and not trim:
         return hist, bins, hist
     else:
         var, bins = np.histogram(np_arr, bins=bins, weights=wts*wts)
