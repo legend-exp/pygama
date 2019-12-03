@@ -335,7 +335,7 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel("ADC", ha='right', y=1)
-            plt.legend(loc=2)
+            plt.legend(loc=2, fontsize=12)
             plt.tight_layout()
             plt.show(block=False)
             plt.pause(0.001)

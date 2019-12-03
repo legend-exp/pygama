@@ -5,6 +5,28 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+def get_dataset_from_cmdline(args, run_db, cal_db):
+    """
+    make it easier to call this from argparse:
+        arg("-ds", nargs='*', action="store", help="load runs for a DS")
+        arg("-r", "--run", nargs=1, help="load a single run")
+    """
+    # -- declare the DataSet --
+    if args["ds"]:
+        ds_lo = int(args["ds"][0])
+        try:
+            ds_hi = int(args["ds"][1])
+        except:
+            ds_hi = None
+        ds = DataSet(ds_lo, ds_hi,
+                     md=run_db, cal=cal_db, v=args["test"])
+
+    if args["run"]:
+        ds = DataSet(run=int(args["run"][0]),
+                     md=run_db, cal=cal_db, v=args["test"])
+    return ds
+
+
 def sh(cmd, sh=False):
     """
     input a shell command as you would type it on the command line.
@@ -68,6 +90,7 @@ def set_plot_style(style):
     path = __file__.rstrip('.utils.py')
     plt.style.use(path+'/'+style+'.mpl')
 
+
 def get_par_names(func):
     """
     Return a list containing the names of the arguments of "func" other than the
@@ -76,6 +99,7 @@ def get_par_names(func):
     from scipy._lib._util import getargspec_no_self
     args, varargs, varkw, defaults = getargspec_no_self(func)
     return args[1:]
+
 
 def plot_func(func, pars, range=None, npx=None, **kwargs):
     """

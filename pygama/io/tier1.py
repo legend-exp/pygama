@@ -16,24 +16,23 @@ from ..io.decoders.digitizers import *
 from ..utils import *
 
 
-def ProcessTier1(t1_file,
-                 intercom,
-                 digitizers=None,
-                 ftype="default",
-                 output_dir=None,
-                 output_prefix="t2",
-                 overwrite=True,
-                 verbose=False,
-                 nevt=None,
-                 ioff=None,
-                 multiprocess=True,
-                 chunk=3000):
-
-    print("Starting pygama Tier 1 processing ...")
-    print("  Date:", datetime.datetime.now())
-    print("  Input file:", t1_file)
-    print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
+def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default", 
+                 output_dir=None, output_prefix="t2", overwrite=True, 
+                 verbose=False, nevt=None, ioff=None, multiprocess=True, 
+                 chunk=3000, run=None, t2_file=None):
     t_start = time.time()
+
+    if verbose:
+        print("Starting pygama Tier 1 processing ...")
+        print("  Date:", datetime.datetime.now())
+        print("  Input file:", t1_file)
+    
+    if "~" in t1_file:
+        t1_file = os.path.expanduser("~") + t1_file.split("~")[-1]
+
+    if verbose:
+        print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
+    
 
     # multiprocessing parameters
     CHUNKSIZE = chunk
@@ -43,9 +42,10 @@ def ProcessTier1(t1_file,
     in_dir = os.path.dirname(t1_file)
     output_dir = os.getcwd() if output_dir is None else output_dir
 
-    # snag the run number (assuming t1_file ends in _run<number>.<filetype>)
-    run_str = re.findall('run\d+', t1_file)[-1]
-    run = int(''.join(filter(str.isdigit, run_str)))
+    if run is None:
+        # snag the run number (assuming t1_file ends in _run<number>.<filetype>)
+        run_str = re.findall('run\d+', t1_file)[-1]
+        run = int(''.join(filter(str.isdigit, run_str)))
 
     # declare output file
     output_dir = os.getcwd() if output_dir is None else output_dir
@@ -61,34 +61,42 @@ def ProcessTier1(t1_file,
     #################################################################
     
     else:
-       t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
-
+        if t2_file is None:
+            t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
+       
     if os.path.isfile(t2_file):
         if overwrite:
-            print("Overwriting existing file...")
+            if verbose:
+                print("Overwriting existing file...")
             os.remove(t2_file)
         else:
-            print("File already exists, continuing ...")
+            if verbose:
+                print("File already exists, continuing ...")
             return
 
     # get digitizers
     if digitizers is None:
         decoders = get_decoders()
         digitizers = [d for d in decoders if isinstance(d, Digitizer)]
+        
+        # shouldn't this extend the list instead of overwriting it?
         with pd.HDFStore(t1_file, 'r') as store:
             keys = [key[1:] for key in store.keys()]  # remove leading '/'
             digitizers = [d for d in digitizers if d.decoder_name in keys]
 
     # go running
     for d in digitizers:
-        print("Processing data from digitizer: {}".format(d.decoder_name))
+        if verbose:
+            print("Processing data from digitizer: {}".format(d.decoder_name))
 
         # get some info about the objects in the file
         with pd.HDFStore(t1_file, 'r') as store:
 
             s = store.get_storer(d.decoder_name)
-            object_info = store.get(d.class_name)
-            d.load_metadata(object_info)
+            
+            if d.class_name is not None:
+                object_info = store.get(d.class_name)
+                d.load_metadata(object_info)
 
             if isinstance(s, pd.io.pytables.AppendableFrameTable):
                 use_pytables = True
@@ -100,12 +108,13 @@ def ProcessTier1(t1_file,
             else:
                 print("Unknown type!", type(s))
                 exit()
+                
 
         # --------------- run multiprocessing ----------------
         if use_pytables and multiprocess:
 
-            print("Found {} rows, splitting into {} chunks".format(
-                nrows, nchunks))
+            if verbose:
+                print(f"Found {nrows} rows, splitting into {nchunks} chunks")
 
             keywords = {
                 "t1_file": t1_file,
@@ -125,10 +134,12 @@ def ProcessTier1(t1_file,
 
             # debug: process chunks in series
             # for idx in chunk_idxs:
-            # process_chunk(idx, **keywords)
+                # process_chunk(idx, **keywords)
             # exit()
 
             t2_df = pd.concat(result_list)
+            
+            # print("it worked", len(t2_df), len(result_list[0]))
 
         # ---------------- single process data ----------------
         # if df is fixed, we have to read the whole thing in
@@ -143,10 +154,8 @@ def ProcessTier1(t1_file,
                 if ioff != 0:
                     ioff = int(ioff)
 
-                t1_df = pd.read_hdf(
-                    t1_file,
-                    key=d.decoder_name,
-                    where = "ievt > {} & ievt < {}".format(ioff, ioff+nevt))
+                t1_df = pd.read_hdf(t1_file, key=d.decoder_name,
+                                    where = f"ievt > {ioff} & ievt < {ioff+nevt}")
             else:
                 print("WARNING: no event limit set (-n option)")
                 print("read the whole df into memory?  are you sure? (y/n)")
@@ -157,43 +166,44 @@ def ProcessTier1(t1_file,
 
             t2_df = intercom.process(t1_df, verbose)
 
-    update_progress(1)
+    if verbose:
+        update_progress(1)
 
     # ---------------- write Tier 2 output ----------------
 
-    print("Writing Tier 2 File:\n   {}".format(t2_file))
-    print("  Entries: {}".format(len(t2_df)))
+    if verbose:
+        print("Writing Tier 2 File:\n   {}".format(t2_file))
+        print("  Entries: {}".format(len(t2_df)))
 
+    # set everything except the index as a searchable data column
+    dcols = [col for col in t2_df.columns.tolist() if "index" not in col]
     if verbose:
         print("  Data columns:\n", t2_df.columns.values)
-
+    # print(t2_df.dtypes)
+    # print(t2_df.shape)
+    
     t2_df.to_hdf(
         t2_file,
         key="data",
-        format='table',
         mode='w',
-        data_columns=t2_df.columns.tolist(),
+        format='table',
+        data_columns=dcols,
         complib="blosc:snappy",
         complevel=2
         )
 
-    statinfo = os.stat(t2_file)
-    print("  File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    proc_rate = elapsed / len(t2_df)
-    print("  Date:", datetime.datetime.now())
-    print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
-        elapsed / 60, proc_rate))
-    print("Done.\n")
+    if verbose:
+        statinfo = os.stat(t2_file)
+        print("  File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        elapsed = time.time() - start
+        proc_rate = elapsed / len(t2_df)
+        print("  Date:", datetime.datetime.now())
+        print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
+            elapsed / 60, proc_rate))
+        print("Done.\n")
 
 
-def process_chunk(chunk_idx,
-                  t1_file,
-                  chunksize,
-                  nchunks,
-                  ncpu,
-                  key,
-                  intercom,
+def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom, 
                   verbose=False):
     """
     use hdf5 indexing, which is way faster than reading in the df first.
@@ -205,24 +215,26 @@ def process_chunk(chunk_idx,
     # code gets to 25 % at: 11:21 = 2 minutes actual time.
 
     global ichunk, pstart
-    update_progress(float(ichunk / nchunks))
+    if verbose:
+        update_progress(float(ichunk / nchunks))
     ichunk += ncpu
     if ichunk == 4 * ncpu:
         ptime = nchunks * (time.time() - pstart) / 10 / 60
-        print("Estimated time to completion: {:.2f} min".format(ptime))#, end='')
+        print(f"Estimated time to completion: {ptime:.2f} min")#, end='')
         # sys.stdout.flush()
 
     with pd.HDFStore(t1_file, 'r') as store:
 
         start = chunk_idx * chunksize
         stop = (chunk_idx + 1) * chunksize
-
-        chunk = pd.read_hdf(
-            t1_file, key, where="ievt >= {} & ievt < {}".format(start, stop))
-
-        # if verbose:
-        #     print("Chunk {}, start: {}  stop: {}, len: {},"
-        #           .format(chunk_idx, start, stop, stop - start),
-        #           "df shape:", chunk.shape)
+        
+        # this was ievt before, this requires a reset_index before calling this.
+        # it probably partially fixes the "pygama append bug"
+        chunk = pd.read_hdf(t1_file, key, where=f"index >= {start} & index < {stop}")
+        
+        if verbose:
+            print("Chunk {}, start: {}  stop: {}, len: {},"
+                  .format(chunk_idx, start, stop, stop - start),
+                  "df shape:", chunk.shape)
 
     return intercom.process(chunk)

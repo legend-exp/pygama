@@ -39,7 +39,13 @@ def main(argv):
         ds = DataSet(ds_lo, ds_hi, md=run_db, v=args["verbose"])
 
     if args["run"]:
+<<<<<<< HEAD
         ds = DataSet(run=int(args["run"][0]), sub="none", md=run_db, v=args["verbose"])
+=======
+        ds = DataSet(run=int(args["run"][0]), md=run_db, v=args["verbose"])
+    # if args["run"]:
+        # ds = DataSet(run=int("2019-4-12-BackgroundRun".split("Run")[-1]), md=run_db, v=args["verbose"])
+>>>>>>> cdbb3e2ad0f18d6e098da9a562da0bc953aad065
 
     # -- start processing --
     if args["tier0"]:
