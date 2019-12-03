@@ -43,7 +43,7 @@ def main():
                      md=run_db, cal=cal_db, v=args["test"])
 
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]),
+        ds = DataSet(run=int(args["run"][0]), sub='none',
                      md=run_db, cal=cal_db, v=args["test"])
 
     # -- start calibration routines --

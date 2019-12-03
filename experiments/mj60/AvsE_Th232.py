@@ -52,13 +52,16 @@ def main():
                      md=run_db, cal = cal_db) #,tier_dir=tier_dir)
 
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]),
+        ds = DataSet(run=int(args["run"][0]), sub='none',
                      md=run_db, cal=cal_db)
+    ds_list = ds.ds_list
+    pprint(ds.paths)
+    
 
-    find_cut(ds, ds_lo, args["writeDB"])
+    # find_cut(ds, args["writeDB"])
 
 #Code to find and record the optimal A/E cut
-def find_cut(ds, ds_lo, write_db=False):
+def find_cut(ds, write_db=False):
 
     #Make tier2 dataframe, get e_ftp and first pass calibration constants, then calibrate
     t2 = ds.get_t2df()
@@ -69,7 +72,7 @@ def find_cut(ds, ds_lo, write_db=False):
     table = calDB.table("cal_pass1")
     vals = table.all()
     df_cal = pd.DataFrame(vals) # <<---- omg awesome
-    df_cal = df_cal.loc[df_cal.ds==ds_lo]
+    df_cal = df_cal.loc[df_cal.ds==ds.ds_list[0]]
     p1cal = df_cal.iloc[0]["p1cal"]
     cal = p1cal * np.asarray(t2["e_ftp"])
 
@@ -80,7 +83,7 @@ def find_cut(ds, ds_lo, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
-    double_gauss_issue(cal, y, ds_lo)
+    double_gauss_issue(cal, y, ds)
     exit()
 
 
@@ -145,7 +148,7 @@ def find_cut(ds, ds_lo, write_db=False):
     plt.hist2d(cal, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
     plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
     cbar = plt.colorbar()
-    plt.title("Dataset {}".format(ds_lo))
+    plt.title("Dataset {}".format(ds.ds_list[0]))
     plt.xlabel("Energy (keV)", ha='right', x=1)
     plt.ylabel("A/Eunc", ha='right', y=1)
     cbar.ax.set_ylabel('Counts')
@@ -156,8 +159,8 @@ def find_cut(ds, ds_lo, write_db=False):
     hist1, bins1 = np.histogram(x1, bins=2000, range=[0,2000])
 
     plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
-    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
+    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
     plt.ylabel('Counts')
     plt.xlabel('keV')
     plt.legend()
@@ -203,7 +206,7 @@ def linear_correction(energy, a_over):
 
     return a_over
 
-def double_gauss_issue(energy, a_over_e, ds_lo):
+def double_gauss_issue(energy, a_over_e, ds):
 
     # file1 = np.load('./ds18.npz')
     # file2 = np.load('./bins_ds18.npz')
@@ -307,8 +310,8 @@ def double_gauss_issue(energy, a_over_e, ds_lo):
     hist1, bins1 = np.histogram(e1, bins=2000, range=[0,2000])
 
     plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
-    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
+    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
     plt.ylabel('Counts')
     plt.xlabel('keV')
     plt.legend()
