@@ -20,16 +20,19 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
                  output_dir=None, output_prefix="t2", overwrite=True, 
                  verbose=False, nevt=None, ioff=None, multiprocess=True, 
                  chunk=3000, run=None, t2_file=None):
+    t_start = time.time()
 
-    print("Starting pygama Tier 1 processing ...")
-    print("  Date:", datetime.datetime.now())
-    print("  Input file:", t1_file)
+    if verbose:
+        print("Starting pygama Tier 1 processing ...")
+        print("  Date:", datetime.datetime.now())
+        print("  Input file:", t1_file)
     
     if "~" in t1_file:
         t1_file = os.path.expanduser("~") + t1_file.split("~")[-1]
 
-    print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
-    t_start = time.time()
+    if verbose:
+        print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
+    
 
     # multiprocessing parameters
     CHUNKSIZE = chunk
@@ -63,10 +66,12 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
        
     if os.path.isfile(t2_file):
         if overwrite:
-            print("Overwriting existing file...")
+            if verbose:
+                print("Overwriting existing file...")
             os.remove(t2_file)
         else:
-            print("File already exists, continuing ...")
+            if verbose:
+                print("File already exists, continuing ...")
             return
 
     # get digitizers
@@ -81,7 +86,8 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
 
     # go running
     for d in digitizers:
-        print("Processing data from digitizer: {}".format(d.decoder_name))
+        if verbose:
+            print("Processing data from digitizer: {}".format(d.decoder_name))
 
         # get some info about the objects in the file
         with pd.HDFStore(t1_file, 'r') as store:
@@ -99,7 +105,6 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
                 nchunks = len(chunk_idxs)
             elif isinstance(s, pd.io.pytables.FrameFixed):
                 use_pytables = False
-                print("using fixed pytable")
             else:
                 print("Unknown type!", type(s))
                 exit()
@@ -108,7 +113,8 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
         # --------------- run multiprocessing ----------------
         if use_pytables and multiprocess:
 
-            print(f"Found {nrows} rows, splitting into {nchunks} chunks")
+            if verbose:
+                print(f"Found {nrows} rows, splitting into {nchunks} chunks")
 
             keywords = {
                 "t1_file": t1_file,
@@ -160,12 +166,14 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
 
             t2_df = intercom.process(t1_df, verbose)
 
-    update_progress(1)
+    if verbose:
+        update_progress(1)
 
     # ---------------- write Tier 2 output ----------------
 
-    print("Writing Tier 2 File:\n   {}".format(t2_file))
-    print("  Entries: {}".format(len(t2_df)))
+    if verbose:
+        print("Writing Tier 2 File:\n   {}".format(t2_file))
+        print("  Entries: {}".format(len(t2_df)))
 
     # set everything except the index as a searchable data column
     dcols = [col for col in t2_df.columns.tolist() if "index" not in col]
@@ -184,14 +192,15 @@ def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default",
         complevel=2
         )
 
-    statinfo = os.stat(t2_file)
-    print("  File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    proc_rate = elapsed / len(t2_df)
-    print("  Date:", datetime.datetime.now())
-    print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
-        elapsed / 60, proc_rate))
-    print("Done.\n")
+    if verbose:
+        statinfo = os.stat(t2_file)
+        print("  File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        elapsed = time.time() - start
+        proc_rate = elapsed / len(t2_df)
+        print("  Date:", datetime.datetime.now())
+        print("  Time elapsed: {:.2f} min  ({:.5f} sec/wf)".format(
+            elapsed / 60, proc_rate))
+        print("Done.\n")
 
 
 def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom, 
@@ -206,7 +215,8 @@ def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom,
     # code gets to 25 % at: 11:21 = 2 minutes actual time.
 
     global ichunk, pstart
-    update_progress(float(ichunk / nchunks))
+    if verbose:
+        update_progress(float(ichunk / nchunks))
     ichunk += ncpu
     if ichunk == 4 * ncpu:
         ptime = nchunks * (time.time() - pstart) / 10 / 60
