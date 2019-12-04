@@ -11,19 +11,19 @@ def get_dataset_from_cmdline(args, run_db, cal_db):
         arg("-ds", nargs='*', action="store", help="load runs for a DS")
         arg("-r", "--run", nargs=1, help="load a single run")
     """
-    # -- declare the DataSet --
+    from pygama import DataSet
+    
     if args["ds"]:
         ds_lo = int(args["ds"][0])
         try:
             ds_hi = int(args["ds"][1])
         except:
             ds_hi = None
-        ds = DataSet(ds_lo, ds_hi,
-                     md=run_db, cal=cal_db, v=args["test"])
-
+        ds = DataSet(ds_lo, ds_hi, md=run_db, cal=cal_db, v=args["verbose"])
+    
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]),
-                     md=run_db, cal=cal_db, v=args["test"])
+        ds = DataSet(run=int(args["run"][0]), md=run_db, cal=cal_db, 
+                     v=args["verbose"])
     return ds
 
 

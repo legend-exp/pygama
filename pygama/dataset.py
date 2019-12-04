@@ -55,6 +55,7 @@ class DataSet:
         self.runs, self.ds_list = [], []
         if ds_lo is not None:
             self.runs.extend(self.get_runs(ds_lo, ds_hi, v))
+            self.ds_lo = ds_lo
         if run is not None:
             self.runs.append(run)
             self.ds_list.append(self.lookup_ds(run))
