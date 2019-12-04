@@ -1,0 +1,28 @@
+{
+  "raw_dir":"$DATADIR/L200",
+  "tier_dir":"$DATADIR/L200",
+
+  "t0_prefix":"protothppmco_",
+  "t0_suffix":".fcio",
+
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+
+  "daq":"FlashCam",
+  "datasets":{
+    "0":["0","multi-detector test file from UNC"]
+  },
+
+  "processing":{
+    "cycle_1":{
+      "run_coverage":[0,9999999],
+      "daq_to_raw":{
+        "digitizer":"FlashCam"
+      },
+      "raw_to_dsp":{
+        "avg_bl": {"ihi":20},
+        "blsub" : {}
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import h5py
+import re
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,7 +11,7 @@ def main():
     show_h5()
     # show_evts()
     # test_bool()
-    write_h5()
+    # write_h5()
 
     
 def show_h5():
@@ -27,7 +28,7 @@ def show_h5():
 
         # skip bool columns for now (see test_bool below)
         if any(x in path for x in ["inverted", "muveto"]):
-            print("  skipping bool dataset:", path)
+            # print("  skipping bool dataset:", path)
             continue
         
         dt = dset.dtype
@@ -35,12 +36,12 @@ def show_h5():
         at = dset.attrs
         ldtype = get_legend_dtype(dset.attrs['datatype']) 
 
-        print(f"  type: {dt}  size: {ds}")
-        for name in dset.attrs:
-            print(f"  attr: {name}  value: {dset.attrs[name]}")
-        for d in ldtype:
-            print(f"    {d} : {ldtype[d]}")
-        print("")
+        # print(f"  type: {dt}  size: {ds}")
+        # for name in dset.attrs:
+        #     print(f"  attr: {name}  value: {dset.attrs[name]}")
+        # for d in ldtype:
+        #     print(f"    {d} : {ldtype[d]}")
+        # print("")
 
 
 def h5iter(g, prefix=''):
@@ -67,17 +68,20 @@ def get_legend_dtype(dtstr):
     """
     dt = {}
     
-    # TODO: oliver gave me these, we should update the function below
-    # to use them instead of all that messy string splitting
+    # # TODO: oliver gave me these, we should update this function
+    # # to use them instead of all that messy string splitting
     # datatype_regexp = r"""^(([A-Za-z_]*)(<([0-9,]*)>)?)(\{(.*)\})?$"""
     # arraydims_regexp = r"""^<([0-9,]*)>$"""
-    
+    # tmp_dt = re.split(datatype_regexp, dtstr)
+    # tmp_ar = re.split(arraydims_regexp, dtstr)
+
+    # clint's original method based on some ugly string splitting
     sp1 = dtstr.split("{")[0]
     dt["format"] = sp1 # scalar, array, struct, or table
     
     if "array" in dt["format"]:
         dt["ndim"] = int(sp1.split("<")[1].split(">")[0])
-
+    
     sp2 = dtstr.split("{")[1:]
     if "enum" in sp2:
         dt["dtype"] = "enum"

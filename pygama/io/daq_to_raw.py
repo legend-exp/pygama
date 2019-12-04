@@ -2,96 +2,93 @@
 pygama tier 0 processing
 raw daq data --> pandas dfs saved to hdf5 file (tier 1)
 """
-import numpy as np
 import os, re, sys, glob, time
-import pandas as pd
+import numpy as np
 import h5py
-from future.utils import iteritems
-from functools import partial
+import pandas as pd
 from pprint import pprint
 
 from ..utils import *
-from ..io.decoders.digitizers import *
-from ..io.decoders.pollers import *
-from ..io.decoders.data_loading import *
-from ..io.decoders.xml_parser import *
-from ..dsp.base import *
-from ..io.decoders.SIS3316File import *
+from ..io.digitizers import *
+from ..io.pollers import *
+from ..io.io_base import *
+from ..io.orca_header import *
+from ..io.llama_3316 import *             
 
-def ProcessTier0(t0_file,
-                 run,
-                 ftype="default",
-                 output_prefix="t1",
-                 chan_list=None,
-                 n_max=np.inf,
-                 verbose=False,
-                 output_dir=None,
-                 overwrite=True,
-                 decoders=None,
-                 settings={}):
+
+def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
+               verbose=False, output_dir=None, overwrite=True, decoders=None,
+               config={}):
     """
-    for now, reads ORCA data and turns it into pandas DataFrames,
-    and saves to HDF5 using pytables
     """
-    print("Starting pygama Tier 0 processing ...")
+    print("Starting pygama daq_to_raw processing ...")
     print("  Input file:", t0_file)
 
     output_dir = os.getcwd() if output_dir is None else output_dir
 
-    ###############################################################
-    """
-    Change for HADES style output
-    """
-
-    if ftype == "hades_char":
-    # declare Tier 1 output file
-
-       file_body = t0_file.split("/")[-1].replace("fcio","h5")
-       t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
-       if os.path.isfile(t1_file):
-           if overwrite:
-               print("Overwriting existing file...")
-               os.remove(t1_file)
-           else:
-               print("File already exists, continuing ...")
-               return
-    ################################################################ 
-    
-    else:
-       t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
-       if os.path.isfile(t1_file):
-           if overwrite:
-               print("Overwriting existing file...")
-               os.remove(t1_file)
-           else:
-               print("File already exists, continuing ...")
-               return
+    # ###############################################################
+    # # Change for HADES style output
+    # # TODO: as vince would say, i need to do something smart here
+    # 
+    # if ftype == "hades_char":
+    # # declare Tier 1 output file
+    # 
+    #    file_body = t0_file.split("/")[-1].replace("fcio","h5")
+    #    t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
+    #    if os.path.isfile(t1_file):
+    #        if overwrite:
+    #            print("Overwriting existing file...")
+    #            os.remove(t1_file)
+    #        else:
+    #            print("File already exists, continuing ...")
+    #            return
+    # ################################################################ 
+    # else:
+    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+    if os.path.isfile(t1_file):
+       if overwrite:
+           print("Overwriting existing file...")
+           os.remove(t1_file)
+       else:
+           print("File already exists, continuing ...")
+           return
+       
+    t_start = time.time()
     
     # set max number of events (useful for debugging)
-    if n_max is not np.inf:
+    if n_max is not np.inf and n_max is not None:
         n_max = int(n_max)
 
     # get the DAQ mode
-    if settings["daq"] == "ORCA":
-        ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose)
-    elif settings["daq"] == "FlashCam":
-        ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose)
-    elif settings["daq"] == "SIS3316":
-        ProcessSIS3316(t0_file, t1_file, run, n_max, settings, verbose)
-    elif settings["daq"] == "CAENDT57XX":
-        ProcessCompass(t0_file, t1_file, decoders, output_dir)
+    if config["daq"] == "ORCA":
+        process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose)
+    
+    elif config["daq"] == "FlashCam":
+        process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
+    
+    elif config["daq"] == "SIS3316":
+        process_llama_3316(t0_file, t1_file, run, n_max, config, verbose)
+    
+    elif config["daq"] == "CAENDT57XXDecoder":
+        process_compass(t0_file, t1_file, decoders, output_dir)
+    
     else:
-        print(f"DAQ: {settings['daq']} not recognized.  Exiting ...")
+        print(f"DAQ: {config['daq']} not recognized.  Exiting ...")
         exit()
+        
+    # --------- summary ------------
+
+    statinfo = os.stat(t1_file)
+    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+    elapsed = time.time() - t_start
+    print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Done.\n")
     
     
-def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
+def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     """
-    handle ORCA raw files
+    convert ORCA DAQ data to pygama "raw" lh5
     """
-    # num. rows between writes.  larger eats more memory
-    # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'settings' dict
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -102,10 +99,6 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
 
     # parse the header
     reclen, reclen2, header_dict = parse_header(t0_file)
-    # print("   {} longs in plist header".format(reclen))
-    # print("   {} bytes in the header".format(reclen2))
-    # pprint(header_dict)
-    # exit()
 
     # figure out the total size
     SEEK_END = 2
@@ -143,11 +136,7 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
-        d.apply_settings(settings)
-
-        # if d.class_name=="ORSIS3302Model":
-            # pprint(d.df_metadata.columns)
-            # exit()
+        d.apply_config(config)
 
     
     # ------------ scan over raw data starts here -----------------
@@ -171,7 +160,7 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file, verbose=True)
+                d.save_to_pytables(t1_file, verbose=True)
 
         try:
             event_data, data_id = get_next_event(f_in)
@@ -195,7 +184,7 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file, verbose=True)
+        d.save_to_pytables(t1_file, verbose=True)
 
     if verbose:
         update_progress(1)
@@ -213,12 +202,6 @@ def ProcessORCA(t0_file, t1_file, run, n_max, decoders, settings, verbose):
         print(store.keys())
         # print(store.info())
 
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
-
 
 def get_next_event(f_in):
     """
@@ -232,8 +215,8 @@ def get_next_event(f_in):
     # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
     """
     try:
-        head = np.fromstring(
-            f_in.read(4), dtype=np.uint32)  # event header is 8 bytes (2 longs)
+        # event header is 8 bytes (2 longs)
+        head = np.fromstring(f_in.read(4), dtype=np.uint32)  
     except Exception as e:
         print(e)
         raise Exception("Failed to read in the event orca header.")
@@ -264,23 +247,13 @@ def get_next_event(f_in):
     return event_data, data_id
     
 
-
-def ProcessSIS3316(t0_file, 
-                    t1_file, 
-                    run,
-                    n_max, 
-                    settings, 
-                    verbose):
+def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     """
-    My implementation for the Struck SIS3316 digitizer.
-    Use the llamaDAQ program for producing compatible input files.
-    """                    
+    convert llama DAQ data to pygama "raw" lh5
     
-    #now the ugly code duplication starts ... 
-    
-    # num. rows between writes.  larger eats more memory
-    # smaller does more writes and takes more time to finish
-    # TODO: pass this option in from the 'settings' dict
+    Mario's implementation for the Struck SIS3316 digitizer.
+    Requires the llamaDAQ program for producing compatible input files.
+    """       
     ROW_LIMIT = 5e4
     
     start = time.time()
@@ -289,10 +262,10 @@ def ProcessSIS3316(t0_file,
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
         
-    #file = SIS3316File(f_in,2) #test
+    #file = llama_3316(f_in,2) #test
 
     verbosity = 1 if verbose else 0     # 2 is for debug
-    sisfile = SIS3316File(f_in, verbosity)
+    sisfile = llama_3316(f_in, verbosity)
 
     # figure out the total size
     SEEK_END = 2
@@ -307,12 +280,12 @@ def ProcessSIS3316(t0_file,
     # run = get_run_number(header_dict)
     print("Run number: {}".format(run))
 
-    #see pygama/pygama/io/decoders/data_loading.py
+    #see pygama/pygama/io/decoders/io_base.py
     decoders = []
     decoders.append(SIS3316Decoder(pd.DataFrame.from_dict(header_dict)))   #we just have that one
-                    # fix: saving metadata using data_loadings ctor
+                    # fix: saving metadata using io_bases ctor
                     # have to convert to dataframe here in order to avoid 
-                    # passing to xml_header.get_object_info in data_loading.load_metadata
+                    # passing to xml_header.get_object_info in io_base.load_metadata
     channelOne = list(list(header_dict.values())[0].values())[0]
     decoders[0].initialize(1000./channelOne["SampleFreq"], channelOne["Gain"])
         # FIXME: gain set according to first found channel, but gain can change!
@@ -321,7 +294,7 @@ def ProcessSIS3316(t0_file,
 
     # pass in specific decoder options (windowing, multisampling, etc.)
     for d in decoders:
-        d.apply_settings(settings)
+        d.apply_config(config)
 
     # ------------ scan over raw data starts here -----------------
     # more code duplication
@@ -331,7 +304,7 @@ def ProcessSIS3316(t0_file,
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
 
-    # header is already skipped by SIS3316File
+    # header is already skipped by llama_3316
 
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
@@ -343,7 +316,7 @@ def ProcessSIS3316(t0_file,
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.to_file(t1_file, verbose=True)
+                d.save_to_pytables(t1_file, verbose=True)
 
         try:
             fadcID, channelID, event_data = sisfile.read_next_event(header_dict)
@@ -362,7 +335,7 @@ def ProcessSIS3316(t0_file,
 
     # final write to file
     for d in decoders:
-        d.to_file(t1_file, verbose=True)
+        d.save_to_pytables(t1_file, verbose=True)
 
     if verbose:
         update_progress(1)
@@ -380,14 +353,8 @@ def ProcessSIS3316(t0_file,
         print(store.keys())
         # print(store.info())
 
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
 
-
-def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
+def process_compass(t0_file, t1_file, digitizer, output_dir=None):
     """
     Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs a .h5 file named t1_file
 
@@ -435,114 +402,46 @@ def ProcessCompass(t0_file, t1_file, digitizer, output_dir=None):
     with pd.HDFStore(t1_file, "r") as store:
         print(store.keys())
 
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")
 
+def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
+    """
+    decode FlashCam data, using the fcutils package to handle file access,
+    and the FlashCam DataTaker to save the results and write to output.
+    """
+    import fcutils
 
-def ProcessFlashCam(t0_file, t1_file, run, n_max, decoders, settings, verbose):
-
-    ############################################
-    # Start of FlashCam data specific decoding #
-    ############################################
-
-    from fcutils import fcio
-
-    ROW_LIMIT = 5e4
-    start = time.time()
-
-    print("Lets process amazing FlashCam data")
-    # The fcio class is used to open the datafile
-    io = fcio(t0_file)
-    # no run info in FC header yet - get_run_number(header_dict)
-    print("Run number: {}".format(run))
+    fcio = fcutils.fcio(t0_file)
+    decoder = FlashCam()
+    decoder.get_file_config(fcio)
     
-    # no decoder info in FC header yet - get_decoder_for_id(header_dict)
-    id_dict = {"decoder":"FlashCam"}
+    # ROW_LIMIT = 5e4
+    ROW_LIMIT = 1000
+
+    # loop over raw data packets
+    i_debug = 0
     
-    if verbose:
-      print("Data IDs present in this header are:")
-      for id in id_dict:
-        print(" {}: {}".format(id, id_dict[id]))
-    used_decoder_names = set([id_dict[id] for id in id_dict])
-    
-    #Currently no decoder name provide by the FC file header
-    #Set by hand - get_decoder()
-    if decoders is None:
-      decoders = []
-      decoders.append(FlashCamDecoder())
-      decoder_names = []
-      decoder_names.append('FlashCam')
-
-    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
-    decoder_to_id = {d.decoder_name: d for d in decoders}
-
-    # pass in specific decoder options (windowing, multisampling, etc.)
-    for d in decoders:
-      d.apply_settings(settings)
-
-    if os.path.isfile(t1_file):
-      if overwrite:
-        print("Overwriting existing file...")
-        os.remove(t1_file)
-      else:
-        print("File already exists, continuing ...")
-        return
-
-    packet_id = 0 # number of events decoded
-    unrecognized_data_ids = []
-    
-    while io.next_event() and packet_id<n_max:
+    packet_id = 0
+    while fcio.next_event() and packet_id < n_max:
       packet_id += 1
-      if packet_id % 10000 == 0:
-        print(packet_id,io.eventtime)
-      #if verbose and packet_id % 1000 == 0:
-      #update_progress(float(io.telid) / file_size)
+      if verbose and packet_id % 1000 == 0:
+          update_progress(float(fcio.telid) / file_size)
       
-      # write periodically to the output file instead of writing all at once
+      # write periodically to the output file
       if packet_id % ROW_LIMIT == 0:
-        for d in decoders:
-          d.to_file(t1_file, verbose=True)
-      
-      # sends data to the pandas dataframe
-      # specific FlashCam formatting
-      for d in decoders:
-        if d.decoder_name == 'FlashCam':
-          d.decode_event(io, packet_id)
-        else:
-          print("ERROR: Specific FlashCam event decoder provided to ",d.decoder_name)
-          sys.exit()
+          
+          # decoder.save_to_pytables(t1_file, verbose=True)
+          decoder.save_to_lh5(t1_file)
+          i_debug += 1
+          
+          if i_debug == 5:
+              print("breaking early")
+              break # debug, deleteme
 
-    ##########################################
-    # End of FlashCam data specific decoding #
-    ##########################################
+      decoder.decode_event(fcio, packet_id)
 
-    # final write to file
-    for d in decoders:
-      if verbose:
-        print("tier0 - write in decoder ",d.decoder_name)
-      d.to_file(t1_file, verbose=True)
+    # end of loop, write to file once more
+    # decoder.save_to_pytables(t1_file, verbose=True)
+    # decoder.save_to_lh5(t1_file, verbose=True)
 
     if verbose:
       update_progress(1)
-  
-    if len(unrecognized_data_ids) > 0:
-      print("WARNING, Found the following unknown data IDs:")
-      for id in unrecognized_data_ids:
-        print(" {}".format(id))
-      print("hopefully they weren't important!\n")
-
-    # --------- summary ------------
-
-    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
-    with pd.HDFStore(t1_file,'r') as store:
-      print(store.keys())
-      # print(store.info())
-  
-    statinfo = os.stat(t1_file)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
-    elapsed = time.time() - start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Done.\n")

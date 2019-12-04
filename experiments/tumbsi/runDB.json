@@ -44,11 +44,11 @@
   "build_options": {
     "conf1": {
       "run_coverage": [0, 99999],
-      "tier0_options": {
+      "daq_to_raw_options": {
         "daq": "FlashCam",
         "digitizer": "FlashCamWaveformDecoder"
       },
-      "tier1_options": {
+      "raw_to_dsp_options": {
         "clk": 62500000.0,
         "fit_bl": {
           "ihi": 100,

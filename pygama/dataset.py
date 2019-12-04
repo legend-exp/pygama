@@ -37,18 +37,17 @@ class DataSet:
 
         try:
             self.ftype = self.runDB["filetype"]
-            print("Processing ", self.ftype, " data")
         except:
             self.ftype = "default"
 
         # match ds number to run numbers
         self.ds_run_table = {}
-        for ds in self.runDB["ds"]:
+        for ds in self.config["datasets"]:
             try:
                 dsnum = int(ds)
             except:
                 continue
-            run_cov = self.runDB["ds"][ds][0].split(",")
+            run_cov = self.config["datasets"][ds][0].split(",")
             self.ds_run_table[int(ds)] = [int(r) for r in run_cov]
 
         # create the internal lists of run numbers and ds's
@@ -95,17 +94,17 @@ class DataSet:
 
     def get_runs(self, ds_lo=None, ds_hi=None, verbose=False):
         """
-        using the runDB,
+        using the config,
         create a list of data sets to process,
         then return a list of the included run numbers
         """
-        if self.runDB is None:
-            print("Error, runDB not set.")
+        if self.config is None:
+            print("Error, config not set.")
             return []
 
         # load all data
         if ds_lo is None and ds_hi is None:
-            self.ds_list.extend([d for d in self.runDB["ds"] if d != "note"])
+            self.ds_list.extend([d for d in self.config["ds"] if d != "note"])
 
         # load single ds
         elif ds_hi is None:
@@ -117,7 +116,7 @@ class DataSet:
 
         run_list = []
         for ds in self.ds_list:
-            tmp = self.runDB["ds"][str(ds)][0].split(",")
+            tmp = self.config["ds"][str(ds)][0].split(",")
             r1 = int(tmp[0])
             r2 = int(tmp[1]) if len(tmp)>1 else None
             if r2 is None:
@@ -261,7 +260,7 @@ class DataSet:
         """
         return the pass-1 initial guess parameters for an energy estimator.
         """
-        for key in self.runDB["ecal"]:
+        for key in self.config["ecal"]:
             tmp = key.split(",")
             if len(tmp) == 1:
                 continue
@@ -366,9 +365,9 @@ class DataSet:
         This is wrong by a factor ~2*tau (dt between events).
         """
         if clock is None:
-            clock = self.runDB["clock"]
+            clock = self.config["clock"]
         if rollover is None:
-            rollover = self.runDB["rollover"]
+            rollover = self.config["rollover"]
 
         total_rt = 0
         for run in self.runs:

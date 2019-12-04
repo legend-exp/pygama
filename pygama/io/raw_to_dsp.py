@@ -11,15 +11,28 @@ import datetime
 import multiprocessing as mp
 from functools import partial
 
-from ..io.decoders.data_loading import *
+from ..io.decoders.io_base import *
 from ..io.decoders.digitizers import *
 from ..utils import *
 
 
-def ProcessTier1(t1_file, intercom, digitizers=None, ftype="default", 
-                 output_dir=None, output_prefix="t2", overwrite=True, 
-                 verbose=False, nevt=None, ioff=None, multiprocess=True, 
-                 chunk=3000, run=None, t2_file=None):
+def RunDSP(t1_file,
+                 intercom,
+                 digitizers=None,
+                 ftype="default",
+                 output_dir=None,
+                 output_prefix="t2",
+                 overwrite=True,
+                 verbose=False,
+                 nevt=None,
+                 ioff=None,
+                 multiprocess=True,
+                 chunk=3000):
+
+    print("Starting pygama Tier 1 processing ...")
+    print("  Date:", datetime.datetime.now())
+    print("  Input file:", t1_file)
+    print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
     t_start = time.time()
 
     if verbose:

@@ -11,7 +11,7 @@ def main():
     """
     sync MJ60 data with cenpa-rocks.
     - rsync the entire Data/MJ60 directory using the $DATADIR variable
-    - set flags to then remove raw/tier1/tier2 files
+    - set flags to then remove raw/raw_to_dsp/tier2 files
     Hopefully we can reuse this script for C1.
     """
     global runDB

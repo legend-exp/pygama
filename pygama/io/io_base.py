@@ -1,120 +1,78 @@
 """
-data_loading.py
+io_base.py
 base class for reading raw data, usually 32-bit data words,
 from different `data takers`.
 contains methods to save pandas dataframes to files.
 subclasses:
      - digitizers.py -- Gretina4M, SIS3302, FlashCam, etc.
      - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
+     
+Notes on writing new DataTaker objects:
+
+I recommend you save entries to the output file by using 
+`self.format_data(locals())` as the last line of `decode_event`.
+
+DataTakers require you declare these before calling `super().__init__()`:
+    * `self.digitizer_type`: a string naming the digitizer
+    * `self.decoded_values`: the Python lists to convert to HDF5
 """
-import sys
+import sys, os
 import numpy as np
 import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
 from pprint import pprint
-from .xml_parser import get_object_info
+from .orca_header import get_object_info
+import h5py
 
-
-def get_decoders(object_info=None):
-    """ Find all the active pygama data takers that inherit from DataLoader.
-    This only works if the subclasses have been imported.
-    """
-    decoders = []
-    for sub in DataLoader.__subclasses__():
-        for subsub in sub.__subclasses__():
-            try:
-                decoder = subsub(object_info) # initialize the decoder
-                decoders.append(decoder)
-            except Exception as e:
-                print(e)
-                pass
-    return decoders
-
-
-class DataLoader(ABC):
-    """
-    NOTE:
-    all subclasses should save entries into pandas dataframes
-    by putting this as the last line of their decode_event:
-        self.format_data(locals())
-    This sends any variable whose name is a key in
-    `self.decoded_values` to the output (create_df) function.
-    """
-    def __init__(self, df_metadata=None):
+class DataTaker(ABC):
+    def __init__(self, user_config=None):
         """
-        when you initialize this from a derived class with 'super',
-        you should have already declared:
-        self.decoder_name, self.class_name, and self.decoded_values
+        all DataTakers should count the total number of events, and track
+        garbage values separately.  To properly initialize self.garbage_values,
+        you should declare self.decoded_values in your DataTaker before calling:
+            super().__init__(*args, **kwargs)
         """
         self.total_count = 0
         self.garbage_count = 0 # never leave any data behind
         self.garbage_values = {key:[] for key in self.decoded_values}
 
-        # every DataLoader should set this (affects if we can chunk the output)
-        self.h5_format = "table"
-        self.pytables_col_limit = 3100
-
-        # need the decoder name and the class name
-        if df_metadata is not None:
-            self.load_metadata(df_metadata)
-        else:
-            self.df_metadata = None
-
-
-    def load_metadata(self, df_metadata):
-        """ Load metadata for this data taker """
-
-        # print('trying this', self.class_name)
-        # pprint(df_metadata)
-
-        if isinstance(df_metadata, dict):
-            self.df_metadata = get_object_info(df_metadata, self.class_name)
-
-        elif isinstance(df_metadata, pd.core.frame.DataFrame):
-            self.df_metadata = df_metadata
-
-        elif isinstance(df_metadata, str):
-            self.df_metadata = pd.read_hdf(df_metadata, self.class_name)
-
-        else:
-            raise TypeError(
-                "Wrong DataLoader metadata type:"
-                .format(type(df_metadata)))
-
+        if user_config is not None:
+            with open(user_config) as f:
+                self.user_config = json.load(f)
 
     def format_data(self, vals, is_garbage=False):
         """
-        for every single event in the raw DAQ data, we send
-        any variable with a name in "self.decoded_values"
-        to the pandas output with:
-        self.format_data(locals())
+        for every event in the raw DAQ data, we send any local variable with a 
+        name in "self.decoded_values" to the output with the line:
+            self.format_data(locals())
         """
         self.total_count += 1
-
         if is_garbage:
             self.garbage_count += 1
 
         for key in vals:
             if key is not "self" and key in self.decoded_values:
-
-                # print(key, vals[key], type(vals[key]))
-                # if isinstance(vals[key], np.ndarray):
-                    # print(len(vals[key]))
-
                 if is_garbage:
                     self.garbage_values[key].append(vals[key])
                 else:
-                    # Need to make this fix, otherwise waveform array overwritten at each event
-                    if type(vals[key])==np.ndarray:
+                    if type(vals[key]) == np.ndarray:
                         self.decoded_values[key].append(vals[key].copy())
                     else:
                         self.decoded_values[key].append(vals[key])
 
+    def clear_data(self):
+        """ clear out standard objects when we do a write to file """
+        self.total_count = 0
+        self.garbage_count = 0
+        self.decoded_values = {key:[] for key in self.decoded_values}
+        self.garbage_values = {key:[] for key in self.garbage_values}
+
+    # === PANDAS HDF5 I/O ======================================================
     def create_df(self, get_garbage=False):
         """
         Base dataframe creation method.
-        Classes inheriting from DataLoader (like digitizers or pollers) can
+        Classes inheriting from DataTaker (like digitizers or pollers) can
         overload this if necessary for more complicated use cases.
         Try to avoid pickling to 'object' types if possible.
         """
@@ -176,10 +134,10 @@ class DataLoader(ABC):
         else:
             return df
 
-
-    def to_file(self, file_name, verbose=False, write_option="a"):
-        """ save primary data, garbage data, and metadata to hdf5 """
-
+    def save_to_pytables(self, file_name, verbose=False, write_option="a"):
+        """ 
+        save primary data, garbage data, and metadata to hdf5 
+        """
         if verbose:
             print("Writing {}".format(self.decoder_name))
 
@@ -256,10 +214,88 @@ class DataLoader(ABC):
         self.clear_data()
 
 
-    def clear_data(self):
-        """ clear out standard objects when we do a write to file """
-        self.total_count = 0
-        self.garbage_count = 0
-        self.decoded_values = {key:[] for key in self.decoded_values}
-        self.garbage_values = {key:[] for key in self.garbage_values}
+    # === LH5 HDF5 I/O =========================================================
+    def save_to_lh5(self, file_name):
+        """
+        """
+        append = os.path.exists(file_name)
+        file_mode = "a" if append else "w"
+        
+        # open the output file
+        hf = h5py.File(file_name, file_mode)
+        
+        # create the header, saving everything in attributes (like a dict)
+        if not append:
+            hf.create_group('header')
+            for c in self.file_config:
+                hf["/header"].attrs[c] = self.file_config[c]
+            hf["/header"].attrs["file_name"] = file_name
+        
+        # create datasets for each member of self.decoded_values
+        for col in self.decoded_values:
+            
+            # create waveform datasets
+            if "waveform" in col:
+                
+                wf_group = f"/daqdata/{col}/"
+                nwfs = len(self.decoded_values[col])
+                nsamp = self.file_config['nsamples']
+                wf_idxs = np.arange(0, nsamp*nwfs-1, nsamp)
+                wfs = np.hstack(self.decoded_values[col])
+                
+                # NOTE: could apply compression here, and wf_idxs would vary
+                
+                # write first time
+                if not append:
+                    wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
+                                              data=wfs, maxshape=(None,))
+                    wf_idxs_ds = hf.create_dataset(f"{wf_group}/cumulative_length",
+                                                  data=wf_idxs, maxshape=(None,))
+                
+                    # placeholders to match Oliver's spec
+                    wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
+                    wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                
+                # append
+                else:
+                    print("appending ...")
+                    wf_ds = hf[f"{wf_group}/flattened_data"]
+                    wf_ds.resize(wf_ds.shape[0] + wfs.shape[0], axis=0)   
+                    wf_ds[-wfs.shape[0]:] = wfs
+                    
+                    wf_idxs_ds = hf[f"{wf_group}/cumulative_length"]
+                    wf_idxs_ds.resize(wf_idxs_ds.shape[0] + wf_idxs.shape[0], axis=0)
+                    wf_idxs_ds[-wf_idxs.shape[0]:] = wf_idxs
 
+            # create single-valued datasets
+            else:
+                npa = np.asarray(self.decoded_values[col]) # dtype is automatic
+                
+                # write first time
+                if not append:
+                    dset = hf.create_dataset(f"/daqdata/{col}", data=npa, maxshape=(None,))
+                    print("first one:", npa.shape[0], col)
+                
+                    # set default attributes
+                    dset.attrs["units"] = "none"
+                    dset.attrs["datatype"] = "array<1>{real}"
+                
+                    # overwrite attributes if they exist
+                    if col in self.lh5_spec:
+                        if "units" in self.lh5_spec[col]: 
+                            dset.attrs["units"] = self.lh5_spec[col]["units"]
+                
+                # append
+                else:
+                    dset = hf[f"/daqdata/{col}"]
+                    dset.resize(dset.shape[0] + npa.shape[0], axis=0)
+                    dset[-npa.shape[0]:] = npa
+            
+        # write stuff to the file
+        hf.flush()
+        hf.close()
+        
+        # finally, clear out existing data (relieve memory pressure)
+        self.clear_data()
+        
+        print('wrote stuff once')

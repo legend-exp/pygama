@@ -23,21 +23,21 @@ t1_options = {
 
 def main():
     """
-    ProcessTier0 needs to output DAQ data in a format that is:
+    ProcessRaw needs to output DAQ data in a format that is:
     - parallelizable, requires hdf5 tables
-    - chunkable (allows vectorizing calculators in ProcessTier1)
+    - chunkable (allows vectorizing calculators in RunDSP)
     - doesn't embed waveforms in a cell (tables output doesn't work for 'fixed')
     - wf tables don't exceed pytables dimension limits
     - works for both Gretina and SIS3302 cards (shows versatility)
     """
     # ------- TIER 0 -------
 
-    tier0(run, n_evt=np.inf)
-    # check_tier0(run)
+    daq_to_raw(run, n_evt=np.inf)
+    # check_daq_to_raw(run)
 
     # ------- TIER 1 -------
 
-    tier1(run)
+    raw_to_dsp(run)
 
     # ------- TIER 2 -------
 
@@ -46,23 +46,23 @@ def main():
     # ----------------------
 
 
-def tier0(run, n_evt=None):
+def daq_to_raw(run, n_evt=None):
 
-    from pygama.processing.tier0 import ProcessTier0
+    from pygama.processing.daq_to_raw import ProcessRaw
 
     raw_file = glob.glob("{}/*Run{}".format(data_dir, run))[0]
 
     if n_evt is None:
         n_evt = np.inf
 
-    ProcessTier0(raw_file,
+    ProcessRaw(raw_file,
                  verbose=True,
                  output_dir=data_dir,
                  n_max=n_evt,
                  settings=t0_options[run])
 
 
-def check_tier0(run):
+def check_daq_to_raw(run):
 
     t1_file = glob.glob("{}/t1_run{}.h5".format(data_dir, run))[0]
 
@@ -81,10 +81,10 @@ def check_tier0(run):
         # nrows = store.get_storer(h5keys[run]).shape[0] # fixed only
 
 
-def tier1(run):
+def raw_to_dsp(run):
 
-    from pygama.processing.base import Tier1Processor
-    from pygama.processing.tier1 import ProcessTier1
+    from pygama.processing.dsp_base import Tier1Processor
+    from pygama.processing.raw_to_dsp import RunDSP
 
     t1_file = glob.glob("{}/t1_run{}.h5".format(data_dir, run))[0]
 
@@ -94,7 +94,7 @@ def tier1(run):
     proc.AddTransformer(bl_subtract, fun_args = {"test":False})
     proc.AddTransformer(trap_filter, fun_args = {"test":False})
 
-    ProcessTier1(t1_file,
+    RunDSP(t1_file,
                  proc,
                  out_prefix="t2",
                  verbose=True,

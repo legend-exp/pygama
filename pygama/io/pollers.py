@@ -2,20 +2,9 @@ import numpy as np
 import pandas as pd
 import sys
 
-from .data_loading import DataLoader
+from .io_base import DataTaker
 
-
-class Poller(DataLoader):
-    """ handle any data taker that does not record waveforms """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def apply_settings(self, settings):
-        """ apply user settings specific to this card and run """
-        pass
-
-
-class MJDPreampDecoder(Poller):
+class MJDPreampDecoder(DataTaker):
     """
     members:
     - decode_event (decodes raw data from an MJDPreAmp object)
@@ -113,7 +102,7 @@ class MJDPreampDecoder(Poller):
         return channel_names
 
 
-class ISegHVDecoder(Poller):
+class ISegHVDecoder(DataTaker):
     """ iSeg HV Card """
 
     def __init__(self, *args, **kwargs):
@@ -137,12 +126,11 @@ class ISegHVDecoder(Poller):
         self.h5_format = 'fixed'
 
 
-    def decode_event(self,
-                     event_data_bytes,
-                     event_number,
-                     header_dict,
+    def decode_event(self, event_data_bytes, event_number, header_dict,
                      verbose=False):
-        """ see README for the 32-bit data word diagram """
+        """ 
+        see README for the 32-bit data word diagram 
+        """
         event_data_int = np.fromstring(event_data_bytes, dtype=np.uint32)
         event_data_float = np.fromstring(event_data_bytes, dtype=np.float32)
 

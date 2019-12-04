@@ -31,12 +31,16 @@ def sh(cmd, sh=False):
     """
     input a shell command as you would type it on the command line.
     """
-    import shlex
-    import subprocess as sp
-    if not sh:
-        sp.call(shlex.split(cmd))  # "safe"
-    else:
-        sp.call(cmd, shell=sh)  # "less safe"
+    decoders = []
+    for sub in DataTaker.__subclasses__():
+        for subsub in sub.__subclasses__():
+            try:
+                decoder = subsub(object_info) # initialize the decoder
+                decoders.append(decoder)
+            except Exception as e:
+                print(e)
+                pass
+    return decoders
 
 
 def update_progress(progress, run=None):
@@ -219,4 +223,16 @@ def peakdet(v, delta, x=None):
                 find_max = True
 
     return np.array(maxes), np.array(mins)
+
+
+def sh(cmd, sh=False):
+    """
+    input a shell command as you would type it on the command line.
+    """
+    import shlex
+    import subprocess as sp
+    if not sh:
+        sp.call(shlex.split(cmd))  # "safe"
+    else:
+        sp.call(cmd, shell=sh)  # "less safe"
 
