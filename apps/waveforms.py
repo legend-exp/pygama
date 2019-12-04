@@ -9,6 +9,9 @@ from ROOT import TFile, TChain, TTree, MGTWaveform
 
 def main(argv):
     doc="""
+    TODO: placeholder app for browsing waveforms.  Somebody needs to update
+    this to read HDF5 files.  -Clint
+    
     quick interactive waveform viewer for wave_skim.cc output files.
     Default is interactive mode.  
     - [Enter] advances to the next wf, 
