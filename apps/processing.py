@@ -29,17 +29,7 @@ def main(argv):
     arg("-m", "--nomp", action=sf, help="don't use multiprocessing")
     args = vars(par.parse_args())
 
-    # -- declare the DataSet --
-    if args["ds"]:
-        ds_lo = int(args["ds"][0])
-        try:
-            ds_hi = int(args["ds"][1])
-        except:
-            ds_hi = None
-        ds = DataSet(ds_lo, ds_hi, md=run_db, v=args["verbose"])
-
-    if args["run"]:
-        ds = DataSet(run=int(args["run"][0]), md=run_db, v=args["verbose"])
+    ds = pu.get_dataset_from_cmdline(args, "runDB.json", "calDB.json")
 
     # -- start processing --
     if args["tier0"]:
