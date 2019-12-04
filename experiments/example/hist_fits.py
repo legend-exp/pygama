@@ -1,6 +1,5 @@
 """
 Example code by Jason demonstrating some pygama convenience functions.
-https://github.com/legend-exp/pygama/pull/1
 """
 import numpy as np
 import matplotlib.pyplot as plt
