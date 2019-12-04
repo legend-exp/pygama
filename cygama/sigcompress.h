@@ -23,4 +23,4 @@ std::vector<int> multiply(const std::vector<double>& input);
 
 py::array_t<int> py_multiply(py::array_t<double, py::array::c_style | py::array::forcecast> array);
 
-py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::forecast> array);
+py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::forcecast> array);

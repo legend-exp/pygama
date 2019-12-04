@@ -23,8 +23,6 @@ int compress_signal(short *sig_in, unsigned short *sig_out, int sig_len_in) {
   // ------------ do compression of signal ------------ 
   j = iso = bp = 0;
   
-  return sig_out;
-
   sig_out[iso++] = sig_len_in;     // signal length
   
   while (j < sig_len_in) {         // j = starting index of section of signal
@@ -182,7 +180,6 @@ int decompress_signal(unsigned short *sig_in, short *sig_out, int sig_len_in) {
            iso, siglen);
   }
   return siglen; // number of shorts in decompressed signal data
-  */
 } 
 
 
@@ -246,7 +243,7 @@ py::array_t<int> py_multiply(py::array_t<double, py::array::c_style | py::array:
 }
 
 
-py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::forecast> array){
+py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::forcecast> array){
   /*
   for compress_signal.  with a little work could maybe make this more general
   */
@@ -254,14 +251,15 @@ py::array_t<int> py_compress(py::array_t<int, py::array::c_style | py::array::fo
 
   std::memcpy(array_vec.data(), array.data(), array.size()*sizeof(int));
 
-  std::vector<int> result_vec = compress_signal(array_vec);
+  // std::vector<int> result_vec = compress_signal(array_vec);
 
-  auto result        = py::array_t<int>(array.size());
-  auto result_buffer = result.request();
-  int *result_ptr    = (int *) result_buffer.ptr;
+  // auto result        = py::array_t<int>(array.size());
+  // auto result_buffer = result.request();
+  // int *result_ptr    = (int *) result_buffer.ptr;
+  // 
+  // std::memcpy(result_ptr,result_vec.data(),result_vec.size()*sizeof(int));
 
-  std::memcpy(result_ptr,result_vec.data(),result_vec.size()*sizeof(int));
-
-  return result;
+  // hack, need to return result
+  return py::array_t<int>(array.size());
   
 }

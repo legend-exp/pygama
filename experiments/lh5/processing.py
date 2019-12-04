@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pygama import DataSet
+from pprint import pprint
 
 def main():
     """
@@ -8,7 +9,8 @@ def main():
     write for processing with a specific config file.
     """
     # process_data()
-    read_data()
+    # read_data()
+    test_cygama()
     
 
 def process_data():
@@ -45,8 +47,8 @@ def read_data():
     # get the number of entries in the dataset
     def getentries(name, obj):
         print(name, obj)
-        if isinstance(obj, h5py.Dataset):
-            print("size is:", obj.shape)
+        # if isinstance(obj, h5py.Dataset):
+            # print("size is:", obj.shape)
     hf.visititems(getentries)
     # exit()
     
@@ -54,14 +56,20 @@ def read_data():
     # 1. energy histogram
     import pygama.analysis.histograms as pgh
     import matplotlib.pyplot as plt
+    plt.style.use("../../pygama/clint.mpl")
+    
+    
     wf_max = hf['/daqdata/wf_max'][...] # slice reads into memory
     wf_bl = hf['/daqdata/baseline'][...]
     wf_max = wf_max - wf_bl
     xlo, xhi, xpb = 0, 5000, 10
     hist, bins, var = pgh.get_hist(wf_max, range=(xlo, xhi), dx=xpb)
     bins = bins[1:]
-    # plt.semilogy(bins, hist, ls='steps', c='b')
-    # plt.show()
+    plt.semilogy(bins, hist, ls='steps', c='b')
+    plt.xlabel("Energy (uncal)", ha='right', x=1)
+    plt.ylabel("Counts", ha='right', y=1)
+    plt.show()
+    exit()
     
     # 2. energy vs time
     # ts = hf['/daqdata/timestamp']
@@ -101,6 +109,13 @@ def read_data():
     
     hf.close()
 
+
+def test_cygama():
+    """
+    """
+    import pygama.cygama as pc
+    print(pc.add(1,2))
+    
     
 if __name__=="__main__":
     main()
