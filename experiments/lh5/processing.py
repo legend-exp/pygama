@@ -9,8 +9,8 @@ def main():
     write for processing with a specific config file.
     """
     # process_data()
-    # read_data()
-    test_cygama()
+    read_data()
+    # test_cygama()
     
 
 def process_data():
@@ -24,7 +24,7 @@ def read_data():
     read the output
     """
     import h5py
-    out_file = "/Users/wisecg/Data/L200/t1_run0.h5"
+    out_file = "/Users/wisecg/Data/L200/t1_run0.lh5"
     hf = h5py.File(out_file)
     
     header = hf['/header']
@@ -63,13 +63,13 @@ def read_data():
     wf_bl = hf['/daqdata/baseline'][...]
     wf_max = wf_max - wf_bl
     xlo, xhi, xpb = 0, 5000, 10
-    hist, bins, var = pgh.get_hist(wf_max, range=(xlo, xhi), dx=xpb)
-    bins = bins[1:]
+    hist, bins = pgh.get_hist(wf_max, range=(xlo, xhi), dx=xpb)
     plt.semilogy(bins, hist, ls='steps', c='b')
     plt.xlabel("Energy (uncal)", ha='right', x=1)
     plt.ylabel("Counts", ha='right', y=1)
-    plt.show()
-    exit()
+    # plt.show()
+    # exit()
+    plt.cla()
     
     # 2. energy vs time
     # ts = hf['/daqdata/timestamp']
