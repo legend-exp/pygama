@@ -6,7 +6,7 @@ def main():
     """
     testing Yoann's Tier 0 (daq_to_raw) FlashCam parser.
     this is the high-level part of the code, something that a user might
-    write for processing with a specific config file.
+    write (even on the interpreter) for processing with a specific config file.
     """
     # process_data()
     read_data()
