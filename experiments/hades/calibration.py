@@ -109,7 +109,7 @@ def calibrate_pass0(ds, df, etype="e_ftp", write_db=False, test=False):
     print("Calibration on single peak")
  
 
-    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    epeaks = sorted(ds.config["cal_peaks"], reverse=True)
     pu = epeaks[0]
     # get initial parameters for this energy estimator
     calpars = ds.get_p1cal_pars("e_ftp")
@@ -176,7 +176,7 @@ def calibrate_pass1(ds, df, etype="e_ftp", write_db=False, test=False):
 
     print("Start first Calibration!")
     # get a list of peaks we assume are always present
-    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    epeaks = sorted(ds.config["cal_peaks"], reverse=True)
 
     # get initial parameters for this energy estimator
     calpars = ds.get_p1cal_pars(etype)
@@ -261,7 +261,7 @@ def calibrate_pass1(ds, df, etype="e_ftp", write_db=False, test=False):
         for x,y in maxes:
             plt.plot(x * ds_cal, y, "m.", ms=10)
 
-        pks = ds.runDB["pks"]
+        pks = ds.config["pks"]
         cmap = plt.cm.get_cmap('jet', len(pks) + 1)
         for i, pk in enumerate(pks):
             plt.axvline(float(pk), c=cmap(i), linestyle="--", lw=1, label=f"{pks[pk]}: {pk} keV")
@@ -301,7 +301,7 @@ def calibrate_pass2(ds,df,run, cal_db,run_db,write_db=False):
       runDB = json.load(f)
 
     path_to_files =  os.path.expandvars(runDB["meta_dir"]) 
-    true_peaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    true_peaks = sorted(ds.config["cal_peaks"], reverse=True)
     iter = 0
     
     plt.figure(1)

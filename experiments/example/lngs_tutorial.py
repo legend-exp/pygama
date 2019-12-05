@@ -126,7 +126,7 @@ for run in ds.runs:
         continue
 
     conf = ds.paths[run]["build_opt"]
-    opts = ds.runDB["build_options"][conf]["daq_to_raw_options"]
+    opts = ds.config["build_options"][conf]["daq_to_raw_options"]
 
     if test:
         print("test mode (dry run), processing Tier 0 file:", t0_file)
@@ -157,7 +157,7 @@ for run in ds.runs:
 
 
 # show our processor list
-t1_opts = ds.runDB["build_options"][conf]["raw_to_dsp_options"]
+t1_opts = ds.config["build_options"][conf]["raw_to_dsp_options"]
 
 # modify one of the processors to have the test argument.  Can also directly edit the JSON file
 t1_opts['ftp']["test"] = 1
@@ -191,7 +191,7 @@ multiproc = True
 # reload the DataSet
 ds = DataSet(run=204, md=db_file, v=True) # can also use a list of run numbers
 
-t1_opts = ds.runDB["build_options"][conf]["raw_to_dsp_options"]
+t1_opts = ds.config["build_options"][conf]["raw_to_dsp_options"]
 # t1_opts['ftp']["test"] = 1
 
 # undo the modification

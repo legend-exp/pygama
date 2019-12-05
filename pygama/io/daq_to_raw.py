@@ -12,7 +12,7 @@ from ..utils import *
 from ..io.digitizers import *
 from ..io.pollers import *
 from ..io.io_base import *
-from ..io.orca_header import *
+from ..io.orca_helper import *
 from ..io.llama_3316 import *             
 
 
@@ -85,7 +85,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
     print("Done.\n")
     
     
-def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
+def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
@@ -99,7 +99,7 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
 
     # parse the header
     reclen, reclen2, header_dict = parse_header(t0_file)
-
+    
     # figure out the total size
     SEEK_END = 2
     f_in.seek(0, SEEK_END)
@@ -108,36 +108,28 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
     file_size_MB = file_size / 1e6
     print("Total file size: {:.3f} MB".format(file_size_MB))
 
-    # run = get_run_number(header_dict)
+    if run is not None:
+        run = get_run_number(header_dict)
     print("Run number: {}".format(run))
-
+    
+    # figure out which decoders we can use
+    decoders = []
     id_dict = get_decoder_for_id(header_dict)
     if verbose:
         print("Data IDs present in this header are:")
         for id in id_dict:
-            print("    {}: {}".format(id, id_dict[id]))
-    used_decoder_names = set([id_dict[id] for id in id_dict])
-
-    # get all available pygama decoders, then remove unused ones
-    if decoders is None:
-        decoders = get_decoders(header_dict)
-        decoder_names = [d.decoder_name for d in decoders]
-
-    final_decoder_list = list(set(decoder_names).intersection(used_decoder_names))
-    decoders = [d for d in decoders if d.decoder_name in final_decoder_list]
+            print(f"    {id}: {id_dict[id]}")
+    used_ids = set([id_dict[id] for id in id_dict])
+    for sub in DataTaker.__subclasses__():
+        tmp = sub() # instantiate the class
+        if tmp.decoder_name in used_ids:
+            # tmp.apply_config(config) # broken rn
+            decoders.append(tmp)
     decoder_to_id = {d.decoder_name: d for d in decoders}
-
-    print("pygama will run these decoders:")
-    for name in final_decoder_list:
-        for id in id_dict:
-            if id_dict[id] == name:
-                this_data_id = id
-        print("    {}: {}".format(this_data_id, name))
-
-    # pass in specific decoder options (windowing, multisampling, etc.)
-    for d in decoders:
-        d.apply_config(config)
-
+    if verbose:
+        print("pygama will run these decoders:")
+        for d in decoders:
+            print("   ", d.decoder_name)
     
     # ------------ scan over raw data starts here -----------------
 
@@ -161,7 +153,6 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
                 d.save_to_pytables(t1_file, verbose=True)
-
         try:
             event_data, data_id = get_next_event(f_in)
         except EOFError:
@@ -202,50 +193,6 @@ def process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose):
         print(store.keys())
         # print(store.info())
 
-
-def get_next_event(f_in):
-    """
-    Gets the next event, and some basic information about it
-    Takes the file pointer as input
-    Outputs:
-    -event_data: a byte array of the data produced by the card (could be header + data)
-    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
-    # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
-    # The read is set up to do two 32-bit integers, rather than bytes or shorts
-    # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
-    """
-    try:
-        # event header is 8 bytes (2 longs)
-        head = np.fromstring(f_in.read(4), dtype=np.uint32)  
-    except Exception as e:
-        print(e)
-        raise Exception("Failed to read in the event orca header.")
-
-    # Assuming we're getting an array of bytes:
-    # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
-    # data_id         = (head[2] >> 2) + (head[3]<<8)
-    # slot            = (head[6] & 0x1f)
-    # crate           = (head[6]>>5) + head[7]&0x1
-    # reserved        = (head[4] + (head[5]<<8))
-
-    # Using an array of uint32
-    record_length = int((head[0] & 0x3FFFF))
-    data_id = int((head[0] >> 18))
-    # slot            =int( (head[1] >> 16) & 0x1f)
-    # crate           =int( (head[1] >> 21) & 0xf)
-    # reserved        =int( (head[1] &0xFFFF))
-
-    # /* ========== read in the rest of the event data ========== */
-    try:
-        # record_length is in longs, read gives bytes
-        event_data = f_in.read(record_length * 4 - 4)
-    except Exception as e:
-        print("  No more data...\n")
-        print(e)
-        raise EOFError
-
-    return event_data, data_id
-    
 
 def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     """

@@ -1,7 +1,7 @@
 import plistlib
 import sys
 import pandas as pd
-
+import numpy as np
 
 def parse_header(xmlfile):
     """
@@ -61,56 +61,56 @@ def get_run_number(header_dict):
     raise ValueError("No run number found in header!")
 
 
-def get_data_id(headerDict, class_name, super_name):
+def get_data_id(header_dict, class_name, super_name):
     """
     stored like this:
-    `headerDict["dataDescription"]["ORRunModel"]["Run"]["dataId"]`
+    `header_dict["dataDescription"]["ORRunModel"]["Run"]["dataId"]`
     but integer needs to be bitshifted by 18
     """
-    id_int = headerDict["dataDescription"][class_name][super_name]["dataId"]
+    id_int = header_dict["dataDescription"][class_name][super_name]["dataId"]
 
     return id_int >> 18
 
 
-def flip_data_ids(headerDict):
+def flip_data_ids(header_dict):
     """
     Returns an inverted dictionary such that:
     Could be extended somehow to give you all the supers associated with a given class name (maybe like)
     flipped[dataId] = [class_key, [super1, super2, ...]]
     """
     flipped = dict()
-    # headerDict["dataDescription"][class_name][super_name]["dataId"]
-    for class_key in headerDict["dataDescription"].keys():
+    # header_dict["dataDescription"][class_name][super_name]["dataId"]
+    for class_key in header_dict["dataDescription"].keys():
         super_keys_list = []
-        for super_key in headerDict["dataDescription"][class_key].keys():
+        for super_key in header_dict["dataDescription"][class_key].keys():
             super_keys_list.append(super_key)
-            ID_val = (headerDict["dataDescription"][class_key][super_key]
+            ID_val = (header_dict["dataDescription"][class_key][super_key]
                       ["dataId"]) >> 18
             flipped[ID_val] = [class_key, super_keys_list]
 
     # this one just gives a single super             flipped[dataId] = [class_key, super_key]
-    # for class_key in headerDict["dataDescription"].keys():
-    #     super_keys_list = headerDict["dataDescription"][class_key].keys()
-    #     ID_val = (headerDict["dataDescription"][class_key][super_keys_list[0]]["dataId"])>>18
+    # for class_key in header_dict["dataDescription"].keys():
+    #     super_keys_list = header_dict["dataDescription"][class_key].keys()
+    #     ID_val = (header_dict["dataDescription"][class_key][super_keys_list[0]]["dataId"])>>18
     #     flipped[ID_val] = [class_key,super_keys_list]
 
     return flipped
 
 
-def get_decoder_for_id(headerDict):
+def get_decoder_for_id(header_dict):
     """
     Returns a dictionary that goes:
     `dict[dataIdNum] = "decoderName"`
     e.g: d[5] = 'ORSIS3302DecoderForEnergy'
     """
     d = dict()
-    for class_key in headerDict["dataDescription"].keys():
+    for class_key in header_dict["dataDescription"].keys():
         super_keys_list = []
-        for super_key in headerDict["dataDescription"][class_key].keys():
+        for super_key in header_dict["dataDescription"][class_key].keys():
             super_keys_list.append(super_key)
-            ID_val = (headerDict["dataDescription"][class_key][super_key]
+            ID_val = (header_dict["dataDescription"][class_key][super_key]
                       ["dataId"]) >> 18
-            decoderName = headerDict["dataDescription"][class_key][super_key][
+            decoderName = header_dict["dataDescription"][class_key][super_key][
                 "decoder"]
 
             d[ID_val] = decoderName
@@ -118,14 +118,14 @@ def get_decoder_for_id(headerDict):
     return d
 
 
-def get_object_info(headerDict, class_name):
+def get_object_info(header_dict, class_name):
     """
     returns a dict keyed by data id with all info from the header
     TODO: doesn't include all parts of the header yet!
     """
     object_info_list = []
 
-    crates = headerDict["ObjectInfo"]["Crates"]
+    crates = header_dict["ObjectInfo"]["Crates"]
     for crate in crates:
         cards = crate["Cards"]
         for card in cards:
@@ -133,7 +133,7 @@ def get_object_info(headerDict, class_name):
                 card["Crate"] = crate["CrateNumber"]
                 object_info_list.append(card)
 
-    # AuxHw = headerDict["ObjectInfo"]["AuxHw"]
+    # AuxHw = header_dict["ObjectInfo"]["AuxHw"]
     # print("AUX IS:")
     # for aux in AuxHw:
     # print(aux.keys())
@@ -145,3 +145,48 @@ def get_object_info(headerDict, class_name):
     df = pd.DataFrame.from_dict(object_info_list)
     df.set_index(['Crate', 'Card'], inplace=True)
     return df
+
+
+def get_next_event(f_in):
+    """
+    Gets the next event, and some basic information about it
+    Takes the file pointer as input
+    Outputs:
+    -event_data: a byte array of the data produced by the card (could be header + data)
+    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
+    # The read is set up to do two 32-bit integers, rather than bytes or shorts
+    # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
+    """
+    try:
+        # event header is 8 bytes (2 longs)
+        head = np.fromstring(f_in.read(4), dtype=np.uint32)  
+    except Exception as e:
+        print(e)
+        raise Exception("Failed to read in the event orca header.")
+
+    # Assuming we're getting an array of bytes:
+    # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
+    # data_id         = (head[2] >> 2) + (head[3]<<8)
+    # slot            = (head[6] & 0x1f)
+    # crate           = (head[6]>>5) + head[7]&0x1
+    # reserved        = (head[4] + (head[5]<<8))
+
+    # Using an array of uint32
+    record_length = int((head[0] & 0x3FFFF))
+    data_id = int((head[0] >> 18))
+    # slot            =int( (head[1] >> 16) & 0x1f)
+    # crate           =int( (head[1] >> 21) & 0xf)
+    # reserved        =int( (head[1] &0xFFFF))
+
+    # /* ========== read in the rest of the event data ========== */
+    try:
+        # record_length is in longs, read gives bytes
+        event_data = f_in.read(record_length * 4 - 4)
+    except Exception as e:
+        print("  No more data...\n")
+        print(e)
+        raise EOFError
+
+    return event_data, data_id
+    

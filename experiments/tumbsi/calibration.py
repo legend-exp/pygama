@@ -108,7 +108,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
     by the second pass, and other codes.
     """
     # get a list of peaks we assume are always present
-    epeaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    epeaks = sorted(ds.config["cal_peaks"], reverse=True)
 
     # get initial parameters for this energy estimator
     calpars = ds.get_p1cal_pars(etype)
@@ -189,7 +189,7 @@ def calibrate_pass1(ds, etype="e_ftp", write_db=False, test=False):
         for x,y in maxes:
             plt.plot(x * ds_cal, y, "m.", ms=10)
 
-        pks = ds.runDB["pks"]
+        pks = ds.config["pks"]
         cmap = plt.cm.get_cmap('jet', len(pks) + 1)
         for i, pk in enumerate(pks):
             plt.axvline(float(pk), c=cmap(i), linestyle="--", lw=1, label=f"{pks[pk]}: {pk} keV")
@@ -230,7 +230,7 @@ def calibrate_pass2(ds, write_db=False):
 
     df = ds.get_t2df()
 
-    true_peaks = sorted(ds.runDB["cal_peaks"], reverse=True)
+    true_peaks = sorted(ds.config["cal_peaks"], reverse=True)
     iter = 0
     
     plt.figure(1)

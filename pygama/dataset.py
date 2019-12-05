@@ -15,15 +15,15 @@ class DataSet:
                  opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
 
         # load metadata and set paths to data folders
-        self.runDB, self.calDB = None, None
+        self.config, self.calDB = None, None
         if md is not None:
             self.load_metadata(md) # pure JSON
         if cal is not None:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
-            self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
-            self.t1pre = self.runDB["t1_prefix"]
-            self.t2pre = self.runDB["t2_prefix"]
+            self.raw_dir = os.path.expandvars(self.config["raw_dir"])
+            self.t1pre = self.config["t1_prefix"]
+            self.t2pre = self.config["t2_prefix"]
 
         except:
             print("Bad metadata, reverting to defaults ...")
@@ -32,22 +32,22 @@ class DataSet:
             self.t2pre = "t2_run"
 
         self.tier_dir = None
-        self.tier1_dir = os.path.expandvars(self.runDB["tier1_dir"])
-        self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
+        self.tier1_dir = os.path.expandvars(self.config["tier1_dir"])
+        self.tier2_dir = os.path.expandvars(self.config["tier2_dir"])
 
         try:
-            self.ftype = self.runDB["filetype"]
+            self.ftype = self.config["filetype"]
         except:
             self.ftype = "default"
 
         # match ds number to run numbers
         self.ds_run_table = {}
-        for ds in self.config["datasets"]:
+        for ds in self.config["ds"]:
             try:
                 dsnum = int(ds)
             except:
                 continue
-            run_cov = self.config["datasets"][ds][0].split(",")
+            run_cov = self.config["ds"][ds][0].split(",")
             self.ds_run_table[int(ds)] = [int(r) for r in run_cov]
 
         # create the internal lists of run numbers and ds's
@@ -79,7 +79,7 @@ class DataSet:
         load a JSON file into a dict
         """
         with open(fname) as f:
-            self.runDB = json.load(f)
+            self.config = json.load(f)
 
 
     def add_run(self, runs):
@@ -217,10 +217,10 @@ class DataSet:
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
-        if self.runDB is not None:
+        if self.config is not None:
             cov = {}
-            for conf in self.runDB["build_options"]:
-                cov[conf] = self.runDB["build_options"][conf]["run_coverage"]
+            for conf in self.config["build_options"]:
+                cov[conf] = self.config["build_options"][conf]["run_coverage"]
 
             for run in runs:
                 for conf, ranges in cov.items():
@@ -272,7 +272,7 @@ class DataSet:
                 print("Error, we don't currently support multiple p1 cal pars.")
                 exit()
             # print(key,etype)
-            pars = self.runDB["ecal"][key][etype]
+            pars = self.config["ecal"][key][etype]
             # pprint(pars)
             return pars
 
@@ -423,7 +423,7 @@ class DataSet:
             conf = self.paths[run]["build_opt"]
             
             if proc_list is None:
-                proc_list = self.runDB['build_options'][conf]['tier1_options']
+                proc_list = self.config['build_options'][conf]['tier1_options']
 
             proc = Intercom(proc_list)
 
@@ -432,5 +432,5 @@ class DataSet:
             ProcessTier1(t1_file, proc, output_dir=out_dir, 
                          overwrite=overwrite, verbose=verbose, 
                          multiprocess=False, nevt=np.inf, 
-                         ioff=0, chunk=self.runDB["chunksize"])
+                         ioff=0, chunk=self.config["chunksize"])
 

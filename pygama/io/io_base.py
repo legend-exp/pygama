@@ -22,8 +22,8 @@ import pandas as pd
 from abc import ABC
 import matplotlib.pyplot as plt
 from pprint import pprint
-from .orca_header import get_object_info
 import h5py
+
 
 class DataTaker(ABC):
     def __init__(self, user_config=None):
@@ -40,6 +40,11 @@ class DataTaker(ABC):
         if user_config is not None:
             with open(user_config) as f:
                 self.user_config = json.load(f)
+
+                
+    # def set_config(self, config):
+        # self.config = config
+
 
     def format_data(self, vals, is_garbage=False):
         """
@@ -61,12 +66,14 @@ class DataTaker(ABC):
                     else:
                         self.decoded_values[key].append(vals[key])
 
+
     def clear_data(self):
         """ clear out standard objects when we do a write to file """
         self.total_count = 0
         self.garbage_count = 0
         self.decoded_values = {key:[] for key in self.decoded_values}
         self.garbage_values = {key:[] for key in self.garbage_values}
+
 
     # === PANDAS HDF5 I/O ======================================================
     def create_df(self, get_garbage=False):
@@ -133,6 +140,7 @@ class DataTaker(ABC):
             return None
         else:
             return df
+
 
     def save_to_pytables(self, file_name, verbose=False, write_option="a"):
         """ 

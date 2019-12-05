@@ -69,7 +69,7 @@ def daq_to_raw(ds,overwrite=False, nevt=np.inf, v=False, test=False):
         
       print("In/Out files:",t0_file,t1_file)
       conf = ds.paths[run]["build_opt"]
-      opts = ds.runDB["build_options"][conf]["daq_to_raw_options"]
+      opts = ds.config["build_options"][conf]["daq_to_raw_options"]
       
       if test:
         print("test mode (dry run), processing Tier 0 file:", t0_file)
@@ -118,7 +118,7 @@ def raw_to_dsp(ds,
             continue
 
         conf = ds.paths[run]["build_opt"]
-        proc_list = ds.runDB["build_options"][conf]["raw_to_dsp_options"]
+        proc_list = ds.config["build_options"][conf]["raw_to_dsp_options"]
         proc = Intercom(proc_list)
 
         RunDSP(
@@ -130,7 +130,7 @@ def raw_to_dsp(ds,
             multiprocess=multiproc,
             nevt=nevt,
             ioff=ioff,
-            chunk=ds.runDB["chunksize"])
+            chunk=ds.config["chunksize"])
 
 
 if __name__ == "__main__":

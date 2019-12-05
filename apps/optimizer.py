@@ -209,7 +209,7 @@ def process_ds(ds, f_grid, f_opt, f_tier1, f_tier2):
         # process silently
         ProcessTier1(f_tier1, proc, output_dir=out_dir, overwrite=True, 
                      verbose=False, multiprocess=True, nevt=np.inf, ioff=0, 
-                     chunk=ds.runDB["chunksize"], run=ds.runs[0], 
+                     chunk=ds.config["chunksize"], run=ds.runs[0], 
                      t2_file=f_tier2, digitizers=[dig])
         
         # load the temporary file and append to the main output file

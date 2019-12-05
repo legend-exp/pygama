@@ -49,12 +49,11 @@ class ORCAStruck3302(DataTaker):
         self.n_blsamp = 2000
         self.ievt = 0
         self.ievt_gbg = 0
+        self.pytables_col_limit = 3000
+        self.df_metadata = None # hack, this probably isn't right
+        
 
-    def decode_event(self,
-                     event_data_bytes,
-                     packet_id,
-                     header_dict,
-                     verbose=False):
+    def decode_event(self, event_data_bytes, packet_id, header_dict, verbose=False):
         """
         see README for the 32-bit data word diagram
         """
@@ -84,17 +83,17 @@ class ORCAStruck3302(DataTaker):
 
         # compute expected and actual array dimensions
         wf_length16 = 2 * wf_length_32
-        orca_header_length16 = 2
+        orca_helper_length16 = 2
         sis_header_length16 = 12 if buffer_wrap else 8
-        header_length16 = orca_header_length16 + sis_header_length16
+        header_length16 = orca_helper_length16 + sis_header_length16
         ene_wf_length16 = 2 * ene_wf_length
         footer_length16 = 8
-        expected_wf_length = len(evt_data_16) - orca_header_length16 - sis_header_length16 - \
+        expected_wf_length = len(evt_data_16) - orca_helper_length16 - sis_header_length16 - \
             footer_length16 - ene_wf_length16
 
         # error check: waveform size must match expectations
         if wf_length16 != expected_wf_length or last_word != 0xdeadbeef:
-            print(len(evt_data_16), orca_header_length16, sis_header_length16,
+            print(len(evt_data_16), orca_helper_length16, sis_header_length16,
                   footer_length16)
             print("ERROR: Waveform size %d doesn't match expected size %d." %
                   (wf_length16, expected_wf_length))
@@ -132,22 +131,22 @@ class ORCAStruck3302(DataTaker):
         # final raw wf array
         waveform = wf_data
 
-        # if the wf is too big for pytables, we can window it
-        if self.window:
-            wf = Waveform(wf_data, self.sample_period, self.decoder_name)
-            win_wf, win_ts = wf.window_waveform(self.win_type,
-                                                self.n_samp,
-                                                self.n_blsamp,
-                                                test=False)
-            ts_lo, ts_hi = win_ts[0], win_ts[-1]
-
-            waveform = win_wf # modify final wf array
-
-            if wf.is_garbage:
-                ievt = self.ievt_gbg
-                self.ievt_gbg += 1
-                self.format_data(locals(), wf.is_garbage)
-                return
+        # # if the wf is too big for pytables, we can window it
+        # if self.window:
+        #     wf = Waveform(wf_data, self.sample_period, self.decoder_name)
+        #     win_wf, win_ts = wf.window_waveform(self.win_type,
+        #                                         self.n_samp,
+        #                                         self.n_blsamp,
+        #                                         test=False)
+        #     ts_lo, ts_hi = win_ts[0], win_ts[-1]
+        # 
+        #     waveform = win_wf # modify final wf array
+        # 
+        #     if wf.is_garbage:
+        #         ievt = self.ievt_gbg
+        #         self.ievt_gbg += 1
+        #         self.format_data(locals(), wf.is_garbage)
+        #         return
 
         if len(waveform) > self.pytables_col_limit and self.h5_format == "table":
             print("WARNING: too many columns for tables output,\n",
@@ -220,6 +219,7 @@ class ORCAStruck3316(DataTaker):
         """
         self.sample_period = sample_period
         self.gain = gain
+        
         
     def decode_event(self, event_data_bytes, packet_id, header_dict, fadcIndex, 
                      channelIndex, verbose=False):
@@ -336,9 +336,10 @@ class CAENDT57XX(DataTaker):
     a dictionary, this will most importantly assemble the file header used
     by CAEN CoMPASS to label output files.
     """
-    def __init__(self, model_name, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.id = None
-        self.model_name = model_name
+        self.model_name = "DT5725" # hack -- can't set the model name in the init
+        self.decoder_name = "caen"
         self.file_header = None
         self.adc_bitcount = 14
         self.sample_rates = {"DT5725": 250e6, "DT5730": 500e6}
@@ -366,6 +367,7 @@ class CAENDT57XX(DataTaker):
         }
         super().__init__(*args, **kwargs)
 
+
     def input_config(self, config):
         self.id = config["id"]
         self.v_range = config["v_range"]
@@ -373,6 +375,7 @@ class CAENDT57XX(DataTaker):
         self.e_type = config["e_type"]
         self.int_window = config["int_window"]
         self.file_header = "CH_"+str(config["channel"])+"@"+self.model_name+"_"+str(config["id"])+"_Data_"
+
 
     def get_event_size(self, t0_file):
         with open(t0_file, "rb") as file:
@@ -386,6 +389,7 @@ class CAENDT57XX(DataTaker):
                 return 30 + 2 * num_samples  # number of bytes / 2
             else:
                 raise TypeError("Invalid e_type! Valid e_type's: uncalibrated, calibrated")
+
 
     def get_event(self, event_data_bytes):
         self.decoded_values["board"] = np.frombuffer(event_data_bytes[0:2], dtype=np.uint16)[0]
@@ -405,15 +409,17 @@ class CAENDT57XX(DataTaker):
             self.decoded_values["waveform"] = np.frombuffer(event_data_bytes[30:], dtype=np.uint16)
         else:
             raise TypeError("Invalid e_type! Valid e_type's: uncalibrated, calibrated")
-        return self._assemble_data_row()
+        return self.assemble_data_row()
 
-    def _assemble_data_row(self):
+
+    def assemble_data_row(self):
         timestamp = self.decoded_values["timestamp"]
         energy = self.decoded_values["energy"]
         energy_short = self.decoded_values["energy_short"]
         flags = self.decoded_values["flags"]
         waveform = self.decoded_values["waveform"]
         return [timestamp, energy, energy_short, flags], waveform
+
 
     def create_dataframe(self, array):
         waveform_labels = [str(item) for item in list(range(self.decoded_values["num_samples"]-1))]
@@ -443,7 +449,6 @@ class ORCAGretina4M(DataTaker):
         }
         super().__init__(*args, **kwargs)
         self.chan_list = None
-        self.active_channels = self.find_active_channels()
         self.is_multisampled = True
         self.event_header_length = 18
         self.sample_period = 10  # ns
@@ -451,7 +456,10 @@ class ORCAGretina4M(DataTaker):
         self.window = False
         self.n_blsamp = 500
         self.ievt = 0
-
+        
+        self.df_metadata = None # hack, this probably isn't right
+        self.active_channels = self.find_active_channels()
+        
 
     def crate_card_chan(self, crate, card, channel):
         return (crate << 9) + (card << 4) + (channel)
@@ -578,8 +586,8 @@ class SIS3316ORCADecoder(DataTaker):
 
         # compute expected and actual array dimensions
         wf_length16 = 1024
-        orca_header_length16 = 52
-        header_length16 = orca_header_length16
+        orca_helper_length16 = 52
+        header_length16 = orca_helper_length16
         ene_wf_length16 = 2 * ene_wf_length
         footer_length16 = 0
 

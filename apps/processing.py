@@ -56,7 +56,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             continue
 
         conf = ds.paths[run]["build_opt"]
-        opts = ds.runDB["build_options"][conf]["tier0_options"]
+        opts = ds.config["build_options"][conf]["tier0_options"]
 
         if test:
             print("test mode (dry run), processing Tier 0 file:", t0_file)
@@ -104,7 +104,7 @@ def tier1(ds,
             continue
 
         conf = ds.paths[run]["build_opt"]
-        proc_list = ds.runDB["build_options"][conf]["tier1_options"]
+        proc_list = ds.config["build_options"][conf]["tier1_options"]
         proc = Intercom(proc_list)
 
         ProcessTier1(
@@ -116,7 +116,7 @@ def tier1(ds,
             multiprocess=multiproc,
             nevt=nevt,
             ioff=ioff,
-            chunk=ds.runDB["chunksize"])
+            chunk=ds.config["chunksize"])
 
 
 if __name__ == "__main__":
