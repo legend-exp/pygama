@@ -12,7 +12,7 @@ set(SOURCES "${SDIR}/test.cc" "${SDIR}/sigcompress.cc")
 # set(GLOB SOURCES "${SDIR}/*.cc") # this doesn't work like it should
 
 # point to the pybind11 installation
-add_subdirectory(pybind11)
+add_subdirectory(cygama/pybind11)
 
 # Generate the python extension module (used by setup.py)
 pybind11_add_module(cygama ${SOURCES} "${SDIR}/bindings.cpp")
