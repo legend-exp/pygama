@@ -20,6 +20,12 @@ from pygama.utils import set_plot_style
 set_plot_style("clint")
 
 def main():
+
+    ###########################################################
+    ##COMMENT OUT CODE AND RENAME VARIABLES###############
+    #######################
+
+    
     """
     Code to implement an A/E cut
     """
@@ -49,16 +55,14 @@ def main():
         except:
             ds_hi = None
         ds = DataSet(ds_lo, ds_hi,
-                     md=run_db, cal = cal_db) #,tier_dir=tier_dir)
+                     md=run_db, cal = cal_db) #,tier2_dir=tier_dir)
 
     if args["run"]:
         ds = DataSet(run=int(args["run"][0]), sub='none',
                      md=run_db, cal=cal_db)
-    ds_list = ds.ds_list
-    pprint(ds.paths)
-    
 
-    # find_cut(ds, args["writeDB"])
+
+    find_cut(ds, args["writeDB"])
 
 #Code to find and record the optimal A/E cut
 def find_cut(ds, write_db=False):
@@ -83,8 +87,8 @@ def find_cut(ds, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
-    double_gauss_issue(cal, y, ds)
-    exit()
+    # double_gauss_issue(cal, y, ds)
+    # exit()
 
 
     dep_range = [1530,1620]
@@ -141,7 +145,7 @@ def find_cut(ds, write_db=False):
         ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
         cut = ans1[0] - ((1600-1583)*bkg1)
 
-        line += .0005
+        line += .001
 
 
     print(line, cut)

@@ -48,6 +48,8 @@ def main():
 
     # gain_shift(ds)
     # get_power_spectrum(ds)
+
+    ########PLOT Kr vs Kr, and BKG vs BKG against each campain
     plot_psd()
 
 def gain_shift(ds):

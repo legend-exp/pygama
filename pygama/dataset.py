@@ -382,8 +382,8 @@ class DataSet:
             total_rt += rt
 
         return total_rt
-    
-    
+
+
     def daq_to_raw(self, overwrite=False, test=False):
         """
         convenience function for calling the main daq_to_raw function.
@@ -402,7 +402,7 @@ class DataSet:
             daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
                        overwrite=overwrite, n_max=self.n_max, config=self.config)
 
-    
+
     def run_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
                 verbose=False, multiproc=True):
         """
@@ -422,7 +422,7 @@ class DataSet:
                 continue
 
             conf = self.paths[run]["build_opt"]
-            
+
             if proc_list is None:
                 proc_list = self.runDB['build_options'][conf]['tier1_options']
 
@@ -430,8 +430,7 @@ class DataSet:
 
             out_dir = self.tier2_dir if out_dir is None else out_dir
 
-            ProcessTier1(t1_file, proc, output_dir=out_dir, 
-                         overwrite=overwrite, verbose=verbose, 
-                         multiprocess=False, nevt=np.inf, 
+            ProcessTier1(t1_file, proc, output_dir=out_dir,
+                         overwrite=overwrite, verbose=verbose,
+                         multiprocess=False, nevt=np.inf,
                          ioff=0, chunk=self.runDB["chunksize"])
-
