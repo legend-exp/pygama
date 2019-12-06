@@ -8,14 +8,14 @@ def main():
     this is the high-level part of the code, something that a user might
     write (even on the interpreter) for processing with a specific config file.
     """
-    # process_data()
-    read_data()
+    process_data()
+    # read_data()
     # test_cygama()
     
 
 def process_data():
     # build dataset and run processing
-    ds = DataSet(run=0, config="config.json")
+    ds = DataSet(run=0, md="config.json")
     ds.daq_to_raw(overwrite=True, test=False)
 
 

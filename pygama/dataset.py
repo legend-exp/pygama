@@ -133,15 +133,13 @@ class DataSet:
 
     def get_paths(self, runs, subfile, verbose=False):
         """
+        TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL
+        
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
-        """
-        self.paths = {r:{} for r in runs}
-
-
-        ##############################################################################################
-        """
+        
+        Note from Andreas -- 
         A new filetype flag in the runDB:
         In the HADES characterization campaign we have a different filestructure and we have Subfiles.
         e.g. our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
@@ -151,6 +149,9 @@ class DataSet:
         Other structure are not implemented. If no filetype flag is given, the original files earch is done.
         What I still don't like is that I use counter for the subfiles. I have to think about something better.
         """
+        self.paths = {r:{} for r in runs}
+
+        # choose method of searching for raw files -- depends on file fmt string
         if self.ftype == "hades_char":
             # search data directories for extant files
 
@@ -187,10 +188,33 @@ class DataSet:
                           self.paths[run]["t2_path"] = "{}/{}".format(p,f)
                        counter += 1
 
+
         elif self.ftype == "legend200":
             print("Read awsome LEGEND200 Data. But not ready yet...")
 
-        ##############################################################################################
+        elif self.ftype == "flashcam":
+            for p, d, files in os.walk(self.raw_dir):
+                for f in files:
+                    if any("protothppmco_{}".format(r) in f for r in runs):
+                        run = f.split("protothppmco_")[-1]
+                        run = run.split(".")[0]
+                        if ".log" in run:
+                            continue
+                        else:
+                            run = int(run)
+                        self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+
+            for p, d, files in os.walk(self.tier1_dir):
+                for f in files:
+                    if any("t1_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+
+            for p, d, files in os.walk(self.tier2_dir):
+                for f in files:
+                    if any("t2_run{}".format(r) in f for r in runs):
+                        run = int(f.split("run")[-1].split(".h5")[0])
+                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         else:
             # search data directories for extant files
@@ -383,12 +407,13 @@ class DataSet:
         return total_rt
     
     
-    def daq_to_raw(self, overwrite=False, test=False):
+    def daq_to_raw(self, overwrite=False, test=False, n_max=np.inf):
         """
         convenience function for calling the main daq_to_raw function.
         right now, this processes runs sequentially.
         """
         from pygama.io.daq_to_raw import daq_to_raw
+
         for run in self.runs:
             t0_file = self.paths[run]["t0_path"]
             t1_file = self.paths[run]["t1_path"]
@@ -398,8 +423,8 @@ class DataSet:
             if test:
                 print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
                 continue
-            daq_to_raw(t0_file, run, verbose=self.v, output_dir=self.tier_dir,
-                       overwrite=overwrite, n_max=self.n_max, config=self.config)
+            daq_to_raw(t0_file, run, verbose=test, output_dir=self.tier_dir,
+                       overwrite=overwrite, n_max=n_max, config=self.config)
 
     
     def run_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
