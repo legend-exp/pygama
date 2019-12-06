@@ -61,7 +61,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
 
     # get the DAQ mode
     if config["daq"] == "ORCA":
-        process_orca(t0_file, t1_file, run, n_max, decoders, config, verbose)
+        process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
     
     elif config["daq"] == "FlashCam":
         process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
@@ -107,12 +107,12 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
     print("Total file size: {:.3f} MB".format(file_size_MB))
-
+    
     if run is not None:
         run = get_run_number(header_dict)
     print("Run number: {}".format(run))
     
-    # figure out which decoders we can use
+    # figure out which decoders we can use.  should simplify this block
     decoders = []
     id_dict = get_decoder_for_id(header_dict)
     if verbose:
@@ -131,8 +131,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
         for d in decoders:
             print("   ", d.decoder_name)
     
-    # ------------ scan over raw data starts here -----------------
-
+    # -- scan over raw data -- 
     print("Beginning Tier 0 processing ...")
 
     packet_id = 0  # number of events decoded
@@ -141,11 +140,12 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     # skip the header.
     # reclen is in number of longs, and we want to skip a number of bytes
     f_in.seek(reclen * 4)
-
+    
+    
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
         packet_id += 1
-
+        
         if verbose and packet_id % 1000 == 0:
             update_progress(float(f_in.tell()) / file_size)
 
@@ -160,6 +160,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
         except Exception as e:
             print("Failed to get the next event ... Exception:",e)
             break
+
         try:
             decoder = decoder_to_id[id_dict[data_id]]
         except KeyError:
@@ -169,7 +170,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
         # sends data to the pandas dataframe
         decoder.decode_event(event_data, packet_id, header_dict)
-
+        
     print("done.  last packet ID:", packet_id)
     f_in.close()
 
@@ -179,16 +180,14 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
     if verbose:
         update_progress(1)
-
+        
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
         for id in unrecognized_data_ids:
             print("  {}".format(id))
         print("hopefully they weren't important!\n")
 
-    # ---------  summary ------------
-
-    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
     with pd.HDFStore(t1_file,'r') as store:
         print(store.keys())
         # print(store.info())
@@ -270,7 +269,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
         except Exception as e:
             print("Failed to get the next event ... Exception:",e)
             break
-        if event_data is None:      #EOF
+        if event_data is None:
             break
             
         decoder = decoders[0]       #well, ...
