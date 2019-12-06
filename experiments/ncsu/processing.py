@@ -20,8 +20,8 @@ def main(argv):
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
     arg("-r", "--run", nargs=1, help="load a single run")
-    arg("-t0", "--tier0", action=st, help="run ProcessTier0 on list")
-    arg("-t1", "--tier1", action=st, help="run ProcessTier1 on list")
+    arg("-t0", "--daq_to_raw", action=st, help="run ProcessRaw on list")
+    arg("-t1", "--raw_to_dsp", action=st, help="run RunDSP on list")
     arg("-t", "--test", action=st, help="test mode, don't run")
     arg("-n", "--nevt", nargs='?', default=np.inf, help="limit max num events")
     arg("-i", "--ioff", nargs='?', default=0, help="start at index [i]")
@@ -43,20 +43,20 @@ def main(argv):
         ds = DataSet(run=int(args["run"][0]), md=run_db, v=args["verbose"])
 
     # -- start processing --
-    if args["tier0"]:
-        tier0(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
+    if args["daq_to_raw"]:
+        daq_to_raw(ds, args["ovr"], args["nevt"], args["verbose"], args["test"])
 
-    if args["tier1"]:
-        tier1(ds, args["ovr"], args["nevt"], args["ioff"], args["nomp"], args["verbose"],
+    if args["raw_to_dsp"]:
+        raw_to_dsp(ds, args["ovr"], args["nevt"], args["ioff"], args["nomp"], args["verbose"],
               args["test"])
 
 
-def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
+def daq_to_raw(ds, overwrite=False, nevt=np.inf, v=False, test=False):
     """
-    Run ProcessTier0 on a set of runs.
+    Run ProcessRaw on a set of runs.
     [raw file] ---> [t1_run{}.h5] (tier 1 file: basic info & waveforms)
     """
-    from pygama.io.tier0 import ProcessTier0
+    from pygama.io.daq_to_raw import ProcessRaw
 
     for run in ds.runs:
 
@@ -66,13 +66,13 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             continue
 
         conf = ds.paths[run]["build_opt"]
-        opts = ds.runDB["build_options"][conf]["tier0_options"]
+        opts = ds.config["build_options"][conf]["daq_to_raw_options"]
 
         if test:
             print("test mode (dry run), processing Tier 0 file:", t0_file)
             continue
 
-        ProcessTier0(
+        ProcessRaw(
             t0_file,
             run,
             verbose=v,
@@ -82,7 +82,7 @@ def tier0(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             settings=opts)
 
 
-def tier1(ds,
+def raw_to_dsp(ds,
           overwrite=False,
           nevt=None,
           ioff=None,
@@ -90,7 +90,7 @@ def tier1(ds,
           verbose=False,
           test=False):
     """
-    Run ProcessTier1 on a set of runs.
+    Run RunDSP on a set of runs.
     [t1_run{}.h5] ---> [t2_run{}.h5]  (tier 2 file: DSP results, no waveforms)
 
     Can declare the processor list via:
@@ -98,8 +98,8 @@ def tier1(ds,
     - Intercom(default_list=True)
     - manually add with Intercom::add
     """
-    from pygama.dsp.base import Intercom
-    from pygama.io.tier1 import ProcessTier1
+    from pygama.dsp.dsp_base import Intercom
+    from pygama.io.raw_to_dsp import RunDSP
 
     for run in ds.runs:
 
@@ -113,10 +113,10 @@ def tier1(ds,
             continue
 
         conf = ds.paths[run]["build_opt"]
-        proc_list = ds.runDB["build_options"][conf]["tier1_options"]
+        proc_list = ds.config["build_options"][conf]["raw_to_dsp_options"]
         proc = Intercom(proc_list)
 
-        ProcessTier1(
+        RunDSP(
             t1_file,
             proc,
             output_dir=ds.tier_dir,
@@ -125,7 +125,7 @@ def tier1(ds,
             multiprocess=multiproc,
             nevt=nevt,
             ioff=ioff,
-            chunk=ds.runDB["chunksize"])
+            chunk=ds.config["chunksize"])
 
 
 if __name__ == "__main__":

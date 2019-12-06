@@ -11,19 +11,19 @@ def get_dataset_from_cmdline(args, run_db, cal_db):
         arg("-ds", nargs='*', action="store", help="load runs for a DS")
         arg("-r", "--run", nargs=1, help="load a single run")
     """
-    # -- declare the DataSet --
+    from pygama import DataSet
+    
     if args["ds"]:
         ds_lo = int(args["ds"][0])
         try:
             ds_hi = int(args["ds"][1])
         except:
             ds_hi = None
-        ds = DataSet(ds_lo, ds_hi,
-                     md=run_db, cal=cal_db, v=args["test"])
-
+        ds = DataSet(ds_lo, ds_hi, md=run_db, cal=cal_db, v=args["verbose"])
+    
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]),
-                     md=run_db, cal=cal_db, v=args["test"])
+        ds = DataSet(run=int(args["run"][0]), md=run_db, cal=cal_db, 
+                     v=args["verbose"])
     return ds
 
 
@@ -31,12 +31,16 @@ def sh(cmd, sh=False):
     """
     input a shell command as you would type it on the command line.
     """
-    import shlex
-    import subprocess as sp
-    if not sh:
-        sp.call(shlex.split(cmd))  # "safe"
-    else:
-        sp.call(cmd, shell=sh)  # "less safe"
+    decoders = []
+    for sub in DataTaker.__subclasses__():
+        for subsub in sub.__subclasses__():
+            try:
+                decoder = subsub(object_info) # initialize the decoder
+                decoders.append(decoder)
+            except Exception as e:
+                print(e)
+                pass
+    return decoders
 
 
 def update_progress(progress, run=None):
@@ -219,4 +223,16 @@ def peakdet(v, delta, x=None):
                 find_max = True
 
     return np.array(maxes), np.array(mins)
+
+
+def sh(cmd, sh=False):
+    """
+    input a shell command as you would type it on the command line.
+    """
+    import shlex
+    import subprocess as sp
+    if not sh:
+        sp.call(shlex.split(cmd))  # "safe"
+    else:
+        sp.call(cmd, shell=sh)  # "less safe"
 

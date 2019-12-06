@@ -15,15 +15,15 @@ class DataSet:
                  opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
 
         # load metadata and set paths to data folders
-        self.runDB, self.calDB = None, None
+        self.config, self.calDB = None, None
         if md is not None:
             self.load_metadata(md) # pure JSON
         if cal is not None:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
-            self.raw_dir = os.path.expandvars(self.runDB["raw_dir"])
-            self.t1pre = self.runDB["t1_prefix"]
-            self.t2pre = self.runDB["t2_prefix"]
+            self.raw_dir = os.path.expandvars(self.config["raw_dir"])
+            self.t1pre = self.config["t1_prefix"]
+            self.t2pre = self.config["t2_prefix"]
 
         except:
             print("Bad metadata, reverting to defaults ...")
@@ -32,29 +32,29 @@ class DataSet:
             self.t2pre = "t2_run"
 
         self.tier_dir = None
-        self.tier1_dir = os.path.expandvars(self.runDB["tier1_dir"])
-        self.tier2_dir = os.path.expandvars(self.runDB["tier2_dir"])
+        self.tier1_dir = os.path.expandvars(self.config["tier1_dir"])
+        self.tier2_dir = os.path.expandvars(self.config["tier2_dir"])
 
         try:
-            self.ftype = self.runDB["filetype"]
-            print("Processing ", self.ftype, " data")
+            self.ftype = self.config["filetype"]
         except:
             self.ftype = "default"
 
         # match ds number to run numbers
         self.ds_run_table = {}
-        for ds in self.runDB["ds"]:
+        for ds in self.config["ds"]:
             try:
                 dsnum = int(ds)
             except:
                 continue
-            run_cov = self.runDB["ds"][ds][0].split(",")
+            run_cov = self.config["ds"][ds][0].split(",")
             self.ds_run_table[int(ds)] = [int(r) for r in run_cov]
 
         # create the internal lists of run numbers and ds's
         self.runs, self.ds_list = [], []
         if ds_lo is not None:
             self.runs.extend(self.get_runs(ds_lo, ds_hi, v))
+            self.ds_lo = ds_lo
         if run is not None:
             self.runs.append(run)
             self.ds_list.append(self.lookup_ds(run))
@@ -79,7 +79,7 @@ class DataSet:
         load a JSON file into a dict
         """
         with open(fname) as f:
-            self.runDB = json.load(f)
+            self.config = json.load(f)
 
 
     def add_run(self, runs):
@@ -94,17 +94,17 @@ class DataSet:
 
     def get_runs(self, ds_lo=None, ds_hi=None, verbose=False):
         """
-        using the runDB,
+        using the config,
         create a list of data sets to process,
         then return a list of the included run numbers
         """
-        if self.runDB is None:
-            print("Error, runDB not set.")
+        if self.config is None:
+            print("Error, config not set.")
             return []
 
         # load all data
         if ds_lo is None and ds_hi is None:
-            self.ds_list.extend([d for d in self.runDB["ds"] if d != "note"])
+            self.ds_list.extend([d for d in self.config["ds"] if d != "note"])
 
         # load single ds
         elif ds_hi is None:
@@ -116,7 +116,7 @@ class DataSet:
 
         run_list = []
         for ds in self.ds_list:
-            tmp = self.runDB["ds"][str(ds)][0].split(",")
+            tmp = self.config["ds"][str(ds)][0].split(",")
             r1 = int(tmp[0])
             r2 = int(tmp[1]) if len(tmp)>1 else None
             if r2 is None:
@@ -217,10 +217,10 @@ class DataSet:
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
-        if self.runDB is not None:
+        if self.config is not None:
             cov = {}
-            for conf in self.runDB["build_options"]:
-                cov[conf] = self.runDB["build_options"][conf]["run_coverage"]
+            for conf in self.config["build_options"]:
+                cov[conf] = self.config["build_options"][conf]["run_coverage"]
 
             for run in runs:
                 for conf, ranges in cov.items():
@@ -260,7 +260,7 @@ class DataSet:
         """
         return the pass-1 initial guess parameters for an energy estimator.
         """
-        for key in self.runDB["ecal"]:
+        for key in self.config["ecal"]:
             tmp = key.split(",")
             if len(tmp) == 1:
                 continue
@@ -272,7 +272,7 @@ class DataSet:
                 print("Error, we don't currently support multiple p1 cal pars.")
                 exit()
             # print(key,etype)
-            pars = self.runDB["ecal"][key][etype]
+            pars = self.config["ecal"][key][etype]
             # pprint(pars)
             return pars
 
@@ -366,9 +366,9 @@ class DataSet:
         This is wrong by a factor ~2*tau (dt between events).
         """
         if clock is None:
-            clock = self.runDB["clock"]
+            clock = self.config["clock"]
         if rollover is None:
-            rollover = self.runDB["rollover"]
+            rollover = self.config["rollover"]
 
         total_rt = 0
         for run in self.runs:
@@ -424,7 +424,7 @@ class DataSet:
             conf = self.paths[run]["build_opt"]
 
             if proc_list is None:
-                proc_list = self.runDB['build_options'][conf]['tier1_options']
+                proc_list = self.config['build_options'][conf]['tier1_options']
 
             proc = Intercom(proc_list)
 
@@ -433,4 +433,4 @@ class DataSet:
             ProcessTier1(t1_file, proc, output_dir=out_dir,
                          overwrite=overwrite, verbose=verbose,
                          multiprocess=False, nevt=np.inf,
-                         ioff=0, chunk=self.runDB["chunksize"])
+                         ioff=0, chunk=self.config["chunksize"])

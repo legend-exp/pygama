@@ -10,31 +10,31 @@ def main():
     raw_file = "/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343"
     t1_file = "/Users/wisecg/dev/mj60/data/t1_run42343.h5"
 
-    # tier0(raw_file)
-    # tier1(t1_file)
-    tier1_quick(t1_file)
-    # tier1_mp(t1_file)
+    # daq_to_raw(raw_file)
+    # raw_to_dsp(t1_file)
+    raw_to_dsp_quick(t1_file)
+    # raw_to_dsp_mp(t1_file)
     # check_equal(t1_file)
-    # optimize_tier1_mp(t1_file)
+    # optimize_raw_to_dsp_mp(t1_file)
 
 
-def tier0(raw_file, n_evt=None):
+def daq_to_raw(raw_file, n_evt=None):
 
     if n_evt is None:
         n_evt = 10000 # 487500 or np.inf
         # n_evt = 5000
 
-    from pygama.processing.tier0 import ProcessTier0
-    ProcessTier0(raw_file,
+    from pygama.processing.daq_to_raw import ProcessRaw
+    ProcessRaw(raw_file,
                  verbose=True,
                  output_dir="/Users/wisecg/dev/mj60/data",
                  n_max=n_evt,
                  chan_list=None)
 
 
-def tier1(t1_file):
+def raw_to_dsp(t1_file):
 
-    digitizer = pygama.decoders.digitizers.Gretina4MDecoder(
+    digitizer = pygama.decoders.digitizers.Gretina4M(
         correct_presum = False,
         split_waveform = False,
         )
@@ -71,7 +71,7 @@ def tier1(t1_file):
     wfs = pygama.WaveformFrame(wf_df)
 
 
-def tier1_quick(t1_file):
+def raw_to_dsp_quick(t1_file):
 
     t_start = time.time()
 
@@ -80,7 +80,7 @@ def tier1_quick(t1_file):
     # exit()
 
     n_evt = 100
-    # tier0("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
+    # daq_to_raw("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
 
     # use index (can also use anything in 'data_columns')
     # event_df = pd.read_hdf(t1_file, "ORGretina4MWaveformDecoder",
@@ -98,13 +98,13 @@ def tier1_quick(t1_file):
     return t1_df
 
 
-def tier1_mp(t1_file):
+def raw_to_dsp_mp(t1_file):
 
     import multiprocessing as mp
     from functools import partial
 
     n_evt = np.inf
-    # tier0("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
+    # daq_to_raw("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
 
     t_start = time.time()
 
@@ -148,8 +148,8 @@ def process_chunk(chunk_idx, t1_file, chunksize, h5key):
 
 def check_equal(t1_file):
 
-    full_df = tier1_quick(t1_file)
-    mp_df = tier1_mp(t1_file)
+    full_df = raw_to_dsp_quick(t1_file)
+    mp_df = raw_to_dsp_mp(t1_file)
 
     print("mp df:",mp_df.shape, "standard df:",full_df.shape)
 
@@ -167,14 +167,14 @@ def check_equal(t1_file):
             # print(i, "YEAH")
 
 
-def optimize_tier1_mp(t1_file):
+def optimize_raw_to_dsp_mp(t1_file):
     """ seems that the sweet spot on my mac is chunksize ~ 3000 """
 
     import multiprocessing as mp
     from functools import partial
 
     n_evt = 200000
-    # tier0("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
+    # daq_to_raw("/Users/wisecg/dev/mj60/data/2018-10-9-P3LTP_Run42343", n_evt)
     h5key = "ORGretina4MWaveformDecoder"
     n_cpu = mp.cpu_count()
     n_cpu = 2

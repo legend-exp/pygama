@@ -136,7 +136,7 @@ def process_ds(rise_times):
         
         ProcessTier1(t1_file, proc, output_dir=out_dir, overwrite=True, 
                      verbose=False, multiprocess=True, nevt=np.inf, ioff=0, 
-                     chunk=ds.runDB["chunksize"], run=first_run, 
+                     chunk=ds.config["chunksize"], run=first_run, 
                      t2_file=t2_file, digitizers=[dig])
         
         # load the temporary file and append to the main output file

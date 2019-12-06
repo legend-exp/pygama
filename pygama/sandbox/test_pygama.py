@@ -26,7 +26,7 @@ def main():
 
 def process_t0(run, data_dir, n_max=np.inf, verbose=False):
     """ Tier 0 defined in:
-    - pygama/processing/_tier0.pyx
+    - pygama/processing/_daq_to_raw.pyx
     """
     run_list = [run]
     pygama.process_tier_0(data_dir, run_list, output_dir=data_dir, chan_list=None,
@@ -35,7 +35,7 @@ def process_t0(run, data_dir, n_max=np.inf, verbose=False):
 
 def process_t1(run, data_dir, n_cpu=1):
     """ Tier 1 defined in:
-    - pygama/processing/_tier1.pyx
+    - pygama/processing/_raw_to_dsp.pyx
     Requires a processor list.
     if run_list is > 1 run, can try processing each run on a separate thread
     with num_threads > 1.  Careful, it's a lot to load in RAM ...
@@ -73,7 +73,7 @@ def process_MJD():
 
     # process data with pygama
     # process_t0(run, data_dir)#, n_max)
-    # print_tier0_info(run)
+    # print_daq_to_raw_info(run)
     # process_t1(run, data_dir, n_cpu=2)
     # return
 
@@ -86,7 +86,7 @@ def process_MJD():
 
     # this class reads the "ORGretina4MWaveformDecoder" dataframe
     ft1 = "%s/t1_run%d.h5" % (data_dir, run)
-    dc = pygama.Gretina4MDecoder(ft1)
+    dc = pygama.Gretina4M(ft1)
     df_events = pd.read_hdf(ft1, key=dc.decoder_name)
 
     # plot a few waveforms
@@ -113,7 +113,7 @@ def process_MJ60():
 
     # process data
     # process_t0(run, np.inf, data_dir, verbose=True)
-    # print_tier0_info(run)
+    # print_daq_to_raw_info(run)
     process_t1(run, data_dir)
     return
 
@@ -124,7 +124,7 @@ def process_MJ60():
     plt.ylabel("counts", ha='right', y=1)
     plt.savefig("./plots/mj60_energy_run%d.pdf" % run)
 
-    # tier1 file
+    # raw_to_dsp file
     ft1 = "%s/t1_run%d.h5" % (data_dir, run)
 
     print("available Tier 1 keys:")
@@ -151,7 +151,7 @@ def process_MJ60():
     plt.savefig("./plots/mj60_waveforms_run%d.png" % run)
 
 
-def print_tier0_info(run):
+def print_daq_to_raw_info(run):
     """ The pygama Tier 1 HDF5 contains multiple datasets,
     whose keys must be specified when we do pd.read_hdf(.., key="name")
     Tier 2 doesn't have this structure, so the key is not needed.

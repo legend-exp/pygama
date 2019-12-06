@@ -4,6 +4,9 @@
 *.npz
 *.pdf
 *.swp
+*.root
+*.h5
+*.lh5
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
@@ -22,7 +25,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/

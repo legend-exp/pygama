@@ -10,7 +10,7 @@ import h5py
 from ..utils import *
 from ..decoders.digitizers import *
 
-def ProcessTier1(filename,
+def RunDSP(filename,
                  processor_list,
                  digitizer_list=None,
                  output_file_string="t2",
@@ -18,7 +18,7 @@ def ProcessTier1(filename,
                  output_dir=None):
     """
     Reads in "raw," or "tier 0," Orca data and saves to a hdf5 format using pandas
-    filename: path to a tier1 data file
+    filename: path to a raw_to_dsp data file
     processor_list:
         TierOneProcessorList object with list of calculations/transforms you want done
         -- NOTE -- Order matters in the list! (Some calculations depend on others.)
@@ -55,7 +55,7 @@ def ProcessTier1(filename,
 
         digitizer.load_object_info(object_info)
 
-        # load the tier1 data (can take a while)
+        # load the raw_to_dsp data (can take a while)
         event_df = pd.read_hdf(filename, key=digitizer.decoder_name)
 
         # pr = cProfile.Profile(); pr.enable()
