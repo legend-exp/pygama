@@ -9,53 +9,64 @@ from ROOT import TFile, TChain, TTree, MGTWaveform
 
 def main(argv):
     doc="""
-    TODO: placeholder app for browsing waveforms.  Somebody needs to update
-    this to read HDF5 files.  -Clint
+    quick interactive waveform viewer.
+    Right now the cut (df.loc) is hardcoded, should decide if we want to 
+    replace this with df.query, which can take a string.
     
-    quick interactive waveform viewer for wave_skim.cc output files.
-    Default is interactive mode.  
     - [Enter] advances to the next wf, 
     - 'p' goes to the previous one
     - 's' saves a wf to the folder ./plots/
     - 'q' to quit
     """
-    par = argparse.ArgumentParser(description=doc)
-    arg = par.add_argument
-    s, st, sf = "store", "store_true", "store_false"
-    arg("-f", nargs=1, action=s, help="set input file")
-    arg("-c", nargs=1, action=s, help="set data cleaning t_cut")
-    arg("-q", action=st, help="quick draw mode")
-    args = par.parse_args()
+    # par = argparse.ArgumentParser(description=doc)
+    # arg = par.add_argument
+    # s, st, sf = "store", "store_true", "store_false"
+    # arg("-f", nargs=1, action=s, help="set input file")
+    # args = par.parse_args()
+    
+    run = 42
+    iwf_max = 100000 # tier 1 files can be a lot to load into memory
+    ds = DataSet(run=run, md="runDB.json")
+    ft1 = ds.paths[run]["t1_path"]
+    t1df = pd.read_hdf(ft1, "ORSIS3302DecoderForEnergy", where=f"ievt < {iwf_max}")
+    t1df.reset_index(inplace=True) # required step -- fix pygama "append" bug
+    
+    # get waveform dataframe
+    wf_cols = []
+    for col in t1df.columns:
+        if isinstance(col, int):
+            wf_cols.append(col)
+    wfs = t1df[wf_cols]
+    
+    # apply a cut based on the t1 columns
+    # idx = t1df.index[(t1df.energy > 1.5e6)&(t1df.energy < 2e6)]
+    
+    # apply a cut based on the t2 columns
+    ft2 = ds.paths[run]['t2_path']
+    t2df = pd.read_hdf(ft2, where=f"ievt < {iwf_max}")
+    t2df.reset_index(inplace=True)
 
-    # user options
-    if args.f:
-        in_file = args.f
-    else:
-        # in_file = "/some/default/regex/*.root"
-        in_file = "/Users/wisecg/Data/low_e/data/bkg/final/lat_final_ds6A.root"
-    quick_draw = True if args.q else False
-    if args.c:
-        t_cut = args.c
-    else:
-        t_cut = ""
-        t_cut = "trapENFCal > 1 && trapENFCal < 50" # some default cut
+    # t2df['AoE'] = t2df.current_max / t2df.e_ftp # scipy method
+    t2df['AoE'] = t2df.atrap_max / t2df.e_ftp # trapezoid method
+    
+    idx = t2df.index[(t2df.AoE < 0.7)
+                     &(t2df.e_ftp > 1000) & (t2df.e_ftp < 10000)
+                     &(t2df.index < iwf_max)]
 
-    # load chain and apply cut
-    tt = TChain("skimTree")
-    tt.Add(in_file)
-
-    n = tt.Draw("Entry$:Iteration$",t_cut,"goff")
-    evt, itr = tt.GetV1(), tt.GetV2()
-    evt_list = [[int(evt[i]),int(itr[i])] for i in range(n)]
-
-    nEnt = len(set([evt[i] for i in range(n)]))
-    print("Found %d total entries, %d passing cut: %s" % (tt.GetEntries(), nEnt, t_cut))
-
-    # loop over waveforms and draw them
-    i, pEvt = -1, -1
-    while(True):
-        i += 1
-        if not quick_draw and i!=0:
+    wfs = wfs.loc[idx]
+    wf_idxs = wfs.index.values # kinda like a TEntryList
+    
+    # make sure the cut output makes sense
+    cols = ['ievt', 'timestamp', 'energy', 'e_ftp', 'atrap_max', 'current_max', 't0', 
+            't_ftp', 'AoE', 'tslope_pz', 'tail_tau']
+    print(t2df.loc[idx][cols].head())
+    print(t1df.loc[idx].head())
+    print(wfs.head())
+    
+    # iterate over the waveform block 
+    iwf = -1
+    while True:
+        if iwf != -1:
             val = input()
             if val == "q": break
             if val == "p": i -= 2
@@ -64,51 +75,35 @@ def main(argv):
                 pltName = "./plots/wf-%d.pdf" % i
                 print("Saving figure:",pltName)
                 plt.savefig(pltName)
-        if i >= len(evt_list): 
-            break
-        iE, iH = evt_list[i]
-
-        if iE != pEvt:
-            tt.GetEntry(iE)
-        pEvt = iE
-
-        run = tt.run
-        chan = tt.channel.at(iH)
-        hitE = tt.trapENFCal.at(iH)
-        tOff = tt.tOffset.at(iH)
-        wfMG = tt.MGTWaveforms.at(iH)
-        period = wfMG.GetSamplingPeriod()
-        wf = np.array(wfMG.GetVectorData()) # fastest conversion to ndarray
-        ts = np.arange(tOff, tOff + len(wf) * period, period)
+        iwf += 1
+        iwf_cut = wf_idxs[iwf]
         
-        # resize the waveform
-        rem_lo, rem_hi = 4, 2 # should work for all DS's
-        rm_samples = []
-        if rem_lo > 0: rm_samples += [i for i in range(0, rem_lo+1)]
-        if rem_hi > 0: rm_samples += [len(wf) - i for i in range(1, rem_hi+1)]
-        ts = np.delete(ts, rm_samples)
-        waveRaw = np.delete(wf, rm_samples)
+        # get waveform and dsp values
+        wf = wfs.iloc[iwf]
+        dsp = t2df.iloc[iwf_cut]
+        ene = dsp.e_ftp
+        aoe = dsp.AoE
+        ts = np.arange(len(wf))
         
-        print("%d / %d  Run %d  chan %d  trapENF %.1f, iE %d, iH %d" % (i,len(evt_list),run,chan,hitE, iE, iH))
-
-        # compute baseline and standard energy trapezoid
-        waveBLSub = waveRaw - np.mean(waveRaw[:500])
-        eTrap = lat.trapFilter(waveBLSub,400,250,-7200)
-        nPad = len(waveBLSub)-len(eTrap)
-        eTrap = np.pad(eTrap, (nPad,0), 'constant')
-        eTrapTS = np.arange(0, len(eTrap)*10., 10)
-        ePickoff = eTrapTS[nPad + 400 + 200]
-        # plt.axvline(ePickoff, c='m')
-
+        # nice horizontal print of a pd.Series
+        print(iwf, iwf_cut)
+        print(wf.to_frame().T)
+        print(t2df.iloc[iwf_cut][cols].to_frame().T)
+        
         plt.cla()
-        # plt.plot(ts, waveRaw, 'b', lw=2, label='Raw WF, %.2f keV' % (hitE))
-        plt.plot(ts, waveBLSub, 'b', label='BlSub WF, %.2f keV' % (hitE))
+        plt.plot(ts, wf, "-b", alpha=0.9, label=f'e: {ene:.1f}, a/e: {aoe:.1f}')
+        
+        # savitzky-golay smoothed
+        # wfsg = signal.savgol_filter(wf, 47, 2)
+        wfsg = signal.savgol_filter(wf, 47, 1)
+        plt.plot(ts, wfsg, "-r", label='savitzky-golay filter')
 
-        plt.xlabel("Time (ns)", ha='right', x=1)
-        plt.ylabel("Voltage (ADC)", ha='right',y=1)
-        plt.legend(loc=4)
+        plt.xlabel("clock ticks", ha='right', x=1)
+        plt.ylabel("ADC", ha='right', y=1)
+        plt.legend()
         plt.tight_layout()
-        plt.pause(0.0001) # scan speed, does plt.show(block=False) automatically
+        plt.show(block=False)
+        plt.pause(0.01)
 
 
 if __name__ == "__main__":

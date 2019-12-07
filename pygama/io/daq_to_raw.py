@@ -376,10 +376,11 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
       if packet_id % ROW_LIMIT == 0:
           
           # decoder.save_to_pytables(t1_file, verbose=True)
-          decoder.save_to_lh5(t1_file)
-          i_debug += 1
           
-          if i_debug == 5:
+          decoder.save_to_lh5(t1_file)
+          
+          i_debug += 1
+          if i_debug == 1:
               print("breaking early")
               break # debug, deleteme
 
