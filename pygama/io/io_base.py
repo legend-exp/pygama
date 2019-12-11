@@ -232,13 +232,20 @@ class DataTaker(ABC):
         # open the output file
         hf = h5py.File(file_name, file_mode)
         
-        # create the header, saving everything in attributes (like a dict)
         if not append:
+            
+            # create the header, saving everything in attributes (like a dict)
             hf.create_group('header')
             for c in self.file_config:
                 hf["/header"].attrs[c] = self.file_config[c]
             hf["/header"].attrs["file_name"] = file_name
-        
+            
+            # create the main "daqdata" group and put the table def in the attrs
+            hf.create_group('daqdata')
+            cols = [col for col in self.decoded_values]
+            table_def = "table{" + ",".join(cols) + "}"
+            hf["/daqdata"].attrs["datatype"] = table_def
+            
         # create datasets for each member of self.decoded_values
         for col in self.decoded_values:
             
@@ -306,4 +313,4 @@ class DataTaker(ABC):
         # finally, clear out existing data (relieve memory pressure)
         self.clear_data()
         
-        print('wrote stuff once')
+        print('wrote stuff once:', file_name)
