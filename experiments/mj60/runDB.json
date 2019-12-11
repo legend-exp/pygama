@@ -106,7 +106,8 @@
     "70":["1140,1156 ", "Ba runs, 10/31.  Started 9:12a."],
     "71":["1157,1164", "15 min threshold runs. See elog 525 for values"],
     "72":["1165,1173", "Bkg runs, 0x3, 1500V bias, for checking resolution & leakage curr."],
-    "73":["1174,1176", "Varying bias runs.  elog uwmjlab 526"]
+    "73":["1174,1176", "Varying bias runs.  elog uwmjlab 526"],
+    "74":["1177,1190", "Ba runs, getting closer to cryostat.  elog uwmjlab 529"]
   },
 
   "ecal":{
