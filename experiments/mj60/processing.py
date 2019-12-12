@@ -29,7 +29,7 @@ def main(argv):
     arg("-o", "--ovr", action=st, help="overwrite existing files")
     arg("-m", "--nomp", action=sf, help="don't use multiprocessing")
     args = vars(par.parse_args())
-    
+
     # -- standard method to declare the DataSet from cmd line --
     ds = pu.get_dataset_from_cmdline(args, "runDB.json", "calDB.json")
 
@@ -64,11 +64,11 @@ def d2r(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             print("test mode (dry run), processing Tier 0 file:", t0_file)
             continue
 
-        daq_to_raw(t0_file, run, verbose=v, output_dir=ds.tier1_dir, 
+        daq_to_raw(t0_file, run, verbose=v, output_dir=ds.tier1_dir,
                    overwrite=overwrite, n_max=nevt, config=ds.config)#, settings=opts)
 
 
-def raw_to_dsp(ds, overwrite=False, nevt=None, ioff=None, multiproc=True, 
+def raw_to_dsp(ds, overwrite=False, nevt=None, ioff=None, multiproc=True,
                verbose=False, test=False):
     """
     Run RunDSP on a set of runs.
@@ -95,8 +95,8 @@ def raw_to_dsp(ds, overwrite=False, nevt=None, ioff=None, multiproc=True,
 
         conf = ds.paths[run]["build_opt"]
         proc_list = ds.config["build_options"][conf]["raw_to_dsp_options"]
-        proc = Intercom(proc_list, fast_add=True)
-        
+        proc = Intercom(proc_list)
+
         # if fast_add:
             # RunFastDSP()
         # else:
