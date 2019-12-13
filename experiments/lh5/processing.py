@@ -15,8 +15,9 @@ def main():
 
 def process_data():
     from pygama import DataSet
-    ds = DataSet(run=0, md="config.json")
+    ds = DataSet(0, md="config.json")
     ds.daq_to_raw(overwrite=True, test=False)
+    # ds.raw_to_dsp(....)
 
 
 def read_data():

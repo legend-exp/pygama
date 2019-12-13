@@ -135,6 +135,8 @@ class DataSet:
         """
         TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL
         
+        Matteo -- add "get_file_list", it will work with all sets of input files
+        
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
@@ -189,6 +191,8 @@ class DataSet:
                        counter += 1
 
 
+        
+        
         elif self.ftype == "legend200":
             print("Read awsome LEGEND200 Data. But not ready yet...")
 

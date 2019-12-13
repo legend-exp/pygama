@@ -251,45 +251,86 @@ class DataTaker(ABC):
             
             # create waveform datasets
             if "waveform" in col:
-                
+
+                # set the overall group name
                 wf_group = f"/daqdata/{col}/"
+
+                # read out the waveforms & convert to numpy arrays
                 nwfs = len(self.decoded_values[col])
                 nsamp = self.file_config['nsamples']
                 wf_idxs = np.arange(0, nsamp*nwfs-1, nsamp)
                 wfs = np.hstack(self.decoded_values[col])
                 
-                # NOTE: could apply compression here, and wf_idxs would vary
-                
-                # write first time
+                # TODO: get actual values
+                # maybe this should just be in decoded_values instead
+                # of the waveform group.  mention it to Oliver
+                wf_t0 = np.ones(len(wf_idxs)) 
+                wf_dt = np.ones(len(wf_idxs)) * 1e-8
+
+                # TODO: apply compression here, and wf_idxs will vary
+
+                # write first time, declare all groups & attributes
                 if not append:
-                    wf_ds = hf.create_dataset(f"{wf_group}/flattened_data", 
-                                              data=wfs, maxshape=(None,))
-                    wf_idxs_ds = hf.create_dataset(f"{wf_group}/cumulative_length",
-                                                  data=wf_idxs, maxshape=(None,))
-                
-                    # placeholders to match Oliver's spec
-                    wf_t0 = hf.create_dataset(f"{wf_group}/t0", data=(1,))
-                    wf_dt = hf.create_dataset(f"{wf_group}/dt", data=(1,))
+                    
+                    # declare the sub-table for the waveform
+                    hf.create_group(wf_group)
+                    hf[wf_group].attrs["datatype"] = "table{dt, t0, values}"
+                    
+                    # dt
+                    st_dt = f"{wf_group}/dt"
+                    ds_dt = hf.create_dataset(st_dt, data=wf_dt, maxshape=(None,))
+                    hf[st_dt].attrs["datatype"] = "array<1>{real}"
+                    hf[st_dt].attrs["units"] = "ns"
+                    
+                    # t0
+                    st_t0 = f"{wf_group}/t0"
+                    ds_dt = hf.create_dataset(st_t0, data=wf_t0, maxshape=(None,))
+                    hf[st_t0].attrs["datatype"] = "array<1>{real}"
+                    hf[st_t0].attrs["units"] = "ns"
+                    
+                    # waveform (contained as a paired subgroup)
+                    gr_wf = f"{wf_group}/values"
+                    hf.create_group(gr_wf)
+                    hf[gr_wf].attrs["datatype"] = "array<1>{array<1>{real}}"
+                    
+                    st_cl = f"{wf_group}/values/cumulative_length"
+                    wf_cl = hf.create_dataset(st_cl, data=wf_idxs, maxshape=(None,))
+                    hf[st_cl].attrs["datatype"] = "array<1>{real}"
+                    
+                    st_fl = f"{wf_group}/values/flattened_data"
+                    wf_fl = hf.create_dataset(st_fl, data=wfs, maxshape=(None,))
+                    hf[st_fl].attrs["datatype"] = "array<1>{real}"
                 
                 # append
                 else:
                     print("appending ...")
-                    wf_ds = hf[f"{wf_group}/flattened_data"]
-                    wf_ds.resize(wf_ds.shape[0] + wfs.shape[0], axis=0)   
-                    wf_ds[-wfs.shape[0]:] = wfs
                     
-                    wf_idxs_ds = hf[f"{wf_group}/cumulative_length"]
-                    wf_idxs_ds.resize(wf_idxs_ds.shape[0] + wf_idxs.shape[0], axis=0)
-                    wf_idxs_ds[-wf_idxs.shape[0]:] = wf_idxs
-
+                    ds_cl = hf[f"{wf_group}/values/cumulative_length"]
+                    ds_cl.resize(ds_cl.shape[0] + wf_idxs.shape[0], axis=0)
+                    ds_cl[-wf_idxs.shape[0]:] = wf_idxs
+                    
+                    ds_fl = hf[f"{wf_group}/values/flattened_data"]
+                    ds_fl.resize(ds_fl.shape[0] + wfs.shape[0], axis=0)   
+                    ds_fl[-wfs.shape[0]:] = wfs
+                    
+                    ds_t0 = hf[f"{wf_group}/t0"]
+                    ds_t0.resize(ds_t0.shape[0] + wf_t0.shape[0], axis=0)
+                    ds_t0[-wf_t0.shape[0]:] = wf_t0
+                    
+                    ds_dt = hf[f"{wf_group}/dt"]
+                    ds_dt.resize(ds_dt.shape[0] + wf_dt.shape[0], axis=0)
+                    ds_dt[-wf_dt.shape[0]:] = wf_dt
+                    
+                    
             # create single-valued datasets
             else:
-                npa = np.asarray(self.decoded_values[col]) # dtype is automatic
+                # dtype is declared automatically
+                npa = np.asarray(self.decoded_values[col]) 
                 
                 # write first time
                 if not append:
                     dset = hf.create_dataset(f"/daqdata/{col}", data=npa, maxshape=(None,))
-                    print("first one:", npa.shape[0], col)
+                    # print("first one:", npa.shape[0], col)
                 
                     # set default attributes
                     dset.attrs["units"] = "none"
@@ -313,4 +354,3 @@ class DataTaker(ABC):
         # finally, clear out existing data (relieve memory pressure)
         self.clear_data()
         
-        print('wrote stuff once:', file_name)

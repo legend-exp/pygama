@@ -10,7 +10,7 @@ warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarn
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
-def fS(waves, calcs,  wfin="wf_trap", calc="fS"):
+def fS(waves, calcs, wfin="wf_trap", calc="fS"):
     """
     grab first ADC sample of each trap-filtered waveform
     """

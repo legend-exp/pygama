@@ -140,7 +140,7 @@ class Intercom:
             if verbose:
                 print(" -> ", processor.function.__name__, processor.fun_args)
 
-            p_result = processor.process_block(self.waves, self.calcs)
+            p_result = processor.process_block(self.waves, self.calcs) # need to actually pass ndarrays here
 
             if isinstance(processor, Calculator):
                 # self.calcs is updated inside the functions right now
