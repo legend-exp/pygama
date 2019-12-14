@@ -83,36 +83,39 @@ def gain_shift(ds):
 def plot_psd():
 
     run280 = np.load('psd_280.npz')
-    run296 = np.load('psd_296.npz')
-    run316 = np.load('psd_316.npz')
+    # run296 = np.load('psd_296.npz')
+    # run316 = np.load('psd_316.npz')
     run330 = np.load('psd_330.npz')
-    run354 = np.load('psd_354.npz')
+    # run354 = np.load('psd_354.npz')
     freq = run280['arr_0']
-    psd280 = run280['arr_1']
-    psd296 = run296['arr_1']
-    psd316 = run316['arr_1']
+    # psd280 = run280['arr_1']
+    # psd296 = run296['arr_1']
+    # psd316 = run316['arr_1']
     psd330 = run330['arr_1']
-    psd354 = run354['arr_1']
+    # psd354 = run354['arr_1']
 
 
 
     run946 = np.load('psd_946.npz')
-    run994 = np.load('psd_994.npz')
-    run1042 = np.load('psd_1042.npz')
-    run1091 = np.load('psd_1091.npz')
-    run1140 = np.load('psd_1140.npz')
+    # run994 = np.load('psd_994.npz')
+    # run1042 = np.load('psd_1042.npz')
+    # run1091 = np.load('psd_1091.npz')
+    # run1140 = np.load('psd_1140.npz')
     # freq = run946['arr_0']
     psd946 = run946['arr_1']
-    psd994 = run994['arr_1']
-    psd1042 = run1042['arr_1']
-    psd1091 = run1091['arr_1']
-    psd1140 = run1140['arr_1']
+    # psd994 = run994['arr_1']
+    # psd1042 = run1042['arr_1']
+    # psd1091 = run1091['arr_1']
+    # psd1140 = run1140['arr_1']
 
-    psd_c1 = psd280 + psd296 + psd316 + psd330 + psd354
-    psd_c2 = psd946 + psd994 + psd1042 + psd1091 + psd1140
+    # psd_c1 = psd280 + psd296 + psd316 + psd330 + psd354
+    # psd_c2 = psd946 + psd994 + psd1042 + psd1091 + psd1140
 
-    plt.semilogy(freq, psd_c1, linewidth=2, label='C1')
-    plt.semilogy(freq, psd_c2, linewidth=2, label='C2')
+    # plt.semilogy(freq, psd_c1, linewidth=2, label='C1')
+    # plt.semilogy(freq, psd_c2, linewidth=2, label='C2')
+
+    plt.semilogy(freq, psd330, linewidth=2, label='BKG_1')
+    plt.semilogy(freq, psd946, linewidth=2, label='BKG_2')
 
     # plt.semilogy(freq, psd280, linewidth=2, label='run280')
     # plt.semilogy(freq, psd946, linewidth=2, label='run946')
