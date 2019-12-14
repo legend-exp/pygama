@@ -97,16 +97,18 @@
     "62":["880,890", "Bkg runs for C2, vac valve open, 2019.10.21.  Higher noise (bad HV cable, microdischarge evts)"],
     "63":["891,892", "Bkg runs, heater tape off, 2GB ORCA constraint removed."],
     "64":["893,907", "Bkg runs after bias-down, with new HV cable. "],
-    "64":["908,910", "908 HV pulser run, 910 Preamp pulser run."],
-    "65":["913,945", "Barium runs, 913,914 shorter duration (7.5 min), 915 onward 15 min."],
-    "66":["946,993", "Kr runs"],
-    "67":["994,1041", "Bkg runs, 10/27.  Started 3:20p, stopped 3:02p next day"],
-    "68":["1042,1090", "Kr runs, 10/28.  Started 7:01p, stopped 7:02p next day"],
-    "69":["1091,1139", "Bkg runs, 10/30.  Started 8:58a, stopped 9:05a next day"],
-    "70":["1140,1156 ", "Ba runs, 10/31.  Started 9:12a."],
-    "71":["1157,1164", "15 min threshold runs. See elog 525 for values"],
-    "72":["1165,1173", "Bkg runs, 0x3, 1500V bias, for checking resolution & leakage curr."],
-    "73":["1174,1176", "Varying bias runs.  elog uwmjlab 526"]
+    "65":["908,910", "908 HV pulser run, 910 Preamp pulser run."],
+    "66":["913,945", "Barium runs, 913,914 shorter duration (7.5 min), 915 onward 15 min."],
+    "67":["946,993", "Kr runs"],
+    "68":["994,1041", "Bkg runs, 10/27.  Started 3:20p, stopped 3:02p next day"],
+    "69":["1042,1090", "Kr runs, 10/28.  Started 7:01p, stopped 7:02p next day"],
+    "70":["1091,1139", "Bkg runs, 10/30.  Started 8:58a, stopped 9:05a next day"],
+    "71":["1140,1156 ", "Ba runs, 10/31.  Started 9:12a."],
+    "72":["1157,1164", "15 min threshold runs. See elog 525 for values"],
+    "73":["1165,1173", "Bkg runs, 0x3, 1500V bias, for checking resolution & leakage curr."],
+    "74":["1174,1176", "Varying bias runs.  elog uwmjlab 526"],
+    "75":["1178,1190", "Ba runs, getting closer to cryostat.  elog uwmjlab 529"],
+    "76":["1191,1208", "Th232 runs, source 40in from detector.  elog uwmjlab 530"]
   },
 
   "ecal":{
