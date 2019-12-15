@@ -8,7 +8,7 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 plt.style.use("../../pygama/clint.mpl")
 
-from pygama import DataSet, read_lh5, dir_lh5
+from pygama import DataSet, read_lh5, get_lh5_header
 import pygama.analysis.histograms as pgh
 
 def main():
@@ -37,9 +37,9 @@ def plot_data():
     """
     
     f_lh5 = "/Users/wisecg/Data/L200/tier1/t1_run0.lh5"
-    # df = dir_lh5(f_lh5)
+    df = get_lh5_header(f_lh5)
     
-    df = read_lh5(f_lh5)
+    # df = read_lh5(f_lh5)
     # print(df)
     exit()
     

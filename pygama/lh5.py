@@ -7,70 +7,207 @@ import pandas as pd
 from pprint import pprint
 
 
-def dir_lh5(in_file):
+def get_lh5_header(in_file, verbose=False):
     """
-    access an lh5 file and pretty print the structure.
-    TODO: add verbosity option
-    NOTE: calling hf.visit or hf.visititems iterates over groups automatically, 
-    instead of an explicit loop.  the h5py book tells you to do it this way.
+    Access an lh5 file, pretty print the structure, and return a useful header.
+    
+    Usage:
+    >>> import pygama as pg 
+    >>> pg.get_lh5_header(file, verbose=True) # pretty print the file structure
+    >>> hdr = pg.get_lh5_header(file, *args)  # gives a dict of DataFrames
+
+    A handy reference page for doing efficient iteration over h5py groups:
+    https://stackoverflow.com/questions/45562169/traverse-hdf5-file-tree-and-continue-after-return
     """
     hf = h5py.File(in_file)
-    
-    def print_groups(name, obj):
-        if isinstance(obj, h5py.Group):
-            print(f"GROUP /{name}")
-            indent = "  "
-        if isinstance(obj, h5py.Dataset):
-            print("  DATASET", obj.shape, obj.name)
-            indent = "    "
-        for att, val in obj.attrs.items():
-            print(f"{indent}ATTRIBUTE {att}:", val)
-        print(" ")
 
-    hf.visititems(print_groups)
+    # pretty print the raw structure, with all attributes
+    if verbose:
+        def print_groups(name, obj):
+            if isinstance(obj, h5py.Group):
+                print(f"GROUP /{name}")
+                indent = "  "
+            if isinstance(obj, h5py.Dataset):
+                print("  DATASET", obj.shape, obj.name)
+                indent = "    "
+            for att, val in obj.attrs.items():
+                print(f"{indent}ATTRIBUTE {att}:", val)
+            print(" ")
+        hf.visititems(print_groups) # accesses __call__
+    
+    # find each LH5 "Table" contained in the file, and create a DataFrame header
+    tables = {}
+    for g_top in hf.keys():
+        
+        h5group = hf[f"/{g_top}"]
+        attrs = {att:val for att, val in h5group.attrs.items()}
+        
+        # LH5 table condition
+        if "datatype" in attrs.keys() and "table{" in attrs["datatype"]:
+            
+            # call our nice iterator at this group level
+            table = {g_top:[]}
+            for (path, name, size, dtype) in get_datasets(h5group):
+                table[g_top].append((name, size, dtype))
+            
+            hdr = pd.DataFrame(table[g_top], columns=['name','size','dtype'])
+            
+            # fix waveform datatype to match flattened_data
+            if 'waveform' in hdr['name'].values:
+                wf_dt = h5group['waveform/values/flattened_data'].dtype
+                hdr.loc[hdr['name'] == 'waveform', ['dtype']] = wf_dt
+            
+            tables[g_top] = hdr
+
+    return tables
+
+
+def get_datasets(h5group, prefix=''):
+    """
+    this is an iterator that lets you recursively build a list of all (names, dtypes, lengths) of each HDF5 dataset that is a member of the given group.
+    """
+    for key in h5group.keys():
+        h5obj = h5group[key]
+        path = '{}/{}'.format(prefix, key)
+
+        if isinstance(h5obj, h5py.Dataset): 
+        
+            # special handling for the nested waveform dataset
+            if "waveform/values/cumulative_length" in path:
+                nwfs = h5obj.shape[0]
+                yield (path, "waveform", nwfs, None) # must fix after this iter
+            elif "waveform" in path:
+                pass
+            
+            # handle normal 'array<1>{real}' datasets
+            else:
+                yield (path, key, h5obj.shape[0], h5obj.dtype) 
+            
+        # test for group (go down)
+        elif isinstance(h5obj, h5py.Group): 
+            yield from get_datasets(h5obj, path)
+
+
+def read_lh5(in_file, key=None, cols=None, ilo=0, ihi=None):
+    """
+    Convert lh5 to pandas DF, loading it into memory as efficiently as possible.
+    
+    This function should be very general and include many keyword arguments, 
+    just like the way pandas.read_hdf works.  It will have special handling for
+    "waveform"-valued tables.
+    
+    If key is None, return a df from the first Table we find in the file.
+    
+    Usage:
+        import pygama as pg 
+        df = pg.read_lh5(file, *args)
+
+    TODO: call this with additional metadata from DataSet, which could allow 
+    the header structure to be more generalized
+        from pygama import DataSet
+        ds = DataSet(...)
+        hdr = ds.get_header(file, *args)
+        df = ds.read_lh5(file, *args)
+    """
+    if ".lh5" not in in_file:
+        print("Error, unknown file:", in_file)
+        exit()
+    
+    # open the file in context manager to avoid weird crashes 
+    t_start = time.time()
+    with h5py.File(os.path.expanduser(in_file)) as hf:
+        
+        header = get_lh5_header(f_lh5, verbose=False)
+
+        # pick off first table by default, or let the user specify the name
+        table = list(header.keys())[0] if key is None else key
+        df_hdr = header[table]    
+        
+        # this function reads the Table into memory
+        df = read_table(table, hf, df_hdr, ilo, ihi)
+
+    # t_elapsed = time.time() - t_start
+    # print("elapsed: {t_elapsed:.4f} sec")
+    
+    return df
 
                             
-def read_table(table_name, hf, df_fmt, get_wfs=False):
+def read_table(table_name, hf, df_fmt, ilo, ihi):
     """
-    internal function for read_lh5
+    internal function for read_lh5.
+    
+    We want to read from the LH5 file, using h5py operations, with the absolute
+    minimum number of allocations and copy operations possible.
     
     Wisdom from Jeff Reback about doing this efficiently:
     "you can simply create an empty frame with an index and columns, then assign
-    ndarrays - these won't copy if you assign all of a particular dtype at once. 
+    ndarrays - these won't copy IF you assign all of a particular dtype at once. 
     you could create these with np.empty if you wish."
+    
+    So this is fast because it's mirroring what BlockManager does internally.
     """
     dfs = []
     for dt, block in df_fmt.groupby("dtype"):
         
-        ncols = len(block)
-        nrows = block["shape"].unique()
-        if len(nrows) > 1:
-            print("Error, columns are different lengths")
-            exit()
-        nrows = nrows[0][0]
+        # check if this dtype contains waveform data
+        if 'waveform' in block['name'].values:
+            wf_group = f"/{table_name}/waveform"
+            wf_block = read_waveforms(wf_group, hf, df_fmt, ilo, ihi)
+            wf_rows, wf_cols = wf_block.shape
+            nrows = wf_rows
+            
+            # get number of additional columns
+            new_cols = [c for c in list(block["name"].values) if c != 'waveform']
+            newcols = len(new_cols)
+            
+            # allocate the full numpy array for this dtype
+            np_block = np.empty((nrows, newcols + wf_cols), dtype=dt)
+            np_block[:, newcols:] = wf_block
+            
+            cols = []
+            for i, col in enumerate(new_cols):
+                ds = hf[f"{table_name}/{col}"] 
+                
+                if ihi is None:
+                    ihi = ds.shape[0]
+                nwfs = ihi - ilo + 1 # inclusive
+                
+                np_block[:, i] = ds[ilo:ihi]
+                cols.append(col)
+            cols.extend(np.arange(wf_cols))    
 
-        # preallocate a block for this dtype
-        np_block = np.empty((nrows, ncols), dtype=dt)
+            dfs.append(pd.DataFrame(np_block, columns=cols))
         
-        for i, col in enumerate(block["name"]):
+        # read normal 'array<1>{real}' columns
+        else:
+            ncols = len(block)
+            nrows = block["size"].unique()
+            if len(nrows) > 1:
+                print('Error, columns are different lengths')
+                exit()
+            nrows = nrows[0]
+            np_block = np.empty((nrows, ncols), dtype=dt)
             
-            ds = hf[f"{table_name}/{col}"] # reference the ds w/o reading
-            np_block[:,i] = ds[...]   # read into memory
-            
-        dfs.append(pd.DataFrame(np_block, columns=block["name"]))
-
+            for i, col in enumerate(block["name"]):
+                ds = hf[f"{table_name}/{col}"]
+                np_block[:,i] = ds[...]
+        
+            dfs.append(pd.DataFrame(np_block, columns=block["name"]))    
+        
     # concat final DF after grouping dtypes and avoiding copies
     return pd.concat(dfs, axis=1, copy=False)
         
 
 def read_waveforms(table_name, hf, df_fmt, ilo=0, ihi=None):
     """
+    internal function for read_lh5
+    
     efficiently decompress waveforms in an LH5 file into a rectangular ndarray,
     which can be concatenated into the main 'tier 1' waveform dataframe
     """
+    # assume LH5 structure
     ds_clen = hf[f"{table_name}/values/cumulative_length"]
     ds_flat = hf[f"{table_name}/values/flattened_data"]
-    
     nwf_tot = ds_clen.shape[0]
     nval_tot = ds_flat.shape[0]
     
@@ -96,87 +233,19 @@ def read_waveforms(table_name, hf, df_fmt, ilo=0, ihi=None):
     return np.vstack(wf_list)
 
 
-def read_lh5(in_file, header=False, cols=None, ilo=None, ihi=None, ds=None):
-    """
-    Convert lh5 to pandas DF, loading it into memory with minimal copying.  
-    
-    This function should be very general and include many keyword arguments, 
-    just like the way pandas.read_hdf works.  
-    
-    There are three standard use cases we should support:
-    Usage 1:
-    >>> from pygama import read_lh5
-    >>> df = read_lh5(file, *args)
-
-    Usage 2:
-    >>> import pygama as pg 
-    >>> df = pg.read_lh5(file, *args)
-
-    TODO: Usage 3: call it with additional metadata from DataSet
-    >>> from pygama import DataSet
-    >>> ds = DataSet(...)
-    >>> df = ds.read_lh5(file, *args)
-    """
-    if ".lh5" not in in_file:
-        print("Error, unknown file:", in_file)
-        exit()
-    
-    tables = {}
-    def lookup_tables(name, obj):
-        """
-        for each table in the LH5 file, save column, size, and dtype 
-        so that we can preallocate numpy arrays before reading the data.
-        """ 
-        if isinstance(obj, h5py.Group):
-            for att, val in obj.attrs.items():
-                if att == "datatype" and "table{" in val:
-                    cols = [] 
-                    table_dfn = val[6:-1].split(",")
-                    for col in table_dfn:
-                        ds_path = f"{name}/{col}"
-                        ds = hf[ds_path]
-                        s, d = None, None
-                        if isinstance(ds, h5py.Dataset):
-                            s, d = ds.shape, ds.dtype
-                        cols.append((col, s, d))
-                    tables[name] = cols
-
-    # open the file in context manager to avoid weird crashes 
-    t_start = time.time()
-    with h5py.File(os.path.expanduser(in_file)) as hf:
-        
-        # find all tables in the file
-        hf.visititems(lookup_tables)
-        # pprint(tables)
-        
-        # read single-valued tables (ignoring "None" columns)
-        # tname = "daqdata"
-        # df_fmt = pd.DataFrame(tables[tname], columns=["name","shape","dtype"])
-        # df = read_table(tname, hf, df_fmt)
-        # print(df_fmt)
-        # print(df)
-
-        # read waveform-valued tables (un-flattening & decompressing wfs)
-        wname = "daqdata/waveform"
-        df_wfs = pd.DataFrame(tables[wname], columns=["name","shape","dtype"])
-        
-        df = read_table(wname, hf, df_wfs, get_wfs=True)
-        
-        # df = read_waveforms(wname, hf, df_wfs)
-        print(df_wfs)
-        print(df)
-    
-    # t_elapsed = time.time() - t_start
-    # print("elapsed: {t_elapsed:.4f} sec")
-    
-    # return df
-
-
 if __name__=="__main__":
     """
     debug functions
     """
     f_lh5 = "/Users/wisecg/Data/L200/tier1/t1_run0.lh5"
-    dir_lh5(f_lh5)
+    
+    # check the headers only
+    headers = get_lh5_header(f_lh5, verbose=False)
+    for table, df_hdr in headers.items():
+        print("TABLE", table)
+        print(df_hdr)
+    
+    # read data into memory
     df = read_lh5(f_lh5)
-    print(df)
+    # df = read_lh5(f_lh5, ilo=1) # broken, messes up dtypes
+    print(df.head(10))
