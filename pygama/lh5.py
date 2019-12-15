@@ -47,10 +47,11 @@ def get_lh5_header(in_file, verbose=False):
             
             # call our nice iterator at this group level
             table = {g_top:[]}
-            for (path, name, size, dtype) in get_datasets(h5group):
-                table[g_top].append((name, size, dtype))
+            for (path, name, size, dtype, units, spec) in get_datasets(h5group):
+                table[g_top].append((name, size, dtype, units, spec))
             
-            hdr = pd.DataFrame(table[g_top], columns=['name','size','dtype'])
+            hdr = pd.DataFrame(table[g_top], columns=['name','size','dtype',
+                                                      'units','spec'])
             
             # fix waveform datatype to match flattened_data
             if 'waveform' in hdr['name'].values:
@@ -69,19 +70,26 @@ def get_datasets(h5group, prefix=''):
     for key in h5group.keys():
         h5obj = h5group[key]
         path = '{}/{}'.format(prefix, key)
+        attrs = {att:val for att, val in h5obj.attrs.items()}
 
         if isinstance(h5obj, h5py.Dataset): 
+            
+            # get metadata
+            units = attrs["units"] if 'units' in attrs else None
+            spec = attrs["datatype"] if 'datatype' in attrs else None
         
             # special handling for the nested waveform dataset
             if "waveform/values/cumulative_length" in path:
                 nwfs = h5obj.shape[0]
-                yield (path, "waveform", nwfs, None) # must fix after this iter
+                
+                # must fix datatype AFTER this initial iteration
+                yield (path, "waveform", nwfs, None, units, spec) 
             elif "waveform" in path:
                 pass
             
             # handle normal 'array<1>{real}' datasets
             else:
-                yield (path, key, h5obj.shape[0], h5obj.dtype) 
+                yield (path, key, h5obj.shape[0], h5obj.dtype, units, spec) 
             
         # test for group (go down)
         elif isinstance(h5obj, h5py.Group): 
@@ -90,7 +98,7 @@ def get_datasets(h5group, prefix=''):
 
 def read_lh5(in_file, key=None, cols=None, ilo=0, ihi=None):
     """
-    Convert lh5 to pandas DF, loading it into memory as efficiently as possible.
+    Convert on-disk LH5 to pandas DataFrame in memory, efficiently!
     
     This function should be very general and include many keyword arguments, 
     just like the way pandas.read_hdf works.  It will have special handling for
