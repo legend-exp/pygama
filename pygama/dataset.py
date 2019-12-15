@@ -133,7 +133,7 @@ class DataSet:
 
     def get_paths(self, runs, subfile, verbose=False):
         """
-        TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL
+        TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL.
         
         Matteo -- add "get_file_list", it will work with all sets of input files
         
@@ -197,6 +197,10 @@ class DataSet:
             print("Read awsome LEGEND200 Data. But not ready yet...")
 
         elif self.ftype == "flashcam":
+            
+            # .lh5
+            suffix = "." + self.config["suffix"]
+            
             for p, d, files in os.walk(self.raw_dir):
                 for f in files:
                     if any("protothppmco_{}".format(r) in f for r in runs):
@@ -211,13 +215,13 @@ class DataSet:
             for p, d, files in os.walk(self.tier1_dir):
                 for f in files:
                     if any("t1_run{}".format(r) in f for r in runs):
-                        run = int(f.split("run")[-1].split(".h5")[0])
+                        run = int(f.split("run")[-1].split(suffix)[0])
                         self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
             for p, d, files in os.walk(self.tier2_dir):
                 for f in files:
                     if any("t2_run{}".format(r) in f for r in runs):
-                        run = int(f.split("run")[-1].split(".h5")[0])
+                        run = int(f.split("run")[-1].split(suffix)[0])
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         else:
@@ -235,13 +239,13 @@ class DataSet:
             for p, d, files in os.walk(self.tier1_dir):
                 for f in files:
                     if any("t1_run{}".format(r) in f for r in runs):
-                        run = int(f.split("run")[-1].split(".h5")[0])
+                        run = int(f.split("run")[-1].split(suffix)[0])
                         self.paths[run]["t1_path"] = "{}/{}".format(p,f)
 
             for p, d, files in os.walk(self.tier2_dir):
                 for f in files:
                     if any("t2_run{}".format(r) in f for r in runs):
-                        run = int(f.split("run")[-1].split(".h5")[0])
+                        run = int(f.split("run")[-1].split(suffix)[0])
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
@@ -427,7 +431,9 @@ class DataSet:
             if test:
                 print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
                 continue
-            daq_to_raw(t0_file, run, verbose=test, output_dir=self.tier_dir,
+            
+            daq_to_raw(t0_file, run, suffix=self.config["suffix"],
+                       verbose=test, output_dir=self.tier1_dir,
                        overwrite=overwrite, n_max=n_max, config=self.config)
 
     

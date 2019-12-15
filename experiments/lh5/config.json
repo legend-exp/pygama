@@ -6,7 +6,8 @@
   "filetype":"flashcam",
   "t0_prefix":"protothppmco_",
   "t0_suffix":".fcio",
-
+  
+  "suffix":"lh5",
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
 

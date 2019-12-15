@@ -274,19 +274,19 @@ class DataTaker(ABC):
                     
                     # declare the sub-table for the waveform
                     hf.create_group(wf_group)
-                    hf[wf_group].attrs["datatype"] = "table{dt, t0, values}"
-                    
-                    # dt
-                    st_dt = f"{wf_group}/dt"
-                    ds_dt = hf.create_dataset(st_dt, data=wf_dt, maxshape=(None,))
-                    hf[st_dt].attrs["datatype"] = "array<1>{real}"
-                    hf[st_dt].attrs["units"] = "ns"
+                    hf[wf_group].attrs["datatype"] = "table{t0,dt,values}"
                     
                     # t0
                     st_t0 = f"{wf_group}/t0"
                     ds_dt = hf.create_dataset(st_t0, data=wf_t0, maxshape=(None,))
                     hf[st_t0].attrs["datatype"] = "array<1>{real}"
                     hf[st_t0].attrs["units"] = "ns"
+                    
+                    # dt
+                    st_dt = f"{wf_group}/dt"
+                    ds_dt = hf.create_dataset(st_dt, data=wf_dt, maxshape=(None,))
+                    hf[st_dt].attrs["datatype"] = "array<1>{real}"
+                    hf[st_dt].attrs["units"] = "ns"
                     
                     # waveform (contained as a paired subgroup)
                     gr_wf = f"{wf_group}/values"
@@ -324,7 +324,7 @@ class DataTaker(ABC):
                     
             # create single-valued datasets
             else:
-                # dtype is declared automatically
+                
                 npa = np.asarray(self.decoded_values[col]) 
                 
                 # write first time
