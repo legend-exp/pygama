@@ -79,9 +79,10 @@ def find_cut(ds, ds_lo, write_db=False):
     a_over_e = y0 * e_over_unc / cal
 
     y = linear_correction(cal, a_over_e)
-
-    # double_gauss_issue(cal, a_over_e)
-    # exit()
+    ans = input('Are you running A/E on Th232? \n y/n -->')
+    if ans == 'y':
+        double_gauss_issue(cal, a_over_e)
+        exit()
 
 
     dep_range = [1530,1620]

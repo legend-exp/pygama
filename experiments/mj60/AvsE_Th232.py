@@ -25,7 +25,7 @@ def main():
     ##COMMENT OUT CODE AND RENAME VARIABLES###############
     #######################
 
-    
+
     """
     Code to implement an A/E cut
     """
@@ -87,89 +87,89 @@ def find_cut(ds, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
-    # double_gauss_issue(cal, y, ds)
-    # exit()
+    line = double_gauss_issue(cal, y, ds)
 
 
-    dep_range = [1530,1620]
-    hist, bins = np.histogram(cal, bins=450, range=dep_range)
-    hist = hist * 5
 
-    def gauss(x, *params):
-        y = np.zeros_like(x)
-        for i in range(0, len(params) - 1, 3):
-            x0 = params[i]
-            a = params[i + 1]
-            sigma = params[i + 2]
-            y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
-        y = y + params[-1]
-        return y
-
-    p0_list = [1591, 200, 3, 4]
-
-    par, pcov = curve_fit(
-        gauss, bins[1:], hist, p0=p0_list)
-    print(par)
-    perr = np.sqrt(np.diag(pcov))
-    print(perr)
-
-    mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
-    print("Scanning ", mu, " peak")
-    ans = quad(gauss, 1583, 1600, args=(mu, amp, sig, bkg))
-    counts = ans[0] - ((1600-1583)*bkg)
-    print("Counts in ", mu, " peak is ", counts)
-
-    cut = counts
-    line = .4
-
-    y1 = y[np.where(line < y)]
-    x1 = cal[np.where(line < y)]
-    # hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
-    hist1, bins1 = np.histogram(x1, bins=450, range=[1530,1620])
-    hist1 = hist1*5
-
-    print("Finding optimal cut, keeping 90% of 1592 DEP")
-    while cut > .9 * counts:
-
-        y1 = y[np.where(line < y)]
-        x1 = cal[np.where(line < y)]
-
-        hist1, bins1 = np.histogram(x1, bins=450, range=dep_range)
-        hist1 = hist1*5
-
-        par1, pcov1 = curve_fit(
-            gauss, bins1[1:], hist1, p0=p0_list)
-        perr1 = np.sqrt(np.diag(pcov1))
-
-        mu1, amp1, sig1, bkg1 = par1[0], par1[1], par1[2], par1[-1]
-        ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
-        cut = ans1[0] - ((1600-1583)*bkg1)
-
-        line += .001
-
-
-    print(line, cut)
-    plt.hist2d(cal, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
-    plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
-    cbar = plt.colorbar()
-    plt.title("Dataset {}".format(ds.ds_list[0]))
-    plt.xlabel("Energy (keV)", ha='right', x=1)
-    plt.ylabel("A/Eunc", ha='right', y=1)
-    cbar.ax.set_ylabel('Counts')
-    plt.tight_layout()
-    plt.show()
-
-    hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
-    hist1, bins1 = np.histogram(x1, bins=2000, range=[0,2000])
-
-    plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
-    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
-    plt.ylabel('Counts')
-    plt.xlabel('keV')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # dep_range = [1530,1620]
+    # hist, bins = np.histogram(cal, bins=450, range=dep_range)
+    # hist = hist * 5
+    #
+    # def gauss(x, *params):
+    #     y = np.zeros_like(x)
+    #     for i in range(0, len(params) - 1, 3):
+    #         x0 = params[i]
+    #         a = params[i + 1]
+    #         sigma = params[i + 2]
+    #         y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+    #     y = y + params[-1]
+    #     return y
+    #
+    # p0_list = [1591, 200, 3, 4]
+    #
+    # par, pcov = curve_fit(
+    #     gauss, bins[1:], hist, p0=p0_list)
+    # print(par)
+    # perr = np.sqrt(np.diag(pcov))
+    # print(perr)
+    #
+    # mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
+    # print("Scanning ", mu, " peak")
+    # ans = quad(gauss, 1583, 1600, args=(mu, amp, sig, bkg))
+    # counts = ans[0] - ((1600-1583)*bkg)
+    # print("Counts in ", mu, " peak is ", counts)
+    #
+    # cut = counts
+    # line = .4
+    #
+    # y1 = y[np.where(line < y)]
+    # x1 = cal[np.where(line < y)]
+    # # hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
+    # hist1, bins1 = np.histogram(x1, bins=450, range=[1530,1620])
+    # hist1 = hist1*5
+    #
+    # print("Finding optimal cut, keeping 90% of 1592 DEP")
+    # while cut > .9 * counts:
+    #
+    #     y1 = y[np.where(line < y)]
+    #     x1 = cal[np.where(line < y)]
+    #
+    #     hist1, bins1 = np.histogram(x1, bins=450, range=dep_range)
+    #     hist1 = hist1*5
+    #
+    #     par1, pcov1 = curve_fit(
+    #         gauss, bins1[1:], hist1, p0=p0_list)
+    #     perr1 = np.sqrt(np.diag(pcov1))
+    #
+    #     mu1, amp1, sig1, bkg1 = par1[0], par1[1], par1[2], par1[-1]
+    #     ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
+    #     cut = ans1[0] - ((1600-1583)*bkg1)
+    #
+    #     line += .001
+    #
+    #
+    # print(line, cut)
+    # plt.hist2d(cal, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
+    # plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
+    # cbar = plt.colorbar()
+    # plt.title("Dataset {}".format(ds.ds_list[0]))
+    # plt.xlabel("Energy (keV)", ha='right', x=1)
+    # plt.ylabel("A/Eunc", ha='right', y=1)
+    # cbar.ax.set_ylabel('Counts')
+    # plt.tight_layout()
+    # plt.show()
+    #
+    # hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
+    # hist1, bins1 = np.histogram(x1, bins=2000, range=[0,2000])
+    #
+    # plt.clf()
+    # plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    # plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
+    # plt.ylabel('Counts')
+    # plt.xlabel('keV')
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
 
     if write_db:
         table = calDB.table("A/E_cut")
@@ -210,7 +210,7 @@ def linear_correction(energy, a_over):
 
     return a_over
 
-def double_gauss_issue(energy, a_over_e, ds):
+def double_gauss_issue(energy, a_over_e, ds, write_db=False):
 
     # file1 = np.load('./ds18.npz')
     # file2 = np.load('./bins_ds18.npz')
@@ -310,8 +310,8 @@ def double_gauss_issue(energy, a_over_e, ds):
     plt.legend()
     plt.show()
 
-    hist, bins = np.histogram(energy, bins=2000, range=[0,2000])
-    hist1, bins1 = np.histogram(e1, bins=2000, range=[0,2000])
+    hist, bins = np.histogram(energy, bins=2600, range=[0,2600])
+    hist1, bins1 = np.histogram(e1, bins=2600, range=[0,2600])
 
     plt.clf()
     plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
@@ -321,6 +321,8 @@ def double_gauss_issue(energy, a_over_e, ds):
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+    return line
 
     #b + a1e^-(alphaE-1588.2 +delta)+ a2e^-(alphaE-1592.5 +delta) fit this with
     #same delta or alpha for each one
