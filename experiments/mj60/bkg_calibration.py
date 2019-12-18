@@ -21,9 +21,9 @@ def main():
         print('Usage: bkg_calibration.py [run number]')
         sys.exit()
 
-    #plot_raw()
+    plot_raw()
     #spectrum_medfilt_peaks()
-    linear_calibration()
+    #linear_calibration()
 
 def plot_raw():
 
@@ -163,6 +163,8 @@ def linear_calibration():
     # E = A(e_ftp) + B
     A = float((pks_lit[1]-pks_lit[0])/(adc_values[1]-adc_values[0]))
     B = float((pks_lit[1] - adc_values[1]*A))
+    A = 0.4074162679425837
+    B = 0.23267942583743206
     #Now we will add a column to df that represents the energy measured (rather than only having the adc (e_ftp) value measured as the df currently does)
     print('E = {}(e_ftp) + {}'.format(A,B))
     print(A)
@@ -170,7 +172,7 @@ def linear_calibration():
 
     df["e_cal"] = A * df['e_ftp'] + B
 
-    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')
+    df.to_hdf('{}/Spectrum_{}.hdf5'.format(meta_dir,sys.argv[1]), key='df', mode='w')   
 
     pks_lit_all = [238.6, 351.9, 511.0, 583.2, 609.3, 911.2, 969, 1120.3, 1460.8, 1764.5, 2614.5]
     plt.axvline(x=238.6, ymin=0, ymax=30, color='red', linestyle='--', lw=1, zorder=1)

@@ -1,52 +1,83 @@
-#!/usr/bin/env python
-""" pygama setup script.
-run from containing folder with:
-$ pip install -e pygama
-re-runs cythonize function on a list of extensions.
-"""
+ #!/usr/bin/env python3
+import os
+import re
+import sys
+import sysconfig
+import platform
+import subprocess
+
+from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
-import sys, os, glob
+from setuptools.command.build_ext import build_ext
+from setuptools.command.test import test as TestCommand
+from shutil import copyfile, copymode
 
-do_cython = False
-try:
-    from Cython.Build import cythonize
-    do_cython = True
-except ImportError:
-    do_cython = False
 
-if __name__ == "__main__":
+class CMakeExtension(Extension):
+    def __init__(self, name, sourcedir=''):
+        Extension.__init__(self, name, sources=[])
+        self.sourcedir = os.path.abspath(sourcedir)
 
-    try:
-        import numpy as np
-        include_dirs = [np.get_include(),]
-    except ImportError:
-        do_cython = False
 
-    src = []
-    fext = ".pyx" if do_cython else ".c"
+class CMakeBuild(build_ext):
+    def run(self):
+        try:
+            out = subprocess.check_output(['cmake', '--version'])
+        except OSError:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: " +
+                ", ".join(e.name for e in self.extensions))
 
-    exts = []
-    for mod in ["decoders","processing"]:
-        for f in glob.glob("./pygama/{}/*.pyx".format(mod)):
-            f_name = f.split('/')[-1]
-            cyname = os.path.splitext(f_name)[0]
-            exts.append(Extension(
-                "pygama.{}.{}".format(mod, cyname),
-                sources = [os.path.join("pygama", mod, cyname + fext)],
-                language = 'c',
-                include_dirs = include_dirs)
-                )
+        if platform.system() == "Windows":
+            cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)',
+                                         out.decode()).group(1))
+            if cmake_version < '3.1.0':
+                raise RuntimeError("CMake >= 3.1.0 is required on Windows")
 
-    if do_cython:
-        exts = cythonize(exts)
+        for ext in self.extensions:
+            self.build_extension(ext)
 
-    setup(
-        name="pygama",
-        version="0.2",
-        author="Clint Wiseman",
-        author_email="wisecg.neontetra@gmail.com",
-        packages=find_packages(),
-        ext_modules=exts,
-        install_requires=[
-            "numpy", "scipy", "pandas", "tables", "future", "cython", "tinydb"
-        ])
+    def build_extension(self, ext):
+        extdir = os.path.abspath(
+            os.path.dirname(self.get_ext_fullpath(ext.name)))
+        cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
+                      '-DPYTHON_EXECUTABLE=' + sys.executable]
+
+        cfg = 'Debug' if self.debug else 'Release'
+        build_args = ['--config', cfg]
+
+        if platform.system() == "Windows":
+            cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(
+                cfg.upper(),
+                extdir)]
+            if sys.maxsize > 2**32:
+                cmake_args += ['-A', 'x64']
+            build_args += ['--', '/m']
+        else:
+            cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg]
+            build_args += ['--', '-j2']
+
+        env = os.environ.copy()
+        env['CXXFLAGS'] = '{} -DVERSION_INFO=\\"{}\\"'.format(
+            env.get('CXXFLAGS', ''),
+            self.distribution.get_version())
+        if not os.path.exists(self.build_temp):
+            os.makedirs(self.build_temp)
+        subprocess.check_call(['cmake', ext.sourcedir] + cmake_args,
+                              cwd=self.build_temp, env=env)
+        subprocess.check_call(['cmake', '--build', '.'] + build_args,
+                              cwd=self.build_temp)
+    
+        
+setup(
+    name='pygama',
+    version='0.2',
+    author='Clint Wiseman',
+    author_email='wisecg.neontetra@gmail.com',
+    description='Python package for decoding and processing digitizer data',
+    long_description='',
+    packages=find_packages(),
+    ext_modules=[CMakeExtension('pygama/cygama')],
+    cmdclass=dict(build_ext=CMakeBuild),
+    zip_safe=False,
+)

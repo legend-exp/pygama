@@ -15,7 +15,7 @@ from pygama import DataSet
 # from pygama.utils import set_plot_style
 # set_plot_style('root')
 # load file
-db_file = "testDB.json"
+db_file = "config.json"
 with open(db_file) as f:
     testDB = json.load(f)
 
@@ -36,7 +36,7 @@ ds = DataSet(run=xrun, md=db_file, v=True) # can also use a list of run number
 
 # print some of the DataSet attributes
 print("raw dir : ", ds.raw_dir)
-print("tier dir : ", ds.tier_dir)
+print("tier1 dir : ", ds.tier1_dir)
 print("t1 file prefix :", ds.t1pre)
 print("t2 file prefix :", ds.t2pre)
 print("current run list :", ds.runs)
@@ -78,7 +78,7 @@ t1_file = ds.paths[run]["t1_path"]
 
 # remind ourselves the name of the HDF5 group key using the DB.
 # pprint(testDB['build_options'])
-t1_key = testDB['build_options']['conf1']['tier0_options']['digitizer']
+t1_key = testDB['build_options']['conf1']['daq_to_raw']['digitizer']
 
 # load a small dataframe 
 #t1_file = "/mnt/e15/schwarz/testdata_pg/scarf/tier/t1_run2002.h5.0013" #manual override

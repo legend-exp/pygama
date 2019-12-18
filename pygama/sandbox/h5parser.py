@@ -200,7 +200,7 @@ def test_bool():
 def write_h5():
     """
     read an MJ60 raw file and convert to Oliver's format.
-    this is a test function on the way to changing tier0.py in pygama.
+    this is a test function on the way to changing daq_to_raw.py in pygama.
     """
     print("hi clint")
     

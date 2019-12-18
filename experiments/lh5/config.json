@@ -1,0 +1,31 @@
+{
+  "raw_dir":"$DATADIR/L200/Data",
+  "tier1_dir":"$DATADIR/L200/tier1",
+  "tier2_dir":"$DATADIR/L200/tier2",
+
+  "filetype":"flashcam",
+  "t0_prefix":"protothppmco_",
+  "t0_suffix":".fcio",
+  
+  "suffix":"lh5",
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+
+  "daq":"FlashCam",
+  "ds":{
+    "0":["0","multi-detector test file from UNC"]
+  },
+
+  "build_options":{
+    "cycle_1":{
+      "run_coverage":[0,9999999],
+      "daq_to_raw":{
+        "digitizer":"FlashCam"
+      },
+      "raw_to_dsp":{
+        "avg_bl": {"ihi":20},
+        "blsub" : {}
+      }
+    }
+  }
+}

@@ -80,6 +80,10 @@ def find_cut(ds, ds_lo, write_db=False):
 
     y = linear_correction(cal, a_over_e)
 
+    # double_gauss_issue(cal, a_over_e)
+    # exit()
+
+
     dep_range = [1530,1620]
     hist, bins = np.histogram(cal, bins=450, range=dep_range)
     hist = hist * 5
@@ -136,6 +140,7 @@ def find_cut(ds, ds_lo, write_db=False):
 
         line += .0005
 
+
     print(line, cut)
     plt.hist2d(cal, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
     plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
@@ -149,6 +154,7 @@ def find_cut(ds, ds_lo, write_db=False):
 
     hist, bins = np.histogram(cal, bins=2000, range=[0,2000])
     hist1, bins1 = np.histogram(x1, bins=2000, range=[0,2000])
+
     plt.clf()
     plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
     plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
@@ -196,6 +202,52 @@ def linear_correction(energy, a_over):
     #     a_over[i] = a_over[i] / (par[0] * energy[i] + par[1])
 
     return a_over
+
+def double_gauss_issue(energy, a_over_e):
+
+    # file1 = np.load('./ds18.npz')
+    # file2 = np.load('./bins_ds18.npz')
+    # counts = file1['arr_0']
+    # energy = file2['arr_0']
+
+    dep_range = [1530,1620]
+    hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]), range=dep_range)
+    b = (bins[:-1] + bins[1:]) / 2
+
+    def gauss(x, *params):
+        y = np.zeros_like(x)
+        for i in range(0, len(params) - 1, 3):
+            x0 = params[i]
+            a = params[i + 1]
+            sigma = params[i + 2]
+            y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+        y = y + params[-1]
+        return y
+
+    p0_list = [1588, 400, 2.5, 1592, 400, 2.5, 157]
+    bnds = ([1587.8, 100, .6*p0_list[2], 1591.8, 100, .6*p0_list[5], 0],
+            [1588.2, 700, 1.4*p0_list[2], 1592.2, 700, 1.4*p0_list[5], 300])
+
+    par, pcov = curve_fit(gauss, b, hist, p0=p0_list, bounds=bnds)
+    print(par)
+    perr = np.sqrt(np.diag(pcov))
+    print(perr)
+
+    np.savez('double_gauss_params', par)
+
+    plt.title('Finding FWHM of roe')
+    plt.plot(b, hist, color='black')
+    plt.plot(b, gauss(b, *par), '-r')
+    plt.tight_layout()
+    plt.show()
+
+    #fit whole 1590 peak region with two gaussians
+
+    #start cutting up AoverE line, and fitting region on ms and ss, find the efficiency
+    # of both ms and ss, find where there is 90% of the counts left from the original
+    #1592 gaussian from above
+
+
 
 
 if __name__=="__main__":

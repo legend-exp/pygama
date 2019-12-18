@@ -4,11 +4,11 @@ import multiprocessing as mp
 from functools import partial
 
 from .vector import *
-from ..decoders.data_loading import *
+from ..decoders.io_base import *
 from ..decoders.digitizers import *
 from ..utils import *
 
-def ProcessTier1Vec(t1_file,
+def RunDSPVec(t1_file,
                     vec_process=None,
                     digitizer_list=None,
                     out_prefix="t2",

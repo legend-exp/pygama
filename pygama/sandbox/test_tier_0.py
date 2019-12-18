@@ -52,7 +52,7 @@ def plot_baselines(file_name, draw_non_detectors=False):
 def plot_waveforms(file_name, num_waveforms=5):
     df_gretina = pd.read_hdf(file_name, key="ORGretina4MWaveformDecoder")
 
-    g4 = dl.Gretina4MDecoder(file_name)
+    g4 = dl.Gretina4M(file_name)
 
     plt.figure()
     plt.xlabel("Time [ns]")
