@@ -227,9 +227,12 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     # run = get_run_number(header_dict)
     print("Run number: {}".format(run))
 
+    pprint(header_dict)
+
     #see pygama/pygama/io/decoders/io_base.py
     decoders = []
-    decoders.append(LLAMAStruck3316(metadata=pd.DataFrame.from_dict(header_dict)))   #we just have that one
+    #decoders.append(LLAMAStruck3316(metadata=pd.DataFrame.from_dict(header_dict)))   #we just have that one
+    decoders.append(LLAMAStruck3316(metadata=header_dict))  #we just have that one
                     # fix: saving metadata using io_bases ctor
                     # have to convert to dataframe here in order to avoid 
                     # passing to xml_header.get_object_info in io_base.load_metadata
@@ -249,7 +252,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     print("Beginning Tier 0 processing ...")
 
     packet_id = 0  # number of events decoded
-    row_id = 0      #index of written rows
+    row_id = 0      #index of written rows, FIXME maybe gets unused
     unrecognized_data_ids = []
 
     # header is already skipped by llama_3316,
@@ -271,8 +274,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                #d.save_to_pytables(t1_file, verbose=True)
-                toFile(d, t1_file, row_id, True)
+                d.save_to_lh5(t1_file)
             row_id += 1
 
         try:
@@ -292,8 +294,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
 
     # final write to file
     for d in decoders:
-        #d.save_to_pytables(t1_file, verbose=True)
-        toFile(d, t1_file, row_id, True)
+        d.save_to_lh5(t1_file)
 
     if verbose:
         update_progress(1)
@@ -306,14 +307,10 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
 
     # ---------  summary ------------
 
-    #print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
-    #with pd.HDFStore(t1_file,'r') as store:
-    #    print(store.keys())
-    #    # print(store.info())
-    print("Wrote {} Tier 1 Files:\n    {}.xxxx\nFILE INFO of 1st file:".format(row_id, t1_file))
-    with pd.HDFStore(t1_file+".0000",'r') as store:
+    print("Wrote: Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    with pd.HDFStore(t1_file,'r') as store:
         print(store.keys())
-    #print(store.keys())
+    #    # print(store.info())
     
 
 

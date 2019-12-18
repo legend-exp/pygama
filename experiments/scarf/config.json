@@ -9,7 +9,7 @@
 
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
-  "suffix":"h5",
+  "suffix":"lh5",
 
   "daq":"SIS3316",
   "ds":{

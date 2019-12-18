@@ -2,6 +2,7 @@
 import os
 import time
 import h5py
+import sys
 import numpy as np
 import pandas as pd
 from pprint import pprint
@@ -10,41 +11,53 @@ import matplotlib.pyplot as plt
 from pygama import DataSet, read_lh5, get_lh5_header
 import pygama.analysis.histograms as pgh
 
+# new viewer for waveforms for llama / scarf tests.
+# Largely "inspired" by Clint's processing.py
+
 def main():
     """
-    this is the high-level part of the code, something that a user might
-    write (even on the interpreter) for processing with a specific config file.
+    Currently this is quite simple: just take a filename from argument
+    (ignoring the whole fancy run number stuff) and throws it to the plotter
     """
-    process_data()
+    #process_data()
     
     
-    
-    #plot_data()
-    #plot_waveforms()
-    
+    try:
+        filename = sys.argv[1]
+    except:
+        print("You have to give a file name as argument!")
+        exit(0)
 
-def process_data():
-    from pygama import DataSet
-    ds = DataSet(3, md="config.json")
-    ds.daq_to_raw(overwrite=True, test=False)
-    # ds.raw_to_dsp(....)
+    plot_data(filename)
+    #testmethod(filename)
 
 
-def plot_data():
+
+def testmethod(filename):
+    hf = h5py.File(filename)
+
+    
+
+
+def plot_data(filename):
     """
     read the lh5 output.
+    plot waveforms
+    Mostly written by Clint
     """
     
-    f_lh5 = "/Users/wisecg/Data/L200/tier1/t1_run0.lh5"
-    df = get_lh5_header(f_lh5)
     
-    # df = read_lh5(f_lh5)
-    # print(df)
-    exit()
+
+    #filename = "/mnt/e15/schwarz/testdata_pg/scarf/tier1/t1_run2002.lh5"
+    df = get_lh5_header(filename)
+    
+    #df = read_lh5(filename)
+    print(df)
+    #exit()
     
     
     
-    # hf = h5py.File("/Users/wisecg/Data/L200/tier1/t1_run0.lh5")
+    hf = h5py.File(filename)
     
     # # 1. energy histogram
     # wf_max = hf['/daqdata/wf_max'][...] # slice reads into memory
@@ -78,6 +91,7 @@ def plot_data():
         ihi = wfidx[iwf+1] if iwf+1 < nevt else nevt
         wfs.append(wfdata[ilo : ihi])
     wfs = np.vstack(wfs)
+    print("Shape of the waveforms:")
     print(wfs.shape) # wfs on each row.  will work w/ pygama.
 
     # plot waveforms, flip polarity for fun
@@ -93,8 +107,6 @@ def plot_data():
     
     hf.close()
 
-
-    
     
 if __name__=="__main__":
     main()

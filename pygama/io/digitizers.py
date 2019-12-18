@@ -198,6 +198,13 @@ class LLAMAStruck3316(DataTaker):
             "channel": [],
             "waveform": [],
         }
+
+        self.config_names = []  #TODO at some point we want the metainfo here
+        self.file_config = {}
+        self.lh5_spec = {}
+        self.file_config["nadcs"], self.file_config["nsamples"] = self.readMetadata(metadata)
+        print("We have {} adcs and {} samples per WF.".format(self.file_config["nadcs"],self.file_config["nsamples"]))
+
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
 
         # self.event_header_length = 1 #?
@@ -210,6 +217,18 @@ class LLAMAStruck3316(DataTaker):
         self.window = False
         self.df_metadata = metadata #seems that was passed to superclass before, try now like this
         self.pytables_col_limit = 3000
+
+    def readMetadata(self, meta):
+        nsamples = -1
+        totChan = 0
+        for fadc in meta:
+            for channel in meta[fadc]:
+                if nsamples == -1:
+                    nsamples = meta[fadc][channel]["SampleLength"]
+                elif nsamples != meta[fadc][channel]["SampleLength"]:
+                    print("samples not uniform!!!")
+                totChan += 1
+        return totChan, nsamples
         
     def initialize(self, sample_period, gain):
         """
