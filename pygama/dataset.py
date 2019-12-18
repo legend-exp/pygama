@@ -225,6 +225,10 @@ class DataSet:
                         self.paths[run]["t2_path"] = "{}/{}".format(p,f)
 
         else:
+	
+            suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
+                        # in the config file ("suffix":"h5")
+
             # search data directories for extant files
             for p, d, files in os.walk(self.raw_dir):
                 for f in files:

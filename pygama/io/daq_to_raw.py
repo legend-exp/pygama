@@ -229,7 +229,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
 
     #see pygama/pygama/io/decoders/io_base.py
     decoders = []
-    decoders.append(SIS3316Decoder(pd.DataFrame.from_dict(header_dict)))   #we just have that one
+    decoders.append(LLAMAStruck3316(metadata=pd.DataFrame.from_dict(header_dict)))   #we just have that one
                     # fix: saving metadata using io_bases ctor
                     # have to convert to dataframe here in order to avoid 
                     # passing to xml_header.get_object_info in io_base.load_metadata
@@ -240,8 +240,8 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
     print("pygama will run this fancy decoder: SIS3316Decoder")
 
     # pass in specific decoder options (windowing, multisampling, etc.)
-    for d in decoders:
-        d.apply_config(config)
+    #for d in decoders:
+    #    d.apply_config(config) #no longer used (why?)
 
     # ------------ scan over raw data starts here -----------------
     # more code duplication

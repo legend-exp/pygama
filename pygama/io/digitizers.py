@@ -161,7 +161,7 @@ class ORCAStruck3302(DataTaker):
         self.format_data(locals())
 
         
-class ORCAStruck3316(DataTaker):
+class LLAMAStruck3316(DataTaker):
     """ 
     decode Struck 3316 digitizer data
     
@@ -169,7 +169,7 @@ class ORCAStruck3316(DataTaker):
     handle per-channel data (gain, ...)
     most metadata of Struck header (energy, ...)
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, metadata=None, *args, **kwargs):
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
@@ -208,7 +208,8 @@ class ORCAStruck3316(DataTaker):
         self.ievt = 0       #event number
         self.ievt_gbg = 0      #garbage event number
         self.window = False
-        
+        self.df_metadata = metadata #seems that was passed to superclass before, try now like this
+        self.pytables_col_limit = 3000
         
     def initialize(self, sample_period, gain):
         """
