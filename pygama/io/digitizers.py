@@ -202,7 +202,7 @@ class LLAMAStruck3316(DataTaker):
         self.config_names = []  #TODO at some point we want the metainfo here
         self.file_config = {}
         self.lh5_spec = {}
-        self.file_config["nadcs"], self.file_config["nsamples"] = self.readMetadata(metadata)
+        self.file_config = self.readMetadata(metadata)
         print("We have {} adcs and {} samples per WF.".format(self.file_config["nadcs"],self.file_config["nsamples"]))
 
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
@@ -221,14 +221,27 @@ class LLAMAStruck3316(DataTaker):
     def readMetadata(self, meta):
         nsamples = -1
         totChan = 0
+        configs = {}
+        adcOff = {}
         for fadc in meta:
+            adcOff[fadc] = {}
             for channel in meta[fadc]:
                 if nsamples == -1:
+                    # FIXME everything is fixed to 1st existing channel.
                     nsamples = meta[fadc][channel]["SampleLength"]
+                    configs["14BitFlag"] = meta[fadc][channel]["14BitFlag"]
+                    #configs["ADCOffset"] = meta[fadc][channel]["ADCOffset"]
+                    configs["FormatBits"] = meta[fadc][channel]["FormatBits"]
+                    configs["Gain"] = meta[fadc][channel]["Gain"]
+                    configs["SampleFreq"] = meta[fadc][channel]["SampleFreq"]
+                    configs["SampleOffset"] = meta[fadc][channel]["SampleOffset"]
+                    adcOff[fadc][channel] = meta[fadc][channel]["ADCOffset"]
                 elif nsamples != meta[fadc][channel]["SampleLength"]:
                     print("samples not uniform!!!")
                 totChan += 1
-        return totChan, nsamples
+        configs["nadcs"] = totChan
+        configs["nsamples"] = nsamples
+        return configs
         
     def initialize(self, sample_period, gain):
         """

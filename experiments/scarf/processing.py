@@ -15,7 +15,10 @@ def main():
     this is the high-level part of the code, something that a user might
     write (even on the interpreter) for processing with a specific config file.
     """
-    process_data()
+
+    #set the run index (first number in ds field in config.json) here:
+    run_index = 1
+    process_data(run_index)
     
     
     
@@ -23,9 +26,9 @@ def main():
     #plot_waveforms()
     
 
-def process_data():
+def process_data(run_index):
     from pygama import DataSet
-    ds = DataSet(3, md="config.json")
+    ds = DataSet(run_index, md="config.json")
     ds.daq_to_raw(overwrite=True, test=False)
     # ds.raw_to_dsp(....)
 

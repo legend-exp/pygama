@@ -240,6 +240,7 @@ class DataTaker(ABC):
             # create the header, saving everything in attributes (like a dict)
             hf.create_group('header')
             for c in self.file_config:
+                #print(c, self.file_config[c])  #test
                 hf["/header"].attrs[c] = self.file_config[c]
             hf["/header"].attrs["file_name"] = file_name
             
