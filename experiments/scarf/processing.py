@@ -17,7 +17,7 @@ def main():
     """
 
     #set the run index (first number in ds field in config.json) here:
-    run_index = 1
+    run_index = 3
     process_data(run_index)
     
     
