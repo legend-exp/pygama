@@ -54,9 +54,6 @@ def main():
 
 def gain_shift(ds):
 
-
-
-
     calDB = ds.calDB
     query = db.Query()
     table = calDB.table("cal_pass1")
@@ -143,7 +140,6 @@ def get_power_spectrum(ds):
             icols.append(col)
     wfs = t1[icols].values
     wfs = wfs[:20000]
-    print("check1")
 
     # xvals = np.arange(0,3000)
     # start = time.time()
@@ -235,11 +231,6 @@ def blsub(waves, calcs, blest="", wfin="waveform", wfout="wf_blsub", test=False)
 
     # note, floats are gonna take up more memory
     return {wfout: blsub_wfs}
-
-
-
-
-
 
 
 

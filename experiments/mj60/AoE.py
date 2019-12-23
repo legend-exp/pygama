@@ -64,6 +64,7 @@ def find_cut(ds, ds_lo, write_db=False):
     t2 = ds.get_t2df()
     t2 = t2.reset_index(drop=True)
 
+    #Get pass1 calibration constant TODO: need pass2 constants at some point
     calDB = ds.calDB
     query = db.Query()
     table = calDB.table("cal_pass1")
@@ -73,20 +74,22 @@ def find_cut(ds, ds_lo, write_db=False):
     p1cal = df_cal.iloc[0]["p1cal"]
     cal = p1cal * np.asarray(t2["e_ftp"])
 
+    #Make A/E array
     current = "current_max"
-    e_over_unc = cal / np.asarray(t2["e_ftp"])
+    e_over_unc = cal / np.asarray(t2["e_ftp"]) #Needed to normalize or something, idk
     y0 = np.asarray(t2[current])
     a_over_e = y0 * e_over_unc / cal
 
-    y = linear_correction(cal, a_over_e)
-    
+    y = linear_correction(cal, a_over_e) # Linear correct slight downward trend
+
+    # Two separate functions, one for Ac contaminated peak(Th232), one for Th228
     ans = input('Are you running A/E on Th232? \n y/n -->')
     if ans == 'y':
         th_232(cal, y, ds)
     else:
         regular_cut(cal, y, ds)
 
-
+    # Write cut to the calDB.json file
     if write_db:
         table = calDB.table("A/E_cut")
         for dset in ds.ds_list:
@@ -95,6 +98,10 @@ def find_cut(ds, ds_lo, write_db=False):
 
 
 def linear_correction(energy, a_over_e):
+
+##################
+### TODO: Use compt continuum bkg areas with a gaussian fit to
+##################
 
     max_list = []
     peak_list = np.asarray([2614.5, 1460.8, 583.2])
@@ -106,7 +113,7 @@ def linear_correction(energy, a_over_e):
 
         max_c = b[0]
         max = hist[0]
-        for i in range(len(b)):
+        for i in range(len(b)):   # Find max point of A/E dist
             if max < hist[i]:
                 max = hist[i]
                 max_c = b[i]
@@ -130,6 +137,8 @@ def linear_correction(energy, a_over_e):
 
 
 def regular_cut(cal, y, ds):
+
+## Find A/E cut for Th228 source
 
     dep_range = [1530,1620]
     hist, bins = np.histogram(cal, bins=450, range=dep_range)
@@ -185,7 +194,7 @@ def regular_cut(cal, y, ds):
         ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
         cut = ans1[0] - ((1600-1583)*bkg1)
 
-        line += .0005
+        line += .001
 
 
     print(line, cut)
@@ -214,6 +223,8 @@ def regular_cut(cal, y, ds):
 
 
 def th_232(energy, a_over_e, ds, write_db=False):
+
+    ## Find A/E cut for Th232 source
 
     # file1 = np.load('./ds18.npz')
     # file2 = np.load('./bins_ds18.npz')

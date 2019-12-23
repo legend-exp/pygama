@@ -154,7 +154,7 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
 
     maxes = np.amax(wfs, axis=1)
     imaxes = np.argmax(wfs, axis=1)
-    
+
     cname = wfin.split("_")[-1]
     calcs["{}_max".format(cname)] = maxes
     calcs["{}_imax".format(cname)] = imaxes
@@ -665,6 +665,33 @@ def drift_time(waves, calcs, test=False):
     could maybe also try a np polyfit to roughly
     estimate the curvature? idk, maybe simpler is better
     """
+    wfs = waves[wfin]
+    t0 = calcs['t0']
+    energy = calcs['e_ftp']
+
+    if test:
+
+        iwf = 0
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+
+
+
+        xvals = np.arange(0,3000)
+        start = time.time()
+
+        plt.plot(xvals, wfs[iwf], lw=1)
+        plt.vlines(t0[i], np.amin(wfs[i]), np.amax(wfs[i]), color='r', linewidth=1.5)
+        plt.hlines(energy[i], 0, 3000, color='r', linewidth=1.5, zorder=10)
+        plt.xlabel('Sample Number', ha='right', x=1.0)
+        plt.ylabel('ADC Value', ha='right', y=1.0)
+        plt.tight_layout()
+        plt.show()
+
+        iwf += 1
+
     print("hi clint")
 
 
