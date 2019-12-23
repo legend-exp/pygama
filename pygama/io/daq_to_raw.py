@@ -16,7 +16,7 @@ from ..io.orca_helper import *
 from ..io.llama_3316 import *             
 
 
-def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
+def daq_to_raw(t0_file, run, prefix="t1", suffix="", chan_list=None, n_max=np.inf,
                verbose=False, output_dir=None, overwrite=True, decoders=None,
                config={}):
     """
@@ -34,7 +34,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
     # # declare Tier 1 output file
     # 
     #    file_body = t0_file.split("/")[-1].replace("fcio","h5")
-    #    t1_file = "{}/{}_{}".format(output_dir,output_prefix,file_body)
+    #    t1_file = "{}/{}_{}".format(output_dir,prefix,file_body)
     #    if os.path.isfile(t1_file):
     #        if overwrite:
     #            print("Overwriting existing file...")
@@ -44,7 +44,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
     #            return
     # ################################################################ 
     # else:
-    t1_file = "{}/{}_run{}.h5".format(output_dir, output_prefix, run)
+    t1_file = f"{output_dir}/{prefix}_run{run}.{suffix}"
     if os.path.isfile(t1_file):
        if overwrite:
            print("Overwriting existing file...")
@@ -82,6 +82,7 @@ def daq_to_raw(t0_file, run, output_prefix="t1", chan_list=None, n_max=np.inf,
     print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
     elapsed = time.time() - t_start
     print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("  Output file:", t1_file)
     print("Done.\n")
     
     
@@ -302,7 +303,7 @@ def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
 
 def process_compass(t0_file, t1_file, digitizer, output_dir=None):
     """
-    Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs a .h5 file named t1_file
+    Takes an input .bin file name as t0_file from CAEN CoMPASS and outputs t1_file
 
     t0_file: input file name, string type
     t1_file: output file name, string type
@@ -365,7 +366,6 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
 
     # loop over raw data packets
     i_debug = 0
-    
     packet_id = 0
     while fcio.next_event() and packet_id < n_max:
       packet_id += 1
@@ -376,10 +376,11 @@ def process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose):
       if packet_id % ROW_LIMIT == 0:
           
           # decoder.save_to_pytables(t1_file, verbose=True)
-          decoder.save_to_lh5(t1_file)
-          i_debug += 1
           
-          if i_debug == 5:
+          decoder.save_to_lh5(t1_file)
+          
+          i_debug += 1
+          if i_debug == 1:
               print("breaking early")
               break # debug, deleteme
 

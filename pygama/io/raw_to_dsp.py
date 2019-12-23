@@ -11,41 +11,28 @@ import datetime
 import multiprocessing as mp
 from functools import partial
 
-from ..io.decoders.io_base import *
-from ..io.decoders.digitizers import *
+from ..io.io_base import *
+from ..io.digitizers import *
 from ..utils import *
 
 
-def RunDSP(t1_file,
-                 intercom,
-                 digitizers=None,
-                 ftype="default",
-                 output_dir=None,
-                 output_prefix="t2",
-                 overwrite=True,
-                 verbose=False,
-                 nevt=None,
-                 ioff=None,
-                 multiprocess=True,
-                 chunk=3000):
+def RunDSP(t1_file, intercom, run=None, digitizers=None, ftype="default",
+           output_dir=None, output_prefix="t2", overwrite=True, verbose=False,
+           nevt=None, ioff=None, multiprocess=True, chunk=3000):
 
-    print("Starting pygama Tier 1 processing ...")
-    print("  Date:", datetime.datetime.now())
-    print("  Input file:", t1_file)
-    print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
     t_start = time.time()
 
     if verbose:
         print("Starting pygama Tier 1 processing ...")
         print("  Date:", datetime.datetime.now())
         print("  Input file:", t1_file)
-    
+
     if "~" in t1_file:
         t1_file = os.path.expanduser("~") + t1_file.split("~")[-1]
 
     if verbose:
         print("  Size: ", sizeof_fmt(os.path.getsize(t1_file)))
-    
+
 
     # multiprocessing parameters
     CHUNKSIZE = chunk
@@ -67,16 +54,16 @@ def RunDSP(t1_file,
     #################################################################
     """
     Change for HADES style data structre
-    """ 
+    """
     if ftype == "hades_char":
        file_body = t1_file.split("/")[-1].replace("t1","t2")
        t2_file = "{}/{}".format(output_dir, file_body)
     #################################################################
-    
+
     else:
-        if t2_file is None:
-            t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
-       
+        # if t2_file is None:
+        t2_file = os.path.join(output_dir, "t2_run{}.h5".format(run))
+
     if os.path.isfile(t2_file):
         if overwrite:
             if verbose:
@@ -89,13 +76,16 @@ def RunDSP(t1_file,
 
     # get digitizers
     if digitizers is None:
-        decoders = get_decoders()
-        digitizers = [d for d in decoders if isinstance(d, Digitizer)]
-        
+
+        decoders = []
+        for sub in DataTaker.__subclasses__():
+            tmp = sub() # instantiate the class
+            decoders.append(tmp)
+
         # shouldn't this extend the list instead of overwriting it?
         with pd.HDFStore(t1_file, 'r') as store:
             keys = [key[1:] for key in store.keys()]  # remove leading '/'
-            digitizers = [d for d in digitizers if d.decoder_name in keys]
+            digitizers = [d for d in decoders if d.decoder_name in keys]
 
     # go running
     for d in digitizers:
@@ -106,10 +96,10 @@ def RunDSP(t1_file,
         with pd.HDFStore(t1_file, 'r') as store:
 
             s = store.get_storer(d.decoder_name)
-            
-            if d.class_name is not None:
-                object_info = store.get(d.class_name)
-                d.load_metadata(object_info)
+
+            # if d.class_name is not None:
+            #     object_info = store.get(d.decoder_name)
+            #     d.load_metadata(object_info)
 
             if isinstance(s, pd.io.pytables.AppendableFrameTable):
                 use_pytables = True
@@ -121,7 +111,7 @@ def RunDSP(t1_file,
             else:
                 print("Unknown type!", type(s))
                 exit()
-                
+
 
         # --------------- run multiprocessing ----------------
         if use_pytables and multiprocess:
@@ -141,17 +131,18 @@ def RunDSP(t1_file,
 
             global ichunk, pstart
             ichunk, pstart = 0, time.time()
-            with mp.Pool(ncpu) as p:
-                result_list = p.map(
-                    partial(process_chunk, **keywords), chunk_idxs)
 
-            # debug: process chunks in series
+            # main routine: use multiprocessing
+            with mp.Pool(ncpu) as p:
+                result_list = p.map(partial(process_chunk, **keywords), chunk_idxs)
+
+            # # debug: process chunks in series
             # for idx in chunk_idxs:
-                # process_chunk(idx, **keywords)
-            # exit()
+            #     process_chunk(idx, **keywords)
+            #     exit()
 
             t2_df = pd.concat(result_list)
-            
+
             # print("it worked", len(t2_df), len(result_list[0]))
 
         # ---------------- single process data ----------------
@@ -194,7 +185,7 @@ def RunDSP(t1_file,
         print("  Data columns:\n", t2_df.columns.values)
     # print(t2_df.dtypes)
     # print(t2_df.shape)
-    
+
     t2_df.to_hdf(
         t2_file,
         key="data",
@@ -216,7 +207,7 @@ def RunDSP(t1_file,
         print("Done.\n")
 
 
-def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom, 
+def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom,
                   verbose=False):
     """
     use hdf5 indexing, which is way faster than reading in the df first.
@@ -230,7 +221,9 @@ def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom,
     global ichunk, pstart
     if verbose:
         update_progress(float(ichunk / nchunks))
+
     ichunk += ncpu
+
     if ichunk == 4 * ncpu:
         ptime = nchunks * (time.time() - pstart) / 10 / 60
         print(f"Estimated time to completion: {ptime:.2f} min")#, end='')
@@ -240,14 +233,21 @@ def process_chunk(chunk_idx, t1_file, chunksize, nchunks, ncpu, key, intercom,
 
         start = chunk_idx * chunksize
         stop = (chunk_idx + 1) * chunksize
-        
+
         # this was ievt before, this requires a reset_index before calling this.
         # it probably partially fixes the "pygama append bug"
-        chunk = pd.read_hdf(t1_file, key, where=f"index >= {start} & index < {stop}")
-        
-        if verbose:
-            print("Chunk {}, start: {}  stop: {}, len: {},"
-                  .format(chunk_idx, start, stop, stop - start),
-                  "df shape:", chunk.shape)
+        # chunk = pd.read_hdf(t1_file, key, where=f"index >= {start} & index < {stop}")
+
+        # had to change this back to get MJ60 processing working.  at some point
+        # I need to look into the difference between ievt and index
+        chunk = pd.read_hdf(t1_file, key, where=f"ievt >= {start} & ievt < {stop}")
+        # print("")
+        # print(chunk)
+        # exit()
+
+        # super verbose
+        # print("Chunk {}, start: {}  stop: {}, len: {},"
+        #       .format(chunk_idx, start, stop, stop - start),
+        #       "df shape:", chunk.shape)
 
     return intercom.process(chunk)
