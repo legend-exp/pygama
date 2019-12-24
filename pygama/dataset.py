@@ -134,21 +134,21 @@ class DataSet:
     def get_paths(self, runs, subfile, verbose=False):
         """
         TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL.
-        
+
         Matteo -- add "get_file_list", it will work with all sets of input files
-        
+
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
-        
-        Note from Andreas -- 
+
+        Note from Andreas --
         A new filetype flag in the runDB:
         In the HADES characterization campaign we have a different filestructure and we have Subfiles.
         e.g. our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
         "char_data-DetID-Source-run00XY-YYMMDDTHHMMSS.fcio"
         Also the are ".log" files in the same directory
         To deal with different filenames I added a filteype flag in the runDB. If it is hades_char I look for HADES structure.
-        Other structure are not implemented. If no filetype flag is given, the original file search is done.
+        Other structure are not implemented. If no filetype flag is given, the original files earch is done.
         What I still don't like is that I use counter for the subfiles. I have to think about something better.
         """
         self.paths = {r:{} for r in runs}
@@ -191,16 +191,16 @@ class DataSet:
                        counter += 1
 
 
-        
-        
+
+
         elif self.ftype == "legend200":
             print("Read awsome LEGEND200 Data. But not ready yet...")
 
         elif self.ftype == "flashcam":
-            
+
             # .lh5
             suffix = "." + self.config["suffix"]
-            
+
             for p, d, files in os.walk(self.raw_dir):
                 for f in files:
                     if any("protothppmco_{}".format(r) in f for r in runs):
@@ -315,11 +315,10 @@ class DataSet:
         careful, it can be a lot
         to load in memory ...
         """
-        key = "/ORSIS3302DecoderForEnergy"
         dfs = []
         for run in self.runs:
             p = self.paths[run]["t1_path"]
-            dfs.append(pd.read_hdf(p, key))
+            dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
 
@@ -414,15 +413,9 @@ class DataSet:
             total_rt += rt
 
         return total_rt
-<<<<<<< HEAD
 
 
-    def daq_to_raw(self, overwrite=False, test=False):
-=======
-    
-    
     def daq_to_raw(self, overwrite=False, test=False, n_max=np.inf):
->>>>>>> ca923af50664d8ae716bc499562ca9584f97b791
         """
         convenience function for calling the main daq_to_raw function.
         right now, this processes runs sequentially.
@@ -438,7 +431,7 @@ class DataSet:
             if test:
                 print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
                 continue
-            
+
             daq_to_raw(t0_file, run, suffix=self.config["suffix"],
                        verbose=test, output_dir=self.tier1_dir,
                        overwrite=overwrite, n_max=n_max, config=self.config)
