@@ -10,7 +10,7 @@ warnings.filterwarnings(action="ignore", module="numpy.ma", category=np.RankWarn
 warnings.filterwarnings(action="ignore", category=RuntimeWarning)
 
 
-def fS(waves, calcs, wfin="wf_trap", calc="fS"):
+def fS(waves, calcs,  wfin="wf_trap", calc="fS"):
     """
     grab first ADC sample of each trap-filtered waveform
     """
@@ -180,7 +180,7 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
             plt.plot(ts, raw_wf, '-b', alpha=0.7, label="raw_wf, normd")
             plt.plot(ts, wf, "-k", label=wfin)
             plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", ms=20, label="max")
-
+            
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
             plt.legend(loc=2)
@@ -188,6 +188,44 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
             plt.show(block=False)
             plt.pause(0.01)
 
+def get_zacmax(waves, calcs, wfin="wf_zac", calc="zac_max", test=False):
+    """
+    calculate maxima of each row of a waveform block
+    creates two columns:  max value and index of maximum.
+    """
+    wfs = waves[wfin]
+    clk = waves["settings"]["clk"]  # Hz
+    
+    maxes = np.amax(wfs, axis=1)
+    imaxes = np.argmax(wfs, axis=1)
+    
+    cname = wfin.split("_")[-1]
+    calcs["{}_max".format(cname)] = maxes
+    calcs["{}_imax".format(cname)] = imaxes
+    
+    if test:
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp) - 1
+            iwf += 1
+            print(iwf)
+            print("zac max = ",maxes[iwf])
+            print("zac max position = ", imaxes[iwf])
+            plt.cla()
+            wf, ts = wfs[iwf], np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wfs[iwf], '-k', label=wfin)
+            plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", ms=20, label="max")
+            plt.xlabel("clock ticks", ha='right', x=1)
+            plt.ylabel('ADC', ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.01)
+            
 
 def timepoint(waves, calcs, pct, wfin="wf_savgol", calc="tp", test=False):
     """
@@ -335,7 +373,7 @@ def ftp(waves, calcs, wf1="wf_etrap", wf2="wf_atrap", test=False):
 
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel("ADC", ha='right', y=1)
-            plt.legend(loc=2, fontsize=12)
+            plt.legend(loc=2)
             plt.tight_layout()
             plt.show(block=False)
             plt.pause(0.001)
