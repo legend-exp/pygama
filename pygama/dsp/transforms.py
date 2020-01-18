@@ -972,6 +972,7 @@ def peakdet_test(waves, calcs, delta, sigma, ihi, test=False):
 
     exit()
 
+
 def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False):
     """
     incomplete, needs work --clint
@@ -990,8 +991,10 @@ def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False
     # convert to clock ticks
     nsamp = 1e10 / waves["settings"]["clk"]
     nd, nwin = int(nsamp * delay), int(nsamp * win)
+
     # set up the kernel
     a, b = np.zeros(nd+nwin), np.zeros(nd+nwin)
+    
     # internet settings
     frac, delay, win = 0.5, 4, 0.01
     a[0], b[0], b[-1] = 1, -frac, 1
@@ -1000,16 +1003,20 @@ def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False
     # way to generate a fake pileup or multisite event, esp if we varied the
     # parameters randomly.  you should spin this off into some other code,
     # that generates a training set of fake multisite/pileup wfs.
+    
     # clint's settings
     # a[0] = 1
     # b[nd:nd+nwin] = -frac
+    
     wf_cfd = signal.lfilter(b, a, wfs, axis=1)
     wfsub = wfs + wf_cfd
+    
     # for i, wf in enumerate(wfs):
     #     # cross_pts =
     #     tol = 1e-5 # tolerance (could use bl rms??)
     #     out = b[(np.abs(a[:,None] - b) < tol).any(0)]
     #     # out = b[np.isclose(a[:,None],b).any(0)]
+    
     if test:
         iwf = -1
         while True:
