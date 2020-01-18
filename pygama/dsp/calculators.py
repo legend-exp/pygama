@@ -180,6 +180,7 @@ def get_max(waves, calcs, wfin="wf_trap", calc="trap_max", test=False):
             plt.plot(ts, raw_wf, '-b', alpha=0.7, label="raw_wf, normd")
             plt.plot(ts, wf, "-k", label=wfin)
             plt.plot(ts[imaxes[iwf]], maxes[iwf], ".m", ms=20, label="max")
+
             plt.xlabel("clock ticks", ha='right', x=1)
             plt.ylabel('ADC', ha='right', y=1)
             plt.legend(loc=2)
