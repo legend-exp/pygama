@@ -160,14 +160,17 @@ class DataTaker(ABC):
                       "data_columns":["ievt"]} # cols for hdf5 fast file indexing
 
         def check_and_append(file_name, key, df_data):
-            with pd.HDFStore(file_name, 'r') as store:
-                try:
-                    extant_df = store.get(key)
-                    df_data = pd.concat([extant_df, df_data]).reset_index(drop=True)
-                    if verbose:
-                        print(key, df_data.shape)
-                except KeyError:
-                    pass
+            try:
+                with pd.HDFStore(file_name, 'r') as store:
+                    try:
+                        extant_df = store.get(key)
+                        df_data = pd.concat([extant_df, df_data]).reset_index(drop=True)
+                        if verbose:
+                            print(key, df_data.shape)
+                    except KeyError:
+                        pass
+            except IOError:
+               print("sees that the file is not yet open, which is normal for 1st call??")
             return df_data
 
         #  ------------- save primary data -------------
@@ -237,6 +240,7 @@ class DataTaker(ABC):
             # create the header, saving everything in attributes (like a dict)
             hf.create_group('header')
             for c in self.file_config:
+                #print(c, self.file_config[c])  #test
                 hf["/header"].attrs[c] = self.file_config[c]
             hf["/header"].attrs["file_name"] = file_name
             

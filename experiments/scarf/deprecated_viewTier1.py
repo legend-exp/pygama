@@ -15,7 +15,7 @@ from pygama import DataSet
 # from pygama.utils import set_plot_style
 # set_plot_style('root')
 # load file
-db_file = "testDB.json"
+db_file = "config.json"
 with open(db_file) as f:
     testDB = json.load(f)
 
@@ -36,7 +36,7 @@ ds = DataSet(run=xrun, md=db_file, v=True) # can also use a list of run number
 
 # print some of the DataSet attributes
 print("raw dir : ", ds.raw_dir)
-print("tier dir : ", ds.tier_dir)
+print("tier1 dir : ", ds.tier1_dir)
 print("t1 file prefix :", ds.t1pre)
 print("t2 file prefix :", ds.t2pre)
 print("current run list :", ds.runs)
@@ -78,14 +78,16 @@ t1_file = ds.paths[run]["t1_path"]
 
 # remind ourselves the name of the HDF5 group key using the DB.
 # pprint(testDB['build_options'])
-t1_key = testDB['build_options']['conf1']['daq_to_raw_options']['digitizer']
+t1_key = testDB['build_options']['conf1']['daq_to_raw']['digitizer']
 
-# load a small dataframe
+# load a small dataframe 
+#t1_file = "/mnt/e15/schwarz/testdata_pg/scarf/tier/t1_run2002.h5.0013" #manual override
 t1df = pd.read_hdf(t1_file, stop=200, key=t1_key)
 t1df.reset_index(inplace=True) # required step -- until we fix pygama 'append' bug
 
 print("Tier 1 DataFrame columns:")
 print(t1df.columns)
+print(t1df)
 
 # scrub the non-wf columns and create a 2d numpy array
 icols = []
@@ -93,6 +95,14 @@ for idx, col in enumerate(t1df.columns):
     if isinstance(col, int):
         icols.append(col)
 wfs = t1df[icols].values
+
+if(len(wfs[0]) == 0):
+    print("we dont have a flat (i.e. colums as int) here, since the file has been saved in \"fixed\" HDF5 format.")
+    print("we now have to fill the WFs differently")
+    #print(t1df["waveform"][0])
+    wfs = t1df["waveform"].values
+
+print(t1df["timestamp"])
 
 #prepare the x values for plotting
 #np.arange: start, stop, step
@@ -129,7 +139,7 @@ while True:
     user = input("WF viewer> ")
     if user == "next":
         plt.clf()   #have to clear the figure before the next plot appears
-        wfList = getWFEvent(index, wfs, [0, 1, 2])
+        wfList = getWFEvent(index, wfs, [0, 2])
         for i, ch in enumerate(wfList):
             plt.plot(ts, wfList[i])
         f.savefig("temp.pdf") #overwrite; evince should be intelligent 

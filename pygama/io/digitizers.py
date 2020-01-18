@@ -161,7 +161,7 @@ class ORCAStruck3302(DataTaker):
         self.format_data(locals())
 
         
-class ORCAStruck3316(DataTaker):
+class LLAMAStruck3316(DataTaker):
     """ 
     decode Struck 3316 digitizer data
     
@@ -169,7 +169,7 @@ class ORCAStruck3316(DataTaker):
     handle per-channel data (gain, ...)
     most metadata of Struck header (energy, ...)
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, metadata=None, *args, **kwargs):
         self.decoder_name = 'SIS3316Decoder'
         self.class_name = 'SIS3316'
 
@@ -198,17 +198,50 @@ class ORCAStruck3316(DataTaker):
             "channel": [],
             "waveform": [],
         }
+
+        self.config_names = []  #TODO at some point we want the metainfo here
+        self.file_config = {}
+        self.lh5_spec = {}
+        self.file_config = self.readMetadata(metadata)
+        print("We have {} adcs and {} samples per WF.".format(self.file_config["nadcs"],self.file_config["nsamples"]))
+
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
 
         # self.event_header_length = 1 #?
         self.sample_period = 0  # ns, I will set this later, according to header info
         self.gain = 0           
-        self.h5_format = "table"
+        self.h5_format = "table"	#was table
         #self.n_blsamp = 2000
         self.ievt = 0       #event number
         self.ievt_gbg = 0      #garbage event number
         self.window = False
-        
+        self.df_metadata = metadata #seems that was passed to superclass before, try now like this
+        self.pytables_col_limit = 3000
+
+    def readMetadata(self, meta):
+        nsamples = -1
+        totChan = 0
+        configs = {}
+        adcOff = {}
+        for fadc in meta:
+            adcOff[fadc] = {}
+            for channel in meta[fadc]:
+                if nsamples == -1:
+                    # FIXME everything is fixed to 1st existing channel.
+                    nsamples = meta[fadc][channel]["SampleLength"]
+                    configs["14BitFlag"] = meta[fadc][channel]["14BitFlag"]
+                    #configs["ADCOffset"] = meta[fadc][channel]["ADCOffset"]
+                    configs["FormatBits"] = meta[fadc][channel]["FormatBits"]
+                    configs["Gain"] = meta[fadc][channel]["Gain"]
+                    configs["SampleFreq"] = meta[fadc][channel]["SampleFreq"]
+                    configs["SampleOffset"] = meta[fadc][channel]["SampleOffset"]
+                    adcOff[fadc][channel] = meta[fadc][channel]["ADCOffset"]
+                elif nsamples != meta[fadc][channel]["SampleLength"]:
+                    print("samples not uniform!!!")
+                totChan += 1
+        configs["nadcs"] = totChan
+        configs["nsamples"] = nsamples
+        return configs
         
     def initialize(self, sample_period, gain):
         """
@@ -250,19 +283,34 @@ class ORCAStruck3316(DataTaker):
             accumulator5 = evt_data_32[offset+6]
             accumulator6 = evt_data_32[offset+7]
             offset += 7
+        else:
+            peakhigh_value = 0
+            peakhigh_index = 0  
+            information = 0
+            accumulator1 = accumulator2 = accumulator3 = accumulator4 = accumulator5 = accumulator6 = 0
+            pass
         if format_bits & 0x2:
             accumulator7 = evt_data_32[offset+0]
             accumulator8 = evt_data_32[offset+1]
             offset += 2
+        else:
+            accumulator7 = accumulator8 = 0
+            pass
         if format_bits & 0x4:
             mawMax = evt_data_32[offset+0]
             maw_before = evt_data_32[offset+1]
             maw_after = evt_data_32[offset+2]
             offset += 3
+        else:
+            mawMax = maw_before = maw_after = 0
+            pass
         if format_bits & 0x8:
             energy_first = evt_data_32[offset+0]
             energy = evt_data_32[offset+1]
             offset += 2
+        else:
+            energy_first = energy = 0
+            pass
         wf_length_32 = (evt_data_32[offset+0]) & 0x03ffffff
         offset += 1 #now the offset points to the wf data
         fadcID = fadcIndex
@@ -276,7 +324,7 @@ class ORCAStruck3316(DataTaker):
 
         # error check: waveform size must match expectations
         if wf_length16 != expected_wf_length:
-            print(len(evt_data_16), header_length)
+            print(len(evt_data_16), header_length16)
             print("ERROR: Waveform size %d doesn't match expected size %d." %
                   (wf_length16, expected_wf_length))
             exit()
@@ -713,4 +761,5 @@ class FlashCam(DataTaker):
             
             # send any variable with a name in "decoded_values" to the output
             self.format_data(locals())  
+
 

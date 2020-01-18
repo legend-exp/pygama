@@ -1,0 +1,34 @@
+{
+  "raw_dir":"$DATADIR/scarf/raw",
+  "tier1_dir":"$DATADIR/scarf/tier1",
+  "tier2_dir":"$DATADIR/scarf/tier2",
+
+  "filetype":"llama",
+  "t0_prefix":"",
+  "t0_suffix":"",
+
+  "t1_prefix":"t1_run",
+  "t2_prefix":"t2_run",
+  "suffix":"lh5",
+
+  "daq":"SIS3316",
+  "ds":{
+    "0":["111", "2019/06/27 Just Empty Baselines"],
+    "1":["1000", "2019/07/03 Triple coincidences with three SiPMs and 2 PMTs"],
+    "2":["1001", "2019/07/03 Triple coincidences with three SiPMs"],
+    "3":["2002", "2019/07/03 Triple coincidences, long run"]
+  },
+
+  "build_options":{
+    "conf1":{
+      "run_coverage":[0,99999],
+      "daq_to_raw":{
+        "digitizer":"SIS3316Decoder"
+      },
+      "raw_to_dsp":{
+        "avg_bl": {"ihi":20},
+        "blsub" : {}
+      }
+    }
+  }
+}
