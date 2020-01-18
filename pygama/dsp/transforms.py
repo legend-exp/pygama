@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 import scipy.ndimage as ndimage
+import math
+from math import pow
 
 # silence harmless warnings
 import warnings
@@ -138,6 +140,111 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
     else:
         return {wfout: atrap}
 
+def zac(waves, calcs, lenght, sigma, flat, decay, wfin="waveform", wfout="wf_zac", test=False):
+    """
+    ZAC filter.
+    inputs are in microsec (lenght, sigma, flat, decay)
+    """
+    wfs = waves[wfin]
+    clk = waves["settings"]["clk"] # Hz
+    nwfs, nbin = wfs.shape[0], wfs.shape[1]
+    
+    # convert params to num samples
+    nsamp = 1e3*clk/1e9
+    nzac, sg, ft, dc = int(lenght*nsamp), sigma*nsamp, int(flat*nsamp), decay*nsamp
+    
+    lt = int((nzac-ft)/2) #lenght of cusp
+    
+    # calculate cusp filter and negative parables
+    cusp = np.zeros(nzac)
+    par = np.zeros(nzac)
+    ind = 0
+    while ind < nzac:
+        if ind < lt:
+            cusp[ind] = float(math.sinh(ind/sg)/math.sinh(lt/sg))
+            par[ind] = pow(ind-lt/2,2)-pow(lt/2,2)
+        elif ind < lt+ft+1:
+            cusp[ind] = 1
+        else:
+            cusp[ind] = float(math.sinh((nzac-ind)/sg)/math.sinh(lt/sg))
+            par[ind] = pow(nzac-ind-lt/2,2)-pow(lt/2,2)
+        ind += 1
+    
+    # calculate area of cusp and parables
+    areapar, areacusp = 0, 0
+    for i in range(nzac):
+        areapar += par[i]
+        areacusp += cusp[i]
+    
+    #normalize parables area
+    par = -par/areapar*areacusp
+    
+    #create zac filter
+    zac = cusp + par
+        
+    #deconvolve zac filter
+    den = [1, -np.exp(-1/dc)]
+    zacd = np.convolve(zac, den, 'same')
+    
+    #filter waveforms
+    wfszac = np.zeros((nwfs,nbin-nzac+1))
+    for i, wf in enumerate(wfs):
+        wfszac[i, :] = np.convolve(wf, zacd, 'valid')
+    
+
+    if test:
+        iwf = 2
+        while True:
+            if iwf != 2:
+                inp = input()
+                if inp == "q": exit()
+                if inp == "p": iwf -= 2
+                if inp.isdigit(): iwf = int(inp)-1
+            iwf += 1
+            print(iwf)
+            
+            # plot of ZAC filter
+            plt.figure(1)
+            plt.cla()
+            tz = np.arange(cusp.shape[0])
+            plt.plot(tz, zac, '-r', lw=2, alpha=0.7, label='ZAC')
+            plt.plot(tz, cusp, '-g', label='cusp')
+            plt.plot(tz, par, '-b', label='parables')
+            plt.xlabel("samples", ha='right', x=1)
+            #plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.00001)
+            
+            ## plot of waveforms
+            plt.figure(2)
+            plt.cla()
+            wf = wfs[iwf]
+            ts = np.arange(wfs[iwf].shape[0])
+            plt.plot(ts, wf, '-r', label='waveform')
+            plt.xlabel("samples", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.00001)
+            
+            ## plot of filter outputs
+            plt.figure(3)
+            plt.cla()
+            wfzac = wfszac[iwf]                       
+            tszac = np.arange(wfszac[iwf].shape[0])
+            plt.plot(tszac, wfzac, '-b', label='filter output')
+            plt.xlabel("samples", ha='right', x=1)
+            plt.ylabel("ADC", ha='right', y=1)
+            plt.legend()
+            plt.tight_layout()
+            plt.show(block=False)
+            plt.pause(0.00001)
+
+    return {wfout: wfszac}
+    
 
 def pz(waves, calcs, decay, wfin="wf_blsub", wfout="wf_pz", test=False):
     """
