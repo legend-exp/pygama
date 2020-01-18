@@ -68,10 +68,12 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
     """
     wfs = waves[wfin]
     clk = waves["settings"]["clk"] # Hz
+
     # convert params to units of [num samples, i.e. clock ticks]
     nsamp = 1e10 / clk
     rt, ft, dt = int(rise * nsamp), int(flat * nsamp), decay * nsamp
     flt = rt if fall is None else int(fall * nsamp)
+
     # calculate trapezoids
     if rt == flt:
         """
@@ -100,6 +102,7 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
         npad = int((rt+ft+flt)/2)
         atrap = np.pad(atrap, ((0, 0), (npad, 0)), mode='constant')[:, :-npad]
         # atrap[:, -(npad):] = 0
+
     # pole-zero correct the trapezoids
     if dt != 0:
         rc = 1 / np.exp(1 / dt)
