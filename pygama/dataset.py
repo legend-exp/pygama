@@ -134,14 +134,14 @@ class DataSet:
     def get_paths(self, runs, subfile, verbose=False):
         """
         TODO: REFACTOR THIS ROUTINE TO BE SHORTER AND MORE GENERAL.
-        
+
         Matteo -- add "get_file_list", it will work with all sets of input files
-        
+
         collect path info and flag nonexistent files.
         does a directory search with os.walk, which is faster than iglob
         https://stackoverflow.com/questions/1724693/find-a-file-in-python
-        
-        Note from Andreas -- 
+
+        Note from Andreas --
         A new filetype flag in the runDB:
         In the HADES characterization campaign we have a different filestructure and we have Subfiles.
         e.g. our HADES HV-Scan data consists of 5 Files per Run and the file names are structured like:
@@ -191,16 +191,16 @@ class DataSet:
                        counter += 1
 
 
-        
-        
+
+
         elif self.ftype == "legend200":
             print("Read awsome LEGEND200 Data. But not ready yet...")
 
         elif self.ftype == "flashcam":
-            
+
             # .lh5
             suffix = "." + self.config["suffix"]
-            
+
             for p, d, files in os.walk(self.raw_dir):
                 for f in files:
                     if any("protothppmco_{}".format(r) in f for r in runs):
@@ -413,8 +413,8 @@ class DataSet:
             total_rt += rt
 
         return total_rt
-    
-    
+
+
     def daq_to_raw(self, overwrite=False, test=False, n_max=np.inf):
         """
         convenience function for calling the main daq_to_raw function.
@@ -431,12 +431,12 @@ class DataSet:
             if test:
                 print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
                 continue
-            
+
             daq_to_raw(t0_file, run, suffix=self.config["suffix"],
                        verbose=test, output_dir=self.tier1_dir,
                        overwrite=overwrite, n_max=n_max, config=self.config)
 
-    
+
     def run_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
                 verbose=False, multiproc=True):
         """
@@ -456,7 +456,7 @@ class DataSet:
                 continue
 
             conf = self.paths[run]["build_opt"]
-            
+
             if proc_list is None:
                 proc_list = self.config['build_options'][conf]['tier1_options']
 
@@ -464,8 +464,7 @@ class DataSet:
 
             out_dir = self.tier2_dir if out_dir is None else out_dir
 
-            ProcessTier1(t1_file, proc, output_dir=out_dir, 
-                         overwrite=overwrite, verbose=verbose, 
-                         multiprocess=False, nevt=np.inf, 
+            ProcessTier1(t1_file, proc, output_dir=out_dir,
+                         overwrite=overwrite, verbose=verbose,
+                         multiprocess=False, nevt=np.inf,
                          ioff=0, chunk=self.config["chunksize"])
-

@@ -21,7 +21,7 @@ def blsub(waves, calcs, blest="", wfin="waveform", wfout="wf_blsub", test=False)
     if blest == "fcdaq":
         bl_0 = calcs["fcdaq"].values[:, np.newaxis]
         blsub_wfs = wfs - bl_0
-    
+
     else:
         bl_0 = calcs["bl_p0"].values[:, np.newaxis]
         if "bl_p1" in calcs.keys():
@@ -420,7 +420,7 @@ def savgol(waves, calcs, window=47, order=2, wfin="wf_blsub", wfout="wf_savgol",
         plt.tight_layout()
         plt.show(block=False)
         plt.pause(0.001)
-            
+
     return {wfout: wfsg}
 
 
@@ -433,7 +433,7 @@ def psd(waves, calcs, ilo=None, ihi=None, nseg=100, test=False):
     wfs = waves["wf_blsub"]
     if ilo is not None and ihi is not None:
         wfs = wfs[:, ilo:ihi]
-    clk = waves["settings"]["clk"] # Hz
+    clk = 100e6 # Hz
 
     nseg = 2999
     f, p = signal.welch(wfs, clk, nperseg=nseg)

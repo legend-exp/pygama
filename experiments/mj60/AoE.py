@@ -64,6 +64,7 @@ def find_cut(ds, ds_lo, write_db=False):
     t2 = ds.get_t2df()
     t2 = t2.reset_index(drop=True)
 
+    #Get pass1 calibration constant TODO: need pass2 constants at some point
     calDB = ds.calDB
     query = db.Query()
     table = calDB.table("cal_pass1")
@@ -73,16 +74,71 @@ def find_cut(ds, ds_lo, write_db=False):
     p1cal = df_cal.iloc[0]["p1cal"]
     cal = p1cal * np.asarray(t2["e_ftp"])
 
+    #Make A/E array
     current = "current_max"
-    e_over_unc = cal / np.asarray(t2["e_ftp"])
+    e_over_unc = cal / np.asarray(t2["e_ftp"]) #Needed to normalize or something, idk
     y0 = np.asarray(t2[current])
     a_over_e = y0 * e_over_unc / cal
 
-    y = linear_correction(cal, a_over_e)
+    y = linear_correction(cal, a_over_e) # Linear correct slight downward trend
 
-    # double_gauss_issue(cal, a_over_e)
-    # exit()
+    # Two separate functions, one for Ac contaminated peak(Th232), one for Th228
+    ans = input('Are you running A/E on Th232? \n y/n -->')
+    if ans == 'y':
+        th_232(cal, y, ds)
+    else:
+        regular_cut(cal, y, ds)
 
+    # Write cut to the calDB.json file
+    if write_db:
+        table = calDB.table("A/E_cut")
+        for dset in ds.ds_list:
+            row = {"ds":dset, "line":line}
+            table.upsert(row, query.ds == dset)
+
+
+def linear_correction(energy, a_over_e):
+
+##################
+### TODO: Use compt continuum bkg areas with a gaussian fit to
+##################
+
+    max_list = []
+    peak_list = np.asarray([2614.5, 1460.8, 583.2])
+    for peak in peak_list:
+
+        aoe = a_over_e[np.where((energy > (peak-20)) & (energy < (peak + 20)))]
+        hist, bins = np.histogram(aoe, bins=200, range=[0.01,0.03])
+        b = (bins[:-1] + bins[1:]) / 2
+
+        max_c = b[0]
+        max = hist[0]
+        for i in range(len(b)):   # Find max point of A/E dist
+            if max < hist[i]:
+                max = hist[i]
+                max_c = b[i]
+        max_list.append(max_c)
+
+    max_list = np.asarray(max_list)
+
+    def line(x, a, b):
+        return a * x + b
+    par, pcov = curve_fit(line, peak_list, max_list)
+
+    print(par)
+
+    a_over_e = a_over_e / (par[0] * energy + par[1])
+
+    # for i in range(len(a_over)):
+    #     a_over[i] = a_over[i] / (par[0] * energy[i] + par[1])
+
+    return a_over_e
+
+
+
+def regular_cut(cal, y, ds):
+
+## Find A/E cut for Th228 source
 
     dep_range = [1530,1620]
     hist, bins = np.histogram(cal, bins=450, range=dep_range)
@@ -138,7 +194,7 @@ def find_cut(ds, ds_lo, write_db=False):
         ans1 = quad(gauss, 1583, 1600, args=(mu1, amp1, sig1, bkg1))
         cut = ans1[0] - ((1600-1583)*bkg1)
 
-        line += .0005
+        line += .001
 
 
     print(line, cut)
@@ -164,52 +220,18 @@ def find_cut(ds, ds_lo, write_db=False):
     plt.tight_layout()
     plt.show()
 
-    if write_db:
-        table = calDB.table("A/E_cut")
-        for dset in ds.ds_list:
-            row = {"ds":dset, "line":line}
-            table.upsert(row, query.ds == dset)
 
-def linear_correction(energy, a_over):
 
-    max_list = []
-    peak_list = np.asarray([2614.5, 1460.8, 583.2])
-    for peak in peak_list:
+def th_232(energy, a_over_e, ds, write_db=False):
 
-        aoe = a_over[np.where((energy > (peak-20)) & (energy < (peak + 20)))]
-        hist, bins = np.histogram(aoe, bins=200, range=[0.01,0.03])
-        b = (bins[:-1] + bins[1:]) / 2
-
-        max_c = b[0]
-        max = hist[0]
-        for i in range(len(b)):
-            if max < hist[i]:
-                max = hist[i]
-                max_c = b[i]
-        max_list.append(max_c)
-
-    max_list = np.asarray(max_list)
-
-    def line(x, a, b):
-        return a * x + b
-    par, pcov = curve_fit(line, peak_list, max_list)
-
-    print(par)
-
-    a_over = a_over / (par[0] * energy + par[1])
-
-    # for i in range(len(a_over)):
-    #     a_over[i] = a_over[i] / (par[0] * energy[i] + par[1])
-
-    return a_over
-
-def double_gauss_issue(energy, a_over_e):
+    ## Find A/E cut for Th232 source
 
     # file1 = np.load('./ds18.npz')
     # file2 = np.load('./bins_ds18.npz')
     # counts = file1['arr_0']
     # energy = file2['arr_0']
 
+    #FWHM of nearby peaks is 2.5
     dep_range = [1530,1620]
     hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]), range=dep_range)
     b = (bins[:-1] + bins[1:]) / 2
@@ -224,30 +246,108 @@ def double_gauss_issue(energy, a_over_e):
         y = y + params[-1]
         return y
 
-    p0_list = [1588, 400, 2.5, 1592, 400, 2.5, 157]
-    bnds = ([1587.8, 100, .6*p0_list[2], 1591.8, 100, .6*p0_list[5], 0],
-            [1588.2, 700, 1.4*p0_list[2], 1592.2, 700, 1.4*p0_list[5], 300])
+    p0_list = [1588.2, 400, 2.5, 1592.5, 400, 2.5, 157]
+    bnds = ([1588, 0, .9*p0_list[2], 1592.5, 0, .9*p0_list[5], 0],
+            [1589, 700, 1.1*p0_list[2], 1593, 700, 1.1*p0_list[5], 300])
 
     par, pcov = curve_fit(gauss, b, hist, p0=p0_list, bounds=bnds)
     print(par)
     perr = np.sqrt(np.diag(pcov))
     print(perr)
 
-    np.savez('double_gauss_params', par)
+    # np.savez('double_gauss_params', par)
 
-    plt.title('Finding FWHM of roe')
-    plt.plot(b, hist, color='black')
+    plt.title('Peak 1590 combined')
+    plt.plot(b, hist, ls="steps", color='black')
     plt.plot(b, gauss(b, *par), '-r')
     plt.tight_layout()
     plt.show()
+
+    ac_peak_height = par[1]
+    th_peak_height = par[4]
+    cut_ac_peak_height = par[1]
+    cut_th_peak_height = par[4]
+    ss_eff_array = []
+    ms_eff_array = []
+    cut_line_list = []
+
+    line = .4
+    print("Finding optimal cut, keeping 90% of 1592 DEP")
+
+    while cut_th_peak_height > .9 * th_peak_height:
+
+        y = a_over_e[np.where(line < a_over_e)]
+        e1 = energy[np.where(line < a_over_e)]
+
+        hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]), range=dep_range)
+
+        par1, pcov1 = curve_fit(
+            gauss, b, hist1, p0=p0_list, bounds=bnds)
+        perr1 = np.sqrt(np.diag(pcov1))
+
+        cut_ac_peak_height = par1[1]
+        cut_th_peak_height = par1[4]
+        ss_eff = cut_th_peak_height / th_peak_height
+        ms_eff = cut_ac_peak_height / ac_peak_height
+        ss_eff_array.append(ss_eff)
+        ms_eff_array.append(ms_eff)
+        cut_line_list.append(line)
+
+        line += .001
+
+    print(line)
+
+    plt.clf()
+    plt.hist2d(energy, a_over_e, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
+    plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
+    plt.xlabel("Energy (keV)", ha='right', x=1)
+    plt.ylabel("A/Eunc", ha='right', y=1)
+    cbar = plt.colorbar()
+    cbar.ax.set_ylabel('Counts')
+    plt.tight_layout()
+    plt.show()
+
+    plt.clf()
+    a1 = a_over_e[np.where((1589 < energy) & (energy < 1595))]
+    hist, bins = np.histogram(a_over_e, bins = 200, range=[.4,1.5])
+    plt.vlines(line, 0, 300000, color='r', linewidth=1.5)
+    plt.plot(bins[1:], hist)
+    plt.xlabel('A over E normalized')
+    plt.ylabel('Counts')
+    plt.show()
+
+    plt.clf()
+    plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
+    plt.plot(cut_line_list, ms_eff_array, label='ms_eff')
+    plt.ylabel('eff')
+    plt.xlabel('AoverE_normalized')
+    plt.legend()
+    plt.show()
+
+    hist, bins = np.histogram(energy, bins=2600, range=[0,2600])
+    hist1, bins1 = np.histogram(e1, bins=2600, range=[0,2600])
+
+    plt.clf()
+    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
+    plt.ylabel('Counts')
+    plt.xlabel('keV')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    return line
+
+    #b + a1e^-(alphaE-1588.2 +delta)+ a2e^-(alphaE-1592.5 +delta) fit this with
+    #same delta or alpha for each one
+
+
 
     #fit whole 1590 peak region with two gaussians
 
     #start cutting up AoverE line, and fitting region on ms and ss, find the efficiency
     # of both ms and ss, find where there is 90% of the counts left from the original
     #1592 gaussian from above
-
-
 
 
 if __name__=="__main__":

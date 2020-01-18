@@ -28,7 +28,7 @@
   },
   "expected_peaks":[2614.5, 1764.5, 1460.8, 583.2],
   "main_peaks":[2615.5, 1460.8],
-  
+
   "ds_flist":{
     "0":["key", "/path/to/file/list"]
   }

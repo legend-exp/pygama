@@ -7,6 +7,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.colors import LogNorm
+import scipy.signal as signal
+import argparse
 
 from pygama import DataSet
 from pygama.analysis.calibration import *
@@ -18,33 +20,51 @@ set_plot_style("clint")
 
 def main():
     """
-    mj60 analysis suite
+    mj60 waveform viewer
     """
-    global runDB
-    with open("runDB.json") as f:
-        runDB = json.load(f)
+    run_db, cal_db = "runDB.json", "calDB.json"
 
-    global tier_dir
-    tier_dir = runDB["tier_dir"]
-    global meta_dir
-    meta_dir = runDB["meta_dir"]
+    par = argparse.ArgumentParser(description="waveform viewer for mj60")
+    arg, st, sf = par.add_argument, "store_true", "store_false"
+    arg("-ds", nargs='*', action="store", help="load runs for a DS")
+    arg("-r", "--run", nargs=1, help="load a single run")
+    arg("-db", "--writeDB", action=st, help="store results in DB")
+    args = vars(par.parse_args())
 
-    # Which run number  is the being analyzed
+    # -- declare the DataSet --
+    if args["ds"]:
+        ds_lo = int(args["ds"][0])
+        try:
+            ds_hi = int(args["ds"][1])
+        except:
+            ds_hi = None
+        ds = DataSet(ds_lo, ds_hi,
+                     md=run_db, cal = cal_db) #,tier_dir=tier_dir)
+
+    if args["run"]:
+        ds = DataSet(run=int(args["run"][0]),
+                     md=run_db, cal=cal_db)
+
+
+    # Which run number is the being analyzed
     # run = 249
     # run = 214
     # run = 204
-    run = 278
+    # run = 278
 
     # working on analysis for the AvsE cut in mj60
     # t1df, t2df = chunker(run)
     # cutwf, t2cut = cutter(t1df, t2df, run)
     # histograms(cutwf, t2cut, run)
-    histograms(run)
+    # histograms(ds)
+    drift_correction(ds)
 
 # def histograms(t1df, t2df, run):
-def histograms(run):
-    ds = DataSet(runlist=[run], md='./runDB.json', tier_dir=tier_dir)
+def histograms(ds):
+
     t2 = ds.get_t2df()
+    print(t2.columns)
+    exit()
     t2df = os.path.expandvars('{}/Spectrum_{}.hdf5'.format(meta_dir,run))
     t2df = pd.read_hdf(t2df, key="df")
 
@@ -146,6 +166,78 @@ def cutter(t1df, t2df, run):
     #     plt.show()
 
     return cutwf, t2cut
+
+def drift_correction(ds):
+
+    ## testing a drift time correction code
+
+    t1df = ds.get_t1df()
+    t1df.reset_index(inplace=True)
+    t2df = ds.get_t2df()
+
+    # key = "/ORSIS3302DecoderForEnergy"
+    # wf_chunk = pd.read_hdf(t1df, key, where="ievt < {}".format(75000))
+    # wf_chunk.reset_index(inplace=True) # required step -- fix pygama "append" bug
+    # t2df = t2df.reset_index(drop=True)
+
+    # create waveform block.  mask wfs of unequal lengths
+
+    number = 20000
+    icols = []
+    for idx, col in enumerate(t1df.columns):
+        if isinstance(col, int):
+            icols.append(col)
+    wfs = t1df[icols].values
+    wfs = wfs[:number]
+    t2df_chunk = t2df[:number]
+    # print(wf_block.shape, type(wf_block))
+    # print(t2df_chunk)
+    t0 = t2df_chunk['t0']
+    energy = t2df_chunk['e_ftp']
+
+    baseline = wfs[:, 0:500]
+    avg_bl = []
+    for i in range(0,number):
+        avg_bl.append(np.mean(baseline[i], keepdims=True))
+    avg_bl = np.asarray(avg_bl)
+    wfs = np.asarray(wfs)
+    wfs = wfs - avg_bl
+
+    clk = 100e6
+    decay = 82
+    wfs = pz(wfs, decay, clk)
+
+    xvals = np.arange(0,3000)
+    start = time.time()
+    for i in range(0,5):
+    # for i in range(0,5):
+        plt.plot(xvals, wfs[i], lw=1)
+        plt.vlines(t0[i], np.amin(wfs[i]), np.amax(wfs[i]), color='r', linewidth=1.5)
+        plt.hlines(energy[i], 0, 3000, color='r', linewidth=1.5, zorder=10)
+        plt.xlabel('Sample Number', ha='right', x=1.0)
+        plt.ylabel('ADC Value', ha='right', y=1.0)
+        plt.tight_layout()
+        plt.show()
+
+def pz(wfs, decay, clk):
+    """
+    pole-zero correct a waveform
+    decay is in us, clk is in Hz
+    """
+
+
+    # get linear filter parameters, in units of [clock ticks]
+    dt = decay * (1e10 / clk)
+    rc = 1 / np.exp(1 / dt)
+    num, den = [1, -1], [1, -rc]
+
+    # reversing num and den does the inverse transform (ie, PZ corrects)
+    pz_wfs = signal.lfilter(den, num, wfs)
+
+
+    return pz_wfs
+
+    # return wfs, t2df_chunk
 
 if __name__=="__main__":
     main()
