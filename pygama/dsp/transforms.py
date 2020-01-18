@@ -68,18 +68,17 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
     """
     wfs = waves[wfin]
     clk = waves["settings"]["clk"] # Hz
-    
     # convert params to units of [num samples, i.e. clock ticks]
     nsamp = 1e10 / clk
     rt, ft, dt = int(rise * nsamp), int(flat * nsamp), decay * nsamp
     flt = rt if fall is None else int(fall * nsamp)
-    
     # calculate trapezoids
     if rt == flt:
         """
         symmetric case, use recursive trap (fastest)
         """
-        tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(wfs)
+        tr1, tr2, tr3 = np.zeros_like(wfs), np.zeros_like(wfs), np.zeros_like(
+            wfs)
         tr1[:, rt:] = wfs[:, :-rt]
         tr2[:, (ft + rt):] = wfs[:, :-rt - ft]
         tr3[:, (rt + ft + flt):] = wfs[:, :-rt - ft - flt]
@@ -101,7 +100,6 @@ def trap(waves, calcs, rise, flat, fall=None, decay=0, wfin="wf_blsub", wfout="w
         npad = int((rt+ft+flt)/2)
         atrap = np.pad(atrap, ((0, 0), (npad, 0)), mode='constant')[:, :-npad]
         # atrap[:, -(npad):] = 0
-        
     # pole-zero correct the trapezoids
     if dt != 0:
         rc = 1 / np.exp(1 / dt)
@@ -847,7 +845,7 @@ def trap_test(waves,
             # plt.plot(ts, pz_wfs[iwf], '-b', label='pz_trap, {}'.format(dt))
 
             # check against ben's function
-            # import pygama.sandbox.base_transforms as pt
+            # import pygama.sandbox.dsp_base_transforms as pt
             # trapwf = pt.trap_filter(wfs[iwf], 400, 250, 7200)
             # plt.plot(np.arange(len(trapwf)), trapwf, '-m', label='bentrap')
 
@@ -992,10 +990,8 @@ def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False
     # convert to clock ticks
     nsamp = 1e10 / waves["settings"]["clk"]
     nd, nwin = int(nsamp * delay), int(nsamp * win)
-    
     # set up the kernel
     a, b = np.zeros(nd+nwin), np.zeros(nd+nwin)
-    
     # internet settings
     frac, delay, win = 0.5, 4, 0.01
     a[0], b[0], b[-1] = 1, -frac, 1
@@ -1004,20 +1000,16 @@ def cfd(waves, calcs, frac=0.5, delay=0.5, win=0.01, wfin="wf_blsub", test=False
     # way to generate a fake pileup or multisite event, esp if we varied the
     # parameters randomly.  you should spin this off into some other code,
     # that generates a training set of fake multisite/pileup wfs.
-    
     # clint's settings
     # a[0] = 1
     # b[nd:nd+nwin] = -frac
-    
     wf_cfd = signal.lfilter(b, a, wfs, axis=1)
     wfsub = wfs + wf_cfd
-    
     # for i, wf in enumerate(wfs):
     #     # cross_pts =
     #     tol = 1e-5 # tolerance (could use bl rms??)
     #     out = b[(np.abs(a[:,None] - b) < tol).any(0)]
     #     # out = b[np.isclose(a[:,None],b).any(0)]
-    
     if test:
         iwf = -1
         while True:
