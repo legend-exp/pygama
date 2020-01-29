@@ -147,9 +147,9 @@ def get_object_info(header_dict, class_name):
     return df
 
 
-def get_next_event(f_in):
+def get_next_packet(f_in):
     """
-    Gets the next event, and some basic information about it
+    Gets the next packet, and some basic information about it
     Takes the file pointer as input
     Outputs:
     -event_data: a byte array of the data produced by the card (could be header + data)
