@@ -24,7 +24,8 @@ import matplotlib.pyplot as plt
 from pprint import pprint
 import h5py
 
-
+# JASON: rename to data decoder
+# JASON: add "decoder_ring" for simple packets (Howe-style formatting)
 class DataTaker(ABC):
     def __init__(self, user_config=None):
         """
@@ -41,7 +42,15 @@ class DataTaker(ABC):
             with open(user_config) as f:
                 self.user_config = json.load(f)
 
-                
+
+    def initialize_buffer(self, table_buffer):
+        if not hasattr(self, 'decoded_vals'):
+            print('Error: no decoded_values available for setting up table_buffer')
+            return
+        for key in self.decoded_vals.keys():
+            table_buffer.add_field(key, attributes=self.decoded_vals[key])
+
+
     # def set_config(self, config):
         # self.config = config
 
@@ -358,3 +367,265 @@ class DataTaker(ABC):
         # finally, clear out existing data (relieve memory pressure)
         self.clear_data()
         
+
+class TableBuffer: 
+    """A class for buffering tables of data
+
+    Essentially a dictionary of numpy ndarrays, intended for use as the
+    in-memory buffer for data stored in lh5 files. Some features:
+    - A user-settable size sets the number of rows in the table.
+    - Use add_field(name, attributes) to add a column to the table. The optional
+      attributes dictionary argument allows arbitrary descriptors to be stored
+      with the field. Non-scalar data are stored as flattened arrays.
+    - An internal variable manages the write location in the table. Use
+      tb.next_row() to increment it, and clear_data() to reset it (along with
+      the whole buffer). Skipping around is dangerous but can be accomplished by
+      accessing tb_loc directly
+    - We use the __setattr__ magic to get the fields to look like attributes of
+      the buffer: setting the variable stores the set value to the appropriate
+      write location in the buffer.
+    - Use get_flat_buffer(name) and set_flat_buffer_len(name, len) to iterate through the
+      flat buffer for a non-scalar field if the array for setting is not already
+      made (avoids allocating an extra array)
+
+    Example:
+
+    size = 1000
+    tb = TableBuffer(size)
+    tb.add_field('energy', attributes = { 'dtype': 'uint32' })
+    tb.add_field{'wf', attributes = { 'dtype': 'uint16', 'max_length': 1024 })
+    ds = SomeDataSource()
+    for _ in range(size):
+        tb.energy = ds.get_energy()
+        tb.wf = ds.get_wf()
+        tb.next_row()
+    n = 10
+    nth_energy = tb.get_data_buffer('energy')[n-1]
+    nth_wf = tb.get_flat_buffer('wf', n-1)
+    """
+
+    def __init__(self, size=1024):
+        self.tb_size = size
+        self.tb_loc = 0
+        self.tb_atts = {}
+
+    def add_field(self, name, attributes=None):
+        """Add a field to the buffer.
+
+        If attributes is none, the field is made as a scalar, unitless float.
+        The attributes variable should be a dictionary. It can contain anything,
+        but this function makes use of:
+          dtype = 'type': sets the data type
+          shape = (N, M, ...): specifies a N x M x ... array (N, M, ... must be ints)
+          max_length = N: specifies a 1D possibly variable array of max length N
+                          (same as shape = (N,))
+        Currently does not accommodate variable length arrays of unknown max
+        length, structs, non-numeric data...
+        """
+        if self.has_field(name):
+            print('output buffer already contains field ' + name)
+            return
+        if name.startswith('tb_'):
+            print('cannot use name ' + name + ' (starts with tb_)')
+            return
+        # get shape and dtype from attributes
+        shape = None
+        dtype = float
+        if attributes is not None:
+            if 'shape' in attributes.keys(): shape = attributes['shape']
+            if 'max_length' in attributes.keys(): shape = (attributes['max_length'],)
+            if 'dtype' in attributes.keys(): dtype = attributes['dtype']
+        # allocate buffers for single variables
+        if shape is None or len(shape) == 0: 
+            self.__dict__[name] = np.zeros(self.tb_size, dtype=dtype)
+        # allocate buffers for arrays
+        else: 
+            max_length = self.tb_size * np.prod(shape)
+            self.__dict__[name+'_flat'] = np.zeros(max_length, dtype=dtype)
+            self.__dict__[name+'_cumlen'] = np.zeros(self.tb_size, dtype=int)
+        self.tb_atts[name] = attributes
+
+    def has_field(self, name):
+        """Check if field already exists in the buffer"""
+        if name in self.__dict__.keys(): return True
+        if name + '_flat' in self.__dict__.keys(): return True
+        if name + '_cumlen' in self.__dict__.keys(): return True
+
+    def clear_data(self):
+        """Clears all buffers and resets tb_loc"""
+        for key, value in self.__dict__.items():
+            if not key.startswith('tb_'):
+                value.fill(0)
+        self.tb_loc = 0
+
+    def get_start_loc(self, array_name, loc = None):
+        """Internal function for getting start loc in flat buffer for an array"""
+        if loc == None: loc = self.tb_loc
+        if loc == 0: return 0
+        return self.__dict__[array_name+'_cumlen'][loc-1]
+
+    def __setattr__(self, name, value):
+        """Python magic for accessing fields as if they were attributes
+
+        We use this magic so that fields can be accessed directly like variables, e.g.
+        buffer.energy = 2615 
+        puts val 2615 at tb_loc entry of array named 'energy'
+        """
+        if name.startswith('tb_'): self.__dict__[name] = value
+        elif np.isscalar(value): self.__dict__[name][self.tb_loc] = value
+        else: 
+            # array values are flattened and encoded into _flat and _cumlen arrays
+            cumlen = self.__dict__[name+'_cumlen']
+            flat = self.__dict__[name+'_flat']
+            loc = self.tb_loc
+            length = np.prod(np.shape(value))
+            start_loc = self.get_start_loc(name)
+            max_length = len(flat)
+            if start_loc + length > max_length:
+                print('buffer to small to add ' + name + ' with length ' + length)
+                return
+            cumlen[loc] = start_loc + length
+            flat[start_loc:start_loc+length] = value.flat
+
+    #JASON def __getattr__(self, name, value):
+
+    def get_flat_buffer(self, name, loc = None):
+        """Alternative interface for array data
+        
+        Useful when you need to set values in a loop rather than passing in an
+        array to copy over (for that, use tb.name = array, see __setattr__())
+
+        Doubles as an interface for pulling out a flattened array of the data
+        for name at location loc (after table has been filled)
+        """
+        if loc is None: loc = self.tb_loc
+        start_loc = self.get_start_loc(name, loc)
+        end_loc = self.__dict__[name+'_cumlen'][loc] 
+        if end_loc <= start_loc: end_loc = None
+        return self.__dict__[name+'_flat'][start_loc:end_loc]
+
+    def set_flat_buffer_len(self, name, length):
+        """For updating _cumlen after munaully filling _flat buffer"""
+        self.__dict__[name+'_cumlen'][self.tb_loc] = self.get_start_loc(name) + length
+
+    def get_flat_buffer_len(self, name, loc=None):
+        if loc is None: loc = self.tb_loc
+        return self.__dict__[name+'_cumlen'][loc] - self.get_start_loc(name, loc)
+       
+
+    def get_data_buffer(self, name):
+        """Return the raw buffer for field 'name'"""
+        return self.__dict__[name]
+        
+    def next_row(self):
+        """Go to next row in the buffer"""
+        self.tb_loc += 1
+
+    def get_column_names(self):
+        names = []
+        for name in self.__dict__.keys():
+            if name.startswith('tb_'): continue
+            if name.endswith('_cumlen'): continue
+            if name.endswith('_flat'):
+                name = name[:-5]
+            names.append(name)
+        return names
+
+    def get_scalar_column_names(self):
+        names = []
+        for name in self.__dict__.keys():
+            if name.startswith('tb_'): continue
+            if name.endswith('_cumlen'): continue
+            if name.endswith('_flat'): continue
+            names.append(name)
+        return names
+
+    def get_array_column_names(self):
+        names = []
+        for name in self.__dict__.keys():
+            if name.endswith('_flat'):
+                name = name[:-5]
+            else: continue
+            names.append(name)
+        return names
+
+    def get_attributes(self, name):
+        if name in self.tb_atts.keys(): return self.tb_atts[name]
+        return None
+
+    def is_full(self):
+        return self.tb_loc == self.tb_size
+
+    def append_to_lh5(self, filename, group = '/', lh5_store = None):
+        # Exit if no data
+        if len(self.get_column_names()) == 0: return
+
+        # Manage lh5 data with LH5Store
+        if lh5_store is None: lh5_store = LH5Store() 
+
+        # Append scalar data to their datasets
+        for field_name in self.get_scalar_column_names():
+            nda_data = self.get_data_buffer(field_name)
+            data_attrs = self.get_attributes(field_name)
+            lh5_store.append_ndarray(filename, field_name, nda_data, group, data_attrs)
+
+        # Append array data to appropriate datasets
+        for field_name in self.get_array_column_names():
+            grp_attrs = self.get_attributes(field_name)
+
+            ds_name = field_name + '/cumulative_length'
+            nda_data = self.get_data_buffer(field_name+'_cumlen')
+            lh5_store.append_ndarray(filename, ds_name, nda_data, group, grp_attrs)
+            fd_len = nda_data[self.tb_loc-1]
+
+            ds_name = field_name + '/flattened_data'
+            nda_data = self.get_data_buffer(field_name+'_flat')[:fd_len]
+            lh5_store.append_ndarray(filename, ds_name, nda_data, group, grp_attrs)
+
+        # Clear data so that we can write more
+        self.clear_data()
+
+    #def load_from_lh5(filename, path=None)
+
+
+class LH5Store:
+    def __init__(self, base_path='', keep_open=False):
+        self.base_path = base_path
+        self.keep_open = keep_open
+        self.files = {}
+
+    def gimme_file(self, lh5_file):
+        if isinstance(lh5_file, h5py.File): return lh5_file
+        if lh5_file in self.files.keys(): return self.files[lh5_file]
+        full_path = self.base_path + '/' + lh5_file
+        h5f = h5py.File(full_path, 'a')
+        if self.keep_open: self.files[lh5_file] = h5f
+        return h5f
+
+    def gimme_group(self, group, base_group, grp_attrs=None):
+        if isinstance(group, h5py.Group): return group
+        if group in base_group: return base_group[group]
+        group = base_group.create_group(group)
+        if grp_attrs is not None: group.attrs.update(grp_attrs)
+        return group
+
+    def gimme_dataset(self, dataset, dtype, group, data_attrs=None):
+        if isinstance(dataset, h5py.Dataset): return dataset
+        if dataset in group: return group[dataset]
+        dataset = group.create_dataset(dataset, shape=(0,), dtype=dtype, maxshape=(None,))
+        if data_attrs is not None: dataset.attrs.update(data_attrs)
+        return dataset
+
+    def append_ndarray(self, lh5_file, dataset, nda_data, group='/', data_attrs=None, grp_attrs=None):
+        # Grab the file, group, and ds, creating as necessary along the way
+        lh5_file = self.gimme_file(lh5_file)
+        group = self.gimme_group(group, lh5_file, grp_attrs)
+        ds = self.gimme_dataset(dataset, nda_data.dtype, group, data_attrs)
+
+        # Now append
+        old_len = ds.shape[0]
+        add_len = nda_data.shape[0]
+        #print(ds.name,old_len, add_len)
+        ds.resize(old_len + add_len, axis=0)
+        ds[-add_len:] = nda_data # JASON: speed this up?
+
