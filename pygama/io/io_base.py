@@ -615,25 +615,32 @@ class LH5Store:
         if grp_attrs is not None: group.attrs.update(grp_attrs)
         return group
 
-    def gimme_dataset(self, dataset, dtype, group, data_attrs=None):
-        if isinstance(dataset, h5py.Dataset): return dataset
-        if dataset in group: return group[dataset]
-        dataset = group.create_dataset(dataset, shape=(0,), dtype=dtype, maxshape=(None,))
-        if data_attrs is not None: dataset.attrs.update(data_attrs)
-        return dataset
 
-    def append_ndarray(self, lh5_file, dataset, nda_data, group='/', data_attrs=None, grp_attrs=None):
+    def append_ndarray(self, lh5_file, ds, nda_data, group='/', data_attrs=None, grp_attrs=None):
         # Grab the file, group, and ds, creating as necessary along the way
         lh5_file = self.gimme_file(lh5_file)
         group = self.gimme_group(group, lh5_file, grp_attrs)
-        ds = self.gimme_dataset(dataset, nda_data.dtype, group, data_attrs)
+
+        # originally was in gimme_dataset but need to create from nda_data the
+        # first time for speed
+        if not isinstance(ds, h5py.Dataset):
+            if ds not in group:
+                # Original version of the next line:
+                # dataset = group.create_dataset(ds, shape=(0,), dtype=dtype, maxshape=(None,))
+                # This works but is super slow. For some reason, dataset
+                # appending is way faster if it's given an appropriately sized
+                # array the first time.
+                ds = group.create_dataset(ds, data=nda_data, maxshape=(None,))
+                if data_attrs is not None: ds.attrs.update(data_attrs)
+                return
+            else: ds = group[ds]
+        if data_attrs is not None: ds.attrs.update(data_attrs)
 
         # Now append
         old_len = ds.shape[0]
         add_len = nda_data.shape[0]
-        #print(ds.name,old_len, add_len)
         ds.resize(old_len + add_len, axis=0)
-        ds[-add_len:] = nda_data # JASON: speed this up?
+        ds[-add_len:] = nda_data 
 
 
 ### convenience functions for using dataframe as buffer
