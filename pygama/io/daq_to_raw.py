@@ -61,9 +61,9 @@ def daq_to_raw(t0_file, run, prefix="t1", suffix="", chan_list=None, n_max=np.in
 
     # get the DAQ mode
     if config["daq"] == "ORCA":
-        #process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
         #process_orca_tb(t0_file, t1_file, n_max, decoders, config, verbose, run)
-        process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        #process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run)
 
     elif config["daq"] == "FlashCam":
         process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
@@ -92,7 +92,8 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    ROW_LIMIT = 5e4
+    #ROW_LIMIT = 50000
+    ROW_LIMIT = 1024
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -202,8 +203,8 @@ def process_orca_tb(t0_file, t1_file, n_max, decoders, config, verbose, run=None
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-   # table_buffer_size = 1024
-    table_buffer_size = 50000
+    table_buffer_size = 1024
+    #table_buffer_size = 50000
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -318,7 +319,8 @@ def process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run=None
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    df_attrs = dfbuf_init_attrs(size = 50000)
+    df_attrs = dfbuf_init_attrs(size = 1024)
+    #df_attrs = dfbuf_init_attrs(size = 50000)
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
