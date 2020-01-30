@@ -50,6 +50,12 @@ class DataTaker(ABC):
         for key in self.decoded_vals.keys():
             table_buffer.add_field(key, attributes=self.decoded_vals[key])
 
+    def initialize_dataframe(self, dataframe, df_attrs):
+        if not hasattr(self, 'decoded_vals'):
+            print('Error: no decoded_values available for setting up dataframe')
+            return
+        for name, attrs in self.decoded_vals.items():
+            dfbuf_add_field(dataframe, df_attrs, name, attrs)
 
     # def set_config(self, config):
         # self.config = config
@@ -629,3 +635,51 @@ class LH5Store:
         ds.resize(old_len + add_len, axis=0)
         ds[-add_len:] = nda_data # JASON: speed this up?
 
+
+### convenience functions for using dataframe as buffer
+
+def dfbuf_init_attrs(size):
+    return { 'size': size, 'field_attrs': {} }
+
+def dfbuf_add_field(df, df_attrs, field_name, field_attrs):
+    if field_name in df:
+        print('dataframe buffer already contains field ' + name)
+        return
+    df_size = df_attrs['size']
+    dtype = 'uint_32' if 'dtype' not in field_attrs else field_attrs['dtype']
+    if 'shape' in field_attrs:
+        shape = (df_size,) + field_attrs['shape']
+        df[field_name] = [table for table in np.empty(shape, dtype=dtype)]
+    else: df[field_name] = np.empty(df_size, dtype=dtype)
+    df_attrs['field_attrs'][field_name] = field_attrs
+
+def dfbuf_append_to_lh5(df, n_rows_to_write, df_attrs, filename, group = '/', lh5_store = None):
+    # Exit if no data
+    if len(df.keys()) == 0 or n_rows_to_write == 0: return
+
+    # Manage lh5 data with LH5Store
+    if lh5_store is None: lh5_store = LH5Store() 
+
+    for name, data in df.iteritems():
+        # Append scalar data to their datasets
+        if data.dtype != 'O': 
+            nda_data = data.values[:n_rows_to_write]
+            data_attrs = df_attrs['field_attrs'][name]
+            lh5_store.append_ndarray(filename, name, data.values, group, data_attrs)
+        # Append array data to appropriate datasets
+        else:
+            grp_attrs = df_attrs['field_attrs'][name]
+            ds_name = name + '/flattened_data'
+            nda_data = dfbuf_get_raw_buffer(df, name, n_rows_to_write)
+            lh5_store.append_ndarray(filename, ds_name, nda_data, group, grp_attrs)
+
+def dfbuf_get_raw_buffer(df, col, n_rows):
+    import ctypes as C
+    from ctypes.util import find_library
+    libc = C.CDLL(find_library('c'))
+    libc.malloc.restype = C.c_void_p
+    data_pointer = df[col][0].__array_interface__['data'][0]
+    ctype = np.ctypeslib.as_ctypes_type(df[col][0].dtype)
+    data_pointer = C.cast(data_pointer,C.POINTER(ctype))
+    size = n_rows * np.prod(df[col][0].shape)
+    return np.ctypeslib.as_array(data_pointer,shape=(size,))
