@@ -88,18 +88,17 @@ def daq_to_raw(t0_file, run, prefix="t1", suffix="", chan_list=None, n_max=np.in
 
 def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     """
-    convert ORCA DAQ data to pygama "raw" lh5
+    convert ORCA DAQ data to "raw" lh5
     """
     buffer_size = 1024
     #buffer_size = 50000
 
-    start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
     if f_in == None:
         print("Couldn't find the file %s" % t0_file)
         sys.exit(0)
 
-    # parse the header
+    # parse the header. save the length so we can jump past it later
     reclen, reclen2, header_dict = parse_header(t0_file)
 
     # figure out the total size
@@ -112,39 +111,34 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
     if run is not None:
         run = get_run_number(header_dict)
-    print("Run number: {}".format(run))
+    print("Run number:", run)
 
-    # figure out which decoders we can use.  should simplify this block
-    decoders = []
-    id_dict = get_decoder_for_id(header_dict)
+    # figure out which decoders we can use and build a dictionary from 
+    # dataID to decoder
+    decoders = {}
+    id2dn_dict = get_id_to_decoder_name_dict(header_dict)
     if verbose:
-        print("Data IDs present in this header are:")
-        for id in id_dict:
-            print(f"    {id}: {id_dict[id]}")
-    used_ids = set([id_dict[id] for id in id_dict])
-    for sub in DataTaker.__subclasses__():
-        tmp = sub() # instantiate the class
-        if tmp.decoder_name in used_ids:
-            # tmp.apply_config(config) # broken rn
-            if tmp.decoder_name != 'ORSIS3302DecoderForEnergy': continue
-            decoders.append(tmp)
-    decoder_to_id = {d.decoder_name: d for d in decoders}
-    # Set up dataframe buffers -- for now, one for each decoder
-    dfs = {}
+        print("Data IDs present in ORCA file header are:")
+        for ID in id2dn_dict:
+            print(f"    {ID}: {id2dn_dict[ID]}")
+    dn2id_dict = {}
+    for ID, name in id2dn_dict.items(): dn2id_dict[name] = ID
+    for sub in DataDecoder.__subclasses__():
+        decoder = sub() # instantiate the class
+        if decoder.get_decoder_name in dn2id_dict:
+            # Later: allow to turn on / off decoders in exp.json
+            if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+            decoders[dn2id_dict[name]] = decoder
     if verbose:
         print("pygama will run these decoders:")
-        for d in decoders:
-            data_id = None
-            for d_id, name in id_dict.items():
-                if name == d.decoder_name: data_id = d_id
-            print("   ", d.decoder_name+ ", id =",data_id)
+        for ID, dec in decoders.items():
+            print("   ", dec.decoder_name+ ", id =", ID)
 
-    for dec in decoders:
-        data_id = None
-        for d_id, name in id_dict.items():
-            if name == dec.decoder_name: data_id = d_id
-        dfs[data_id] = TableBuffer()
-        dec.initialize_dataframe(dfs[data_id])
+    # Set up dataframe buffers -- for now, one for each decoder
+    dfs = {}
+    for ID, dec in decoders.items():
+        dfs[data_id] = DFBuffer()
+        dec.initialize_df_buffer(dfs[data_id])
 
     # -- scan over raw data --
     print("Beginning Tier 0 processing ...")
@@ -164,7 +158,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
             update_progress(float(f_in.tell()) / file_size)
 
         try:
-            packet, data_id = get_next_packet(f_in)
+            packet, data_id, crate, card = get_next_packet(f_in)
         except EOFError:
             break
         except Exception as e:
