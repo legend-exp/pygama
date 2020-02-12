@@ -424,7 +424,7 @@ class LH5Store:
 
 
 
-class TableBuffer(pd.DataFrame)
+class DFBuffer(pd.DataFrame)
     """A fixed-length pandas dataframe with a read/write location and attributes.
 
     Used in daq-to-raw data conversion, DSP, and parameter calibration as a
@@ -432,10 +432,8 @@ class TableBuffer(pd.DataFrame)
     read itself in from a .lh5 file. Reads and writes are performed in blocks up
     to the specified length.
     """
-    def __init__(self, *args, size=1024, **kwargs)
+    def __init__(self, size=1024, *args, **kwargs)
         super().__init__(*args, **kwargs)
-    #def __init__(self, size=1024, data=None, index=None, columns=None, dtype=None, copy=False):
-        #super().__init__(data, index, columns, dtype, copy)
         self.size = size
         self.loc = 0
         self.attrs = {}
@@ -457,13 +455,13 @@ class TableBuffer(pd.DataFrame)
         elif field_attrs['datatype'] == 'time_series':
             # need to be able to compute the shape for the buffer
             if 'length' not in field_attrs:
-                print('TableBuffer error: time_series must have length attribute.')
+                print('DFBuffer error: time_series must have length attribute.')
                 return
 
             # compute the shape
             if field_attrs['length'] == 'var':
                 if 'length_estimate' not in field_attrs:
-                    print('TableBuffer error: var-length time_series must have length_estimate attribute.')
+                    print('DFBuffer error: var-length time_series must have length_estimate attribute.')
                     return
                 shape = (self.size,) + field_attrs['length_estimate']
             else: shape = (self.size,) + field_attrs['length']
@@ -485,7 +483,7 @@ class TableBuffer(pd.DataFrame)
 
         # check another 'dataset' value
         else
-            print('TableBuffer error: unknown datatype', field_attrs['datatype'])
+            print('DFBuffer error: unknown datatype', field_attrs['datatype'])
 
         # finally, append the attributews
         self.attrs['field_attrs'][field_name] = field_attrs
