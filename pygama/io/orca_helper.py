@@ -7,18 +7,26 @@ from .io_base import DataDecoder
 
 
 class OrcaDecoder(DataDecoder):
-    def __init__(self, dataID, header = None, *args, **kwargs):
+    """ Base class for ORCA decoders.
+
+    ORCA data packets have a dataID-to-decoder_name mapping so these decoders
+    need to have self.decoder_name defined in __init__
+
+    ORCA also stores an object_info dictionary in the header by 'class name" so
+    these decoders need to have self.orca_class_name defined in __init__
+
+    ORCA also uses a uniform packet structure so put some boiler plate here so
+    that all ORCA decoders can make use of it.
+    """
+    def __init__(self, dataID=None, object_info=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dataID = dataID
-        self.header = header
+        self.set_object_info(object_info)
 
-    def get_decoder_name():
-        if not hasattr(self, 'decoder_name'): return None
-        return self.decoder_name
-
-    def get_orca_class_name():
-        if not hasattr(self, 'orca_class_name'): return None
-        return self.orca_class_name
+    def set_object_info(self, object_info):
+        """Overload to e.g. update decoded_values based on object_info.
+        """
+        self.object_info = object_info
 
 
 def parse_header(xmlfile):
