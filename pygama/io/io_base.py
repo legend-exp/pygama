@@ -19,6 +19,20 @@ from abc import ABC
 import h5py
 
 class DataDecoder(ABC):
+    """Decodes DAQ stream data packets.
+
+    The values that get decoded need to be described by a dict called
+    'decoded_values' that helps determine how to set up the buffers and write
+    them to file. See ORCAStruck3302 for an example.
+
+    Subclasses should define a method for decoding data to a buffer like
+    decode_packet(packet, data_buffer, packet_id, verbose=False)
+
+    Garbage collection writes binary data as an array of uint32s to a
+    variable-length array in the output file. If a problematic packet is found,
+    call put_in_garbage(packet). User should set up an enum or bitbank of garbage
+    codes to be stored along with the garbage packets.
+    """
     def __init__(self, garbage_size=65536):
         self.garbage_buffer = np.empty(garbage_size, dtype='uint32')
         self.garbage_lensum = []
@@ -88,6 +102,7 @@ class DataDecoder(ABC):
         self.garbage_lensum.clear()
         self.garbage_codes.clear()
         self.garbage_ids.clear()
+
 
 
 class LH5Store:
