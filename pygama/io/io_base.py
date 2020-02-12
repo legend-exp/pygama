@@ -90,23 +90,6 @@ class DataDecoder(ABC):
         self.garbage_ids.clear()
 
 
-
-class OrcaDecoder(DataDecoder):
-    def __init__(self, dataID, header = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.dataID = dataID
-        self.header = header
-
-    @abstractmethod
-    def get_decoder_name(): 
-        ...
-
-    @abstractmethod
-    def get_orca_class_name(): 
-        ...
-
-
-
 class LH5Store:
     def __init__(self, base_path='', keep_open=False):
         self.base_path = base_path
