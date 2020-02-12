@@ -146,15 +146,7 @@ def get_object_info(header_dict, class_name):
                 card["Crate"] = crate["CrateNumber"]
                 object_info_list.append(card)
 
-    # AuxHw = header_dict["ObjectInfo"]["AuxHw"]
-    # print("AUX IS:")
-    # for aux in AuxHw:
-    # print(aux.keys())
-    # exit()
-
-    if len(object_info_list) == 0:
-        # print("Warning: no object info parsed for {}".format(class_name))
-        return None
+    if len(object_info_list) == 0: return None
     df = pd.DataFrame.from_dict(object_info_list)
     df.set_index(['Crate', 'Card'], inplace=True)
     return df
@@ -165,8 +157,10 @@ def get_next_packet(f_in):
     Gets the next packet, and some basic information about it
     Takes the file pointer as input
     Outputs:
-    -event_data: a byte array of the data produced by the card (could be header + data)
-    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    - event_data: a byte array of the data produced by the card (could be header + data)
+    - data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    - crate: the crate number for the packet
+    - card: the card number for the packet
     # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
     # The read is set up to do two 32-bit integers, rather than bytes or shorts
     # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
@@ -181,16 +175,16 @@ def get_next_packet(f_in):
     # Assuming we're getting an array of bytes:
     # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
     # data_id         = (head[2] >> 2) + (head[3]<<8)
-    # slot            = (head[6] & 0x1f)
+    # card            = (head[6] & 0x1f)
     # crate           = (head[6]>>5) + head[7]&0x1
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
     record_length = int((head[0] & 0x3FFFF))
     data_id = int((head[0] >> 18))
-    # slot            =int( (head[1] >> 16) & 0x1f)
-    # crate           =int( (head[1] >> 21) & 0xf)
-    # reserved        =int( (head[1] &0xFFFF))
+    card = int((head[1] >> 16) & 0x1f)
+    crate = int((head[1] >> 21) & 0xf)
+    # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
     try:
@@ -201,5 +195,5 @@ def get_next_packet(f_in):
         print(e)
         raise EOFError
 
-    return event_data, data_id
+    return event_data, data_id, crate, card
     
