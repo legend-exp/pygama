@@ -269,3 +269,21 @@ class DFBuffer(pd.DataFrame)
                 if field+'_dt' in self:
                     nda_data = self[field+'_dt'].values[:n_rows_to_write]
                     lh5_store.append_ndarray(filename, 'dt', nda_data, group=group)
+
+
+
+def get_ccc(crate, card, channel):
+    return (crate << 9) + ((card & 0xf) << 4) + (channel & 0xf)
+
+
+def get_crate(ccc):
+    return ccc >> 9
+
+
+def get_card(ccc):
+    return (ccc >> 4) & 0x1f
+
+
+def get channel(ccc):
+    return ccc * 0xf
+
