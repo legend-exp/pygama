@@ -1,95 +1,49 @@
 """
 io_base.py
-base class for reading raw data, usually 32-bit data words,
-from different `data takers`.
+
+base classes for reading/writing data
 contains methods to save pandas dataframes to files.
 subclasses:
      - digitizers.py -- Gretina4M, SIS3302, FlashCam, etc.
      - pollers.py -- MJDPreampDecoder, ISegHVDecoder, etc.
      
-Notes on writing new DataTaker objects:
-
-I recommend you save entries to the output file by using 
-`self.format_data(locals())` as the last line of `decode_event`.
-
-DataTakers require you declare these before calling `super().__init__()`:
+DataDecoders require you declare these before calling `super().__init__()`:
     * `self.digitizer_type`: a string naming the digitizer
-    * `self.decoded_values`: the Python lists to convert to HDF5
+    * `self.decoded_values`: a dictionary of variables and their attributes to
+       convert to HDF5
 """
-import sys, os
+
 import numpy as np
 import pandas as pd
 from abc import ABC
-import matplotlib.pyplot as plt
-from pprint import pprint
 import h5py
 
-# JASON: rename to data decoder
-# JASON: add "decoder_ring" for simple packets (Howe-style formatting)
-class DataTaker(ABC):
-    def __init__(self, user_config=None):
-        """
-        all DataTakers should count the total number of events, and track
-        garbage values separately.  To properly initialize self.garbage_values,
-        you should declare self.decoded_values in your DataTaker before calling:
-            super().__init__(*args, **kwargs)
-        """
+class DataDecoder(ABC):
+    def __init__(self):
         self.total_count = 0
         self.garbage_count = 0 # never leave any data behind
         self.garbage_values = {key:[] for key in self.decoded_values}
 
-        if user_config is not None:
-            with open(user_config) as f:
-                self.user_config = json.load(f)
+    
 
+    @abstractmethod
+    def get_decoded_values_dict():
+        ...
 
-    def initialize_buffer(self, table_buffer):
-        if not hasattr(self, 'decoded_vals'):
-            print('Error: no decoded_values available for setting up table_buffer')
+    @abstractmethod
+    def decode_packet(packet, data_buffer, packet_id, header_dict, verbose=False):
+        ...
+
+    def initialize_df_buffer(self, df_buffer):
+        if not hasattr(self, 'decoded_values'):
+            print('Error: no decoded_values available for setting up buffer')
             return
-        for key in self.decoded_vals.keys():
-            table_buffer.add_field(key, attributes=self.decoded_vals[key])
-
-    def initialize_dataframe(self, dataframe):
-        if not hasattr(self, 'decoded_vals'):
-            print('Error: no decoded_values available for setting up dataframe')
-            return
-        for name, attrs in self.decoded_vals.items():
-            dataframe.add_field(name, attrs)
-
-    # def set_config(self, config):
-        # self.config = config
+        for name, attrs in self.decoded_values.items():
+            df_buffer.add_field(name, attrs)
 
 
-    def format_data(self, vals, is_garbage=False):
-        """
-        for every event in the raw DAQ data, we send any local variable with a 
-        name in "self.decoded_values" to the output with the line:
-            self.format_data(locals())
-        """
-        self.total_count += 1
-        if is_garbage:
-            self.garbage_count += 1
 
-        for key in vals:
-            if key is not "self" and key in self.decoded_values:
-                if is_garbage:
-                    self.garbage_values[key].append(vals[key])
-                else:
-                    if type(vals[key]) == np.ndarray:
-                        self.decoded_values[key].append(vals[key].copy())
-                    else:
-                        self.decoded_values[key].append(vals[key])
-
-
-    def clear_data(self):
-        """ clear out standard objects when we do a write to file """
-        self.total_count = 0
-        self.garbage_count = 0
-        self.decoded_values = {key:[] for key in self.decoded_values}
-        self.garbage_values = {key:[] for key in self.garbage_values}
-
-
+class DataDecoder(ABC):
 
 class LH5Store:
     def __init__(self, base_path='', keep_open=False):
@@ -118,20 +72,13 @@ class LH5Store:
         lh5_file = self.gimme_file(lh5_file)
         group = self.gimme_group(group, lh5_file, grp_attrs)
 
-        # originally was in gimme_dataset but need to create from nda_data the
-        # first time for speed
+        # need to create dataset from nda_data the first time for speed
+        # creating an empty dataset and appending to that is super slow!
         if not isinstance(ds, h5py.Dataset):
             if ds not in group:
-                # Original version of the next line:
-                # dataset = group.create_dataset(ds, shape=(0,), dtype=dtype, maxshape=(None,))
-                # This works but is super slow. For some reason, dataset
-                # appending is way faster if it's given an appropriately sized
-                # array the first time.
                 ds = group.create_dataset(ds, data=nda_data, maxshape=(None,))
                 if data_attrs is not None: ds.attrs.update(data_attrs)
-                return
             else: ds = group[ds]
-        if data_attrs is not None: ds.attrs.update(data_attrs)
 
         # Now append
         old_len = ds.shape[0]
@@ -154,6 +101,14 @@ class DFBuffer(pd.DataFrame)
         self.size = size
         self.loc = 0
         self.attrs = {}
+
+
+    def is_full(self):
+        return self.loc >= self.size
+
+
+    def clear(self):
+        self.loc = 0
 
 
     def add_field(self, field_name, field_attrs):
