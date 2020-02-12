@@ -115,25 +115,20 @@ def flip_data_ids(header_dict):
     return flipped
 
 
-def get_decoder_for_id(header_dict):
+def get_id_to_decoder_name_dict(header_dict):
     """
     Returns a dictionary that goes:
-    `dict[dataIdNum] = "decoderName"`
+    `dict[dataID] = "decoderName"`
     e.g: d[5] = 'ORSIS3302DecoderForEnergy'
     """
-    d = dict()
-    for class_key in header_dict["dataDescription"].keys():
-        super_keys_list = []
-        for super_key in header_dict["dataDescription"][class_key].keys():
-            super_keys_list.append(super_key)
-            ID_val = (header_dict["dataDescription"][class_key][super_key]
-                      ["dataId"]) >> 18
-            decoderName = header_dict["dataDescription"][class_key][super_key][
-                "decoder"]
-
-            d[ID_val] = decoderName
-
-    return d
+    id2dn_dict = {}
+    dd = header_dict['dataDescription']
+    for class_key in dd.keys():
+        for super_key in dd[class_key].keys():
+            dataID = (dd[class_key][super_key]['dataId']) >> 18
+            decoder_name = dd[class_key][super_key]['decoder']
+            id2dn_dict[dataID] = decoder_name
+    return id2dn_dict
 
 
 def get_object_info(header_dict, class_name):
