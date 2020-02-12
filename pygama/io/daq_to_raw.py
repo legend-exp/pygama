@@ -61,9 +61,9 @@ def daq_to_raw(t0_file, run, prefix="t1", suffix="", chan_list=None, n_max=np.in
 
     # get the DAQ mode
     if config["daq"] == "ORCA":
-        process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        #process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
         #process_orca_tb(t0_file, t1_file, n_max, decoders, config, verbose, run)
-        #process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run)
 
     elif config["daq"] == "FlashCam":
         process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
@@ -319,8 +319,8 @@ def process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run=None
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    df_attrs = dfbuf_init_attrs(size = 1024)
-    #df_attrs = dfbuf_init_attrs(size = 50000)
+    buffer_size = 1024
+    #buffer_size = 50000
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -367,8 +367,13 @@ def process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run=None
             for d_id, name in id_dict.items():
                 if name == d.decoder_name: data_id = d_id
             print("   ", d.decoder_name+ ", id =",data_id)
-            dfs[data_id] = [pd.DataFrame(), 0] # dataframe and its write location
-            d.initialize_dataframe(dfs[data_id][0], df_attrs)
+
+    for dec in decoders:
+        data_id = None
+        for d_id, name in id_dict.items():
+            if name == dec.decoder_name: data_id = d_id
+        dfs[data_id] = TableBuffer()
+        dec.initialize_dataframe(dfs[data_id])
 
     # -- scan over raw data --
     print("Beginning Tier 0 processing ...")
