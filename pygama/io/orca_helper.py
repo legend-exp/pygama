@@ -3,6 +3,24 @@ import sys
 import pandas as pd
 import numpy as np
 
+from .io_base import DataDecoder
+
+
+class OrcaDecoder(DataDecoder):
+    def __init__(self, dataID, header = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataID = dataID
+        self.header = header
+
+    def get_decoder_name():
+        if not hasattr(self, 'decoder_name'): return None
+        return self.decoder_name
+
+    def get_orca_class_name():
+        if not hasattr(self, 'orca_class_name'): return None
+        return self.orca_class_name
+
+
 def parse_header(xmlfile):
     """
     Opens the given file for binary read ('rb'), then grabs the first 8 bytes
