@@ -19,31 +19,81 @@ from abc import ABC
 import h5py
 
 class DataDecoder(ABC):
-    def __init__(self):
-        self.total_count = 0
-        self.garbage_count = 0 # never leave any data behind
-        self.garbage_values = {key:[] for key in self.decoded_values}
-
-    
-
-    @abstractmethod
-    def get_decoded_values_dict():
-        ...
+    def __init__(self, garbage_size=65536):
+        self.garbage_buffer = np.empty(garbage_size, dtype='uint32')
+        self.garbage_lensum = []
+        self.garbage_ids = []
+        self.garbage_codes = []
 
     @abstractmethod
-    def decode_packet(packet, data_buffer, packet_id, header_dict, verbose=False):
+    def decode_packet(packet, data_buffer, packet_id, verbose=False):
         ...
+
 
     def initialize_df_buffer(self, df_buffer):
         if not hasattr(self, 'decoded_values'):
-            print('Error: no decoded_values available for setting up buffer')
+            name = self.__class__.__name__
+            print(name, 'Error: no decoded_values available for setting up buffer')
             return
         for name, attrs in self.decoded_values.items():
             df_buffer.add_field(name, attrs)
 
 
+    def put_in_garbage(self, packet, packet_id, code):
+        p32 = np.frombuffer(packet, dtype=np.uint32)
+        start_loc = 0 if len(self.garbage_lensum) == 0 else self.garbage_lensum[-1]
+        size = len(self.garbage_buffer)
+        while start_loc + len(p32) > size:
+            self.garbage_buffer.resize(2*size)
+            size = 2*size
+        self.garbage_buffer[start_loc:start_loc+len(p32)] = p32
+        self.garbage_lensum.append(len(p32))
+        self.garbage_ids.append(packet_id)
+        self.garbage_codes.append(code)
 
-class DataDecoder(ABC):
+
+    def write_out_garbage(self, filename, group, code_attrs, lh5_store=None):
+        if lh5_store is None: lh5_store = LH5Store()
+        size = 0 if len(self.garbage_lensum) == 0 else self.garbage_lensum[-1]
+        if size == 0: return
+
+        # set group name according to decoder class name
+        if not group.endswith('/'): group += '/'
+        group += self.__class__.__name__
+
+        # write the packets
+        pgrp_attrs = '{ datatype: variable_length_array }'
+        lh5_store.append_ndarray(filename, 'data', 
+                                 self.garbage_buffer[:size]
+                                 group = group+'/packets', 
+                                 grp_attrs = pgrp_attrs)
+
+        # write the packet lengths
+        lh5_store.append_ndarray(filename, 'lensum', 
+                                 np.ndarray(self.garbage_lensum, dtype='uint32')
+                                 group=group+'/packets')
+
+        # write the packet ids
+        lh5_store.append_ndarray(filename, 'packet_ids', 
+                                 np.ndarray(self.garbage_ids, dtype='uint32')
+                                 group=group)
+
+        # write the packet codes
+        lh5_store.append_ndarray(filename, 'codes', 
+                                 np.ndarray(self.garbage_ids, dtype='uint32')
+                                 data_attrs = code_attrs, 
+                                 group = group)
+
+        # clear the garbage fields so that they can be reused if desired
+        self.garbage_lensum.clear()
+        self.garbage_codes.clear()
+        self.garbage_ids.clear()
+
+#class OrcaDecoder(DataDecoder):
+
+#set_header
+
+#get_name / model
 
 class LH5Store:
     def __init__(self, base_path='', keep_open=False):
@@ -196,8 +246,8 @@ class DFBuffer(pd.DataFrame)
             # handle time_series data
             elif field_attrs['datatype'] == 'time_series':
                 # will write to its own group
-                if not group.endswith('/'): group = group + '/'
-                group = group + field
+                if not group.endswith('/'): group += '/'
+                group += field
                 grp_attrs = field_attrs
                 # write the raw data
                 nda_data = get_raw_buffer(self, field, n_rows_to_write)
