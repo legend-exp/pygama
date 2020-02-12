@@ -51,7 +51,7 @@ class ORCAStruck3302(DataTaker):
             },
             "energy": { 
               'dtype': 'uint32', 
-              'units': 'adc_sum',
+              'units': 'summed_ADC',
             },
             "energy_first": { 
               'dtype': 'uint32',
@@ -68,13 +68,16 @@ class ORCAStruck3302(DataTaker):
             },
             "channel": { 
               'dtype': 'uint8',
+              'range': '[0,7]',
             },
             "waveform": { 
               'dtype': 'uint16', 
-              #'max_length': 65532, # suggest to override this before calling prepare_buffer() to save RAM
-              'shape': (8192,),
-              'sample_period_ns': 10, # override if a different clock rate is used
-              'units': 'adc',
+              'datatype': 'time_series', 
+              #'length': 65532, # max value. override this before calling add_filed() to save RAM
+              'length': 8192, 
+              'sample_period': 10, # override if a different clock rate is used
+              'sample_period_units': 'ns'
+              'units': 'ADC',
             },
             # "energy_wf": []
         }
