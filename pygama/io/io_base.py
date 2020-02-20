@@ -66,6 +66,14 @@ class DataDecoder(ABC):
         self.garbage_codes.append(code)
 
 
+    def get_garbage_usage(self):
+        n_packets = len(self.garbage_lensum)
+        used = 0 if n_packets == 0 else self.garbage_lensum[-1]
+        used *= self.garbage_buffer.itemsize
+        size = self.garbage_buffer.nbytes
+        return n_packets, used, size
+
+
     def write_out_garbage(self, filename, group, code_attrs, lh5_store=None):
         if lh5_store is None: lh5_store = LH5Store()
         size = 0 if len(self.garbage_lensum) == 0 else self.garbage_lensum[-1]
@@ -111,11 +119,11 @@ class LH5Store:
         self.keep_open = keep_open
         self.files = {}
 
-    def gimme_file(self, lh5_file):
+    def gimme_file(self, lh5_file, mode):
         if isinstance(lh5_file, h5py.File): return lh5_file
         if lh5_file in self.files.keys(): return self.files[lh5_file]
         full_path = self.base_path + '/' + lh5_file
-        h5f = h5py.File(full_path, 'a')
+        h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f
 
@@ -129,7 +137,7 @@ class LH5Store:
 
     def append_ndarray(self, lh5_file, ds, nda_data, data_attrs=None, group='/', grp_attrs=None):
         # Grab the file, group, and ds, creating as necessary along the way
-        lh5_file = self.gimme_file(lh5_file)
+        lh5_file = self.gimme_file(lh5_file, 'a')
         group = self.gimme_group(group, lh5_file, grp_attrs)
 
         # need to create dataset from nda_data the first time for speed
@@ -147,7 +155,158 @@ class LH5Store:
         ds[-add_len:] = nda_data 
 
 
+    def read_object(self, lh5_file, path, start_row=0, n_rows=None):
+        """Return an object accessing data at path in lh5_file
 
+        Set n_rows to read out a subset of the first data axis (when possible)
+        """
+        h5f = self.gimme_file(lh5_file, 'r')
+        if path not in h5f:
+            print('LH5Store:', path, "not in", lh5_file)
+            return None
+
+        # get the datatype
+        if 'datatype' not in h5f[path].attrs:
+            print('LH5Store:', path, "in file", lh5_file, "is missing the datatype attribute")
+            return None
+        datatype = h5f[path].attrs
+        
+        # scalars are dim-0 datasets
+        if datatype == 'real' or datatype == 'bool' or datatype == 'string':
+            return h5f[path][()]
+
+        # for other datatypes, need to parse the datatype string
+        import parse
+        datatype, element_description = parse('{}{{{}}}', datatype)
+        if datatype.endswith('>'): datatype, dims = parse('{}<{}>')
+        dims = [int(i) for i in dims.split(',')]
+        is_vecvec = element_description.startswith('array<1>')
+
+        # read out "normal" arrays by slicing
+        if datatype == 'array' and not is_vecvec:
+            if n_rows == None: return h5f[path][()]
+            else: return h5f[path][start_row:start_row+n_rows]
+
+        # skip fixed-sized arrays
+        if datatype == 'fixedsize_array': 
+            print('LH5Store: fixed-sized array reading not implemented')
+            return None
+
+        # arrays of arrays get reshaped and sliced
+        if datatype == 'array_of_equalsized_arrays':
+            dimprod = np.prod(dims)
+            nn = h5f[path].size / dimprod
+            if n_rows == None or n_rows >= nn: 
+               return h5f[path][()].reshape([nn]+dims)
+            stop_row = n_rows-start_row
+            # put the slice before the reshape to avoid reading whole ds at once
+            return h5f[path][start_row*dimprod:stop_row*dimprod].reshape(dims)
+
+        # skip vector-of-vectors
+        if is_vecvec:
+            print('LH5Store: vector-of-vectors reading not implemented')
+            return None
+
+        # recursively build a struct, return as a dictionary
+        if datatype == 'struct':
+            struct = {}
+            for field in element_description.split(','):
+                struct[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
+            return struct
+
+        # read a table into a dataframe
+        if dataframe == 'table':
+            col_dict = {}
+            for field in element_description.split(','):
+                col_dict[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
+            return pd.DataFrame(data=col_dict)
+
+        print('LH5Store: don\'t know how to read datatype', datatype)
+        return None
+
+
+    def write_object(self, obj, name, lh5_file, group, append=True):
+        """Write an object into an lh5_file
+
+        If obj is array-like and you only want to send in the first n rows, send
+        it in as obj[:n].
+        """
+        lh5_file = self.gimme_file(lh5_file, mode = 'a' if append else 'w')
+        group = self.gimme_group(group, lh5_file)
+
+        if np.isscalar(obj):
+            # extract the datatype
+            datatype = obj.__class__.__name__
+            if datatype == 'bool': pass
+            elif datatype == 'bool_': datatype = 'bool'
+            elif datatype == 'str': datatype = 'string'
+            elif datatype == 'float' or datatype == 'int': datatype = 'real'
+            else:
+                try: is_number = np.issubdtype(obj, np.number)
+                except TypeError: is_number = false
+                if is_number: datatype = 'real'
+                else:
+                    print('LH5Store: don\'t know how to write out a', datatype)
+                    return
+            ds = group.create_dataset(name, shape=(), data=obj)
+            ds.attrs['datatype'] = datatype
+            return
+
+----
+        
+        # for other datatypes, need to parse the datatype string
+        import parse
+        datatype, element_description = parse('{}{{{}}}', datatype)
+        if datatype.endswith('>'): datatype, dims = parse('{}<{}>')
+        dims = [int(i) for i in dims.split(',')]
+        is_vecvec = element_description.startswith('array<1>')
+
+        # read out "normal" arrays by slicing
+        if datatype == 'array' and not is_vecvec:
+            if n_rows == None: return h5f[path][()]
+            else: return h5f[path][start_row:start_row+n_rows]
+
+        # skip fixed-sized arrays
+        if datatype == 'fixedsize_array': 
+            print('LH5Store: fixed-sized array reading not implemented')
+            return None
+
+        # arrays of arrays get reshaped and sliced
+        if datatype == 'array_of_equalsized_arrays':
+            dimprod = np.prod(dims)
+            nn = h5f[path].size / dimprod
+            if n_rows == None or n_rows >= nn: 
+               return h5f[path][()].reshape([nn]+dims)
+            stop_row = n_rows-start_row
+            # put the slice before the reshape to avoid reading whole ds at once
+            return h5f[path][start_row*dimprod:stop_row*dimprod].reshape(dims)
+
+        # skip vector-of-vectors
+        if is_vecvec:
+            print('LH5Store: vector-of-vectors reading not implemented')
+            return None
+
+        # recursively build a struct, return as a dictionary
+        if datatype == 'struct':
+            struct = {}
+            for field in element_description.split(','):
+                struct[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
+            return struct
+
+        # read a table into a dataframe
+        if dataframe == 'table':
+            col_dict = {}
+            for field in element_description.split(','):
+                col_dict[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
+            return pd.DataFrame(data=col_dict)
+
+        print('LH5Store: don\'t know how to read datatype', datatype)
+        return None
+
+
+
+
+# FIXME: rename TableBuffer
 class DFBuffer(pd.DataFrame)
     """A fixed-length pandas dataframe with a read/write location and attributes.
 
