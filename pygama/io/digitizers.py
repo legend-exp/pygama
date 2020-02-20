@@ -23,6 +23,7 @@ class ORCAStruck3302(OrcaDecoder):
         self.decoded_values = {
             "packet_id": { 
                'dtype': 'uint32',
+               'description': 'index of packet in datastream',
              },
             "ievt": { 
               'dtype': 'uint32',
@@ -51,15 +52,16 @@ class ORCAStruck3302(OrcaDecoder):
             "waveform": { 
               'dtype': 'uint16', 
               'datatype': 'time_series', 
-              #'length': 65532, # max value. override this before calling add_filed() to save RAM
-              'length': 8192, 
+              'length': 65532, # max value. override this before calling add_filed() to save RAM
               'sample_period': 10, # override if a different clock rate is used
-              'sample_period_units': 'ns'
+              'sample_period_units': 'ns',
               'units': 'ADC',
             },
             # "energy_wf": []
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df
+        self.enabled_cccs = []
+        '''
         self.event_header_length = 1
         self.sample_period = 10  # ns
         self.h5_format = "table"
@@ -70,7 +72,46 @@ class ORCAStruck3302(OrcaDecoder):
         self.df_metadata = None # hack, this probably isn't right
         self.file_config = { 'nsamples': 8192 }
         self.lh5_spec = {}
+        '''
         
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+
+        # parse object_info for important info
+        for card_dict, card_data in self.object_info.items:
+            crate = card_dict['Crate']
+            card = card_dict['Card']
+
+            int_enabled_mask = card_dict['internalTriggerEnabledMask']
+            ext_enabled_mask = card_dict['externalTriggerEnabledMask']
+            enabled_mask = int_enabled_mask | ext_enabled_mask
+            trace_length = 0
+            for channel in range(8):
+                # only care about enabled channels
+                if (enabled_mask >> channel) & 0x1:
+                    # save list of enabled channels
+                    self.enabled_cccs.append(get_ccc(crate, card, channel))
+
+                    # get trace length(s). Should all be the same until
+                    # multi-buffer mode is implemented AND each channel has its
+                    # own buffer
+                    this_length = card_dict['sampleLengths'][int(channel/2)]
+                    if trace_length == 0: trace_length = this_length
+                    elif this_length != trace_length:
+                        print('SIS3316ORCADecoder Error: multiple trace lengths not supported')
+                        sys.exit()
+
+            # check trace length and update decoded_values
+            if trace_length <= 0 or trace_length 2**16:
+                print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
+                sys.exit()
+            self.decoded_values['waveform']['length'] = trace_length
+
+
+
+
+
 
     def decode_packet(self, packet, df_buffer, packet_id, header_dict, verbose=False):
         """
