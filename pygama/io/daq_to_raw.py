@@ -125,9 +125,11 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     for ID, name in id2dn_dict.items(): dn2id_dict[name] = ID
     for sub in DataDecoder.__subclasses__():
         decoder = sub() # instantiate the class
-        if decoder.get_decoder_name in dn2id_dict:
+        if decoder.decoder_name in dn2id_dict:
             # Later: allow to turn on / off decoders in exp.json
             if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+            decoder.dataID = dn2id_dict[name]
+            decoder.set_object_info(get_object_info(header_dict, decoder.decoder_name))
             decoders[dn2id_dict[name]] = decoder
     if verbose:
         print("pygama will run these decoders:")
@@ -135,6 +137,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
             print("   ", dec.decoder_name+ ", id =", ID)
 
     # Set up dataframe buffers -- for now, one for each decoder
+    # Later: control in intercom
     dfs = {}
     for ID, dec in decoders.items():
         dfs[data_id] = DFBuffer()
@@ -146,7 +149,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
 
-    # skip the header.
+    # skip the header using reclen from before
     # reclen is in number of longs, and we want to skip a number of bytes
     f_in.seek(reclen * 4)
 
@@ -162,13 +165,11 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
         except EOFError:
             break
         except Exception as e:
-            print("Failed to get the next event ... Exception:",e)
+            print("Failed to get the next event ... Exception:", e)
             break
 
-        try:
-            decoder = decoder_to_id[id_dict[data_id]]
-        except KeyError:
-            if data_id not in id_dict and data_id not in unrecognized_data_ids:
+        if data_id not in decoders:
+            if data_id not in unrecognized_data_ids: 
                 unrecognized_data_ids.append(data_id)
             continue
 
