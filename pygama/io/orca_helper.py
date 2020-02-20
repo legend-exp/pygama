@@ -23,10 +23,13 @@ class OrcaDecoder(DataDecoder):
         self.dataID = dataID
         self.set_object_info(object_info)
 
-    def set_object_info(self, object_info):
+    def set_header_dict(self, header_dict):
         """Overload to e.g. update decoded_values based on object_info.
+
+        Otherwise just use header_dict and object_info as you need it
         """
-        self.object_info = object_info
+        self.header_dict = header_dict
+        self.object_info = get_object_info(header_dict, self.orca_class_name)
 
 
 def parse_header(xmlfile):
@@ -155,9 +158,10 @@ def get_object_info(header_dict, class_name):
                 object_info_list.append(card)
 
     if len(object_info_list) == 0: return None
-    df = pd.DataFrame.from_dict(object_info_list)
-    df.set_index(['Crate', 'Card'], inplace=True)
-    return df
+    return object_info_list
+    #df = pd.DataFrame.from_dict(object_info_list)
+    #df.set_index(['Crate', 'Card'], inplace=True)
+    #return df
 
 
 def get_next_packet(f_in):
