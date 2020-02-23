@@ -4,32 +4,66 @@ import itertools as it
 from scimath.units import convert
 from scimath.units.unit import unit
 
-class Intercom:
+class ProcessingChain:
     """
-    TODO: Description of intercom 
-          Verbose output options for debugging
+    A ProcessingChain is used to efficiently perform a sequence of digital
+    signal processing (dsp) transforms. It contains a list of dsp functions and
+    a set of constant values and named variables contained in fixed memory
+    locations. When executing the ProcessingChain, processors will act on the
+    internal memory without allocating new memory in the process. Furthermore,
+    the memory is allocated in blocks, enabling vectorized processing of many
+    entries at once. To set up a ProcessingChain, use the following methods:
+    1) add_input_buffer: bind a named variable to an external numpy array to
+         read data from
+    2) add_processor: add a dsp function and bind its inputs to a set of named
+         variables and constant values
+    3) add_output_buffer: bind a named variable to an external numpy array to
+         write data into
+    When calling these methods, the ProcessingChain class will use available
+    information to allocate buffers to the correct sizes and data types. For
+    this reason, transforms will ideally implement the numpy ufunc class,
+    enabling broadcasting of array dimensions. If not enough information is
+    available to correctly allocate memory, it can be provided through the
+    named variable strings or by calling add_vector or add_scalar.
     """
     def __init__(self, block_width=8, buffer_len=None, clock_unit=None):
+        """Named arguments:
+        - block_width: number of entries to simultaneously process.
+        - buffer_len: length of input and output buffers. Should be a multiple
+            of block_width
+        - clock_unit: period or frequency of the clock for all waveforms.
+            constant values with time units will be converted to this unit.
+        """
         # Dictionary with numpy arrays containing input and output variables
         self.__vars_dict__ = {}
         # Ordered list of processors and a tuple containing the bound parameters
         # as either constants or variables from vars_dict
         self.__proc_list__ = []
-        self.__block_width__ = block_width
-        self.__buffer_len__ = buffer_len
+        # lists of tuple pairs of external buffers and internal buffers
         self.__input_buffers__ = []
         self.__output_buffers__ = []
+        
+        self.__block_width__ = block_width
+        self.__buffer_len__ = buffer_len
         self.__clk__ = clock_unit
 
     def add_waveform(self, name, dtype, length):
+        """Add named variable containing a waveform block with fixed type and length"""
         self.__add_variable__(name, dtype, (self.__block_width__, length))
 
     def add_scalar(self, name, dtype):
+        """Add named variable containing a scalar block with fixed type"""
         self.__add_variable__(name, dtype, (self.__block_width__))
 
     def add_input_buffer(self, varname, buff, buffer_len=None):
-        """
-        Link an input buffer to a variable.
+        """Link an input buffer to a variable. The buffer should be a numpy
+        ndarray with length that is a multiple of the buffer length, the block
+        width, and the named variable length. If any of these are unknown we
+        will try to deduce the right lengths. varname can be of the form:
+          "varname(length, type)[range]"
+        The optional (length, type) field is used to initialize a new variable.
+        The optional [range] field copies from the buffer into a subrange of the
+        array.
         """
         if(buffer_len is not None):
             if self.__buffer_len__ is None:
@@ -42,8 +76,14 @@ class Intercom:
         self.__add_io_buffer__(buff, varname, True)
 
     def add_output_buffer(self, varname, buff, buffer_len=None):
-        """
-        Link an output buffer to a variable.
+        """Link an output buffer to a variable. The buffer should be a numpy
+        ndarray with length that is a multiple of the buffer length, the block
+        width, and the named variable length. If any of these are unknown we
+        will try to deduce the right lengths. varname can be of the form:
+          "varname(length, type)[range]"
+        The optional (length, type) field is used to initialize a new variable.
+        The optional [range] field copies a subrange of the named array into the
+        output buffer.
         """
         if(buffer_len is not None):
             if self.__buffer_len__ is None:
@@ -60,19 +100,22 @@ class Intercom:
     def add_processor(self, func, *args, **kwargs):
         """
         Add a new processor and bind it to a set of parameters.
-        - func should be a function taking numpy array args and no return
-        - args should include the variables, by string, and values used to
-          call func
+        - func should be a function implementing the numpy ufunc class. If not,
+          then the signature and types keyword arguments will be necessary.
+        - args is a list of names and constants. The names link to internal
+          numpy array variables that will be bound to the function. Names can
+          be given in the form:
+            "varname(length, type)[range]"
+          The optional (length, type) field is used to initialize a new variable
+          if necessary. The optional [range] field copies binds only a subrange
+          of the array to the function. Non-string constant values will be
+          converted to the right type and bound to the function. Constants with
+          scimath time units will be converted to the internal clock unit.
         - keyword arguments include:
           - signature: broadcasting signature for a ufunc. By default, use
             func.signature
           - types: a list of strings defining the types of arrays needed for
             the func. By default, use func.types
-        If parameters are given by value, they will be treated as constant
-        and applied to all waveforms. If given by name, the parameter will be
-        treated as a variable, and a block of memory will be allocated as needed
-        and bound to the function.
-        TODO: Add function lookup by string, for use with JSON files
         """
         
         # Get the signature and list of valid types for the function
@@ -96,7 +139,7 @@ class Intercom:
         params = []
         for i, param in enumerate(args):
             if(isinstance(param, str)):
-                param_val = self.__get_var__(param)
+                param_val = self.get_variable(param)
                 if param_val is not None:
                     param=param_val
             params.append(param)
@@ -167,37 +210,29 @@ class Intercom:
         return None
 
     def execute(self):
+        """Execute the dsp chain on the entire input/output buffers"""
         for begin in range(0, self.__buffer_len__, self.__block_width__):
             self.execute_block(begin)
         
     def execute_block(self, offset=0):
+        """Execute the dsp chain on a sub-set of the input/output buffers
+        starting at entry offset, with length equal to the internal block size.
+        """
         end = min(offset+self.__block_width__, self.__buffer_len__)
         self.__read_input_data__(offset, end)
         self.__execute_procs__()
         self.__write_output_data__(offset, end)
     
-    
-    # Add an array of zeros to the vars dict called name and return it
-    def __add_var__(self, name, dtype, shape):
-        if not re.match("\A\w+$", name):
-            raise KeyError(name+' is not a valid alphanumeric name')
-        if name in self.__vars_dict__:
-            raise KeyError(name+' is already in variable list')
-        arr = np.zeros(shape, dtype)
-        self.__vars_dict__[name] = arr
-        return arr
-
-    
-    # Parse variable name and fetch and return the array. Expected format is:
-    #    varname(constructor vals)[slice vals]
-    # where constructor vals and subrange vals are optional. Constructor vals
-    # include the waveform length and type; if provided, and no variable is
-    # found, create a new array. Slice vals are colon-separated values used
-    # to define a slice
-    def __get_var__(self, var):
-        parse = re.match("\A(\w+)(\(.*\))?(\[.*\])?$", var)
+    def get_variable(self, varname):
+        """Get the numpy array holding the internal memory buffer used for a
+        named variable. The varname has the format
+          "varname(length, type)[range]"
+        The optional (length, type) field is used to initialize a new variable
+        if necessary. The optional [range] field fetches only a subrange
+        of the array to the function."""
+        parse = re.match("\A(\w+)(\(.*\))?(\[.*\])?$", varname)
         if not parse:
-            raise KeyError(var+' could not be parsed')
+            raise KeyError(varname+' could not be parsed')
         name, construct, slice = parse.groups()
         val = None
         
@@ -243,6 +278,17 @@ class Intercom:
         else:
             return val
     
+    # Add an array of zeros to the vars dict called name and return it
+    def __add_var__(self, name, dtype, shape):
+        if not re.match("\A\w+$", name):
+            raise KeyError(name+' is not a valid alphanumeric name')
+        if name in self.__vars_dict__:
+            raise KeyError(name+' is already in variable list')
+        arr = np.zeros(shape, dtype)
+        self.__vars_dict__[name] = arr
+        return arr
+
+    
     # call all the processors on their paired arg tuples
     def __execute_procs__(self):
         for func, args in self.__proc_list__:
@@ -262,7 +308,7 @@ class Intercom:
     # list (if input=true) or output buffer list (if input=false), making sure
     # that buffer shapes are compatible
     def __add_io_buffer__(self, buff, varname, input):
-        var = self.__get_var__(varname)
+        var = self.get_variable(varname)
         if not isinstance(buff, np.ndarray):
             raise ValueError("Buffers must be ndarrays or valid indices for a provided library of ndarrays.")
 
