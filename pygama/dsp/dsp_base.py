@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 import pygama.dsp.calculators as pc
-import pygama.dsp.transforms as pt
+import pygama.dsp.oldtransforms as pt
 from ..utils import update_progress
 
 class Processor:

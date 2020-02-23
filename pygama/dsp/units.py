@@ -10,5 +10,5 @@ mhz = 1000000*hz
 mhz.label = 'MHz'
 megahertz = mhz
 
-import legend_units as u
+import units as u
 unit_parser.parser.extend(u)

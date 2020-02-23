@@ -1,7 +1,7 @@
-import intercom as ic
-import intercom_transforms as tr
+from ProcessingChain import ProcessingChain
+from transforms import mean_rms, trap_filter
 import numpy as np
-from legend_units import *
+from units import *
 
 nReps = 8 # number of times to loop over file
 wflen = 8192 # length of wf
@@ -11,17 +11,17 @@ bufferlen = 256 # number of wfs to read from disk at once
 block_size = nblock*wflen
 read_len = wflen*bufferlen
 
-#Set up intercom
-intercom = ic.Intercom(block_width=nblock, buffer_len=bufferlen, sampling_unit=100*mhz)
+# Set up processing chain
+proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz)
 wfbuffer=np.zeros(read_len, np.uint16)
-intercom.add_input_buffer("wf(8192, float32)", wfbuffer)
-intercom.add_processor(tr.mean_sigma, "wf[0:1000]", "bl", "bl_sig")
-intercom.add_processor(np.subtract, "wf", "bl", "wf_blsub")
-intercom.add_processor(tr.trapfilter, "wf_blsub", 10*us, 5*us, "wf_trap")
-intercom.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', types=['fi->f'])
-intercom.add_processor(np.divide, "trapmax", 1000, "trapE")
+proc.add_input_buffer("wf(8192, float32)", wfbuffer)
+proc.add_processor(mean_rms, "wf[0:1000]", "bl", "bl_sig")
+proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
+proc.add_processor(trap_filter, "wf_blsub", 10*us, 5*us, "wf_trap")
+proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', types=['fi->f'])
+proc.add_processor(np.divide, "trapmax", 1000, "trapE")
 Eout=np.zeros(bufferlen, np.float32)
-intercom.add_output_buffer("trapE", Eout)
+proc.add_output_buffer("trapE", Eout)
 
 # Read from file and execute analysis
 for i in range(nReps):
@@ -32,5 +32,5 @@ for i in range(nReps):
             if(len(pointlesslycopiedbuffer)==0): break
             np.copyto(wfbuffer, pointlesslycopiedbuffer)
             
-            intercom.execute()
+            proc.execute()
             #print(Eout)
