@@ -1,14 +1,15 @@
 import numpy as np
 import re
 import itertools as it
+from scimath.units import convert
+from scimath.units.unit import unit
 
 class Intercom:
     """
     TODO: Description of intercom 
-          A way to handle units
           Verbose output options for debugging
     """
-    def __init__(self, block_width=8, buffer_len=None):
+    def __init__(self, block_width=8, buffer_len=None, clock_unit=None):
         # Dictionary with numpy arrays containing input and output variables
         self.__vars_dict__ = {}
         # Ordered list of processors and a tuple containing the bound parameters
@@ -18,6 +19,7 @@ class Intercom:
         self.__buffer_len__ = buffer_len
         self.__input_buffers__ = []
         self.__output_buffers__ = []
+        self.__clk__ = clock_unit
 
     def add_waveform(self, name, dtype, length):
         self.__add_variable__(name, dtype, (self.__block_width__, length))
@@ -131,7 +133,6 @@ class Intercom:
                         outerdims.insert(len(fun_dims)-i, ad)
                         fun_dims.insert(len(fun_dims)-i, ad)
                     else:
-                        print(fun_dims, arr_dims)
                         raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions.")
 
             # find type signatures that match type of array
@@ -143,7 +144,7 @@ class Intercom:
             raise TypeError("Could not find a type signature matching the types of the variables given for " + func.__name__)
         elif(len(types)>1):
             print("Found multiple compatible type signatures for this function:", types, "Using signature " + types[0] + ".")
-        types = types[0]
+        types = [np.dtype(t) for t in types[0]]
         
         # Reshape variable arrays to add broadcast dimensions and allocate new arrays as needed
         for i, param, dims, dtype in zip(range(len(params)), params, dims_list, types):
@@ -156,9 +157,13 @@ class Intercom:
                     if arshape[idim]!=shape[idim]:
                         arshape.insert(len(arshape)+idim+1, 1)
                 params[i] = param.reshape(tuple(arshape))
+            elif isinstance(param, unit):
+                params[i] = dtype.type(convert(1,param,self.__clk__))
+            else:
+                params[i] = dtype.type(param)
                 
         # Add the function and bound parameters to the list of processors
-        self.__proc_list__.append((func, tuple(params))) 
+        self.__proc_list__.append((func, tuple(params)))
         return None
 
     def execute(self):
