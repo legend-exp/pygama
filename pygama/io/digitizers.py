@@ -7,19 +7,11 @@ from scipy import signal
 import matplotlib.pyplot as plt
 from pprint import pprint
 
-from .io_base import DataTaker
+from .io_base import DataDecoder
+from .orca_helper import OrcaDecoder
 from .waveform import Waveform
 
-"""
-FIXME:
-these variables should be set by config if digitizer:
-self.[window, win_type, n_samp, n_blsamp]
-
-TODO:
-Remove windowing feature completely, it's unnecessary with lh5 var-length arrs
-"""
-
-class ORCAStruck3302(DataTaker):
+class ORCAStruck3302(OrcaDecoder):
     """ 
     decode ORCA Struck 3302 digitizer data
     """
@@ -28,30 +20,17 @@ class ORCAStruck3302(DataTaker):
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.class_name = 'ORSIS3302Model'
 
-        # store an entry for every event
         self.decoded_values = {
-            "packet_id": [],
-            "ievt": [],
-            "energy": [],
-            "energy_first": [],
-            "timestamp": [],
-            "channel": [],
-            "ts_lo": [],
-            "ts_hi": [],
-            "waveform": [],
-            # "energy_wf": []
-        }
-
-        self.decoded_vals = {
             "packet_id": { 
                'dtype': 'uint32',
+               'description': 'index of packet in datastream',
              },
             "ievt": { 
               'dtype': 'uint32',
             },
             "energy": { 
               'dtype': 'uint32', 
-              'units': 'adc_sum',
+              'units': 'summed_ADC',
             },
             "energy_first": { 
               'dtype': 'uint32',
@@ -68,18 +47,21 @@ class ORCAStruck3302(DataTaker):
             },
             "channel": { 
               'dtype': 'uint8',
+              'range': '[0,7]',
             },
             "waveform": { 
               'dtype': 'uint16', 
-              #'max_length': 65532, # suggest to override this before calling prepare_buffer() to save RAM
-              'shape': (8192,),
-              'sample_period_ns': 10, # override if a different clock rate is used
-              'units': 'adc',
+              'datatype': 'time_series', 
+              'length': 65532, # max value. override this before calling add_filed() to save RAM
+              'sample_period': 10, # override if a different clock rate is used
+              'sample_period_units': 'ns',
+              'units': 'ADC',
             },
             # "energy_wf": []
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df
-
+        self.enabled_cccs = []
+        '''
         self.event_header_length = 1
         self.sample_period = 10  # ns
         self.h5_format = "table"
@@ -90,9 +72,48 @@ class ORCAStruck3302(DataTaker):
         self.df_metadata = None # hack, this probably isn't right
         self.file_config = { 'nsamples': 8192 }
         self.lh5_spec = {}
+        '''
         
 
-    def decode_packet_to_buffer(self, packet, table_buffer, packet_id, header_dict, verbose=False):
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+
+        # parse object_info for important info
+        for card_dict, card_data in self.object_info.items:
+            crate = card_dict['Crate']
+            card = card_dict['Card']
+
+            int_enabled_mask = card_dict['internalTriggerEnabledMask']
+            ext_enabled_mask = card_dict['externalTriggerEnabledMask']
+            enabled_mask = int_enabled_mask | ext_enabled_mask
+            trace_length = 0
+            for channel in range(8):
+                # only care about enabled channels
+                if (enabled_mask >> channel) & 0x1:
+                    # save list of enabled channels
+                    self.enabled_cccs.append(get_ccc(crate, card, channel))
+
+                    # get trace length(s). Should all be the same until
+                    # multi-buffer mode is implemented AND each channel has its
+                    # own buffer
+                    this_length = card_dict['sampleLengths'][int(channel/2)]
+                    if trace_length == 0: trace_length = this_length
+                    elif this_length != trace_length:
+                        print('SIS3316ORCADecoder Error: multiple trace lengths not supported')
+                        sys.exit()
+
+            # check trace length and update decoded_values
+            if trace_length <= 0 or trace_length 2**16:
+                print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
+                sys.exit()
+            self.decoded_values['waveform']['length'] = trace_length
+
+
+
+
+
+
+    def decode_packet(self, packet, df_buffer, packet_id, header_dict, verbose=False):
         """
         see README for the 32-bit data word diagram
         """
@@ -102,99 +123,9 @@ class ORCAStruck3302(DataTaker):
         p32 = np.frombuffer(packet, dtype=np.uint32)
         p16 = np.frombuffer(packet, dtype=np.uint16)
 
-        # another alias for brevity
-        tb = table_buffer
-
-        tb.packet_id = packet_id
-
-        # start reading the binary, baby
-        n_lost_msb = (p32[0] >> 25) & 0x7F
-        n_lost_lsb = (p32[0] >> 2) & 0x7F
-        n_lost_records = (n_lost_msb << 7) + n_lost_lsb
-        tb.crate = (p32[0] >> 21) & 0xF
-        tb.card = (p32[0] >> 16) & 0x1F
-        tb.channel = (p32[0] >> 8) & 0xFF
-        buffer_wrap = p32[0] & 0x1
-        #crate_card_chan = (tb.crate << 9) + (card << 4) + channel
-        wf_length32 = p32[1]
-        ene_wf_length32 = p32[2]
-        evt_header_id = p32[3] & 0xFF
-        tb.timestamp = ((p32[3] >> 16) & 0xFFFF) << 32 + p32[4]
-        last_word = p32[-1]
-
-        # get the footer
-        tb.energy = p32[-4]
-        tb.energy_first = p32[-3]
-        extra_flags = p32[-2]
-
-        # compute expected and actual array dimensions
-        wf_length16 = 2 * wf_length32
-        orca_helper_length16 = 2
-        sis_header_length16 = 12 if buffer_wrap else 8
-        header_length16 = orca_helper_length16 + sis_header_length16
-        ene_wf_length16 = 2 * ene_wf_length32
-        footer_length16 = 8
-        expected_wf_length = len(p16) - orca_helper_length16 - sis_header_length16 - \
-            footer_length16 - ene_wf_length16
-
-        # error check: waveform size must match expectations
-        if wf_length16 != expected_wf_length or last_word != 0xdeadbeef:
-            print(len(p16), orca_helper_length16, sis_header_length16,
-                  footer_length16)
-            print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
-            print("       The Last Word (should be 0xdeadbeef):",
-                  hex(last_word))
-            exit()
-
-        # indexes of stuff (all referring to the 16 bit array)
-        i_wf_start = header_length16
-        i_wf_stop = i_wf_start + wf_length16
-        i_ene_start = i_wf_stop + 1
-        i_ene_stop = i_ene_start + ene_wf_length16
-        if buffer_wrap:
-            # start somewhere in the middle of the record
-            i_start_1 = p32[6] + header_length16 + 1
-            i_stop_1 = i_wf_stop  # end of the wf record
-            i_start_2 = i_wf_start  # beginning of the wf record
-            i_stop_2 = i_start_1
-
-        # handle the waveform(s)
-        energy_wf = np.zeros(ene_wf_length16)  # not used rn
-        tbwf = tb.get_flat_buffer('waveform')
-        if wf_length32 > 0:
-            if not buffer_wrap:
-                tbwf = p16[i_wf_start:i_wf_stop]
-                tb.set_flat_buffer_len('waveform', i_wf_stop-i_wf_start)
-            else:
-                len1 = istop_1-i_start_1
-                tbwf[:len1] = p16[i_start_1:i_stop_1]
-                len2 = istop_2-i_start_2
-                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]
-                tb.set_flat_buffer_len('waveform', len1+len2)
-
-        tbwf_len = tb.get_flat_buffer_len('waveform') 
-        if tbwf_len != expected_wf_length:
-            print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                  (ievt, expected_wf_length, tbwf_len))
-            exit()
-
-        # set the event number (searchable HDF5 column)
-        tb.ievt = self.ievt
-        self.ievt += 1
-
-        tb.next_row()
-
-    def decode_packet_to_df_buf(self, packet, df, ii, packet_id, header_dict, verbose=False):
-        """
-        see README for the 32-bit data word diagram
-        """
-
-        # interpret the raw event data into numpy arrays of 16 and 32 bit ints
-        # does not copy data. p32 and p16 are read-only
-        p32 = np.frombuffer(packet, dtype=np.uint32)
-        p16 = np.frombuffer(packet, dtype=np.uint16)
-
+        # aliases for brevity
+        df = df_buffer
+        ii = df.loc
         df.packet_id.values[ii] = packet_id
 
         # start reading the binary, baby
@@ -251,7 +182,7 @@ class ORCAStruck3302(DataTaker):
 
         # handle the waveform(s)
         energy_wf = np.zeros(ene_wf_length16)  # not used rn
-        dfwf = df.waveform.values[ii]
+        dfwf = df.waveform[ii]
         if wf_length32 > 0:
             if not buffer_wrap:
                 if i_wf_stop - i_wf_start != expected_wf_length:
