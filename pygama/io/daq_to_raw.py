@@ -62,6 +62,8 @@ def daq_to_raw(t0_file, run, prefix="t1", suffix="", chan_list=None, n_max=np.in
     # get the DAQ mode
     if config["daq"] == "ORCA":
         process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        #process_orca_tb(t0_file, t1_file, n_max, decoders, config, verbose, run)
+        #process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run)
 
     elif config["daq"] == "FlashCam":
         process_flashcam(t0_file, t1_file, run, n_max, decoders, config, verbose)
@@ -90,7 +92,8 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     """
     convert ORCA DAQ data to pygama "raw" lh5
     """
-    ROW_LIMIT = 5e4
+    #ROW_LIMIT = 50000
+    ROW_LIMIT = 1024
 
     start = time.time()
     f_in = open(t0_file.encode('utf-8'), "rb")
@@ -153,9 +156,10 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
             for d in decoders:
-                d.save_to_pytables(t1_file, verbose=True)
+                #d.save_to_pytables(t1_file, verbose=True)
+                d.save_to_lh5(t1_file)
         try:
-            event_data, data_id = get_next_event(f_in)
+            event_data, data_id = get_next_packet(f_in)
         except EOFError:
             break
         except Exception as e:
@@ -177,7 +181,8 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
     # final write to file
     for d in decoders:
-        d.save_to_pytables(t1_file, verbose=True)
+        #d.save_to_pytables(t1_file, verbose=True)
+        d.save_to_lh5(t1_file)
 
     if verbose:
         update_progress(1)
@@ -192,6 +197,242 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     with pd.HDFStore(t1_file,'r') as store:
         print(store.keys())
         # print(store.info())
+
+
+def process_orca_tb(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
+    """
+    convert ORCA DAQ data to pygama "raw" lh5
+    """
+    table_buffer_size = 1024
+    #table_buffer_size = 50000
+
+    start = time.time()
+    f_in = open(t0_file.encode('utf-8'), "rb")
+    if f_in == None:
+        print("Couldn't find the file %s" % t0_file)
+        sys.exit(0)
+
+    # parse the header
+    reclen, reclen2, header_dict = parse_header(t0_file)
+
+    # figure out the total size
+    SEEK_END = 2
+    f_in.seek(0, SEEK_END)
+    file_size = float(f_in.tell())
+    f_in.seek(0, 0)  # rewind
+    file_size_MB = file_size / 1e6
+    print("Total file size: {:.3f} MB".format(file_size_MB))
+
+    if run is not None:
+        run = get_run_number(header_dict)
+    print("Run number: {}".format(run))
+
+    # figure out which decoders we can use.  should simplify this block
+    decoders = []
+    id_dict = get_decoder_for_id(header_dict)
+    if verbose:
+        print("Data IDs present in this header are:")
+        for id in id_dict:
+            print(f"    {id}: {id_dict[id]}")
+    used_ids = set([id_dict[id] for id in id_dict])
+    for sub in DataTaker.__subclasses__():
+        tmp = sub() # instantiate the class
+        if tmp.decoder_name in used_ids:
+            # tmp.apply_config(config) # broken rn
+            if tmp.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+            decoders.append(tmp)
+    decoder_to_id = {d.decoder_name: d for d in decoders}
+    # Set up TableBuffers -- for now, one for each decoder
+    tbs = {}
+    if verbose:
+        print("pygama will run these decoders:")
+        for d in decoders:
+            data_id = None
+            for d_id, name in id_dict.items():
+                if name == d.decoder_name: data_id = d_id
+            print("   ", d.decoder_name+ ", id =",data_id)
+            tbs[data_id] = TableBuffer()
+            d.initialize_buffer(tbs[data_id])
+
+    # -- scan over raw data --
+    print("Beginning Tier 0 processing ...")
+
+    packet_id = 0  # number of events decoded
+    unrecognized_data_ids = []
+
+    # skip the header.
+    # reclen is in number of longs, and we want to skip a number of bytes
+    f_in.seek(reclen * 4)
+
+    # start scanning
+    while (packet_id < n_max and f_in.tell() < file_size):
+        packet_id += 1
+
+        if verbose and packet_id % 1000 == 0:
+            update_progress(float(f_in.tell()) / file_size)
+
+        try:
+            packet, data_id = get_next_packet(f_in)
+        except EOFError:
+            break
+        except Exception as e:
+            print("Failed to get the next event ... Exception:",e)
+            break
+
+        try:
+            decoder = decoder_to_id[id_dict[data_id]]
+        except KeyError:
+            if data_id not in id_dict and data_id not in unrecognized_data_ids:
+                unrecognized_data_ids.append(data_id)
+            continue
+
+        if data_id in tbs.keys():
+            decoder.decode_packet_to_buffer(packet, tbs[data_id], packet_id, header_dict)
+            # write to the output file when a buffer gets full
+            if tbs[data_id].is_full(): 
+                tbs[data_id].append_to_lh5(t1_file, '/daqdata')
+
+
+    print("done.  last packet ID:", packet_id)
+    f_in.close()
+
+    # final write to file
+    for tb in tbs.values():
+        tb.append_to_lh5(t1_file, '/daqdata')
+
+    if verbose:
+        update_progress(1)
+
+    if len(unrecognized_data_ids) > 0:
+        print("WARNING, Found the following unknown data IDs:")
+        for id in unrecognized_data_ids:
+            print("  {}".format(id))
+        print("hopefully they weren't important!\n")
+
+    print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    #with pd.HDFStore(t1_file,'r') as store:
+        #print(store.keys())
+        ## print(store.info())
+
+
+def process_orca_df(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
+    """
+    convert ORCA DAQ data to pygama "raw" lh5
+    """
+    df_attrs = dfbuf_init_attrs(size = 1024)
+    #df_attrs = dfbuf_init_attrs(size = 50000)
+
+    start = time.time()
+    f_in = open(t0_file.encode('utf-8'), "rb")
+    if f_in == None:
+        print("Couldn't find the file %s" % t0_file)
+        sys.exit(0)
+
+    # parse the header
+    reclen, reclen2, header_dict = parse_header(t0_file)
+
+    # figure out the total size
+    SEEK_END = 2
+    f_in.seek(0, SEEK_END)
+    file_size = float(f_in.tell())
+    f_in.seek(0, 0)  # rewind
+    file_size_MB = file_size / 1e6
+    print("Total file size: {:.3f} MB".format(file_size_MB))
+
+    if run is not None:
+        run = get_run_number(header_dict)
+    print("Run number: {}".format(run))
+
+    # figure out which decoders we can use.  should simplify this block
+    decoders = []
+    id_dict = get_decoder_for_id(header_dict)
+    if verbose:
+        print("Data IDs present in this header are:")
+        for id in id_dict:
+            print(f"    {id}: {id_dict[id]}")
+    used_ids = set([id_dict[id] for id in id_dict])
+    for sub in DataTaker.__subclasses__():
+        tmp = sub() # instantiate the class
+        if tmp.decoder_name in used_ids:
+            # tmp.apply_config(config) # broken rn
+            if tmp.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+            decoders.append(tmp)
+    decoder_to_id = {d.decoder_name: d for d in decoders}
+    # Set up dataframe buffers -- for now, one for each decoder
+    dfs = {}
+    if verbose:
+        print("pygama will run these decoders:")
+        for d in decoders:
+            data_id = None
+            for d_id, name in id_dict.items():
+                if name == d.decoder_name: data_id = d_id
+            print("   ", d.decoder_name+ ", id =",data_id)
+            dfs[data_id] = [pd.DataFrame(), 0] # dataframe and its write location
+            d.initialize_dataframe(dfs[data_id][0], df_attrs)
+
+    # -- scan over raw data --
+    print("Beginning Tier 0 processing ...")
+
+    packet_id = 0  # number of events decoded
+    unrecognized_data_ids = []
+
+    # skip the header.
+    # reclen is in number of longs, and we want to skip a number of bytes
+    f_in.seek(reclen * 4)
+
+    # start scanning
+    while (packet_id < n_max and f_in.tell() < file_size):
+        packet_id += 1
+
+        if verbose and packet_id % 1000 == 0:
+            update_progress(float(f_in.tell()) / file_size)
+
+        try:
+            packet, data_id = get_next_packet(f_in)
+        except EOFError:
+            break
+        except Exception as e:
+            print("Failed to get the next event ... Exception:",e)
+            break
+
+        try:
+            decoder = decoder_to_id[id_dict[data_id]]
+        except KeyError:
+            if data_id not in id_dict and data_id not in unrecognized_data_ids:
+                unrecognized_data_ids.append(data_id)
+            continue
+
+        if data_id in dfs.keys():
+            dfii = dfs[data_id]
+            decoder.decode_packet_to_df_buf(packet, dfii[0], dfii[1], packet_id, header_dict)
+            dfii[1] += 1
+            # write to the output file when a buffer gets full
+            if dfii[1] == df_attrs['size']: 
+                dfbuf_append_to_lh5(dfii[0], dfii[1], df_attrs, t1_file, '/daqdata')
+                dfii[1] = 0
+
+
+    print("done.  last packet ID:", packet_id)
+    f_in.close()
+
+    # final write to file
+    for dfii in dfs.values():
+        dfbuf_append_to_lh5(dfii[0], dfii[1], df_attrs, t1_file, '/daqdata')
+        dfii[1] = 0
+
+    if verbose:
+        update_progress(1)
+
+    if len(unrecognized_data_ids) > 0:
+        print("WARNING, Found the following unknown data IDs:")
+        for id in unrecognized_data_ids:
+            print("  {}".format(id))
+        print("hopefully they weren't important!\n")
+
+    print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
+    #with pd.HDFStore(t1_file,'r') as store:
+        #print(store.keys())
+        ## print(store.info())
 
 
 def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):
