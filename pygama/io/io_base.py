@@ -46,7 +46,7 @@ class DataDecoder(ABC):
 
     def initialize_df_buffer(self, df_buffer):
         if not hasattr(self, 'decoded_values'):
-            name = self.__class__.__name__
+            name = type(self).__name__
             print(name, 'Error: no decoded_values available for setting up buffer')
             return
         for name, attrs in self.decoded_values.items():
@@ -81,7 +81,7 @@ class DataDecoder(ABC):
 
         # set group name according to decoder class name
         if not group.endswith('/'): group += '/'
-        group += self.__class__.__name__
+        group += type(self).__name__
 
         # write the packets
         pgrp_attrs = '{ datatype: variable_length_array }'
@@ -111,6 +111,154 @@ class DataDecoder(ABC):
         self.garbage_codes.clear()
         self.garbage_ids.clear()
 
+
+
+def get_lh5_datatypename(obj):
+    """Get the LH5 datatype name of an LH5 object"""
+    if isinstance(obj, LH5Table): return 'table'
+    if isinstance(obj, LH5Struct): return 'struct'
+    if np.isscalar(obj): return get_lh5_element_type(obj)
+    if isinstance(obj, LH5FixedSizeArray): return 'fixedsize_array'
+    if isinstance(obj, LH5ArrayOfEqualSizedArrays): return 'array_of_equalsized_arrays'
+    # only options left are LH5Array and LH5VectorOfVectors
+    if isinstance(obj, LH5Array): return 'array'
+
+
+def get_lh5_element_type(obj):
+    """Get the LH5 element type of a scalar or array"""
+    if isinstance(obj, str): return 'string'
+    if hasattr(obj, dtype):
+        kind = obj.dtype.kind
+        if kind == '?': return 'bool'
+        if kind in ['b', 'B', 'V']: return 'blob'
+        if kind in ['i', 'u', 'f']: return 'real'
+        if kind == 'c': return 'complex'
+        if kind in ['S', 'a', 'U']: return 'string'
+    print('Cannot determine LH5 element_type for object of type', type(obj).__name__)
+    return None
+
+
+
+class LH5Struct(dict):
+    """A dictionary with an optional set of attributes.
+
+    Don't allow to instantiate with a dictionary -- have to add fields
+    one-by-one using add_field() to keep datatype updated
+    """
+    # TODO: overload setattr to require add_field for setting
+    def __init__(self, attrs={}):
+        self.attrs = attrs
+        self.attrs['datatype'] = get_lh5_datatypename(self)+'{}'
+
+
+    def add_field(self, name, obj, attrs={}):
+        self[name] = obj
+        self.update_datatype()
+
+
+    def update_datatype(self):
+        datatype = get_lh5_datatypename(self)
+        datatype += '{' + ','.join(self.keys()) + '}'
+        self.attrs['datatype'] = datatype
+
+
+
+class LH5Table(LH5Struct):
+    """A special struct of array or subtable 'columns' of equal length."""
+    # TODO: overload getattr to allow access to fields as object attributes?
+    def __init__(self, size=1024, attrs={})
+        super().__init__(attrs=attrs)
+        self.size = size
+        self.loc = 0
+
+
+    def push_row(self):
+        self.loc += 1
+
+
+    def is_full(self):
+        return self.loc >= self.size
+
+
+    def clear(self):
+        self.loc = 0
+
+
+    def add_field(self, name, obj, attrs={}):
+        if not isinstance(obj, LH5Table) and not isinstance(obj, LH5Array):
+            print('LH5Table: Error: cannot add field of type', type(obj).__name__)
+            return
+        super().add_field(name, obj, attrs)
+
+
+class LH5Scalar:
+    """Holds a value and some attributes (like units)
+    """
+    def __init__(self, value, attrs={}):
+        self.value = value
+        self.attrs = attrs
+        self.attrs['datatype'] = get_lh5_element_type(self.value)
+
+
+class LH5Array:
+    """Holds an ndarray and attributes
+    """
+    def __init__(self, nda, attrs={}):
+        self.nda = nda
+        self.dtype = nda.dtype
+        self.attrs = attrs
+        dt = get_lh5_datatypename(self)
+        nD = str(len(self.nda.shape))
+        et = get_lh5_element_type(self)
+        self.attrs['datatype'] = dt + '<' + nD + '>{' + et + '}'
+
+
+class LH5FixedSizeArray(LH5Array):
+    """An array of fixed-size arrays
+
+    Arrays with guaranteed shape along axes > 0: for example, an array of
+    vectors will always length 3 on axis 1, and it will never change from
+    application to application.  This data type is used for optimized memory
+    handling on some platforms. We are not that sophisticated so we are just
+    storing this identification for .lh5 validity, i.e. for now this class is
+    just an alias.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+
+class LH5ArrayOfEqualSizedArrays(LH5Array):
+    """An array of equal-sized arrays
+
+    Arrays of equal size within a file but could be different from application
+    to application. Canonical example: array of same-length waveforms.
+
+    If shape is not "1D array of arrays of shape given by axes 1-N" (of nda)
+    then specify the dimensionality split in the constructor.
+    """
+    def __init__(self, *args, dims=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        dt = get_lh5_datatypename(self)
+        nD = str(len(self.nda.shape))
+        if dims is not None: nD = '.'.join([str(i) for i in dims])
+        et = get_lh5_element_type(self)
+        self.attrs['datatype'] = dt + '<' + nD + '>{' + et + '}'
+
+
+class LH5VectorOfVectors:
+    """A variable-length array of variable-length arrays
+
+    For now only a 1D vector of 1D vectors is supported. Internal representation
+    is as two ndarrays, one to store the flattened data contiguosly and one to
+    store the cumulative sum of lengths of each vector. 
+    """ 
+    def __init__(self, *args, data_nda, lensum_nda, attrs={}, **kwargs):
+        self.data_nda = data_nda
+        self.lensum_nda = lensum_nda
+        self.dtype = data_nda.dtype
+        self.attrs = attrs
+        et = get_lh5_element_type(self)
+        self.attrs['datatype'] = 'array<1>{array<1>{' + et + '}}'
 
 
 class LH5Store:
@@ -155,8 +303,23 @@ class LH5Store:
         ds[-add_len:] = nda_data 
 
 
-    def read_object(self, lh5_file, path, start_row=0, n_rows=None):
-        """Return an object accessing data at path in lh5_file
+    @staticmethod
+    def parse_datatype(datatype):
+        """Parse datatype string and return type, shape, elements"""
+        if '{' not in datatype: return 'scalar', (), datatype
+
+        # for other datatypes, need to parse the datatype string
+        import parse
+        datatype, element_description = parse('{}{{{}}}', datatype)
+        if datatype.endswith('>'): 
+            datatype, dims = parse('{}<{}>')
+            dims = [int(i) for i in dims.split(',')]
+            return datatype, tuple(dims), element_description
+        else return datatype, None, element_description.split(',')
+
+
+    def read_object(self, lh5_file, path, start_row=0, n_rows=None, obj_buf=None):
+        """Return an object and attributes for data at path in lh5_file
 
         Set n_rows to read out a subset of the first data axis (when possible)
         """
@@ -167,20 +330,16 @@ class LH5Store:
 
         # get the datatype
         if 'datatype' not in h5f[path].attrs:
-            print('LH5Store:', path, "in file", lh5_file, "is missing the datatype attribute")
+            print('LH5Store:', path, 'in file', lh5_file, 'is missing the datatype attribute')
             return None
         datatype = h5f[path].attrs
-        
-        # scalars are dim-0 datasets
-        if datatype == 'real' or datatype == 'bool' or datatype == 'string':
-            return h5f[path][()]
+        datatype, shape, elements = self.parse_datatype(datatype)
 
-        # for other datatypes, need to parse the datatype string
-        import parse
-        datatype, element_description = parse('{}{{{}}}', datatype)
-        if datatype.endswith('>'): datatype, dims = parse('{}<{}>')
-        dims = [int(i) for i in dims.split(',')]
-        is_vecvec = element_description.startswith('array<1>')
+        # scalars are dim-0 datasets
+        if datatype == 'scalar': return h5f[path][()]
+
+        # check if we have a vector of vectors of different size...
+        is_vecvec = elements.startswith('array<1>')
 
         # read out "normal" arrays by slicing
         if datatype == 'array' and not is_vecvec:
@@ -197,7 +356,7 @@ class LH5Store:
             dimprod = np.prod(dims)
             nn = h5f[path].size / dimprod
             if n_rows == None or n_rows >= nn: 
-               return h5f[path][()].reshape([nn]+dims)
+               return h5f[path][()].reshape((nn,)+dims)
             stop_row = n_rows-start_row
             # put the slice before the reshape to avoid reading whole ds at once
             return h5f[path][start_row*dimprod:stop_row*dimprod].reshape(dims)
@@ -225,101 +384,137 @@ class LH5Store:
         return None
 
 
-    def write_object(self, obj, name, lh5_file, group, append=True):
+    def write_object(self, obj, name, lh5_file, group, scalar_attrs={}, append=True):
         """Write an object into an lh5_file
 
-        If obj is array-like and you only want to send in the first n rows, send
+        obj should be a scalar or a LH5* object. If a scalar, you can optionally
+        send in attributes (like units) via scalar_attrs
+
+        Set append to true for non-scalar objects if you want to append along
+        axis 0 (the first dimension) (or axis 0 of non-scalar subfields of
+        structs)
+
+        If obj is array-like and you only want to write out the first n rows, send
         it in as obj[:n].
+
+        Note on scalar values: must be either a str or a fixed-size numpy type
+            (see list at https://numpy.org/devdocs/user/basics.types.html )
+            - If it has units, specify it in scalar_attrs['units']. 
+            - Not appendable
+            - Example:
+              length = np.float64(1.)
+              length_attrs = { 'units': 'm' }
+
+        Arrays: Built off of ndarrays, which map well to HDF5 datasets.
+            - appendable along axis 0
+            - If it has units, specify it in obj_attrs['units']
+            - type of array is determined by obj_attrs['datatype']:
+              - matches 'array', 'array<N>{kind}', or no datatype: 
+                just a standard array. Infer shape and dtype from ndarray
+                attributes
+              - matches 'fixedsize_array' or 'fixedsize_array<N>{kind}': 
+                a fixed-sized array that guarantees some length e.g. along axis
+                1, used for optimized memory handling on some platforms. Python
+                is not that sophisticated so we are just storing this
+                identification in the attributes. Shape and kind is inferred
+                from ndarray attributes
+              - matches 'array_of_equalsized_arrays' or
+                'array_of_equalsized_arrays<N,M,...>{kind}':
+                arrays of arrays of the same size, stored as an ndarray of
+                dimension 1 + N + M + ... where we used ndarray's reshape to get
+                the right "view" so that array[i] is the i'th N-dim array of
+                M-dim arrays of ...
+              - matches 'array{array}' or 'array<1>{array<1>{kind}}':
+                vector of vectors. obj must be a tuple of ndarrays, where the
+                first 
+
+            
         """
         lh5_file = self.gimme_file(lh5_file, mode = 'a' if append else 'w')
         group = self.gimme_group(group, lh5_file)
 
-        if np.isscalar(obj):
-            # extract the datatype
-            datatype = obj.__class__.__name__
-            if datatype == 'bool': pass
-            elif datatype == 'bool_': datatype = 'bool'
-            elif datatype == 'str': datatype = 'string'
-            elif datatype == 'float' or datatype == 'int': datatype = 'real'
-            else:
-                try: is_number = np.issubdtype(obj, np.number)
-                except TypeError: is_number = false
-                if is_number: datatype = 'real'
-                else:
-                    print('LH5Store: don\'t know how to write out a', datatype)
-                    return
-            ds = group.create_dataset(name, shape=(), data=obj)
-            ds.attrs['datatype'] = datatype
+        # struct or table
+        if isinstance(obj, LH5Struct)
+            if 'datatype' not in obj.attrs:
+                print('LH5Store: misformed struct', name)
+                return
+            group = gimme_group(name, group, grp_attrs=obj.attrs)
+            fields = obj.keys()
+            obj_attrs['datatype'] = obj.gimme_datatype(datatype)
+            for fieldname in obj.keys():
+                self.write_object(obj[field], 
+                                  fieldname, 
+                                  lh5_file, 
+                                  group, 
+                                  obj_attrs=obj.field_attrs[field], 
+                                  append=append)
             return
 
-----
-        
-        # for other datatypes, need to parse the datatype string
-        import parse
-        datatype, element_description = parse('{}{{{}}}', datatype)
-        if datatype.endswith('>'): datatype, dims = parse('{}<{}>')
-        dims = [int(i) for i in dims.split(',')]
-        is_vecvec = element_description.startswith('array<1>')
+        # scalars
+        elif np.isscalar(obj):
+            ds = group.create_dataset(name, shape=(), data=obj)
+            ds.attrs.update(obj_attrs)
+            ds.attrs['datatype'] = get_lh5_element_type(obj)
+            return
 
-        # read out "normal" arrays by slicing
-        if datatype == 'array' and not is_vecvec:
-            if n_rows == None: return h5f[path][()]
-            else: return h5f[path][start_row:start_row+n_rows]
+ 
+        # if we get this far, must be one of the LH5Array types
+        else: 
+            else: 
+                if obj_type != 'ndarray': 
+                    print('LH5Store: don\'t know how to write out a', obj_type, 'named', name)
+                    return 
 
-        # skip fixed-sized arrays
-        if datatype == 'fixedsize_array': 
-            print('LH5Store: fixed-sized array reading not implemented')
-            return None
+                # flat arrays: "bare" ndarrays
+                if 'datatype' not in obj_attrs:
+                    ndim = len(obj.shape)
+                    obj_attrs['datatype'] = 'array<' + str(ndim) + '>{' + kind + '}'
 
-        # arrays of arrays get reshaped and sliced
-        if datatype == 'array_of_equalsized_arrays':
-            dimprod = np.prod(dims)
-            nn = h5f[path].size / dimprod
-            if n_rows == None or n_rows >= nn: 
-               return h5f[path][()].reshape([nn]+dims)
-            stop_row = n_rows-start_row
-            # put the slice before the reshape to avoid reading whole ds at once
-            return h5f[path][start_row*dimprod:stop_row*dimprod].reshape(dims)
+                # fixed-sized arrays
+                else if obj_attrs['datatype'] == 'fixedsize_array':
+                    ndim = len(obj.shape)
+                    obj_attrs['datatype'] += '<' + str(ndim) + '>{' + kind + '}'
 
-        # skip vector-of-vectors
-        if is_vecvec:
-            print('LH5Store: vector-of-vectors reading not implemented')
-            return None
+                # arrays of arrays of same size
+                else if obj_attrs['datatype'].startswith('array_of_equalsized_arrays<'):
+                    if not obj_attrs['datatype'].endswith('>'):
+                        print('LH5Store: improper obj_attrs', obj_attrs['datatype'], 'for', name)
+                        return
+                    obj_attrs['datatype'] += '{' + kind + '}'
 
-        # recursively build a struct, return as a dictionary
-        if datatype == 'struct':
-            struct = {}
-            for field in element_description.split(','):
-                struct[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
-            return struct
 
-        # read a table into a dataframe
-        if dataframe == 'table':
-            col_dict = {}
-            for field in element_description.split(','):
-                col_dict[field] = self.read_object(lh5_file, path+'/'+field, start_row, n_rows)
-            return pd.DataFrame(data=col_dict)
-
-        print('LH5Store: don\'t know how to read datatype', datatype)
-        return None
+                # need to create dataset from ndarray the first time for speed
+                # creating an empty dataset and appending to that is super slow!
+                if not append or name not in group:
+                    ds = group.create_dataset(name, data=obj, maxshape=(None,))
+                    ds.attrs.update(obj_attrs)
+                    return
+                
+                # Now append
+                ds = group[name]
+                old_len = ds.shape[0]
+                add_len = obj.shape[0]
+                ds.resize(old_len + add_len, axis=0)
+                ds[-add_len:] = obj 
 
 
 
+class TableBuffer(pd.DataFrame)
+    """Buffer object for pygama tables
 
-# FIXME: rename TableBuffer
-class DFBuffer(pd.DataFrame)
-    """A fixed-length pandas dataframe with a read/write location and attributes.
-
+    A collection of arrays of shape (N,...) where N is a fixed lenth
     Used in daq-to-raw data conversion, DSP, and parameter calibration as a
-    buffer for IO with tables of data. Knows how to write itself out to and
-    read itself in from a .lh5 file. Reads and writes are performed in blocks up
-    to the specified length.
+    buffer for IO with tables of data. LH5Store streams to/from this object
     """
-    def __init__(self, size=1024, *args, **kwargs)
-        super().__init__(*args, **kwargs)
+    def __init__(self, size=1024)
         self.size = size
         self.loc = 0
-        self.attrs = {}
+        self.fields = {}
+        self.fld_attrs = {}
+
+
+    def push_row(self):
+        self.loc += 1
 
 
     def is_full(self):
@@ -330,29 +525,31 @@ class DFBuffer(pd.DataFrame)
         self.loc = 0
 
 
+    def add_field(self, field_name, field_data, field_attrs):
+
     def add_field(self, field_name, field_attrs):
-    if field_name in self:
-        print('buffer already contains field ' + name)
-        return
+        if field_name in self.fields:
+            print('buffer already contains field ' + name)
+            return
 
         # pop the dtype attribute since it's now a property of the field
         dtype = 'double' if 'dtype' not in field_attrs else field_attrs.pop('dtype')
 
         # handle simple scalar first 
         if 'datatype' not in field_attrs: 
-            self[field_name] = np.empty(self.size, dtype=dtype)
+            self.fields[field_name] = np.empty(self.size, dtype=dtype)
 
-        # handle time_series data
-        elif field_attrs['datatype'] == 'time_series':
+        # handle waveform data
+        elif field_attrs['datatype'] == 'waveform':
             # need to be able to compute the shape for the buffer
             if 'length' not in field_attrs:
-                print('DFBuffer error: time_series must have length attribute.')
+                print('TableBuffer error: time_series must have length attribute.')
                 return
 
             # compute the shape
             if field_attrs['length'] == 'var':
                 if 'length_estimate' not in field_attrs:
-                    print('DFBuffer error: var-length time_series must have length_estimate attribute.')
+                    print('TableBuffer error: var-length time_series must have length_estimate attribute.')
                     return
                 shape = (self.size,) + field_attrs['length_estimate']
             else: shape = (self.size,) + field_attrs['length']
@@ -374,7 +571,7 @@ class DFBuffer(pd.DataFrame)
 
         # check another 'dataset' value
         else
-            print('DFBuffer error: unknown datatype', field_attrs['datatype'])
+            print('TableBuffer error: unknown datatype', field_attrs['datatype'])
 
         # finally, append the attributews
         self.attrs['field_attrs'][field_name] = field_attrs
