@@ -12,7 +12,7 @@ block_size = nblock*wflen
 read_len = wflen*bufferlen
 
 # Set up processing chain
-proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz)
+proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz, verbosity=3)
 wfbuffer=np.zeros(read_len, np.uint16)
 proc.add_input_buffer("wf(8192, float32)", wfbuffer)
 proc.add_processor(mean_rms, "wf[0:1000]", "bl", "bl_sig")
@@ -22,6 +22,8 @@ proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', typ
 proc.add_processor(np.divide, "trapmax", 1000, "trapE")
 Eout=np.zeros(bufferlen, np.float32)
 proc.add_output_buffer("trapE", Eout)
+
+print(proc)
 
 # Read from file and execute analysis
 for i in range(nReps):

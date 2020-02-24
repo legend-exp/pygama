@@ -26,13 +26,18 @@ class ProcessingChain:
     available to correctly allocate memory, it can be provided through the
     named variable strings or by calling add_vector or add_scalar.
     """
-    def __init__(self, block_width=8, buffer_len=None, clock_unit=None):
+    def __init__(self, block_width=8, buffer_len=None, clock_unit=None, verbosity=1):
         """Named arguments:
         - block_width: number of entries to simultaneously process.
         - buffer_len: length of input and output buffers. Should be a multiple
             of block_width
         - clock_unit: period or frequency of the clock for all waveforms.
             constant values with time units will be converted to this unit.
+        - verbosity: integer indicating the verbosity level:
+            0: Print nothing (except errors...)
+            1: Print basic warnings (default)
+            2: Print basic debug info
+            3: Print friggin' everything!
         """
         # Dictionary with numpy arrays containing input and output variables
         self.__vars_dict__ = {}
@@ -41,11 +46,16 @@ class ProcessingChain:
         self.__proc_list__ = []
         # lists of tuple pairs of external buffers and internal buffers
         self.__input_buffers__ = []
+        self.__input_strs__ = []
+        # strings of input transforms and variable names for printings
+        self.__proc_strs__ = []
         self.__output_buffers__ = []
+        self.__output_strs__ = []
         
         self.__block_width__ = block_width
         self.__buffer_len__ = buffer_len
         self.__clk__ = clock_unit
+        self.__verbosity__ = verbosity
 
     def add_waveform(self, name, dtype, length):
         """Add named variable containing a waveform block with fixed type and length"""
@@ -186,7 +196,7 @@ class ProcessingChain:
         if(not types):
             raise TypeError("Could not find a type signature matching the types of the variables given for " + func.__name__)
         elif(len(types)>1):
-            print("Found multiple compatible type signatures for this function:", types, "Using signature " + types[0] + ".")
+            self.__print__(1, "Found multiple compatible type signatures for this function:", types, "Using signature " + types[0] + ".")
         types = [np.dtype(t) for t in types[0]]
         
         # Reshape variable arrays to add broadcast dimensions and allocate new arrays as needed
@@ -205,8 +215,20 @@ class ProcessingChain:
             else:
                 params[i] = dtype.type(param)
                 
+        # Make strings of input variables/constants for later printing
+        proc_strs = []
+        for i, arg in enumerate(args):
+            if isinstance(arg, str):
+                proc_strs.append(re.search('(\w+)', arg).group(0))
+            else:
+                proc_strs.append(str(params[i]))
+        proc_strs = tuple(proc_strs)
+        
+        self.__print__(2, 'Added processor: ' + func.__name__ + str(proc_strs).replace("'", ""))
+        
         # Add the function and bound parameters to the list of processors
         self.__proc_list__.append((func, tuple(params)))
+        self.__proc_strs__.append(proc_strs)
         return None
 
     def execute(self):
@@ -219,10 +241,12 @@ class ProcessingChain:
         starting at entry offset, with length equal to the internal block size.
         """
         end = min(offset+self.__block_width__, self.__buffer_len__)
-        self.__read_input_data__(offset, end)
-        self.__execute_procs__()
-        self.__write_output_data__(offset, end)
-    
+        if self.__verbosity__<3:
+            self.__execute_procs__(offset, end)
+        else:
+            self.__execute_procs_verbose__(offset, end)
+            
+        
     def get_variable(self, varname):
         """Get the numpy array holding the internal memory buffer used for a
         named variable. The varname has the format
@@ -286,23 +310,45 @@ class ProcessingChain:
             raise KeyError(name+' is already in variable list')
         arr = np.zeros(shape, dtype)
         self.__vars_dict__[name] = arr
+        self.__print__(2, 'Added variable ' + re.search('(\w+)', name).group(0) + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
         return arr
 
     
+    # copy from input buffers to variables
     # call all the processors on their paired arg tuples
-    def __execute_procs__(self):
+    # copy from variables to list of output buffers
+    def __execute_procs__(self, start, end):
+        for buf, var in self.__input_buffers__:
+            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
         for func, args in self.__proc_list__:
             func(*args)
-    
-    # copy from list of input buffers to variables
-    def __read_input_data__(self, start, end):
-        for buffer, var in self.__input_buffers__:
-            np.copyto(var[0:end-start, ...], buffer[start:end, ...], 'unsafe')
-    
-    # copy from variables to list of output buffers
-    def __write_output_data__(self, start, end):
-        for buffer, var in self.__output_buffers__:
-            np.copyto(buffer[start:end, ...], var[0:end-start, ...], 'unsafe')
+        for buf, var in self.__output_buffers__:
+            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+
+    # verbose version of __execute_procs__. This is probably overkill, but it
+    # was done to minimize python calls in the non-verbose version
+    def __execute_procs_verbose__(self, start, end):
+        names = set(self.__vars_dict__.keys())
+        self.__print__(3, 'Input:')
+        for (buf, var), name in zip(self.__input_buffers__, self.__input_strs__):
+            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
+            self.__print__(3, name+' = '+str(var))
+            names.discard(name)
+            
+        self.__print__(3, 'Processing:')
+        for (func, args), strs in zip(self.__proc_list__, self.__proc_strs__):
+            func(*args)
+            self.__print__(3, func.__name__ + str(strs).replace("'", ""))
+            for name, arg in zip(strs, args):
+                try:
+                    names.remove(name)
+                    self.__print__(3, name+' = '+str(arg))
+                except: pass
+                
+        self.__print__(3, 'Output:')
+        for (buf, var), name in zip(self.__output_buffers__, self.__output_strs__):
+            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+            self.__print__(3, name+' = '+str(var))
 
     # append a tuple with the buffer and variable to either the input buffer
     # list (if input=true) or output buffer list (if input=false), making sure
@@ -315,7 +361,7 @@ class ProcessingChain:
         # if buffer length is not defined, figure out what it should be
         if not self.__buffer_len__:
             self.__buffer_len__ = buff.shape[0]
-            print("Setting buffer length to " + self.__buffer_len__)
+            self.__print__(1, "Setting buffer length to " + self.__buffer_len__)
             
         # Check that the buffer length is correct. For 1D buffer, reshape
         # it if possible, assuming array of structure ordering
@@ -332,6 +378,24 @@ class ProcessingChain:
         elif var.shape[1:] != buff.shape[1:]:
             raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
 
-        if input: self.__input_buffers__.append((buff, var))
-        else: self.__output_buffers__.append((buff, var))
-        
+        varname = re.search('(\w+)', varname).group(0)
+        if input:
+            self.__input_buffers__.append((buff, var))
+            self.__input_strs__.append(varname)
+            self.__print__(2, 'Binding input buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
+        else:
+            self.__output_buffers__.append((buff, var))
+            self.__output_strs__.append(varname)
+            self.__print__(2, 'Binding output buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
+
+
+    def __print__(self, verbosity, *args):
+        if self.__verbosity__ >= verbosity:
+            print(*args)
+
+    def __str__(self):
+        ret = 'Input variables: ' + str(self.__input_strs__)
+        for proc, strs in zip(self.__proc_list__, self.__proc_strs__):
+            ret += '\n' + proc[0].__name__ + str(strs)
+        ret += '\nOutput variables: ' + str(self.__output_strs__)
+        return ret.replace("'", "")
