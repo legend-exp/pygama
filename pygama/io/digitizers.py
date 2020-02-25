@@ -18,12 +18,11 @@ class ORCAStruck3302(OrcaDecoder):
     def __init__(self, *args, **kwargs):
 
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
-        self.class_name = 'ORSIS3302Model'
+        self.orca_class_name = 'ORSIS3302Model'
 
         self.decoded_values = {
             "packet_id": { 
                'dtype': 'uint32',
-               'description': 'index of packet in datastream',
              },
             "ievt": { 
               'dtype': 'uint32',
@@ -47,39 +46,26 @@ class ORCAStruck3302(OrcaDecoder):
             },
             "channel": { 
               'dtype': 'uint8',
-              'range': '[0,7]',
             },
             "waveform": { 
               'dtype': 'uint16', 
-              'datatype': 'time_series', 
+              'datatype': 'waveform', 
               'length': 65532, # max value. override this before calling add_filed() to save RAM
               'sample_period': 10, # override if a different clock rate is used
               'sample_period_units': 'ns',
               'units': 'ADC',
             },
-            # "energy_wf": []
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df
         self.enabled_cccs = []
-        '''
-        self.event_header_length = 1
-        self.sample_period = 10  # ns
-        self.h5_format = "table"
-        self.n_blsamp = 2000
         self.ievt = 0
-        self.ievt_gbg = 0
-        self.pytables_col_limit = 3000
-        self.df_metadata = None # hack, this probably isn't right
-        self.file_config = { 'nsamples': 8192 }
-        self.lh5_spec = {}
-        '''
         
 
     def set_object_info(self, object_info):
         self.object_info = object_info
 
         # parse object_info for important info
-        for card_dict, card_data in self.object_info.items:
+        for card_dict in self.object_info:
             crate = card_dict['Crate']
             card = card_dict['Card']
 
@@ -91,7 +77,7 @@ class ORCAStruck3302(OrcaDecoder):
                 # only care about enabled channels
                 if (enabled_mask >> channel) & 0x1:
                     # save list of enabled channels
-                    self.enabled_cccs.append(get_ccc(crate, card, channel))
+                    #self.enabled_cccs.append(get_ccc(crate, card, channel))
 
                     # get trace length(s). Should all be the same until
                     # multi-buffer mode is implemented AND each channel has its
@@ -103,17 +89,14 @@ class ORCAStruck3302(OrcaDecoder):
                         sys.exit()
 
             # check trace length and update decoded_values
-            if trace_length <= 0 or trace_length 2**16:
+            if trace_length <= 0 or trace_length > 2**16:
                 print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
                 sys.exit()
             self.decoded_values['waveform']['length'] = trace_length
 
 
 
-
-
-
-    def decode_packet(self, packet, df_buffer, packet_id, header_dict, verbose=False):
+    def decode_packet(self, packet, lh5_table, packet_id, header_dict, verbose=False):
         """
         see README for the 32-bit data word diagram
         """
@@ -124,28 +107,28 @@ class ORCAStruck3302(OrcaDecoder):
         p16 = np.frombuffer(packet, dtype=np.uint16)
 
         # aliases for brevity
-        df = df_buffer
-        ii = df.loc
-        df.packet_id.values[ii] = packet_id
+        tb = lh5_table
+        ii = tb.loc
+        tb['packet_id'].nda[ii] = packet_id
 
         # start reading the binary, baby
         n_lost_msb = (p32[0] >> 25) & 0x7F
         n_lost_lsb = (p32[0] >> 2) & 0x7F
         n_lost_records = (n_lost_msb << 7) + n_lost_lsb
-        df.crate.values[ii] = (p32[0] >> 21) & 0xF
-        df.card.values[ii] = (p32[0] >> 16) & 0x1F
-        df.channel.values[ii] = (p32[0] >> 8) & 0xFF
+        tb['crate'].nda[ii] = (p32[0] >> 21) & 0xF
+        tb['card'].nda[ii] = (p32[0] >> 16) & 0x1F
+        tb['channel'].nda[ii] = (p32[0] >> 8) & 0xFF
         buffer_wrap = p32[0] & 0x1
-        #crate_card_chan = (df.crate.values[ii] << 9) + (df.card.values[ii] << 4) + df.channel.values[ii]
+        #crate_card_chan = (tb['crate'].nda[ii] << 9) + (tb['card'].nda[ii] << 4) + tb['channel'].nda[ii]
         wf_length32 = p32[1]
         ene_wf_length32 = p32[2]
         evt_header_id = p32[3] & 0xFF
-        df.timestamp.values[ii] = ((p32[3] >> 16) & 0xFFFF) << 32 + p32[4]
+        tb['timestamp'].nda[ii] = ((p32[3] >> 16) & 0xFFFF) << 32 + p32[4]
         last_word = p32[-1]
 
         # get the footer
-        df.energy.values[ii] = p32[-4]
-        df.energy_first.values[ii] = p32[-3]
+        tb['energy'].nda[ii] = p32[-4]
+        tb['energy_first'].nda[ii] = p32[-3]
         extra_flags = p32[-2]
 
         # compute expected and actual array dimensions
@@ -181,14 +164,14 @@ class ORCAStruck3302(OrcaDecoder):
             i_stop_2 = i_start_1
 
         # handle the waveform(s)
-        energy_wf = np.zeros(ene_wf_length16)  # not used rn
-        dfwf = df.waveform[ii]
+        #energy_wf = np.zeros(ene_wf_length16)  # not used rn
+        tbwf = tb['waveform']['values'].nda[ii]
         if wf_length32 > 0:
             if not buffer_wrap:
                 if i_wf_stop - i_wf_start != expected_wf_length:
                     print("ERROR: event %d, we expected %d WF samples and only got %d" %
                           (ievt, expected_wf_length, i_wf_stope - i_wf_start))
-                dfwf[:] = p16[i_wf_start:i_wf_stop]
+                tbwf[:expected_wf_length] = p16[i_wf_start:i_wf_stop]
             else:
                 len1 = istop_1-i_start_1
                 len2 = istop_2-i_start_2
@@ -196,123 +179,16 @@ class ORCAStruck3302(OrcaDecoder):
                     print("ERROR: event %d, we expected %d WF samples and only got %d" %
                           (ievt, expected_wf_length, len1+len2))
                     exit()
-                dfwf[:len1] = p16[i_start_1:i_stop_1]
-                dfwf[len1:len1+len2] = p16[i_start_2:i_stop_2]
+                tbwf[:len1] = p16[i_start_1:i_stop_1]
+                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]
 
 
         # set the event number (searchable HDF5 column)
-        df.ievt.values[ii] = self.ievt
+        tb['ievt'].nda[ii] = self.ievt
         self.ievt += 1
 
 
-    def decode_event(self, event_data_bytes, packet_id, header_dict, verbose=False):
-        """
-        see README for the 32-bit data word diagram
-        """
-        # parse the raw event data into numpy arrays of 16 and 32 bit ints
-        evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
-        evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
-
-        # start reading the binary, baby
-        n_lost_msb = (evt_data_32[0] >> 25) & 0x7F
-        n_lost_lsb = (evt_data_32[0] >> 2) & 0x7F
-        n_lost_records = (n_lost_msb << 7) + n_lost_lsb
-        crate = (evt_data_32[0] >> 21) & 0xF
-        card = (evt_data_32[0] >> 16) & 0x1F
-        channel = (evt_data_32[0] >> 8) & 0xFF
-        buffer_wrap = evt_data_32[0] & 0x1
-        crate_card_chan = (crate << 9) + (card << 4) + channel
-        wf_length_32 = evt_data_32[1]
-        ene_wf_length = evt_data_32[2]
-        evt_header_id = evt_data_32[3] & 0xFF
-        timestamp = evt_data_32[4] + ((evt_data_32[3] >> 16) & 0xFFFF)
-        last_word = evt_data_32[-1]
-
-        # get the footer
-        energy = evt_data_32[-4]
-        energy_first = evt_data_32[-3]
-        extra_flags = evt_data_32[-2]
-
-        # compute expected and actual array dimensions
-        wf_length16 = 2 * wf_length_32
-        orca_helper_length16 = 2
-        sis_header_length16 = 12 if buffer_wrap else 8
-        header_length16 = orca_helper_length16 + sis_header_length16
-        ene_wf_length16 = 2 * ene_wf_length
-        footer_length16 = 8
-        expected_wf_length = len(evt_data_16) - orca_helper_length16 - sis_header_length16 - \
-            footer_length16 - ene_wf_length16
-
-        # error check: waveform size must match expectations
-        if wf_length16 != expected_wf_length or last_word != 0xdeadbeef:
-            print(len(evt_data_16), orca_helper_length16, sis_header_length16,
-                  footer_length16)
-            print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
-            print("       The Last Word (should be 0xdeadbeef):",
-                  hex(last_word))
-            exit()
-
-        # indexes of stuff (all referring to the 16 bit array)
-        i_wf_start = header_length16
-        i_wf_stop = i_wf_start + wf_length16
-        i_ene_start = i_wf_stop + 1
-        i_ene_stop = i_ene_start + ene_wf_length16
-        if buffer_wrap:
-            # start somewhere in the middle of the record
-            i_start_1 = evt_data_32[6] + header_length16 + 1
-            i_stop_1 = i_wf_stop  # end of the wf record
-            i_start_2 = i_wf_start  # beginning of the wf record
-            i_stop_2 = i_start_1
-
-        # handle the waveform(s)
-        energy_wf = np.zeros(ene_wf_length16)  # not used rn
-        if wf_length_32 > 0:
-            if not buffer_wrap:
-                wf_data = evt_data_16[i_wf_start:i_wf_stop]
-            else:
-                wf_data1 = evt_data_16[i_start_1:i_stop_1]
-                wf_data2 = evt_data_16[i_start_2:i_stop_2]
-                wf_data = np.concatenate([wf_data1, wf_data2])
-
-        if len(wf_data) != expected_wf_length:
-            print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                  (ievt, expected_wf_length, len(wf_data)))
-            exit()
-
-        # final raw wf array
-        waveform = wf_data
-
-        # # if the wf is too big for pytables, we can window it
-        # if self.window:
-        #     wf = Waveform(wf_data, self.sample_period, self.decoder_name)
-        #     win_wf, win_ts = wf.window_waveform(self.win_type,
-        #                                         self.n_samp,
-        #                                         self.n_blsamp,
-        #                                         test=False)
-        #     ts_lo, ts_hi = win_ts[0], win_ts[-1]
-        # 
-        #     waveform = win_wf # modify final wf array
-        # 
-        #     if wf.is_garbage:
-        #         ievt = self.ievt_gbg
-        #         self.ievt_gbg += 1
-        #         self.format_data(locals(), wf.is_garbage)
-        #         return
-
-        if len(waveform) > self.pytables_col_limit and self.h5_format == "table":
-            print("WARNING: too many columns for tables output,\n",
-                  "         reverting to saving as fixed hdf5 ...")
-            self.h5_format = "fixed"
-
-        # set the event number (searchable HDF5 column)
-        ievt = self.ievt
-        self.ievt += 1
-
-        # send any variable with a name in "decoded_values" to the pandas output
-        self.format_data(locals())
-
-        
+'''
 class LLAMAStruck3316(DataTaker):
     """ 
     decode Struck 3316 digitizer data
@@ -915,4 +791,4 @@ class FlashCam(DataTaker):
             # send any variable with a name in "decoded_values" to the output
             self.format_data(locals())  
 
-
+'''
