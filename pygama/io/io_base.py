@@ -302,7 +302,7 @@ class LH5ArrayOfEqualSizedArrays(LH5Array):
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
         nD = str(len(self.nda.shape))
-        if self.dims is not None: nD = '.'.join([str(i) for i in self.dims])
+        if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
         et = get_lh5_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
 
@@ -454,7 +454,7 @@ class LH5Store:
             if datatype == 'fixedsize_array': 
                 return LH5FixedSizeArray(nda=nda, attrs=attrs)
             if datatype == 'array_of_equalsized_arrays': 
-                return LH5ArrayOfEqualSizedArrays(nda=nda, attrs=attrs)
+                return LH5ArrayOfEqualSizedArrays(nda=nda, dims=shape, attrs=attrs)
 
         print('LH5Store: don\'t know how to read datatype', datatype)
         return None
