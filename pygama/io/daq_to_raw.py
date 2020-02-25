@@ -93,6 +93,9 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
     buffer_size = 1024
     #buffer_size = 50000
 
+    # TODO: add overwrite capability
+    lh5_store = LH5Store()
+
     f_in = open(t0_file.encode('utf-8'), "rb")
     if f_in == None:
         print("Couldn't find the file %s" % t0_file)
@@ -123,14 +126,14 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
             print(f"    {ID}: {id2dn_dict[ID]}")
     dn2id_dict = {}
     for ID, name in id2dn_dict.items(): dn2id_dict[name] = ID
-    for sub in DataDecoder.__subclasses__():
+    for sub in OrcaDecoder.__subclasses__():
         decoder = sub() # instantiate the class
         if decoder.decoder_name in dn2id_dict:
             # Later: allow to turn on / off decoders in exp.json
             if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
-            decoder.dataID = dn2id_dict[name]
-            decoder.set_object_info(get_object_info(header_dict, decoder.decoder_name))
-            decoders[dn2id_dict[name]] = decoder
+            decoder.dataID = dn2id_dict[decoder.decoder_name]
+            decoder.set_object_info(get_object_info(header_dict, decoder.orca_class_name))
+            decoders[decoder.dataID] = decoder
     if verbose:
         print("pygama will run these decoders:")
         for ID, dec in decoders.items():
@@ -138,10 +141,10 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
     # Set up dataframe buffers -- for now, one for each decoder
     # Later: control in intercom
-    dfs = {}
-    for ID, dec in decoders.items():
-        dfs[data_id] = DFBuffer()
-        dec.initialize_df_buffer(dfs[data_id])
+    tbs = {}
+    for data_id, dec in decoders.items():
+        tbs[data_id] = LH5Table(buffer_size)
+        dec.initialize_lh5_table(tbs[data_id])
 
     # -- scan over raw data --
     print("Beginning Tier 0 processing ...")
@@ -161,7 +164,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
             update_progress(float(f_in.tell()) / file_size)
 
         try:
-            packet, data_id, crate, card = get_next_packet(f_in)
+            packet, data_id = get_next_packet(f_in)
         except EOFError:
             break
         except Exception as e:
@@ -173,23 +176,25 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
                 unrecognized_data_ids.append(data_id)
             continue
 
-        if data_id in dfs.keys():
-            dfii = dfs[data_id]
-            decoder.decode_packet_to_df_buf(packet, dfii[0], dfii[1], packet_id, header_dict)
-            dfii[1] += 1
+        if data_id in tbs.keys():
+            tb = tbs[data_id]
+            decoder.decode_packet(packet, tb, packet_id, header_dict)
+            tb.push_row()
             # write to the output file when a buffer gets full
-            if dfii[1] == df_attrs['size']: 
-                dfbuf_append_to_lh5(dfii[0], dfii[1], df_attrs, t1_file, '/daqdata')
-                dfii[1] = 0
+            if tb.is_full():
+                lh5_store.write_object(tb, id2dn_dict[data_id], t1_file, n_rows=tb.size)
+                tb.clear()
 
 
     print("done.  last packet ID:", packet_id)
     f_in.close()
 
     # final write to file
-    for dfii in dfs.values():
-        dfbuf_append_to_lh5(dfii[0], dfii[1], df_attrs, t1_file, '/daqdata')
-        dfii[1] = 0
+    for data_id in tbs.keys():
+        tb = tbs[data_id]
+        if tb.loc == 0: continue
+        lh5_store.write_object(tb, id2dn_dict[data_id], t1_file, n_rows=tb.loc)
+        tb.clear()
 
     if verbose:
         update_progress(1)
@@ -201,9 +206,7 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
         print("hopefully they weren't important!\n")
 
     print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(t1_file))
-    #with pd.HDFStore(t1_file,'r') as store:
-        #print(store.keys())
-        ## print(store.info())
+
 
 
 def process_llama_3316(t0_file, t1_file, run, n_max, config, verbose):

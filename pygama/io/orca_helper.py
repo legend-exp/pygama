@@ -18,7 +18,7 @@ class OrcaDecoder(DataDecoder):
     ORCA also uses a uniform packet structure so put some boiler plate here so
     that all ORCA decoders can make use of it.
     """
-    def __init__(self, dataID=None, object_info=None, *args, **kwargs):
+    def __init__(self, dataID=None, object_info=[], *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dataID = dataID
         self.set_object_info(object_info)
@@ -30,6 +30,9 @@ class OrcaDecoder(DataDecoder):
         """
         self.header_dict = header_dict
         self.object_info = get_object_info(header_dict, self.orca_class_name)
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
 
 
 def parse_header(xmlfile):
@@ -142,7 +145,7 @@ def get_id_to_decoder_name_dict(header_dict):
     return id2dn_dict
 
 
-def get_object_info(header_dict, class_name):
+def get_object_info(header_dict, orca_class_name):
     """
     returns a dict keyed by data id with all info from the header
     TODO: doesn't include all parts of the header yet!
@@ -153,15 +156,14 @@ def get_object_info(header_dict, class_name):
     for crate in crates:
         cards = crate["Cards"]
         for card in cards:
-            if card["Class Name"] == class_name:
+            if card["Class Name"] == orca_class_name:
                 card["Crate"] = crate["CrateNumber"]
                 object_info_list.append(card)
 
-    if len(object_info_list) == 0: return None
+    if len(object_info_list) == 0: 
+        print('OrcaDecoder::get_object_info(): Warning: no object info')
     return object_info_list
-    #df = pd.DataFrame.from_dict(object_info_list)
-    #df.set_index(['Crate', 'Card'], inplace=True)
-    #return df
+
 
 
 def get_next_packet(f_in):
@@ -194,8 +196,6 @@ def get_next_packet(f_in):
     # Using an array of uint32
     record_length = int((head[0] & 0x3FFFF))
     data_id = int((head[0] >> 18))
-    card = int((head[1] >> 16) & 0x1f)
-    crate = int((head[1] >> 21) & 0xf)
     # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
@@ -207,5 +207,5 @@ def get_next_packet(f_in):
         print(e)
         raise EOFError
 
-    return event_data, data_id, crate, card
+    return event_data, data_id
     
