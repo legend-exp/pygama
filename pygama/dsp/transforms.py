@@ -12,3 +12,4 @@ the ufunc interface, they can also be called to return a numpy array, but if
 from __transforms__.mean_stdev import mean_stdev
 from __transforms__.pole_zero import pole_zero
 from __transforms__.trap_filter import trap_filter
+from __transforms__.current import avg_current

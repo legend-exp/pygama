@@ -4,7 +4,7 @@ import numpy as np
 from units import *
 from pygama.io import io_base as io
 
-verbose = 3 # 0=silent, 1=basic warnings, 2=basic output, 3=TMI
+verbose = 2 # 0=silent, 1=basic warnings, 2=basic output, 3=TMI
 nReps = 8 # number of times to loop over file
 wflen = 8192 # length of wf
 nblock = 8 # number of wfs to process at once
@@ -27,12 +27,17 @@ proc.add_processor(pole_zero, "wf_blsub", 70*us, "wf_pz")
 proc.add_processor(trap_filter, "wf_pz", 10*us, 5*us, "wf_trap")
 proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', types=['fi->f'])
 proc.add_processor(np.divide, "trapmax", 10*us, "trapE")
+proc.add_processor(avg_current, "wf_pz", 10, "curr")
+proc.add_processor(np.amax, "curr", 1, "A_10", signature='(n),()->()', types=['fi->f'])
+proc.add_processor(np.divide, "A_10", "trapE", "AoE")
 
 # Set up the LH5 output
 lh5_out = io.LH5Table(size=proc.__buffer_len__)
 lh5_out.add_field("trapE", io.LH5Array(proc.get_output_buffer("trapE"), attrs={"units":"ADC"}))
 lh5_out.add_field("bl", io.LH5Array(proc.get_output_buffer("bl"), attrs={"units":"ADC"}))
 lh5_out.add_field("bl_sig", io.LH5Array(proc.get_output_buffer("bl_sig"), attrs={"units":"ADC"}))
+lh5_out.add_field("A", io.LH5Array(proc.get_output_buffer("A_10"), attrs={"units":"ADC"}))
+lh5_out.add_field("AoE", io.LH5Array(proc.get_output_buffer("AoE"), attrs={"units":"ADC"}))
 
 print(proc)
 
