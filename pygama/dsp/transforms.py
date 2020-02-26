@@ -9,6 +9,6 @@ the ufunc interface, they can also be called to return a numpy array, but if
 """
 
 # I think there's a way to do this recursively, but I'll figure it out later...
-from __transforms__.mean_rms import mean_rms
+from __transforms__.mean_stdev import mean_stdev
 from __transforms__.pole_zero import pole_zero
 from __transforms__.trap_filter import trap_filter

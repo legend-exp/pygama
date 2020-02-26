@@ -1,5 +1,5 @@
 from ProcessingChain import ProcessingChain
-from transforms import mean_rms, trap_filter
+from transforms import mean_stdev, trap_filter
 import numpy as np
 from units import *
 
@@ -15,13 +15,13 @@ read_len = wflen*bufferlen
 proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz, verbosity=3)
 wfbuffer=np.zeros(read_len, np.uint16)
 proc.add_input_buffer("wf(8192, float32)", wfbuffer)
-proc.add_processor(mean_rms, "wf[0:1000]", "bl", "bl_sig")
+proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
 proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
 proc.add_processor(trap_filter, "wf_blsub", 10*us, 5*us, "wf_trap")
 proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', types=['fi->f'])
-proc.add_processor(np.divide, "trapmax", 1000, "trapE")
 Eout=np.zeros(bufferlen, np.float32)
 proc.add_output_buffer("trapE", Eout)
+proc.add_processor(np.divide, "trapmax", 10*us, "trapE")
 
 print(proc)
 
