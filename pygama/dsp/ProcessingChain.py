@@ -243,10 +243,13 @@ class ProcessingChain:
                     if arshape[idim]!=shape[idim]:
                         arshape.insert(len(arshape)+idim+1, 1)
                 params[i] = param.reshape(tuple(arshape))
-            elif isinstance(param, unit):
-                params[i] = dtype.type(convert(1,param,self.__clk__))
             else:
-                params[i] = dtype.type(param)
+                if isinstance(param, unit):
+                    param = convert(1, param, self.__clk__)
+                if np.issubdtype(dtype, np.integer):
+                    params[i] = dtype.type(round(param))
+                else:
+                    params[i] = dtype.type(param)
                 
         # Make strings of input variables/constants for later printing
         proc_strs = []
