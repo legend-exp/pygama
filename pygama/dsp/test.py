@@ -28,9 +28,16 @@ proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', typ
 proc.add_processor(np.divide, "trapmax", 10*us, "trapE")
 Eout=proc.get_output_buffer("trapE")
 
+# Set up the LH5 output
+lh5_out = io.LH5Table(size=proc.__buffer_len__)
+lh5_out.add_field("trapE", io.LH5Array(Eout, attrs={"units":"ADC"}))
+lh5_out.add_field("bl", io.LH5Array(bl, attrs={"units":"ADC"}))
+lh5_out.add_field("bl_sig", io.LH5Array(bl_sig, attrs={"units":"ADC"}))
+
 print(proc)
 
 # Read from file and execute analysis
 for i in range(nReps):
     proc.execute()
-    print(Eout, bl, bl_sig)
+
+lh5.write_object(lh5_out, "data", "t2_run1687.lh5")
