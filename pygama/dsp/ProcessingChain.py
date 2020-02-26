@@ -44,13 +44,11 @@ class ProcessingChain:
         # Ordered list of processors and a tuple containing the bound parameters
         # as either constants or variables from vars_dict
         self.__proc_list__ = []
-        # lists of tuple pairs of external buffers and internal buffers
-        self.__input_buffers__ = []
-        self.__input_strs__ = []
-        # strings of input transforms and variable names for printings
         self.__proc_strs__ = []
-        self.__output_buffers__ = []
-        self.__output_strs__ = []
+        # lists of tuple pairs of external buffers and internal buffers
+        self.__input_buffers__ = {}
+        # strings of input transforms and variable names for printings
+        self.__output_buffers__ = {}
         
         self.__block_width__ = block_width
         self.__buffer_len__ = buffer_len
@@ -65,7 +63,7 @@ class ProcessingChain:
         """Add named variable containing a scalar block with fixed type"""
         self.__add_variable__(name, dtype, (self.__block_width__))
 
-    def add_input_buffer(self, varname, buff, buffer_len=None):
+    def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None):
         """Link an input buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -74,18 +72,36 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable.
         The optional [range] field copies from the buffer into a subrange of the
         array.
-        """
-        if(buffer_len is not None):
-            if self.__buffer_len__ is None:
-                self.__buffer_len__ = buffer_len
-            elif self.__buffer_len__ != buffer_len:
-                raise ValueError("Buffer length was already set to a number different than the one provided. To change the buffer length, you must reset the buffers.")
-        
-        if not isinstance(buff, np.ndarray) and buffer_library:
-            buff = buffer_library[buff]
-        self.__add_io_buffer__(buff, varname, True)
 
-    def add_output_buffer(self, varname, buff, buffer_len=None):
+        Optional keyword args:
+        - buffer_len: number of entries in buffer. This is needed if we cannot
+          figure it out from the shape (i.e. multi-dimensional buffer fed as
+          a one-dimensional array)
+        - dtype: data type used for the variable. Use this if the variable is
+          automatically allocated here, but with a different type from buff
+        """
+        self.__add_io_buffer__(buff, varname, True, dtype, buffer_len)
+
+    def get_input_buffer(self, varname, dtype=None, buffer_len=None):
+        """Get the input buffer associated with varname. If there is no such
+        buffer, create one with a shape compatible with the input variable and
+        return it. The input varname has the form:
+          "varname(length, type)[range]"
+        The optional (length, type) field is used to initialize a new variable.
+        The optional [range] field copies a subrange of the named array into the
+        output buffer.
+        
+        Optional keyword arguments:
+        - dtype can be used to specify the numpy data type of the buffer if it
+          should differ from that held in varname
+        - buffer_len specifies the buffer length, if it has not already been set
+        """
+        name = re.search('(\w+)', varname).group(0)
+        if name not in self.__input_buffers__:
+            self.__add_io_buffer__(None, varname, True, dtype, buffer_len)
+        return self.__input_buffers__[name][0]
+
+    def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None):
         """Link an output buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -94,18 +110,35 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable.
         The optional [range] field copies a subrange of the named array into the
         output buffer.
+
+        Optional keyword args:
+        - buffer_len: number of entries in buffer. This is needed if we cannot
+          figure it out from the shape (i.e. multi-dimensional buffer fed as
+          a one-dimensional array)
+        - dtype: data type used for the variable. Use this if the variable is
+          automatically allocated here, but with a different type from buff
         """
-        if(buffer_len is not None):
-            if self.__buffer_len__ is None:
-                self.__buffer_len__ = buffer_len
-            elif self.__buffer_len__ != buffer_len:
-                raise ValueError("Buffer length was already set to a number different than the one provided. To change the buffer length, you must reset the buffers.")
+        self.__add_io_buffer__(buff, varname, False, dtype, buffer_len)
+
+    def get_output_buffer(self, varname, dtype=None, buffer_len=None):
+        """Get the output buffer associated with varname. If there is no such
+        buffer, create one with a shape compatible with the input variable and
+        return it. The input varname has the form:
+          "varname(length, type)[range]"
+        The optional (length, type) field is used to initialize a new variable.
+        The optional [range] field copies a subrange of the named array into the
+        output buffer.
         
-        if not isinstance(buff, np.ndarray) and buffer_library:
-            buff = buffer_library[buff]
-        self.__add_io_buffer__(buff, varname, False)
-
-
+        Optional keyword arguments:
+        - dtype can be used to specify the numpy data type of the buffer if it
+          should differ from that held in varname
+        - buffer_len specifies the buffer length, if it has not already been set
+        """
+        name = re.search('(\w+)', varname).group(0)
+        if name not in self.__output_buffers__:
+            self.__add_io_buffer__(None, varname, False, dtype, buffer_len)
+        return self.__output_buffers__[name][0]
+    
     
     def add_processor(self, func, *args, **kwargs):
         """
@@ -318,11 +351,11 @@ class ProcessingChain:
     # call all the processors on their paired arg tuples
     # copy from variables to list of output buffers
     def __execute_procs__(self, start, end):
-        for buf, var in self.__input_buffers__:
+        for buf, var in self.__input_buffers__.values():
             np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
         for func, args in self.__proc_list__:
             func(*args)
-        for buf, var in self.__output_buffers__:
+        for buf, var in self.__output_buffers__.values():
             np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
 
     # verbose version of __execute_procs__. This is probably overkill, but it
@@ -330,7 +363,7 @@ class ProcessingChain:
     def __execute_procs_verbose__(self, start, end):
         names = set(self.__vars_dict__.keys())
         self.__print__(3, 'Input:')
-        for (buf, var), name in zip(self.__input_buffers__, self.__input_strs__):
+        for name, (buf, var) in self.__input_buffers__.items():
             np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
             self.__print__(3, name+' = '+str(var))
             names.discard(name)
@@ -346,22 +379,37 @@ class ProcessingChain:
                 except: pass
                 
         self.__print__(3, 'Output:')
-        for (buf, var), name in zip(self.__output_buffers__, self.__output_strs__):
+        for name, (buf, var) in self.__output_buffers__.items():
             np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
             self.__print__(3, name+' = '+str(var))
 
     # append a tuple with the buffer and variable to either the input buffer
     # list (if input=true) or output buffer list (if input=false), making sure
     # that buffer shapes are compatible
-    def __add_io_buffer__(self, buff, varname, input):
+    def __add_io_buffer__(self, buff, varname, input, dtype, buffer_len):
         var = self.get_variable(varname)
-        if not isinstance(buff, np.ndarray):
-            raise ValueError("Buffers must be ndarrays or valid indices for a provided library of ndarrays.")
-
+        if buff is not None and not isinstance(buff, np.ndarray):
+            raise ValueError("Buffers must be ndarrays.")
+        
         # if buffer length is not defined, figure out what it should be
+        if buffer_len is not None:
+            if self.__buffer_len__ is None:
+                self.__buffer_len__ = buffer_len
+            elif self.__buffer_len__ != buffer_len:
+                raise ValueError("Buffer length was already set to a number different than the one provided. To change the buffer length, you must reset the buffers.")
         if not self.__buffer_len__:
-            self.__buffer_len__ = buff.shape[0]
-            self.__print__(1, "Setting buffer length to " + self.__buffer_len__)
+            if buff is not None: self.__buffer_len__ = buff.shape[0]
+            else: self.__buffer_len__ = self.__block_width__
+            self.__print__(1, "Setting i/o buffer length to " + str(self.__buffer_len__))
+
+        # if no buffer was provided, make one
+        returnbuffer=False
+        if buff is None:
+            if var is None:
+                raise ValueError("Cannot make buffer for variable that does not exist!")
+            if not dtype: dtype=var.dtype
+            buff = np.zeros((self.__buffer_len__,)+var.shape[1:], dtype)
+            returnbuffer=True
             
         # Check that the buffer length is correct. For 1D buffer, reshape
         # it if possible, assuming array of structure ordering
@@ -374,28 +422,28 @@ class ProcessingChain:
         # Check that shape of buffer is compatible with shape of variable.
         # If variable does not yet exist, add it here
         if var is None:
-            var = self.__add_var__(varname, buff.dtype, (self.__block_width__,)+buff.shape[1:])
+            if dtype is None: dtype = buff.dtype
+            var = self.__add_var__(varname, dtype, (self.__block_width__,)+buff.shape[1:])
         elif var.shape[1:] != buff.shape[1:]:
             raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
-
+        
         varname = re.search('(\w+)', varname).group(0)
         if input:
-            self.__input_buffers__.append((buff, var))
-            self.__input_strs__.append(varname)
+            self.__input_buffers__[varname]=(buff, var)
             self.__print__(2, 'Binding input buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
         else:
-            self.__output_buffers__.append((buff, var))
-            self.__output_strs__.append(varname)
+            self.__output_buffers__[varname]=(buff, var)
             self.__print__(2, 'Binding output buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
 
+        if returnbuffer: return buff
 
     def __print__(self, verbosity, *args):
         if self.__verbosity__ >= verbosity:
             print(*args)
 
     def __str__(self):
-        ret = 'Input variables: ' + str(self.__input_strs__)
+        ret = 'Input variables: ' + str([name for name in self.__input_buffers__.keys()])
         for proc, strs in zip(self.__proc_list__, self.__proc_strs__):
             ret += '\n' + proc[0].__name__ + str(strs)
-        ret += '\nOutput variables: ' + str(self.__output_strs__)
+        ret += '\nOutput variables: ' + str([name for name in self.__output_buffers__.keys()])
         return ret.replace("'", "")

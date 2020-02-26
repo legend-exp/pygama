@@ -14,14 +14,15 @@ read_len = wflen*bufferlen
 # Set up processing chain
 proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz, verbosity=3)
 wfbuffer=np.zeros(read_len, np.uint16)
-proc.add_input_buffer("wf(8192, float32)", wfbuffer)
+proc.add_input_buffer("wf", wf_in, dtype='float32')
 proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
+bl=proc.get_output_buffer("bl")
+bl_sig=proc.get_output_buffer("bl_sig")
 proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
 proc.add_processor(trap_filter, "wf_blsub", 10*us, 5*us, "wf_trap")
 proc.add_processor(np.amax, "wf_trap", 1, "trapmax", signature='(n),()->()', types=['fi->f'])
-Eout=np.zeros(bufferlen, np.float32)
-proc.add_output_buffer("trapE", Eout)
 proc.add_processor(np.divide, "trapmax", 10*us, "trapE")
+Eout=proc.get_output_buffer("trapE")
 
 print(proc)
 
@@ -35,4 +36,4 @@ for i in range(nReps):
             np.copyto(wfbuffer, pointlesslycopiedbuffer)
             
             proc.execute()
-            #print(Eout)
+    print(Eout, bl, bl_sig)
