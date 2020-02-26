@@ -2,18 +2,22 @@ from ProcessingChain import ProcessingChain
 from transforms import mean_stdev, trap_filter
 import numpy as np
 from units import *
+from pygama.io import io_base as io
 
 nReps = 8 # number of times to loop over file
 wflen = 8192 # length of wf
 nblock = 8 # number of wfs to process at once
 bufferlen = 256 # number of wfs to read from disk at once
 
-block_size = nblock*wflen
-read_len = wflen*bufferlen
+lh5 = io.LH5Store()
+#data = lh5.read_object('ORSIS3302DecoderForEnergy', 't1_run1687.lh5', 0, bufferlen)
+data = lh5.read_object('ORSIS3302DecoderForEnergy', 't1_run1687.lh5')
+
+wf_in = data['waveform']['values'].nda
+dt = data['waveform']['dt'].nda[0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
 
 # Set up processing chain
-proc = ProcessingChain(block_width=nblock, buffer_len=bufferlen, clock_unit=100*mhz, verbosity=3)
-wfbuffer=np.zeros(read_len, np.uint16)
+proc = ProcessingChain(block_width=nblock, clock_unit=dt, verbosity=2)
 proc.add_input_buffer("wf", wf_in, dtype='float32')
 proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
 bl=proc.get_output_buffer("bl")
@@ -28,12 +32,5 @@ print(proc)
 
 # Read from file and execute analysis
 for i in range(nReps):
-    with open('wfs.bin', 'r') as file:
-        while True:
-            # This is not ideal, since fromfile allocates memory and then it gets unnecessarily copied into wfbuffer. Unfortunately I can't find a numpy function to read it straight into the buffer... This will be fixed using the real pygama i/o
-            pointlesslycopiedbuffer = np.fromfile(file, dtype=np.uint16, count=read_len)
-            if(len(pointlesslycopiedbuffer)==0): break
-            np.copyto(wfbuffer, pointlesslycopiedbuffer)
-            
-            proc.execute()
+    proc.execute()
     print(Eout, bl, bl_sig)
