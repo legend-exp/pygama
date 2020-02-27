@@ -409,7 +409,7 @@ class ProcessingChain:
         returnbuffer=False
         if buff is None:
             if var is None:
-                raise ValueError("Cannot make buffer for variable that does not exist!")
+                raise ValueError("Cannot make buffer for non-existent variable " + varname)
             if not dtype: dtype=var.dtype
             buff = np.zeros((self.__buffer_len__,)+var.shape[1:], dtype)
             returnbuffer=True
