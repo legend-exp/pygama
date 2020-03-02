@@ -79,7 +79,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'scimath',
-        'numba'
+        'numba',
+        'parse'
     ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
