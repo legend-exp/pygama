@@ -55,6 +55,7 @@ class DataDecoder(ABC):
         size = lh5_table.size
         for field, attrs in self.decoded_values.items():
             if 'dtype' not in attrs:
+                name = type(self).__name__
                 print(name, 'Error: must specify dtype for', field)
                 continue
 
@@ -93,10 +94,28 @@ class DataDecoder(ABC):
                 wf_table.add_field('values', aoesa)
 
                 lh5_table.add_field(field, wf_table)
+                continue
+
+            # If we get here, must be a LH5 datatype
+            datatype, shape, elements = parse_datatype(datatype)
+
+            if datatype == 'array_of_equalsized_arrays':
+                length = attrs.pop('length')
+                dims = [1,1]
+                aoesa = LH5ArrayOfEqualSizedArrays(shape=(size,length), dtype=dtype, dims=dims, attrs=attrs)
+                lh5_table.add_field(field, aoesa)
+                continue
+
+            if elements.startswith('array'): # vector-of-vectors
+                length_guess = size
+                if 'length_guess' in attrs: length_guess = attrs.pop('length_guess')
+                vov = LH5VectorOfVectors(shape_guess=(size,length_guess), dtype=dtype, attrs=attrs)
+                lh5_table.add_field(field, vov)
+                continue
 
             else:
+                name = type(self).__name__
                 print(name, 'Error: do not know how to make a', datatype, 'for', field)
-                continue
 
 
     def put_in_garbage(self, packet, packet_id, code):
@@ -106,7 +125,6 @@ class DataDecoder(ABC):
         self.garbage_table['packet_id'].nda[i_row] = packet_id
         self.garbage_table['garbage_codes'].nda[i_row] = code
         self.garbage_table.push_row()
-
 
 
     def write_out_garbage(self, filename, group='/', lh5_store=None):
@@ -203,7 +221,7 @@ class LH5Table(LH5Struct):
     # TODO: overload getattr to allow access to fields as object attributes?
     def __init__(self, size=1024, col_dict={}, attrs={}):
         super().__init__(obj_dict=col_dict, attrs=attrs)
-        self.size = size
+        self.size = int(size)
         self.loc = 0
 
 
@@ -344,9 +362,12 @@ class LH5VectorOfVectors:
 
         self.data_array is doubled in length until nda can be appended to it.
         """
-        if not is_integer(i_vec) or i_vec<0 or i_vec>len(self.lensum_array.nda):
+        if i_vec<0 or i_vec>len(self.lensum_array.nda)-1:
             print('LH5VectorOfVectors: Error: bad i_vec', i_vec)
             return 
+        if len(nda.shape) != 1:
+            print('LH5VectorOfVectors: Error: nda had bad shape', nda.shape)
+            return
         start = 0 if i_vec == 0 else self.lensum_array.nda[i_vec-1]
         end = start + len(nda)
         while end >= len(self.data_array.nda):
@@ -385,7 +406,11 @@ class LH5Store:
 
         Set start_row, n_rows to read out a subset of the first data axis (when possible)
         """
-        #FIXME: implement obj_buf
+        #TODO: implement obj_buf. Ian's idea: add an iterator so one can do
+        #      something like
+        #      for data in lh5iterator(file, chunksize, nentries, ...):
+        #          proc.execute()
+
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
             print('LH5Store:', name, "not in", lh5_file)
@@ -413,6 +438,7 @@ class LH5Store:
 
         # read a table into a dataframe
         if datatype == 'table':
+            # TODO: set the size and loc parameters
             col_dict = {}
             for field in elements:
                 col_dict[field] = self.read_object(name+'/'+field, 
