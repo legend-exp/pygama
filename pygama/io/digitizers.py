@@ -21,39 +21,39 @@ class ORCAStruck3302(OrcaDecoder):
         self.orca_class_name = 'ORSIS3302Model'
 
         self.decoded_values = {
-            "packet_id": { 
+            'packet_id': { 
                'dtype': 'uint32',
              },
-            "ievt": { 
+            'ievt': { 
               'dtype': 'uint32',
             },
-            "energy": { 
+            'energy': { 
               'dtype': 'uint32', 
-              'units': 'summed_ADC',
+              'units': 'adc',
             },
-            "energy_first": { 
+            'energy_first': { 
               'dtype': 'uint32',
             },
-            "timestamp": { 
+            'timestamp': { 
               'dtype': 'uint64',
               'units': 'clock_ticks',
             },
-            "crate": { 
+            'crate': { 
               'dtype': 'uint8',
             },
-            "card": { 
+            'card': { 
               'dtype': 'uint8',
             },
-            "channel": { 
+            'channel': { 
               'dtype': 'uint8',
             },
-            "waveform": { 
+            'waveform': { 
               'dtype': 'uint16', 
               'datatype': 'waveform', 
-              'length': 65532, # max value. override this before calling add_filed() to save RAM
+              'length': 65532, # max value. override this before initalizing buffers to save RAM
               'sample_period': 10, # override if a different clock rate is used
               'sample_period_units': 'ns',
-              'units': 'ADC',
+              'units': 'adc',
             },
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df
@@ -109,6 +109,8 @@ class ORCAStruck3302(OrcaDecoder):
         # aliases for brevity
         tb = lh5_table
         ii = tb.loc
+
+        # store packet id
         tb['packet_id'].nda[ii] = packet_id
 
         # start reading the binary, baby
@@ -186,6 +188,7 @@ class ORCAStruck3302(OrcaDecoder):
         # set the event number (searchable HDF5 column)
         tb['ievt'].nda[ii] = self.ievt
         self.ievt += 1
+        tb.push_row()
 
 
 '''
@@ -229,7 +232,6 @@ class LLAMAStruck3316(DataTaker):
 
         self.config_names = []  #TODO at some point we want the metainfo here
         self.file_config = {}
-        self.lh5_spec = {}
         if metadata is not None: 
             self.file_config = self.readMetadata(metadata)
             print("We have {} adcs and {} samples per WF.".format(self.file_config["nadcs"],self.file_config["nsamples"]))
@@ -702,53 +704,207 @@ class SIS3316ORCADecoder(DataTaker):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
+'''
 
 
-class FlashCam(DataTaker):
+
+class FlashCamEventDecoder(DataDecoder):
     """ 
-    decode FlashCam digitizer data.
+    decode FlashCam digitizer event data.
     """
     def __init__(self, *args, **kwargs):
         """
         """
-        self.decoder_name = "FlashCam"
+        #self.decoder_name = "FlashCam" #Jason: DataTaker had this for ORCA. Not needed here?
         
         # these are read for every event (decode_event)
         self.decoded_values = {
-          "ievt": [], # index of event
-          "timestamp": [], # time since beginning of file
-          "channel": [], # right now, index of the trigger (trace)
-          "baseline" : [], # averages prebaseline0 and prebaseline1
-          "wf_max": [], # ultra-simple np.max energy estimation
-          "wf_std": [], # ultra-simple np.std noise estimation
-          "waveform": [] # digitizer data
+            'packet_id': { # packet index in file
+               'dtype': 'uint32',
+             },
+            'ievt': { # index of event
+              'dtype': 'int32',
+            },
+            'timestamp': { # time since beginning of file
+              'dtype': 'float32',
+              'units': 's',
+            },
+            'numtraces': { # number of triggered adc channels
+              'dtype': 'int32',
+            },
+            'tracelist': { # list of triggered adc channels
+              'dtype': 'int16',
+              'datatype': 'array<1>{array<1>{real}}', # vector of vectors
+              'length_guess': 16,
+            },
+            'baseline': { # fpga baseline
+              'dtype': 'int16',
+              'units': 'adc',
+            },
+            'energy': {  # fpga energy
+              'dtype': 'int16',
+              'units': 'adc',
+            },
+            'channel': { # right now, index of the trigger (trace)
+              'dtype': 'uint32',
+            },
+            'wf_max': { # ultra-simple np.max energy estimation
+              'dtype': 'uint16',
+              'units': 'adc',
+            },
+            'wf_std': { # ultra-simple np.std noise estimation
+              'dtype': 'float32',
+              'units': 'adc',
+            },
+            'waveform': { # digitizer data
+              'dtype': 'uint16',
+              'datatype': 'waveform', 
+              'length': 65532, # max value. override this before initializing buffers to save RAM
+              'sample_period': 15, # override if a different clock rate is used
+              'sample_period_units': 'ns',
+              'units': 'adc',
+            },
         }
+
+        # these are read for every file (get_file_config)
+        # FIXME: push into a file header object?
+        self.config_names = [
+            'nsamples', # samples per channel
+            'nadcs', # number of adc channels
+            'ntriggers', # number of triggertraces
+            'telid', # id of telescope
+            'adcbits', # bit range of the adc channels
+            'sumlength', # length of the fpga integrator
+            'blprecision', # precision of the fpga baseline
+            'mastercards', # number of attached mastercards
+            'triggercards', # number of attached triggercards
+            'adccards', # number of attached fadccards
+            'gps', # gps mode (0: not used, 1: external pps and 10MHz)
+        ]
+    
+        super().__init__(*args, **kwargs)
         
+        
+    def get_file_config(self, fcio):
+        """
+        access FCIOConfig members once when each file is opened
+        """
+        self.file_config = {c:getattr(fcio, c) for c in self.config_names}
+        self.decoded_values['waveform']['length'] = self.file_config['nsamples']
+
+
+    def decode_packet(self, fcio, lh5_table, packet_id, verbose=False):
+        """
+        access FCIOEvent members for each event in the raw file
+        """
+
+        # aliases for brevity
+        tb = lh5_table
+
+        ievt      = fcio.eventnumber # the eventnumber since the beginning of the file
+        timestamp = fcio.eventtime   # the time since the beginning of the file in seconds
+        eventsamples = fcio.nsamples   # number of sample per trace
+        if eventsamples != tb['waveform']['values'].nda.shape[1]:
+            print('FlashCamEventDecoder Warning: event wf length was',
+                  eventsamples, 'when',
+                  self.decoded_values['waveform']['length'], 'were expected')
+        numtraces = fcio.numtraces   # number of triggered adcs
+        tracelist = fcio.tracelist   # list of triggered adcs
+        traces    = fcio.traces      # the full traces for the event: (nadcs, nsamples)
+        baselines = fcio.baseline    # the fpga baseline values for each channel in LSB
+        energies  = fcio.daqenergy   # the fpga energy values for each channel in LSB
+
+        # all channels are read out simultaneously for each event
+        for iwf in tracelist:
+            ii = tb.loc
+            tb['packet_id'].nda[ii] = packet_id
+            tb['ievt'].nda[ii] =  ievt
+            tb['timestamp'].nda[ii] =  timestamp
+            tb['numtraces'].nda[ii] =  numtraces
+            tb['tracelist'].set_vector(ii, tracelist)
+            tb['baseline'].nda[ii] = baselines[iwf]
+            tb['energy'].nda[ii] = energies[iwf]
+            tb['channel'].nda[ii] = iwf 
+            waveform = traces[iwf]
+            tb['wf_max'].nda[ii] = np.amax(waveform)
+            tb['wf_std'].nda[ii] = np.std(waveform)
+            tb['waveform']['values'].nda[ii][:] = waveform
+            tb.push_row()
+            
+
+
+
+class FlashCamStatusDecoder(DataDecoder):
+    """ 
+    decode FlashCam digitizer status data.
+    """
+
+    def __init__(self, *args, **kwargs):
+
+        self.decoded_values = {
+            'status': { # 0: Errors occured, 1: no errors
+              'dtype': 'int32',
+            },
+            'statustime': { # fc250 seconds, microseconds, dummy, startsec startusec 
+              'dtype': 'float32',
+              'units': 's',
+            },
+            'cputime': { # CPU seconds, microseconds, dummy, startsec startusec 
+              'dtype': 'float32',
+              'units': 's',
+            },
+            'cards': { # Total number of cards (number of status data to follow)
+              'dtype': 'int32',
+            },
+            'size': { # Size of each status data
+              'dtype': 'int32',
+            },
+            'environment': { # FC card-wise environment status
+              # Array contents:
+              # [0-4] Temps in mDeg
+              # [5-10] Voltages in mV
+              # 11 main current in mA
+              # 12 humidity in o/oo
+              # [13-14] Temps from adc cards in mDeg
+              # FIXME: change to a table? 
+              'dtype': 'uint32',
+              'datatype': 'array_of_equalsized_arrays<1,1>{real}',
+              'length': 16,
+            },
+            'totalerrors': { # FC card-wise list DAQ errors during data taking
+              'dtype': 'uint32',
+            },
+            'enverrors': { 
+              'dtype': 'uint32',
+            },
+            'ctierrors': { 
+              'dtype': 'uint32',
+            },
+            'linkerrors': {
+              'dtype': 'uint32',
+            },
+            'othererrors': {
+              'dtype': 'uint32',
+              'datatype': 'array_of_equalsized_arrays<1,1>{real}',
+              'length': 5,
+            },
+        }
+
         # these are read for every file (get_file_config)
         self.config_names = [
-            "nsamples", # samples per channel
-            "nadcs", # number of adc channels
-            "ntriggers", # number of triggertraces
-            "telid", # id of telescope
-            "adcbits", # bit range of the adc channels
-            "sumlength", # length of the fpga integrator
-            "blprecision", # precision of the fpga baseline
-            "mastercards", # number of attached mastercards
-            "triggercards", # number of attached triggercards
-            "adccards", # number of attached fadccards
-            "gps", # gps mode (0: not used, 1: external pps and 10MHz)
-            ]
-        
-        # put add'l info useful for LH5 specification
-        # default structure is array<1>{real}, default unit is None.
-        # here we only specify columns if they are non-default.
-        self.lh5_spec = {
-            "timestamp":{"units":"sec"},
-            "baseline":{"units":"adc"},
-            "wf_max":{"units":"adc"},
-            "wf_std":{"units":"adc"},
-        }
-        
+            'nsamples', # samples per channel
+            'nadcs', # number of adc channels
+            'ntriggers', # number of triggertraces
+            'telid', # id of telescope
+            'adcbits', # bit range of the adc channels
+            'sumlength', # length of the fpga integrator
+            'blprecision', # precision of the fpga baseline
+            'mastercards', # number of attached mastercards
+            'triggercards', # number of attached triggercards
+            'adccards', # number of attached fadccards
+            'gps', # gps mode (0: not used, 1: external pps and 10MHz)
+        ]
+    
         super().__init__(*args, **kwargs)
         
         
@@ -758,37 +914,38 @@ class FlashCam(DataTaker):
         """
         self.file_config = {c:getattr(fcio, c) for c in self.config_names}
 
-          
-    def decode_event(self, fcio, packet_id, verbose=False):
-        """
-        access FCIOEvent members for each event in the raw file
-        """
-        ievt = fcio.eventnumber # the eventnumber since the beginning of the file
-        timestamp = fcio.eventtime  # the time since the beginning of the file in seconds
-        traces = fcio.traces # the full traces for the event: (nadcs, nsamples)
-        baselines = fcio.baselines # the fpga baseline values for each channel in LSB
-        # baselines = fcio.average_prebaselines # equivalent?
-        
-        # these are empty in my test file
-        integrals = fcio.integrals # the fpga integrator values for each channel in LSB
-        triggertraces = fcio.triggertraces # the triggersum traces: (ntriggers, nsamples)
-        
-        # all channels are read out simultaneously for each event
-        for iwf in range(self.file_config["nadcs"]):
-            channel = iwf
-            waveform = traces[iwf]
-            baseline = baselines[iwf]
-            wf_max = np.amax(waveform)
-            wf_std = np.std(waveform)
-            self.total_count += 1
-            
-            # i don't know what indicates a garbage event yet
-            # if wf.is_garbage:
-            #     self.garbage_count += 1
-            #     self.format_data(locals(), wf.is_garbage)
-            #     return
-            
-            # send any variable with a name in "decoded_values" to the output
-            self.format_data(locals())  
 
-'''
+    def decode_packet(self, fcio, lh5_table, packet_id, verbose=False):
+        """
+        access FC status (temp., log, ...)
+        """
+
+        # aliases for brevity
+        tb = lh5_table
+        ii = tb.loc
+
+        # status -- 0: Errors occured, 1: no errors
+        tb['status'].nda[ii] = fcio.status 
+
+        # times
+        tb['statustime'].nda[ii] = fcio.statustime[0]+fcio.statustime[1]/1e6
+        tb['cputime'].nda[ii] = fcio.statustime[2]+fcio.statustime[3]/1e6
+
+        # Total number of cards (number of status data to follow)
+        tb['cards'].nda[ii] = fcio.cards 
+
+        # Size of each status data
+        tb['size'].nda[ii] = fcio.size 
+
+        # FC card-wise environment status (temp., volt., hum., ...)
+        tb['environment'].nda[ii][:] = fcio.environment 
+
+        # FC card-wise list DAQ errors during data taking
+        tb['totalerrors'].nda[ii] = fcio.totalerrors 
+        tb['linkerrors'].nda[ii] = fcio.linkerrors
+        tb['ctierrors'].nda[ii] = fcio.ctierrors
+        tb['enverrors'].nda[ii] = fcio.enverrors
+        tb['othererrors'].nda[ii][:] = fcio.othererrors
+
+        tb.push_row()
+
