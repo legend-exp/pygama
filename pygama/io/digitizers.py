@@ -760,7 +760,7 @@ class FlashCamEventDecoder(DataDecoder):
               'dtype': 'uint16',
               'datatype': 'waveform', 
               'length': 65532, # max value. override this before initializing buffers to save RAM
-              'sample_period': 15, # override if a different clock rate is used
+              'sample_period': 16, # override if a different clock rate is used
               'sample_period_units': 'ns',
               'units': 'adc',
             },
