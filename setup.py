@@ -77,6 +77,9 @@ setup(
     description='Python package for decoding and processing digitizer data',
     long_description='',
     packages=find_packages(),
+    install_requires=[
+        'scimath'
+    ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
