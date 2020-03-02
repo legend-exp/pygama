@@ -87,6 +87,7 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1", suffix="l
     print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
     elapsed = time.time() - t_start
     print("Time elapsed: {:.2f} sec".format(elapsed))
+    print("Conversion speed: {}ps".format(sizeof_fmt(statinfo.st_size/elapsed)))
     print("  Output file:", raw_filename)
     print("Done.\n")
 
@@ -419,7 +420,9 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
         packet_id += 1
         if verbose and packet_id % 1000 == 0:
             # FIXME: is cast to float necessary?
-            update_progress(float(fcio.telid) / file_size)
+            pct_done = float(fcio.telid) / file_size
+            if n_max < np.inf and n_max > 0: pct_done = packet_id / n_max
+            update_progress(pct_done)
 
         if rc == 4: # Status record
             status_decoder.decode_packet(fcio, status_tb, packet_id)
@@ -448,5 +451,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
         lh5_store.write_object(status_tb, 'daqdata', raw_filename, n_rows=status_tb.loc)
         status_tb.clear()
 
-    if verbose: update_progress(1)
+    if verbose: 
+        update_progress(1)
+        print(packet_id, 'packets decoded')
 
