@@ -10,5 +10,5 @@ mhz = 1000000*hz
 mhz.label = 'MHz'
 megahertz = mhz
 
-import units as u
-unit_parser.parser.extend(u)
+#import pygama.dsp.units as u
+#unit_parser.parser.extend(u)
