@@ -38,6 +38,10 @@ class CMakeBuild(build_ext):
             self.build_extension(ext)
 
     def build_extension(self, ext):
+        import git
+        repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+        repo.git.submodule('update', '--init', '--recursive')
+        
         extdir = os.path.abspath(
             os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
@@ -80,9 +84,11 @@ setup(
     install_requires=[
         'scimath',
         'numba',
-        'parse'
+        'parse',
+        'GitPython'
     ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
 )
+        
