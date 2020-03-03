@@ -3,6 +3,38 @@ import sys
 import pandas as pd
 import numpy as np
 
+from .io_base import DataDecoder
+
+
+class OrcaDecoder(DataDecoder):
+    """ Base class for ORCA decoders.
+
+    ORCA data packets have a dataID-to-decoder_name mapping so these decoders
+    need to have self.decoder_name defined in __init__
+
+    ORCA also stores an object_info dictionary in the header by 'class name" so
+    these decoders need to have self.orca_class_name defined in __init__
+
+    ORCA also uses a uniform packet structure so put some boiler plate here so
+    that all ORCA decoders can make use of it.
+    """
+    def __init__(self, dataID=None, object_info=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataID = dataID
+        self.set_object_info(object_info)
+
+    def set_header_dict(self, header_dict):
+        """Overload to e.g. update decoded_values based on object_info.
+
+        Otherwise just use header_dict and object_info as you need it
+        """
+        self.header_dict = header_dict
+        self.object_info = get_object_info(header_dict, self.orca_class_name)
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+
+
 def parse_header(xmlfile):
     """
     Opens the given file for binary read ('rb'), then grabs the first 8 bytes
@@ -97,28 +129,23 @@ def flip_data_ids(header_dict):
     return flipped
 
 
-def get_decoder_for_id(header_dict):
+def get_id_to_decoder_name_dict(header_dict):
     """
     Returns a dictionary that goes:
-    `dict[dataIdNum] = "decoderName"`
+    `dict[dataID] = "decoderName"`
     e.g: d[5] = 'ORSIS3302DecoderForEnergy'
     """
-    d = dict()
-    for class_key in header_dict["dataDescription"].keys():
-        super_keys_list = []
-        for super_key in header_dict["dataDescription"][class_key].keys():
-            super_keys_list.append(super_key)
-            ID_val = (header_dict["dataDescription"][class_key][super_key]
-                      ["dataId"]) >> 18
-            decoderName = header_dict["dataDescription"][class_key][super_key][
-                "decoder"]
-
-            d[ID_val] = decoderName
-
-    return d
+    id2dn_dict = {}
+    dd = header_dict['dataDescription']
+    for class_key in dd.keys():
+        for super_key in dd[class_key].keys():
+            dataID = (dd[class_key][super_key]['dataId']) >> 18
+            decoder_name = dd[class_key][super_key]['decoder']
+            id2dn_dict[dataID] = decoder_name
+    return id2dn_dict
 
 
-def get_object_info(header_dict, class_name):
+def get_object_info(header_dict, orca_class_name):
     """
     returns a dict keyed by data id with all info from the header
     TODO: doesn't include all parts of the header yet!
@@ -129,31 +156,25 @@ def get_object_info(header_dict, class_name):
     for crate in crates:
         cards = crate["Cards"]
         for card in cards:
-            if card["Class Name"] == class_name:
+            if card["Class Name"] == orca_class_name:
                 card["Crate"] = crate["CrateNumber"]
                 object_info_list.append(card)
 
-    # AuxHw = header_dict["ObjectInfo"]["AuxHw"]
-    # print("AUX IS:")
-    # for aux in AuxHw:
-    # print(aux.keys())
-    # exit()
-
-    if len(object_info_list) == 0:
-        # print("Warning: no object info parsed for {}".format(class_name))
-        return None
-    df = pd.DataFrame.from_dict(object_info_list)
-    df.set_index(['Crate', 'Card'], inplace=True)
-    return df
+    if len(object_info_list) == 0: 
+        print('OrcaDecoder::get_object_info(): Warning: no object info')
+    return object_info_list
 
 
-def get_next_event(f_in):
+
+def get_next_packet(f_in):
     """
-    Gets the next event, and some basic information about it
+    Gets the next packet, and some basic information about it
     Takes the file pointer as input
     Outputs:
-    -event_data: a byte array of the data produced by the card (could be header + data)
-    -data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    - event_data: a byte array of the data produced by the card (could be header + data)
+    - data_id: This is the identifier for the type of data-taker (i.e. Gretina4M, etc)
+    - crate: the crate number for the packet
+    - card: the card number for the packet
     # number of bytes to read in = 8 (2x 32-bit words, 4 bytes each)
     # The read is set up to do two 32-bit integers, rather than bytes or shorts
     # This matches the bitwise arithmetic used elsewhere best, and is easy to implement
@@ -168,16 +189,14 @@ def get_next_event(f_in):
     # Assuming we're getting an array of bytes:
     # record_length   = (head[0] + (head[1]<<8) + ((head[2]&0x3)<<16))
     # data_id         = (head[2] >> 2) + (head[3]<<8)
-    # slot            = (head[6] & 0x1f)
+    # card            = (head[6] & 0x1f)
     # crate           = (head[6]>>5) + head[7]&0x1
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
     record_length = int((head[0] & 0x3FFFF))
     data_id = int((head[0] >> 18))
-    # slot            =int( (head[1] >> 16) & 0x1f)
-    # crate           =int( (head[1] >> 21) & 0xf)
-    # reserved        =int( (head[1] &0xFFFF))
+    # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
     try:

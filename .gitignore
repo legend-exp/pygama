@@ -7,6 +7,7 @@
 *.root
 *.h5
 *.lh5
+*~
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
