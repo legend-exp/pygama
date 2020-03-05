@@ -1,12 +1,12 @@
 {
   "elog":"https://maxwell.npl.washington.edu/elog/Majorana/UWMJLab/",
 
-  "loc_dir":"$DATADIR/MJ60",
-  "raw_dir":"$DATADIR/MJ60/Data",
-  "tier1_dir":"$DATADIR/MJ60/tier1",
-  "tier2_dir":"$DATADIR/MJ60/tier2",
-  "meta_dir":"$DATADIR/MJ60/metadata",
-  "rocks_dir":"/data/LEGEND/Data/MJ60",
+  "loc_dir":"$DATADIR/mjd",
+  "raw_dir":"$DATADIR/mjd/Data",
+  "tier1_dir":"$DATADIR/mjd/tier1",
+  "tier2_dir":"$DATADIR/mjd/tier2",
+  "meta_dir":"$DATADIR/mjd/metadata",
+  "rocks_dir":"/data/LEGEND/Data/mjd",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
 
   "digitizer":"ORSIS3302Model",
