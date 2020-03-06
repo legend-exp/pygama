@@ -127,10 +127,10 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     id2dn_dict = get_id_to_decoder_name_dict(header_dict)
     if verbose:
         print("Data IDs present in ORCA file header are:")
-        for ID in id2dn_dict:
-            print(f"    {ID}: {id2dn_dict[ID]}")
+        for data_id in id2dn_dict:
+            print(f"    {data_id}: {id2dn_dict[data_id]}")
     dn2id_dict = {}
-    for ID, name in id2dn_dict.items(): dn2id_dict[name] = ID
+    for data_id, name in id2dn_dict.items(): dn2id_dict[name] = data_id
     for sub in OrcaDecoder.__subclasses__():
         decoder = sub() # instantiate the class
         if decoder.decoder_name in dn2id_dict:
@@ -141,8 +141,8 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
             decoders[decoder.dataID] = decoder
     if verbose:
         print("pygama will run these decoders:")
-        for ID, dec in decoders.items():
-            print("   ", dec.decoder_name+ ", id =", ID)
+        for data_id, dec in decoders.items():
+            print("   ", dec.decoder_name+ ", id =", data_id)
 
     # Set up dataframe buffers -- for now, one for each decoder
     # Later: control in intercom
@@ -205,8 +205,8 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
 
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
-        for id in unrecognized_data_ids:
-            print("  {}".format(id))
+        for data_id in unrecognized_data_ids:
+            print("  {}: {}".format(data_id, id2dn_dict[data_id]))
         print("hopefully they weren't important!\n")
 
     print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(raw_filename))
