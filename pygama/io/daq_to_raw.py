@@ -16,7 +16,8 @@ from ..io.orca_helper import *
 from ..io.llama_3316 import *
 
 
-def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1", suffix="lh5", chan_list=None, n_max=np.inf,
+def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
+               suffix="lh5", chan_list=None, n_max=np.inf,
                verbose=False, output_dir=None, overwrite=True, decoders=None,
                config={}):
     """
@@ -96,6 +97,8 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     """
     convert ORCA DAQ data to "raw" lh5
     """
+
+    # may want to move these to config?
     buffer_size = 1024
     #buffer_size = 50000
 
@@ -121,7 +124,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
         run = get_run_number(header_dict)
     print("Run number:", run)
 
-    # figure out which decoders we can use and build a dictionary from 
+    # figure out which decoders we can use and build a dictionary from
     # dataID to decoder
     decoders = {}
     id2dn_dict = get_id_to_decoder_name_dict(header_dict)
@@ -152,7 +155,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
         dec.initialize_lh5_table(tbs[data_id])
 
     # -- scan over raw data --
-    print("Beginning Tier 0 processing ...")
+    print("Beginning daq-to-raw processing ...")
 
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
@@ -177,7 +180,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
             break
 
         if data_id not in decoders:
-            if data_id not in unrecognized_data_ids: 
+            if data_id not in unrecognized_data_ids:
                 unrecognized_data_ids.append(data_id)
             continue
 
@@ -189,8 +192,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
                 lh5_store.write_object(tb, id2dn_dict[data_id], raw_filename, n_rows=tb.size)
                 tb.clear()
 
-
-    print("done.  last packet ID:", packet_id)
+    print("Done. Last packet ID:", packet_id)
     f_in.close()
 
     # final write to file
@@ -209,7 +211,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
             print("  {}".format(id))
         print("hopefully they weren't important!\n")
 
-    print("Wrote Tier 1 File:\n    {}\nFILE INFO:".format(raw_filename))
+    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_filename))
 
 
 
@@ -281,7 +283,7 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
         filename_mod = filename_raw + "." + numb
         print("redirecting output file to packetfile "+filename_mod)
         digitizer.save_to_pytables(filename_mod, verbose)
-    
+
 
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
@@ -330,7 +332,7 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
     with pd.HDFStore(raw_filename,'r') as store:
         print(store.keys())
     #    # print(store.info())
-    
+
 
 
 def process_compass(daq_filename, raw_filename, digitizer, output_dir=None):
@@ -415,7 +417,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
 
         # Skip non-interesting records
         # FIXME: push to a buffer of skipped packets?
-        if rc == 0 or rc == 1 or rc == 2 or rc == 5: continue 
+        if rc == 0 or rc == 1 or rc == 2 or rc == 5: continue
 
         packet_id += 1
         if verbose and packet_id % 1000 == 0:
@@ -451,7 +453,6 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
         lh5_store.write_object(status_tb, 'daqdata', raw_filename, n_rows=status_tb.loc)
         status_tb.clear()
 
-    if verbose: 
+    if verbose:
         update_progress(1)
         print(packet_id, 'packets decoded')
-

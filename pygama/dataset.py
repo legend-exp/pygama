@@ -12,7 +12,7 @@ class DataSet:
     can also load a JSON file to get a dict of metadata.
     """
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None, sub=None,
-                 opt=None, v=False, md=None, cal=None, raw_dir=None, tier1_dir=None, tier2_dir=None ):
+                 opt=None, v=False, md=None, cal=None, daq_dir=None, raw_dir=None, dsp_dir=None):
 
         # load metadata and set paths to data folders
         self.config, self.calDB = None, None
@@ -21,19 +21,21 @@ class DataSet:
         if cal is not None:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         try:
+            self.daq_dir = os.path.expandvars(self.config["daq_dir"])
             self.raw_dir = os.path.expandvars(self.config["raw_dir"])
-            self.t1pre = self.config["t1_prefix"]
-            self.t2pre = self.config["t2_prefix"]
+            self.dsp_dir = os.path.expandvars(self.config["dsp_dir"])
+            self.daqpre = self.config["daq_prefix"]
+            self.rawpre = self.config["raw_prefix"]
+            self.dsppre = self.config["dsp_prefix"]
 
         except:
             print("Bad metadata, reverting to defaults ...")
+            self.daq_dir = daq_dir
             self.raw_dir = raw_dir
-            self.t1pre = "t1_run"
-            self.t2pre = "t2_run"
-
-        self.tier_dir = None
-        self.tier1_dir = os.path.expandvars(self.config["tier1_dir"])
-        self.tier2_dir = os.path.expandvars(self.config["tier2_dir"])
+            self.dsp_dir = dsp_dir
+            self.daqpre = ""
+            self.rawpre = "raw_run"
+            self.dsppre = "dsp_run"
 
         try:
             self.ftype = self.config["filetype"]
@@ -166,28 +168,28 @@ class DataSet:
                            if int(f.split("run")[-1].split("-")[0]) == r:
                                if counter==subfile:
                                   run = int(f.split("run")[-1].split("-")[0])
-                                  self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                                  self.paths[run]["daq_path"] = "{}/{}".format(p,f)
                                counter+=1
 
-           # Check for tier1 Data
+           # Check for raw Data
            counter = 1
-           for p, d, files in os.walk(self.tier1_dir):
+           for p, d, files in os.walk(self.raw_dir):
                for f in files:
                    if any("{}-".format(r) in f for r in runs):
                        if counter == subfile:
                           run = int(f.split("run")[-1].split("-")[0])
-                          self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+                          self.paths[run]["raw_path"] = "{}/{}".format(p,f)
                        counter += 1
 
 
-           # Check for tier2 Data
+           # Check for dsp Data
            counter = 1
-           for p, d, files in os.walk(self.tier2_dir):
+           for p, d, files in os.walk(self.dsp_dir):
                for f in files:
                    if any("{}-".format(r) in f for r in runs):
                        if counter == subfile:
                           run = int(f.split("run")[-1].split("-")[0])
-                          self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                          self.paths[run]["dsp_path"] = "{}/{}".format(p,f)
                        counter += 1
 
 
@@ -210,27 +212,28 @@ class DataSet:
                             continue
                         else:
                             run = int(run)
-                        self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["daq_path"] = "{}/{}".format(p,f)
 
-            for p, d, files in os.walk(self.tier1_dir):
+            for p, d, files in os.walk(self.raw_dir):
                 for f in files:
-                    if any("t1_run{}".format(r) in f for r in runs):
+                    if any("raw_run{}".format(r) in f for r in runs):
                         run = int(f.split("run")[-1].split(suffix)[0])
-                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["raw_path"] = "{}/{}".format(p,f)
 
-            for p, d, files in os.walk(self.tier2_dir):
+            for p, d, files in os.walk(self.dsp_dir):
                 for f in files:
-                    if any("t2_run{}".format(r) in f for r in runs):
+                    if any("dsp_run{}".format(r) in f for r in runs):
                         run = int(f.split("run")[-1].split(suffix)[0])
-                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["dsp_path"] = "{}/{}".format(p,f)
 
         else:
-	
+            # ORCA METHOD
+
             suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
                         # in the config file ("suffix":"h5")
 
             # search data directories for extant files
-            for p, d, files in os.walk(self.raw_dir):
+            for p, d, files in os.walk(self.daq_dir):
                 for f in files:
                     if any("Run{}".format(r) in f for r in runs):
                         run = f.split("Run")[-1]
@@ -238,19 +241,19 @@ class DataSet:
                             continue
                         else:
                             run = int(run)
-                        self.paths[run]["t0_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["daq_path"] = "{}/{}".format(p,f)
 
-            for p, d, files in os.walk(self.tier1_dir):
+            for p, d, files in os.walk(self.raw_dir):
                 for f in files:
-                    if any("t1_run{}".format(r) in f for r in runs):
+                    if any("raw_run{}".format(r) in f for r in runs):
                         run = int(f.split("run")[-1].split(suffix)[0])
-                        self.paths[run]["t1_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["raw_path"] = "{}/{}".format(p,f)
 
-            for p, d, files in os.walk(self.tier2_dir):
+            for p, d, files in os.walk(self.dsp_dir):
                 for f in files:
-                    if any("t2_run{}".format(r) in f for r in runs):
+                    if any("dsp_run{}".format(r) in f for r in runs):
                         run = int(f.split("run")[-1].split(suffix)[0])
-                        self.paths[run]["t2_path"] = "{}/{}".format(p,f)
+                        self.paths[run]["dsp_path"] = "{}/{}".format(p,f)
 
         # get pygama build options for each run
         if self.config is not None:
@@ -266,12 +269,12 @@ class DataSet:
         # check for missing entries
         # TODO: get lists of unprocessed runs?
         for r in runs:
-            if "t0_path" not in self.paths[r].keys():
-                self.paths[r]["t0_path"] = None
-            if "t1_path" not in self.paths[r].keys():
-                self.paths[r]["t1_path"] = None
-            if "t2_path" not in self.paths[r].keys():
-                self.paths[r]["t2_path"] = None
+            if "daq_path" not in self.paths[r].keys():
+                self.paths[r]["daq_path"] = None
+            if "raw_path" not in self.paths[r].keys():
+                self.paths[r]["raw_path"] = None
+            if "dsp_path" not in self.paths[r].keys():
+                self.paths[r]["dsp_path"] = None
             if "build_opt" not in self.paths[r].keys():
                 self.paths[r]["build_opt"] = None
 
@@ -313,7 +316,7 @@ class DataSet:
             return pars
 
 
-    def get_t1df(self):
+    def get_rawdf(self):
         """
         concat tier 1 df's.
         careful, it can be a lot
@@ -321,18 +324,18 @@ class DataSet:
         """
         dfs = []
         for run in self.runs:
-            p = self.paths[run]["t1_path"]
+            p = self.paths[run]["raw_path"]
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
 
-    def get_t2df(self):
+    def get_dspdf(self):
         """
         concat tier 2 dfs.
         """
         dfs = []
         for run in self.runs:
-            p = self.paths[run]["t2_path"]
+            p = self.paths[run]["dsp_path"]
             dfs.append(pd.read_hdf(p))
         return pd.concat(dfs)
 
@@ -347,7 +350,7 @@ class DataSet:
         """
         if df is None:
             # be careful, this can load multiple runs
-            df = self.get_t2df()
+            df = self.get_dspdf()
 
         if not rollover:
             return df["timestamp"].values / clock # seconds
@@ -407,7 +410,7 @@ class DataSet:
 
         total_rt = 0
         for run in self.runs:
-            p = self.paths[run]["t2_path"]
+            p = self.paths[run]["dsp_path"]
             df = pd.read_hdf(p)
             ts = self.get_ts(df, clock, rollover)
 
@@ -421,23 +424,26 @@ class DataSet:
 
     def daq_to_raw(self, overwrite=False, test=False, n_max=np.inf):
         """
+        TODO: duplicate the CAGE/processing code here, so that someone
+        can run from command line:
+
         convenience function for calling the main daq_to_raw function.
         right now, this processes runs sequentially.
         """
         from pygama.io.daq_to_raw import daq_to_raw
 
         for run in self.runs:
-            t0_file = self.paths[run]["t0_path"]
-            t1_file = self.paths[run]["t1_path"]
-            if t1_file is not None and overwrite is False:
+            daq_file = self.paths[run]["daq_path"]
+            raw_file = self.paths[run]["raw_path"]
+            if raw_file is not None and overwrite is False:
                 print("file exists, overwrite flag isn't set.  continuing ...")
                 continue
             if test:
-                print("test mode (dry run), processing Tier 0 file:\n    ", t0_file)
+                print("test mode (dry run), processing Tier 0 file:\n    ", daq_file)
                 continue
 
-            daq_to_raw(t0_file, run, suffix=self.config["suffix"],
-                       verbose=test, output_dir=self.tier1_dir,
+            daq_to_raw(daq_file, run, suffix=self.config["suffix"],
+                       verbose=test, output_dir=self.raw_dir,
                        overwrite=overwrite, n_max=n_max, config=self.config)
 
 
@@ -447,28 +453,28 @@ class DataSet:
         output a file with dsp parameters
         """
         from pygama.dsp.base import Intercom
-        from pygama.io.tier1 import ProcessTier1
+        from pygama.io.raw import Processraw
 
         for run in self.runs:
-            t1_file = self.paths[run]["t1_path"]
-            t2_file = self.paths[run]["t2_path"]
-            if t2_file is not None and overwrite is False:
+            raw_file = self.paths[run]["raw_path"]
+            dsp_file = self.paths[run]["dsp_path"]
+            if dsp_file is not None and overwrite is False:
                 continue
 
             if test:
-                print("test mode (dry run), processing Tier 1 file:", t1_file)
+                print("test mode (dry run), processing Tier 1 file:", raw_file)
                 continue
 
             conf = self.paths[run]["build_opt"]
 
             if proc_list is None:
-                proc_list = self.config['build_options'][conf]['tier1_options']
+                proc_list = self.config['build_options'][conf]['raw_options']
 
             proc = Intercom(proc_list)
 
-            out_dir = self.tier2_dir if out_dir is None else out_dir
+            out_dir = self.dsp_dir if out_dir is None else out_dir
 
-            ProcessTier1(t1_file, proc, output_dir=out_dir,
+            Processraw(raw_file, proc, output_dir=out_dir,
                          overwrite=overwrite, verbose=verbose,
                          multiprocess=False, nevt=np.inf,
                          ioff=0, chunk=self.config["chunksize"])
