@@ -245,6 +245,17 @@ class LH5Table(LH5Struct):
         # provide length override to for obj to be resized to self.size
         super().add_field(name, obj)
 
+    def get_dataframe(self, *cols, copy=False):
+        """Get a dataframe containing each of the columns given. If no columns
+        are given, get include all fields as columns."""
+        df = pd.DataFrame(copy=copy)
+        if len(cols)==0:
+            for col, dat in self.items():
+                df[col] = dat.nda
+        else:
+            for col in cols:
+                df[col] = self[col].nda
+        return df
 
 
 class LH5Scalar:
