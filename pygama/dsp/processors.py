@@ -9,7 +9,7 @@ the ufunc interface, they can also be called to return a numpy array, but if
 """
 
 # I think there's a way to do this recursively, but I'll figure it out later...
-from .processors.mean_stdev import mean_stdev
-from .processors.pole_zero import pole_zero
-from .processors.trap_filter import trap_filter
-from .processors.current import avg_current
+from ._processors.mean_stdev import mean_stdev
+from ._processors.pole_zero import pole_zero
+from ._processors.trap_filter import trap_filter
+from ._processors.current import avg_current
