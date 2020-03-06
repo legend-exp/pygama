@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 
 from pygama.dsp.ProcessingChain import ProcessingChain
-from pygama.dsp.transforms import *
+from pygama.dsp.processors import *
 from pygama.dsp.units import *
 
 from pygama.io import io_base as io
