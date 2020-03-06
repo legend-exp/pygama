@@ -15,3 +15,6 @@ cd pygama
 git submodule update --init --recursive
 cd ..
 ```
+
+NOTE: temporary pygama to-do
+https://docs.google.com/document/d/1ecOSJbIfC8p4OtYX3IngcsMnGxi7kOgaPVxwUFVHxGE/edit?usp=sharing
