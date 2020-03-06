@@ -4,7 +4,7 @@ import numpy as np
 import argparse
 
 from pygama.dsp.ProcessingChain import ProcessingChain
-from pygama.dsp.transforms import *
+from pygama.dsp.processors import *
 from pygama.dsp.units import *
 
 from pygama.io import io_base as io
@@ -54,7 +54,7 @@ proc.add_processor(np.amax, "curr", 1, "A_10", signature='(n),()->()', types=['f
 proc.add_processor(np.divide, "A_10", "trapE", "AoE")
 
 # Set up the LH5 output
-lh5_out = io.LH5Table(size=proc.__buffer_len__)
+lh5_out = io.LH5Table(size=proc._buffer_len)
 lh5_out.add_field("trapE", io.LH5Array(proc.get_output_buffer("trapE"), attrs={"units":"ADC"}))
 lh5_out.add_field("bl", io.LH5Array(proc.get_output_buffer("bl"), attrs={"units":"ADC"}))
 lh5_out.add_field("bl_sig", io.LH5Array(proc.get_output_buffer("bl_sig"), attrs={"units":"ADC"}))

@@ -245,6 +245,17 @@ class LH5Table(LH5Struct):
         # provide length override to for obj to be resized to self.size
         super().add_field(name, obj)
 
+    def get_dataframe(self, *cols, copy=False):
+        """Get a dataframe containing each of the columns given. If no columns
+        are given, get include all fields as columns."""
+        df = pd.DataFrame(copy=copy)
+        if len(cols)==0:
+            for col, dat in self.items():
+                df[col] = dat.nda
+        else:
+            for col in cols:
+                df[col] = self[col].nda
+        return df
 
 
 class LH5Scalar:
@@ -401,6 +412,12 @@ class LH5Store:
         return group
 
 
+    def ls(self, lh5_file):
+        """Print a list of the group names in the lh5 file"""
+        h5f = self.gimme_file(lh5_file, 'r')
+        for key in h5f.keys():
+            print(key)
+    
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
         """Return an object and attributes for data at path=name in lh5_file
 

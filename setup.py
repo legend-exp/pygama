@@ -85,7 +85,8 @@ setup(
         'scimath',
         'numba',
         'parse',
-        'GitPython'
+        'GitPython',
+        'tinydb'
     ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
