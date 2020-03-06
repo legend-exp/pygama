@@ -412,6 +412,12 @@ class LH5Store:
         return group
 
 
+    def ls(self, lh5_file):
+        """Print a list of the group names in the lh5 file"""
+        h5f = self.gimme_file(lh5_file, 'r')
+        for key in h5f.keys():
+            print(key)
+    
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
         """Return an object and attributes for data at path=name in lh5_file
 
