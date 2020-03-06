@@ -226,7 +226,7 @@ class DataSet:
 
         else:
 	
-            suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
+            suffix = "." + "h5"#edit: we need this also here. One has to set the suffix then
                         # in the config file ("suffix":"h5")
 
             # search data directories for extant files

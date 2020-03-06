@@ -34,13 +34,14 @@ def main():
     # global meta_dir
     # meta_dir = runDB["meta_dir"]
 
-    run_db, cal_db = "runDB.json", "calDB.json"
+    run_db, cal_db = "../experiments/mj60/runDB.json", "../experiments/mj60/calDB.json"
 
     par = argparse.ArgumentParser(description="A/E cut for MJ60")
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
     arg("-r", "--run", nargs=1, help="load a single run")
     arg("-db", "--writeDB", action=st, help="store results in DB")
+    arg("-mode", "--mode", nargs=1, action="store", help="232 or 228 for the two diffrerent thorium types")
     args = vars(par.parse_args())
 
     # -- declare the DataSet --
@@ -57,10 +58,10 @@ def main():
         ds = DataSet(run=int(args["run"][0]),
                      md=run_db, cal=cal_db)
 
-    find_cut(ds, ds_lo, args["writeDB"])
+    find_cut(ds, ds_lo, args["mode"][0], args["writeDB"])
 
 #Code to find and record the optimal A/E cut
-def find_cut(ds, ds_lo, write_db=False):
+def find_cut(ds, ds_lo, mode, write_db=False):
 
     #Make tier2 dataframe
     t2 = ds.get_t2df()
@@ -84,15 +85,20 @@ def find_cut(ds, ds_lo, write_db=False):
 
     y = linear_correction(cal, a_over_e) # Linear correct slight downward trend
 
-    test_code(y, cal, ds)
-    exit()
+    #####
+    # test_code(y, cal, ds)
+    # exit()
+    #####
+
 
     # Two separate functions, one for Ac contaminated peak(Th232), one for Th228
-    ans = input('Are you running A/E on Th232? \n y/n -->')
-    if ans == 'y':
+    if mode == '232':
         line = th_232(cal, y, ds)
-    else:
+    elif mode == '228':
         line = regular_cut(cal, y, ds)
+    else:
+        print('Must specify a mode, 228 or 232')
+        exit()
 
     # Write cut to the calDB.json file
     if write_db:
@@ -120,7 +126,7 @@ def regular_cut(energy, y, ds):
         y = y + params[-1]
         return y
 
-    p0_list = [1591, 200, 3, 4]
+    p0_list = [1592, 200, 3, 4]
 
     par, pcov = curve_fit(
         gauss, bins[1:], hist, p0=p0_list)
@@ -129,7 +135,7 @@ def regular_cut(energy, y, ds):
     print(perr)
 
     plt.title('Peak 1592')
-    plt.plot(b, hist, ls="steps", color='black')
+    plt.plot(b, hist, ds="steps", color='black')
     plt.plot(b, gauss(b, *par), '-r')
     plt.tight_layout()
     plt.show()
@@ -139,16 +145,10 @@ def regular_cut(energy, y, ds):
     ss_eff_array = []
     cut_line_list = []
 
-    # mu, amp, sig, bkg = par[0], par[1], par[2], par[-1]
-    # print("Scanning ", mu, " peak")
-    # ans = quad(gauss, 1583, 1600, args=(mu, amp, sig, bkg))
-    # counts = ans[0] - ((1600-1583)*bkg)
-    # print("Counts in ", mu, " peak is ", counts)
-
     line = .6
 
     y1 = y[np.where(line < y)]
-    x1 = cal[np.where(line < y)]
+    x1 = energy[np.where(line < y)]
     # hist1, bins1 = np.histogram(x1, bins=500, range=[1500,1700])
     hist1, bins1 = np.histogram(x1, bins=450, range=[1530,1620])
     hist1 = hist1*5
@@ -157,7 +157,7 @@ def regular_cut(energy, y, ds):
     while cut_th_peak_height > .9 * th_peak_height:
 
         y1 = y[np.where(line < y)]
-        e1 = cal[np.where(line < y)]
+        e1 = energy[np.where(line < y)]
 
         hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]), range=dep_range)
 
@@ -177,19 +177,35 @@ def regular_cut(energy, y, ds):
     plt.hist2d(energy, y, bins=[1000,200], range=[[0, 2000], [0, 2]], norm=LogNorm(), cmap='jet')
     plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
     cbar = plt.colorbar()
-    plt.title("Dataset {}".format(ds_lo))
+    plt.title("Dataset {}".format(ds.ds_list[0]))
     plt.xlabel("Energy (keV)", ha='right', x=1)
     plt.ylabel("A/Eunc", ha='right', y=1)
     cbar.ax.set_ylabel('Counts')
     plt.tight_layout()
     plt.show()
 
+    plt.clf()
+    a1 = y[np.where((1589 < energy) & (energy < 1595))]
+    hist, bins = np.histogram(a1, bins = 100, range=[.4,1.5])
+    plt.vlines(line, 0, np.max(hist), color='r', linewidth=1.5)
+    plt.plot(bins[1:], hist)
+    plt.xlabel('A over E normalized')
+    plt.ylabel('Counts')
+    plt.show()
+
+    plt.clf()
+    plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
+    plt.ylabel('eff')
+    plt.xlabel('AoverE_normalized')
+    plt.legend()
+    plt.show()
+
     hist, bins = np.histogram(energy, bins=2000, range=[0,2000])
     hist1, bins1 = np.histogram(e1, bins=2000, range=[0,2000])
 
     plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds_lo))
-    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds_lo))
+    plt.semilogy(bins[1:], hist, color='black', ds="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins1[1:], hist1, '-r', ds="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
     plt.ylabel('Counts')
     plt.xlabel('keV')
     plt.legend()
@@ -220,7 +236,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     # np.savez('double_gauss_params', par)
 
     plt.title('Peak 1590 combined')
-    plt.plot(b, hist, ls="steps", color='black')
+    plt.plot(b, hist, ds="steps", color='black')
     plt.plot(b, gauss(b, *par), '-r')
     plt.tight_layout()
     plt.show()
@@ -271,8 +287,8 @@ def th_232(energy, a_over_e, ds, write_db=False):
 
     plt.clf()
     a1 = a_over_e[np.where((1589 < energy) & (energy < 1595))]
-    hist, bins = np.histogram(a_over_e, bins = 200, range=[.4,1.5])
-    plt.vlines(line, 0, 300000, color='r', linewidth=1.5)
+    hist, bins = np.histogram(a1, bins = 100, range=[.4,1.5])
+    plt.vlines(line, 0, np.max(hist), color='r', linewidth=1.5)
     plt.plot(bins[1:], hist)
     plt.xlabel('A over E normalized')
     plt.ylabel('Counts')
@@ -290,8 +306,8 @@ def th_232(energy, a_over_e, ds, write_db=False):
     hist1, bins1 = np.histogram(e1, bins=2600, range=[0,2600])
 
     plt.clf()
-    plt.semilogy(bins[1:], hist, color='black', ls="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
-    plt.semilogy(bins1[1:], hist1, '-r', ls="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins[1:], hist, color='black', ds="steps", linewidth=1.5, label='Calibrated Energy: Dataset {}'.format(ds.ds_list[0]))
+    plt.semilogy(bins1[1:], hist1, '-r', ds="steps", linewidth=1.5, label='AvsE Cut: Dataset {}'.format(ds.ds_list[0]))
     plt.ylabel('Counts')
     plt.xlabel('keV')
     plt.legend()
@@ -304,7 +320,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
 def linear_correction(energy, a_over_e):
 
 ##################
-### TODO: Use compt continuum bkg areas with a gaussian fit to
+### TODO: Use compt continuum bkg areas with a gaussian fit to improve linear correction
 ##################
 
     max_list = []
@@ -327,7 +343,7 @@ def linear_correction(energy, a_over_e):
 
     def line(x, a, b):
         return a * x + b
-    par, pcov = curve_fit(line, peak_list, max_list)
+    par, pcov = curve_fit(linear_func, peak_list, max_list)
 
     a_over_e = a_over_e / (par[0] * energy + par[1])
 
@@ -360,7 +376,14 @@ def gauss_new(x, *params):
 def linear_func(x,a,b):
     return a*x + b
 
+## Below is a bunch of test code to try and optimize the cut and cut_algorithm
+## DOES NOT WORK ATM
+
 def test_code(a_over_e, energy, ds):
+    """
+    Function for testing a better algorithm to find the cut, currently in shambles
+    and needs A LOT more work.
+    """
 
 
     dep_range = [1530,1620]
@@ -436,6 +459,7 @@ def test_code(a_over_e, energy, ds):
 
     cut_algorithm(energy, a_over_e, line, cut_params)
 
+
     """
     for i in range(20):
 
@@ -509,6 +533,10 @@ def test_code(a_over_e, energy, ds):
     # plt.show()
 
 def cut_algorithm(energy, a_over_e, line, cut_params):
+
+    """
+    Heart of algorithm for test code, needs A LOT more work
+    """
 
     ss_eff_array = []
     ms_eff_array = []
