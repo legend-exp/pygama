@@ -195,6 +195,7 @@ class DataSet:
 
 
 
+
         elif self.ftype == "legend200":
             print("Read awsome LEGEND200 Data. But not ready yet...")
 
@@ -422,6 +423,8 @@ class DataSet:
         return total_rt
 
 
+    # === should these be removed?? it makes DataSet very monolithic .... ======
+
     def daq_to_raw(self, overwrite=False, test=False, n_max=np.inf):
         """
         TODO: duplicate the CAGE/processing code here, so that someone
@@ -447,7 +450,7 @@ class DataSet:
                        overwrite=overwrite, n_max=n_max, config=self.config)
 
 
-    def run_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
+    def raw_to_dsp(self, overwrite=False, test=False, proc_list=None, out_dir=None,
                 verbose=False, multiproc=True):
         """
         output a file with dsp parameters
