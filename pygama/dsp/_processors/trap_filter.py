@@ -16,3 +16,5 @@ def trap_filter(wf_in, rise, flat, wf_out):
     wf_out[rise+flat:] -= wf_in[:-(rise+flat)]
     wf_out[2*rise+flat:] += wf_in[:-(2*rise+flat)]
     np.cumsum(wf_out, out=wf_out, axis=0)
+
+    #Plot every line
