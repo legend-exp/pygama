@@ -13,3 +13,4 @@ from ._processors.mean_stdev import mean_stdev
 from ._processors.pole_zero import pole_zero
 from ._processors.trap_filter import trap_filter
 from ._processors.current import avg_current
+from ._processors.asym_trap_filter import asymTrapFilter
