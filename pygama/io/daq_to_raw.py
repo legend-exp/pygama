@@ -466,7 +466,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_
     status_decoder.initialize_lh5_table(status_tb)
     status_filename = raw_filename
     if 'file_label' in status_filename: 
-        status_filename = status_filename.format(file_label='fcs')
+        status_filename = status_filename.format(file_label='auxs')
 
     # TODO: add overwrite capability
     lh5_store = LH5Store()
@@ -493,7 +493,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_
         if rc == 4: # Status record
             bytes_processed += status_decoder.decode_packet(fcio, status_tb, packet_id)
             if status_tb.is_full():
-                lh5_store.write_object(status_tb, 'fcstatus', status_filename, n_rows=status_tb.size)
+                lh5_store.write_object(status_tb, 'stat', status_filename, n_rows=status_tb.size)
                 status_tb.clear()
 
         if rc == 3 or rc == 6: # Event or SparseEvent record
@@ -516,7 +516,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_
             lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
             tb.clear()
     if status_tb.loc != 0:
-        lh5_store.write_object(status_tb, 'fcstatus', status_filename, n_rows=status_tb.loc)
+        lh5_store.write_object(status_tb, 'stat', status_filename, n_rows=status_tb.loc)
         status_tb.clear()
 
     if verbose:
