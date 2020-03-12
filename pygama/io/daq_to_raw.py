@@ -2,11 +2,12 @@
 pygama tier 0 processing
 raw daq data --> pandas dfs saved to hdf5 file (tier 1)
 """
-import os, re, sys, glob, time
+import os, re, sys, glob, time, json
 import numpy as np
 import h5py
 import pandas as pd
 from pprint import pprint
+from parse import parse
 
 from ..utils import *
 from ..io.digitizers import *
@@ -22,15 +23,45 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
                config={}):
     """
     """
+    print()
     print("Starting pygama daq_to_raw processing ...")
+
+    daq_filename = os.path.expandvars(daq_filename)
     print("  Input file:", daq_filename)
 
+    if isinstance(config, str):
+        config = os.path.expandvars(config)
+        with open(config) as f:
+            config = json.load(f)
+
+    d2r_conf = config['daq_to_raw'] if 'daq_to_raw' in config else config
+    if 'daq_filename_template' in d2r_conf:
+        filename_info = parse(d2r_conf['daq_filename_template'], daq_filename.split('/')[-1]).named
+        if 'filename_info' not in d2r_conf: d2r_conf['filename_info'] = {}
+        d2r_conf['filename_info'].update(filename_info)
+        if 'filename_info_mods' in d2r_conf:
+            for key, value in d2r_conf['filename_info_mods'].items():
+                d2r_conf['filename_info'][key] = value[d2r_conf['filename_info'][key]]
+
+
     if raw_filename is None:
-        if run is None:
+        if 'raw_filename_template' in d2r_conf:
+            template = d2r_conf['raw_filename_template']
+            class SafeDict(dict):
+                def __missing__(self, key):
+                    return '{' + key + '}'
+            raw_filename = template.format_map(SafeDict(d2r_conf['filename_info']))
+        elif run is not None: raw_filename = f"{prefix}_run{run}.{suffix}"
+        else:
             print('daq_to_raw error: must supply either raw_filename or run number')
             sys.exit()
-        output_dir = os.getcwd() if output_dir is None else output_dir
-        raw_filename = f"{output_dir}/{prefix}_run{run}.{suffix}"
+
+    if output_dir is None:
+        output_dir = config['raw_dir'] if 'raw_dir' in config else os.getcwd()
+    output_dir = os.path.expandvars(output_dir)
+    raw_filename = f"{output_dir}/{raw_filename}"
+    print('  Output:', raw_filename)
+
 
     # ###############################################################
     # # Change for HADES style output
@@ -59,18 +90,31 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
            print("File already exists, continuing ...")
            return
 
+    if 'file_label' in raw_filename:
+       ch_groups = config['daq_to_raw']['ch_groups']
+       for group, attrs in ch_groups.items():
+           out_filename = raw_filename.format_map(attrs)
+           if os.path.isfile(out_filename):
+               if overwrite:
+                   print("Overwriting existing file", out_filename)
+                   os.remove(out_filename)
+               else:
+                   print("File", out_filename, "already exists, continuing ...")
+                   return
+
     t_start = time.time()
 
     # set max number of events (useful for debugging)
     if n_max is not np.inf and n_max is not None:
         n_max = int(n_max)
 
+    bytes_processed = 0
     # get the DAQ mode
     if config["daq"] == "ORCA":
         process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run)
 
     elif config["daq"] == "FlashCam":
-        process_flashcam(daq_filename, raw_filename, n_max, config, verbose)
+        bytes_processed = process_flashcam(daq_filename, raw_filename, n_max, config, verbose)
 
     elif config["daq"] == "SIS3316":
         process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose)
@@ -84,12 +128,16 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
 
     # --------- summary ------------
 
-    statinfo = os.stat(raw_filename)
-    print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
     elapsed = time.time() - t_start
     print("Time elapsed: {:.2f} sec".format(elapsed))
-    print("Conversion speed: {}ps".format(sizeof_fmt(statinfo.st_size/elapsed)))
-    print("  Output file:", raw_filename)
+    if 'file_label' not in raw_filename:
+        statinfo = os.stat(raw_filename)
+        print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
+        print("Conversion speed: {}ps".format(sizeof_fmt(statinfo.st_size/elapsed)))
+        print("  Output file:", raw_filename)
+    else:
+        print("Total converted: {}".format(sizeof_fmt(bytes_processed)))
+        print("Conversion speed: {}ps".format(sizeof_fmt(bytes_processed/elapsed)))
     print("Done.\n")
 
 
@@ -397,13 +445,33 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
 
     event_decoder = FlashCamEventDecoder()
     event_decoder.get_file_config(fcio)
-    event_tb = LH5Table(buffer_size)
-    event_decoder.initialize_lh5_table(event_tb)
+
+    event_tbs = {}
+    tb_grp_file_list = []
+    if 'daq_to_raw' in config and 'ch_groups' in config['daq_to_raw']:
+        ch_groups = config['daq_to_raw']['ch_groups']
+        for group, attrs in ch_groups.items():
+            ch_range = attrs['ch_range']
+            tb = LH5Table(buffer_size)
+            for ch in range(ch_range[0], ch_range[1]+1):
+                event_tbs[ch] = tb
+            event_decoder.initialize_lh5_table(tb)
+            group = group + '/raw'
+            filename = raw_filename.format_map(attrs)
+            tb_grp_file_list.append( (tb, group, filename) )
+    else:
+        tb = LH5Table(buffer_size)
+        event_decoder.initialize_lh5_table(tb)
+        tb_grp_file_list.append( (tb, 'raw', raw_filename) )
+        event_tbs = tb
 
     status_decoder = FlashCamStatusDecoder()
     status_decoder.get_file_config(fcio)
     status_tb = LH5Table(buffer_size)
     status_decoder.initialize_lh5_table(status_tb)
+    status_filename = raw_filename
+    if 'file_label' in status_filename: 
+        status_filename = status_filename.format(file_label='fcs')
 
     # TODO: add overwrite capability
     lh5_store = LH5Store()
@@ -412,6 +480,7 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
     i_debug = 0
     packet_id = 0
     rc=1
+    bytes_processed = 0
     while rc and packet_id < n_max:
         rc = fcio.get_record()
 
@@ -422,21 +491,23 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
         packet_id += 1
         if verbose and packet_id % 1000 == 0:
             # FIXME: is cast to float necessary?
-            pct_done = float(fcio.telid) / file_size
+            pct_done = bytes_processed / file_size
             if n_max < np.inf and n_max > 0: pct_done = packet_id / n_max
             update_progress(pct_done)
 
         if rc == 4: # Status record
-            status_decoder.decode_packet(fcio, status_tb, packet_id)
+            bytes_processed += status_decoder.decode_packet(fcio, status_tb, packet_id)
             if status_tb.is_full():
-                lh5_store.write_object(status_tb, 'fcstatus', raw_filename, n_rows=stats_tb.size)
+                lh5_store.write_object(status_tb, 'fcstatus', status_filename, n_rows=status_tb.size)
                 status_tb.clear()
 
         if rc == 3 or rc == 6: # Event or SparseEvent record
-            event_decoder.decode_packet(fcio, event_tb, packet_id)
-            if event_tb.is_full():
-                lh5_store.write_object(event_tb, 'daqdata', raw_filename, n_rows=event_tb.size)
-                event_tb.clear()
+            for tb, group, filename in tb_grp_file_list:
+                if tb.size - tb.loc < fcio.numtraces: # might overflow 
+                    lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
+                    tb.clear()
+            bytes_processed += event_decoder.decode_packet(fcio, event_tbs, packet_id)
+
 
                 #i_debug += 1
                 #if i_debug == 1:
@@ -445,14 +516,16 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
 
 
     # end of loop, write to file once more
-    # decoder.save_to_pytables(raw_filename, verbose=True)
-    if event_tb.loc != 0:
-        lh5_store.write_object(event_tb, 'daqdata', raw_filename, n_rows=event_tb.loc)
-        event_tb.clear()
+    for tb, group, filename in tb_grp_file_list:
+        if tb.loc != 0:
+            lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
+            tb.clear()
     if status_tb.loc != 0:
-        lh5_store.write_object(status_tb, 'daqdata', raw_filename, n_rows=status_tb.loc)
+        lh5_store.write_object(status_tb, 'fcstatus', status_filename, n_rows=status_tb.loc)
         status_tb.clear()
 
     if verbose:
         update_progress(1)
         print(packet_id, 'packets decoded')
+
+    return bytes_processed
