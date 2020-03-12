@@ -404,7 +404,8 @@ class LH5Store:
         else: full_path = lh5_file
         if mode != 'r':
             directory = os.path.dirname(full_path)
-            if not os.path.exists(directory): os.makedirs(directory)
+            if directory != '' and not os.path.exists(directory): 
+                os.makedirs(directory)
         h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f
