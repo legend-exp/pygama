@@ -7,7 +7,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 from pprint import pprint
 
-from .io_base import DataDecoder
+from .io_base import DataDecoder, LH5Table
 from .orca_helper import OrcaDecoder
 from .waveform import Waveform
 
@@ -793,21 +793,14 @@ class FlashCamEventDecoder(DataDecoder):
         self.decoded_values['waveform']['length'] = self.file_config['nsamples']
 
 
-    def decode_packet(self, fcio, lh5_table, packet_id, verbose=False):
+    def decode_packet(self, fcio, lh5_tables, packet_id, verbose=False):
         """
         access FCIOEvent members for each event in the raw file
         """
 
-        # aliases for brevity
-        tb = lh5_table
-
         ievt      = fcio.eventnumber # the eventnumber since the beginning of the file
         timestamp = fcio.eventtime   # the time since the beginning of the file in seconds
         eventsamples = fcio.nsamples   # number of sample per trace
-        if eventsamples != tb['waveform']['values'].nda.shape[1]:
-            print('FlashCamEventDecoder Warning: event wf length was',
-                  eventsamples, 'when',
-                  self.decoded_values['waveform']['length'], 'were expected')
         numtraces = fcio.numtraces   # number of triggered adcs
         tracelist = fcio.tracelist   # list of triggered adcs
         traces    = fcio.traces      # the full traces for the event: (nadcs, nsamples)
@@ -816,7 +809,18 @@ class FlashCamEventDecoder(DataDecoder):
 
         # all channels are read out simultaneously for each event
         for iwf in tracelist:
+            tb = lh5_tables
+            if not isinstance(tb, LH5Table): 
+                if iwf not in lh5_tables:
+                    print('FlashCamEventDecoder Warning: no table buffer for channel', iwf)
+                    continue
+                tb = lh5_tables[iwf]
+            if eventsamples != tb['waveform']['values'].nda.shape[1]:
+                print('FlashCamEventDecoder Warning: event wf length was',
+                      eventsamples, 'when',
+                      self.decoded_values['waveform']['length'], 'were expected')
             ii = tb.loc
+            tb['channel'].nda[ii] = iwf 
             tb['packet_id'].nda[ii] = packet_id
             tb['ievt'].nda[ii] =  ievt
             tb['timestamp'].nda[ii] =  timestamp
@@ -824,15 +828,13 @@ class FlashCamEventDecoder(DataDecoder):
             tb['tracelist'].set_vector(ii, tracelist)
             tb['baseline'].nda[ii] = baselines[iwf]
             tb['energy'].nda[ii] = energies[iwf]
-            tb['channel'].nda[ii] = iwf 
             waveform = traces[iwf]
             tb['wf_max'].nda[ii] = np.amax(waveform)
             tb['wf_std'].nda[ii] = np.std(waveform)
             tb['waveform']['values'].nda[ii][:] = waveform
             tb.push_row()
-            
 
-
+        return 36*4 + numtraces*(1 + eventsamples + 2)*2
 
 class FlashCamStatusDecoder(DataDecoder):
     """ 
@@ -949,3 +951,4 @@ class FlashCamStatusDecoder(DataDecoder):
 
         tb.push_row()
 
+        return 302132 # sizeof(fcio_status)
