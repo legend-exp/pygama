@@ -13,9 +13,10 @@ DataDecoders require you declare these before calling `super().__init__()`:
        convert to HDF5
 """
 
+import os
+from abc import ABC
 import numpy as np
 import pandas as pd
-from abc import ABC
 import h5py
 
 
@@ -53,7 +54,8 @@ class DataDecoder(ABC):
             print(name, 'Error: no decoded_values available for setting up buffer')
             return
         size = lh5_table.size
-        for field, attrs in self.decoded_values.items():
+        for field, fld_attrs in self.decoded_values.items():
+            attrs = fld_attrs.copy()
             if 'dtype' not in attrs:
                 name = type(self).__name__
                 print(name, 'Error: must specify dtype for', field)
@@ -400,6 +402,9 @@ class LH5Store:
         if lh5_file in self.files.keys(): return self.files[lh5_file]
         if self.base_path != '': full_path = self.base_path + '/' + lh5_file
         else: full_path = lh5_file
+        if mode != 'r':
+            directory = os.path.dirname(full_path)
+            if not os.path.exists(directory): os.makedirs(directory)
         h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f
