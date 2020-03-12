@@ -348,7 +348,7 @@ class LH5VectorOfVectors:
     """ 
     def __init__(self, data_array=None, lensum_array=None, shape_guess=None, dtype=None, attrs={}):
         if lensum_array is None:
-            self.lensum_array = LH5Array(shape=(shape_guess[0],), dtype=dtype)
+            self.lensum_array = LH5Array(shape=(shape_guess[0],), dtype='uint32')
         else: self.lensum_array = lensum_array
         if data_array is None:
             length = np.prod(shape_guess)
