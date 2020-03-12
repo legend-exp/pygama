@@ -102,6 +102,8 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
                    print("File", out_filename, "already exists, continuing ...")
                    return
 
+    buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8096
+
     t_start = time.time()
 
     # set max number of events (useful for debugging)
@@ -111,10 +113,10 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
     bytes_processed = 0
     # get the DAQ mode
     if config["daq"] == "ORCA":
-        process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run)
+        process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run=run, buffer_size=buffer_size)
 
     elif config["daq"] == "FlashCam":
-        bytes_processed = process_flashcam(daq_filename, raw_filename, n_max, config, verbose)
+        bytes_processed = process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_size=buffer_size)
 
     elif config["daq"] == "SIS3316":
         process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose)
@@ -141,14 +143,10 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
     print("Done.\n")
 
 
-def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run=None):
+def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run=None, buffer_size=1024):
     """
     convert ORCA DAQ data to "raw" lh5
     """
-
-    # may want to move these to config?
-    buffer_size = 1024
-    #buffer_size = 50000
 
     lh5_store = LH5Store()
 
@@ -430,15 +428,12 @@ def process_compass(daq_filename, raw_filename, digitizer, output_dir=None):
         print(store.keys())
 
 
-def process_flashcam(daq_filename, raw_filename, n_max, config, verbose):
+def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_size=8092):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
     """
     import fcutils
-
-    buffer_size = 1024
-    #buffer_size = 5e4
 
     file_size = os.path.getsize(daq_filename)
     fcio = fcutils.fcio(daq_filename)
