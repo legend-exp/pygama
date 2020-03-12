@@ -738,11 +738,11 @@ class FlashCamEventDecoder(DataDecoder):
               'length_guess': 16,
             },
             'baseline': { # fpga baseline
-              'dtype': 'int16',
+              'dtype': 'uint16',
               'units': 'adc',
             },
             'energy': {  # fpga energy
-              'dtype': 'int16',
+              'dtype': 'uint16',
               'units': 'adc',
             },
             'channel': { # right now, index of the trigger (trace)
