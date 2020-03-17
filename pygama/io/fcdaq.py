@@ -3,7 +3,7 @@ import numpy as np
 
 from ..utils import *
 from .io_base import DataDecoder
-import lh5
+from . import lh5
 
 
 class FlashCamEventDecoder(DataDecoder):

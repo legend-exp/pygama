@@ -8,7 +8,7 @@ base classes for decoding daq data into raw lh5 files
 from abc import ABC
 import numpy as np
 
-import lh5
+from . import lh5
 
 
 class DataDecoder(ABC):
