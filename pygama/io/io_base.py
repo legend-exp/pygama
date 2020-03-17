@@ -598,20 +598,3 @@ class LH5Store:
             return
 
 
-
-
-def get_ccc(crate, card, channel):
-    return (crate << 9) + ((card & 0xf) << 4) + (channel & 0xf)
-
-
-def get_crate(ccc):
-    return ccc >> 9
-
-
-def get_card(ccc):
-    return (ccc >> 4) & 0x1f
-
-
-def get_channel(ccc):
-    return ccc & 0xf
-
