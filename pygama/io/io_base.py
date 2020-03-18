@@ -4,7 +4,6 @@ io_base.py
 base classes for decoding daq data into raw lh5 files
 """
 
-
 from abc import ABC
 import numpy as np
 

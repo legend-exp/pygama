@@ -1,13 +1,6 @@
 import sys
-import array
-import itertools
 import numpy as np
-import pandas as pd
-from scipy import signal
-import matplotlib.pyplot as plt
-from pprint import pprint
 
-from .io_base import DataDecoder, LH5Table
 from .orca_helper import OrcaDecoder
 from .waveform import Waveform
 

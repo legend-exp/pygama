@@ -1,9 +1,9 @@
-import plistlib
 import sys
-import pandas as pd
 import numpy as np
+import plistlib
 
 from .io_base import DataDecoder
+from . import lh5
 
 
 class OrcaDecoder(DataDecoder):
@@ -231,7 +231,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     convert ORCA DAQ data to "raw" lh5
     """
 
-    lh5_store = LH5Store()
+    lh5_store = lh5.Store()
 
     f_in = open(daq_filename.encode('utf-8'), "rb")
     if f_in == None:
@@ -280,7 +280,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     # Later: control in intercom
     tbs = {}
     for data_id, dec in decoders.items():
-        tbs[data_id] = LH5Table(buffer_size)
+        tbs[data_id] = lh5.Table(buffer_size)
         dec.initialize_lh5_table(tbs[data_id])
 
     # -- scan over raw data --
