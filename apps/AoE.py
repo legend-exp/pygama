@@ -154,7 +154,7 @@ def regular_cut(energy, y, ds):
     ss_eff_array = []
     cut_line_list = []
 
-    line = .6
+    line = .8
 
     y1 = y[np.where(line < y)]
     x1 = energy[np.where(line < y)]
@@ -271,7 +271,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     ms_eff_array = []
     cut_line_list = []
 
-    line = .6
+    line = .8
     print("Finding optimal cut, keeping 90% of 1592 DEP")
 
     while cut_th_peak_height > .9 * th_peak_height:
@@ -344,7 +344,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.tight_layout()
     plt.show()
 
-    return line
+    return line, ss_eff_array, ms_eff_array
 
 
 def linear_correction(energy, a_over_e):
