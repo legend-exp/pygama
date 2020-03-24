@@ -97,7 +97,7 @@ def find_cut(ds, ds_lo, mode, write_db=False):
 
     # Two separate functions, one for Ac contaminated peak(Th232), one for Th228
     if mode == '232':
-        line = th_232(cal, y, ds)
+        line, ss_eff, ms_eff, cc_eff, cut_list = th_232(cal, y, ds)
     elif mode == '228':
         line = regular_cut(cal, y, ds)
     else:
@@ -241,6 +241,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     ## Find A/E cut for Th232 source
 
     #FWHM of nearby peaks is 2.5
+    cc_range = [1790,2050]
     dep_range = [1530,1620]
     hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]),
                               range=dep_range)
@@ -263,12 +264,15 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.tight_layout()
     plt.show()
 
+    cc_height = np.sum(energy[np.where((energy > cc_range[0]) & (energy < cc_range[1]))]) / (cc_range[1]-cc_range[0])
+
     ac_peak_height = par[1]
     th_peak_height = par[4]
     cut_ac_peak_height = par[1]
     cut_th_peak_height = par[4]
     ss_eff_array = []
     ms_eff_array = []
+    cc_eff_array = []
     cut_line_list = []
 
     line = .8
@@ -278,6 +282,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
 
         y = a_over_e[np.where(line < a_over_e)]
         e1 = energy[np.where(line < a_over_e)]
+        cut_cc_height = np.sum(e1[np.where((e1 > cc_range[0]) & (e1 < cc_range[1]))]) / (cc_range[1]-cc_range[0])
 
         hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]),
                                     range=dep_range)
@@ -290,8 +295,10 @@ def th_232(energy, a_over_e, ds, write_db=False):
         cut_th_peak_height = par1[4]
         ss_eff = cut_th_peak_height / th_peak_height
         ms_eff = cut_ac_peak_height / ac_peak_height
+        cc_eff = cut_cc_height / cc_height
         ss_eff_array.append(ss_eff)
         ms_eff_array.append(ms_eff)
+        cc_eff_array.append(cc_eff)
         cut_line_list.append(line)
 
         line += .001
@@ -323,6 +330,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.clf()
     plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
     plt.plot(cut_line_list, ms_eff_array, label='ms_eff')
+    plt.plot(cut_line_list, cc_eff_array, label='cc_eff')
     plt.title("Dataset {}: Efficiency curves".format(ds.ds_list[0]))
     plt.ylabel('eff')
     plt.xlabel('AoverE_normalized')
@@ -344,7 +352,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.tight_layout()
     plt.show()
 
-    return line, ss_eff_array, ms_eff_array
+    return line, ss_eff_array, ms_eff_array, cc_eff_array, cut_line_list
 
 
 def linear_correction(energy, a_over_e):
