@@ -48,7 +48,8 @@ def main():
         ds = DataSet(run=int(args["run"][0]),
                      md=run_db, cal=cal_db)
 
-    resolution(ds, args["writeDB"])
+    # resolution(ds, args["writeDB"])
+    baseline_noise(ds)
 
 def resolution(ds, write_db=False):
 
@@ -100,7 +101,43 @@ def resolution(ds, write_db=False):
     plt.show()
 
 
+def baseline_noise(ds):
 
+    def gauss(x, *params):
+        y = np.zeros_like(x)
+        for i in range(0, len(params) - 1, 3):
+            x0 = params[i]
+            a = params[i + 1]
+            sigma = params[i + 2]
+            y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
+        y = y + params[-1]
+        return y
+
+    t2 = ds.get_t2df()
+    bl_rms = t2['bl_rms']
+    run = ds.runs[0]
+
+    hist, bins = np.histogram(bl_rms, bins=250, range=[3,5.5])
+    b = (bins[:-1] + bins[1:]) / 2
+
+    p0_list = [4.1, 3500, .5, 2]
+
+    par, pcov = curve_fit(
+        gauss, b, hist, p0=p0_list)
+    print(par)
+    perr = np.sqrt(np.diag(pcov))
+    print(perr)
+
+    fwhm = 2*np.sqrt(2*np.log(2))*par[2]
+
+    plt.plot(b, hist, ls="steps")
+    plt.plot(b, gauss(b, *par), '-r', label='FWHM:{}\nCenter:{}'.format(fwhm, par[0]))
+    plt.title('Run {}: Baseline Noise'.format(run))
+    plt.xlabel('bl rms')
+    plt.ylabel('cts')
+    plt.legend(loc='upper right', prop={'size': 12})
+    plt.tight_layout()
+    plt.show()
 
 
 

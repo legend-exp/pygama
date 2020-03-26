@@ -1,5 +1,6 @@
 import numpy as np
 from numba import guvectorize
+import matplotlib.pyplot as plt
 
 
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
@@ -15,4 +16,8 @@ def trap_filter(wf_in, rise, flat, wf_out):
     wf_out[rise:] -= wf_in[:-rise]
     wf_out[rise+flat:] -= wf_in[:-(rise+flat)]
     wf_out[2*rise+flat:] += wf_in[:-(2*rise+flat)]
-    np.cumsum(wf_out, out=wf_out, axis=0)
+    wf_out = np.cumsum(wf_out, out=wf_out, axis=0)
+
+
+
+    #Plot every line
