@@ -37,22 +37,18 @@ class FlashCamEventDecoder(DataDecoder):
             },
             'baseline': { # fpga baseline
               'dtype': 'uint16',
-              'units': 'adc',
             },
             'energy': {  # fpga energy
               'dtype': 'uint16',
-              'units': 'adc',
             },
             'channel': { # right now, index of the trigger (trace)
               'dtype': 'uint32',
             },
             'wf_max': { # ultra-simple np.max energy estimation
               'dtype': 'uint16',
-              'units': 'adc',
             },
             'wf_std': { # ultra-simple np.std noise estimation
               'dtype': 'float32',
-              'units': 'adc',
             },
             'waveform': { # digitizer data
               'dtype': 'uint16',
@@ -60,7 +56,7 @@ class FlashCamEventDecoder(DataDecoder):
               'length': 65532, # max value. override this before initializing buffers to save RAM
               'sample_period': 16, # override if a different clock rate is used
               'sample_period_units': 'ns',
-              'units': 'adc',
+              't0_units': 'ns',
             },
         }
 
@@ -272,13 +268,29 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_
         ch_groups = config['daq_to_raw']['ch_groups']
         for group, attrs in ch_groups.items():
             ch_range = attrs['ch_range']
-            tb = lh5.Table(buffer_size)
-            for ch in range(ch_range[0], ch_range[1]+1):
-                event_tbs[ch] = tb
-            event_decoder.initialize_lh5_table(tb)
-            group = group + '/raw'
-            filename = raw_filename.format_map(attrs)
-            tb_grp_file_list.append( (tb, group, filename) )
+
+            tb_per_ch = False
+            if 'tb_per_ch' in attrs:
+                tb_per_ch = (attrs['tb_per_ch'].lower() == "true")
+
+            if tb_per_ch: 
+                for ch in range(ch_range[0], ch_range[1]+1):
+                    tb = lh5.Table(buffer_size)
+                    event_tbs[ch] = tb
+                    event_decoder.initialize_lh5_table(tb)
+                    if '{ch:' in group: ch_group = group.format(ch=ch)
+                    ch_group = ch_group + '/raw'
+                    filename = raw_filename.format_map(attrs)
+                    tb_grp_file_list.append( (tb, ch_group, filename) )
+
+            else: # one table for all channels in the range
+                tb = lh5.Table(buffer_size)
+                for ch in range(ch_range[0], ch_range[1]+1):
+                    event_tbs[ch] = tb
+                event_decoder.initialize_lh5_table(tb)
+                group = group + '/raw'
+                filename = raw_filename.format_map(attrs)
+                tb_grp_file_list.append( (tb, group, filename) )
     else:
         tb = lh5.Table(buffer_size)
         event_decoder.initialize_lh5_table(tb)
