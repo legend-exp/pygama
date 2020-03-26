@@ -48,9 +48,10 @@ def main():
 
     # gain_shift(ds)
     # get_power_spectrum(ds)
+    baseline_noise(ds)
 
     ########PLOT Kr vs Kr, and BKG vs BKG against each campain
-    plot_psd()
+    # plot_psd()
 
 def gain_shift(ds):
 
@@ -79,49 +80,49 @@ def gain_shift(ds):
 
 def plot_psd():
 
-    run280 = np.load('psd_280.npz')
-    run296 = np.load('psd_296.npz')
-    run316 = np.load('psd_316.npz')
-    run330 = np.load('psd_330.npz')
-    run354 = np.load('psd_354.npz')
-    freq = run280['arr_0']
-    psd280 = run280['arr_1']
-    psd296 = run296['arr_1']
-    psd316 = run316['arr_1']
-    psd330 = run330['arr_1']
-    psd354 = run354['arr_1']
+    run1174 = np.load('psd_1174.npz')
+    run1175 = np.load('psd_1175.npz')
+    run1176 = np.load('psd_1176.npz')
+    # run330 = np.load('psd_330.npz')
+    # run354 = np.load('psd_354.npz')
+    freq = run1174['arr_0']
+    psd1174 = run1174['arr_1']
+    psd1175 = run1175['arr_1']
+    psd1176 = run1176['arr_1']
+    # psd330 = run330['arr_1']
+    # psd354 = run354['arr_1']
 
 
 
-    run946 = np.load('psd_946.npz')
-    run994 = np.load('psd_994.npz')
-    run1042 = np.load('psd_1042.npz')
-    run1091 = np.load('psd_1091.npz')
-    run1140 = np.load('psd_1140.npz')
+    # run946 = np.load('psd_946.npz')
+    # run994 = np.load('psd_994.npz')
+    # run1042 = np.load('psd_1042.npz')
+    # run1091 = np.load('psd_1091.npz')
+    # run1140 = np.load('psd_1140.npz')
     # freq = run946['arr_0']
-    psd946 = run946['arr_1']
-    psd994 = run994['arr_1']
-    psd1042 = run1042['arr_1']
-    psd1091 = run1091['arr_1']
-    psd1140 = run1140['arr_1']
+    # psd946 = run946['arr_1']
+    # psd994 = run994['arr_1']
+    # psd1042 = run1042['arr_1']
+    # psd1091 = run1091['arr_1']
+    # psd1140 = run1140['arr_1']
+    #
+    # psd_c1 = psd280 + psd296 + psd316
+    # psd_c2 = psd994 + psd1091
 
-    psd_c1 = psd280 + psd296 + psd316
-    psd_c2 = psd994 + psd1091
-
-    plt.semilogy(freq, psd_c1, linewidth=2, label='C1')
-    plt.semilogy(freq, psd_c2, linewidth=2, label='C2')
+    # plt.semilogy(freq, psd_c1, linewidth=2, label='C1')
+    # plt.semilogy(freq, psd_c2, linewidth=2, label='C2')
 
     # plt.semilogy(freq, psd330, linewidth=2, label='BKG_1')
     # plt.semilogy(freq, psd946, linewidth=2, label='BKG_2')
 
-    # plt.semilogy(freq, psd280, linewidth=2, label='run280')
-    # plt.semilogy(freq, psd946, linewidth=2, label='run946')
-    # plt.semilogy(freq, psd1042, linewidth=2, label='run1042')
+    plt.semilogy(freq, psd1174, linewidth=2, label='run1174')
+    plt.semilogy(freq, psd1175, linewidth=2, label='run1175')
+    plt.semilogy(freq, psd1176, linewidth=2, label='run1176')
     # plt.semilogy(freq, psd1091, linewidth=2, label='run1091')
     # plt.semilogy(freq, psd1140, linewidth=2, label='run1140')
     plt.xlabel('Frequency (Hz)', ha='right', x=0.9)
     plt.ylabel('PSD (ADC^2 / Hz)', ha='right', y=1)
-    plt.title(' BKG Campaign 1 vs Campaign 2')
+    plt.title('Bias Runs')
     plt.legend(loc=1)
     plt.tight_layout()
     plt.show()
@@ -130,6 +131,7 @@ def get_power_spectrum(ds):
 
     t1 = ds.get_t1df()
     t1.reset_index(inplace=True)
+
     # key = "/ORSIS3302DecoderForEnergy"
     # wf_chunk = pd.read_hdf(t1, key, where="ievt < {}".format(75000))
     # key = "/ORSIS3302DecoderForEnergy"
@@ -232,6 +234,20 @@ def blsub(waves, calcs, blest="", wfin="waveform", wfout="wf_blsub", test=False)
     # note, floats are gonna take up more memory
     return {wfout: blsub_wfs}
 
+
+def baseline_noise(ds):
+
+    t2 = ds.get_t2df()
+    bl_rms = t2['bl_rms']
+
+    hist, bins = np.histogram(bl_rms, bins=250, range=[3,5.5])
+    b = (bins[:-1] + bins[1:]) / 2
+
+
+
+    plt.plot(b, hist)
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__=="__main__":
