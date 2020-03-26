@@ -43,4 +43,3 @@ warnings.filterwarnings(action='ignore', module="scipy.stats", category=FutureWa
 #     __import__(modname)
 
 from .dataset import DataSet
-from .lh5 import *
