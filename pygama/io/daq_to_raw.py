@@ -47,6 +47,7 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
                 def __missing__(self, key):
                     return '{' + key + '}'
             raw_filename = template.format_map(SafeDict(d2r_conf['filename_info']))
+            if run is not None: raw_filename = raw_filename.format_map(SafeDict({ 'run': run }))
         elif run is not None: raw_filename = f"{prefix}_run{run}.{suffix}"
         else:
             print('daq_to_raw error: must supply either raw_filename or run number')
