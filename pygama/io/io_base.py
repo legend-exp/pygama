@@ -69,7 +69,9 @@ class DataDecoder(ABC):
                 # Build t0 array. No attributes for now
                 # TODO: add more control over t0: another field to fill it?
                 # Optional units attribute?
-                wf_table.add_field('t0', lh5.Array(nda=np.zeros(size, dtype='float'))) 
+                t0_units = attrs.pop('t0_units')
+                t0_attrs = { 'units': t0_units }
+                wf_table.add_field('t0', lh5.Array(nda=np.zeros(size, dtype='float'), attrs = t0_attrs)) 
 
                 # Build sampling period array with units attribute
                 wf_per = attrs.pop('sample_period')
