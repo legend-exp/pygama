@@ -39,7 +39,6 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
             for key, value in d2r_conf['filename_info_mods'].items():
                 d2r_conf['filename_info'][key] = value[d2r_conf['filename_info'][key]]
 
-
     if raw_filename is None:
         if 'raw_filename_template' in d2r_conf:
             template = d2r_conf['raw_filename_template']
@@ -58,7 +57,6 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
     output_dir = os.path.expandvars(output_dir)
     raw_filename = f"{output_dir}/{raw_filename}"
     print('  Output:', raw_filename)
-
 
     # ###############################################################
     # # Change for HADES style output
@@ -138,5 +136,3 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
         print("Total converted: {}".format(sizeof_fmt(bytes_processed)))
         print("Conversion speed: {}ps".format(sizeof_fmt(bytes_processed/elapsed)))
     print("Done.\n")
-
-

@@ -228,15 +228,8 @@ class DataSet:
                         self.paths[run]["dsp_path"] = "{}/{}".format(p,f)
 
         else:
-<<<<<<< HEAD
             # ORCA METHOD
-
-            suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
-=======
-	
-            suffix = "." + "h5"#edit: we need this also here. One has to set the suffix then
->>>>>>> 6fb01563abdbfe9d552d435fb280ff8984e25c65
-                        # in the config file ("suffix":"h5")
+            suffix = "." + self.config["suffix"]
 
             # search data directories for extant files
             for p, d, files in os.walk(self.daq_dir):

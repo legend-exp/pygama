@@ -26,15 +26,15 @@ class DataDecoder(ABC):
     codes to be stored along with the garbage packets.
     """
     def __init__(self, garbage_length=256, packet_size_guess=1024):
-        self.garbage_table = lh5.Table(garbage_length) 
+        self.garbage_table = lh5.Table(garbage_length)
         shape_guess=(garbage_length, packet_size_guess)
-        self.garbage_table.add_field('packets', 
+        self.garbage_table.add_field('packets',
                                      lh5.VectorOfVectors(shape_guess=shape_guess, dtype='uint8'))
-        self.garbage_table.add_field('packet_id', 
+        self.garbage_table.add_field('packet_id',
                                      lh5.Array(shape=garbage_length, dtype='uint32'))
         # TODO: add garbage codes enum attribute: user supplies in constructor
         # before calling super()
-        self.garbage_table.add_field('garbage_code', 
+        self.garbage_table.add_field('garbage_code',
                                      lh5.Array(shape=garbage_length, dtype='uint32'))
 
 
@@ -53,9 +53,9 @@ class DataDecoder(ABC):
 
             dtype = attrs.pop('dtype')
             if 'datatype' not in attrs:
-                # no datatype: just a "normal" array 
+                # no datatype: just a "normal" array
                 # allow to override "kind" for the dtype for lh5
-                if 'kind' in attrs: 
+                if 'kind' in attrs:
                     attrs['datatype'] = 'array<1>{' + attrs.pop('kind') + '}'
                 lh5_table.add_field(field, lh5.Array(shape=size, dtype=dtype, attrs=attrs))
                 continue
@@ -64,14 +64,13 @@ class DataDecoder(ABC):
 
             # handle waveforms from digitizers in a uniform way
             if datatype == 'waveform':
-                wf_table = lh5.Table(size) 
+                wf_table = lh5.Table(size)
 
                 # Build t0 array. No attributes for now
                 # TODO: add more control over t0: another field to fill it?
                 # Optional units attribute?
-                t0_units = attrs.pop('t0_units')
-                t0_attrs = { 'units': t0_units }
-                wf_table.add_field('t0', lh5.Array(nda=np.zeros(size, dtype='float'), attrs = t0_attrs)) 
+                t0_attrs = { 'units': 'ns' }
+                wf_table.add_field('t0', lh5.Array(nda=np.zeros(size, dtype='float'), attrs = t0_attrs))
 
                 # Build sampling period array with units attribute
                 wf_per = attrs.pop('sample_period')
@@ -123,8 +122,8 @@ class DataDecoder(ABC):
 
     def write_out_garbage(self, filename, group='/', lh5_store=None):
         if lh5_store is None: lh5_store = lh5.Store()
-        n_rows = self.garbage_table.loc 
-        if n_rows == 0: return 
+        n_rows = self.garbage_table.loc
+        if n_rows == 0: return
         lh5_store.write_object(self.garbage_table, 'garbage', filename, group, n_rows=n_rows, append=True)
         self.garbage_table.clear()
 
@@ -134,4 +133,3 @@ class DataDecoder(ABC):
 # code
 class DataTaker(DataDecoder):
     pass
-
