@@ -13,8 +13,6 @@ class FlashCamEventDecoder(DataDecoder):
     def __init__(self, *args, **kwargs):
         """
         """
-        #self.decoder_name = "FlashCam" #Jason: DataTaker had this for ORCA. Not needed here?
-        
         # these are read for every event (decode_event)
         self.decoded_values = {
             'packet_id': { # packet index in file
@@ -77,6 +75,7 @@ class FlashCamEventDecoder(DataDecoder):
         ]
     
         super().__init__(*args, **kwargs)
+        self.skipped_channels = {}
         
         
     def get_file_config(self, fcio):
@@ -106,7 +105,10 @@ class FlashCamEventDecoder(DataDecoder):
             tb = lh5_tables
             if not isinstance(tb, lh5.Table): 
                 if iwf not in lh5_tables:
-                    print('FlashCamEventDecoder Warning: no table buffer for channel', iwf)
+                    #print('FlashCamEventDecoder Warning: no table buffer for channel', iwf)
+                    if iwf not in self.skipped_channels: 
+                        self.skipped_channels[iwf] = 0
+                    self.skipped_channels[iwf] += 1
                     continue
                 tb = lh5_tables[iwf]
             if eventsamples != tb['waveform']['values'].nda.shape[1]:
@@ -359,5 +361,10 @@ def process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_
     if verbose:
         update_progress(1)
         print(packet_id, 'packets decoded')
+
+    if len(event_decoder.skipped_channels) > 0:
+        print("Warning - got skipped channels:")
+        for ch, n in event_decoder.skipped_channels.items():
+            print("  ch", ch, ":", n, "hits")
 
     return bytes_processed
