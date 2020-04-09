@@ -1,11 +1,10 @@
 import sys
 import numpy as np
 
-from .orca_helper import OrcaDecoder
-from .waveform import Waveform
+from .orcadaq import OrcaDecoder
 
 class ORCAStruck3302(OrcaDecoder):
-    """ 
+    """
     decode ORCA Struck 3302 digitizer data
     """
     def __init__(self, *args, **kwargs):
@@ -14,35 +13,35 @@ class ORCAStruck3302(OrcaDecoder):
         self.orca_class_name = 'ORSIS3302Model'
 
         self.decoded_values = {
-            'packet_id': { 
+            'packet_id': {
                'dtype': 'uint32',
              },
-            'ievt': { 
+            'ievt': {
               'dtype': 'uint32',
             },
-            'energy': { 
-              'dtype': 'uint32', 
+            'energy': {
+              'dtype': 'uint32',
               'units': 'adc',
             },
-            'energy_first': { 
+            'energy_first': {
               'dtype': 'uint32',
             },
-            'timestamp': { 
+            'timestamp': {
               'dtype': 'uint64',
               'units': 'clock_ticks',
             },
-            'crate': { 
+            'crate': {
               'dtype': 'uint8',
             },
-            'card': { 
+            'card': {
               'dtype': 'uint8',
             },
-            'channel': { 
+            'channel': {
               'dtype': 'uint8',
             },
-            'waveform': { 
-              'dtype': 'uint16', 
-              'datatype': 'waveform', 
+            'waveform': {
+              'dtype': 'uint16',
+              'datatype': 'waveform',
               'length': 65532, # max value. override this before initalizing buffers to save RAM
               'sample_period': 10, # override if a different clock rate is used
               'sample_period_units': 'ns',
@@ -52,7 +51,7 @@ class ORCAStruck3302(OrcaDecoder):
         super().__init__(*args, **kwargs) # also initializes the garbage df
         self.enabled_cccs = []
         self.ievt = 0
-        
+
 
     def set_object_info(self, object_info):
         self.object_info = object_info
@@ -86,7 +85,6 @@ class ORCAStruck3302(OrcaDecoder):
                 print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
                 sys.exit()
             self.decoded_values['waveform']['length'] = trace_length
-
 
 
     def decode_packet(self, packet, lh5_table, packet_id, header_dict, verbose=False):
@@ -186,9 +184,9 @@ class ORCAStruck3302(OrcaDecoder):
 
 '''
 class ORCAGretina4M(DataTaker):
-    """ 
+    """
     decode Majorana Gretina4M digitizer data
-    
+
     NOTE: Tom Caldwell made some nice new summary slides on a 2019 LEGEND call
     https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
     """
@@ -213,18 +211,18 @@ class ORCAGretina4M(DataTaker):
         self.window = False
         self.n_blsamp = 500
         self.ievt = 0
-        
+
         self.df_metadata = None # hack, this probably isn't right
         self.active_channels = self.find_active_channels()
-        
+
 
     def crate_card_chan(self, crate, card, channel):
         return (crate << 9) + (card << 4) + (channel)
 
 
     def find_active_channels(self):
-        """ 
-        Only do this for multi-detector data 
+        """
+        Only do this for multi-detector data
         """
         active_channels = []
         if self.df_metadata is None:
@@ -241,8 +239,8 @@ class ORCAGretina4M(DataTaker):
 
 
     def decode_event(self, event_data_bytes, packet_id, header_dict):
-        """ 
-        Parse the header for an individual event 
+        """
+        Parse the header for an individual event
         """
         self.gretina_event_no += 1
         event_data = np.fromstring(event_data_bytes, dtype=np.uint16)
@@ -287,15 +285,15 @@ class ORCAGretina4M(DataTaker):
 
 
 class SIS3316ORCADecoder(DataTaker):
-    """ 
-    handle ORCA Struck 3316 digitizer 
-    
-    TODO: 
+    """
+    handle ORCA Struck 3316 digitizer
+
+    TODO:
     handle per-channel data (gain, ...)
     most metadata of Struck header (energy, ...)
     """
     def __init__(self, *args, **kwargs):
-        
+
         self.decoder_name = 'ORSIS3316WaveformDecoder'
         self.class_name = 'ORSIS3316Model'
 
@@ -313,14 +311,14 @@ class SIS3316ORCADecoder(DataTaker):
 
         # self.event_header_length = 1 #?
         self.sample_period = 10  # ns, I will set this later, according to header info
-        self.gain = 0           
+        self.gain = 0
         self.h5_format = "table"
         self.ievt = 0       #event number
         self.ievt_gbg = 0      #garbage event number
         self.window = False
-        
-        
-    def decode_event(self, event_data_bytes, packet_id, header_dict, 
+
+
+    def decode_event(self, event_data_bytes, packet_id, header_dict,
                      verbose=False):
 
         # parse the raw event data into numpy arrays of 16 and 32 bit ints

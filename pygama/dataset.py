@@ -229,9 +229,7 @@ class DataSet:
 
         else:
             # ORCA METHOD
-
-            suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
-                        # in the config file ("suffix":"h5")
+            suffix = "." + self.config["suffix"]
 
             # search data directories for extant files
             for p, d, files in os.walk(self.daq_dir):

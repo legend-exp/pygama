@@ -1,10 +1,9 @@
 import sys
 import numpy as np
 import plistlib
-
+from ..utils import update_progress
 from .io_base import DataDecoder
 from . import lh5
-
 
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
@@ -33,6 +32,10 @@ class OrcaDecoder(DataDecoder):
 
     def set_object_info(self, object_info):
         self.object_info = object_info
+
+# NOTE: this import has to be after OrcaDecoder is defined.
+# TODO: organize these classes better
+from .orca_digitizers import *
 
 
 def parse_header(xmlfile):
@@ -160,10 +163,9 @@ def get_object_info(header_dict, orca_class_name):
                 card["Crate"] = crate["CrateNumber"]
                 object_info_list.append(card)
 
-    if len(object_info_list) == 0: 
+    if len(object_info_list) == 0:
         print('OrcaDecoder::get_object_info(): Warning: no object info')
     return object_info_list
-
 
 
 def get_next_packet(f_in):
@@ -181,7 +183,7 @@ def get_next_packet(f_in):
     """
     try:
         # event header is 8 bytes (2 longs)
-        head = np.fromstring(f_in.read(4), dtype=np.uint32)  
+        head = np.fromstring(f_in.read(4), dtype=np.uint32)
     except Exception as e:
         print(e)
         raise Exception("Failed to read in the event orca header.")
@@ -208,7 +210,7 @@ def get_next_packet(f_in):
         raise EOFError
 
     return event_data, data_id
-    
+
 
 def get_ccc(crate, card, channel):
     return (crate << 9) + ((card & 0xf) << 4) + (channel & 0xf)
@@ -230,7 +232,6 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     """
     convert ORCA DAQ data to "raw" lh5
     """
-
     lh5_store = lh5.Store()
 
     f_in = open(daq_filename.encode('utf-8'), "rb")
@@ -261,8 +262,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
         print("Data IDs present in ORCA file header are:")
         for data_id in id2dn_dict:
             print(f"    {data_id}: {id2dn_dict[data_id]}")
-    dn2id_dict = {}
-    for data_id, name in id2dn_dict.items(): dn2id_dict[name] = data_id
+    dn2id_dict = {name:data_id for data_id, name in id2dn_dict.items()}
     for sub in OrcaDecoder.__subclasses__():
         decoder = sub() # instantiate the class
         if decoder.decoder_name in dn2id_dict:
@@ -341,4 +341,3 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
         print("hopefully they weren't important!\n")
 
     print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_filename))
-

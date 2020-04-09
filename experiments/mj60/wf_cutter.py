@@ -9,6 +9,8 @@ import matplotlib.colors as mcolors
 from matplotlib.colors import LogNorm
 import scipy.signal as signal
 import argparse
+import pdb
+import tinydb as db
 
 from pygama import DataSet
 from pygama.analysis.calibration import *
@@ -57,7 +59,7 @@ def main():
     # cutwf, t2cut = cutter(t1df, t2df, run)
     # histograms(cutwf, t2cut, run)
     # histograms(ds)
-    drift_correction(ds)
+    drift_correction(ds, ds_lo)
 
 # def histograms(t1df, t2df, run):
 def histograms(ds):
@@ -167,18 +169,76 @@ def cutter(t1df, t2df, run):
 
     return cutwf, t2cut
 
-def drift_correction(ds):
+def drift_correction(ds, ds_lo):
 
     ## testing a drift time correction code
 
-    t1df = ds.get_t1df()
-    t1df.reset_index(inplace=True)
+    # t1df = ds.get_t1df()
+    # t1df.reset_index(inplace=True)
+    # t2df = ds.get_t2df()
+
+    """
+    Take a single DataSet and window it so that the output file only contains
+    events near an expected peak location.
+    """
+    # a user has to figure out the uncalibrated energy range of the K40 peak
+    # xlo, xhi, xpb = 0, 2e6, 2000 # show phys. spectrum (top feature is 2615 pk)
+    # xlo, xhi, xpb = 990000, 1030000, 250 # k40 peak, ds 3
+
     t2df = ds.get_t2df()
+
+    calDB = ds.calDB
+    query = db.Query()
+    table = calDB.table("cal_pass1")
+    vals = table.all()
+    df_cal = pd.DataFrame(vals) # <<---- omg awesome
+    df_cal = df_cal.loc[df_cal.ds==ds_lo]
+    p1cal = df_cal.iloc[0]["p1cal"]
+    cal = p1cal * np.asarray(t2df["e_ftp"])
+
+    xlo = 2.46e6
+    xhi = 2.5e6
+
+    hE, xE = ph.get_hist(t2df["energy"], bins=100, range=(xlo, xhi))
+    plt.semilogy(xE, hE, ls='steps', lw=1, c='r')
+
+    import matplotlib.ticker as ticker
+    plt.gca().xaxis.set_major_formatter(ticker.FormatStrFormatter('%0.4e'))
+    plt.locator_params(axis='x', nbins=5)
+
+    plt.xlabel("Energy (uncal.)", ha='right', x=1)
+    plt.ylabel("Counts", ha='right', y=1)
+    plt.show()
+    # plt.savefig(f"./plots/cage_ds{ds.ds_lo}_winK40.pdf")
+
+    t1df = pd.DataFrame()
+    for run in ds.paths:
+        ft1 = ds.paths[run]["t1_path"]
+        print(f"Scanning ds {ds.ds_lo}, run {run}\n    file: {ft1}")
+        for chunk in pd.read_hdf(ft1, 'ORSIS3302DecoderForEnergy', chunksize=5e4):
+            t1df_win = chunk.loc[(chunk.energy > xlo) & (chunk.energy < xhi)]
+            print(t1df_win.shape)
+            t1df = pd.concat([t1df, t1df_win], ignore_index=True)
+
+    print('It worked? maybe?')
+
+    h5_opts = {
+        "mode":"w", # overwrite existing
+        "append":False,
+        "format":"table",
+        # "complib":"blosc:zlib", # no compression, increases I/O speed
+        # "complevel":1,
+        # "data_columns":["ievt"]
+        }
+    t1df.reset_index(inplace=True)
+    t1df.to_hdf('./test_dt_file.h5', key="df_windowed", **h5_opts)
+    print("wrote file")
+    exit()
 
     # key = "/ORSIS3302DecoderForEnergy"
     # wf_chunk = pd.read_hdf(t1df, key, where="ievt < {}".format(75000))
     # wf_chunk.reset_index(inplace=True) # required step -- fix pygama "append" bug
-    # t2df = t2df.reset_index(drop=True)
+    t2df = t2df.reset_index(drop=True)
 
     # create waveform block.  mask wfs of unequal lengths
 
@@ -188,36 +248,138 @@ def drift_correction(ds):
         if isinstance(col, int):
             icols.append(col)
     wfs = t1df[icols].values
-    wfs = wfs[:number]
-    t2df_chunk = t2df[:number]
+    wfs = np.asarray(wfs)
+
+    # wfs = wfs[:number]
+    # t2df_chunk = t2df[:number]
+
     # print(wf_block.shape, type(wf_block))
     # print(t2df_chunk)
-    t0 = t2df_chunk['t0']
-    energy = t2df_chunk['e_ftp']
+    t0 = np.asarray(t2df['t0'])
+    energy = np.asarray(t2df['e_ftp'])
+    # energy = 0.4066852222964447 * energy
 
     baseline = wfs[:, 0:500]
     avg_bl = []
-    for i in range(0,number):
+    for i in range(len(wfs)):
         avg_bl.append(np.mean(baseline[i], keepdims=True))
     avg_bl = np.asarray(avg_bl)
     wfs = np.asarray(wfs)
     wfs = wfs - avg_bl
 
     clk = 100e6
-    decay = 82
+    decay = 78
     wfs = pz(wfs, decay, clk)
+
+    t100 = []
+    t0_raw = []
+    wf_raw = []
+    e_raw = []
+
+    for i in range(len(wfs)):
+
+        t100_t = np.where(wfs[i] > energy[i])
+        t100_t = t100_t[0]
+        if len(t100_t) > 0:
+            t100_t = t100_t[0]
+            t100.append(t100_t)
+            t0_raw.append(t0[i])
+            wf_raw.append(wfs[i])
+            e_raw.append(energy[i])
+
+    e_raw = np.asarray(e_raw)
+    index = np.where(e_raw < 7300)[0]
+    t100 = np.asarray(t100)
+    t0_raw = np.asarray(t0_raw)
+    wf_raw = np.asarray(wf_raw)
+
+
+    e_raw = e_raw[index]
+    t100 = t100[index]
+    t0_raw = t0_raw[index]
+    wf_raw = wf_raw[index]
+    e_raw = 0.4066852222964447 * e_raw
+    wf_raw = 0.4066852222964447 * wf_raw
+
+    hist, bins = np.histogram(e_raw, bins=2700, range=[0,2700])
+    b = (bins[:-1] + bins[1:]) / 2
+    plt.plot(b, hist, ls="steps", color='black')
+    plt.tight_layout()
+    plt.show()
+    plt.clf()
+
+    # xvals = np.arange(0,3000)
+    # start = time.time()
+    # for i in range(len(t100)):
+    #
+    #     plt.plot(xvals, wf_raw[i], lw=1)
+    #     plt.vlines(t0_raw[i], np.amin(wf_raw[i]), e_raw[i], color='r', linewidth=1.5, label='t0')
+    #     plt.vlines(t100[i], np.amin(wf_raw[i]), e_raw[i], color='g', linewidth=1.5, label='t100')
+    #     plt.hlines(e_raw[i], t0_raw[i], 3000, color='k', linewidth=1.5, zorder=10, label='e_ftp')
+    #     plt.xlabel('Sample Number', ha='right', x=1.0)
+    #     plt.ylabel('ADC Value', ha='right', y=1.0)
+    #     plt.legend()
+    #     plt.tight_layout()
+    #     plt.show()
+    # exit()
+
+
+
+
+    """
+        a1 = (t100 - t0_raw) * e_raw
+        a_wf = []
+        for i in range(len(wf_raw)):
+
+            a2 = sum(wf_raw[i,t0[i]:t100[i]])
+            a_wf.append(a2)
+
+        a_drift = a1 - a_wf
+        # a_drift = a_drift.tolist()
+        # print(a_drift)
+        # exit()
+
+        a_test = a_drift[np.where((e_raw > 2600) & (e_raw < 2630))]
+        e_test = e_raw[np.where((e_raw > 2600) & (e_raw < 2630))]
+
+
+        plt.hist2d(e_test, a_test, bins=[30,100], range=[[2600, 2630], [0, np.amax(a_test)]], norm=LogNorm(), cmap='jet')
+        cbar = plt.colorbar()
+        cbar.ax.set_ylabel('Counts')
+        plt.tight_layout()
+        plt.show()
+        exit()
+    """
+
 
     xvals = np.arange(0,3000)
     start = time.time()
-    for i in range(0,5):
+    for i in range(0,number):
     # for i in range(0,5):
         plt.plot(xvals, wfs[i], lw=1)
-        plt.vlines(t0[i], np.amin(wfs[i]), np.amax(wfs[i]), color='r', linewidth=1.5)
-        plt.hlines(energy[i], 0, 3000, color='r', linewidth=1.5, zorder=10)
+        plt.vlines(t0[i], np.amin(wfs[i]), energy[i], color='r', linewidth=1.5, label='t0')
+        plt.vlines(t100[i], np.amin(wfs[i]), energy[i], color='g', linewidth=1.5, label='t100')
+        plt.hlines(energy[i], t0[i], 3000, color='k', linewidth=1.5, zorder=10, label='e_ftp')
         plt.xlabel('Sample Number', ha='right', x=1.0)
         plt.ylabel('ADC Value', ha='right', y=1.0)
+        plt.legend()
         plt.tight_layout()
         plt.show()
+
+
+    #   input:
+    #   fsignal: PZ-corrected and INL-corrected signal of length len, from channel chan
+    #   Dets: MJ detector info  data structure
+    #   PSA:  contains filter params to use for trapezoids
+    #   CTC_factor: the value used in the correction, usually CTC.e_dt_slope[chan]
+    # outputs:
+    #   returned value: energy in keV, or -1.0f in case of error
+    #   t0: start time of drift/signal
+    #   e_adc: energy in ADC units
+    #   e_raw: uncorrected energy in 0.001 ADC units
+    #   drift: charge trapping value (drift time * charge)
+    #          to be used for optimizing correction, in ADC units
+    #          CTC correction = drift*ctc_factor[chan]
 
 def pz(wfs, decay, clk):
     """
