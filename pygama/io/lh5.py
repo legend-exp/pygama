@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import h5py
+import fnmatch
 
 def get_lh5_datatype_name(obj):
     """Get the LH5 datatype name of an LH5 object"""
@@ -278,12 +279,27 @@ class Store:
         return group
 
 
-    def ls(self, lh5_file):
-        """Print a list of the group names in the lh5 file"""
-        h5f = self.gimme_file(lh5_file, 'r')
-        for key in h5f.keys():
-            print(key)
-    
+    def ls(self, lh5_file, group_path=''):
+        """Print a list of the group names in the lh5 file in the style of a
+        Unix ls command. Supports wildcards."""
+        # To use recursively, make lh5_file a h5group instead of a string
+        if isinstance(lh5_file, str):
+            lh5_file = self.gimme_file(lh5_file, 'r')
+        if group_path=='':
+            group_path='*'
+        
+        splitpath = group_path.split('/', 1)
+        matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
+        ret = []
+        
+        if len(splitpath)==1:
+            return matchingkeys
+        else:
+            ret = []
+            for key in matchingkeys:
+                ret.extend([key + '/' + path for path in self.ls(lh5_file[key], splitpath[1])])
+            return ret
+            
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
         """Return an object and attributes for data at path=name in lh5_file
 
