@@ -72,7 +72,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
     """
     if var is None:
         # the concat calls get the steps to draw correctly at the range boundaries
-        plt.step(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), where="post")
+        plt.step(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), where="post", **kwargs)
     else:
         plt.errorbar(get_bin_centers(bins), hist,
                      xerr=get_bin_widths(bins) / 2, yerr=np.sqrt(var),
