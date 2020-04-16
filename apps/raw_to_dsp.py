@@ -70,12 +70,17 @@ for group in groups:
     # Energy calculation
     proc.add_processor(np.amax, "wf_trap", 1, "trapEmax", signature='(n),()->()', types=['fi->f'])
     proc.add_processor(fixed_time_pickoff, "wf_trap", "tp_0", 5*us+9*us, "trapEftp")
-    proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", "ct_corr")
+    proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", 0, "ct_corr")
     
     # Current calculation
     proc.add_processor(avg_current, "wf_pz", 10, "curr")
     proc.add_processor(np.amax, "curr", 1, "curr_amp", signature='(n),()->()', types=['fi->f'])
     proc.add_processor(np.divide, "curr_amp", "trapEftp", "aoe")
+    
+    # DCR calculation: use slope using 1000 samples apart and averaging 200
+    # samples, with the start 1.5 us offset from t0
+    proc.add_processor(trap_pickoff, "wf_pz", 200, 1000, "tp_0", 1.5*us, "dcr_unnorm")
+    proc.add_processor(np.divide, "dcr_unnorm", "trapEftp", "dcr")
     
     # Set up the LH5 output
     lh5_out = lh5.Table(size=proc._buffer_len)
@@ -86,6 +91,7 @@ for group in groups:
     lh5_out.add_field("bl_sig", lh5.Array(proc.get_output_buffer("bl_sig"), attrs={"units":"ADC"}))
     lh5_out.add_field("A", lh5.Array(proc.get_output_buffer("curr_amp"), attrs={"units":"ADC"}))
     lh5_out.add_field("AoE", lh5.Array(proc.get_output_buffer("aoe"), attrs={"units":"ADC"}))
+    lh5_out.add_field("dcr", lh5.Array(proc.get_output_buffer("dcr"), attrs={"units":"ADC"}))
     
     lh5_out.add_field("tp_max", lh5.Array(proc.get_output_buffer("tp_95"), attrs={"units":"ticks"}))
     lh5_out.add_field("tp_95", lh5.Array(proc.get_output_buffer("tp_95"), attrs={"units":"ticks"}))
