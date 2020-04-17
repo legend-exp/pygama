@@ -65,7 +65,7 @@ for group in groups:
     proc.add_processor(time_point_frac, "wf_blsub", 0.5, "t_max", "tp_50")
     proc.add_processor(time_point_frac, "wf_blsub", 0.2, "t_max", "tp_20")
     proc.add_processor(time_point_frac, "wf_blsub", 0.05, "t_max", "tp_05")
-    proc.add_processor(time_point_thresh, "wf_atrap[0:1200]", 0, "tp_0")
+    proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
     
     # Energy calculation
     proc.add_processor(np.amax, "wf_trap", 1, "trapEmax", signature='(n),()->()', types=['fi->f'])
@@ -93,13 +93,13 @@ for group in groups:
     lh5_out.add_field("AoE", lh5.Array(proc.get_output_buffer("aoe"), attrs={"units":"ADC"}))
     lh5_out.add_field("dcr", lh5.Array(proc.get_output_buffer("dcr"), attrs={"units":"ADC"}))
     
-    lh5_out.add_field("tp_max", lh5.Array(proc.get_output_buffer("tp_95"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_95", lh5.Array(proc.get_output_buffer("tp_95"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_80", lh5.Array(proc.get_output_buffer("tp_80"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_50", lh5.Array(proc.get_output_buffer("tp_50"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_20", lh5.Array(proc.get_output_buffer("tp_20"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_05", lh5.Array(proc.get_output_buffer("tp_05"), attrs={"units":"ticks"}))
-    lh5_out.add_field("tp_0", lh5.Array(proc.get_output_buffer("tp_0"), attrs={"units":"ticks"}))
+    lh5_out.add_field("tp_max", lh5.Array(proc.get_output_buffer("tp_95", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_95", lh5.Array(proc.get_output_buffer("tp_95", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_80", lh5.Array(proc.get_output_buffer("tp_80", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_50", lh5.Array(proc.get_output_buffer("tp_50", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_20", lh5.Array(proc.get_output_buffer("tp_20", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_05", lh5.Array(proc.get_output_buffer("tp_05", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tp_0", lh5.Array(proc.get_output_buffer("tp_0", unit=us), attrs={"units":"us"}))
     
     proc.execute()
     

@@ -63,7 +63,7 @@ class ProcessingChain:
         """Add named variable containing a scalar block with fixed type"""
         self.__add_variable(name, dtype, (self._block_width))
 
-    def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None):
+    def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an input buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -79,10 +79,11 @@ class ProcessingChain:
           a one-dimensional array)
         - dtype: data type used for the variable. Use this if the variable is
           automatically allocated here, but with a different type from buff
+        - unit specifies a unit to convert the input from. Unit must have same type as clk, or be a ratio to multiply the input by
         """
-        self.__add_io_buffer(buff, varname, True, dtype, buffer_len)
+        self.__add_io_buffer(buff, varname, True, dtype, buffer_len, unit)
 
-    def get_input_buffer(self, varname, dtype=None, buffer_len=None):
+    def get_input_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the input buffer associated with varname. If there is no such
         buffer, create one with a shape compatible with the input variable and
         return it. The input varname has the form:
@@ -95,13 +96,14 @@ class ProcessingChain:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
         - buffer_len specifies the buffer length, if it has not already been set
+        - unit specifies a unit to convert the input from. Unit must have same type as clk, or be a ratio to multiply the input by
         """
         name = re.search('(\w+)', varname).group(0)
         if name not in self.__input_buffers:
-            self.__add_io_buffer(None, varname, True, dtype, buffer_len)
+            self.__add_io_buffer(None, varname, True, dtype, buffer_len, unit)
         return self.__input_buffers[name][0]
 
-    def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None):
+    def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an output buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -117,10 +119,12 @@ class ProcessingChain:
           a one-dimensional array)
         - dtype: data type used for the variable. Use this if the variable is
           automatically allocated here, but with a different type from buff
-        """
-        self.__add_io_buffer(buff, varname, False, dtype, buffer_len)
+        - unit specifies a unit to convert the output into. Unit must have same type as clk, or be a ratio to divide the output by
 
-    def get_output_buffer(self, varname, dtype=None, buffer_len=None):
+        """
+        self.__add_io_buffer(buff, varname, False, dtype, buffer_len, unit)
+
+    def get_output_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the output buffer associated with varname. If there is no such
         buffer, create one with a shape compatible with the input variable and
         return it. The input varname has the form:
@@ -133,10 +137,11 @@ class ProcessingChain:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
         - buffer_len specifies the buffer length, if it has not already been set
+        - unit specifies a unit to convert the output into. Unit must have same type as clk, or be a ratio to divide the output by
         """
         name = re.search('(\w+)', varname).group(0)
         if name not in self.__output_buffers:
-            self.__add_io_buffer(None, varname, False, dtype, buffer_len)
+            self.__add_io_buffer(None, varname, False, dtype, buffer_len, unit)
         return self.__output_buffers[name][0]
     
     
@@ -354,20 +359,29 @@ class ProcessingChain:
     # call all the processors on their paired arg tuples
     # copy from variables to list of output buffers
     def __execute_procs(self, start, end):
-        for buf, var in self.__input_buffers.values():
-            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
+        for buf, var, scale in self.__input_buffers.values():
+            if scale:
+                np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
+            else:
+                np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
         for func, args in self.__proc_list:
             func(*args)
-        for buf, var in self.__output_buffers.values():
-            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+        for buf, var, scale in self.__output_buffers.values():
+            if scale:
+                np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
+            else:
+                np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
 
     # verbose version of __execute_procs. This is probably overkill, but it
     # was done to minimize python calls in the non-verbose version
     def __execute_procs_verbose(self, start, end):
         names = set(self.__vars_dict.keys())
         self.__print(3, 'Input:')
-        for name, (buf, var) in self.__input_buffers.items():
-            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
+        for name, (buf, var, scale) in self.__input_buffers.items():
+            if scale:
+                np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
+            else:
+                np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
             names.discard(name)
             
@@ -383,13 +397,16 @@ class ProcessingChain:
                 
         self.__print(3, 'Output:')
         for name, (buf, var) in self.__output_buffers.items():
-            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+            if scale:
+                np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
+            else:
+                np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
 
     # append a tuple with the buffer and variable to either the input buffer
     # list (if input=true) or output buffer list (if input=false), making sure
     # that buffer shapes are compatible
-    def __add_io_buffer(self, buff, varname, input, dtype, buffer_len):
+    def __add_io_buffer(self, buff, varname, input, dtype, buffer_len, scale):
         var = self.get_variable(varname)
         if buff is not None and not isinstance(buff, np.ndarray):
             raise ValueError("Buffers must be ndarrays.")
@@ -404,13 +421,22 @@ class ProcessingChain:
             if buff is not None: self._buffer_len = buff.shape[0]
             else: self._buffer_len = self._block_width
             self.__print(1, "Setting i/o buffer length to " + str(self._buffer_len))
+        
+        # if a unit is given, convert it to a scaling factor
+        if isinstance(scale, unit):
+            scale = convert(1, scale, self._clk)
 
         # if no buffer was provided, make one
         returnbuffer=False
         if buff is None:
             if var is None:
                 raise ValueError("Cannot make buffer for non-existent variable " + varname)
-            if not dtype: dtype=var.dtype
+            # deduce dtype. If scale is used, force float type
+            if not dtype:
+                if not scale:
+                    dtype=var.dtype
+                else:
+                    dtype=np.dtype('float'+str(var.dtype.itemsize*8))
             buff = np.zeros((self._buffer_len,)+var.shape[1:], dtype)
             returnbuffer=True
             
@@ -425,17 +451,21 @@ class ProcessingChain:
         # Check that shape of buffer is compatible with shape of variable.
         # If variable does not yet exist, add it here
         if var is None:
-            if dtype is None: dtype = buff.dtype
+            if dtype is None:
+                if not scale:
+                    dtype=buff.dtype
+                else:
+                    dtype=np.dtype('float'+str(buff.dtype.itemsize*8))
             var = self.__add_var(varname, dtype, (self._block_width,)+buff.shape[1:])
         elif var.shape[1:] != buff.shape[1:]:
             raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
         
         varname = re.search('(\w+)', varname).group(0)
         if input:
-            self.__input_buffers[varname]=(buff, var)
+            self.__input_buffers[varname]=(buff, var, scale)
             self.__print(2, 'Binding input buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
         else:
-            self.__output_buffers[varname]=(buff, var)
+            self.__output_buffers[varname]=(buff, var, scale)
             self.__print(2, 'Binding output buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
 
         if returnbuffer: return buff
