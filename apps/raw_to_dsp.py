@@ -54,7 +54,7 @@ for group in groups:
     # Basic Filters
     proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
     proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
-    proc.add_processor(pole_zero, "wf_blsub", 70*us, "wf_pz")
+    proc.add_processor(pole_zero, "wf_blsub", 145*us, "wf_pz")
     proc.add_processor(trap_norm, "wf_pz", 10*us, 5*us, "wf_trap")
     proc.add_processor(asymTrapFilter, "wf_pz", 0.05*us, 2*us, 4*us, "wf_atrap")
     
@@ -81,6 +81,11 @@ for group in groups:
     # samples, with the start 1.5 us offset from t0
     proc.add_processor(trap_pickoff, "wf_pz", 200, 1000, "tp_0", 1.5*us, "dcr_unnorm")
     proc.add_processor(np.divide, "dcr_unnorm", "trapEftp", "dcr")
+
+    # Tail slope. Basically the same as DCR, except with no PZ correction
+    proc.add_processor(trap_pickoff, "wf_blsub", 100, 1000, "t_max", 0.1*us, "tail_diff")
+    proc.add_processor(np.divide, "tail_diff", -1100, "tail_slope") 
+    proc.add_processor(np.divide, "trapEmax", "tail_slope", "tail_rc")
     
     # Set up the LH5 output
     lh5_out = lh5.Table(size=proc._buffer_len)
@@ -100,6 +105,7 @@ for group in groups:
     lh5_out.add_field("tp_20", lh5.Array(proc.get_output_buffer("tp_20", unit=us), attrs={"units":"us"}))
     lh5_out.add_field("tp_05", lh5.Array(proc.get_output_buffer("tp_05", unit=us), attrs={"units":"us"}))
     lh5_out.add_field("tp_0", lh5.Array(proc.get_output_buffer("tp_0", unit=us), attrs={"units":"us"}))
+    lh5_out.add_field("tail_rc", lh5.Array(proc.get_output_buffer("tail_rc", unit=us), attrs={"units":"us"}))
     
     proc.execute()
     
