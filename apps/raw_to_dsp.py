@@ -83,9 +83,8 @@ for group in groups:
     proc.add_processor(np.divide, "dcr_unnorm", "trapEftp", "dcr")
 
     # Tail slope. Basically the same as DCR, except with no PZ correction
-    proc.add_processor(trap_pickoff, "wf_blsub", 100, 1000, "t_max", 0.1*us, "tail_diff")
-    proc.add_processor(np.divide, "tail_diff", -1100, "tail_slope") 
-    proc.add_processor(np.divide, "trapEmax", "tail_slope", "tail_rc")
+    proc.add_processor(linear_fit, "wf_blsub[3000:]", "wf_b", "wf_m")
+    proc.add_processor(np.divide, "wf_b", "wf_m", "tail_rc")
     
     # Set up the LH5 output
     lh5_out = lh5.Table(size=proc._buffer_len)
