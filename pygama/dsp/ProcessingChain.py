@@ -1,8 +1,13 @@
 import numpy as np
 import re
+import ast
 import itertools as it
 from scimath.units import convert
 from scimath.units.unit import unit
+
+ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
+                ast.Div: np.divide, ast.USub: np.negative}
+
 
 class ProcessingChain:
     """
@@ -210,7 +215,7 @@ class ProcessingChain:
                 if(isinstance(fd, str)):
                     # Define the dimension or make sure it is consistent
                     if not ad or dims_dict.setdefault(fd, ad)!=ad:
-                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+dim)
+                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+fd)
                 elif not fd:
                     # if we ran out of function dimensions, add a new outer dim
                     outerdims.insert(0, ad)
@@ -295,53 +300,123 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable
         if necessary. The optional [range] field fetches only a subrange
         of the array to the function."""
-        parse = re.match("\A(\w+)(\(.*\))?(\[.*\])?$", varname)
-        if not parse:
-            raise KeyError(varname+' could not be parsed')
-        name, construct, slice = parse.groups()
-        val = None
+        return self.__parse_expr(ast.parse(varname, mode='eval').body)
+
+    # helper function for get_variable that recursively evaluates the AST tree
+    # based on: https://stackoverflow.com/a/9558001.
+    def __parse_expr(self, node):
+        if node is None:
+            return None
         
-        if name in self.__vars_dict:
-            val = self.__vars_dict[name]
-        # if we did not varoable, but have a constructor expression, construct
-        # a zeros-array using the size and data type in the constructor expr
-        elif construct:
-            args = [s.strip() for s in construct[1:-1].split(',')]
-            if len(args)==1: # allocate scalar block
-                try: val = np.zeros((self._block_width,), np.dtype(args[0]), 'F')
-                except TypeError:
-                    raise TypeError('Could not parse dtype from '+construct)
-            elif len(args)==2: # allocate vector block
-                try:
-                    dtype = np.dtype(args[0])
-                    del args[0]
-                except TypeError:
-                    try:
-                        dtype = np.dtype(args[1])
-                        del args[1]
-                    except TypeError:
-                        raise TypeError('Could not parse dtype and size from '+construct)
-                try:
-                    val = np.zeros((self._block_width, int(args[0])), dtype, 'F')
-                except ValueError:
-                    raise TypeError('Could not parse dtype and size from '+construct)
-            self.__vars_dict[name] = val
-        # if variable was not defined and no constructor expression was found
-        else: return None
-        
-        # if we found a bracketed range, return a slice of that range
-        if slice:
+        elif isinstance(node, ast.Num):
+            return node.n
+
+        elif isinstance(node, ast.Str):
+            return node.s
+
+        elif isinstance(node, ast.Constant):
+            return node.val
+
+        # look for name in variable dictionary
+        elif isinstance(node, ast.Name):
             try:
-                args = [int(i) if i else None for i in slice[1:-1].split(':')]
-            except:
-                raise TypeError('Could not slice array based on '+slice)
-            if(len(args)==0): return val
-            elif(len(args)==1): return val[..., args[0]]
-            elif(len(args)==2): return val[..., args[0]:args[1]]
-            elif(len(args)==3): return val[..., args[0]:args[1]:args[2]]
-            else: raise TypeError('Could not slice array based on '+slice)
-        else:
-            return val
+                return self.__vars_dict[node.id]
+            except KeyError:
+                return None
+        
+        # define binary operators (+,-,*,/)
+        elif isinstance(node, ast.BinOp):
+            lhs = self.__parse_expr(node.left)
+            rhs = self.__parse_expr(node.right)
+            op = ast_ops_dict[type(node.op)]
+            out = op(lhs, rhs)
+            if isinstance(out, np.ndarray):
+                self.__proc_list.append((op, tuple(lhs, rhs, out)))
+                self.__proc_strs.append("Binary operator: " + op.__name__)
+            return out
+
+        # define unary operators (-)
+        elif isinstance(node, ast.UnaryOp):
+            operand = self.__parse_expr(node.operand)
+            op = ast_ops_dict[type(node.op)]
+            out = op(operand)
+            # if we have a np array, add to processor list
+            if isinstance(out, np.ndarray):
+                self.__proc_list.append((op, (operand, out)))
+                self.__proc_strs.append("Unary operator: " + op.__name__)
+            return out
+
+        elif isinstance(node, ast.Subscript):
+            val = self.__parse_expr(node.value)
+            if isinstance(node.slice, ast.Index):
+                if isinstance(val, np.ndarray):
+                    return val[..., self.__parse_expr(node.slice.value)]
+                else:
+                    return val[self.__parse_expr(node.slice.value)]
+            elif isinstance(node.slice, ast.Slice):
+                if isinstance(val, np.ndarray):
+                    return val[..., slice(self.__parse_expr(node.slice.lower),
+                                          self.__parse_expr(node.slice.upper),
+                                          self.__parse_expr(node.slice.step) )]
+                else:
+                    return val[slice(upper, lower, step)]
+            elif isinstance(node.slice, ast.ExtSlice):
+                slices = tuple(node.slice.dims)
+                for i, sl in enumerate(slices):
+                    if isinstance(sl, ast.index):
+                        slices[i] = self.__parse_expr(sl.value)
+                    else:
+                        slices[i] = slice(self.__parse_expr(sl.upper),
+                                          self.__parse_expr(sl.lower),
+                                          self.__parse_expr(sl.step) )
+                return val[..., slices]
+        
+        # for name.attribute
+        elif isinstance(node, ast.Attribute):
+            val = self.__parse_expr(node.value)
+            # get shape with buffer_len dimension removed
+            if node.attr=='shape' and isinstance(val, np.ndarray):
+                return val.shape[1:]
+        
+        # for func([args])
+        elif isinstance(node, ast.Call):
+            func = node.func.id
+            # get length of 1D array variable
+            if func=="len" and len(node.args)==1 and isinstance(node.args[0], ast.Name):
+                var = self.__parse_expr(node.args[0])
+                if isinstance(var, np.ndarray) and len(var.shape)==2:
+                    return var.shape[1]
+                else:
+                    raise ValueError("len(): " + node.args[0].id + "has wrong number of dims")
+            # if this is a valid call to construct a new array, do so; otherwise raise an exception
+            else:
+                if len(node.args)==2:
+                    shape = self.__parse_expr(node.args[0])
+                    if isinstance(shape, (int, np.int32, np.int64)):
+                        shape = (self._block_width, shape)
+                    elif isinstance(shape, tuple):
+                        shape = (self._block_width, ) + shape
+                    else:
+                        raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+                    try: dtype = np.dtype(node.args[1].id)
+                    except: raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+                    
+                    if func in self.__vars_dict:
+                        var = self.__vars_dict[func]
+                        if not var.shape==shape and var.dtype==dtype:
+                            raise ValueError("Requested shape and type for " + func + " do not match existing values")
+                        return var
+                    else:
+                        var = np.zeros(shape, dtype, 'F')
+                        self.__vars_dict[func] = var
+                        self.__print(2, 'Added variable ' + func + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
+
+                        return var
+                else:
+                    raise ValueError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
+                
+        raise ValueError("Cannot parse AST nodes of type " + str(node.__dict__))
+    
     
     # Add an array of zeros to the vars dict called name and return it
     def __add_var(self, name, dtype, shape):

@@ -73,7 +73,7 @@ for group in groups:
     proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", 0, "ct_corr")
     
     # Current calculation
-    proc.add_processor(avg_current, "wf_pz", 10, "curr")
+    proc.add_processor(avg_current, "wf_pz", 10, "curr(len(wf_pz)-10, f)")
     proc.add_processor(np.amax, "curr", 1, "curr_amp", signature='(n),()->()', types=['fi->f'])
     proc.add_processor(np.divide, "curr_amp", "trapEftp", "aoe")
     
@@ -84,7 +84,7 @@ for group in groups:
 
     # Tail slope. Basically the same as DCR, except with no PZ correction
     proc.add_processor(linear_fit, "wf_blsub[3000:]", "wf_b", "wf_m")
-    proc.add_processor(np.divide, "wf_b", "wf_m", "tail_rc")
+    proc.add_processor(np.divide, "-wf_b", "wf_m", "tail_rc")
     
     # Set up the LH5 output
     lh5_out = lh5.Table(size=proc._buffer_len)
