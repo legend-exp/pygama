@@ -69,8 +69,8 @@ for group in groups:
     
     # Energy calculation
     proc.add_processor(np.amax, "wf_trap", 1, "trapEmax", signature='(n),()->()', types=['fi->f'])
-    proc.add_processor(fixed_time_pickoff, "wf_trap", "tp_0", 5*us+9*us, "trapEftp")
-    proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", 0, "ct_corr")
+    proc.add_processor(fixed_time_pickoff, "wf_trap", "tp_0+(5*us+9*us)", "trapEftp")
+    proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", "ct_corr")
     
     # Current calculation
     proc.add_processor(avg_current, "wf_pz", 10, "curr(len(wf_pz)-10, f)")
@@ -79,7 +79,7 @@ for group in groups:
     
     # DCR calculation: use slope using 1000 samples apart and averaging 200
     # samples, with the start 1.5 us offset from t0
-    proc.add_processor(trap_pickoff, "wf_pz", 200, 1000, "tp_0", 1.5*us, "dcr_unnorm")
+    proc.add_processor(trap_pickoff, "wf_pz", 200, 1000, "tp_0+1.5*us", "dcr_unnorm")
     proc.add_processor(np.divide, "dcr_unnorm", "trapEftp", "dcr")
 
     # Tail slope. Basically the same as DCR, except with no PZ correction

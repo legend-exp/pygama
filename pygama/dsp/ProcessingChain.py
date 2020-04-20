@@ -3,6 +3,7 @@ import re
 import ast
 import itertools as it
 from scimath.units import convert
+from scimath.units.api import unit_parser
 from scimath.units.unit import unit
 
 ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
@@ -319,21 +320,40 @@ class ProcessingChain:
 
         # look for name in variable dictionary
         elif isinstance(node, ast.Name):
-            try:
-                return self.__vars_dict[node.id]
-            except KeyError:
-                return None
-        
+            # check if it is a unit
+            val = unit_parser.parse_unit(node.id)
+            if val.is_valid():
+                return val
+
+            #check if it is a variable
+            val = self.__vars_dict.get(node.id, None)
+            return val
+                
         # define binary operators (+,-,*,/)
         elif isinstance(node, ast.BinOp):
             lhs = self.__parse_expr(node.left)
             rhs = self.__parse_expr(node.right)
             op = ast_ops_dict[type(node.op)]
-            out = op(lhs, rhs)
-            if isinstance(out, np.ndarray):
-                self.__proc_list.append((op, tuple(lhs, rhs, out)))
+            if isinstance(lhs, np.ndarray) or isinstance(lhs, np.ndarray):
+                if not isinstance(lhs, np.ndarray):
+                    if isinstance(lhs, unit):
+                        lhs = convert(1, lhs, self._clk)
+                    if np.issubdtype(rhs.dtype, np.integer):
+                        lhs = rhs.dtype.type(round(lhs))
+                    else:
+                        lhs = rhs.dtype.type(lhs)
+                if not isinstance(rhs, np.ndarray):
+                    if isinstance(rhs, unit):
+                        rhs = convert(1, rhs, self._clk)
+                    if np.issubdtype(lhs.dtype, np.integer):
+                        rhs = lhs.dtype.type(round(rhs))
+                    else:
+                        rhs = lhs.dtype.type(rhs)
+                out = op(lhs, rhs)
+                self.__proc_list.append((op, (lhs, rhs, out)))
                 self.__proc_strs.append("Binary operator: " + op.__name__)
-            return out
+                return out
+            return op(lhs, rhs)
 
         # define unary operators (-)
         elif isinstance(node, ast.UnaryOp):
@@ -471,7 +491,7 @@ class ProcessingChain:
                 except: pass
                 
         self.__print(3, 'Output:')
-        for name, (buf, var) in self.__output_buffers.items():
+        for name, (buf, var, scale) in self.__output_buffers.items():
             if scale:
                 np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
             else:

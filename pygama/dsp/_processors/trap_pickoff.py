@@ -2,19 +2,19 @@ import numpy as np
 from numba import guvectorize
 
 
-@guvectorize(["void(float32[:], int32, int32, int32, int32, float32[:])",
-              "void(float64[:], int32, int32, int32, int32, float64[:])",
-              "void(int32[:], int32, int32, int32, int32, int32[:])",
-              "void(int64[:], int32, int32, int32, int32, int64[:])"],
-             "(n),(),(),(),()->()", nopython=True, cache=True)
+@guvectorize(["void(float32[:], int32, int32, int32, float32[:])",
+              "void(float64[:], int32, int32, int32, float64[:])",
+              "void(int32[:], int32, int32, int32, int32[:])",
+              "void(int64[:], int32, int32, int32, int64[:])"],
+             "(n),(),(),()->()", nopython=True, cache=True)
 
-def trap_pickoff(wf_in, rise, flat, pickoff_time, offset_time, value_out):
+def trap_pickoff(wf_in, rise, flat, pickoff_time, value_out):
     """
-    Gives the value of a trapezoid, normalized by the "rise" (integration) time, at a specific time equal to pickoff_time+offset_time (the idea is one will be a variable such as t0, and one a constant such as 1*us). Use when the rest of the trapezoid output is extraneous.
+    Gives the value of a trapezoid, normalized by the "rise" (integration) time, at a specific time equal to pickoff_time. Use when the rest of the trapezoid output is extraneous.
     """
     I_1 = 0.
     I_2 = 0.
-    start_time = pickoff_time + offset_time
+    start_time = pickoff_time
     
     for i in range(start_time,(start_time + rise)):
         I_1 += wf_in[i]
