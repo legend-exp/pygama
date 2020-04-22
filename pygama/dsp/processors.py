@@ -19,3 +19,4 @@ from ._processors.trap_norm import trap_norm
 from ._processors.trap_pickoff import trap_pickoff
 from ._processors.time_point_frac import time_point_frac
 from ._processors.time_point_thresh import time_point_thresh
+from ._processors.linear_fit import linear_fit
