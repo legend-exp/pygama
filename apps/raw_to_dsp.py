@@ -14,22 +14,22 @@ parser = argparse.ArgumentParser(description=
 """Process a tier 1 LH5 file and produce a tier 2 LH5 file. This entails running
 sequence of DSP transforms to calculate un-calibrated parameters.""")
 
-parser.add_argument('file', help="Input (tier 1) LH5 file.")
-parser.add_argument('-o', '--output',
+arg = par.add_argument
+arg('file', help="Input (tier 1) LH5 file.")
+arg('-o', '--output',
                     help="Name of output file. By default, output to ./t2_[input file name].")
 
-parser.add_argument('-v', '--verbose', default=2, type=int,
+arg('-v', '--verbose', default=2, type=int,
                     help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
 
-parser.add_argument('-b', '--block', default=8, type=int,
+arg('-b', '--block', default=8, type=int,
                     help="Number of waveforms to process simultaneously. Default is 8")
 
-parser.add_argument('-c', '--chunk', default=256, type=int,
+arg('-c', '--chunk', default=256, type=int,
                     help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
 
-parser.add_argument('-g', '--group', default='daqdata',
+arg('-g', '--group', default='daqdata',
                     help="Name of group in LH5 file. Default is daqdata.")
-
 args = parser.parse_args()
 
 lh5_in = lh5.Store()
