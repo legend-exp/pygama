@@ -97,18 +97,15 @@ def set_grid(f_grid,zac):
     """
     if zac==1:
         print("Creation of grid for ZAC optimization")
-        #lenghts = np.arange(57, 57.5, 1)
-        sigmas = np.arange(10, 51, 10)
-        flats = np.arange(1.0, 3.6, 0.5)
-        rc_consts = np.arange(160, 161, 5)
-        lists = [sigmas, flats, rc_consts]
+        sigmas = np.linspace(1, 50, 10, dtype='int16')
+        flats =  np.linspace(1, 3, 3, dtype='int16')
+        decays =  np.linspace(160, 160, 1, dtype='int16')
+        lists = [sigmas, flats, decays]
     else:
         print("Creation of grid for trap optimization")
-        # # this is pretty ambitious, but maybe doable -- 3500 entries
-        e_rises = np.arange(1, 6, 0.2)
-        e_flats = np.arange(0.5, 4, 1)
-        rc_consts = np.arange(50, 150, 10)
-        
+        e_rises = np.linspace(1, 6, 10, dtype='float')
+        e_flats = np.linspace(0.5, 3.5, 3, dtype='float')
+        rc_consts = np.linspace(50, 150, 1, dtype='float')
         lists = [e_rises, e_flats, rc_consts]
     
     prod = list(itertools.product(*lists))
@@ -137,6 +134,7 @@ def window_ds(ds, raw_file, f_tier1):
     f_win = h5py.File(f_tier1, 'w')
     print(f_tier1)
     for ged in f.keys():
+        #if ged!='g060': continue
         try: 
             dset = f[ged]['raw']
             #print("key: ",ged,"Data info: ",dset.keys())
@@ -212,46 +210,46 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
     t_start = time.time()
     #for group in groups:
     for group in f.keys():#loop on detectors
-        if group!='g060': continue
-        #if group == 'g028':
-            #diff = time.time() - t_start
-            #tot = diff/5 * len(df_grid) / 60
-            #tot -= diff / 60
-            #print(f"Estimated remaining time: {tot:.2f} mins")
+        #if group!='g060': continue
+        if group == 'g028':
+            diff = time.time() - t_start
+            tot = diff/5 * len(df_grid) / 60
+            tot -= diff / 60
+            print(f"Estimated remaining time: {tot:.2f} mins")
         
-        #print("Processing: " + f_tier1 + '/' + group)
+        print("Detector:",group)
         #data = lh5_in.read_object(group, f_tier1)
         data =  f[group]['raw']
-            
+        
         #wf_in = data['waveform']['values'].nda
         #dt = data['waveform']['dt'].nda[0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
         wf_in = data['waveform']['values'][()]
         dt = data['waveform']['dt'][0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
-        
         # Set up DSP processing chain -- very minimal
         block = 8 #waveforms to process simultaneously
         proc = ProcessingChain(block_width=block, clock_unit=dt, verbosity=False)
         proc.add_input_buffer("wf", wf_in, dtype='float32')
+        wsize = wf_in.shape[1]
+        dt0 = data['waveform']['dt'][0]
 
-        #basic processors
+        # basic processors
         proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
         proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
         proc.add_processor(pole_zero, "wf_blsub", 145*us, "wf_pz")
         
-        for i, row in df_grid.iterrows():#loop on parameters
+        for i, row in df_grid.iterrows():
             if zac==1:
-                sigma, flat, decay = row
-                proc.add_processor(zac_filter, "wf", sigma*us, flat*us, decay*us, f"wf_zac_{i}(101, f)")
+                sigma, flat, decay = row/dt0*1000
+                proc.add_processor(zac_filter(wsize, sigma, flat, decay),"wf", f"wf_zac_{i}(101, f)")
                 proc.add_processor(np.amax, f"wf_zac_{i}", 1, f"zacE_{i}", signature='(n),()->()', types=['fi->f'])
             else:
                 rise, flat, rc = row
                 proc.add_processor(trap_norm, "wf_pz", rise*us, flat*us, f"wf_trap_{i}")
-                #proc.add_processor(asymTrapFilter, "wf_pz", rise*us, flat*us, rc*us, "wf_atrap")
-                #proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
+                proc.add_processor(asymTrapFilter, "wf_pz", rise*us, flat*us, rc*us, "wf_atrap")
+                proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
                 proc.add_processor(np.amax, f"wf_trap_{i}", 1, f"trapEmax_{i}", signature='(n),()->()', types=['fi->f'])
-                #proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
-                #proc.add_processor(fixed_time_pickoff, "wf_trap", "tp_0+5*us+9*us", "trapEftp")
-                #proc.add_processor(trap_pickoff, "wf_pz", rise*us, flat, "tp_0", "ct_corr")
+                proc.add_processor(fixed_time_pickoff, f"wf_trap_{i}", "tp_0+(5*us+9*us)", f"trapEftp_{i}")
+                proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", "ct_corr")
                 
         # Set up the LH5 output
         lh5_out = lh5.Table(size=proc._buffer_len)
@@ -260,7 +258,7 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
                 lh5_out.add_field(f"zacE_{i}", lh5.Array(proc.get_output_buffer(f"zacE_{i}"), attrs={"units":"ADC"}))
             else:
                 lh5_out.add_field(f"trapEmax_{i}", lh5.Array(proc.get_output_buffer(f"trapEmax_{i}"), attrs={"units":"ADC"}))
-                #lh5_out.add_field("trapEftp", lh5.Array(proc.get_output_buffer("trapEftp"), attrs={"units":"ADC"}))
+                lh5_out.add_field(f"trapEftp_{i}", lh5.Array(proc.get_output_buffer(f"trapEftp_{i}"), attrs={"units":"ADC"}))
         
         print("Processing:\n",proc)
         proc.execute()
@@ -271,20 +269,19 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
         print("Writing to: " + f_opt + "/" + groupname)
         lh5_in.write_object(lh5_out, groupname, f_opt)
         print("")
-            
-          
+    
     #list the datasets of the output file
     data_opt = lh5_in.ls(f_opt)
     #data_opt_0 = lh5_in.ls(f_opt,'opt_0/*')
     data_opt_0 = lh5_in.ls(f_opt,'g024/data/*')
-    print("Optimization groups:",data_opt)
-    print("Optimization sub-groups:",data_opt_0)
-
+    diff = time.time() - t_start
+    print(f"Time to process: {diff:.2f} s")
+        
 
 def get_fwhm(f_grid, f_opt, zac, verbose=False):
     """
-    this code fits the 2.6 MeV peak using the peakshape function (same as in
-    calibration.py) and writes a new column to df_grid, "fwhm".
+    this code fits the 2.6 MeV peak using the gauss+step function
+    and writes new columns to the df_grid "fwhm", "fwhmerr"
     """
     print("Grid file:",f_grid)
     print("DSP file:",f_opt)
@@ -292,7 +289,7 @@ def get_fwhm(f_grid, f_opt, zac, verbose=False):
 
     f = h5py.File(f_opt,'r')
     for group in f.keys():
-        if group!='g060': continue
+        #if group!='g060': continue
         print("Detector:",group)
         data =  f[group]['data']
         
@@ -308,11 +305,8 @@ def get_fwhm(f_grid, f_opt, zac, verbose=False):
                 mean = np.mean(energies)
                 bins = 12000
                 hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
-                #ph.plot_hist(hE,xE,label=group,show_stats=True)
-                #plt.show()
             except:
                 print("Energy not find in",group,"and entry",i)
-            
             
             # set histogram centered and symmetric on the peak
             mu = xE[np.argmax(hE)]
@@ -388,7 +382,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
     df_grid = pd.read_hdf(f_grid)
     f = h5py.File(f_opt,'r')
     for group in f.keys():
-        if group!='g060': continue
+        #if group!='g060': continue
         d_det = f"{d_plot}/{group}"
         try: os.mkdir(d_det)
         except FileExistsError: print ("Directory '%s' already exists" % d_det)
