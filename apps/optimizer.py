@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import os
 import argparse
@@ -31,7 +30,6 @@ def main():
     
     Modified by:
     V. D'Andrea
-    
     """
     
     par = argparse.ArgumentParser(description="pygama dsp optimizer")
@@ -58,13 +56,10 @@ def main():
     #pprint(ds.paths)
     
     d_out = "cage"
-    try:
-        os.mkdir(d_out)
-    except FileExistsError:
-        print ("Directory '%s' already exists" % d_out)
-    else:
-        print ("Directory '%s' created" % d_out)
-
+    try: os.mkdir(d_out)
+    except FileExistsError: print ("Directory '%s' already exists" % d_out)
+    else: print ("Directory '%s' created" % d_out)
+    
     f_tier1 = f"{d_out}/cage_optimizer_raw.h5"
     if zac==1:
         print("Run ZAC filter Optimization")
@@ -77,25 +72,22 @@ def main():
         
     # -- run routines --
     if args["grid"]: set_grid(f_grid,zac)
-
+    
     # generate a small single-peak file w/ uncalibrated energy to reanalyze
     if args["window"]: window_ds(ds, raw_file, f_tier1)
-
+    
     # create a file with DataFrames for each set of parameters
     if args["process"]: process_ds(ds, f_grid, f_opt, f_tier1,zac)
-
+    
     # fit all outputs to the peakshape function and find the best resolution
     if args["fit"]: get_fwhm(f_grid, f_opt, zac,verbose=args["verbose"])
-
+    
     # show results
     if args["plot"]:
         d_plot = f"{d_out}/plots"
-        try:
-            os.mkdir(d_plot)
-        except FileExistsError:
-            print ("Directory '%s' already exists" % d_plot)
-        else:
-            print ("Directory '%s' created" % d_plot)
+        try: os.mkdir(d_plot)
+        except FileExistsError: print ("Directory '%s' already exists" % d_plot)
+        else: print ("Directory '%s' created" % d_plot)
         plot_fwhm(f_grid,f_opt,d_plot,zac) 
     
     
@@ -136,7 +128,7 @@ def window_ds(ds, raw_file, f_tier1):
     print("Creating windowed raw file")
     
     #for run in ds.runs:
-
+    
     conf = ds.config["daq_to_raw"]
     print("conf",conf)
     #read existing raw file
@@ -164,7 +156,7 @@ def window_ds(ds, raw_file, f_tier1):
         except:
             print("Maximum not find in:",ged)
             continue
-
+        
         #create dataset for windowed file
         try:
             bl_win = dset['baseline'][(energies>min_ene) & (energies<max_ene)]
@@ -190,15 +182,16 @@ def window_ds(ds, raw_file, f_tier1):
             f_win.create_dataset(ged+"/raw/waveform/values",dtype='f',data=wf_win)
             d_dt = f_win.create_dataset(ged+"/raw/waveform/dt",dtype='f',data=wf_win_dt)
             d_dt.attrs['units'] = 'ns'
+            f_win.attrs['datatype'] = 'table{energy,ievt,baseline,numtraces,timestamp,wf_max,wf_std,waveform}'
             print("Created datasets",ged+"/raw")
         except:
             print("Problem in datasets creation in",ged)
             continue
-
+        
     f_win.close()        
     print("wrote file:", f_tier1)
-
-
+    
+    
 def process_ds(ds, f_grid, f_opt, f_tier1, zac):
     """
     process the windowed raw file 'f_tier1' and create the DSP file 'f_opt'
@@ -209,32 +202,23 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
     
     if os.path.exists(f_opt):
         os.remove(f_opt)
-
+    
     # open raw file
     lh5_in = lh5.Store()
     #groups = lh5_in.ls(f_tier1, '*/raw')
     f = h5py.File(f_tier1,'r')
     #print("File info: ",f.keys())
-
-    #t_start = time.time()
-    #for i, row in df_grid.iterrows():#loop on parameters
-    # estimate remaining time in scan
-    #if i == 4:
-    #diff = time.time() - t_start
-    #tot = diff/5 * len(df_grid) / 60
-    #tot -= diff / 60
-    #print(f"Estimated remaining time: {tot:.2f} mins")
-    #print("")
-    #if zac==1:
-    #sigma, flat, decay = row
-    #print(f"Row {i}/{len(df_grid)},  sigma {sigma}  flat {flat}  decay {decay}")
-    #else:
-    #rise, flat, rc = row
-    #print(f"Row {i}/{len(df_grid)},  rise {rise}  flat {flat}  rc {rc}")
-    #df_key = f"opt_{i}"
+    
+    t_start = time.time()
+    #for group in groups:
     for group in f.keys():#loop on detectors
         if group!='g060': continue
-        #for group in groups:
+        #if group == 'g028':
+            #diff = time.time() - t_start
+            #tot = diff/5 * len(df_grid) / 60
+            #tot -= diff / 60
+            #print(f"Estimated remaining time: {tot:.2f} mins")
+        
         #print("Processing: " + f_tier1 + '/' + group)
         #data = lh5_in.read_object(group, f_tier1)
         data =  f[group]['raw']
@@ -253,7 +237,7 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
         proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
         proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
         proc.add_processor(pole_zero, "wf_blsub", 145*us, "wf_pz")
-
+        
         for i, row in df_grid.iterrows():#loop on parameters
             if zac==1:
                 sigma, flat, decay = row
@@ -268,7 +252,7 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
                 #proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
                 #proc.add_processor(fixed_time_pickoff, "wf_trap", "tp_0+5*us+9*us", "trapEftp")
                 #proc.add_processor(trap_pickoff, "wf_pz", rise*us, flat, "tp_0", "ct_corr")
-                        
+                
         # Set up the LH5 output
         lh5_out = lh5.Table(size=proc._buffer_len)
         for i, row in df_grid.iterrows():#loop on parameters
@@ -325,128 +309,134 @@ def get_fwhm(f_grid, f_opt, zac, verbose=False):
                 bins = 12000
                 hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
                 #ph.plot_hist(hE,xE,label=group,show_stats=True)
-                plt.show()
+                #plt.show()
             except:
-                print("Energy not find in",group)
+                print("Energy not find in",group,"and entry",i)
             
             
-            # shift the histogram to be roughly centered at 0 and symmetric
-            mu0 = xE[np.argmax(hE)]
-            #xE -= mu0
+            # set histogram centered and symmetric on the peak
+            mu = xE[np.argmax(hE)]
             imax = np.argmax(hE)
             hmax = hE[imax]
             idx = np.where(hE > hmax/2) # fwhm
             ilo, ihi = idx[0][0], idx[0][-1]
             sig = (xE[ihi] - xE[ilo]) / 2.355
-            idx = np.where(((xE-mu0) > -8 * sig) & ((xE-mu0) < 8 * sig))
-            idx0 = np.where(((xE-mu0) > -4.5 * sig) & ((xE-mu0) < 4.5 * sig))
+            idx = np.where(((xE-mu) > -8 * sig) & ((xE-mu) < 8 * sig))
+            idx0 = np.where(((xE-mu) > -4.5 * sig) & ((xE-mu) < 4.5 * sig))
             try:
                 ilo, ihi = idx[0][0], idx[0][-1]
                 ilo0, ihi0 = idx0[0][0], idx0[0][-1]
-                xE = xE[ilo:ihi+1]
-                hE, vE = hE[ilo:ihi], vE[ilo:ihi]
+                xE, hE, vE = xE[ilo:ihi+1], hE[ilo:ihi], vE[ilo:ihi]
             except:
-                xE=xE
+                continue
             
-            #ph.plot_hist(hE,xE,label=group,show_stats=True)    
-            #plt.plot(xE, hE, ls='steps', c='r', lw=3)
-            #plt.show()
-                
-            # set initial guesses for the peakshape function.  could all be improved
-            mu = mu0
-            hstep = 0#np.mean(hE[:10])/hmax
-            htail = np.mean(hE[:100])/hmax
+            # set initial guesses for the peakshape function
+            hstep = 0
             tau = np.mean(hE[:10])
-            bg0 = 1#np.mean(hE[:10])
-            amp = (xE[1]-xE[0])*np.sum(hE[:ihi0-ilo0])
-            #x0 = [mu, sig, hstep, htail, tau, bg0, amp]
+            bg0 = 1
             x0 = [hmax, mu, sig, bg0, hstep]
             
-            #try:
-            #xF, xF_cov = pf.fit_hist(pf.radford_peak, hE, xE, var=vE, guess=x0)
-            xF, xF_cov = pf.fit_hist(pf.ge_peak, hE, xE, var=vE, guess=x0)
-            xF_err = np.sqrt(np.diag(xF_cov))
-
-            # goodness of fit
-            chisq = []
-            for j, h in enumerate(hE):
-                #model = pf.radford_peak(xE[j], *xF)
-                model = pf.ge_peak(xE[j], *xF)
-                diff = (model - h)**2 / model
-                chisq.append(abs(diff))
-            print("Fit guess:",x0)
-            print("Fit results:",xF)
-            # update the master dataframe
-            fwhm = xF[2] * 2.355 * 2614.5 / mu0
-            fwhmerr = xF_err[2] * 2.355 * 2614.5 / mu0 
-            rchi2 = sum(np.array(chisq) / len(hE))
-            
-            df_grid.at[i, f"fwhm_{group}"] = fwhm
-            df_grid.at[i, f"fwhmerr_{group}"] = fwhmerr
-            df_grid.at[i, f"rchi2_{group}"] = rchi2
-            #if zac==1:
-            #sigma, flat, decay = row[:3]
-            #label = f"{i} {sigma:.2f} {flat:.2f} {decay:.0f} {fwhm:.2f} {fwhmerr:.2f} {rchi2:.2f}"
-            #else:
-            #rise, flat, rc = row[:3]
-            #label = f"{i} {rise:.2f} {flat:.2f} {rc:.0f} {fwhm:.2f} {fwhmerr:.2f} {rchi2:.2f}"
-            #print(label)
-            #except:
-            #print("Fit not computed")
+            try:
+                xF, xF_cov = pf.fit_hist(pf.gauss_step, hE, xE, var=vE, guess=x0)
+                xF_err = np.sqrt(np.diag(xF_cov))
+                
+                # goodness of fit
+                chisq = []
+                for j, h in enumerate(hE):
+                    model = pf.gauss_step(xE[j], *xF)
+                    diff = (model - h)**2 / model
+                    chisq.append(abs(diff))
+                # update the master dataframe
+                fwhm = xF[2] * 2.355 * 2614.5 / mu
+                fwhmerr = xF_err[2] * 2.355 * 2614.5 / mu 
+                rchi2 = sum(np.array(chisq) / len(hE))
+                
+                df_grid.at[i, f"fwhm_{group}"] = fwhm
+                df_grid.at[i, f"fwhmerr_{group}"] = fwhmerr
+                df_grid.at[i, f"rchi2_{group}"] = rchi2
+            except:
+                print("Fit not computed for detector",group,"and entry",i)
                 
             if verbose:
-                #try:
                 plt.cla()
-                
-                # peakshape function
-                #plt.plot(xE, pf.radford_peak(xE, *x0), c='orange', label='guess')
-                #plt.plot(xE, pf.radford_peak(xE, *xF), c='r', label='peakshape')
-                #plt.plot(xE, pf.ge_peak(xE, *x0), c='orange', label='guess')
-                plt.plot(xE, pf.ge_peak(xE, *xF), c='r', label='peakshape')
-                
-                #plt.axvline(mu, c='g')
-                
-                # plot individual components
-                #tail_hi, gaus, bg, step, tail_lo = pf.radford_peak(xE, *xF, components=True)
-                gaus, bg, step = pf.ge_peak(xE, *xF, components=True)
+                plt.plot(xE, pf.gauss_step(xE, *xF), c='r', label='peakshape')
+                gaus, step = pf.gauss_step(xE, *xF, components=True)
                 gaus = np.array(gaus)
                 step = np.array(step)
-                #tail_lo = np.array(tail_lo)
-                #plt.plot(xE, gaus*tail_hi, ls="--", lw=2, c='g', label="gauss")
                 plt.plot(xE, gaus, ls="--", lw=2, c='g', label="gaus")
-                plt.plot(xE, step+bg, ls='--', lw=2, c='m', label='step + bg')
-                #plt.plot(xE, tail_lo, ls='--', lw=2, c='k', label='tail_lo')
-                
-                plt.plot(xE[1:], hE, ls='steps', lw=1, c='b', label=f"data {group}")
-                
+                plt.plot(xE, step, ls='--', lw=2, c='m', label='step + bg')
+                plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {group}")
                 plt.xlabel(f"ADC channels", ha='right', x=1)
                 plt.ylabel("Counts", ha='right', y=1)
                 plt.legend(loc=2, fontsize=10,title=f"FWHM = {fwhm:.2f} $\pm$ {fwhmerr:.2f} keV")
                 plt.show()
-                #except:
-                #   print("")
+                
                 
             # write the updated df_grid to the output file.  
             if not verbose:
-                df_grid.to_hdf(f_grid, key="/pygama_optimization")
-            print("wrote output file")
+                df_grid.to_hdf(f_grid, key="pygama_optimization")
+
+    if not verbose:
+        print("Update grid file:",f_grid,"with detector",group)
         print(df_grid)
             
 def plot_fwhm(f_grid,f_opt,d_plot,zac):
     """
+    select the best energy resolution, plot best result fit and fwhm vs parameters
     """
     print("Grid file:",f_grid)
     df_grid = pd.read_hdf(f_grid)
     f = h5py.File(f_opt,'r')
     for group in f.keys():
         if group!='g060': continue
+        d_det = f"{d_plot}/{group}"
+        try: os.mkdir(d_det)
+        except FileExistsError: print ("Directory '%s' already exists" % d_det)
+        else: print ("Directory '%s' created" % d_det)
+
+        data =  f[group]['data']
         print("Detector:",group)
         # find fwhm minimum values
         try:
-            df_grid = df_grid.loc[df_grid[f"rchi2_{group}"]<20]
-            df_min = df_grid.loc[df_grid[f'fwhm_{group}'].idxmin()]
+            df_grid = df_grid.loc[(df_grid[f"rchi2_{group}"]<20)&(df_grid[f"fwhm_{group}"]>0)]
+            minidx = df_grid[f'fwhm_{group}'].idxmin()
+            df_min = df_grid.loc[minidx]
             print("Best parameters:\n",df_min)
-        except: print("")
+            #plot best result fit
+            if zac==1:
+                energies = data[f"zacE_{minidx}"][()]
+            else:
+                energies = data[f"trapEmax_{minidx}"][()]
+            mean = np.mean(energies)
+            bins = 12000
+            hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
+            mu = xE[np.argmax(hE)]
+            hmax = hE[np.argmax(hE)]
+            idx = np.where(hE > hmax/2)
+            ilo, ihi = idx[0][0], idx[0][-1]
+            sig = (xE[ihi] - xE[ilo]) / 2.355
+            idx = np.where(((xE-mu) > -8 * sig) & ((xE-mu) < 8 * sig))
+            ilo, ihi = idx[0][0], idx[0][-1]
+            xE, hE, vE = xE[ilo:ihi+1], hE[ilo:ihi], vE[ilo:ihi]
+            x0 = [hmax, mu, sig, 1, 0]
+            xF, xF_cov = pf.fit_hist(pf.gauss_step, hE, xE, var=vE, guess=x0)
+            xF_err = np.sqrt(np.diag(xF_cov))
+            fwhm = xF[2] * 2.355 * 2614.5 / mu
+            fwhmerr = xF_err[2] * 2.355 * 2614.5 / mu 
+            plt.plot(xE, pf.gauss_step(xE, *xF), c='r', label='peakshape')
+            gaus, step = pf.gauss_step(xE, *xF, components=True)
+            gaus = np.array(gaus)
+            step = np.array(step)
+            plt.plot(xE, gaus, ls="--", lw=2, c='g', label="gaus")
+            plt.plot(xE, step, ls='--', lw=2, c='m', label='step + bg')
+            plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {group}")
+            plt.xlabel(f"ADC channels", ha='right', x=1)
+            plt.ylabel("Counts", ha='right', y=1)
+            plt.legend(loc=2, fontsize=10,title=f"FWHM = {fwhm:.2f} $\pm$ {fwhmerr:.2f} keV")
+            if zac==1: plt.savefig(f"{d_det}/Fit_{group}-zac.pdf")
+            else: plt.savefig(f"{d_det}/Fit_{group}-trap.pdf")
+            plt.cla()
+        except: continue
         if zac==1:
             #try:
             sigma, flat, decay = df_min[:3]
@@ -454,28 +444,25 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             df_sigma = df_grid.loc[(df_grid.flat==flat)&(df_grid.decay==decay)&(df_grid.decay==decay)]
             x, y, err =  df_sigma['sigma'], df_sigma[f'fwhm_{group}'], df_sigma[f'fwhmerr_{group}']
             plt.errorbar(x,y,err,fmt='o')
-            #plt.plot(x,y,'.b')
             plt.xlabel("Sigma Cusp ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_Sigma_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Sigma_{group}-zac.pdf")
             plt.cla()
             # 2. vary the flat time
             df_flat = df_grid.loc[(df_grid.sigma==sigma)&(df_grid.decay==decay)]
             x, y, err =  df_flat['flat'], df_flat[f'fwhm_{group}'], df_flat[f'fwhmerr_{group}']
-            #plt.plot(x,y,'.b')
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Flat Top ($\mu$s)", ha='right', x=1)
             plt.ylabel("FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_Flat_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Flat_{group}-zac.pdf")
             plt.cla() 
             # 3. vary the rc constant
             df_decay = df_grid.loc[(df_grid.sigma==sigma)&(df_grid.flat==flat)]
             x, y, err =  df_decay[f'decay'], df_decay[f'fwhm_{group}'], df_decay[f'fwhmerr_{group}']
-            #plt.plot(x,y,'.b')
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Decay constant ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_Decay_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Decay_{group}-zac.pdf")
             plt.cla()
             #except:
             #print("")
@@ -489,7 +476,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             plt.xlabel("Ramp time ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (kev)", ha='right', y=1)
             # plt.ylabel(r"FWHM", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_Rise_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Rise_{group}-trap.pdf")
             plt.cla()
             
             # 2. vary the flat time
@@ -499,7 +486,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Flat time ($\mu$s)", ha='right', x=1)
             plt.ylabel("FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_Flat_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Flat_{group}-trap.pdf")
             plt.cla() 
             # 3. vary the rc constant
             df_rc = df_grid.loc[(df_grid.rise==rise)&(df_grid.flat==flat)]
@@ -508,7 +495,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("RC constant ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_plot}/FWHM_vs_RC_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_RC_{group}-trap.pdf")
             plt.cla()
         
                 
