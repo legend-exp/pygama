@@ -1,12 +1,18 @@
 import numpy as np
 import json
 import re
+import ast
 import itertools as it
 from scimath.units import convert
+from scimath.units.api import unit_parser
 from scimath.units.unit import unit
 import importlib
 
 from pygama.dsp.units import *
+
+ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
+                ast.Div: np.divide, ast.USub: np.negative}
+
 
 class ProcessingChain:
     """
@@ -67,7 +73,7 @@ class ProcessingChain:
         """Add named variable containing a scalar block with fixed type"""
         self.__add_variable(name, dtype, (self._block_width))
 
-    def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None):
+    def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an input buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -83,10 +89,11 @@ class ProcessingChain:
           a one-dimensional array)
         - dtype: data type used for the variable. Use this if the variable is
           automatically allocated here, but with a different type from buff
+        - unit specifies a unit to convert the input from. Unit must have same type as clk, or be a ratio to multiply the input by
         """
-        self.__add_io_buffer(buff, varname, True, dtype, buffer_len)
+        self.__add_io_buffer(buff, varname, True, dtype, buffer_len, unit)
 
-    def get_input_buffer(self, varname, dtype=None, buffer_len=None):
+    def get_input_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the input buffer associated with varname. If there is no such
         buffer, create one with a shape compatible with the input variable and
         return it. The input varname has the form:
@@ -99,13 +106,14 @@ class ProcessingChain:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
         - buffer_len specifies the buffer length, if it has not already been set
+        - unit specifies a unit to convert the input from. Unit must have same type as clk, or be a ratio to multiply the input by
         """
         name = re.search('(\w+)', varname).group(0)
         if name not in self.__input_buffers:
-            self.__add_io_buffer(None, varname, True, dtype, buffer_len)
+            self.__add_io_buffer(None, varname, True, dtype, buffer_len, unit)
         return self.__input_buffers[name][0]
 
-    def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None):
+    def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an output buffer to a variable. The buffer should be a numpy
         ndarray with length that is a multiple of the buffer length, the block
         width, and the named variable length. If any of these are unknown we
@@ -121,10 +129,12 @@ class ProcessingChain:
           a one-dimensional array)
         - dtype: data type used for the variable. Use this if the variable is
           automatically allocated here, but with a different type from buff
-        """
-        self.__add_io_buffer(buff, varname, False, dtype, buffer_len)
+        - unit specifies a unit to convert the output into. Unit must have same type as clk, or be a ratio to divide the output by
 
-    def get_output_buffer(self, varname, dtype=None, buffer_len=None):
+        """
+        self.__add_io_buffer(buff, varname, False, dtype, buffer_len, unit)
+
+    def get_output_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the output buffer associated with varname. If there is no such
         buffer, create one with a shape compatible with the input variable and
         return it. The input varname has the form:
@@ -137,10 +147,11 @@ class ProcessingChain:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
         - buffer_len specifies the buffer length, if it has not already been set
+        - unit specifies a unit to convert the output into. Unit must have same type as clk, or be a ratio to divide the output by
         """
         name = re.search('(\w+)', varname).group(0)
         if name not in self.__output_buffers:
-            self.__add_io_buffer(None, varname, False, dtype, buffer_len)
+            self.__add_io_buffer(None, varname, False, dtype, buffer_len, unit)
         return self.__output_buffers[name][0]
 
 
@@ -209,7 +220,7 @@ class ProcessingChain:
                 if(isinstance(fd, str)):
                     # Define the dimension or make sure it is consistent
                     if not ad or dims_dict.setdefault(fd, ad)!=ad:
-                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+dim)
+                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+fd)
                 elif not fd:
                     # if we ran out of function dimensions, add a new outer dim
                     outerdims.insert(0, ad)
@@ -294,53 +305,142 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable
         if necessary. The optional [range] field fetches only a subrange
         of the array to the function."""
-        parse = re.match("\A(\w+)(\(.*\))?(\[.*\])?$", varname)
-        if not parse:
-            raise KeyError(varname+' could not be parsed')
-        name, construct, slice = parse.groups()
-        val = None
+        return self.__parse_expr(ast.parse(varname, mode='eval').body)
 
-        if name in self.__vars_dict:
-            val = self.__vars_dict[name]
-        # if we did not varoable, but have a constructor expression, construct
-        # a zeros-array using the size and data type in the constructor expr
-        elif construct:
-            args = [s.strip() for s in construct[1:-1].split(',')]
-            if len(args)==1: # allocate scalar block
-                try: val = np.zeros((self._block_width,), np.dtype(args[0]), 'F')
-                except TypeError:
-                    raise TypeError('Could not parse dtype from '+construct)
-            elif len(args)==2: # allocate vector block
-                try:
-                    dtype = np.dtype(args[0])
-                    del args[0]
-                except TypeError:
-                    try:
-                        dtype = np.dtype(args[1])
-                        del args[1]
-                    except TypeError:
-                        raise TypeError('Could not parse dtype and size from '+construct)
-                try:
-                    val = np.zeros((self._block_width, int(args[0])), dtype, 'F')
-                except ValueError:
-                    raise TypeError('Could not parse dtype and size from '+construct)
-            self.__vars_dict[name] = val
-        # if variable was not defined and no constructor expression was found
-        else: return None
+    # helper function for get_variable that recursively evaluates the AST tree
+    # based on: https://stackoverflow.com/a/9558001.
+    def __parse_expr(self, node):
+        if node is None:
+            return None
 
-        # if we found a bracketed range, return a slice of that range
-        if slice:
-            try:
-                args = [int(i) if i else None for i in slice[1:-1].split(':')]
-            except:
-                raise TypeError('Could not slice array based on '+slice)
-            if(len(args)==0): return val
-            elif(len(args)==1): return val[..., args[0]]
-            elif(len(args)==2): return val[..., args[0]:args[1]]
-            elif(len(args)==3): return val[..., args[0]:args[1]:args[2]]
-            else: raise TypeError('Could not slice array based on '+slice)
-        else:
+        elif isinstance(node, ast.Num):
+            return node.n
+
+        elif isinstance(node, ast.Str):
+            return node.s
+
+        elif isinstance(node, ast.Constant):
+            return node.val
+
+        # look for name in variable dictionary
+        elif isinstance(node, ast.Name):
+            # check if it is a unit
+            val = unit_parser.parse_unit(node.id)
+            if val.is_valid():
+                return val
+
+            #check if it is a variable
+            val = self.__vars_dict.get(node.id, None)
             return val
+
+        # define binary operators (+,-,*,/)
+        elif isinstance(node, ast.BinOp):
+            lhs = self.__parse_expr(node.left)
+            rhs = self.__parse_expr(node.right)
+            op = ast_ops_dict[type(node.op)]
+            if isinstance(lhs, np.ndarray) or isinstance(lhs, np.ndarray):
+                if not isinstance(lhs, np.ndarray):
+                    if isinstance(lhs, unit):
+                        lhs = convert(1, lhs, self._clk)
+                    if np.issubdtype(rhs.dtype, np.integer):
+                        lhs = rhs.dtype.type(round(lhs))
+                    else:
+                        lhs = rhs.dtype.type(lhs)
+                if not isinstance(rhs, np.ndarray):
+                    if isinstance(rhs, unit):
+                        rhs = convert(1, rhs, self._clk)
+                    if np.issubdtype(lhs.dtype, np.integer):
+                        rhs = lhs.dtype.type(round(rhs))
+                    else:
+                        rhs = lhs.dtype.type(rhs)
+                out = op(lhs, rhs)
+                self.__proc_list.append((op, (lhs, rhs, out)))
+                self.__proc_strs.append("Binary operator: " + op.__name__)
+                return out
+            return op(lhs, rhs)
+
+        # define unary operators (-)
+        elif isinstance(node, ast.UnaryOp):
+            operand = self.__parse_expr(node.operand)
+            op = ast_ops_dict[type(node.op)]
+            out = op(operand)
+            # if we have a np array, add to processor list
+            if isinstance(out, np.ndarray):
+                self.__proc_list.append((op, (operand, out)))
+                self.__proc_strs.append("Unary operator: " + op.__name__)
+            return out
+
+        elif isinstance(node, ast.Subscript):
+            val = self.__parse_expr(node.value)
+            if isinstance(node.slice, ast.Index):
+                if isinstance(val, np.ndarray):
+                    return val[..., self.__parse_expr(node.slice.value)]
+                else:
+                    return val[self.__parse_expr(node.slice.value)]
+            elif isinstance(node.slice, ast.Slice):
+                if isinstance(val, np.ndarray):
+                    return val[..., slice(self.__parse_expr(node.slice.lower),
+                                          self.__parse_expr(node.slice.upper),
+                                          self.__parse_expr(node.slice.step) )]
+                else:
+                    return val[slice(upper, lower, step)]
+            elif isinstance(node.slice, ast.ExtSlice):
+                slices = tuple(node.slice.dims)
+                for i, sl in enumerate(slices):
+                    if isinstance(sl, ast.index):
+                        slices[i] = self.__parse_expr(sl.value)
+                    else:
+                        slices[i] = slice(self.__parse_expr(sl.upper),
+                                          self.__parse_expr(sl.lower),
+                                          self.__parse_expr(sl.step) )
+                return val[..., slices]
+
+        # for name.attribute
+        elif isinstance(node, ast.Attribute):
+            val = self.__parse_expr(node.value)
+            # get shape with buffer_len dimension removed
+            if node.attr=='shape' and isinstance(val, np.ndarray):
+                return val.shape[1:]
+
+        # for func([args])
+        elif isinstance(node, ast.Call):
+            func = node.func.id
+            # get length of 1D array variable
+            if func=="len" and len(node.args)==1 and isinstance(node.args[0], ast.Name):
+                var = self.__parse_expr(node.args[0])
+                if isinstance(var, np.ndarray) and len(var.shape)==2:
+                    return var.shape[1]
+                else:
+                    raise ValueError("len(): " + node.args[0].id + "has wrong number of dims")
+            # if this is a valid call to construct a new array, do so; otherwise raise an exception
+            else:
+                if len(node.args)==2:
+                    shape = self.__parse_expr(node.args[0])
+                    if isinstance(shape, (int, np.int32, np.int64)):
+                        shape = (self._block_width, shape)
+                    elif isinstance(shape, tuple):
+                        shape = (self._block_width, ) + shape
+                    else:
+                        raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+                    try: dtype = np.dtype(node.args[1].id)
+                    except: raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+
+                    if func in self.__vars_dict:
+                        var = self.__vars_dict[func]
+                        if not var.shape==shape and var.dtype==dtype:
+                            raise ValueError("Requested shape and type for " + func + " do not match existing values")
+                        return var
+                    else:
+                        var = np.zeros(shape, dtype, 'F')
+                        self.__vars_dict[func] = var
+                        self.__print(2, 'Added variable ' + func + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
+
+                        return var
+                else:
+                    raise ValueError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
+
+        raise ValueError("Cannot parse AST nodes of type " + str(node.__dict__))
+
 
     # Add an array of zeros to the vars dict called name and return it
     def __add_var(self, name, dtype, shape):
@@ -358,20 +458,29 @@ class ProcessingChain:
     # call all the processors on their paired arg tuples
     # copy from variables to list of output buffers
     def __execute_procs(self, start, end):
-        for buf, var in self.__input_buffers.values():
-            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
+        for buf, var, scale in self.__input_buffers.values():
+            if scale:
+                np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
+            else:
+                np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
         for func, args in self.__proc_list:
             func(*args)
-        for buf, var in self.__output_buffers.values():
-            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+        for buf, var, scale in self.__output_buffers.values():
+            if scale:
+                np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
+            else:
+                np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
 
     # verbose version of __execute_procs. This is probably overkill, but it
     # was done to minimize python calls in the non-verbose version
     def __execute_procs_verbose(self, start, end):
         names = set(self.__vars_dict.keys())
         self.__print(3, 'Input:')
-        for name, (buf, var) in self.__input_buffers.items():
-            np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
+        for name, (buf, var, scale) in self.__input_buffers.items():
+            if scale:
+                np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
+            else:
+                np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
             names.discard(name)
 
@@ -386,14 +495,17 @@ class ProcessingChain:
                 except: pass
 
         self.__print(3, 'Output:')
-        for name, (buf, var) in self.__output_buffers.items():
-            np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+        for name, (buf, var, scale) in self.__output_buffers.items():
+            if scale:
+                np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
+            else:
+                np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
 
     # append a tuple with the buffer and variable to either the input buffer
     # list (if input=true) or output buffer list (if input=false), making sure
     # that buffer shapes are compatible
-    def __add_io_buffer(self, buff, varname, input, dtype, buffer_len):
+    def __add_io_buffer(self, buff, varname, input, dtype, buffer_len, scale):
         var = self.get_variable(varname)
         if buff is not None and not isinstance(buff, np.ndarray):
             raise ValueError("Buffers must be ndarrays.")
@@ -409,12 +521,21 @@ class ProcessingChain:
             else: self._buffer_len = self._block_width
             self.__print(1, "Setting i/o buffer length to " + str(self._buffer_len))
 
+        # if a unit is given, convert it to a scaling factor
+        if isinstance(scale, unit):
+            scale = convert(1, scale, self._clk)
+
         # if no buffer was provided, make one
         returnbuffer=False
         if buff is None:
             if var is None:
                 raise ValueError("Cannot make buffer for non-existent variable " + varname)
-            if not dtype: dtype=var.dtype
+            # deduce dtype. If scale is used, force float type
+            if not dtype:
+                if not scale:
+                    dtype=var.dtype
+                else:
+                    dtype=np.dtype('float'+str(var.dtype.itemsize*8))
             buff = np.zeros((self._buffer_len,)+var.shape[1:], dtype)
             returnbuffer=True
 
@@ -429,17 +550,21 @@ class ProcessingChain:
         # Check that shape of buffer is compatible with shape of variable.
         # If variable does not yet exist, add it here
         if var is None:
-            if dtype is None: dtype = buff.dtype
+            if dtype is None:
+                if not scale:
+                    dtype=buff.dtype
+                else:
+                    dtype=np.dtype('float'+str(buff.dtype.itemsize*8))
             var = self.__add_var(varname, dtype, (self._block_width,)+buff.shape[1:])
         elif var.shape[1:] != buff.shape[1:]:
             raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
 
         varname = re.search('(\w+)', varname).group(0)
         if input:
-            self.__input_buffers[varname]=(buff, var)
+            self.__input_buffers[varname]=(buff, var, scale)
             self.__print(2, 'Binding input buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
         else:
-            self.__output_buffers[varname]=(buff, var)
+            self.__output_buffers[varname]=(buff, var, scale)
             self.__print(2, 'Binding output buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
 
         if returnbuffer: return buff

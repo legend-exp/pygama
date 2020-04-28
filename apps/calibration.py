@@ -378,5 +378,139 @@ def calibrate_pass2(ds, mode, write_db=False):
         print("wrote results to DB.")
         
 
+def calibrate_pass3(ds, df,etype="e_ftp", write_db=False, display=False, linfit = True):
+
+    """
+    This is the calibration method I used for HADES ICPC characterization  
+    
+    You have to look at the raw spectrum for one dataset once. One dataset implies:
+ 
+     - One detector setup
+     - One source
+     - One daq-setting 
+
+    From the raw spectrum at least two raw lines of your choice (i.e. 208Tl, 40K, Bi, etc) and determin an range 
+    around the lines have to be selected and added to a config file (to the runDB.json in the HADES work)
+    under "pass3_peaks" and "pass3_lim".
+    (Note that you also need the literature values in e.g. "cal_peaks" ) 
+
+    This calibration function will get the raw peaks by constructing a histogram around the raw values 
+    ,perfom a fit and devide the literature value by the output (c = lit/out). 
+    Then plot all received cal values vs energy and do a poly1 fit to extract the energy dependence (a*x+b)
+    The fit function can also be of other type (quadratic, sqrt-like or else if needed, default = linfit)
+
+    The calibrated energy is then ecal = eraw * (eraw *a +b)  
+  
+
+    A.Zschocke    
+    """
+
+    etype = "e_ftp"
+
+    # get the list of peaks we want  
+    epeaks = np.array(sorted(ds.runDB["pass3_peaks"]))
+    e_lim = ds.runDB["pass3_lim"]
+    true_peaks = sorted(np.array(ds.runDB["cal_peaks"]))
+
+    # get the raw energy 
+    ene = df[etype]
+    means = []
+    cals = []
+    # do the firts loop over all lines of interest
+    for i, peak in enumerate(epeaks):
+
+        xlo, xhi, xpb = peak - e_lim, peak + e_lim, 0.25
+        nb = int((xhi-xlo)/xpb)
+        hE, xE, vE = ph.get_hist(ene, range=(xlo, xhi), dx=xpb)
+        guess = [100000,peak,0.7,1000]
+        guess_lims = ([0,peak -20,0,0],[1e9,peak+20,1e9,1e9])
+
+        xF, xF_cov = pf.fit_hist(pf.gauss_bkg, hE, xE, var=np.ones(len(hE)), guess=guess, bounds=guess_lims)
+        fit = pf.gauss_bkg(xE,*xF)
+
+        if display:
+           plt.plot(xE[1:],hE,ls='steps',lw='1.5',c='b')
+           plt.plot(xE,fit,'r')
+           plt.show()
+
+        mean = xF[1]
+        means.append(mean)
+        cals.append(true_peaks[i]/mean)
+
+    # now calculate the energy dependence
+    cals = np.array(cals)
+    means = np.array(means)
+
+    if linfit:
+       xF = np.polyfit(means,cals,1)
+       pfit = means *xF[0] + xF[1]
+       cal_peaks = means*(means*xF[0]+xF[1])
+
+    else:
+       xF, xF_coev = curve_fit(pf.cal_slope, epeaks, cals)
+       pfit = pf.cal_slope(epeaks,*xF)
+       cal_peaks = means*(np.sqrt(xF[0]+(xF[1]/means**2)))
+
+    print(f"Calibration values:\n a={pfit[0]:.5f} b={pfit[1]:.5f}")
+
+    residuals = abs((cal_peaks-true_peaks))#/true_peaks*100
+
+    if any(residuals > 1):
+       r = residuals[np.where(residuals > 0)]
+       print("\nWaning! No proper calibration\nThere is a deviation of",r, "%")
+
+
+    if display:
+
+       meta_dir = os.path.expandvars(ds.runDB["meta_dir"])
+       runNum = ds.ds_list[0]
+       x = np.arange(1,60000,1)
+
+       if linfit:
+          e_cal = ene * (ene * xF[0] + xF[1])
+          pfit = x * xF[0] + xF[1]
+       else:
+          e_cal = ene *np.sqrt(xF[0] +(xF[1]/(ene**2)))
+          pfit = pf.cal_slope(x,*xF)
+
+       hE, xE, vE = ph.get_hist(e_cal, range=(0, 3000), dx=1)
+
+        x = np.arange(1,60000,1)
+
+       plt.plot(epeaks, cals, 'kx', ms=10, label='calibration values')
+       plt.plot(x, pfit,'r',label='Fit')
+       plt.xlim(0,60010)
+       plt.xlabel("raw Energy")
+       plt.ylabel("cal. value")
+       plt.legend()
+       plt.savefig(meta_dir+"/calVals_pass3_" + str(runNum)+".png")
+       plt.show()
+
+       hE, xE, vE = ph.get_hist(e_cal, range=(0, 3000), dx=1)
+       plt.figure(1,(12.00,10.00))
+       plt.subplot(211)
+       plt.semilogy(xE[1:], hE, ls='steps', lw=1.5,c='b')
+       plt.xlabel("Energy [keV]")
+       plt.xlim(-10,3100)
+       plt.subplot(212)
+       plt.plot(true_peaks, residuals, 'kx',ms=10,label='Residuals')
+       plt.grid()
+       plt.xlabel("Energy [keV]")
+       plt.ylabel("Residuals [%]")
+       plt.xlim(-10,3100)
+       plt.legend()
+       plt.savefig(meta_dir+"/calibratedSpectrum_pass3_" + str(runNum)+".png")
+       plt.show()
+
+
+    if write_db:
+        calDB = ds.calDB
+        query = db.Query()
+        table = calDB.table("cal_pass3")
+
+        for dset in ds.ds_list:
+            row = {"ds":dset, "lin":linfit, "slope":xF[0], "offset":xF[1]}
+            table.upsert(row, query.ds == dset)
+
 if __name__=="__main__":
     main()
