@@ -3,9 +3,9 @@
 Utility to create data directories following the LEGEND convention.
 
 Requires:
-    a metadata directory with a config file for this experiment
+    A metadata directory with a config file for this experiment:
         export LEGEND_META=/some/other/directory
-    an env variable with the experiment name (LPGTA, L200A, etc.):
+    A data directory with the experiment name (LPGTA, L200A, etc.):
         export LPGTA_DATA=/some/directory
 
 Source:

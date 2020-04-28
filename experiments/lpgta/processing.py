@@ -14,7 +14,6 @@ def main():
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
     arg, st, sf = par.add_argument, 'store_true', 'store_false'
-    
     args = par.parse_args()
     
     f = '$LEGEND_META/analysis/LPGTA/LPGTA.json'

@@ -33,7 +33,7 @@ class DataGroup:
 
         # scan over daq files
         if mode == 'daq':
-            self.daq_files = self.get_daq_files()
+            self.daq_files = self.scan_daq_files()
             
 
     def set_config(self, config):
@@ -64,7 +64,7 @@ class DataGroup:
             self.runDB = json.load(f)
         
             
-    def get_daq_files(self, ft=None):
+    def scan_daq_files(self, ft=None):
         """
         Do an os.walk through the daq directory and build a list of files to 
         consider, including any file that matches the file template.
