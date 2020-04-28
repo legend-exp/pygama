@@ -1,8 +1,12 @@
 import numpy as np
+import json
 import re
 import itertools as it
 from scimath.units import convert
 from scimath.units.unit import unit
+import importlib
+
+from pygama.dsp.units import *
 
 class ProcessingChain:
     """
@@ -49,7 +53,7 @@ class ProcessingChain:
         self.__input_buffers = {}
         # strings of input transforms and variable names for printings
         self.__output_buffers = {}
-        
+
         self._block_width = block_width
         self._buffer_len = buffer_len
         self._clk = clock_unit
@@ -90,7 +94,7 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable.
         The optional [range] field copies a subrange of the named array into the
         output buffer.
-        
+
         Optional keyword arguments:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
@@ -128,7 +132,7 @@ class ProcessingChain:
         The optional (length, type) field is used to initialize a new variable.
         The optional [range] field copies a subrange of the named array into the
         output buffer.
-        
+
         Optional keyword arguments:
         - dtype can be used to specify the numpy data type of the buffer if it
           should differ from that held in varname
@@ -138,8 +142,8 @@ class ProcessingChain:
         if name not in self.__output_buffers:
             self.__add_io_buffer(None, varname, False, dtype, buffer_len)
         return self.__output_buffers[name][0]
-    
-    
+
+
     def add_processor(self, func, *args, **kwargs):
         """
         Add a new processor and bind it to a set of parameters.
@@ -160,7 +164,7 @@ class ProcessingChain:
           - types: a list of strings defining the types of arrays needed for
             the func. By default, use func.types
         """
-        
+
         # Get the signature and list of valid types for the function
         signature = kwargs.get("signature", None)
         if(signature == None): signature = func.signature
@@ -176,7 +180,7 @@ class ProcessingChain:
             raise TypeError("Could not find a type signature list for " + func.__name__ + ". Please supply a valid list of types.")
         for i, typestr in enumerate(types):
             types[i]=typestr.replace('->', '')
-        
+
         # make a list of parameters from *args. Replace any strings in the list
         # with numpy objects from vars_dict, where able
         params = []
@@ -186,7 +190,7 @@ class ProcessingChain:
                 if param_val is not None:
                     param=param_val
             params.append(param)
-        
+
         # Make sure arrays obey the broadcasting rules, and make a dictionary
         # of the correct dimensions
         dims_list = re.findall("\((.*?)\)", signature)
@@ -195,7 +199,7 @@ class ProcessingChain:
         for ipar, dims in enumerate(dims_list):
             if not isinstance(params[ipar], np.ndarray):
                 continue
-            
+
             fun_dims = outerdims + [d.strip() for d in dims.split(',') if d]
             arr_dims = list(params[ipar].shape)
             #check if arr_dims can be broadcast to match fun_dims
@@ -224,19 +228,19 @@ class ProcessingChain:
             # find type signatures that match type of array
             arr_type = params[ipar].dtype.char
             types = [type_sig for type_sig in types if arr_type==type_sig[ipar]]
-        
+
         # Get the type signature we are using
         if(not types):
             raise TypeError("Could not find a type signature matching the types of the variables given for " + func.__name__)
         elif(len(types)>1):
             self.__print(1, "Found multiple compatible type signatures for this function:", types, "Using signature " + types[0] + ".")
         types = [np.dtype(t) for t in types[0]]
-        
+
         # Reshape variable arrays to add broadcast dimensions and allocate new arrays as needed
         for i, param, dims, dtype in zip(range(len(params)), params, dims_list, types):
             shape = outerdims + [dims_dict[d.strip()] for d in dims.split(',') if d]
             if isinstance(param, str):
-                params[i] = self.__add_var(param, dtype, shape) 
+                params[i] = self.__add_var(param, dtype, shape)
             elif isinstance(param, np.ndarray):
                 arshape = list(param.shape)
                 for idim in range(-1, -1-len(shape), -1):
@@ -250,7 +254,7 @@ class ProcessingChain:
                     params[i] = dtype.type(round(param))
                 else:
                     params[i] = dtype.type(param)
-                
+
         # Make strings of input variables/constants for later printing
         proc_strs = []
         for i, arg in enumerate(args):
@@ -259,9 +263,9 @@ class ProcessingChain:
             else:
                 proc_strs.append(str(params[i]))
         proc_strs = tuple(proc_strs)
-        
+
         self.__print(2, 'Added processor: ' + func.__name__ + str(proc_strs).replace("'", ""))
-        
+
         # Add the function and bound parameters to the list of processors
         self.__proc_list.append((func, tuple(params)))
         self.__proc_strs.append(proc_strs)
@@ -271,7 +275,7 @@ class ProcessingChain:
         """Execute the dsp chain on the entire input/output buffers"""
         for begin in range(0, self._buffer_len, self._block_width):
             self.execute_block(begin)
-        
+
     def execute_block(self, offset=0):
         """Execute the dsp chain on a sub-set of the input/output buffers
         starting at entry offset, with length equal to the internal block size.
@@ -281,8 +285,8 @@ class ProcessingChain:
             self.__execute_procs(offset, end)
         else:
             self.__execute_procs_verbose(offset, end)
-            
-        
+
+
     def get_variable(self, varname):
         """Get the numpy array holding the internal memory buffer used for a
         named variable. The varname has the format
@@ -295,7 +299,7 @@ class ProcessingChain:
             raise KeyError(varname+' could not be parsed')
         name, construct, slice = parse.groups()
         val = None
-        
+
         if name in self.__vars_dict:
             val = self.__vars_dict[name]
         # if we did not varoable, but have a constructor expression, construct
@@ -323,7 +327,7 @@ class ProcessingChain:
             self.__vars_dict[name] = val
         # if variable was not defined and no constructor expression was found
         else: return None
-        
+
         # if we found a bracketed range, return a slice of that range
         if slice:
             try:
@@ -337,7 +341,7 @@ class ProcessingChain:
             else: raise TypeError('Could not slice array based on '+slice)
         else:
             return val
-    
+
     # Add an array of zeros to the vars dict called name and return it
     def __add_var(self, name, dtype, shape):
         if not re.match("\A\w+$", name):
@@ -349,7 +353,7 @@ class ProcessingChain:
         self.__print(2, 'Added variable ' + re.search('(\w+)', name).group(0) + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
         return arr
 
-    
+
     # copy from input buffers to variables
     # call all the processors on their paired arg tuples
     # copy from variables to list of output buffers
@@ -370,7 +374,7 @@ class ProcessingChain:
             np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
             names.discard(name)
-            
+
         self.__print(3, 'Processing:')
         for (func, args), strs in zip(self.__proc_list, self.__proc_strs):
             func(*args)
@@ -380,7 +384,7 @@ class ProcessingChain:
                     names.remove(name)
                     self.__print(3, name+' = '+str(arg))
                 except: pass
-                
+
         self.__print(3, 'Output:')
         for name, (buf, var) in self.__output_buffers.items():
             np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
@@ -393,7 +397,7 @@ class ProcessingChain:
         var = self.get_variable(varname)
         if buff is not None and not isinstance(buff, np.ndarray):
             raise ValueError("Buffers must be ndarrays.")
-        
+
         # if buffer length is not defined, figure out what it should be
         if buffer_len is not None:
             if self._buffer_len is None:
@@ -413,7 +417,7 @@ class ProcessingChain:
             if not dtype: dtype=var.dtype
             buff = np.zeros((self._buffer_len,)+var.shape[1:], dtype)
             returnbuffer=True
-            
+
         # Check that the buffer length is correct. For 1D buffer, reshape
         # it if possible, assuming array of structure ordering
         if not buff.shape[0] == self._buffer_len:
@@ -421,7 +425,7 @@ class ProcessingChain:
                 buff = buff.reshape(self._buffer_len, len(buff)//self._buffer_len)
             else:
                 raise ValueError("Buffer provided for " + varname + " is the wrong length.")
-            
+
         # Check that shape of buffer is compatible with shape of variable.
         # If variable does not yet exist, add it here
         if var is None:
@@ -429,7 +433,7 @@ class ProcessingChain:
             var = self.__add_var(varname, dtype, (self._block_width,)+buff.shape[1:])
         elif var.shape[1:] != buff.shape[1:]:
             raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
-        
+
         varname = re.search('(\w+)', varname).group(0)
         if input:
             self.__input_buffers[varname]=(buff, var)
@@ -450,3 +454,52 @@ class ProcessingChain:
             ret += '\n' + proc[0].__name__ + str(strs)
         ret += '\nOutput variables: ' + str([name for name in self.__output_buffers.keys()])
         return ret.replace("'", "")
+
+    def set_processor_list(self, json_file):
+
+        output_list = []
+        func_list = []
+        list = []
+        with open(json_file) as f:
+            config = json.load(f)
+
+        processors = config["processors"]
+        for key in processors:
+            output_list.append(key)
+
+        for output in output_list:
+
+            function = [processors[output]["function"], processors[output]["module"]]
+            func_list.append(function)
+            arg_list = processors[output]["args"]
+            settings = []
+            in_out = []
+
+            for key in processors[output]:
+
+                if "units" in key and key.split("_")[0] in arg_list:
+                    setting = float(processors[output][key].split("*")[0]) * unit_parser.parse_unit(processors[output][key].split("*")[1])
+                    in_out.append(setting)
+                elif key in arg_list:
+                    in_out.append(processors[output][key])
+                else:
+                    continue
+            settings.append(in_out)
+
+            if "kwargs" in processors[output]:
+                settings.append(processors[output]["kwargs"])
+
+            list.append(settings)
+
+        for i in range(len(func_list)):
+
+            settings = list[i]
+
+            if len(settings) == 1:
+                settings = list[i]
+                module = importlib.import_module(func_list[i][1])
+                self.add_processor(getattr(module, func_list[i][0]), *settings[0])
+
+            elif len(list[i]) == 2:
+                module = importlib.import_module(func_list[i][1])
+                self.add_processor(getattr(module, func_list[i][0]), *settings[0], **settings[1])

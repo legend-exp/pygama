@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys
+import sys, json
 import numpy as np
 import argparse
 
