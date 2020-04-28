@@ -34,7 +34,7 @@ def main():
     
     par = argparse.ArgumentParser(description="pygama dsp optimizer")
     arg, st, sf = par.add_argument, "store_true", "store_false"
-    arg("-d", "--dir", nargs=1, action="store", help="data directory")
+    arg("-d", "--dir", nargs=1, action="store", help="analysis directory")
     arg("-ds", nargs='*', action="store", help="load runs for a DS")
     arg("-r", "--run", nargs=1, help="load a single run")
     arg("-g", "--grid", action=st, help="set DSP parameters to be varied")
@@ -42,45 +42,47 @@ def main():
     arg("-p", "--process", action=st, help="run DSP processing")
     arg("-f", "--fit", action=st, help="fit outputs to peakshape function")
     arg("-t", "--plot", action=st, help="find optimal parameters & make plots")
-    arg("-z", "--zac", action=st, help="optimize ZAC filter")
+    arg("-c", "--case", nargs=1, help="case: 0 = trap filter, 1= ZAC filter")
     arg("-v", "--verbose", action=st, help="set verbose mode")
     args = vars(par.parse_args())
-    data_dir = "."
-    if args["dir"]: data_dir = args["dir"][0]
-    zac = 0
-    if args["zac"]: zac = 1
+    local_dir = "."
+    if args["dir"]: local_dir = args["dir"][0]
     
-    raw_file = f"{data_dir}/tier1/pgt_longtrace_run0117-20200110-105115-calib_raw.lh5"
+    case = 0
+    if args["case"]: case = int(args["case"][0])
+    if case == 0:
+        filt = "trap"
+        print("Run trap optimization")
+    elif case == 1:
+        filt = "zac"
+        print("Run ZAC optimization")
+    else:
+        print("Case not valid")
+        return
     
-    ds = pu.get_dataset_from_cmdline(args, "meta/runDB.json", "meta/calDB.json")
+    ds = pu.get_dataset_from_cmdline(args, f"{local_dir}/meta/runDB.json", f"{local_dir}/meta/calDB.json")
     #pprint(ds.paths)
     
-    d_out = "cage"
+    d_out = f"{local_dir}/cage"
     try: os.mkdir(d_out)
     except FileExistsError: print ("Directory '%s' already exists" % d_out)
     else: print ("Directory '%s' created" % d_out)
     
     f_tier1 = f"{d_out}/cage_optimizer_raw.h5"
-    if zac==1:
-        print("Run ZAC filter Optimization")
-        f_grid = f"{d_out}/zac_optimizer_grid.h5"
-        f_opt = f"{d_out}/zac_optimizer_dsp.h5"
-    else:
-        print("Run Trap filter Optimization")
-        f_grid = f"{d_out}/cage_optimizer_grid.h5"
-        f_opt = f"{d_out}/cage_optimizer_dsp.h5"
-        
+    f_grid = f"{d_out}/{filt}_optimizer_grid.h5"
+    f_opt = f"{d_out}/{filt}_optimizer_dsp.h5"
+            
     # -- run routines --
-    if args["grid"]: set_grid(f_grid,zac)
+    if args["grid"]: set_grid(f_grid,case)
     
     # generate a small single-peak file w/ uncalibrated energy to reanalyze
-    if args["window"]: window_ds(ds, raw_file, f_tier1)
+    if args["window"]: window_ds(ds, f_tier1)
     
     # create a file with DataFrames for each set of parameters
-    if args["process"]: process_ds(ds, f_grid, f_opt, f_tier1,zac)
+    if args["process"]: process_ds(f_grid, f_opt, f_tier1,case)
     
     # fit all outputs to the peakshape function and find the best resolution
-    if args["fit"]: get_fwhm(f_grid, f_opt, zac,verbose=args["verbose"])
+    if args["fit"]: get_fwhm(f_grid, f_opt, case, verbose=args["verbose"])
     
     # show results
     if args["plot"]:
@@ -88,109 +90,118 @@ def main():
         try: os.mkdir(d_plot)
         except FileExistsError: print ("Directory '%s' already exists" % d_plot)
         else: print ("Directory '%s' created" % d_plot)
-        plot_fwhm(f_grid,f_opt,d_plot,zac) 
+        plot_fwhm(f_grid,f_opt,d_plot,case) 
     
     
-def set_grid(f_grid,zac):
+def set_grid(f_grid,case):
     """
     create grid with set of parameters
     """
-    if zac==1:
+    if case==1:
         print("Creation of grid for ZAC optimization")
         sigmas = np.linspace(1, 50, 10, dtype='int16')
         flats =  np.linspace(1, 3, 3, dtype='int16')
         decays =  np.linspace(160, 160, 1, dtype='int16')
         lists = [sigmas, flats, decays]
-    else:
+    if case==0:
         print("Creation of grid for trap optimization")
         e_rises = np.linspace(1, 6, 10, dtype='float')
-        e_flats = np.linspace(0.5, 3.5, 3, dtype='float')
+        e_flats = np.linspace(1.5, 3.5, 3, dtype='float')
         rc_consts = np.linspace(50, 150, 1, dtype='float')
         lists = [e_rises, e_flats, rc_consts]
     
     prod = list(itertools.product(*lists))
     
-    if zac==1: df = pd.DataFrame(prod, columns=['sigma', 'flat','decay']) 
-    else: df = pd.DataFrame(prod, columns=['rise','flat','rc']) 
+    if case==1: df = pd.DataFrame(prod, columns=['sigma', 'flat','decay']) 
+    if case==0: df = pd.DataFrame(prod, columns=['rise','flat','rc']) 
     print(df)
     df.to_hdf(f_grid, key="pygama_optimization")
     print("Wrote grid file:", f_grid)
     
-    
-def window_ds(ds, raw_file, f_tier1):
+
+def window_ds(ds, f_tier1):
     """
     Take a DataSet and window it so that the output file only contains 
     events near the calibration peak at 2614.5 keV.
     """
-    print("Creating windowed raw file")
-    
-    #for run in ds.runs:
-    
-    conf = ds.config["daq_to_raw"]
-    print("conf",conf)
-    #read existing raw file
-    f = h5py.File(raw_file,'r')
-    #create new h5py file
+    print("Creating windowed raw file:",f_tier1)
     f_win = h5py.File(f_tier1, 'w')
-    print(f_tier1)
-    for ged in f.keys():
-        #if ged!='g060': continue
-        try: 
-            dset = f[ged]['raw']
-            #print("key: ",ged,"Data info: ",dset.keys())
-        except:
-            print("Not find raw key in:",ged)
-            continue
+    
+    raw_dir = ds.config["raw_dir"]
+    geds = ds.config["daq_to_raw"]["ch_groups"]["g{ch:0>3d}"]["ch_range"]
+
+    for ged in range(geds[0],geds[1]):
+        ged = f"g{ged:0>3d}"
+        #if ged!="g060": continue
+        count = 0
+        for p, d, files in os.walk(raw_dir):
+            for f in files:
+                if f.endswith(".lh5"):
+                    f_raw = h5py.File(f"{raw_dir}/{f}",'r')
+                    dset = f_raw[ged]['raw']
+                    if count == 0:
+                        energies = dset['energy'][()]
+                        bl   = dset['baseline'][()]
+                        ene  = dset['energy'][()]
+                        ievt = dset['ievt'][()]
+                        ntr  = dset['numtraces'][()]
+                        time = dset['timestamp'][()]
+                        wf_max = dset['wf_max'][()]
+                        wf_std = dset['wf_std'][()]
+                        wf = dset['waveform']['values'][()][()]
+                        wf_dt = dset['waveform']['dt'][()][()]
+                    else:
+                        energies = np.append(energies,dset['energy'][()],axis=0)
+                        bl = np.append(bl,dset['baseline'][()],axis=0)
+                        ievt = np.append(ievt,dset['ievt'][()],axis=0)
+                        ntr = np.append(ntr,dset['numtraces'][()],axis=0)
+                        time = np.append(time,dset['timestamp'][()],axis=0)
+                        wf_max = np.append(wf_max,dset['wf_max'][()],axis=0)
+                        wf_std = np.append(wf_std,dset['wf_std'][()],axis=0)
+                        wf = np.append(wf,dset['waveform']['values'][()][()],axis=0)
+                        wf_dt = np.append(wf_dt,dset['waveform']['dt'][()][()],axis=0)
+                    count += 1
+                    
         
-        try:
-            energies = dset['energy'][()]
-            maxe = np.amax(energies)
-            h, b, v = ph.get_hist(energies, bins=3500, range=(maxe/4,maxe))
-            bin_max = b[np.where(h == h.max())][0]
-            min_ene = int(bin_max*0.95)
-            max_ene = int(bin_max*1.05)
-            hist, bins, var = ph.get_hist(energies, bins=500, range=(min_ene, max_ene))
-            print(ged,"Raw energy max",maxe,"histogram max",h.max(),"at",bin_max )
-        except:
-            print("Maximum not find in:",ged)
-            continue
+        # search for 2.6 MeV peak
+        maxe = np.amax(energies)
+        h, b, v = ph.get_hist(energies, bins=3500, range=(maxe/4,maxe))
+        bin_max = b[np.where(h == h.max())][0]
+        min_ene = int(bin_max*0.95)
+        max_ene = int(bin_max*1.05)
+        hist, bins, var = ph.get_hist(energies, bins=500, range=(min_ene, max_ene))
+        print(ged,"Raw energy max",maxe,"histogram max",h.max(),"at",bin_max )
         
-        #create dataset for windowed file
-        try:
-            bl_win = dset['baseline'][(energies>min_ene) & (energies<max_ene)]
-            ene_win = dset['energy'][(energies>min_ene) & (energies<max_ene)]
-            ievt_win = dset['ievt'][(energies>min_ene) & (energies<max_ene)]
-            ntr_win = dset['numtraces'][(energies>min_ene) & (energies<max_ene)]
-            time_win = dset['timestamp'][(energies>min_ene) & (energies<max_ene)]
-            wf_max_win = dset['wf_max'][(energies>min_ene) & (energies<max_ene)]
-            wf_std_win = dset['wf_std'][(energies>min_ene) & (energies<max_ene)]
-            wf_win = dset['waveform']['values'][()][(energies>min_ene) & (energies<max_ene)]
-            wf_win_dt = dset['waveform']['dt'][()][(energies>min_ene) & (energies<max_ene)]
-        except:
-            print("Windowing error in:",ged)
-            
-        try:
-            f_win.create_dataset(ged+"/raw/energy",dtype='f',data=ene_win)
-            f_win.create_dataset(ged+"/raw/ievt",dtype='i',data=ievt_win)
-            f_win.create_dataset(ged+"/raw/baseline",dtype='f',data=bl_win)
-            f_win.create_dataset(ged+"/raw/numtraces",dtype='i',data=ntr_win)
-            f_win.create_dataset(ged+"/raw/timestamp",dtype='i',data=time_win)
-            f_win.create_dataset(ged+"/raw/wf_max",dtype='f',data=wf_max_win)
-            f_win.create_dataset(ged+"/raw/wf_std",dtype='f',data=wf_std_win)
-            f_win.create_dataset(ged+"/raw/waveform/values",dtype='f',data=wf_win)
-            d_dt = f_win.create_dataset(ged+"/raw/waveform/dt",dtype='f',data=wf_win_dt)
-            d_dt.attrs['units'] = 'ns'
-            f_win.attrs['datatype'] = 'table{energy,ievt,baseline,numtraces,timestamp,wf_max,wf_std,waveform}'
-            print("Created datasets",ged+"/raw")
-        except:
-            print("Problem in datasets creation in",ged)
-            continue
+        # windowing
+        bl_win = bl[(energies>min_ene) & (energies<max_ene)]
+        ene_win = energies[(energies>min_ene) & (energies<max_ene)]
+        ievt_win = ievt[(energies>min_ene) & (energies<max_ene)]
+        ntr_win = ntr[(energies>min_ene) & (energies<max_ene)]
+        time_win = time[(energies>min_ene) & (energies<max_ene)]
+        wf_max_win = wf_max[(energies>min_ene) & (energies<max_ene)]
+        wf_std_win = wf_std[(energies>min_ene) & (energies<max_ene)]
+        wf_win = wf[()][(energies>min_ene) & (energies<max_ene)]
+        wf_win_dt = wf_dt[()][(energies>min_ene) & (energies<max_ene)]
+
+        # create datasets
+        f_win.create_dataset(ged+"/raw/energy",dtype='f',data=ene_win)
+        f_win.create_dataset(ged+"/raw/ievt",dtype='i',data=ievt_win)
+        f_win.create_dataset(ged+"/raw/baseline",dtype='f',data=bl_win)
+        f_win.create_dataset(ged+"/raw/numtraces",dtype='i',data=ntr_win)
+        f_win.create_dataset(ged+"/raw/timestamp",dtype='i',data=time_win)
+        f_win.create_dataset(ged+"/raw/wf_max",dtype='f',data=wf_max_win)
+        f_win.create_dataset(ged+"/raw/wf_std",dtype='f',data=wf_std_win)
+        f_win.create_dataset(ged+"/raw/waveform/values",dtype='f',data=wf_win)
+        d_dt = f_win.create_dataset(ged+"/raw/waveform/dt",dtype='f',data=wf_win_dt)
+        d_dt.attrs['units'] = 'ns'
+        f_win.attrs['datatype'] = 'table{energy,ievt,baseline,numtraces,timestamp,wf_max,wf_std,waveform}'
+        print("Created datasets",ged+"/raw")
         
     f_win.close()        
     print("wrote file:", f_tier1)
     
     
-def process_ds(ds, f_grid, f_opt, f_tier1, zac):
+def process_ds(f_grid, f_opt, f_tier1, case):
     """
     process the windowed raw file 'f_tier1' and create the DSP file 'f_opt'
     
@@ -238,11 +249,11 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
         proc.add_processor(pole_zero, "wf_blsub", 145*us, "wf_pz")
         
         for i, row in df_grid.iterrows():
-            if zac==1:
+            if case==1:
                 sigma, flat, decay = row/dt0*1000
                 proc.add_processor(zac_filter(wsize, sigma, flat, decay),"wf", f"wf_zac_{i}(101, f)")
                 proc.add_processor(np.amax, f"wf_zac_{i}", 1, f"zacE_{i}", signature='(n),()->()', types=['fi->f'])
-            else:
+            if case==0:
                 rise, flat, rc = row
                 proc.add_processor(trap_norm, "wf_pz", rise*us, flat*us, f"wf_trap_{i}")
                 proc.add_processor(asymTrapFilter, "wf_pz", rise*us, flat*us, rc*us, "wf_atrap")
@@ -254,9 +265,9 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
         # Set up the LH5 output
         lh5_out = lh5.Table(size=proc._buffer_len)
         for i, row in df_grid.iterrows():#loop on parameters
-            if zac==1:
+            if case==1:
                 lh5_out.add_field(f"zacE_{i}", lh5.Array(proc.get_output_buffer(f"zacE_{i}"), attrs={"units":"ADC"}))
-            else:
+            if case==0:
                 lh5_out.add_field(f"trapEmax_{i}", lh5.Array(proc.get_output_buffer(f"trapEmax_{i}"), attrs={"units":"ADC"}))
                 lh5_out.add_field(f"trapEftp_{i}", lh5.Array(proc.get_output_buffer(f"trapEftp_{i}"), attrs={"units":"ADC"}))
         
@@ -278,7 +289,7 @@ def process_ds(ds, f_grid, f_opt, f_tier1, zac):
     print(f"Time to process: {diff:.2f} s")
         
 
-def get_fwhm(f_grid, f_opt, zac, verbose=False):
+def get_fwhm(f_grid, f_opt, case, verbose=False):
     """
     this code fits the 2.6 MeV peak using the gauss+step function
     and writes new columns to the df_grid "fwhm", "fwhmerr"
@@ -300,8 +311,8 @@ def get_fwhm(f_grid, f_opt, zac, verbose=False):
             
         for i, row in df_grid.iterrows():
             try:
-                if zac==1: energies = data[f"zacE_{i}"][()]
-                else: energies = data[f"trapEmax_{i}"][()]
+                if case==1: energies = data[f"zacE_{i}"][()]
+                if case==0: energies = data[f"trapEmax_{i}"][()]
                 mean = np.mean(energies)
                 bins = 12000
                 hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
@@ -374,7 +385,7 @@ def get_fwhm(f_grid, f_opt, zac, verbose=False):
         print("Update grid file:",f_grid,"with detector",group)
         print(df_grid)
             
-def plot_fwhm(f_grid,f_opt,d_plot,zac):
+def plot_fwhm(f_grid,f_opt,d_plot,case):
     """
     select the best energy resolution, plot best result fit and fwhm vs parameters
     """
@@ -397,10 +408,8 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             df_min = df_grid.loc[minidx]
             print("Best parameters:\n",df_min)
             #plot best result fit
-            if zac==1:
-                energies = data[f"zacE_{minidx}"][()]
-            else:
-                energies = data[f"trapEmax_{minidx}"][()]
+            if case==0: energies = data[f"trapEmax_{minidx}"][()]
+            if case==1: energies = data[f"zacE_{minidx}"][()]
             mean = np.mean(energies)
             bins = 12000
             hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
@@ -427,11 +436,11 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             plt.xlabel(f"ADC channels", ha='right', x=1)
             plt.ylabel("Counts", ha='right', y=1)
             plt.legend(loc=2, fontsize=10,title=f"FWHM = {fwhm:.2f} $\pm$ {fwhmerr:.2f} keV")
-            if zac==1: plt.savefig(f"{d_det}/Fit_{group}-zac.pdf")
-            else: plt.savefig(f"{d_det}/Fit_{group}-trap.pdf")
+            if case==1: plt.savefig(f"{d_det}/Fit_{group}-zac.pdf")
+            if case==0: plt.savefig(f"{d_det}/Fit_{group}-trap.pdf")
             plt.cla()
         except: continue
-        if zac==1:
+        if case==1:
             #try:
             sigma, flat, decay = df_min[:3]
             # 1. vary the sigma cusp
@@ -460,7 +469,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,zac):
             plt.cla()
             #except:
             #print("")
-        else:
+        if case==0:
             rise, flat, rc = df_min[:3]
             # 1. vary the rise time
             df_rise = df_grid.loc[(df_grid.flat==flat)&(df_grid.rc==rc)]
