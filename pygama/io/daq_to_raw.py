@@ -85,7 +85,7 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
            print("File already exists, continuing ...")
            return
 
-    if 'file_label' in raw_filename:
+    if 'subsystem' in raw_filename:
        ch_groups = config['daq_to_raw']['ch_groups']
        for group, attrs in ch_groups.items():
            out_filename = raw_filename.format_map(attrs)
@@ -127,7 +127,7 @@ def daq_to_raw(daq_filename, raw_filename=None, run=None, prefix="t1",
 
     elapsed = time.time() - t_start
     print("Time elapsed: {:.2f} sec".format(elapsed))
-    if 'file_label' not in raw_filename:
+    if 'subsystem' not in raw_filename:
         statinfo = os.stat(raw_filename)
         print("File size: {}".format(sizeof_fmt(statinfo.st_size)))
         print("Conversion speed: {}ps".format(sizeof_fmt(statinfo.st_size/elapsed)))

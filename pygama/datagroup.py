@@ -95,6 +95,11 @@ class DataGroup:
             for path, folders, files in os.walk(self.config['daq_dir']):
                 
                 if any(rl in path for rl in self.run_labels):
+                    
+                    # get the run number
+                    run = [rl for rl in self.run_labels if rl in path][0]
+                    run = int(run.split('run')[-1])
+                    
                     for f in sorted(files):
                         
                         # only accept files matching our template
@@ -103,6 +108,7 @@ class DataGroup:
                             finfo = finfo.named # convert to dict
                             finfo['path'] = path
                             finfo['file'] = f
+                            finfo['run'] = run
                             
                             # convert to pd.datetime64 for easier sorting
                             ts = finfo['YYYYmmdd'] + finfo['hhmmss']
@@ -125,14 +131,19 @@ class DataGroup:
             # here as a "subrun" number
             print('lol tbd')
             
-            
+
         # convert found files to DataFrame
         self.daq_files = pd.DataFrame(daq_files)
         
-        return self.daq_files
         
-            
-    def get_raw_files(self):
-        """
-        """
-        print('hi')
+        # calculate output filenames needed by daq_to_raw
+        raw_tmp = self.config['daq_to_raw']['raw_filename_template']
+        
+        print(self.daq_files.columns)
+        print(raw_tmp)
+        exit()
+        
+        
+        print(raw_tmp)
+        
+                

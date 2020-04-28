@@ -1,59 +1,70 @@
 #!/usr/bin/env python3
 """
-Utility to create data directories following the LEGEND convention.
+Define data storage directories for a LEGEND experiment (LPGTA, L200A, etc.)
+Requires an env variable pointing to the base data directory, and another 
+pointing to the legend-metadata directory.
 
-Requires:
-    A metadata directory with a config file for this experiment:
-        export LEGEND_META=/some/other/directory
-    A data directory with the experiment name (LPGTA, L200A, etc.):
-        export LPGTA_DATA=/some/directory
-
+$LPGTA_DATA
++-- LPGTA | L200A
+    |-- raw | dsp | hit
+    |   +-- gNNN | spms | pmts | auxs | pNNN
+    |       +-- phy | cal | trn | lac | tst
+    |           + cycle files
+    |-- evt|tmap
+    |   +-- phy | cal | trn | lac | tst
+    |       + run files
+    
+$LEGEND_META
++-- legend_metadata
+    |-- analysis
+    |   +-- LDQTA | LPGTA | L200A
+    |       + LPGTA.json (main config)
+    |       + runDB.json (run index)
+    |       +-- ged-dsp | ged-ene | ged-aoe
+    |           + run files
+    |       +-- chmap
+    |           + channel map files
+    |-- hardware
+    |   +-- detectors
+    |       + attribute files
+    |   +-- materials
+    
 Source:
 https://docs.legend-exp.org/index.php/apps/files/?dir=/LEGEND%20Documents/Technical%20Documents/Analysis&fileid=9140#pdfviewer
 """
 import os, json
 from pprint import pprint
+import itertools
 from pathlib import Path
 
-test_mode = False
-if test_mode:
-    print('Test mode, not creating directories')
-else:
-    print('Creating directories ...')
+datadir = os.environ.get('LPGTA_DATA')
+metadir = os.environ.get('LEGEND_META') + '/analysis/LPGTA'
 
-# define base data directory and load primary config file
-datadir = os.path.expandvars('$LPGTA_DATA')
-metadir = os.path.expandvars('$LEGEND_META/analysis/LPGTA/')
-with open(metadir + "LPGTA.json") as f:
+with open(f'{metadir}/LPGTA.json') as f:
     config = json.load(f)
     
-# get a list of run types we want to include
 run_types = config['run_types']
+hit_dirs = config['hit_dirs']
+event_dirs = config['event_dirs']
 
-# get a list of subsystems (data takers)
-subsystems = []
-ch_groups = config['daq_to_raw']['ch_groups']
-for grp in ch_groups:
-    if 'g{' in grp:
-        clo, chi = ch_groups[grp]['ch_range']
-        for ch in range(clo, chi+1): # inclusive
-            subsystems.append(f'g{ch:0>3d}')
+# get the active ge detectors from the main config file
+ch_groups = []
+for key, val in config['daq_to_raw']['ch_groups'].items():
+    if 'g{' in key:
+        clo, chi = val['ch_range']
+        geds = [f'g{ch:0>3d}' for ch in range(clo, chi+1)]
+        ch_groups.extend(geds)
     else:
-        subsystems.append(grp)
-         
-# create hit-level directories
-for hdir in config['hit_dirs']:
-    for sysn in subsystems:
-        for rt in run_types:
-            fpath = f'{datadir}/{hdir}/{sysn}/{rt}'
-            if not test_mode:
-                Path(fpath).mkdir(parents=True, exist_ok=True)
-            print(fpath)
-    
-# create event-level directories
-for edir in config['event_dirs']:
-    for rt in run_types:
-        fpath = f'{datadir}/{edir}/{rt}'
-        if not test_mode:
-            Path(fpath).mkdir(parents=True, exist_ok=True)
-        print(fpath)
+        ch_groups.append(key)
+
+# create directories for hit-level data
+for base, rtype, chan in itertools.product(hit_dirs, run_types, ch_groups):
+    dirname = f'{datadir}/{base}/{rtype}/{chan}'
+    Path(dirname).mkdir(parents=True, exist_ok=True)
+    print(dirname)
+        
+# create directories for event-level data
+for dir in config['event_dirs']:
+    dirname = f'{datadir}/{dir}'
+    Path(dirname).mkdir(parents=True, exist_ok=True)
+    print(dirname)
