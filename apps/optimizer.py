@@ -42,6 +42,7 @@ def main():
     arg("-p", "--process", action=st, help="run DSP processing")
     arg("-f", "--fit", action=st, help="fit outputs to peakshape function")
     arg("-t", "--plot", action=st, help="find optimal parameters & make plots")
+    arg("-cf", "--compare", action=st, help="compare fwhm")
     arg("-c", "--case", nargs=1, help="case: 0 = trap filter, 1= ZAC filter")
     arg("-v", "--verbose", action=st, help="set verbose mode")
     args = vars(par.parse_args())
@@ -89,12 +90,10 @@ def main():
     if args["fit"]: get_fwhm(f_grid, f_opt, case, verbose=args["verbose"])
     
     # show results
-    if args["plot"]:
-        d_plot = f"{d_out}/plots"
-        try: os.mkdir(d_plot)
-        except FileExistsError: print ("Directory '%s' already exists" % d_plot)
-        else: print ("Directory '%s' created" % d_plot)
-        plot_fwhm(f_grid,f_opt,d_plot,case) 
+    if args["plot"]: plot_fwhm(f_grid,f_opt,d_out,case) 
+
+    # compare fwhm results
+    if args["compare"]: compare_fwhm(d_out) 
     
     
 def set_grid(f_grid,case):
@@ -109,10 +108,10 @@ def set_grid(f_grid,case):
         lists = [sigmas, flats, decays]
     if case==0:
         print("Creation of grid for trap optimization")
-        e_rises = np.linspace(1, 6, 10, dtype='float')
-        e_flats = np.linspace(1.5, 3.5, 3, dtype='float')
-        rc_consts = np.linspace(50, 150, 1, dtype='float')
-        lists = [e_rises, e_flats, rc_consts]
+        rises = np.linspace(1, 6, 10, dtype='float')
+        flats = np.linspace(1.5, 3.5, 3, dtype='float')
+        rcs = np.linspace(50, 150, 1, dtype='float')
+        lists = [rises, flats, rcs]
     
     prod = list(itertools.product(*lists))
     
@@ -140,7 +139,7 @@ def window_ds(ds, f_tier1):
         count = 0
         for p, d, files in os.walk(raw_dir):
             for f in files:
-                if f.endswith(".lh5"):
+                if (f.endswith(".lh5")) & ("calib" in f):
                     print("Opening raw file:",f)
                     f_raw = h5py.File(f"{raw_dir}/{f}",'r')
                     if count == 0:
@@ -154,6 +153,8 @@ def window_ds(ds, f_tier1):
         energies = dsets[0]
         maxe = np.amax(energies)
         h, b, v = ph.get_hist(energies, bins=3500, range=(maxe/4,maxe))
+        xp = b[np.where(h > h.max()*0.1)][-1]
+        h, b = h[np.where(b < xp-200)], b[np.where(b < xp-200)]
         bin_max = b[np.where(h == h.max())][0]
         min_ene = int(bin_max*0.95)
         max_ene = int(bin_max*1.05)
@@ -278,7 +279,7 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
         cols = [f"fwhm_{ged}", f"fwhmerr_{ged}", f"rchi2_{ged}"]
         for col in cols:
             df_grid[col] = np.nan
-            
+        
         for i, row in df_grid.iterrows():
             try:
                 if case==1: energies = data[f"zacE_{i}"][()]
@@ -355,27 +356,31 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
         print("Update grid file:",f_grid,"with detector",ged)
         print(df_grid)
             
-def plot_fwhm(f_grid,f_opt,d_plot,case):
+def plot_fwhm(f_grid,f_opt,d_out,case):
     """
     select the best energy resolution, plot best result fit and fwhm vs parameters
     """
     print("Grid file:",f_grid)
     df_grid = pd.read_hdf(f_grid)
+    if case == 0:
+        f_res = f"{d_out}/trap_results.h5"
+        df = pd.DataFrame(columns=['ged','rise','flat','rc','fwhm','fwhmerr'])
+    if case == 1:
+        f_res = f"{d_out}/zac_results.h5"
+        df = pd.DataFrame(columns=['ged','sigma','flat','decay','fwhm','fwhmerr'])
     f = h5py.File(f_opt,'r')
-    for ged in f.keys():
-        d_det = f"{d_plot}/{ged}"
+    for chn, ged in enumerate(f.keys()):
+        d_det = f"{d_out}/{ged}"
         try: os.mkdir(d_det)
-        except FileExistsError: print ("Directory '%s' already exists" % d_det)
+        except FileExistsError: pass
         else: print ("Directory '%s' created" % d_det)
 
         data =  f[ged]['data']
-        print("Detector:",ged)
         # find fwhm minimum values
+        df_grid = df_grid.loc[(df_grid[f"rchi2_{ged}"]<20)&(df_grid[f"fwhm_{ged}"]>0)]
+        minidx = df_grid[f'fwhm_{ged}'].idxmin()
+        df_min = df_grid.loc[minidx]
         try:
-            df_grid = df_grid.loc[(df_grid[f"rchi2_{ged}"]<20)&(df_grid[f"fwhm_{ged}"]>0)]
-            minidx = df_grid[f'fwhm_{ged}'].idxmin()
-            df_min = df_grid.loc[minidx]
-            print("Best parameters:\n",df_min)
             #plot best result fit
             if case==0: energies = data[f"trapEmax_{minidx}"][()]
             if case==1: energies = data[f"zacE_{minidx}"][()]
@@ -412,6 +417,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
         if case==1:
             #try:
             sigma, flat, decay = df_min[:3]
+            results = [ged, f'{sigma:.2f}', f'{flat:.2f}', f'{decay:.2f}', f'{fwhm:.2f}', f'{fwhmerr:.2f}']
             # 1. vary the sigma cusp
             df_sigma = df_grid.loc[(df_grid.flat==flat)&(df_grid.decay==decay)&(df_grid.decay==decay)]
             x, y, err =  df_sigma['sigma'], df_sigma[f'fwhm_{ged}'], df_sigma[f'fwhmerr_{ged}']
@@ -440,6 +446,7 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
             #print("")
         if case==0:
             rise, flat, rc = df_min[:3]
+            results = [ged, f'{rise:.2f}', f'{flat:.2f}', f'{rc:.2f}', f'{fwhm:.2f}', f'{fwhmerr:.2f}']
             # 1. vary the rise time
             df_rise = df_grid.loc[(df_grid.flat==flat)&(df_grid.rc==rc)]
             x, y, err =  df_rise['rise'], df_rise[f'fwhm_{ged}'], df_rise[f'fwhmerr_{ged}']
@@ -469,9 +476,36 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
             plt.savefig(f"{d_det}/FWHM_vs_RC_{ged}-trap.pdf")
             plt.cla()
-        
-                
+        df.loc[chn] = results
+    
+    df.to_hdf(f_res, key='results',mode='w')
+    print(df)
 
+def compare_fwhm(d_out):
+    print("Comparing FWHM using trap and zac filters")
+    df_trap = pd.read_hdf(f'{d_out}/trap_results.h5',key='results')
+    df_zac = pd.read_hdf(f'{d_out}/zac_results.h5',key='results')
+    dets = range(len(df_trap['fwhm']))
+    fwhm_trap = np.array([float(df_trap['fwhm'][i]) for i in dets])
+    fwhm_trap_err = np.array([float(df_trap['fwhmerr'][i]) for i in dets])
+    fwhm_zac = np.array([float(df_zac['fwhm'][i]) for i in dets])
+    fwhm_zac_err = np.array([float(df_zac['fwhmerr'][i]) for i in dets])
+    fwhm_diff = 100*(fwhm_trap - fwhm_zac)/fwhm_trap
+    fwhm_diff_err =  100*np.sqrt(np.square(fwhm_trap_err)  + np.square(fwhm_zac_err) )/fwhm_trap
+    plt.errorbar(dets,fwhm_trap,fwhm_trap_err,fmt='o',c='red',label='trap filter')
+    plt.errorbar(dets,fwhm_zac,fwhm_zac_err,fmt='o',c='blue',label='zac filter')
+    plt.xlabel("detector number", ha='right', x=1)
+    plt.ylabel("FWHM (keV)", ha='right', y=1)
+    plt.legend()
+    plt.savefig(f"{d_out}/FWHM_compare.pdf")
+    plt.cla()
+    plt.errorbar(dets,fwhm_diff,fwhm_diff_err,fmt='o',c='green',label='FWHM difference')
+    plt.xlabel("detector number", ha='right', x=1)
+    plt.ylabel("FWHM difference (%)", ha='right', y=1)
+    plt.legend()
+    plt.savefig(f"{d_out}/FWHM_diff.pdf")
+    
+    
     
 if __name__=="__main__":
     main()
