@@ -47,7 +47,7 @@ def main():
     args = vars(par.parse_args())
     local_dir = "."
     if args["dir"]: local_dir = args["dir"][0]
-    
+    run = args["run"][0]
     case = 0
     if args["case"]: case = int(args["case"][0])
     if case == 0:
@@ -64,6 +64,10 @@ def main():
     #pprint(ds.paths)
     
     d_out = f"{local_dir}/cage"
+    try: os.mkdir(d_out)
+    except FileExistsError: print ("Directory '%s' already exists" % d_out)
+    else: print ("Directory '%s' created" % d_out)
+    d_out = f"{d_out}/run{run}"
     try: os.mkdir(d_out)
     except FileExistsError: print ("Directory '%s' already exists" % d_out)
     else: print ("Directory '%s' created" % d_out)
@@ -129,41 +133,25 @@ def window_ds(ds, f_tier1):
     
     raw_dir = ds.config["raw_dir"]
     geds = ds.config["daq_to_raw"]["ch_groups"]["g{ch:0>3d}"]["ch_range"]
-
-    for ged in range(geds[0],geds[1]):
+    cols = ['energy','baseline','ievt','numtraces','timestamp','wf_max','wf_std','waveform/values','waveform/dt']
+    
+    for ged in range(geds[0],geds[1]+1):
         ged = f"g{ged:0>3d}"
-        #if ged!="g060": continue
         count = 0
         for p, d, files in os.walk(raw_dir):
             for f in files:
                 if f.endswith(".lh5"):
+                    print("Opening raw file:",f)
                     f_raw = h5py.File(f"{raw_dir}/{f}",'r')
-                    dset = f_raw[ged]['raw']
                     if count == 0:
-                        energies = dset['energy'][()]
-                        bl   = dset['baseline'][()]
-                        ene  = dset['energy'][()]
-                        ievt = dset['ievt'][()]
-                        ntr  = dset['numtraces'][()]
-                        time = dset['timestamp'][()]
-                        wf_max = dset['wf_max'][()]
-                        wf_std = dset['wf_std'][()]
-                        wf = dset['waveform']['values'][()][()]
-                        wf_dt = dset['waveform']['dt'][()][()]
+                        cdate, ctime = f.split('run')[-1].split('-')[1], f.split('run')[-1].split('-')[2]
+                        dsets = [ f_raw[ged]['raw'][col][()]  for col in cols ]
                     else:
-                        energies = np.append(energies,dset['energy'][()],axis=0)
-                        bl = np.append(bl,dset['baseline'][()],axis=0)
-                        ievt = np.append(ievt,dset['ievt'][()],axis=0)
-                        ntr = np.append(ntr,dset['numtraces'][()],axis=0)
-                        time = np.append(time,dset['timestamp'][()],axis=0)
-                        wf_max = np.append(wf_max,dset['wf_max'][()],axis=0)
-                        wf_std = np.append(wf_std,dset['wf_std'][()],axis=0)
-                        wf = np.append(wf,dset['waveform']['values'][()][()],axis=0)
-                        wf_dt = np.append(wf_dt,dset['waveform']['dt'][()][()],axis=0)
+                        for i, col in enumerate(cols): dsets[i] = np.append(dsets[i],f_raw[ged]['raw'][col][()],axis=0)
                     count += 1
-                    
         
         # search for 2.6 MeV peak
+        energies = dsets[0]
         maxe = np.amax(energies)
         h, b, v = ph.get_hist(energies, bins=3500, range=(maxe/4,maxe))
         bin_max = b[np.where(h == h.max())][0]
@@ -173,28 +161,12 @@ def window_ds(ds, f_tier1):
         print(ged,"Raw energy max",maxe,"histogram max",h.max(),"at",bin_max )
         
         # windowing
-        bl_win = bl[(energies>min_ene) & (energies<max_ene)]
-        ene_win = energies[(energies>min_ene) & (energies<max_ene)]
-        ievt_win = ievt[(energies>min_ene) & (energies<max_ene)]
-        ntr_win = ntr[(energies>min_ene) & (energies<max_ene)]
-        time_win = time[(energies>min_ene) & (energies<max_ene)]
-        wf_max_win = wf_max[(energies>min_ene) & (energies<max_ene)]
-        wf_std_win = wf_std[(energies>min_ene) & (energies<max_ene)]
-        wf_win = wf[()][(energies>min_ene) & (energies<max_ene)]
-        wf_win_dt = wf_dt[()][(energies>min_ene) & (energies<max_ene)]
-
-        # create datasets
-        f_win.create_dataset(ged+"/raw/energy",dtype='f',data=ene_win)
-        f_win.create_dataset(ged+"/raw/ievt",dtype='i',data=ievt_win)
-        f_win.create_dataset(ged+"/raw/baseline",dtype='f',data=bl_win)
-        f_win.create_dataset(ged+"/raw/numtraces",dtype='i',data=ntr_win)
-        f_win.create_dataset(ged+"/raw/timestamp",dtype='i',data=time_win)
-        f_win.create_dataset(ged+"/raw/wf_max",dtype='f',data=wf_max_win)
-        f_win.create_dataset(ged+"/raw/wf_std",dtype='f',data=wf_std_win)
-        f_win.create_dataset(ged+"/raw/waveform/values",dtype='f',data=wf_win)
-        d_dt = f_win.create_dataset(ged+"/raw/waveform/dt",dtype='f',data=wf_win_dt)
-        d_dt.attrs['units'] = 'ns'
-        f_win.attrs['datatype'] = 'table{energy,ievt,baseline,numtraces,timestamp,wf_max,wf_std,waveform}'
+        for i, col in enumerate(cols):
+            dsets[i] = dsets[i][(energies>min_ene) & (energies<max_ene)]
+            d_dt = f_win.create_dataset(ged+"/raw/"+col,dtype='f',data=dsets[i])
+            d_dt.attrs['units'] = 'ns'
+        
+        f_win.attrs['datatype'] = 'table{cols}'
         print("Created datasets",ged+"/raw")
         
     f_win.close()        
@@ -220,17 +192,16 @@ def process_ds(f_grid, f_opt, f_tier1, case):
     
     t_start = time.time()
     #for group in groups:
-    for group in f.keys():#loop on detectors
-        #if group!='g060': continue
-        if group == 'g028':
+    for idx, ged in enumerate(f.keys()):
+        if idx == 4:
             diff = time.time() - t_start
             tot = diff/5 * len(df_grid) / 60
             tot -= diff / 60
             print(f"Estimated remaining time: {tot:.2f} mins")
         
-        print("Detector:",group)
+        print("Detector:",ged)
         #data = lh5_in.read_object(group, f_tier1)
-        data =  f[group]['raw']
+        data =  f[ged]['raw']
         
         #wf_in = data['waveform']['values'].nda
         #dt = data['waveform']['dt'].nda[0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
@@ -276,7 +247,7 @@ def process_ds(f_grid, f_opt, f_tier1, case):
         
         #groupname = group[:group.rfind('/')+1]+"data"
         #groupname = df_key+"/"+group+"/data"
-        groupname = group+"/data"
+        groupname = ged+"/data"
         print("Writing to: " + f_opt + "/" + groupname)
         lh5_in.write_object(lh5_out, groupname, f_opt)
         print("")
@@ -299,13 +270,12 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
     df_grid = pd.read_hdf(f_grid)
 
     f = h5py.File(f_opt,'r')
-    for group in f.keys():
-        #if group!='g060': continue
-        print("Detector:",group)
-        data =  f[group]['data']
+    for ged in f.keys():
+        print("Detector:",ged)
+        data =  f[ged]['data']
         
         # declare some new columns for df_grid
-        cols = [f"fwhm_{group}", f"fwhmerr_{group}", f"rchi2_{group}"]
+        cols = [f"fwhm_{ged}", f"fwhmerr_{ged}", f"rchi2_{ged}"]
         for col in cols:
             df_grid[col] = np.nan
             
@@ -317,7 +287,7 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
                 bins = 12000
                 hE, xE, vE = ph.get_hist(energies,bins,(mean/2,mean*2))
             except:
-                print("Energy not find in",group,"and entry",i)
+                print("Energy not find in",ged,"and entry",i)
             
             # set histogram centered and symmetric on the peak
             mu = xE[np.argmax(hE)]
@@ -356,11 +326,11 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
                 fwhmerr = xF_err[2] * 2.355 * 2614.5 / mu 
                 rchi2 = sum(np.array(chisq) / len(hE))
                 
-                df_grid.at[i, f"fwhm_{group}"] = fwhm
-                df_grid.at[i, f"fwhmerr_{group}"] = fwhmerr
-                df_grid.at[i, f"rchi2_{group}"] = rchi2
+                df_grid.at[i, f"fwhm_{ged}"] = fwhm
+                df_grid.at[i, f"fwhmerr_{ged}"] = fwhmerr
+                df_grid.at[i, f"rchi2_{ged}"] = rchi2
             except:
-                print("Fit not computed for detector",group,"and entry",i)
+                print("Fit not computed for detector",ged,"and entry",i)
                 
             if verbose:
                 plt.cla()
@@ -370,7 +340,7 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
                 step = np.array(step)
                 plt.plot(xE, gaus, ls="--", lw=2, c='g', label="gaus")
                 plt.plot(xE, step, ls='--', lw=2, c='m', label='step + bg')
-                plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {group}")
+                plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {ged}")
                 plt.xlabel(f"ADC channels", ha='right', x=1)
                 plt.ylabel("Counts", ha='right', y=1)
                 plt.legend(loc=2, fontsize=10,title=f"FWHM = {fwhm:.2f} $\pm$ {fwhmerr:.2f} keV")
@@ -382,7 +352,7 @@ def get_fwhm(f_grid, f_opt, case, verbose=False):
                 df_grid.to_hdf(f_grid, key="pygama_optimization")
 
     if not verbose:
-        print("Update grid file:",f_grid,"with detector",group)
+        print("Update grid file:",f_grid,"with detector",ged)
         print(df_grid)
             
 def plot_fwhm(f_grid,f_opt,d_plot,case):
@@ -392,19 +362,18 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
     print("Grid file:",f_grid)
     df_grid = pd.read_hdf(f_grid)
     f = h5py.File(f_opt,'r')
-    for group in f.keys():
-        #if group!='g060': continue
-        d_det = f"{d_plot}/{group}"
+    for ged in f.keys():
+        d_det = f"{d_plot}/{ged}"
         try: os.mkdir(d_det)
         except FileExistsError: print ("Directory '%s' already exists" % d_det)
         else: print ("Directory '%s' created" % d_det)
 
-        data =  f[group]['data']
-        print("Detector:",group)
+        data =  f[ged]['data']
+        print("Detector:",ged)
         # find fwhm minimum values
         try:
-            df_grid = df_grid.loc[(df_grid[f"rchi2_{group}"]<20)&(df_grid[f"fwhm_{group}"]>0)]
-            minidx = df_grid[f'fwhm_{group}'].idxmin()
+            df_grid = df_grid.loc[(df_grid[f"rchi2_{ged}"]<20)&(df_grid[f"fwhm_{ged}"]>0)]
+            minidx = df_grid[f'fwhm_{ged}'].idxmin()
             df_min = df_grid.loc[minidx]
             print("Best parameters:\n",df_min)
             #plot best result fit
@@ -432,12 +401,12 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
             step = np.array(step)
             plt.plot(xE, gaus, ls="--", lw=2, c='g', label="gaus")
             plt.plot(xE, step, ls='--', lw=2, c='m', label='step + bg')
-            plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {group}")
+            plt.plot(xE[1:], hE, lw=1, c='b', label=f"data {ged}")
             plt.xlabel(f"ADC channels", ha='right', x=1)
             plt.ylabel("Counts", ha='right', y=1)
             plt.legend(loc=2, fontsize=10,title=f"FWHM = {fwhm:.2f} $\pm$ {fwhmerr:.2f} keV")
-            if case==1: plt.savefig(f"{d_det}/Fit_{group}-zac.pdf")
-            if case==0: plt.savefig(f"{d_det}/Fit_{group}-trap.pdf")
+            if case==1: plt.savefig(f"{d_det}/Fit_{ged}-zac.pdf")
+            if case==0: plt.savefig(f"{d_det}/Fit_{ged}-trap.pdf")
             plt.cla()
         except: continue
         if case==1:
@@ -445,27 +414,27 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
             sigma, flat, decay = df_min[:3]
             # 1. vary the sigma cusp
             df_sigma = df_grid.loc[(df_grid.flat==flat)&(df_grid.decay==decay)&(df_grid.decay==decay)]
-            x, y, err =  df_sigma['sigma'], df_sigma[f'fwhm_{group}'], df_sigma[f'fwhmerr_{group}']
+            x, y, err =  df_sigma['sigma'], df_sigma[f'fwhm_{ged}'], df_sigma[f'fwhmerr_{ged}']
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Sigma Cusp ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_Sigma_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Sigma_{ged}-zac.pdf")
             plt.cla()
             # 2. vary the flat time
             df_flat = df_grid.loc[(df_grid.sigma==sigma)&(df_grid.decay==decay)]
-            x, y, err =  df_flat['flat'], df_flat[f'fwhm_{group}'], df_flat[f'fwhmerr_{group}']
+            x, y, err =  df_flat['flat'], df_flat[f'fwhm_{ged}'], df_flat[f'fwhmerr_{ged}']
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Flat Top ($\mu$s)", ha='right', x=1)
             plt.ylabel("FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_Flat_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Flat_{ged}-zac.pdf")
             plt.cla() 
             # 3. vary the rc constant
             df_decay = df_grid.loc[(df_grid.sigma==sigma)&(df_grid.flat==flat)]
-            x, y, err =  df_decay[f'decay'], df_decay[f'fwhm_{group}'], df_decay[f'fwhmerr_{group}']
+            x, y, err =  df_decay[f'decay'], df_decay[f'fwhm_{ged}'], df_decay[f'fwhmerr_{ged}']
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Decay constant ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_Decay_{group}-zac.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Decay_{ged}-zac.pdf")
             plt.cla()
             #except:
             #print("")
@@ -473,32 +442,32 @@ def plot_fwhm(f_grid,f_opt,d_plot,case):
             rise, flat, rc = df_min[:3]
             # 1. vary the rise time
             df_rise = df_grid.loc[(df_grid.flat==flat)&(df_grid.rc==rc)]
-            x, y, err =  df_rise['rise'], df_rise[f'fwhm_{group}'], df_rise[f'fwhmerr_{group}']
+            x, y, err =  df_rise['rise'], df_rise[f'fwhm_{ged}'], df_rise[f'fwhmerr_{ged}']
             #plt.plot(x,y,".b")
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Ramp time ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (kev)", ha='right', y=1)
             # plt.ylabel(r"FWHM", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_Rise_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Rise_{ged}-trap.pdf")
             plt.cla()
             
             # 2. vary the flat time
             df_flat = df_grid.loc[(df_grid.rise==rise)&(df_grid.rc==rc)]
-            x, y, err =  df_flat['flat'], df_flat[f'fwhm_{group}'], df_flat[f'fwhmerr_{group}']
+            x, y, err =  df_flat['flat'], df_flat[f'fwhm_{ged}'], df_flat[f'fwhmerr_{ged}']
             #plt.plot(x,y,'.b')
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("Flat time ($\mu$s)", ha='right', x=1)
             plt.ylabel("FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_Flat_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_Flat_{ged}-trap.pdf")
             plt.cla() 
             # 3. vary the rc constant
             df_rc = df_grid.loc[(df_grid.rise==rise)&(df_grid.flat==flat)]
-            x, y, err =  df_rc['rc'], df_rc[f'fwhm_{group}'], df_rc[f'fwhmerr_{group}']
+            x, y, err =  df_rc['rc'], df_rc[f'fwhm_{ged}'], df_rc[f'fwhmerr_{ged}']
             #plt.plot(x,y,'.b')
             plt.errorbar(x,y,err,fmt='o')
             plt.xlabel("RC constant ($\mu$s)", ha='right', x=1)
             plt.ylabel(r"FWHM (keV)", ha='right', y=1)
-            plt.savefig(f"{d_det}/FWHM_vs_RC_{group}-trap.pdf")
+            plt.savefig(f"{d_det}/FWHM_vs_RC_{ged}-trap.pdf")
             plt.cla()
         
                 
