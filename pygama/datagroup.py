@@ -4,6 +4,9 @@ import pandas as pd
 from parse import parse
 from pprint import pprint
 
+import pygama.utils as pu
+
+
 class DataGroup:
     """
     Easily look up groups of files according to the LEGEND data convention,
@@ -15,7 +18,12 @@ class DataGroup:
                  tslo=None, tshi=None, nfiles=None):
         """
         """
-        # initialize member variables
+        # DataFrames to store file key attributes
+        self.daq_files = None # daq & raw 
+        self.hit_files = None # raw, dsp, hit
+        self.evt_files = None # evt
+        
+        # limit number of files (debug, testing)
         self.nfiles = nfiles
 
         # typical usage: include a JSON config file to set data paths, etc.
@@ -31,10 +39,6 @@ class DataGroup:
         elif runlist!=None:
             self.runs.extend(runlist)
 
-        # scan over daq files
-        if mode == 'daq':
-            self.daq_files = self.scan_daq_files()
-            
 
     def set_config(self, config):
         """
@@ -64,13 +68,19 @@ class DataGroup:
             self.runDB = json.load(f)
         
             
-    def scan_daq_files(self, ft=None):
+    def find_daq_files(self, ft=None):
         """
         Do an os.walk through the daq directory and build a list of files to 
         consider, including any file that matches the file template.
         If self.nfiles is set, we stop after adding this many files to the list.
-        Finally, convert to a DataFrame to make sorting by other attributes 
-        (e.g. timestamp) easier.
+        
+        Finally, we convert to a DataFrame to make sorting by other attributes 
+        (e.g. timestamp) easier. 
+        
+        Add the corresponding 'raw` file name(s) for each daq file, using the template string from the config file. Note that the subsystem label
+        "sysn" in the file will be left unfilled, and handled by daq_to_raw
+        to write to multiple output files:
+            `raw_file` : /base/LPGTA/raw/{sysn}/phy/[prefix]_{sysn}_raw.lh5
         """
         # required: file template string.  can be from argument or config dict
         if ft is None:
@@ -106,8 +116,7 @@ class DataGroup:
                         finfo = parse(ft, f)
                         if finfo is not None:
                             finfo = finfo.named # convert to dict
-                            finfo['path'] = path
-                            finfo['file'] = f
+                            finfo['daq_file'] = path + '/' + f
                             finfo['run'] = run
                             
                             # convert to pd.datetime64 for easier sorting
@@ -134,16 +143,28 @@ class DataGroup:
 
         # convert found files to DataFrame
         self.daq_files = pd.DataFrame(daq_files)
+
+        def get_raw_file(row):
+            """
+            generate output filenames and paths needed by daq_to_raw.
+            subsytem (sysn) is left unspecified
+            """
+            # map variables to the template
+            raw_template = self.config['daq_to_raw']['raw_filename_template']
+            sd = pu.SafeDict(row.to_dict())
+            raw_file = raw_template.format_map(sd)
+            
+            # fill in the file path
+            mods = self.config['daq_to_raw']['filename_info_mods']['rtp']
+            rtp = mods[row['rtp']]
+            raw_path = self.config['raw_dir'] + '/{sysn}/' + rtp + '/'
+            
+            row['raw_file'] = raw_path + raw_file
+            
+            return row
+
+        self.daq_files = self.daq_files.apply(get_raw_file, axis=1)
         
+        return self.daq_files
         
-        # calculate output filenames needed by daq_to_raw
-        raw_tmp = self.config['daq_to_raw']['raw_filename_template']
-        
-        print(self.daq_files.columns)
-        print(raw_tmp)
-        exit()
-        
-        
-        print(raw_tmp)
-        
-                
+
