@@ -44,17 +44,32 @@ for group in groups:
     data = lh5_in.read_object(group, args.file)
 
     wf_in = data['waveform']['values'].nda
+    chan_in = data['channel'].nda
     dt = data['waveform']['dt'].nda[0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
 
     # Set up processing chain
     proc = ProcessingChain(block_width=args.block, clock_unit=dt, verbosity=args.verbose)
 
     proc.add_input_buffer("wf", wf_in, dtype='float32')
+<<<<<<< HEAD
 
+=======
+    proc.add_input_buffer("chan", chan_in)
+    
+    # Get tail constants from a hard-coded dict. This is a temporary stop-gap
+    # until we have analysis parameters databasing. This is also a test of the
+    # param_lookup processor. This would become a necessary processor
+    # for mixed-channel processing!
+    chan2PZ = {24:242.4, 25:138.9, 26:345.6, 27:142.6, 28:130.3, 29:219.8, 31:395.2, 32:504.3, 33:373.5, 34:408.5, 35:385.5}
+    for key, val in chan2PZ.items(): chan2PZ[key] = convert(val, us, dt)
+    pz_lookup = param_lookup(chan2PZ, convert(150, us, dt), 'f')
+    proc.add_processor(pz_lookup, "chan", "pz_const")
+    
+>>>>>>> d44745ea5abe4725cdd4ec8c91a3aaed4086adf7
     # Basic Filters
     proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
     proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
-    proc.add_processor(pole_zero, "wf_blsub", 145*us, "wf_pz")
+    proc.add_processor(pole_zero, "wf_blsub", "pz_const", "wf_pz")
     proc.add_processor(trap_norm, "wf_pz", 10*us, 5*us, "wf_trap")
     proc.add_processor(asymTrapFilter, "wf_pz", 0.05*us, 2*us, 4*us, "wf_atrap")
 
@@ -107,7 +122,12 @@ for group in groups:
     lh5_out.add_field("tail_rc", lh5.Array(proc.get_output_buffer("tail_rc", unit=us), attrs={"units":"us"}))
 
     proc.execute()
+<<<<<<< HEAD
 
     groupname = group[:group.rfind('/')+1]+"data"
+=======
+    
+    groupname = group[:group.rfind('/')+1]+"dsp"
+>>>>>>> d44745ea5abe4725cdd4ec8c91a3aaed4086adf7
     print("Writing to: " + out + "/" + groupname)
     lh5_in.write_object(lh5_out, groupname, out)
