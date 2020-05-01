@@ -14,114 +14,75 @@ from ..io.fcdaq import *
 
 
 def daq_to_raw(daq_filename, raw_filename=None, subrun=None, subsystems=None, 
-               n_max=np.inf, verbose=False, output_dir=None,
+               n_max=np.inf, verbose=False, out_dir=None, chans=None,
                overwrite=True, config={}):
     """
-    """
-    daq_filename = os.path.expandvars(daq_filename)
+    Convert DAQ files into LEGEND-HDF5 `raw` format.  
+    Takes an input file (daq_filename) and an output file (raw_filename).
     
-    # if config is a JSON file, load it
+    If the list `subsystems` is supplied, the raw_filename should be a string
+    containing `{sysn}`, which is used to create a list of output files for
+    each data taker.
+    """
+    # convert any environment variables
+    daq_filename = os.path.expandvars(daq_filename)
+    raw_filename = os.path.expandvars(raw_filename)
+    
+    # load options from config (can be dict or JSON filename)
     if isinstance(config, str):
-        config = os.path.expandvars(config)
-        with open(config) as f:
+        with open(os.path.expandvars(config)) as f:
             config = json.load(f)
-            
-    # load daq_to_raw settings 
     d2r_conf = config['daq_to_raw'] if 'daq_to_raw' in config else config
     buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8096
 
-    
-
-    pprint(config)
-    exit()
-        
-    # if we're not given a raw filename, try to infer one
+    # if we're not given a raw filename, make a simple one with subrun number
     if raw_filename is None:
-    
-        # load filename attributes into a dict
-        if 'daq_filename_template' in d2r_conf:
-            f_temp = d2r_conf['daq_filename_template']
-            f_name = daq_filename.split('/')[-1]
-            f_info = parse(f_temp, f_name).named
-            if 'file_info' not in d2r_conf:
-                d2r_conf['file_info'] = {}
-            d2r_conf['file_info'].update(f_info)
-            
-        if 'filename_info_mods' in d2r_conf:
-            for key, value in d2r_conf['filename_info_mods'].items():
-                d2r_conf['file_info'][key] = value[d2r_conf['file_info'][key]]
-
-        if 'raw_filename_template' in d2r_conf:
-            raw_filename = d2r_conf['raw_filename_template']
-            
-            if subrun is not None: 
-                sd = SafeDict({'run': int(subrun)})
-                raw_filename = raw_filename.format_map(sd)
-            
-            raw_filename = raw_filename.format_map(SafeDict(d2r_conf['file_info']))
-        
-        elif subrun is not None: 
-            raw_filename = f"raw_run{subrun}.{suffix}"
-        
-        else:
-            print('Error: must supply either raw_filename or run number')
+        if subrun is None:
+            print('Error, must supply either raw_filename or run number!')
             exit()
+        if out_dir is None: out_dir = './'
+        if subsystems is None:
+            raw_filename = f'{out_dir}/raw_run{subrun}.lh5'
+        else:
+            raw_filename = f'{out_dir}/raw_{{sysn}}_subrun{subrun}.lh5'
 
-    # exit()
-
-    # need to be able to delete all subsystem files [gNNN, spms, etc..]
-    if os.path.isfile(raw_filename):
-       if overwrite:
-           print("Overwriting existing file...")
-           os.remove(raw_filename)
-       else:
-           print("File already exists, continuing ...")
-           return
-
-    if 'sysn' in raw_filename:
-       ch_groups = config['daq_to_raw']['ch_groups']
-       for group, attrs in ch_groups.items():
-           out_filename = raw_filename.format_map(attrs)
-           if os.path.isfile(out_filename):
-               if overwrite:
-                   print("Overwriting existing file", out_filename)
-                   os.remove(out_filename)
-               else:
-                   print("File", out_filename, "already exists, continuing ...")
-                   return
-
-               
+    # set up write to multiple output files
+    if isinstance(subsystems, list):
+        raw_files = {sysn: raw_filename.replace('{sysn}', sysn) for sysn in subsystems}
+    else:
+        raw_files = {'default': raw_filename}
+        
+    # clear existing output files
+    if overwrite:
+        for sysn, file in raw_files.items():
+            if os.path.isfile(file):
+                print('Overwriting existing file :', file)
+                os.remove(file)
     
-
     if verbose:
         print('Starting daq_to_raw processing.'
-              f'\n  Input: {daq_filename}'
-              f'\n  Output: {raw_filename}'
-              f'\n  Buffer size: {buffer_size}')
-
-    exit()
-    
+              f'\n  Buffer size: {buffer_size}'
+              f'\n  Max num. events: {n_max}'
+              f'\n  Input: {daq_filename}\n  Output:')
+        pprint(raw_files)
     t_start = time.time()
-
-    # set max number of events (useful for debugging)
-    if n_max is not np.inf and n_max is not None:
-        n_max = int(n_max)
-
-    bytes_processed = 0
+    
+    bytes_processed = None
+    
     # get the DAQ mode
     if config["daq"] == "ORCA":
         print('note, remove decoder input option')
         process_orca(daq_filename, raw_filename, n_max, None, config, verbose, run=run, buffer_size=buffer_size)
 
     elif config["daq"] == "FlashCam":
-        bytes_processed = process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_size=buffer_size)
+        bytes_processed = process_flashcam(daq_filename, raw_files, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
 
     elif config["daq"] == "SIS3316":
         process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose)
 
     elif config["daq"] == "CAENDT57XXDecoder":
         print('note, remove decoder input option')
-        process_compass(daq_filename, raw_filename, None, output_dir)
+        process_compass(daq_filename, raw_filename, None, out_dir)
 
     else:
         print(f"DAQ: {config['daq']} not recognized.  Exiting ...")

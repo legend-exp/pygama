@@ -23,6 +23,9 @@ class DataGroup:
         self.hit_files = None # raw, dsp, hit
         self.evt_files = None # evt
         
+        # active data takers (geds, spms, etc...)
+        self.subsystems = []
+        
         # limit number of files (debug, testing)
         self.nfiles = nfiles
 
@@ -30,7 +33,7 @@ class DataGroup:
         if config is not None:
             self.set_config(os.path.expandvars(config))
 
-        # define runs of interest (integers)
+        # runs of interest (integers)
         self.runs = []
         if run!=None and rhi!=None:
             self.runs.extend([r for r in range(int(run), int(rhi+1))])
@@ -67,11 +70,22 @@ class DataGroup:
         with open(os.path.expandvars(f_runDB)) as f:
             self.runDB = json.load(f)
         
-            
+        self.run_types = self.config['run_types']
+        self.hit_dirs = self.config['hit_dirs']
+        self.event_dirs = self.config['event_dirs']
+
+        # get the active subsystems from the main config file
+        self.subsystems = []
+        for k, v in self.config['daq_to_raw']['ch_groups'].items():
+            if v['sysn'] not in self.subsystems:
+                self.subsystems.append(v['sysn'])
+        
+        
     def find_daq_files(self, ft=None):
         """
         Do an os.walk through the daq directory and build a list of files to 
         consider, including any file that matches the file template.
+        
         If self.nfiles is set, we stop after adding this many files to the list.
         
         Finally, we convert to a DataFrame to make sorting by other attributes 
@@ -119,10 +133,9 @@ class DataGroup:
                             finfo['daq_file'] = path + '/' + f
                             finfo['run'] = run
                             
-                            # convert to pd.datetime64 for easier sorting
+                            # add a pd.datetime64 column for easier sorting
                             ts = finfo['YYYYmmdd'] + finfo['hhmmss']
-                            fmt = '%Y%m%d%H%M%S'
-                            dt = pd.to_datetime(ts, format=fmt)
+                            dt = pd.to_datetime(ts, format='%Y%m%d%H%M%S')
                             finfo['date'] = dt
                             
                             daq_files.append(finfo)
@@ -146,19 +159,20 @@ class DataGroup:
 
         def get_raw_file(row):
             """
-            generate output filenames and paths needed by daq_to_raw.
-            subsytem (sysn) is left unspecified
+            add a 'raw_file' column to self.daq_files.
+            subsytem {sysn} is left unspecified, that's handled in daq_to_raw
             """
+            # load filename changes (convert daq label to pygama label)
+            mods = self.config['daq_to_raw']['file_info_mods']['rtp']
+            
             # map variables to the template
             raw_template = self.config['daq_to_raw']['raw_filename_template']
             sd = pu.SafeDict(row.to_dict())
+            sd['rtp'] = mods[row['rtp']] # convert DAQ label to legend convention
             raw_file = raw_template.format_map(sd)
             
             # fill in the file path
-            mods = self.config['daq_to_raw']['filename_info_mods']['rtp']
-            rtp = mods[row['rtp']]
-            raw_path = self.config['raw_dir'] + '/{sysn}/' + rtp + '/'
-            
+            raw_path = f"{self.config['raw_dir']}/{{sysn}}/{sd['rtp']}/"
             row['raw_file'] = raw_path + raw_file
             
             return row
