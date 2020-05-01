@@ -214,6 +214,7 @@ def gauss_tail(x,mu, sigma, tail,tau):
 
     tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
     return tail_f
+
 def step(x, mu, sigma, bkg, a):
 
     """
@@ -223,7 +224,22 @@ def step(x, mu, sigma, bkg, a):
 
     step_f = bkg + a * erfc((x-mu)/(np.sqrt(2)*sigma))
     return step_f
- 
+
+def gauss_step(x, a, mu, sigma, bkg, s, components=False):
+    """
+    gaussian + step function for Compton spectrum
+    """
+    peak_f = gauss(x,mu,sigma,a)
+    step_f = step(x,mu,sigma,bkg,s)
+
+    peak = peak_f + step_f
+
+    if components:
+      return peak_f, step_f
+    else:
+      return peak
+
+
 def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
 
     """

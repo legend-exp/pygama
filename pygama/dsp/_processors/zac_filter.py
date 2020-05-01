@@ -3,17 +3,11 @@ from numba import guvectorize
 import math
 from math import pow
 
-@guvectorize(["void(float32[:], int32, int32, int32, float32[:])",
-              "void(float64[:], int32, int32, int32, float64[:])",
-              "void(int32[:], int32, int32, int32, int32[:])",
-              "void(int64[:], int32, int32, int32, int64[:])"],
-             "(n),(),(),(),(m)", forceobj=True, cache=True)
-def zac_filter(wf_in, sigma, flat, decay, wf_out):
+def zac_filter(wsize, sigma, flat, decay):
     """
     ZAC filter
     """
-    nbin = wf_in.shape[0]
-    lenght = nbin - 100
+    lenght = int(wsize - 100)
     lt = int((lenght-flat)/2)
     # calculate cusp filter and negative parables
     cusp = np.zeros(lenght)
@@ -41,5 +35,12 @@ def zac_filter(wf_in, sigma, flat, decay, wf_out):
     #deconvolve zac filter
     den = [1, -np.exp(-1/decay)]
     zacd = np.convolve(zac, den, 'same')
-    #output
-    wf_out[:] = np.convolve(wf_in, zacd, 'valid')
+
+    @guvectorize(["void(float32[:], float32[:])",
+                  "void(float64[:], float64[:])",
+                  "void(int32[:], int32[:])",
+                  "void(int64[:], int64[:])"],
+                 "(n),(m)", forceobj=True)
+    def zac_out(wf_in,wf_out):
+        wf_out[:] = np.convolve(wf_in, zacd, 'valid')
+    return zac_out
