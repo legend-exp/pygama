@@ -61,7 +61,11 @@ for group in groups:
     for key, val in chan2PZ.items(): chan2PZ[key] = convert(val, us, dt)
     pz_lookup = param_lookup(chan2PZ, convert(150, us, dt), 'f')
     proc.add_processor(pz_lookup, "chan", "pz_const")
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> c024e0683b547bb3727765ff40201f93a9f7dd20
     # Basic Filters
     proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
     proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
