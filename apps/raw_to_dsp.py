@@ -51,11 +51,8 @@ for group in groups:
     proc = ProcessingChain(block_width=args.block, clock_unit=dt, verbosity=args.verbose)
 
     proc.add_input_buffer("wf", wf_in, dtype='float32')
-<<<<<<< HEAD
-
-=======
     proc.add_input_buffer("chan", chan_in)
-    
+
     # Get tail constants from a hard-coded dict. This is a temporary stop-gap
     # until we have analysis parameters databasing. This is also a test of the
     # param_lookup processor. This would become a necessary processor
@@ -64,8 +61,7 @@ for group in groups:
     for key, val in chan2PZ.items(): chan2PZ[key] = convert(val, us, dt)
     pz_lookup = param_lookup(chan2PZ, convert(150, us, dt), 'f')
     proc.add_processor(pz_lookup, "chan", "pz_const")
-    
->>>>>>> d44745ea5abe4725cdd4ec8c91a3aaed4086adf7
+
     # Basic Filters
     proc.add_processor(mean_stdev, "wf[0:1000]", "bl", "bl_sig")
     proc.add_processor(np.subtract, "wf", "bl", "wf_blsub")
@@ -122,12 +118,7 @@ for group in groups:
     lh5_out.add_field("tail_rc", lh5.Array(proc.get_output_buffer("tail_rc", unit=us), attrs={"units":"us"}))
 
     proc.execute()
-<<<<<<< HEAD
 
-    groupname = group[:group.rfind('/')+1]+"data"
-=======
-    
     groupname = group[:group.rfind('/')+1]+"dsp"
->>>>>>> d44745ea5abe4725cdd4ec8c91a3aaed4086adf7
     print("Writing to: " + out + "/" + groupname)
     lh5_in.write_object(lh5_out, groupname, out)

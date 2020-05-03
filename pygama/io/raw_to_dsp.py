@@ -11,41 +11,58 @@ from pygama.io import lh5
 
 
 def main():
+    """
+    Below is commented out example of using raw_to_dsp function
+    """
 
-    json_file = "raw_to_dsp.json"
-    # lh5_in = lh5.Store()
+    # json_file = "raw_to_dsp.json"
     # filename = os.path.expandvars("/Volumes/LaCie/Data/CAGE/pygama_raw/raw_run11.lh5")
     # groupname = "/ORSIS3302DecoderForEnergy"
+    #
+    #
+    # with open(json_file) as f:
+    #     config = json.load(f)
+    # paths = config["paths"]
+    # options = config["options"]
+    # processor_outputs = []
+    # for output in config["processors"]:
+    #     processor_outputs.append(output)
+    #
+    # lh5_in = lh5.Store()
+    # file = os.path.expandvars(paths["tier1_dir"] + "/" + filename)
+    # groupname = paths["t1_group_name"]
+    # lh5_data = lh5_in.read_object(groupname, file)
+    #
+    # lh5_out, proc = raw_to_dsp(lh5_data, json_file)
 
-    # data = lh5_in.read_object(groupname, filename)
-    # wf_in = data['waveform']['values'].nda
 
-    r2d(json_file)
+def raw_to_dsp(lh5_in, json_file, buffer_len=8):
+    """
+    Will add doc string when I have time
+    """
 
-#This becomes class
-def r2d(json_file):
-
-    verbose = 1
-    filename = "raw_run11.lh5"
     with open(json_file) as f:
         config = json.load(f)
     paths = config["paths"]
     options = config["options"]
-    block = options["block_width"] if "block_width" in options else 8
 
-    lh5_in = lh5.Store()
-    file = os.path.expandvars(paths["tier1_dir"] + "/" + filename)
-    groupname = paths["t1_group_name"]
-    data = lh5_in.read_object(groupname, file)
-
-    wf_in = data["waveform"]["values"].nda
-    dt = data['waveform']['dt'].nda[0] * unit_parser.parse_unit(data['waveform']['dt'].attrs['units'])
+    wf_in = lh5_in["waveform"]["values"].nda
+    dt = lh5_in['waveform']['dt'].nda[0] * unit_parser.parse_unit(lh5_in['waveform']['dt'].attrs['units'])
 
 
-    proc = ProcessingChain(block_width=block, clock_unit=dt, verbosity=3)
+    proc = ProcessingChain(block_width=buffer_len, clock_unit=dt, verbosity=3) #NOTE Need to add verbosity input to function
     proc.add_input_buffer("wf", wf_in, dtype='float32')
     proc.set_processor_list(json_file)
+    # proc.get_column_names() loop over
 
+    lh5_out = lh5.Table(size=proc._buffer_len)
+
+    for output in config["outputs"]:
+
+        lh5_out.add_field(output, lh5.Array(proc.get_output_buffer(output),
+                                               attrs={"units":"ADC"}))
+
+    return lh5_out, proc
 
 
 

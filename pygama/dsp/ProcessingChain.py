@@ -596,20 +596,9 @@ class ProcessingChain:
 
             function = [processors[output]["function"], processors[output]["module"]]
             func_list.append(function)
-            arg_list = processors[output]["args"]
             settings = []
-            in_out = []
 
-            for key in processors[output]:
-
-                if "units" in key and key.split("_")[0] in arg_list:
-                    setting = float(processors[output][key].split("*")[0]) * unit_parser.parse_unit(processors[output][key].split("*")[1])
-                    in_out.append(setting)
-                elif key in arg_list:
-                    in_out.append(processors[output][key])
-                else:
-                    continue
-            settings.append(in_out)
+            settings.append(processors[output]["args"])
 
             if "kwargs" in processors[output]:
                 settings.append(processors[output]["kwargs"])
