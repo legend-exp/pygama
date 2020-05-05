@@ -56,7 +56,7 @@ subsystems = list(set(subsystems))
 
 # create directories for hit-level data
 for base, rtype, sysm in itertools.product(hit_dirs, run_types, subsystems):
-    dirname = f'{datadir}/{base}/{rtype}/{sysm}'
+    dirname = f'{datadir}/{base}/{sysm}/{rtype}'
     if not test: Path(dirname).mkdir(parents=True, exist_ok=True)
     print(dirname)
         

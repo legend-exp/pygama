@@ -182,3 +182,37 @@ class DataGroup:
         return self.daq_files
         
 
+    def find_raw_files(self):
+        """
+        create a DataFrame with columns for each [raw, dsp, hit] file,
+        and each subsystem [geds, spms, ...].  Each row should have a 
+        unique timestamp.
+        
+        walk over the raw_dir only -- auto-fill filenames for dsp and hit, 
+        check for existence
+        """
+        # required: file template strings
+        raw_tmp = self.config['raw_to_dsp']['raw_filename_template']
+        dsp_tmp = self.config['raw_to_dsp']['dsp_filename_template']
+        hit_tmp = self.config['dsp_to_hit']['hit_filename_template']
+        
+        # list of dictionaries, converted to DataFrame
+        # raw_files = []
+        
+        if self.experiment == 'LPGTA':
+            print(self.config['raw_dir'])
+            print(self.subsystems)
+            
+            # look for folders matching these strings
+            self.run_labels = [f'run{r:0>4d}' for r in self.runs]
+            
+            print('start walk')
+            stop_walk = False
+            for path, folders, files in os.walk(self.config['raw_dir']):
+                if not files: continue
+                
+                print(path)
+                print(folders)
+                print(files)
+                
+                # if any(rl in path for rl in self.run_labels):

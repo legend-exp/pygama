@@ -397,8 +397,9 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
         print(packet_id, 'packets decoded')
 
     if len(event_decoder.skipped_channels) > 0:
-        print("Warning - got skipped channels:")
-        for ch, n in event_decoder.skipped_channels.items():
-            print("  ch", ch, ":", n, "hits")
+        print("Warning - daq_to_raw skipped some channels in file")
+        if verbose: 
+            for ch, n in event_decoder.skipped_channels.items():
+                print("  ch", ch, ":", n, "hits")
 
     return bytes_processed

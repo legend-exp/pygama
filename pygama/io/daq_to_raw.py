@@ -56,31 +56,32 @@ def daq_to_raw(daq_filename, raw_filename=None, subrun=None, subsystems=None,
     if overwrite:
         for sysn, file in raw_files.items():
             if os.path.isfile(file):
-                print('Overwriting existing file :', file)
+                if verbose:
+                    print('Overwriting existing file :', file)
                 os.remove(file)
     
-    if verbose:
-        print('Starting daq_to_raw processing.'
-              f'\n  Buffer size: {buffer_size}'
-              f'\n  Max num. events: {n_max}'
-              f'\n  Input: {daq_filename}\n  Output:')
-        pprint(raw_files)
-    t_start = time.time()
+    # if verbose:
+    print('Starting daq_to_raw processing.'
+          f'\n  Buffer size: {buffer_size}'
+          f'\n  Max num. events: {n_max}'
+          f'\n  Input: {daq_filename}\n  Output:')
+    pprint(raw_files)
     
+    t_start = time.time()
     bytes_processed = None
     
     # get the DAQ mode
-    if config["daq"] == "ORCA":
+    if config['daq'] == 'ORCA':
         print('note, remove decoder input option')
         process_orca(daq_filename, raw_filename, n_max, None, config, verbose, run=run, buffer_size=buffer_size)
 
-    elif config["daq"] == "FlashCam":
+    elif config['daq'] == 'FlashCam':
         bytes_processed = process_flashcam(daq_filename, raw_files, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
 
-    elif config["daq"] == "SIS3316":
+    elif config['daq'] == 'SIS3316':
         process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose)
 
-    elif config["daq"] == "CAENDT57XXDecoder":
+    elif config['daq'] == 'CAENDT57XXDecoder':
         print('note, remove decoder input option')
         process_compass(daq_filename, raw_filename, None, out_dir)
 
