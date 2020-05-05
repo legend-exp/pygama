@@ -60,7 +60,7 @@ def raw_to_dsp(lh5_in, json_file, buffer_len=8):
     for output in config["outputs"]:
 
         lh5_out.add_field(output, lh5.Array(proc.get_output_buffer(output),
-                                               attrs={"units":"ADC"}))
+                                               attrs={"units":config["outputs"][output]}))
 
     return lh5_out, proc
 

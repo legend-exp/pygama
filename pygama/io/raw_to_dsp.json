@@ -6,10 +6,11 @@
     "t1_group_name": "/ORSIS3302DecoderForEnergy"
   },
   "processors":{
-     "bl":{
+     "bl, bl_sig":{
        "function": "mean_stdev",
        "module": "pygama.dsp.processors",
-       "args" : ["wf[0:1000]", "bl", "bl_sig"]
+       "args" : ["wf[0:1000]", "bl", "bl_sig"],
+       "unit": ["ADC", "ADC"]
      },
      "wf_blsub":{
        "function": "subtract",
@@ -40,7 +41,8 @@
      "trapE": {
        "function": "divide",
        "module": "numpy",
-       "args":["trapmax", "10*us", "trapE"]
+       "args":["trapmax", "10*us", "trapE"],
+       "unit": "ADC"
      },
      "curr": {
        "function": "avg_current",
@@ -51,13 +53,15 @@
        "function": "amax",
        "module": "numpy",
        "args": ["curr", 1, "A_10"],
-       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]}
+       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+       "unit": "ADC"
      },
      "AoE": {
        "function": "divide",
        "module": "numpy",
-       "args":["A_10", "trapE", "AoE"]
+       "args":["A_10", "trapE", "AoE"],
+       "unit": "ADC"
      }
    },
-   "outputs": ["trapE", "bl", "bl_sig", "A_10", "AoE"]
+   "outputs": {"trapE":"ADC", "bl":"ADC", "bl_sig":"ADC", "A_10":"ADC", "AoE":"ADC"}
  }

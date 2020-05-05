@@ -599,7 +599,6 @@ class ProcessingChain:
             settings = []
 
             settings.append(processors[output]["args"])
-
             if "kwargs" in processors[output]:
                 settings.append(processors[output]["kwargs"])
 
