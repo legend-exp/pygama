@@ -35,6 +35,8 @@ def main():
     
     # TODO: allow DataGroup to be set by cmd line
     dg = DataGroup(21, config=expDB, nfiles=10)
+    dg.find_keys()
+    exit()
     
 
     # -- set options -- 

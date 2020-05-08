@@ -181,38 +181,63 @@ class DataGroup:
         
         return self.daq_files
         
-
-    def find_raw_files(self):
-        """
-        create a DataFrame with columns for each [raw, dsp, hit] file,
-        and each subsystem [geds, spms, ...].  Each row should have a 
-        unique timestamp.
-        
-        walk over the raw_dir only -- auto-fill filenames for dsp and hit, 
-        check for existence
-        """
-        # required: file template strings
-        raw_tmp = self.config['raw_to_dsp']['raw_filename_template']
-        dsp_tmp = self.config['raw_to_dsp']['dsp_filename_template']
-        hit_tmp = self.config['dsp_to_hit']['hit_filename_template']
-        
-        # list of dictionaries, converted to DataFrame
-        # raw_files = []
-        
-        if self.experiment == 'LPGTA':
-            print(self.config['raw_dir'])
-            print(self.subsystems)
-            
-            # look for folders matching these strings
-            self.run_labels = [f'run{r:0>4d}' for r in self.runs]
-            
-            print('start walk')
-            stop_walk = False
-            for path, folders, files in os.walk(self.config['raw_dir']):
-                if not files: continue
                 
-                print(path)
-                print(folders)
-                print(files)
-                
-                # if any(rl in path for rl in self.run_labels):
+    def find_keys(self):
+        """
+        every file has a unique [cycle/run/timestamp] according to some format
+        string.  if we have these keys, we can build all the files for the
+        groups: [daq/raw/dsp/hit/evt] according to the LEGEND format.
+        
+        These file keys may be worth writing to the legend-metadata repository
+        
+        Note also that in PGT and L200, they intend to delete the daq files,
+        so i might want to either scan over the raw data too, or stipulate that
+        we scan over the daq files to build the list of keys, to ensure we
+        don't lose anything
+        
+        NOTE: in the scan, assume there are nested directories, and we
+        need to os.walk to get all the unique keys matching the given convention.
+        
+        the point is to build a table of filenames from a unique ID,
+        so that the I/O of the processing is really easy to automate -- 
+        we just loop over the table.
+        row 1: [unique id] [daq file] [raw file] [dsp file] [hit file]
+        
+        LPGTA: {base_dir}/{run:0>4d}-{label}/{YYYYmmdd}-{hhmmss}-{rtp}.fcio
+        - dir: /global/cfs/cdirs/legend/data/lngs/pgt
+        - example: 20200404-031933-phys.fcio
+        - unique key: [run, label, YYYYmmdd, hhmmss]
+        
+        LPGTA
+            raw|dsp|hit 
+                geds|spms|pmt
+                    phy|cal
+        DETCHAR
+            geds
+                scantype                    
+        
+        ORCA: {YYYY}-{mm}-{dd}-{prefix}Run{run}
+        - dir: /global/cfs/cdirs/legend/data/cage/Data
+        - example: 2020-3-17-CAGERun126
+        - unique key: [YYYY, mm, dd, run]
+        
+        HADES: {prefix}-run{run:0>4d}-{YYmmdd}T{hhmmss}.fcio
+        - dir: /global/cfs/cdirs/legend/data/hades/I02166B/tier0/ba_HS4_top_dlt
+        
+        - example: char_data-I02166B-ba_HS4_top_dlt-run0001-191025T153307.fcio
+        - unique key: [run, YYmmdd, hhmmss]
+        NOTE: how to handle different detectors?
+        
+        LEGEND: {expt}_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_{tier}.lh5
+        - dir: /global/cfs/cdirs/legend/users/wisecg/LPGTA/raw
+        - example: LPGTA_r0021_20200404T083254Z_phy_geds_raw.lh5
+        - unique key: [run, YYYYmmdd, hhmmss]
+        
+        """
+        # self.keys = None
+        # print('hi clint')
+        pprint(self.config)
+        
+        base_dir = '/cori'
+        os.walk(base_dir)
+        find files matching expression

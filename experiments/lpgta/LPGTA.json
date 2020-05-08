@@ -1,0 +1,68 @@
+{
+  "experiment":"LPGTA",
+  
+  "daq":"FlashCam",
+
+  "daq_dir":"/global/cfs/cdirs/m2676/data/lngs/pgt",
+  "raw_dir":"$LPGTA_DATA/raw",
+  "dsp_dir":"$LPGTA_DATA/dsp",
+  "hit_dir":"$LPGTA_DATA/hit",
+  "tmap_dir":"$LPGTA_DATA/tmap",
+  "evt_dir":"$LPGTA_DATA/evt",
+  
+  "meta_dir":"$LEGEND_META/analysis/LPGTA",
+  "runDB":"runDB.json",
+  
+  "run_types":["phy","cal"],
+  "event_dirs":["evt","tmap"],
+  "hit_dirs":["raw","dsp","hit"],
+  
+  "daq_to_raw":{
+    "daq_filename_template":"{YYYYmmdd}-{hhmmss}-{rtp}.fcio",
+    
+    "buffer_size":8096,
+    
+    "file_info_mods":{
+        "rtp":{
+            "phys":"phy",
+            "calib":"cal"
+        }
+      },
+
+    "raw_filename_template":"LPGTA_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_raw.lh5",
+    
+    "ch_groups":{
+      "g{ch:0>3d}": {
+        "ch_range":[24,64],
+        "tb_per_ch":"True",
+        "sysn":"geds"
+      },
+      "spms": {
+        "ch_range":[6,23],
+        "sysn":"spms"
+      },
+      "puls": {
+        "ch_range":[0,0],
+        "sysn":"auxs"
+      },
+      "muvt": {
+        "ch_range":[1,5],
+        "sysn":"auxs"
+      }
+    }
+  },
+
+  "raw_to_dsp":{
+    "raw_filename_template":"LPGTA_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_raw.lh5",
+    "dsp_filename_template":"LPGTA_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_dsp.lh5"
+  },
+    
+  "dsp_to_hit":{
+    "hit_filename_template":"LPGTA_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_hit.lh5"
+  },
+  
+  "evt_builder":{
+    "evt_filename_template":""
+  }
+
+}
