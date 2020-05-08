@@ -86,7 +86,8 @@ setup(
         'numba',
         'parse',
         'GitPython',
-        'tinydb'
+        'tinydb',
+        'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
