@@ -21,3 +21,4 @@ from ._processors.time_point_frac import time_point_frac
 from ._processors.time_point_thresh import time_point_thresh
 from ._processors.linear_fit import linear_fit
 from ._processors.zac_filter import zac_filter
+from ._processors.cusp_filter import cusp_filter
