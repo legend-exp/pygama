@@ -18,14 +18,20 @@ def analyze_lpgta():
     # dg.lh5_dir_setup()
     dg.scan_daq_dir()
     
+    # print(dg.file_keys)
+    # exit()
+    
     # -- experiment-specific choices -- 
-    dg.file_keys.query('run > 2', inplace=True) # run 1 & 2 files don't match template
+    dg.file_keys.query('run > 2', inplace=True) 
+    
+    # run 1 & 2 files don't match template
     dg.file_keys.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
     dg.file_keys.reset_index(drop=True, inplace=True)
     
     def get_cmap(row):
         row['cmap'] = dg.runDB[f"{row['run']:0>4d}"]["cmap"]
         return row
+    
     dg.file_keys = dg.file_keys.apply(get_cmap, axis=1)
     print(dg.file_keys)
     
@@ -95,7 +101,10 @@ def analyze_hades():
     
     # dg.save_df('HADES_fileDB.h5')
     dg.load_df('HADES_fileDB.h5')
-    print(dg.file_keys)
+    print(dg.file_keys.to_string())
+    
+    # show how to group files in the same run
+    
     
     
 def analyze_ornl():
