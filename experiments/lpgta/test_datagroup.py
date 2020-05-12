@@ -45,8 +45,10 @@ def analyze_cage():
     dg.file_keys.sort_values(['cycle'], inplace=True)
     dg.file_keys.reset_index(drop=True, inplace=True)
     
-    def get_run(row):
-        """ map cycle numbers to physics runs, and identify detector """
+    def get_cyc_info(row):
+        """ 
+        map cycle numbers to physics runs, and identify detector 
+        """
         cyc = row['cycle']
         for run, cycles in dg.runDB.items():
             tmp = cycles[0].split(',')
@@ -68,7 +70,7 @@ def analyze_cage():
             row['det'] = 'icpc'
         return row
         
-    dg.file_keys = dg.file_keys.apply(get_run, axis=1)
+    dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
     print(dg.file_keys.to_string())
     # dg.file_keys['run'].astype(int)
     
