@@ -1,0 +1,18 @@
+{
+  "experiment" : "ORNL",
+  "runDB" : "./ORNL_runDB.json",
+  "fileDB" : "./ORNL_fileDB.csv",
+  
+  "daq_dir" : "/global/cfs/cdirs/legend/data/ornl",
+  "daq_ignore" : [".log",".DS_Store"],
+  "lh5_dir" : "/global/cfs/cdirs/legend/users/wisecg/ORNL",
+  
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : [""],
+  "run_types" : ["P24239A","P24240A"],
+  "evt_dirs" : [""],
+  
+  "unique_key" : "ornl-{detSN}-cyc{cycle}",
+  "daq_template" : "ORTEC-Enr-{detSN}_Run{cycle}",
+  "lh5_template" : "ornl_run{run}_cyc{cycle}_{tier}.lh5"
+}
