@@ -1,0 +1,18 @@
+{
+  "experiment" : "HADES",
+  "runDB" : "./HADES_runDB.json",
+  "fileDB" : "./HADES_fileDB.csv",
+  
+  "daq_dir" : "/global/cfs/cdirs/legend/data/hades",
+  "daq_ignore" : [".log",".DS_Store"],
+  "lh5_dir" : "/global/cfs/cdirs/legend/users/wisecg/HADES",
+  
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : [""],
+  "run_types" : ["I02160A","I02160B","I02162B","I02166B"],
+  "evt_dirs" : [""],
+  
+  "unique_key" : "hades-{detSN}-{YYmmdd}T{hhmmss}",
+  "daq_template" : "char_data-{detSN}-{scantype}-run{cycle}-{YYmmdd}T{hhmmss}.fcio",
+  "lh5_template" : "hades_{detSN}_r{run}_c{cycle}_{YYmmdd}T{hhmmss}_{scantype}_{tier}.lh5"
+}
