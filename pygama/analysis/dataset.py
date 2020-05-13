@@ -165,7 +165,7 @@ class DataSet:
 
         # choose method of searching for raw files -- depends on file fmt string
         if self.ftype == "hades_char":
-           # search data directories for extant files
+           # search data directories for extant files should be removed soon
 
            # Check for raw Data
            counter = 0
