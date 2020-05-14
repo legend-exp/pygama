@@ -12,7 +12,7 @@ class DataSet:
     can also load a JSON file to get a dict of metadata.
     """
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None, sub=None,
-                 opt=None, v=False, md=None, cal=None, cal_in=None, daq_dir=None, raw_dir=None, dsp_dir=None):
+                 opt=None, v=False, md=None, cal=None, cal_input=None, daq_dir=None, raw_dir=None, dsp_dir=None):
 
         # load metadata and set paths to data folders
         self.config, self.calDB, self.cal_input = None, None, None
@@ -21,7 +21,7 @@ class DataSet:
         if cal is not None:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
         if cal_input is not None:
-            self.load_cal(md)
+            self.load_cal(cal_input) 
         try:
             self.daq_dir = os.path.expandvars(self.config["daq_dir"])
             self.raw_dir = os.path.expandvars(self.config["raw_dir"])
@@ -91,7 +91,6 @@ class DataSet:
         """
         with open(fname) as f:
             self.cal_input = json.load(f)
-
 
     def add_run(self, runs):
         """
@@ -166,11 +165,11 @@ class DataSet:
 
         # choose method of searching for raw files -- depends on file fmt string
         if self.ftype == "hades_char":
-           # search data directories for extant files
+           # search data directories for extant files should be removed soon
 
-           # Check for daq Data
+           # Check for raw Data
            counter = 0
-           for p, d, files in os.walk(self.daq_dir):
+           for p, d, files in os.walk(self.raw_dir):
                for f in files:
                    for r in runs:
                        if f.endswith(".fcio"):
