@@ -252,3 +252,37 @@ class DataGroup:
         self.file_keys = pd.read_hdf(fname, key='file_keys')
         
         
+    def get_lh5_cols(self):
+        """
+        compute the LH5 filenames.
+        
+        need to generate the file names, and then figure out which folder
+        to store them in.  probably best to separate these tasks
+        """
+        if 'runtype' not in self.file_keys.columns:
+            print("You must add a 'runtype' column to the file key DF.")
+            exit()
+        
+        def get_files(row):
+            tmp = row.to_dict()
+            for tier in self.tier_dirs:
+                
+                # get filename
+                tmp['tier'] = tier
+                row[f'{tier}_file'] = self.lh5_template.format_map(tmp)
+                
+                # compute file path.  this is tricky
+                path = f'/{tier}'
+                
+                # daq_to_raw outputs a file for each subsystem, and we 
+                # handle this here by leaving a regex in the file string
+                if self.subsystems != [""]: 
+                    path += '/{sysn}'
+                
+                if row['runtype'] in self.run_types: 
+                    path += f"/{row['runtype']}"
+            
+                row[f'{tier}_path'] = path
+            return row
+            
+        self.file_keys = self.file_keys.apply(get_files, axis=1)
