@@ -76,7 +76,8 @@ def daq_to_raw(daq_filename, raw_filename=None, subrun=None, subsystems=None,
         process_orca(daq_filename, raw_filename, n_max, None, config, verbose, run=run, buffer_size=buffer_size)
 
     elif config['daq'] == 'FlashCam':
-        bytes_processed = process_flashcam(daq_filename, raw_files, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
+        print("Processing FlashCam")
+        bytes_processed = process_flashcam(daq_filename, raw_filename, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
 
     elif config['daq'] == 'SIS3316':
         process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose)
