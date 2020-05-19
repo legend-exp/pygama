@@ -15,7 +15,7 @@ def main():
     Below is commented out example of using raw_to_dsp function
     """
 
-    # json_file = "raw_to_dsp.json"
+    # json_file = "r2d_example.json"
     # filename = os.path.expandvars("/Volumes/LaCie/Data/CAGE/pygama_raw/raw_run11.lh5")
     # groupname = "/ORSIS3302DecoderForEnergy"
     #
@@ -29,7 +29,7 @@ def main():
     #     processor_outputs.append(output)
     #
     # lh5_in = lh5.Store()
-    # file = os.path.expandvars(paths["tier1_dir"] + "/" + filename)
+    # file = os.path.expandvars(filename)
     # groupname = paths["t1_group_name"]
     # lh5_data = lh5_in.read_object(groupname, file)
     #
