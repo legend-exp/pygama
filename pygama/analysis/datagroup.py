@@ -65,21 +65,9 @@ class DataGroup:
         
         # set LH5 data directory
         self.lh5_dir = os.path.expandvars(self.config['lh5_dir'])
-        self.lh5_ignore = self.config['lh5_ignore']
         if not os.path.isdir(self.lh5_dir):
             print('Warning, LH5 directory not found:', self.lh5_dir)
 
-        # set raw data directory
-        self.raw_dir = os.path.expandvars(self.config['raw_dir'])
-        self.raw_ignore = self.config['raw_ignore']
-        if not os.path.isdir(self.raw_dir):
-            print('Warning, raw directory not found:', self.raw_dir)
-
-        # set dsp data directory
-        self.dsp_dir = os.path.expandvars(self.config['dsp_dir'])
-        self.dsp_ignore = self.config['dsp_ignore']
-        if not os.path.isdir(self.dsp_dir):
-            print('Warning, dsp directory not found:', self.dsp_dir)
 
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']
@@ -91,8 +79,6 @@ class DataGroup:
         self.unique_key = self.config['unique_key']
         self.daq_template = self.config['daq_template']
         self.lh5_template = self.config['lh5_template']
-        self.raw_template = self.config['raw_template']
-        self.dsp_template = self.config['dsp_template']
 
     
     def lh5_dir_setup(self, create=False):
@@ -149,7 +135,7 @@ class DataGroup:
                 finfo = parse(self.daq_template, f_tmp)
                 if finfo is not None:
                     finfo = finfo.named # convert to dict
-                    finfo['daq_subdir'] = path.replace(self.daq_dir,'') # sub-dir
+                    finfo['daq_dir'] = path.replace(self.daq_dir,'') # sub-dir
                     finfo['daq_file'] = f
                     file_keys.append(finfo)                    
                 
@@ -171,147 +157,20 @@ class DataGroup:
         # reorder cols to match the daq_template string
         cols = ['unique_key']
         cols.extend([fn for _,fn,_,_ in Formatter().parse(dt) if fn is not None])
-        cols.extend(['daq_subdir','daq_file'])
+        cols.extend(['daq_dir','daq_file'])
         self.file_keys = self.file_keys[cols]
         
         # convert cols to numeric dtypes where possible
         for col in self.file_keys.columns:
-            try:
+            if col != 'YYmmdd' and col != 'hhmmss':                
+             try:
                 self.file_keys[col] = pd.to_numeric(self.file_keys[col])
-            except:
+             except:
                 pass
-        # print(self.file_keys.dtypes)
                 
         if verbose:
             print(self.file_keys.to_string())
             
-    def scan_raw_dir(self, verbose=False):
-        """
-        scan the raw directory and build a DataFrame of file keys.
-        A copy+paste of scan_daq_dir more or less
-        """
-        dt = self.raw_template
-        di = self.raw_ignore
-
-        file_keys = []
-        stop_walk = False
-
-        for path, folders, files in os.walk(self.raw_dir):
-
-            for f in files:
-
-                # in some cases, we need information from the path name
-                if '/' in dt:
-                    f_tmp = path.replace(self.raw_dir,'') + '/' + f
-                else:
-                    f_tmp = f
-
-                # check if we should ignore this file
-                if len(di) > 0 and any(ig in f_tmp for ig in di):
-                    continue
-
-                finfo = parse(dt, f_tmp)
-                if finfo is not None:
-                    finfo = finfo.named # convert to dict
-                    finfo['raw_subdir'] = path.replace(self.raw_dir,'') # sub-dir
-                    finfo['raw_file'] = f
-                    file_keys.append(finfo)
-
-                # limit number of files (debug mode)
-                if self.nfiles is not None and len(file_keys)==self.nfiles:
-                    stop_walk = True
-                if stop_walk:
-                    break
-            if stop_walk:
-                break
-
-        # create the main DataFrame
-        self.file_keys = pd.DataFrame(file_keys)
-
-        # grab the unique key and sort the DataFrame by it
-        fk = lambda x: self.unique_key.format_map(x)
-        self.file_keys['unique_key'] = self.file_keys.apply(fk, axis=1)
-
-        # reorder cols to match the daq_template string
-        cols = ['unique_key']
-        cols.extend([fn for _,fn,_,_ in Formatter().parse(dt) if fn is not None])
-        cols.extend(['raw_subdir','raw_file'])
-        self.file_keys = self.file_keys[cols]
-
-        # convert cols to numeric dtypes where possible
-        for col in self.file_keys.columns:
-            try:
-                self.file_keys[col] = pd.to_numeric(self.file_keys[col])
-            except:
-                pass
-
-        if verbose:
-            print(self.file_keys.to_string())
-        
-
-    def scan_dsp_dir(self, verbose=False):
-        """
-        scan the raw directory and build a DataFrame of file keys.
-        A copy+paste of scan_daq_dir more or less
-        """
-        dt = self.dsp_template
-        di = self.dsp_ignore
-
-        file_keys = []
-        stop_walk = False
-
-        for path, folders, files in os.walk(self.dsp_dir):
-
-            for f in files:
-
-                # in some cases, we need information from the path name
-                if '/' in dt:
-                    f_tmp = path.replace(self.dsp_dir,'') + '/' + f
-                else:
-                    f_tmp = f
-
-                # check if we should ignore this file
-                if len(di) > 0 and any(ig in f_tmp for ig in di):
-                    continue
-
-                finfo = parse(dt, f_tmp)
-                if finfo is not None:
-                    finfo = finfo.named # convert to dict
-                    finfo['raw_subdir'] = path.replace(self.dsp_dir,'') # sub-dir
-                    finfo['raw_file'] = f
-                    file_keys.append(finfo)
-
-                # limit number of files (debug mode)
-                if self.nfiles is not None and len(file_keys)==self.nfiles:
-                    stop_walk = True
-                if stop_walk:
-                    break
-            if stop_walk:
-                break
-
-        # create the main DataFrame
-        self.file_keys = pd.DataFrame(file_keys)
-
-        # grab the unique key and sort the DataFrame by it
-        fk = lambda x: self.unique_key.format_map(x)
-        self.file_keys['unique_key'] = self.file_keys.apply(fk, axis=1)
-
-        # reorder cols to match the daq_template string
-        cols = ['unique_key']
-        cols.extend([fn for _,fn,_,_ in Formatter().parse(dt) if fn is not None])
-        cols.extend(['dsp_subdir','dsp_file'])
-        self.file_keys = self.file_keys[cols]
-
-        # convert cols to numeric dtypes where possible
-        for col in self.file_keys.columns:
-            try:
-                self.file_keys[col] = pd.to_numeric(self.file_keys[col])
-            except:
-                pass
-
-        if verbose:
-            print(self.file_keys.to_string())
-
 
     def save_keys(self, fname=None):
         """

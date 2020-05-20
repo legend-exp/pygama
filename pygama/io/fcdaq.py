@@ -251,7 +251,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=8092, chans=None):
+def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=8092, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -262,7 +262,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     import fcutils
     
     # raw_files = './tempofile.lh5' # debug, delete
-    f_out = ''
     single_output = isinstance(raw_files, str)
     if single_output:
         f_out = raw_files
@@ -279,7 +278,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     
     if 'daq_to_raw' in config and 'ch_groups' in config['daq_to_raw']:
         ch_groups = config['daq_to_raw']['ch_groups']
-        print("GROUP ITEMS",ch_groups.items())  
         for group, attrs in ch_groups.items():
             ch_range = attrs['ch_range']
             try:
@@ -303,7 +301,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                    cr = range(ch_range[0], ch_range[1]+1)
                 except:
                    cr = [0] 
-                for ch in cr:#range(ch_range[0], ch_range[1]+1):
+                for ch in cr:
                     
                     tb = lh5.Table(buffer_size)
                     event_tbs[ch] = tb
@@ -315,7 +313,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                     try:
                        out_file = f_out 
                     except:
-                       outfile = fout if single_output else raw_files[subsystem]
+                       outfile = fi_out if single_output else raw_files[subsystem]
                     
                     tb_grp_file_list.append( (tb, ch_group, out_file) )
        
@@ -400,7 +398,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     for tb, group, filename in tb_grp_file_list:
         #if tb.loc != 0:
             lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
-            print("Storing", group)
             tb.clear()
     if status_tb.loc != 0:
         lh5_store.write_object(status_tb, 'stat', status_filename,
