@@ -283,7 +283,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
             try:
                subsystem = attrs['sysn']
             except:
-               subsystem='data'
+               subsystem='default'
           
             
             if not single_output:
@@ -310,11 +310,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                     if '{ch:' in group: ch_group = group.format(ch=ch)
                     ch_group = ch_group + '/raw'
                     # out_file = raw_files[subsystem].format_map(attrs)
-                    try:
-                       out_file = f_out 
-                    except:
-                       outfile = fi_out if single_output else raw_files[subsystem]
-                    
+                    out_file = f_out if single_output else raw_files[subsystem]
                     tb_grp_file_list.append( (tb, ch_group, out_file) )
        
 
@@ -324,7 +320,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                 event_decoder.initialize_lh5_table(tb)
                 group = group + '/raw'
                 # out_file = raw_file.format_map(attrs)
-                
                 out_file = f_out if single_output else raw_files[subsystem]
                 tb_grp_file_list.append( (tb, group, out_file) )
     else:
@@ -396,7 +391,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
 
     # end of loop, write to file once more
     for tb, group, filename in tb_grp_file_list:
-        #if tb.loc != 0:
+        if tb.loc != 0:
             lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
             tb.clear()
     if status_tb.loc != 0:
