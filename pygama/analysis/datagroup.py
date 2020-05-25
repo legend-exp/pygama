@@ -67,7 +67,8 @@ class DataGroup:
         self.lh5_dir = os.path.expandvars(self.config['lh5_dir'])
         if not os.path.isdir(self.lh5_dir):
             print('Warning, LH5 directory not found:', self.lh5_dir)
-        
+
+
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']
         self.subsystems = self.config['subsystems']
@@ -161,16 +162,16 @@ class DataGroup:
         
         # convert cols to numeric dtypes where possible
         for col in self.file_keys.columns:
-            try:
+            if col != 'YYmmdd' and col != 'hhmmss':                
+             try:
                 self.file_keys[col] = pd.to_numeric(self.file_keys[col])
-            except:
+             except:
                 pass
-        # print(self.file_keys.dtypes)
                 
         if verbose:
             print(self.file_keys.to_string())
             
-            
+
     def save_keys(self, fname=None):
         """
         default: save the unique_key and the relative path to the DAQ file,

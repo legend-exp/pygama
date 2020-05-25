@@ -371,6 +371,7 @@ class ProcessingChain:
             return out
 
         elif isinstance(node, ast.Subscript):
+            print(ast.dump(node))
             val = self.__parse_expr(node.value)
             if isinstance(node.slice, ast.Index):
                 if isinstance(val, np.ndarray):
@@ -383,7 +384,8 @@ class ProcessingChain:
                                           self.__parse_expr(node.slice.upper),
                                           self.__parse_expr(node.slice.step) )]
                 else:
-                    return val[slice(upper, lower, step)]
+                    print(self.__parse_expr(node.slice.upper))
+                    return val[slice(self.__parse_expr(node.slice.upper),self.__parse_expr(node.slice.lower),self.__parse_expr(node.slice.step))]
             elif isinstance(node.slice, ast.ExtSlice):
                 slices = tuple(node.slice.dims)
                 for i, sl in enumerate(slices):
