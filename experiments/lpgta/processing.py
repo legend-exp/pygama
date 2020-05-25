@@ -28,7 +28,7 @@ def main():
     arg('--r2d', action=st, help='run raw_to_dsp')
     
     # options
-    arg('--over', action=st, help='overwrite existing files')
+    arg('-o', '--over', action=st, help='overwrite existing files')
     arg('-n', '--nwfs', nargs='*', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
     
@@ -48,7 +48,8 @@ def main():
           f'\n  limit wfs? {nwfs}')
     
     # -- run routines -- 
-    if args.dg: load_datagroup()
+    if args.dg: 
+        dg = load_datagroup()
     
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
@@ -57,46 +58,68 @@ def main():
 def load_datagroup():
     """
     """
-    print('hi')
-    exit()
+    # # -- HADES mode -- 
+    # dg = DataGroup('HADES.json')
+    # dg.load_df('HADES_fileDB.h5')
+
+    # get the first 3 cycle files for det 60A, first th scan
+    # que = "detSN=='I02160A' and scantype=='th_HS2_top_psa' and run==1"
+
+    # det 60A, lat th scan
+    # que = "detSN=='I02160A' and scantype=='th_HS2_lat_psa'"
     
-    daq_path = '/'.join(f for f in df_daq['daq_file'][0].split('/')[:-1])
-    raw_path = '/'.join(f for f in df_daq['raw_file'][0].split('/')[:-1])
-    print('DAQ path:', daq_path)
-    print('RAW path:', raw_path)
-    df_daq['daq_file'] = [f.split('/')[-1] for f in df_daq['daq_file']]
-    df_daq['raw_file'] = [f.split('/')[-1] for f in df_daq['raw_file']]
-    # print(df_daq.columns)
+    # det 60B, first th scan
+    # que = "detSN=='I02160B' and scantype=='th_HS2_top_psa'"
     
-    view_cols = ['date','run','YYYYmmdd','hhmmss','rtp','daq_file','raw_file']
-    print(df_daq[view_cols].to_string())
+    # dg.file_keys.query(que, inplace=True)
+    # dg.file_keys = dg.file_keys[:3]
+    
+    
+    # # -- CAGE mode -- 
+    # dg = DataGroup('CAGE.json')
+    # dg.load_df('CAGE_fileDB.h5')
+    # 
+    # que = 'run==8'
+    # dg.file_keys.query(que, inplace=True)
+    
+    
+    # -- LPGTA mode -- 
+    dg = DataGroup('LPGTA.json')
+    dg.load_df('LPGTA_fileDB.h5')
+    
+    # process one big cal file
+    que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+    dg.file_keys.query(que, inplace=True)
+    
+    print('files to process:')
+    # print(dg.file_keys)
+    return dg
         
     
 def d2r(dg, overwrite=False, nwfs=None, vrb=False):
     """
     run daq_to_raw on the current DataGroup
     """
-    df_daq = dg.find_daq_files()
+    # print(dg.file_keys)
+    # print(dg.file_keys.columns)
     
-    
-    
-    
-    
-    exit()
-    
-    subs = dg.subsystems
-    
+    subs = dg.subsystems # can be blank: ['']
     # subs = ['geds'] # TODO: ignore other datastreams
     # chans = ['g035', 'g042'] # TODO: select a subset of detectors
     
-    print(f'Processing {df_daq.shape[0]} files ...')
+    print(f'Processing {dg.file_keys.shape[0]} files ...')
 
-    for i, row in df_daq.iterrows():
+    for i, row in dg.file_keys.iterrows():
         
-        f_daq, f_raw = row[['daq_file','raw_file']]
+        f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
+        f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        subrun = row['cycle'] if 'cycle' in row else None
+        print(f_daq)
+        print(f_raw)
         
         daq_to_raw(f_daq, f_raw, config=dg.config, subsystems=subs, verbose=vrb,
-                   n_max=nwfs)#, chans=chans)
+                   n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
+        # exit()
         
         
 def r2d(dg, overwrite=False, nwfs=None, vrb=False):

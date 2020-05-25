@@ -270,6 +270,12 @@ class DataGroup:
                 
                 # get filename
                 tmp['tier'] = tier
+
+                # leave subsystem unspecified
+                if self.subsystems != ['']:
+                    tmp['sysn'] = '{sysn}'
+                
+                # set the filename.  might have a '{sysn}' string present
                 row[f'{tier}_file'] = self.lh5_template.format_map(tmp)
                 
                 # compute file path.  this is tricky
