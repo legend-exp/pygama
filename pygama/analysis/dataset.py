@@ -12,14 +12,16 @@ class DataSet:
     can also load a JSON file to get a dict of metadata.
     """
     def __init__(self, ds_lo=None, ds_hi=None, run=None, runlist=None, sub=None,
-                 opt=None, v=False, md=None, cal=None, daq_dir=None, raw_dir=None, dsp_dir=None):
+                 opt=None, v=False, md=None, cal=None, cal_input=None, daq_dir=None, raw_dir=None, dsp_dir=None):
 
         # load metadata and set paths to data folders
-        self.config, self.calDB = None, None
+        self.config, self.calDB, self.cal_input = None, None, None
         if md is not None:
             self.load_metadata(md) # pure JSON
         if cal is not None:
             self.calDB = db.TinyDB(cal) # TinyDB JSON
+        if cal_input is not None:
+            self.load_cal(cal_input) 
         try:
             self.daq_dir = os.path.expandvars(self.config["daq_dir"])
             self.raw_dir = os.path.expandvars(self.config["raw_dir"])
@@ -83,6 +85,12 @@ class DataSet:
         with open(fname) as f:
             self.config = json.load(f)
 
+    def load_cal(self, fname):
+        """
+        load a JSON file into a dict
+        """
+        with open(fname) as f:
+            self.cal_input = json.load(f)
 
     def add_run(self, runs):
         """
@@ -157,10 +165,10 @@ class DataSet:
 
         # choose method of searching for raw files -- depends on file fmt string
         if self.ftype == "hades_char":
-           # search data directories for extant files
+           # search data directories for extant files should be removed soon
 
            # Check for raw Data
-           counter = 1
+           counter = 0
            for p, d, files in os.walk(self.raw_dir):
                for f in files:
                    for r in runs:
@@ -172,7 +180,7 @@ class DataSet:
                                counter+=1
 
            # Check for raw Data
-           counter = 1
+           counter = 0
            for p, d, files in os.walk(self.raw_dir):
                for f in files:
                    if any("{}-".format(r) in f for r in runs):
@@ -183,7 +191,7 @@ class DataSet:
 
 
            # Check for dsp Data
-           counter = 1
+           counter = 0
            for p, d, files in os.walk(self.dsp_dir):
                for f in files:
                    if any("{}-".format(r) in f for r in runs):
@@ -229,7 +237,9 @@ class DataSet:
 
         else:
             # ORCA METHOD
-            suffix = "." + self.config["suffix"]
+
+            suffix = "." + self.config["suffix"]#edit: we need this also here. One has to set the suffix then
+                        # in the config file ("suffix":"h5")
 
             # search data directories for extant files
             for p, d, files in os.walk(self.daq_dir):

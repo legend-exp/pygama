@@ -8,6 +8,7 @@
 *.h5
 *.lh5
 *~
+*.csv
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files

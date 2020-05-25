@@ -1,6 +1,7 @@
 from scimath.units.api import unit_parser
 from scimath.units.time import *
 from scimath.units.frequency import *
+from scimath.units import convert
 import sys
 
 ghz = 1000000000*hz

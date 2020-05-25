@@ -1,0 +1,18 @@
+{
+  "experiment" : "LPGTA",
+  "runDB" : "./LPGTA_runDB.json",
+  "fileDB" : "./LPGTA_fileDB.csv",
+  
+  "daq_dir" : "/global/cfs/cdirs/legend/data/lngs/pgt",
+  "daq_ignore" : [],
+  "lh5_dir" : "$LPGTA_DATA",
+  
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : ["geds","spms","auxs","tmap"],
+  "run_types" : ["phy","cal"],
+  "evt_dirs" : ["evt","skim"],
+  
+  "unique_key" : "lpgta-run{run}-{YYYYmmdd}T{hhmmss}",
+  "daq_template" : "/run{run:0>4d}-{label}/{YYYYmmdd}-{hhmmss}-{rtp}.fcio",
+  "lh5_template" : "LPGTA_r{run:0>4d}_{YYYYmmdd}T{hhmmss}Z_{rtp}_{sysn}_{tier}.lh5"
+}

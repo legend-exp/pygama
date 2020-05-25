@@ -29,17 +29,5 @@ in ipython, etc.
 """
 __version__ = "0.1.0"
 
-# kill annoying warnings
-import warnings, pandas
-warnings.filterwarnings(action="ignore", module="h5py", category=FutureWarning)
-warnings.filterwarnings(action='ignore', category=pandas.io.pytables.PerformanceWarning)
-warnings.filterwarnings(action='ignore', module="scipy.stats", category=FutureWarning)
-
-# # try to import all public functions (probably a bad idea)
-# import pkgutil
-# __path__ = pkgutil.extend_path(__path__, __name__)
-# for importer, modname, ispkg in pkgutil.walk_packages(
-#         path=__path__, prefix=__name__ + '.'):
-#     __import__(modname)
-
-from .dataset import DataSet
+from .analysis.dataset import DataSet
+from .analysis.datagroup import DataGroup

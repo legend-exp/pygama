@@ -1,0 +1,14 @@
+{
+    "0":["1-10", "initial Cs+bkg runs.  2500 V, 0x10 thr.  25 MHz noise, max varcap value."],
+    "1":["11-12,12-14", "initial Cs+bkg runs.  2800 V, same settings otherwise"],
+    "2":["15-41", "HV pulser meas.  Cs source + bkg.  0x15.  see elog 85"],
+    "3":["42-45", "bkg runs, 2800 V, 0x10 thresh"],
+    "4":["46-56", "maybe junk runs, need to check"],
+    "5":["57-90", "bkg runs after electronics fixes"],
+    "6":["91-125", "241Am data, beam direction issues.  some junk runs"],
+    "7":["126-127", "first bkg runs with PPM ICPC, before preamp tuning. 0x8 thresh. see elog 172"],
+    "8":["128-131", "first bkg runs with PPM ICPC, after preamp tuning. 0x8 thresh. see elog 172"],
+    "9":["132", "short bkg run with detector at 4500 V. 0x8 thresh. Saw a bad -10.8 rail 14 minutes into run and biased down. See Elog 173"],
+    "10":["133-134", "Lower bias run. 3000 V. 0x8 thresh. See Elog 173"],
+    "11":["135-136", "0x10 threshold, 3500 V bias, top hat lifted 5 cm and warming, preamp tuned to minimize rise time of waveforms (some oscillatory noise is present). see elog 175"]
+}
