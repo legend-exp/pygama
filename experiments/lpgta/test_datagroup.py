@@ -99,10 +99,9 @@ def analyze_cage():
 def analyze_hades():
     """
     """
-    
     dg = DataGroup('HADES.json')
     # dg.lh5_dir_setup()
-    # dg.scan_daq_dir()
+    dg.scan_daq_dir()
     
     # dg.save_keys()
     # dg.load_keys() # this is really slow
@@ -112,26 +111,31 @@ def analyze_hades():
     
     # sort by timestamp
     # dg.save_df('HADES_fileDB.h5')
-    dg.load_df('HADES_fileDB.h5')
+    # dg.load_df('HADES_fileDB.h5')
     
     # andreas request: show how to group files in the same run
 
-    dg.file_keys = dg.file_keys.query("detSN=='I02160B' and scantype=='ba_HS4_top_dlt' and run==1")
+    # dg.file_keys = dg.file_keys.query("detSN=='I02160B' and scantype=='ba_HS4_top_dlt' and run==1")
     
     # do a sort by timestamp
     def get_ts(row):
         ts = str(row['YYmmdd']) + str(row['hhmmss'])
-        row['date'] = pd.to_datetime(ts, format='%Y%m%d%H%M%S')
+        try:
+            dt = pd.to_datetime(ts, format='%Y%m%d%H%M%S')
+        except ValueError:
+            print("failed on file:")
+            print(row.to_string())
+            exit()
+        row['date'] = dt
         return row
     dg.file_keys = dg.file_keys.apply(get_ts, axis=1)
     dg.file_keys.sort_values('date', inplace=True)
     
+    dg.get_lh5_cols()
+    print(dg.file_keys['raw_file'].values)
     
-    # dg.get_lh5_cols()
-    # print(dg.file_keys)
-    
-    
-    
+    dg.save_df('HADES_fileDB.h5')
+        
     
 def analyze_ornl():
     
