@@ -97,7 +97,7 @@ def find_cut(ds, ds_lo, mode, write_db=False):
 
     # Two separate functions, one for Ac contaminated peak(Th232), one for Th228
     if mode == '232':
-        line = th_232(cal, y, ds)
+        line, ss_eff, ms_eff, cc_eff, cut_list = th_232(cal, y, ds)
     elif mode == '228':
         line = regular_cut(cal, y, ds)
     else:
@@ -117,29 +117,31 @@ def regular_cut(energy, y, ds):
     Algorithm for Th228 source
     """
 
-
+    cc_range = [1790,2050]
+    ms_range = [2083, 2123]
     dep_range = [1530,1620]
     hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]),
                                 range=dep_range)
+    hist1, bins1 = np.histogram(energy, bins=(ms_range[1]-ms_range[0]),
+                                range=ms_range)
     b = (bins[:-1] + bins[1:]) / 2
+    b1 = (bins1[:-1] + bins1[1:]) / 2
 
-    def gauss(x, *params):
-        y = np.zeros_like(x)
-        for i in range(0, len(params) - 1, 3):
-            x0 = params[i]
-            a = params[i + 1]
-            sigma = params[i + 2]
-            y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
-        y = y + params[-1]
-        return y
 
-    p0_list = [1592, 200, 3, 4]
+    p0_list = [1592, 200, 2.5, 4]
+    p1_list = [2103, 400, 3.3, 118]
 
     par, pcov = curve_fit(
         gauss, bins[1:], hist, p0=p0_list)
     print(par)
     perr = np.sqrt(np.diag(pcov))
     print(perr)
+
+    par1, pcov1 = curve_fit(
+        gauss, bins1[1:], hist1, p0=p1_list)
+    print(par1)
+    perr1 = np.sqrt(np.diag(pcov))
+    print(perr1)
 
     #Visual check of 1592 peak
     plt.title('Peak 1592')
@@ -148,10 +150,22 @@ def regular_cut(energy, y, ds):
     plt.tight_layout()
     plt.show()
 
+    plt.clf()
+    plt.title('Peak 2103')
+    plt.plot(b1, hist1, ds="steps", color='black')
+    plt.plot(b1, gauss(b1, *par1), '-r')
+    plt.tight_layout()
+    plt.show()
+
+    cc_height = np.sum(energy[np.where((energy > cc_range[0]) & (energy < cc_range[1]))]) / (cc_range[1]-cc_range[0])
+
     #set initial params and initial cut height
     th_peak_height = par[1]
     cut_th_peak_height = par[1]
+    sep_peak_height = par1[1]
     ss_eff_array = []
+    cc_eff_array = []
+    ms_eff_array = []
     cut_line_list = []
 
     line = .6
@@ -169,17 +183,30 @@ def regular_cut(energy, y, ds):
 
         y1 = y[np.where(line < y)]
         e1 = energy[np.where(line < y)]
+        cut_cc_height = np.sum(e1[np.where((e1 > cc_range[0]) & (e1 < cc_range[1]))]) / (cc_range[1]-cc_range[0])
+
 
         hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]),
                                     range=dep_range)
+        hist2, bins2 = np.histogram(e1, bins=(ms_range[1]-ms_range[0]),
+                                    range=ms_range)
 
         par1, pcov1 = curve_fit(
             gauss, bins1[1:], hist1, p0=p0_list)
         perr1 = np.sqrt(np.diag(pcov1))
 
+        par2, pcov2 = curve_fit(
+            gauss, bins2[1:], hist2, p0=p1_list)
+        perr2 = np.sqrt(np.diag(pcov2))
+
         cut_th_peak_height = par1[1]
+        cut_sep_height = par2[1]
         ss_eff = cut_th_peak_height / th_peak_height
+        ms_eff = cut_sep_height / sep_peak_height
+        cc_eff = cut_cc_height / cc_height
         ss_eff_array.append(ss_eff)
+        ms_eff_array.append(ms_eff)
+        cc_eff_array.append(cc_eff)
         cut_line_list.append(line)
 
         line += .001  ##<-- this can be lowered to get a more fine cut
@@ -212,6 +239,8 @@ def regular_cut(energy, y, ds):
 
     plt.clf()
     plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
+    plt.plot(cut_line_list, ms_eff_array, label='ms_eff')
+    plt.plot(cut_line_list, cc_eff_array, label='cc_eff')
     plt.ylabel('eff')
     plt.xlabel('AoverE_normalized')
     plt.title("Dataset {}: Efficiency curve".format(ds.ds_list[0]))
@@ -233,7 +262,7 @@ def regular_cut(energy, y, ds):
     plt.tight_layout()
     plt.show()
 
-    return line
+    return line, ss_eff_array, cc_eff_array, cut_line_list
 
 
 def th_232(energy, a_over_e, ds, write_db=False):
@@ -241,6 +270,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     ## Find A/E cut for Th232 source
 
     #FWHM of nearby peaks is 2.5
+    cc_range = [1790,2050]
     dep_range = [1530,1620]
     hist, bins = np.histogram(energy, bins=(dep_range[1]-dep_range[0]),
                               range=dep_range)
@@ -263,21 +293,25 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.tight_layout()
     plt.show()
 
+    cc_height = np.sum(energy[np.where((energy > cc_range[0]) & (energy < cc_range[1]))]) / (cc_range[1]-cc_range[0])
+
     ac_peak_height = par[1]
     th_peak_height = par[4]
     cut_ac_peak_height = par[1]
     cut_th_peak_height = par[4]
     ss_eff_array = []
     ms_eff_array = []
+    cc_eff_array = []
     cut_line_list = []
 
-    line = .6
+    line = .8
     print("Finding optimal cut, keeping 90% of 1592 DEP")
 
     while cut_th_peak_height > .9 * th_peak_height:
 
         y = a_over_e[np.where(line < a_over_e)]
         e1 = energy[np.where(line < a_over_e)]
+        cut_cc_height = np.sum(e1[np.where((e1 > cc_range[0]) & (e1 < cc_range[1]))]) / (cc_range[1]-cc_range[0])
 
         hist1, bins1 = np.histogram(e1, bins=(dep_range[1]-dep_range[0]),
                                     range=dep_range)
@@ -290,8 +324,10 @@ def th_232(energy, a_over_e, ds, write_db=False):
         cut_th_peak_height = par1[4]
         ss_eff = cut_th_peak_height / th_peak_height
         ms_eff = cut_ac_peak_height / ac_peak_height
+        cc_eff = cut_cc_height / cc_height
         ss_eff_array.append(ss_eff)
         ms_eff_array.append(ms_eff)
+        cc_eff_array.append(cc_eff)
         cut_line_list.append(line)
 
         line += .001
@@ -299,9 +335,9 @@ def th_232(energy, a_over_e, ds, write_db=False):
     print(line)
 
     plt.clf()
-    plt.hist2d(energy, a_over_e, bins=[1000,200], range=[[0, 2000], [0, 2]],
+    plt.hist2d(energy, a_over_e, bins=[1350,200], range=[[0, 2700], [0, 2]],
                 norm=LogNorm(), cmap='jet')
-    plt.hlines(line, 0, 2000, color='r', linewidth=1.5)
+    plt.hlines(line, 0, 2700, color='r', linewidth=1.5)
     plt.xlabel("Energy (keV)", ha='right', x=1)
     plt.ylabel("A/Eunc", ha='right', y=1)
     plt.title("Dataset {}: 2D A/E vs E".format(ds.ds_list[0]))
@@ -323,14 +359,15 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.clf()
     plt.plot(cut_line_list, ss_eff_array, label='ss_eff')
     plt.plot(cut_line_list, ms_eff_array, label='ms_eff')
+    plt.plot(cut_line_list, cc_eff_array, label='cc_eff')
     plt.title("Dataset {}: Efficiency curves".format(ds.ds_list[0]))
     plt.ylabel('eff')
     plt.xlabel('AoverE_normalized')
     plt.legend()
     plt.show()
 
-    hist, bins = np.histogram(energy, bins=2600, range=[0,2600])
-    hist1, bins1 = np.histogram(e1, bins=2600, range=[0,2600])
+    hist, bins = np.histogram(energy, bins=2700, range=[0,2700])
+    hist1, bins1 = np.histogram(e1, bins=2700, range=[0,2700])
 
     plt.clf()
     plt.semilogy(bins[1:], hist, color='black', ds="steps", linewidth=1.5,
@@ -344,7 +381,7 @@ def th_232(energy, a_over_e, ds, write_db=False):
     plt.tight_layout()
     plt.show()
 
-    return line
+    return line, ss_eff_array, ms_eff_array, cc_eff_array, cut_line_list
 
 
 def linear_correction(energy, a_over_e):
