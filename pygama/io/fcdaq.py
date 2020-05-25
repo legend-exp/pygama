@@ -251,7 +251,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=8092, chans=None):
+def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=8092, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -278,10 +278,13 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     
     if 'daq_to_raw' in config and 'ch_groups' in config['daq_to_raw']:
         ch_groups = config['daq_to_raw']['ch_groups']
-        
         for group, attrs in ch_groups.items():
             ch_range = attrs['ch_range']
-            subsystem = attrs['sysn']
+            try:
+               subsystem = attrs['sysn']
+            except:
+               subsystem='default'
+          
             
             if not single_output:
                 if subsystem not in raw_files.keys():
@@ -293,8 +296,12 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
             if 'tb_per_ch' in attrs:
                 tb_per_ch = (attrs['tb_per_ch'].lower() == "true")
 
-            if tb_per_ch: 
-                for ch in range(ch_range[0], ch_range[1]+1):
+            if tb_per_ch:
+                try:
+                   cr = range(ch_range[0], ch_range[1]+1)
+                except:
+                   cr = [0] 
+                for ch in cr:
                     
                     tb = lh5.Table(buffer_size)
                     event_tbs[ch] = tb
@@ -304,8 +311,8 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                     ch_group = ch_group + '/raw'
                     # out_file = raw_files[subsystem].format_map(attrs)
                     out_file = f_out if single_output else raw_files[subsystem]
-
                     tb_grp_file_list.append( (tb, ch_group, out_file) )
+       
 
             # one table for all channels in the range
             else: 
@@ -314,7 +321,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                 group = group + '/raw'
                 # out_file = raw_file.format_map(attrs)
                 out_file = f_out if single_output else raw_files[subsystem]
-
                 tb_grp_file_list.append( (tb, group, out_file) )
     else:
         print('Config not found.  Single-table mode')
@@ -333,8 +339,10 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     status_decoder.get_file_config(fcio)
     status_tb = lh5.Table(buffer_size)
     status_decoder.initialize_lh5_table(status_tb)
-    status_filename = f_out if single_output else raw_files['auxs']
-
+    try:
+      status_filename = f_out if single_output else raw_files['auxs']
+    except:
+      status_filename = "stat"
     # TODO: add overwrite capability
     lh5_store = lh5.Store()
     
@@ -370,7 +378,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
         # Event or SparseEvent record
         if rc == 3 or rc == 6: 
             for tb, group, filename in tb_grp_file_list:
-                if tb.size - tb.loc < fcio.numtraces: # might overflow 
+                if tb.size - tb.loc < fcio.numtraces: # might overflow
                     lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
                     tb.clear()
             
@@ -380,7 +388,6 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
             # if i_debug == 10:
             #    print("breaking early")
             #    break # debug, deleteme
-
 
     # end of loop, write to file once more
     for tb, group, filename in tb_grp_file_list:
