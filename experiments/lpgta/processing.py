@@ -63,12 +63,12 @@ def main():
 def load_datagroup():
     """
     """
-    # # -- HADES mode -- 
-    # dg = DataGroup('HADES.json')
-    # dg.load_df('HADES_fileDB.h5')
+    # -- HADES mode -- 
+    dg = DataGroup('HADES.json')
+    dg.load_df('HADES_fileDB.h5')
 
     # get the first 3 cycle files for det 60A, first th scan
-    # que = "detSN=='I02160A' and scantype=='th_HS2_top_psa' and run==1"
+    que = "detSN=='I02160A' and scantype=='th_HS2_top_psa' and run==1"
 
     # det 60A, lat th scan
     # que = "detSN=='I02160A' and scantype=='th_HS2_lat_psa'"
@@ -76,15 +76,15 @@ def load_datagroup():
     # det 60B, first th scan
     # que = "detSN=='I02160B' and scantype=='th_HS2_top_psa'"
     
-    # dg.file_keys.query(que, inplace=True)
-    # dg.file_keys = dg.file_keys[:3]
-    
-    
-    # -- CAGE mode -- 
-    dg = DataGroup('CAGE.json')
-    dg.load_df('CAGE_fileDB.h5')
-    que = 'run==8'
     dg.file_keys.query(que, inplace=True)
+    dg.file_keys = dg.file_keys[:3]
+    
+    
+    # # -- CAGE mode -- 
+    # dg = DataGroup('CAGE.json')
+    # dg.load_df('CAGE_fileDB.h5')
+    # que = 'run==8'
+    # dg.file_keys.query(que, inplace=True)
     
     
     # # -- LPGTA mode -- 

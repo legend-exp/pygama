@@ -427,7 +427,7 @@ class ProcessingChain:
             return out
 
         elif isinstance(node, ast.Subscript):
-            print(ast.dump(node))
+            # print(ast.dump(node))
             val = self.__parse_expr(node.value)
             if isinstance(node.slice, ast.Index):
                 if isinstance(val, np.ndarray):

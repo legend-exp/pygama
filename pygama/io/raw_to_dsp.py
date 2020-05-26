@@ -42,6 +42,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
         data_raw = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
         
         # load waveform info
+        if "waveform" not in data_raw.keys():
+            print(f"waveform data not found in table: {tb}.  skipping ...")
+            continue
         wf_in = data_raw["waveform"]["values"].nda
         wf_units = data_raw['waveform']['dt'].attrs['units']
         dt = data_raw['waveform']['dt'].nda[0] * unit_parser.parse_unit(wf_units)
@@ -67,9 +70,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     print('Writing to output file:', f_dsp)
     for tb, tb_out, pc in chains:
         print(f'Processing table: {tb} ...')
-        pc.execute()
-        print(f'Done.  Writing to file ...')
-        raw_store.write_object(tb_out, tb, f_dsp)
+        # pc.execute()
+        # print(f'Done.  Writing to file ...')
+        # raw_store.write_object(tb_out, tb, f_dsp)
     
     t_elap = (time.time() - t_start) / 60
     print(f'Done processing.  Time elapsed: {t_elap:.2f} min.')
