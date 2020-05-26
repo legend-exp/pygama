@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import os
+import json
 import numpy as np
 import argparse
 import pandas as pd
 from pprint import pprint
+from collections import OrderedDict
 
 from pygama import DataGroup
 from pygama.io.daq_to_raw import daq_to_raw
+from pygama.io.raw_to_dsp import raw_to_dsp
 
 
 def main():
@@ -15,6 +18,8 @@ def main():
     You must set these environment variables:
       * $LPGTA_DATA : base data directory
       * $LEGEND_META : the legend-metadata repository
+      
+    TODO: parallelize, submit processing jobs
     """
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
@@ -75,24 +80,23 @@ def load_datagroup():
     # dg.file_keys = dg.file_keys[:3]
     
     
-    # # -- CAGE mode -- 
-    # dg = DataGroup('CAGE.json')
-    # dg.load_df('CAGE_fileDB.h5')
-    # 
-    # que = 'run==8'
-    # dg.file_keys.query(que, inplace=True)
-    
-    
-    # -- LPGTA mode -- 
-    dg = DataGroup('LPGTA.json')
-    dg.load_df('LPGTA_fileDB.h5')
-    
-    # process one big cal file
-    que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+    # -- CAGE mode -- 
+    dg = DataGroup('CAGE.json')
+    dg.load_df('CAGE_fileDB.h5')
+    que = 'run==8'
     dg.file_keys.query(que, inplace=True)
     
-    print('files to process:')
+    
+    # # -- LPGTA mode -- 
+    # dg = DataGroup('LPGTA.json')
+    # dg.load_df('LPGTA_fileDB.h5')
+    # # process one big cal file (64 GB)
+    # que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+    # dg.file_keys.query(que, inplace=True)
+    
+    # print('files to process:')
     # print(dg.file_keys)
+    
     return dg
         
     
@@ -114,31 +118,33 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         subrun = row['cycle'] if 'cycle' in row else None
-        print(f_daq)
-        print(f_raw)
         
         daq_to_raw(f_daq, f_raw, config=dg.config, subsystems=subs, verbose=vrb,
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
-        # exit()
         
         
 def r2d(dg, overwrite=False, nwfs=None, vrb=False):
     """
     """
-    df_raw = dg.find_raw_files()
+    # print(dg.file_keys)
+    # print(dg.file_keys.columns)
     
-    # for i, row in df_raw.iterrows():
-    # 
-    #     f_raw, f_dsp = row[['raw_file','dsp_file']]
-    # 
-    #     # load LH5 tables
-    #     # init mpi4py
-    #     # calculate table splits
-    # 
-    #     # in each thread:
-    #     # pc = ProcessingChain()
-    #     # pc.init_json()
-    #     raw_to_dsp(table_in, table_out)
+    with open(f'{dg.experiment}_dsp.json') as f:
+        dsp_config = json.load(f, object_pairs_hook=OrderedDict)
+
+    for i, row in dg.file_keys.iterrows():
+    
+        f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
+        
+        if "sysn" in f_raw:
+            tmp = {'sysn' : 'geds'} # hack for lpgta
+            f_raw = f_raw.format_map(tmp)
+            f_dsp = f_dsp.format_map(tmp)
+        
+        raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb,
+                   overwrite=overwrite)    
+        
 
     
     
