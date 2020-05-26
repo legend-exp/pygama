@@ -7,8 +7,8 @@ from pygama import DataGroup
 def main():
     """
     """
-    analyze_lpgta()
-    # analyze_cage()
+    # analyze_lpgta()
+    analyze_cage()
     # analyze_hades()
     # analyze_ornl()
     

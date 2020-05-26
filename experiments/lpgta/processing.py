@@ -80,11 +80,11 @@ def load_datagroup():
     dg.file_keys = dg.file_keys[:3]
     
     
-    # # -- CAGE mode -- 
-    # dg = DataGroup('CAGE.json')
-    # dg.load_df('CAGE_fileDB.h5')
-    # que = 'run==8'
-    # dg.file_keys.query(que, inplace=True)
+    # -- CAGE mode -- 
+    dg = DataGroup('CAGE.json')
+    dg.load_df('CAGE_fileDB.h5')
+    que = 'run==8'
+    dg.file_keys.query(que, inplace=True)
     
     
     # # -- LPGTA mode -- 
