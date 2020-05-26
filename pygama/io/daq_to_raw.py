@@ -64,6 +64,7 @@ def daq_to_raw(daq_filename, raw_filename=None, subrun=None, subsystems=None,
     print('Starting daq_to_raw processing.'
           f'\n  Buffer size: {buffer_size}'
           f'\n  Max num. events: {n_max}'
+          f'\n  Cycle (subrun) num: {subrun}'
           f'\n  Input: {daq_filename}\n  Output:')
     pprint(raw_files)
     
@@ -73,9 +74,10 @@ def daq_to_raw(daq_filename, raw_filename=None, subrun=None, subsystems=None,
     # get the DAQ mode
     if config['daq'] == 'ORCA':
         print('note, remove decoder input option')
-        process_orca(daq_filename, raw_filename, n_max, None, config, verbose, run=run, buffer_size=buffer_size)
+        process_orca(daq_filename, raw_filename, n_max, None, config, verbose, run=subrun, buffer_size=buffer_size)
 
     elif config['daq'] == 'FlashCam':
+        print("Processing FlashCam ...")
         bytes_processed = process_flashcam(daq_filename, raw_files, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
 
     elif config['daq'] == 'SIS3316':

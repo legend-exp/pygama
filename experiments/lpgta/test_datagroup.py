@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pandas as pd
 import numpy as np
 from pprint import pprint
 from pygama import DataGroup
@@ -7,24 +8,23 @@ def main():
     """
     """
     # analyze_lpgta()
-    # analyze_cage()
-    analyze_hades()
+    analyze_cage()
+    # analyze_hades()
     # analyze_ornl()
     
 
 def analyze_lpgta():
     
     dg = DataGroup('LPGTA.json')
+    
     # dg.lh5_dir_setup()
     dg.scan_daq_dir()
     
-    # print(dg.file_keys)
-    # exit()
-    
     # -- experiment-specific choices -- 
-    dg.file_keys.query('run > 2', inplace=True) 
     
     # run 1 & 2 files don't match template
+    dg.file_keys.query('run > 2', inplace=True) 
+    
     dg.file_keys.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
     dg.file_keys.reset_index(drop=True, inplace=True)
     
@@ -33,17 +33,20 @@ def analyze_lpgta():
         return row
     
     dg.file_keys = dg.file_keys.apply(get_cmap, axis=1)
-    print(dg.file_keys)
     
-    # dg.save_keys()
-    # dg.load_keys()
-    # print(dg.file_keys)
+    dg.file_keys['runtype'] = dg.file_keys['rtp']
+    
+    dg.get_lh5_cols()
+    
+    dg.save_df('./LPGTA_fileDB.h5')
+    
+    print(dg.file_keys)
     
     
 def analyze_cage():
     
     dg = DataGroup('CAGE.json')
-    # dg.lh5_dir_setup()
+    dg.lh5_dir_setup()
     
     dg.scan_daq_dir()
     
@@ -69,43 +72,51 @@ def analyze_cage():
                     if cyc == clo:
                         row['run'] = run
                         break
-        # label the detector
+        # label the detector ('runtype' matches 'run_types' in config file)
         if cyc < 126:
-            row['det'] = 'oppi'
+            row['runtype'] = 'oppi'
         else:
-            row['det'] = 'icpc'
+            row['runtype'] = 'icpc'
         return row
-        
+    
     dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
-    print(dg.file_keys.to_string())
-    # dg.file_keys['run'].astype(int)
     
+    dg.get_lh5_cols()
     
-    # dg.save_keys()
-    # dg.load_keys()
-    # print(dg.file_keys)
+    for col in ['run']:
+        dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
+
+    print(dg.file_keys)
     
     dg.save_df('CAGE_fileDB.h5')
-    # dg.load_df('CAGE_fileDB.h5')
-    # print(dg.file_keys)
     
     
 def analyze_hades():
-    
+    """
+    """
     dg = DataGroup('HADES.json')
-    # dg.lh5_dir_setup()
-    # dg.scan_daq_dir()
-    # dg.save_keys()
 
-    # dg.load_keys() # this is really slow, maybe I should partition it differently
+    dg.lh5_dir_setup()
+    # dg.lh5_dir_setup(create=True)
     
-    # dg.save_df('HADES_fileDB.h5')
-    dg.load_df('HADES_fileDB.h5')
-    print(dg.file_keys.to_string())
+    dg.scan_daq_dir()
     
-    # show how to group files in the same run
+    # -- experiment-specific stuff -- 
+    dg.file_keys['runtype'] = dg.file_keys['detSN']
     
+    # add a sortable timestamp column
+    def get_ts(row):
+        ts = f"{row['YYmmdd']} {row['hhmmss']}"
+        row['date'] = pd.to_datetime(ts, format='%y%m%d %H%M%S')
+        return row
+    dg.file_keys = dg.file_keys.apply(get_ts, axis=1)
+    dg.file_keys.sort_values('date', inplace=True)
     
+    dg.get_lh5_cols()
+    print(dg.file_keys['raw_file'].values)
+    
+    dg.save_df('HADES_fileDB.h5')
+        
     
 def analyze_ornl():
     

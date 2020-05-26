@@ -67,7 +67,8 @@ class DataGroup:
         self.lh5_dir = os.path.expandvars(self.config['lh5_dir'])
         if not os.path.isdir(self.lh5_dir):
             print('Warning, LH5 directory not found:', self.lh5_dir)
-        
+
+
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']
         self.subsystems = self.config['subsystems']
@@ -161,16 +162,16 @@ class DataGroup:
         
         # convert cols to numeric dtypes where possible
         for col in self.file_keys.columns:
-            try:
+            if col != 'YYmmdd' and col != 'hhmmss':                
+             try:
                 self.file_keys[col] = pd.to_numeric(self.file_keys[col])
-            except:
+             except:
                 pass
-        # print(self.file_keys.dtypes)
                 
         if verbose:
             print(self.file_keys.to_string())
             
-            
+
     def save_keys(self, fname=None):
         """
         default: save the unique_key and the relative path to the DAQ file,
@@ -252,3 +253,41 @@ class DataGroup:
         self.file_keys = pd.read_hdf(fname, key='file_keys')
         
         
+    def get_lh5_cols(self):
+        """
+        compute the LH5 filenames.
+        
+        need to generate the file names, and then figure out which folder
+        to store them in.  probably best to separate these tasks
+        """
+        if 'runtype' not in self.file_keys.columns:
+            print("You must add a 'runtype' column to the file key DF.")
+            exit()
+        
+        def get_files(row):
+            tmp = row.to_dict()
+            for tier in self.tier_dirs:
+                
+                # get filename
+                tmp['tier'] = tier
+
+                # leave subsystem unspecified
+                if self.subsystems != ['']:
+                    tmp['sysn'] = '{sysn}'
+                
+                # set the filename.  might have a '{sysn}' string present
+                row[f'{tier}_file'] = self.lh5_template.format_map(tmp)
+                
+                # compute file path.
+                # daq_to_raw outputs a file for each subsystem, and we 
+                # handle this here by leaving a regex in the file string
+                path = f'/{tier}'
+                if self.subsystems != [""]: 
+                    path += '/{sysn}'
+                if row['runtype'] in self.run_types: 
+                    path += f"/{row['runtype']}"
+            
+                row[f'{tier}_path'] = path
+            return row
+            
+        self.file_keys = self.file_keys.apply(get_files, axis=1)
