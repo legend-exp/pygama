@@ -7,6 +7,7 @@ from scimath.units import convert
 from scimath.units.api import unit_parser
 from scimath.units.unit import unit
 import importlib
+from collections import OrderedDict
 
 from pygama.dsp.units import *
 
@@ -65,13 +66,60 @@ class ProcessingChain:
         self._clk = clock_unit
         self._verbosity = verbosity
 
+
+    def set_processor_list(self, dsp_config):
+        """
+        declare a list of processors from an input list.
+        dsp_config can be a JSON filename or an OrderedDict.
+        """
+        if isinstance(dsp_config, str):
+            with open(dsp_config) as f:
+                dsp_config = json.load(f, object_pairs_hook=OrderedDict)
+        
+        if not isinstance(dsp_config, OrderedDict):
+            print('Error, dsp_config must be an OrderedDict!')
+            exit()
+            
+        outputs, funcs, slist = [], [], []
+            
+        processors = dsp_config["processors"]
+        outputs = [key for key in processors]
+        
+        for output in outputs:
+            function = [processors[output]["function"],
+                        processors[output]["module"]]
+            funcs.append(function)
+
+            settings = []
+            settings.append(processors[output]["args"])
+            if "kwargs" in processors[output]:
+                settings.append(processors[output]["kwargs"])
+
+            slist.append(settings)
+
+        for i in range(len(funcs)):
+            settings = slist[i]
+
+            if len(settings) == 1:
+                settings = slist[i]
+                module = importlib.import_module(funcs[i][1])
+                self.add_processor(getattr(module, funcs[i][0]), *settings[0])
+
+            elif len(slist[i]) == 2:
+                module = importlib.import_module(funcs[i][1])
+                self.add_processor(getattr(module, funcs[i][0]), 
+                                   *settings[0], **settings[1])
+
+
     def add_waveform(self, name, dtype, length):
         """Add named variable containing a waveform block with fixed type and length"""
         self.__add_variable(name, dtype, (self._block_width, length))
 
+
     def add_scalar(self, name, dtype):
         """Add named variable containing a scalar block with fixed type"""
         self.__add_variable(name, dtype, (self._block_width))
+
 
     def add_input_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an input buffer to a variable. The buffer should be a numpy
@@ -93,6 +141,7 @@ class ProcessingChain:
         """
         self.__add_io_buffer(buff, varname, True, dtype, buffer_len, unit)
 
+
     def get_input_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the input buffer associated with varname. If there is no such
         buffer, create one with a shape compatible with the input variable and
@@ -112,6 +161,7 @@ class ProcessingChain:
         if name not in self.__input_buffers:
             self.__add_io_buffer(None, varname, True, dtype, buffer_len, unit)
         return self.__input_buffers[name][0]
+
 
     def add_output_buffer(self, varname, buff, dtype=None, buffer_len=None, unit=None):
         """Link an output buffer to a variable. The buffer should be a numpy
@@ -133,6 +183,7 @@ class ProcessingChain:
 
         """
         self.__add_io_buffer(buff, varname, False, dtype, buffer_len, unit)
+
 
     def get_output_buffer(self, varname, dtype=None, buffer_len=None, unit=None):
         """Get the output buffer associated with varname. If there is no such
@@ -282,10 +333,12 @@ class ProcessingChain:
         self.__proc_strs.append(proc_strs)
         return None
 
+
     def execute(self):
         """Execute the dsp chain on the entire input/output buffers"""
         for begin in range(0, self._buffer_len, self._block_width):
             self.execute_block(begin)
+
 
     def execute_block(self, offset=0):
         """Execute the dsp chain on a sub-set of the input/output buffers
@@ -307,9 +360,12 @@ class ProcessingChain:
         of the array to the function."""
         return self.__parse_expr(ast.parse(varname, mode='eval').body)
 
-    # helper function for get_variable that recursively evaluates the AST tree
-    # based on: https://stackoverflow.com/a/9558001.
+    
     def __parse_expr(self, node):
+        """
+        helper function for get_variable that recursively evaluates the AST tree
+        based on: https://stackoverflow.com/a/9558001.
+        """
         if node is None:
             return None
 
@@ -371,7 +427,7 @@ class ProcessingChain:
             return out
 
         elif isinstance(node, ast.Subscript):
-            print(ast.dump(node))
+            # print(ast.dump(node))
             val = self.__parse_expr(node.value)
             if isinstance(node.slice, ast.Index):
                 if isinstance(val, np.ndarray):
@@ -444,8 +500,10 @@ class ProcessingChain:
         raise ValueError("Cannot parse AST nodes of type " + str(node.__dict__))
 
 
-    # Add an array of zeros to the vars dict called name and return it
     def __add_var(self, name, dtype, shape):
+        """
+        Add an array of zeros to the vars dict called name and return it
+        """
         if not re.match("\A\w+$", name):
             raise KeyError(name+' is not a valid alphanumeric name')
         if name in self.__vars_dict:
@@ -456,10 +514,12 @@ class ProcessingChain:
         return arr
 
 
-    # copy from input buffers to variables
-    # call all the processors on their paired arg tuples
-    # copy from variables to list of output buffers
     def __execute_procs(self, start, end):
+        """
+        copy from input buffers to variables
+        call all the processors on their paired arg tuples
+        copy from variables to list of output buffers
+        """
         for buf, var, scale in self.__input_buffers.values():
             if scale:
                 np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
@@ -473,9 +533,12 @@ class ProcessingChain:
             else:
                 np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
 
-    # verbose version of __execute_procs. This is probably overkill, but it
-    # was done to minimize python calls in the non-verbose version
+    
     def __execute_procs_verbose(self, start, end):
+        """
+        verbose version of __execute_procs. This is probably overkill, but it
+        was done to minimize python calls in the non-verbose version
+        """
         names = set(self.__vars_dict.keys())
         self.__print(3, 'Input:')
         for name, (buf, var, scale) in self.__input_buffers.items():
@@ -504,10 +567,13 @@ class ProcessingChain:
                 np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
             self.__print(3, name+' = '+str(var))
 
-    # append a tuple with the buffer and variable to either the input buffer
-    # list (if input=true) or output buffer list (if input=false), making sure
-    # that buffer shapes are compatible
+    
     def __add_io_buffer(self, buff, varname, input, dtype, buffer_len, scale):
+        """
+        append a tuple with the buffer and variable to either the input buffer
+        list (if input=true) or output buffer list (if input=false), making sure
+        that buffer shapes are compatible
+        """
         var = self.get_variable(varname)
         if buff is not None and not isinstance(buff, np.ndarray):
             raise ValueError("Buffers must be ndarrays.")
@@ -571,9 +637,11 @@ class ProcessingChain:
 
         if returnbuffer: return buff
 
+
     def __print(self, verbosity, *args):
         if self._verbosity >= verbosity:
             print(*args)
+
 
     def __str__(self):
         ret = 'Input variables: ' + str([name for name in self.__input_buffers.keys()])
@@ -582,39 +650,3 @@ class ProcessingChain:
         ret += '\nOutput variables: ' + str([name for name in self.__output_buffers.keys()])
         return ret.replace("'", "")
 
-    def set_processor_list(self, json_file):
-
-        output_list = []
-        func_list = []
-        list = []
-        with open(json_file) as f:
-            config = json.load(f)
-
-        processors = config["processors"]
-        for key in processors:
-            output_list.append(key)
-
-        for output in output_list:
-
-            function = [processors[output]["function"], processors[output]["module"]]
-            func_list.append(function)
-            settings = []
-
-            settings.append(processors[output]["args"])
-            if "kwargs" in processors[output]:
-                settings.append(processors[output]["kwargs"])
-
-            list.append(settings)
-
-        for i in range(len(func_list)):
-
-            settings = list[i]
-
-            if len(settings) == 1:
-                settings = list[i]
-                module = importlib.import_module(func_list[i][1])
-                self.add_processor(getattr(module, func_list[i][0]), *settings[0])
-
-            elif len(list[i]) == 2:
-                module = importlib.import_module(func_list[i][1])
-                self.add_processor(getattr(module, func_list[i][0]), *settings[0], **settings[1])

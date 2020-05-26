@@ -1,0 +1,64 @@
+{
+  "outputs": {
+    "trapE":"ADC", "bl":"ADC", "bl_sig":"ADC", "A_10":"ADC", "AoE":"ADC"
+  },
+  "processors":{
+    "bl, bl_sig":{
+      "function": "mean_stdev",
+      "module": "pygama.dsp.processors",
+      "args" : ["wf[0:1000]", "bl", "bl_sig"],
+      "unit": ["ADC", "ADC"]
+    },
+    "wf_blsub":{
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["wf", "bl", "wf_blsub"]
+    },
+    "wf_pz": {
+      "function": "pole_zero",
+      "module": "pygama.dsp.processors",
+      "args":["wf_blsub", "70*us", "wf_pz"]
+    },
+    "wf_trap": {
+      "function": "trap_filter",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz", "10*us", "5*us", "wf_trap"]
+    },
+    "wf_atrap": {
+      "function": "asymTrapFilter",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz", "0.05*us", "2*us", "3*us", "wf_atrap"]
+    },
+    "trapmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_trap", 1, "trapmax"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]}
+    },
+    "trapE": {
+      "function": "divide",
+      "module": "numpy",
+      "args":["trapmax", "10*us", "trapE"],
+      "unit": "ADC"
+    },
+    "curr": {
+      "function": "avg_current",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz", 10, "curr(len(wf_pz)-10, f)"]
+    },
+    "A_10": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["curr", 1, "A_10"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC"
+    },
+    "AoE": {
+      "function": "divide",
+      "module": "numpy",
+      "args":["A_10", "trapE", "AoE"],
+      "unit": "ADC"
+    }
+  }
+  
+}

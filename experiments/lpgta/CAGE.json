@@ -3,6 +3,7 @@
   "runDB" : "./CAGE_runDB.json",
   "fileDB" : "./CAGE_fileDB.csv",
   
+  "daq" : "ORCA",
   "daq_dir" : "/global/cfs/cdirs/legend/data/cage/Data",
   "daq_ignore" : [".log",".DS_Store"],
   "lh5_dir" : "/global/cfs/cdirs/legend/data/cage/LH5",

@@ -7,9 +7,9 @@ from pygama import DataGroup
 def main():
     """
     """
-    # analyze_lpgta()
+    analyze_lpgta()
     # analyze_cage()
-    analyze_hades()
+    # analyze_hades()
     # analyze_ornl()
     
 
@@ -34,13 +34,11 @@ def analyze_lpgta():
     
     dg.file_keys = dg.file_keys.apply(get_cmap, axis=1)
     
-    print(dg.file_keys)
+    dg.file_keys['runtype'] = dg.file_keys['rtp']
     
-    # dg.save_keys()
-    # dg.load_keys()
+    dg.get_lh5_cols()
     
     dg.save_df('./LPGTA_fileDB.h5')
-    dg.load_df('./LPGTA_fileDB.h5')
     
     print(dg.file_keys)
     
@@ -50,88 +48,75 @@ def analyze_cage():
     dg = DataGroup('CAGE.json')
     dg.lh5_dir_setup()
     
-    # dg.scan_daq_dir()
-    # 
-    # # -- experiment-specific choices -- 
-    # dg.file_keys.sort_values(['cycle'], inplace=True)
-    # dg.file_keys.reset_index(drop=True, inplace=True)
-    # 
-    # def get_cyc_info(row):
-    #     """ 
-    #     map cycle numbers to physics runs, and identify detector 
-    #     """
-    #     cyc = row['cycle']
-    #     for run, cycles in dg.runDB.items():
-    #         tmp = cycles[0].split(',')
-    #         for rng in tmp:
-    #             if '-' in rng:
-    #                 clo, chi = [int(x) for x in rng.split('-')]
-    #                 if clo <= cyc <= chi:
-    #                     row['run'] = run
-    #                     break
-    #             else:
-    #                 clo = int(rng)
-    #                 if cyc == clo:
-    #                     row['run'] = run
-    #                     break
-    #     # label the detector ('runtype' matches 'run_types' in config file)
-    #     if cyc < 126:
-    #         row['runtype'] = 'oppi'
-    #     else:
-    #         row['runtype'] = 'icpc'
-    #     return row
-    # 
-    # dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
+    dg.scan_daq_dir()
     
-    # dg.save_keys()
-    # dg.load_keys()
-    # print(dg.file_keys)
+    # -- experiment-specific choices -- 
+    dg.file_keys.sort_values(['cycle'], inplace=True)
+    dg.file_keys.reset_index(drop=True, inplace=True)
     
-    # dg.save_df('CAGE_fileDB.h5')
-    # exit()
-
-    dg.load_df('CAGE_fileDB.h5')
-    # print(dg.file_keys)
+    def get_cyc_info(row):
+        """ 
+        map cycle numbers to physics runs, and identify detector 
+        """
+        cyc = row['cycle']
+        for run, cycles in dg.runDB.items():
+            tmp = cycles[0].split(',')
+            for rng in tmp:
+                if '-' in rng:
+                    clo, chi = [int(x) for x in rng.split('-')]
+                    if clo <= cyc <= chi:
+                        row['run'] = run
+                        break
+                else:
+                    clo = int(rng)
+                    if cyc == clo:
+                        row['run'] = run
+                        break
+        # label the detector ('runtype' matches 'run_types' in config file)
+        if cyc < 126:
+            row['runtype'] = 'oppi'
+        else:
+            row['runtype'] = 'icpc'
+        return row
+    
+    dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
     
     dg.get_lh5_cols()
+    
+    for col in ['run']:
+        dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
+
+    print(dg.file_keys)
+    
+    dg.save_df('CAGE_fileDB.h5')
     
     
 def analyze_hades():
     """
     """
-    
     dg = DataGroup('HADES.json')
-    # dg.lh5_dir_setup()
-    # dg.scan_daq_dir()
+
+    dg.lh5_dir_setup()
+    # dg.lh5_dir_setup(create=True)
     
-    # dg.save_keys()
-    # dg.load_keys() # this is really slow
+    dg.scan_daq_dir()
     
     # -- experiment-specific stuff -- 
-    # dg.file_keys['runtype'] = dg.file_keys['detSN']
+    dg.file_keys['runtype'] = dg.file_keys['detSN']
     
-    # sort by timestamp
-    # dg.save_df('HADES_fileDB.h5')
-    dg.load_df('HADES_fileDB.h5')
-    
-    # andreas request: show how to group files in the same run
-
-    dg.file_keys = dg.file_keys.query("detSN=='I02160B' and scantype=='ba_HS4_top_dlt' and run==1")
-    
-    # do a sort by timestamp
+    # add a sortable timestamp column
     def get_ts(row):
-        ts = str(row['YYmmdd']) + str(row['hhmmss'])
-        row['date'] = pd.to_datetime(ts, format='%Y%m%d%H%M%S')
+        ts = f"{row['YYmmdd']} {row['hhmmss']}"
+        row['date'] = pd.to_datetime(ts, format='%y%m%d %H%M%S')
         return row
     dg.file_keys = dg.file_keys.apply(get_ts, axis=1)
     dg.file_keys.sort_values('date', inplace=True)
     
+    dg.get_lh5_cols()
+    print(dg.file_keys['raw_file'].values)
     
-    # dg.get_lh5_cols()
-    # print(dg.file_keys)
-    
-    
-    
+    dg.save_df('HADES_fileDB.h5')
+        
     
 def analyze_ornl():
     

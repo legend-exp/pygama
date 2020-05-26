@@ -46,7 +46,6 @@ def parse_datatype(datatype):
     else: return datatype, None, element_description.split(',')
 
 
-
 class Struct(dict):
     """A dictionary with an optional set of attributes.
 
@@ -76,7 +75,6 @@ class Struct(dict):
         datatype = get_lh5_datatype_name(self)
         datatype += '{' + ','.join(self.keys()) + '}'
         return datatype
-
 
 
 class Table(Struct):
@@ -136,7 +134,6 @@ class Scalar:
         else: self.attrs['datatype'] = get_lh5_element_type(self.value)
 
 
-
 class Array:
     """Holds an ndarray and attributes
     """
@@ -161,7 +158,6 @@ class Array:
         return dt + '<' + nD + '>{' + et + '}'
 
 
-
 class FixedSizeArray(Array):
     """An array of fixed-size arrays
 
@@ -175,7 +171,6 @@ class FixedSizeArray(Array):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-
 
 class ArrayOfEqualSizedArrays(Array):
     """An array of equal-sized arrays
@@ -197,7 +192,6 @@ class ArrayOfEqualSizedArrays(Array):
         if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
         et = get_lh5_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
-
 
 
 class VectorOfVectors:
@@ -248,8 +242,6 @@ class VectorOfVectors:
             self.data_array.nda.resize(2*len(self.data_array.nda))
         self.data_array.nda[start:end] = nda
         self.lensum_array.nda[i_vec] = end
-
-
 
 
 class Store:
@@ -472,6 +464,3 @@ class Store:
         else:
             print('Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
-
-
-

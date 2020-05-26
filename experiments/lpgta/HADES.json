@@ -3,6 +3,7 @@
   "runDB" : "./HADES_runDB.json",
   "fileDB" : "./HADES_fileDB.csv",
   
+  "daq" : "FlashCam",
   "daq_dir" : "/global/cfs/cdirs/legend/data/hades",
   "daq_ignore" : [".log",".DS_Store"],
   "lh5_dir" : "/global/cfs/cdirs/legend/users/wisecg/HADES",

@@ -270,16 +270,20 @@ class DataGroup:
                 
                 # get filename
                 tmp['tier'] = tier
+
+                # leave subsystem unspecified
+                if self.subsystems != ['']:
+                    tmp['sysn'] = '{sysn}'
+                
+                # set the filename.  might have a '{sysn}' string present
                 row[f'{tier}_file'] = self.lh5_template.format_map(tmp)
                 
-                # compute file path.  this is tricky
-                path = f'/{tier}'
-                
+                # compute file path.
                 # daq_to_raw outputs a file for each subsystem, and we 
                 # handle this here by leaving a regex in the file string
+                path = f'/{tier}'
                 if self.subsystems != [""]: 
                     path += '/{sysn}'
-                
                 if row['runtype'] in self.run_types: 
                     path += f"/{row['runtype']}"
             

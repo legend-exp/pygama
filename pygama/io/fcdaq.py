@@ -261,11 +261,15 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     """
     import fcutils
     
-    # raw_files = './tempofile.lh5' # debug, delete
-    single_output = isinstance(raw_files, str)
-    if single_output:
+    if isinstance(raw_files, str):
+        single_output = True
         f_out = raw_files
-    
+    elif len(raw_files) == 1:
+        single_output = True
+        f_out = raw_files['']
+    else:
+        single_output = False
+        
     fcio = fcutils.fcio(daq_file)
     
     # set up event decoder
@@ -284,14 +288,12 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
                subsystem = attrs['sysn']
             except:
                subsystem='default'
-          
             
             if not single_output:
                 if subsystem not in raw_files.keys():
                     print('Error, no output file found for subsystem:', subsystem)
 
             # each subsystem can output a table per channel, or a combined table
-            
             tb_per_ch = False
             if 'tb_per_ch' in attrs:
                 tb_per_ch = (attrs['tb_per_ch'].lower() == "true")
@@ -328,7 +330,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
         event_decoder.initialize_lh5_table(tb)
         tb_grp_file_list.append( (tb, 'raw', f_out) )
         event_tbs = tb
-        
+    
     if verbose:
         print('Output group : output file')
         for a, b, c in tb_grp_file_list:
