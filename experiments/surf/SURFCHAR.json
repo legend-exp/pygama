@@ -1,0 +1,21 @@
+{
+  "experiment" : "SURFCHAR",
+  "runDB" : "",
+  "fileDB" : "",
+  
+  "daq" : "FlashCam",
+  "daq_dir" : "/global/cfs/cdirs/legend/data/surf/LEGEND200",
+  "daq_ignore" : [".log",".root"],
+  "lh5_dir" : "/global/cfs/cdirs/legend/users/wisecg/SURF",
+  
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : [""],
+  "run_types" : [""],
+  "evt_dirs" : [""],
+  
+  "unique_key" : "surf-{cycle}",
+  
+  "daq_template" : "FC_surf{cycle}.fcio",
+  
+  "lh5_template" : "surf_cyc{cycle}_{tier}.lh5"
+}
