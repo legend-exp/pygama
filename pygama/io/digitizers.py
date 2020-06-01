@@ -610,6 +610,7 @@ class SIS3316ORCADecoder(DataTaker):
         self.ievt_gbg = 0      #garbage event number
         self.window = False
         self.pytables_col_limit = 5000
+        self.df_metadata = None
         
         
     def decode_event(self, event_data_bytes, packet_id, header_dict, 
