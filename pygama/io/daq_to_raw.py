@@ -122,10 +122,14 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
             print(f"    {id}: {id_dict[id]}")
     used_ids = set([id_dict[id] for id in id_dict])
     for sub in DataTaker.__subclasses__():
-        tmp = sub() # instantiate the class
-        if tmp.decoder_name in used_ids:
-            # tmp.apply_config(config) # broken rn
-            decoders.append(tmp)
+        try:
+            tmp = sub() # instantiate the class
+            if tmp.decoder_name in used_ids:
+                # tmp.apply_config(config) # broken rn
+                decoders.append(tmp)
+        except:
+            continue
+
     decoder_to_id = {d.decoder_name: d for d in decoders}
     if verbose:
         print("pygama will run these decoders:")

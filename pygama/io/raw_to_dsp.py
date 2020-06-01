@@ -79,8 +79,11 @@ def RunDSP(t1_file, intercom, run=None, digitizers=None, ftype="default",
 
         decoders = []
         for sub in DataTaker.__subclasses__():
-            tmp = sub() # instantiate the class
-            decoders.append(tmp)
+            try:
+                tmp = sub() # instantiate the class
+                decoders.append(tmp)
+            except:
+                continue
 
         # shouldn't this extend the list instead of overwriting it?
         with pd.HDFStore(t1_file, 'r') as store:
