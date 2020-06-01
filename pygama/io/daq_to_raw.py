@@ -177,7 +177,10 @@ def process_orca(t0_file, t1_file, n_max, decoders, config, verbose, run=None):
 
     # final write to file
     for d in decoders:
-        d.save_to_pytables(t1_file, verbose=True)
+        try:
+            d.save_to_pytables(t1_file, verbose=True)
+        except:
+            print("WARNING: " + str(d) + " failed to save, may have been empty!")
 
     if verbose:
         update_progress(1)
