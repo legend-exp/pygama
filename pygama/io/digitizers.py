@@ -160,7 +160,7 @@ class ORCAStruck3302(DataTaker):
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
 
- 
+'''
 class LLAMAStruck3316(DataTaker):
     """ 
     decode Struck 3316 digitizer data
@@ -373,7 +373,7 @@ class LLAMAStruck3316(DataTaker):
 
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
-
+'''
 
 class CAENDT57XX(DataTaker):
     """
