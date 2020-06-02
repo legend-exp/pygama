@@ -14,12 +14,14 @@ from pygama.io.raw_to_dsp import raw_to_dsp
 
 def main():
     doc="""
+
     LPGTA data processing routine.
     You must set these environment variables:
       * $LPGTA_DATA : base data directory
       * $LEGEND_META : the legend-metadata repository
 
     TODO: parallelize, submit processing jobs
+
     """
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
@@ -63,6 +65,7 @@ def main():
 def load_datagroup():
     """
     """
+
     # -- HADES mode --
     # dg = DataGroup('HADES.json')
     # dg.load_df('HADES_fileDB.h5')
@@ -76,6 +79,15 @@ def load_datagroup():
     # det 60B, first th scan
     # que = "detSN=='I02160B' and scantype=='th_HS2_top_psa'"
     #
+
+
+
+    # # -- LPGTA mode --
+    # dg = DataGroup('LPGTA.json')
+    # dg.load_df('LPGTA_fileDB.h5')
+    # # process one big cal file (64 GB)
+    # que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+
     # dg.file_keys.query(que, inplace=True)
     # dg.file_keys = dg.file_keys[:3]
 
@@ -97,6 +109,15 @@ def load_datagroup():
 
     # print('files to process:')
     # print(dg.file_keys)
+
+
+    # -- SURF mode --
+    # dg = DataGroup('SURFCHAR.json')
+    # dg.load_df('SURFCHAR_fileDB.h5')
+
+    # can add other filters here
+    # dg.file_keys = dg.file_keys[:2]
+
 
     return dg
 

@@ -7,10 +7,13 @@ from pygama import DataGroup
 def main():
     """
     """
-    analyze_lpgta()
+
+
+    # analyze_lpgta()
     # analyze_cage()
     # analyze_hades()
     # analyze_ornl()
+    analyze_surf()
 
 
 def analyze_lpgta():
@@ -131,6 +134,32 @@ def analyze_ornl():
     dg.save_keys()
     dg.load_keys()
     print(dg.file_keys)
+
+
+
+def analyze_surf():
+    """
+    """
+    dg = DataGroup('SURFCHAR.json')
+
+    dg.lh5_dir_setup()
+    # dg.lh5_dir_setup(create=True)
+
+    dg.scan_daq_dir()
+
+    # -- experiment-specific choices --
+    dg.file_keys.sort_values(['cycle'], inplace=True)
+    dg.file_keys.reset_index(drop=True, inplace=True)
+
+    # TODO: adapt "get_cyc_info" function from analyze_cage to
+    # fill in serial numbers for each detector
+    dg.file_keys['runtype'] = "P9999A"
+
+    dg.get_lh5_cols()
+
+    # print(dg.file_keys.query('cycle < 10'))
+
+    dg.save_df('SURFCHAR_fileDB.h5')
 
 
 if __name__=='__main__':
