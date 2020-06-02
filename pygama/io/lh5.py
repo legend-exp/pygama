@@ -277,14 +277,20 @@ class Store:
         # To use recursively, make lh5_file a h5group instead of a string
         if isinstance(lh5_file, str):
             lh5_file = self.gimme_file(lh5_file, 'r')
+            
+            
         if group_path=='':
             group_path='*'
+            
+            
         
         splitpath = group_path.split('/', 1)
         matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
         ret = []
         
+        
         if len(splitpath)==1:
+            
             return matchingkeys
         else:
             ret = []
