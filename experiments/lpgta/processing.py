@@ -67,29 +67,20 @@ def load_datagroup():
     """
 
     # -- HADES mode --
-    # dg = DataGroup('HADES.json')
-    # dg.load_df('HADES_fileDB.h5')
+    dg = DataGroup('HADES.json')
+    dg.load_df('HADES_fileDB.h5')
 
     # get the first 3 cycle files for det 60A, first th scan
-    # que = "detSN=='I02160A' and scantype=='th_HS2_top_psa' and run==1"
+    que = "detSN=='I02160A' and scantype=='th_HS2_top_psa' and run==1"
 
     # det 60A, lat th scan
     # que = "detSN=='I02160A' and scantype=='th_HS2_lat_psa'"
 
     # det 60B, first th scan
     # que = "detSN=='I02160B' and scantype=='th_HS2_top_psa'"
-    #
 
-
-
-    # # -- LPGTA mode --
-    # dg = DataGroup('LPGTA.json')
-    # dg.load_df('LPGTA_fileDB.h5')
-    # # process one big cal file (64 GB)
-    # que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-
-    # dg.file_keys.query(que, inplace=True)
-    # dg.file_keys = dg.file_keys[:3]
+    dg.file_keys.query(que, inplace=True)
+    dg.file_keys = dg.file_keys[:3]
 
 
     # -- CAGE mode --
@@ -100,12 +91,12 @@ def load_datagroup():
 
 
     # # -- LPGTA mode --
-    dg = DataGroup('LPGTA.json')
-    dg.load_df('LPGTA_fileDB.h5')
+    # dg = DataGroup('LPGTA.json')
+    # dg.load_df('LPGTA_fileDB.h5')
 
     # process one big cal file (64 GB)
-    que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    dg.file_keys.query(que, inplace=True)
+    # que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+    # dg.file_keys.query(que, inplace=True)
 
     # print('files to process:')
     # print(dg.file_keys)

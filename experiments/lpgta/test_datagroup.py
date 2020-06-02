@@ -20,7 +20,7 @@ def analyze_lpgta():
 
     dg = DataGroup('LPGTA.json')
 
-    dg.lh5_dir_setup(create=True)
+    dg.lh5_dir_setup()
     dg.scan_daq_dir()
 
     # -- experiment-specific choices --

@@ -28,19 +28,26 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
         exit()
 
     raw_store = lh5.Store()
+    lh5_file = raw_store.gimme_file(f_raw, 'r')
+
 
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
-        print(raw_store.ls(f_raw))
-        exit()
-        lh5_tables = raw_store.ls(f_raw)
-    print(lh5_tables)
-    # lh5_tables = ['g024/raw', 'g025/raw', 'g026/raw', 'g027/raw', 'g028/raw', 'g029/raw', 'g031/raw', 'g032/raw', 'g033/raw', 'g034/raw', 'g035/raw']
-    # for table in lh5_tables:
-    #     table = table + "/raw"
+        lh5_tables = []
+        lh5_tables_temp = raw_store.ls(f_raw)
+        # sometimes 'raw' is nested, e.g g024/raw
+        for tb in lh5_tables_temp:
+            if "raw" not in tb:
+                tbname = raw_store.ls(lh5_file[tb])[0]
+                if "raw" in tbname:
+                    tb = tb +'/'+ tbname # g024 + /raw
+            lh5_tables.append(tb)
+    #make sure every group points to waveforms, if not, remove the group
+    for tb in lh5_tables:
+        if 'raw' not in tb:
+            lh5_tables.remove(tb)
 
 
-    # lh5_tables = ['raw']
     # set up DSP for each table
     chains = []
 
