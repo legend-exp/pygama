@@ -56,7 +56,7 @@ def daq_to_raw(ds, overwrite=False, nevt=np.inf, v=False, test=False):
     Run ProcessRaw on a set of runs.
     [raw file] ---> [t1_run{}.h5] (tier 1 file: basic info & waveforms)
     """
-    from pygama.io.daq_to_raw import ProcessRaw
+    from pygama.io.daq_to_raw import daq_to_raw
 
     for run in ds.runs:
 
@@ -72,27 +72,15 @@ def daq_to_raw(ds, overwrite=False, nevt=np.inf, v=False, test=False):
             print("test mode (dry run), processing Tier 0 file:", t0_file)
             continue
 
-        ProcessRaw(
-            t0_file,
-            run,
-            verbose=v,
-            output_dir=ds.tier_dir,
-            overwrite=overwrite,
-            n_max=nevt,
-            settings=opts)
+        daq_to_raw(t0_file, run, suffix="h5", verbose=v, output_dir=ds.tier1_dir,
+                   overwrite=overwrite, n_max=nevt, config=ds.config)#, settings=opts)
 
 
-def raw_to_dsp(ds,
-          overwrite=False,
-          nevt=None,
-          ioff=None,
-          multiproc=True,
-          verbose=False,
-          test=False):
+def raw_to_dsp(ds, overwrite=False, nevt=None, ioff=None, multiproc=True,
+               verbose=False, test=False):
     """
     Run RunDSP on a set of runs.
     [t1_run{}.h5] ---> [t2_run{}.h5]  (tier 2 file: DSP results, no waveforms)
-
     Can declare the processor list via:
     - json configuration file (recommended)
     - Intercom(default_list=True)
@@ -102,7 +90,6 @@ def raw_to_dsp(ds,
     from pygama.io.raw_to_dsp import RunDSP
 
     for run in ds.runs:
-
         t1_file = ds.paths[run]["t1_path"]
         t2_file = ds.paths[run]["t2_path"]
         if t2_file is not None and overwrite is False:
@@ -116,16 +103,12 @@ def raw_to_dsp(ds,
         proc_list = ds.config["build_options"][conf]["raw_to_dsp_options"]
         proc = Intercom(proc_list)
 
-        RunDSP(
-            t1_file,
-            proc,
-            output_dir=ds.tier_dir,
-            overwrite=overwrite,
-            verbose=verbose,
-            multiprocess=multiproc,
-            nevt=nevt,
-            ioff=ioff,
-            chunk=ds.config["chunksize"])
+        # if fast_add:
+            # RunFastDSP()
+        # else:
+        RunDSP(t1_file, proc, output_dir=ds.tier2_dir, overwrite=overwrite,
+               verbose=verbose, multiprocess=multiproc, nevt=nevt, ioff=ioff,
+               chunk=ds.config["chunksize"])
 
 
 if __name__ == "__main__":

@@ -160,7 +160,7 @@ class ORCAStruck3302(DataTaker):
         # send any variable with a name in "decoded_values" to the pandas output
         self.format_data(locals())
 
-        
+
 class LLAMAStruck3316(DataTaker):
     """ 
     decode Struck 3316 digitizer data
@@ -609,6 +609,8 @@ class SIS3316ORCADecoder(DataTaker):
         self.ievt = 0       #event number
         self.ievt_gbg = 0      #garbage event number
         self.window = False
+        self.pytables_col_limit = 5000
+        self.df_metadata = None
         
         
     def decode_event(self, event_data_bytes, packet_id, header_dict, 
@@ -641,10 +643,11 @@ class SIS3316ORCADecoder(DataTaker):
 
         expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)/2
 
-        if wf_length16 != expected_wf_length:
-            print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
-            #exit()
+        #TODO more complex header/footer lengths need to be addressed, temp fix
+        #if wf_length16 != expected_wf_length:
+        #    print("ERROR: Waveform size %d doesn't match expected size %d." %
+        #          (wf_length16, expected_wf_length))
+        #    #exit()
 
         # indexes of stuff (all referring to the 16 bit array)
         i_wf_start = header_length16
