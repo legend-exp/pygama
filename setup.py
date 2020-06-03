@@ -41,7 +41,7 @@ class CMakeBuild(build_ext):
         import git
         repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
         repo.git.submodule('update', '--init', '--recursive')
-        
+
         extdir = os.path.abspath(
             os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
@@ -71,8 +71,8 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
-    
-        
+
+
 setup(
     name='pygama',
     version='0.2',
@@ -87,10 +87,9 @@ setup(
         'parse',
         'GitPython',
         'tinydb',
-        'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
+        # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
 )
-        
