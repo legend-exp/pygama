@@ -32,6 +32,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = raw_store.ls(f_raw)
+        
+        # sometimes 'raw' is nested, e.g g024/raw
+        for tb in lh5_tables:
+            if "raw" not in tb:
+                tbname = raw_store.ls(tb)
+                if "raw" in tbname:
+                    tb = tb + tbname # g024 + /raw
 
     # set up DSP for each table
     chains = []
@@ -70,9 +77,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     print('Writing to output file:', f_dsp)
     for tb, tb_out, pc in chains:
         print(f'Processing table: {tb} ...')
-        # pc.execute()
-        # print(f'Done.  Writing to file ...')
-        # raw_store.write_object(tb_out, tb, f_dsp)
+        pc.execute()
+        print(f'Done.  Writing to file ...')
+        raw_store.write_object(tb_out, tb, f_dsp)
     
     t_elap = (time.time() - t_start) / 60
     print(f'Done processing.  Time elapsed: {t_elap:.2f} min.')
