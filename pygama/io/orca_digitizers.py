@@ -166,8 +166,8 @@ class ORCAStruck3302(OrcaDecoder):
                           (ievt, expected_wf_length, i_wf_stope - i_wf_start))
                 tbwf[:expected_wf_length] = p16[i_wf_start:i_wf_stop]
             else:
-                len1 = istop_1-i_start_1
-                len2 = istop_2-i_start_2
+                len1 = i_stop_1-i_start_1
+                len2 = i_stop_2-i_start_2
                 if len1+len2 != expected_wf_length:
                     print("ERROR: event %d, we expected %d WF samples and only got %d" %
                           (ievt, expected_wf_length, len1+len2))
