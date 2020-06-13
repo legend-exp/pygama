@@ -35,6 +35,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     if lh5_tables is None:
         lh5_tables = []
         lh5_tables_temp = raw_store.ls(f_raw)
+
         # sometimes 'raw' is nested, e.g g024/raw
         for tb in lh5_tables_temp:
             if "raw" not in tb:
@@ -46,7 +47,6 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     for tb in lh5_tables:
         if 'raw' not in tb:
             lh5_tables.remove(tb)
-
 
     # set up DSP for each table
     chains = []

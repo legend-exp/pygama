@@ -286,6 +286,8 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     # -- scan over raw data --
     print("Beginning daq-to-raw processing ...")
 
+
+
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
 
@@ -315,10 +317,12 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
 
         if data_id in tbs.keys():
             tb = tbs[data_id]
+            tb_grpname = f'{id2dn_dict[data_id]}/raw'
             decoder.decode_packet(packet, tb, packet_id, header_dict)
             # write to the output file when a buffer gets full
             if tb.is_full():
-                lh5_store.write_object(tb, id2dn_dict[data_id], raw_filename, n_rows=tb.size)
+                lh5_store.write_object(tb, tb_grpname, raw_filename,
+                                        n_rows=tb.size)
                 tb.clear()
 
     print("Done. Last packet ID:", packet_id)
@@ -327,8 +331,10 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     # final write to file
     for data_id in tbs.keys():
         tb = tbs[data_id]
+        tb_grpname = f'{id2dn_dict[data_id]}/raw'
         if tb.loc == 0: continue
-        lh5_store.write_object(tb, id2dn_dict[data_id], raw_filename, n_rows=tb.loc)
+        lh5_store.write_object(tb, tb_grpname, raw_filename,
+                                n_rows=tb.loc)
         tb.clear()
 
     if verbose:
