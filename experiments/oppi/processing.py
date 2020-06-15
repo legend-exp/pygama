@@ -14,11 +14,7 @@ from pygama.io.raw_to_dsp import raw_to_dsp
 
 def main():
     doc="""
-    LPGTA data processing routine.
-    You may need to set these environment variables, check your LPGTA.json file.
-      * $LPGTA_DATA : base data directory
-      * $LEGEND_META : the legend-metadata repository
-
+    OPPI data processing routine.
     TODO: parallelize, submit processing jobs
     """
     rthf = argparse.RawTextHelpFormatter
@@ -31,6 +27,7 @@ def main():
     # routines
     arg('--d2r', action=st, help='run daq_to_raw')
     arg('--r2d', action=st, help='run raw_to_dsp')
+    arg('--r2d_file', nargs=2, type=str, help='single-file raw_to_dsp')
 
     # options
     arg('-o', '--over', action=st, help='overwrite existing files')
@@ -55,6 +52,9 @@ def main():
 
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
+    if args.r2d_file:
+        f_raw, f_dsp = args.r2d_file
+        r2d_file(f_raw, f_dsp, args.over, nwfs, args.verbose)
 
 
 def load_datagroup():
@@ -66,7 +66,8 @@ def load_datagroup():
     # various filters can go here
 
     # que = 'run==0'
-    # dg.file_keys.query(que, inplace=True)
+    que = 'cycle == 2027'
+    dg.file_keys.query(que, inplace=True)
 
     # dg.file_keys = dg.file_keys[:1]
 
@@ -126,7 +127,24 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
                    overwrite=overwrite)
 
 
-
+def r2d_file(f_raw, f_dsp, overwrite=True, nwfs=None, vrb=False):
+    """
+    single-file mode, for testing
+    """
+    print('raw_to_dsp, single-file mode.')
+    print('  input:', f_raw)
+    print('  output:', f_dsp)
+    
+    # always overwrite
+    if os.path.exists(f_dsp):
+        os.remove(f_dsp)
+    
+    with open('oppi_dsp.json') as f:
+        dsp_config = json.load(f, object_pairs_hook=OrderedDict)
+        
+    raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb, 
+               overwrite=overwrite)
+    
 
 
 if __name__=="__main__":
