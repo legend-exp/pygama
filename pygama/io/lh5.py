@@ -106,6 +106,7 @@ class Table(Struct):
         # provide length override to for obj to be resized to self.size
         super().add_field(name, obj)
 
+
     def get_dataframe(self, *cols, copy=False):
         """Get a dataframe containing each of the columns given. If no columns
         are given, get include all fields as columns."""
@@ -250,6 +251,7 @@ class Store:
         self.keep_open = keep_open
         self.files = {}
 
+
     def gimme_file(self, lh5_file, mode):
         if isinstance(lh5_file, h5py.File): return lh5_file
         if lh5_file in self.files.keys(): return self.files[lh5_file]
@@ -262,6 +264,7 @@ class Store:
         h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f
+
 
     def gimme_group(self, group, base_group, grp_attrs=None):
         if isinstance(group, h5py.Group): return group
@@ -297,6 +300,7 @@ class Store:
             for key in matchingkeys:
                 ret.extend([key + '/' + path for path in self.ls(lh5_file[key], splitpath[1])])
             return ret
+
             
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
         """Return an object and attributes for data at path=name in lh5_file
