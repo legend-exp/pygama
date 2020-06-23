@@ -561,9 +561,9 @@ def show_lowe_wfs():
         
     plt.xlabel('time (clock ticks)', ha='right', x=1)
     plt.ylabel('ADC', ha='right', y=1)
-    plt.show()
-    # plt.savefig('./plots/lowe_wfs.png', dpi=300)
-    # plt.cla()
+    # plt.show()
+    plt.savefig('./plots/lowe_wfs.png', dpi=300)
+    plt.cla()
     
     
     
