@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os
 import json
 import h5py
@@ -79,6 +78,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
                                 attrs={'units':dsp_config['outputs'][col]})
             tb_out.add_field(col, lh5_arr)
 
+        # get names of non-wf columns to copy over
+        copy_cols = [col for col in data_raw.keys() if col != 'waveform']
+        for col in copy_cols:
+            print('copying col:', col)
+            lh5_arr = lh5.Array(data_raw[col].nda)
+            tb_out.add_field(col, lh5_arr)
+
         chains.append((tb, tb_out, pc))
 
 
@@ -87,6 +93,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     for tb, tb_out, pc in chains:
         print(f'Processing table: {tb} ...')
         pc.execute()
+
         print(f'Done.  Writing to file ...')
         raw_store.write_object(tb_out, tb, f_dsp)
 

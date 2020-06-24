@@ -66,7 +66,8 @@ def load_datagroup():
     # various filters can go here
 
     # que = 'run==0'
-    # dg.file_keys.query(que, inplace=True)
+    que = 'cycle == 2027'
+    dg.file_keys.query(que, inplace=True)
 
     # dg.file_keys = dg.file_keys[:1]
 
