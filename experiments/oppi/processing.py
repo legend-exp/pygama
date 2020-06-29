@@ -66,8 +66,8 @@ def load_datagroup():
     # various filters can go here
 
     # que = 'run==0'
-    que = 'cycle == 2027'
-    dg.file_keys.query(que, inplace=True)
+    # que = 'cycle == 2027'
+    # dg.file_keys.query(que, inplace=True)
 
     # dg.file_keys = dg.file_keys[:1]
 
@@ -97,7 +97,7 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
         subrun = row['cycle'] if 'cycle' in row else None
 
         if not overwrite and os.path.exists(f_raw):
-            print('file exists, overwrite not set, skipping f_raw', f_raw)
+            print('file exists, overwrite not set, skipping f_raw:\n   ', f_raw)
             continue
 
         daq_to_raw(f_daq, f_raw, config=dg.config, subsystems=subs, verbose=vrb,
@@ -122,6 +122,10 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
             tmp = {'sysn' : 'geds'} # hack for lpgta
             f_raw = f_raw.format_map(tmp)
             f_dsp = f_dsp.format_map(tmp)
+            
+        if not overwrite and os.path.exists(f_dsp):
+            print('file exists, overwrite not set, skipping f_dsp:\n   ', f_dsp)
+            continue
 
         raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb,
                    overwrite=overwrite)
