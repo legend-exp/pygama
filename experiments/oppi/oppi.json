@@ -4,9 +4,9 @@
   "fileDB" : "./oppi_fileDB.csv",
 
   "daq" : "ORCA",
-  "daq_dir" : "/Users/mjcenpa/Data/MJ60",
+  "daq_dir" : "/data/LEGEND/Data/MJ60",
   "daq_ignore" : [".log",".DS_Store", "openFiles"],
-  "lh5_dir" : "/Users/mjcenpa/Data/LH5/oppi",
+  "lh5_dir" : "/data/LEGEND/Data/MJ60/LH5/oppi",
 
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
