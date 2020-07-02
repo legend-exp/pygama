@@ -66,9 +66,8 @@ def load_datagroup():
     # various filters can go here
 
     # que = 'run==0'
-    # que = 'cycle == 2027'
+    # que = 'cycle == 2158'
     # dg.file_keys.query(que, inplace=True)
-
     # dg.file_keys = dg.file_keys[:1]
 
     print('files to process:')
