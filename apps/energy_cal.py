@@ -22,12 +22,18 @@ from pygama.io import lh5
 
 def main():
     
-    paramDB = db.TinyDB('params.json')
+    paramDB = db.TinyDB('lpgta_params.json')
+    
+    #lpgta
+    files = "/Volumes/LaCie/Data/LPGTA/dsp/geds/LPGTA_r0018_20200302T184529Z_calib_geds_dsp.lh5"
+    
+    groupname = "g034/raw"
+    e_param = "trapE"
     
     #cage
-    file_location = "/Volumes/LaCie/Data/CAGE/LH5/dsp/icpc/"
-    file_list = ["cage_run8_cyc128_dsp.lh5", "cage_run8_cyc130_dsp.lh5",
-                    "cage_run8_cyc129_dsp.lh5", "cage_run8_cyc131_dsp.lh5"]
+    # file_location = "/Volumes/LaCie/Data/CAGE/LH5/dsp/icpc/"
+    # file_list = ["cage_run8_cyc128_dsp.lh5", "cage_run8_cyc130_dsp.lh5",
+    #                 "cage_run8_cyc129_dsp.lh5", "cage_run8_cyc131_dsp.lh5"]
                     
     """
     Datagroup not working because paths to files are specific to cori right now, just need to change 
@@ -40,25 +46,31 @@ def main():
                 
     
     #HADES
-    # file_location = "/global/cfs/cdirs/legend/users/wisecg/HADES"
+    # file_location = "/Volumes/LaCie/Data/HADES/dsp/I02160A/"
     # file_list = ["hades_I02160A_r1_191021T162944_th_HS2_top_psa_dsp.lh5", 
     #             "hades_I02160A_r1_191021T163144_th_HS2_top_psa_dsp.lh5", 
-    #             "hades_I02160A_r1_191021T163344_th_HS2_top_psa_dsp.lh5"]
-    
-    files = []
-    for file in file_list:
-        f = file_location + file
-        files.append(f)
-
-    groupname = "/ORSIS3302DecoderForEnergy"
-    e_param = "trapE"
+    #             "hades_I02160A_r1_191021T163344_th_HS2_top_psa_dsp.lh5",
+    #             "hades_I02160A_r1_191023T092533_th_HS2_lat_psa_dsp.lh5",
+    #             "hades_I02160A_r1_191023T092733_th_HS2_lat_psa_dsp.lh5",
+    #             "hades_I02160A_r1_191023T092933_th_HS2_lat_psa_dsp.lh5"]
+    # 
+    # groupname = "/raw"
+    # e_param = "trapE"
+    # 
+    # files = []
+    # for file in file_list:
+    #     f = file_location + file
+    #     files.append(f)
+    # 
+    # groupname = "/ORSIS3302DecoderForEnergy"
+    # e_param = "trapE"
     
     
     energy = get_data(files, groupname, e_param)
     hE, xE, var = histo_data(energy, 0, np.max(energy), 1)
-    find_peaks(hE, xE, var)
-    # par, perr, peaks = cal_input(hE, xE, var, energy)
-    # resolution(par, energy, peaks, paramDB)
+    # find_peaks(hE, xE, var)
+    par, perr, peaks = cal_input(hE, xE, var, energy, 3)#, test=True)
+    resolution(par, energy, peaks, paramDB, 3)
     
     
 
@@ -71,11 +83,19 @@ def get_data(files, groupname, e_param):
     dsp = lh5.Store()
     energies = []
     
-    for file in files:
-        filename = os.path.expandvars(file)
+    if isinstance(files, list):
+    
+        for file in files:
+            filename = os.path.expandvars(file)
+            data = dsp.read_object(groupname, filename)
+            energy = data[e_param].nda
+            energies.extend(energy)
+    else:
+        filename = os.path.expandvars(files)
         data = dsp.read_object(groupname, filename)
         energy = data[e_param].nda
         energies.extend(energy)
+        
         
     return np.asarray(energies)
         
@@ -86,12 +106,8 @@ def histo_data(array, elo, ehi, epb):
     """
     
     hE, xE, var = ph.get_hist(array, range=[elo, ehi], dx=epb)
-    
-    # plt.semilogy(xE[1:], hE, ls='steps', lw=1, c='r')
-    # 
-    # plt.xlabel("Energy (uncal.)", ha='right', x=1)
-    # plt.ylabel("Counts", ha='right', y=1)
-    # plt.show()
+
+
     return hE, xE, var
 
 
@@ -101,9 +117,9 @@ def find_peaks(hE, xE, var):
     run peakdet routine (use a JSON config file to set thresholds)
     """
     
-    maxes, mins = pu.peakdet(hE, 150, xE[1:])
+    maxes, mins = pu.peakdet(hE, 100, xE[1:])
     umaxes = np.array(sorted([x[0] for x in maxes]))
-    print(umaxes)
+    print(f"{umaxes}")
     
     for peak in umaxes:
         plt.axvline(peak, linestyle="--", lw=1)
@@ -138,33 +154,44 @@ def template_match(histogram, reference_histogram):
     -- access a file with a reference histogram for this detector, and shift/scale histogram to minimize chi2
     """
 
-def cal_input(hE, xE, var, e_array, test=False):
+def cal_input(hE, xE, var, e_array, degree, test=False):
     """
     -- mode of 'calibrate'
     -- access a JSON file wth expected peak locations for several peaks, compute a quadratic calibration
     """
     
     peak_table = {
-        '212Pb':238.6, '214Pb':351.9, 'beta+':511.0, '208Tl':583.2, 
+        '212Pb':238.6, '214Pb':351.9, 'beta+':511.0, '583':583.2, 
         '214Bi':609.3, '228Ac':911.2, '228Ac':969.0,
-        '40K':1460.8, '214Bi':1764.5, '208Tl':2614.5
+        '40K':1460.8, 'DEP':1592, '214Bi':1764.5, 'SEP':2104, '208Tl':2614.5
     }
-    expected_peaks = ['212Pb', 'beta+', '40K', '214Bi', '208Tl']
+    #cage
+    # expected_peaks = ['212Pb', 'beta+', '40K', '214Bi', '208Tl']
+    # raw_peaks_guess = np.asarray([406, 872, 2490, 3009, 4461])
     
-    raw_peaks_guess = np.asarray([406, 872, 2490, 3009, 4461])
+    #lpgta
+    expected_peaks = ['212Pb', '583', 'DEP', 'SEP', '208Tl']
+    raw_peaks_guess = np.asarray([1894, 3861, 9521, 12404, 15426])
+    # expected_peaks = ['212Pb', '583', 'SEP', '208Tl']
+    # raw_peaks_guess = np.asarray([1894, 4352, 12404, 15426])
+    
+    #hades
+    # expected_peaks = ['212Pb', '583', 'DEP', 'SEP', '208Tl']
+    # raw_peaks_guess = np.asarray([3124, 8394, 23710, 31430, 39172])
+    
     
     raw_peaks = np.array([])
     raw_error = np.array([])
     for pk in raw_peaks_guess:
         
-        h, e_range, var1 = ph.get_hist(e_array, range=[pk-15, pk+15], dx=1)
+        h, e_range, var1 = ph.get_hist(e_array, range=[pk-50, pk+50], dx=2)
         e_range = e_range[1:]
         h_sub = h - np.min(h)
         i_max = np.argmax(h)
         h_max = h[i_max]
         hs_max = h_sub[i_max]
-        upr_half = e_range[(e_range > e_range[i_max]) & (h_sub <= hs_max/2)][0]
-        bot_half = e_range[(e_range < e_range[i_max]) & (h_sub >= hs_max/2)][0]
+        upr_half = e_range[np.where((e_range > e_range[i_max]) & (h_sub <= hs_max/2))][0]
+        bot_half = e_range[np.where((e_range < e_range[i_max]) & (h_sub <= hs_max/2))][-1]
         fwhm = upr_half - bot_half
         sig = fwhm / 2.355
         p0 = [e_range[i_max], h_max, sig, 0, 0]
@@ -189,7 +216,7 @@ def cal_input(hE, xE, var, e_array, test=False):
 
     # weights = 1 / error**2
     weights = np.diag(1 / error**2)
-    
+        
     
     #####1st order cal constants
     
@@ -249,80 +276,92 @@ def cal_input(hE, xE, var, e_array, test=False):
     # print(perr)
     # ecal = par[0]*e_array**2 + par[1]*e_array + par[2]
     
-    # def wls(pars, x_vals, data_points):
-    # 
-    #     wls = weights * (x_vals - quadratic(data_points, pars[0], pars[1], pars[2]))**2
-    #     wls = np.asarray(wls)
-    #     return np.sum(wls)
-    # 
-    # x0 = [.1, .5,3]
-    # start = process_time()
-    # min = minimize(wls, x0, args=(true_peaks, raw_peaks))
-    # end = process_time()
-    # par = min['x']
-    # ecal = par[0]*e_array**2 + par[1]*e_array
     
-    raw_peaks_matrix = np.array([[raw_peaks[0]**2,raw_peaks[0], 1], 
-                                [raw_peaks[1]**2, raw_peaks[1], 1], 
-                                [raw_peaks[2]**2, raw_peaks[2], 1], 
-                                [raw_peaks[3]**2, raw_peaks[3], 1],
-                                [raw_peaks[4]**2, raw_peaks[4], 1]])
+    raw_peaks_matrix = np.empty((0,degree+1))
+    if len(raw_peaks) < degree + 1:
+        print(f"cannot calibrate to degree {degree} polynomial if there are less than {degree + 1} raw peaks")
+        exit()
+    
+    for pk in raw_peaks:
+        
+        temp_degree = degree
+        row = np.array([])
+        
+        while temp_degree >= 0:
+            row = np.append(row, pk**temp_degree)
+            temp_degree -= 1
+        
+        raw_peaks_matrix = np.vstack((raw_peaks_matrix, row))
+
     xTWX = np.dot(np.dot(raw_peaks_matrix.T, weights), raw_peaks_matrix)
     xTWY = np.dot(np.dot(raw_peaks_matrix.T, weights), true_peaks)
-    
     xTWX_inv = np.linalg.inv(xTWX) 
     par = np.dot(xTWX_inv, xTWY) 
     perr = np.sqrt(np.diag(xTWX_inv))
+    
     print(f"{par}")
     print(f"{perr}")
     
-    ecal = e_array**2 * par[0] + e_array * par[1] + par[2]
+    ecal = np.zeros((1, len(e_array)))
+    
+    cal_peaks = np.zeros(len(raw_peaks))
+    
+    for i in range(len(par)):
+        ecal += e_array**degree * par[i]
+        cal_peaks += raw_peaks**degree * par[i]
+        degree -= 1
+    print(cal_peaks)
+    print(true_peaks)
+    
+ 
+    # ecal = e_array**2 * par[0] + e_array * par[1] + par[2]
     
     
     # true_peaks1 = true_peaks / (par[0]*raw_peaks**2 + par[1]*raw_peaks + par[2]) - 1
-    residuals = true_peaks - (par[0]*raw_peaks**2 + par[1]*raw_peaks + par[2])
+    residuals = true_peaks - cal_peaks
     # raw_peaks1 = raw_peaks /  (true_peaks*par[0]+par[1])-1
     # error = np.sqrt(variance) / (true_peaks*par[0]+par[1])
     # print(raw_peaks1)
     # print(f"{residuals}")
     # print(f"{rerror}")
     
-    hcal, xcal, var = ph.get_hist(ecal, range=[0, 3500], dx=.5)
+    hcal, xcal, var = ph.get_hist(ecal, range=[0, 3500], dx=1)
     xcal = xcal[1:]
     
-    initial_guesses = init_guesses(hcal, xcal, true_peaks)
+    initial_guesses = init_guesses(hcal, xcal, cal_peaks)
     
     
     
-    cmap = plt.cm.get_cmap('jet', len(true_peaks) + 1)
-    if test == True:
-        # for i in range(len(true_peaks)):
-        #     plt.vlines(true_peaks[i], 0, 11000, color=cmap(i), linestyle="--", lw=1, label=true_peaks[i])
-        
-        # plt.semilogy(xcal, hcal, ls='steps', lw=1, c='r', label=f"a={par[0]:.4} b={par[1]:.4} c={par[2]:.4}")
-        # plt.scatter(true_peaks, residuals, s=10)#, label="a={} b={} c={}".format(par[0], par[1], par[2]))
-        # plt.errorbar(true_peaks, residuals, yerr=raw_error, ls='none')
-        # plt.plot(raw_peaks, quadratic(raw_peaks, par[0], par[1], par[2]), color='red', label="a={} b={} c={}".format(par[0], par[1], par[2]))
-        # plt.hlines(0, 0, 3000, color= 'r')
-        # plt.xlabel("Energy", ha='right', x=1)
-        # plt.ylabel("Counts", ha='right', y=1)
-        # plt.xlabel("TrueE", ha='right', x=1)
-        # plt.ylabel("Residuals", ha='right', y=1)
-        # plt.title("Cal hist quad polyfit no constant")
-        # plt.title("Cal hist quad curvefit")
-        # plt.title("Cal hist quad WLS")
-        # plt.title("Poly fit linear normalized")
-        # plt.title("WLS quad residuals")
-        # plt.legend()
-        # plt.tight_layout()
-        # plt.show()
+    # cmap = plt.cm.get_cmap('jet', len(true_peaks) + 1)
+    # 
+    # for i in range(len(true_peaks)):
+    #     plt.vlines(true_peaks[i], 0, 30000, color=cmap(i), linestyle="--", lw=1, label=true_peaks[i])
     
-    # paramDB = db.TinyDB('params.json')
+    # plt.semilogy(xcal, hcal, ls='steps', lw=1, c='r', label=f"a={par[0]:.4} b={par[1]:.4}")
+    # plt.scatter(true_peaks, residuals, s=10)#, label="a={} b={} c={}".format(par[0], par[1], par[2]))
+    plt.errorbar(true_peaks, residuals, yerr=raw_error, ls='none', capsize=5, marker=".", ms=10)
+    # plt.scatter(raw_peaks, true_peaks, s=10)
+    # plt.plot(raw_peaks, quadratic(raw_peaks, par[0], par[1], par[2]), color='red', label="a={} b={} c={}".format(par[0], par[1], par[2]))
+    plt.hlines(0, 0, 3000, color= 'r')
+    # plt.xlabel("Energy", ha='right', x=1)
+    # plt.ylabel("Counts", ha='right', y=1)
+    plt.xlabel("TrueE", ha='right', x=1)
+    plt.ylabel("Residuals", ha='right', y=1)
+    # plt.title("Cal hist quad polyfit no constant")
+    # plt.title("Cal hist quad curvefit")
+    # plt.title("Cal hist degree 3 WLS:g034")
+    # plt.title("Poly fit linear normalized")
+    plt.title("WLS degree 3 g034")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # paramDB = db.TinyDB('lpgta_params.json')
     # paramDB.insert({'par0':initial_guesses})
     # exit()
     
     
-    return par, perr, true_peaks
+    return par, perr, cal_peaks
     
     
 def write_output():
@@ -330,7 +369,7 @@ def write_output():
     -- get cal constants, covariance matrix, results of peak search
     -- write to file
     """
-def init_guesses(e_cal_hist, xE, peaks):
+def init_guesses(e_cal_hist, xE, peaks, test=False):
     
     initial_guesses = []
     
@@ -342,58 +381,70 @@ def init_guesses(e_cal_hist, xE, peaks):
         i_max = np.argmax(h)
         h_max = h[i_max]
         hs_max = h_sub[i_max]
-        upr_half = e_range[(e_range > e_range[i_max]) & (h_sub <= hs_max/2)][0]
-        bot_half = e_range[(e_range < e_range[i_max]) & (h_sub >= hs_max/2)][0]
+        upr_half = e_range[np.where((e_range > e_range[i_max]) & (h_sub <= hs_max/2))][0]
+        bot_half = e_range[np.where((e_range < e_range[i_max]) & (h_sub <= hs_max/2))][-1]
         fwhm = upr_half - bot_half
         sig = fwhm / 2.355
         p0 = [e_range[i_max], h_max, sig, 0, 0]
         
         par, pcov = curve_fit(simple_gauss, e_range, h, p0=p0, sigma = np.sqrt(h), absolute_sigma=True)
         perr = np.sqrt(np.diag(pcov))
-        # print(par, perr)
-        # plt.plot(e_range, h, ls='steps', lw=1, c='r')
-        # plt.plot(e_range, simple_gauss(e_range, par[0], par[1], par[2], par[3], par[4]))
-        # plt.errorbar(e_range, h, yerr=np.sqrt(h), ls='none')
-        # plt.show()
+        print(par, perr)
+        if test==True:
+            plt.plot(e_range, h, ls='steps', lw=1, c='r')
+            plt.plot(e_range, simple_gauss(e_range, par[0], par[1], par[2], par[3], par[4]))
+            plt.errorbar(e_range, h, yerr=np.sqrt(h), ls='none')
+            plt.show()
         
         initial_guesses.append(par.tolist())
     return initial_guesses
     
     
-def resolution(par, e_array, peaks, paramDB):
+def resolution(par, e_array, peaks, paramDB, degree):
     
     params = paramDB.all()[0]['par0']
-    ecal = e_array**2 * par[0] + e_array * par[1] + par[2]
+    
+    ecal = np.zeros((1, len(e_array)))
+    for i in range(len(par)):
+        ecal += e_array**degree * par[i]
+        degree -= 1
     
     resolution = np.array([])
     res_error = np.array([])
     
     for i, pk in enumerate(peaks):
         
-        h, e_range, var = ph.get_hist(ecal, range=[pk-(params[i][2]+7), pk+(params[i][2]+7)], dx=.5)
+        h, e_range, var = ph.get_hist(ecal, range=[pk-(1.7*params[i][2]*2.355), pk+(1.7*params[i][2]*2.355)], dx=.6)
         
         i_max = np.argmax(h)
         h_max = h[i_max]
         amp = h_max * params[i][2] * 2.355
-        hstep = 0.01 # fraction that the step contributes
+        hstep = 0.001 # fraction that the step contributes
         htail = 0.1
         tau = 10
-        bg0 = params[i][4] + params[i][3]*e_range[2]
-        x0 = [params[i][0], params[i][2], hstep, htail, tau, bg0, amp]
-        radford_par, radford_cov = pf.fit_hist(pf.radford_peak, h, e_range, var=np.sqrt(h), guess=x0)
-        radford_err = np.sqrt(np.diag(radford_cov))
-        fit_func = pf.radford_peak
+        # bg0 = params[i][4] + params[i][3]*e_range[2]
+        # x0 = [params[i][0], params[i][2], hstep, htail, tau, bg0, amp]
+        # radford_par, radford_cov = pf.fit_hist(pf.radford_peak, h, e_range, var=np.sqrt(h), guess=x0)
+        # radford_err = np.sqrt(np.diag(radford_cov))
+        # fit_func = pf.radford_peak
         
-        # plt.plot(e_range[1:], h, ls='steps', lw=1, c='r')
-        # plt.plot(e_range[1:], fit_func(e_range[1:], *radford_par))
-        # plt.show()
+        p0 = [e_range[i_max], h_max, params[i][2], e_range[2]]
+        par, pcov = curve_fit(gauss, e_range[1:], h, p0=p0, sigma = np.sqrt(h), absolute_sigma=True)
+        perr = np.sqrt(np.diag(pcov))
         
-        resolution = np.append(resolution, radford_par[1])
-        res_error = np.append(res_error, radford_err[1])
+        
+        
+        plt.plot(e_range[1:], h, ls='steps', lw=1, c='r')
+        plt.plot(e_range[1:], gauss(e_range[1:], *par))
+        plt.show()
+        
+        resolution = np.append(resolution, par[2]*2.355)
+        res_error = np.append(res_error, perr[2]*2.355)
+    # exit()
     
     plt.clf()
     plt.errorbar(peaks, resolution, yerr=res_error, ls='none', capsize=5, marker=".", ms=10)
-    plt.title("Resolution vs E")
+    plt.title("Resolution vs E lpgta g034")
     plt.xlabel("keV")
     plt.ylabel("FWHM")
     plt.show()

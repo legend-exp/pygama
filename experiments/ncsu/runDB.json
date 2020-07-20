@@ -1,45 +1,61 @@
 {
+
   "loc_dir":"$DATADIR/NCSU",
-  "raw_dir":"$DATADIR/NCSU",
-  "tier_dir":"$DATADIR/NCSU/pygama",
-  "digitizer":"ORSIS3316Model",
+  "raw_dir":"$DATADIR/NCSU/data",
+  "tier1_dir":"$DATADIR/NCSU/tier1",
+  "tier2_dir":"$DATADIR/NCSU/tier2",
+  "suffix":"",
+
+  "digitizer":"ORSIS3302Model",
   "daq":"ORCA",
+
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
+
   "chunksize":1000,
   "clock":100e6,
   "rollover":1,
 
   "ds":{
-    "0":["0, 999999", "test run, ORCA/3316 decoder"]
+    "0":["0, 999999", "test run, ORCA/3316 decoder"],
+    "1":["1000000, 99999999", "example of further runs"]
   },
 
   "build_options":{
     "conf1":{
-      "run_coverage":[0,99999],
+      "run_coverage":[0,999999],
       "daq_to_raw_options":{
         "daq":"ORCA",
-        "digitizer":"ORSIS3316WaveformDecoder"
+        "clk" : 100e6,
+        "digitizer":"ORSIS3302DecoderForEnergy",
+        "buffer_wrap":1,
+        "window":"max",
+        "n_samp":2000,
+        "n_blsamp":10000
       },
       "raw_to_dsp_options":{
         "clk" : 100e6,
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
-        "pz" : {"decay":82},
+        "pz" : {"decay":72},
         "notch" : {"f_notch":30e6, "Q":1},
-        "savgol" : {"wfin":"wf_blsub", "wfout":"wf_savgol", "window":47, "order":2},
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_blsub", "rise":4, "flat":2.5, "decay":72},
-            {"wfout":"wf_atrap", "wfin":"wf_notch", "rise":0.04, "flat":0.1, "fall":2}
+            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
+            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1},
+            {"wfout":"wf_pztrap", "wfin":"wf_pz", "rise":1.5, "flat":2.5, "decay":72}
         ],
-        "current" : {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5},
+        "current" : [
+            {"wfin":"wf_blsub", "wfout":"wf_current", "sigma":5}
+        ],
         "get_max" : [
-            {"wfin":"wf_etrap"}, {"wfin":"wf_atrap"}, {"wfin":"wf_current"},
-            {"wfin":"wf_savgol"}
+            {"wfin":"wf_current"},
+            {"wfin":"wf_blsub"}
         ],
-        "ftp" : {},
-        "timepoint" : {"wfin":"wf_blsub", "pct":[5,10,50,100]},
-        "dcr" : {"wfin":"wf_savgol"}
+        "timepoint" : {"wfin":"wf_blsub", "pct":[5,90,100]},
+        "peakdet" : [
+            {"delta":0.5, "sigma":5, "ihi":600}
+        ],
+        "num_peaks" : {}
       }
     }
   }

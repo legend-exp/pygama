@@ -16,7 +16,6 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
                n_max=np.inf, overwrite=True, buffer_len=8):
     """
     Convert raw LH5 files with waveforms to dsp files.
-
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
     To preserve the ordering, we read in using an OrderedDict.
@@ -30,11 +29,11 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     raw_store = lh5.Store()
     lh5_file = raw_store.gimme_file(f_raw, 'r')
 
-
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = []
         lh5_tables_temp = raw_store.ls(f_raw)
+
         # sometimes 'raw' is nested, e.g g024/raw
         for tb in lh5_tables_temp:
             if "raw" not in tb:
@@ -42,11 +41,11 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
                 if "raw" in tbname:
                     tb = tb +'/'+ tbname # g024 + /raw
             lh5_tables.append(tb)
-    #make sure every group points to waveforms, if not, remove the group
+    
+    # make sure every group points to waveforms, if not, remove the group
     for tb in lh5_tables:
         if 'raw' not in tb:
             lh5_tables.remove(tb)
-
 
     # set up DSP for each table
     chains = []
@@ -56,6 +55,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
 
         # load primary table
         data_raw = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
+        
+        # get names of non-waveform columns to carry over
+        raw_cols = [col for col in data_raw.keys() if 'waveform' not in col]
 
         # load waveform info
         if "waveform" not in data_raw.keys():
@@ -79,6 +81,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
                                 attrs={'units':dsp_config['outputs'][col]})
             tb_out.add_field(col, lh5_arr)
 
+        # get names of non-wf columns to copy over
+        copy_cols = [col for col in data_raw.keys() if col != 'waveform']
+        for col in copy_cols:
+            print('copying col:', col)
+            lh5_arr = lh5.Array(data_raw[col].nda)
+            tb_out.add_field(col, lh5_arr)
+
         chains.append((tb, tb_out, pc))
 
 
@@ -87,11 +96,19 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
     for tb, tb_out, pc in chains:
         print(f'Processing table: {tb} ...')
         pc.execute()
+
         print(f'Done.  Writing to file ...')
+        
+        # copy over columns from raw file
+        for col in raw_cols:
+            lh5_arr = lh5.Array(data_raw[col].nda, attrs={'units':'arb'})
+            tb_out.add_field(col, lh5_arr)
+        
         raw_store.write_object(tb_out, tb, f_dsp)
 
     t_elap = (time.time() - t_start) / 60
     print(f'Done processing.  Time elapsed: {t_elap:.2f} min.')
+
 
 # def raw_to_dsp(lh5_in, json_file, buffer_len=8):
 #     """
