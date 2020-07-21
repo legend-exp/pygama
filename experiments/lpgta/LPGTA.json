@@ -1,10 +1,10 @@
 {
   "experiment" : "LPGTA",
-  "runDB" : "./LPGTA_runDB.json",
-  "fileDB" : "./LPGTA_fileDB.csv",
+  "runDB" : "LPGTA_runDB.json",
+  "fileDB" : "LPGTA_fileDB.h5",
   
   "daq": "FlashCam",
-  "daq_dir" : "/global/cfs/cdirs/legend/data/lngs/pgt",
+  "daq_dir" : "$LPGTA_DATA/daq",
   "daq_ignore" : [],
   "lh5_dir" : "$LPGTA_DATA",
   
