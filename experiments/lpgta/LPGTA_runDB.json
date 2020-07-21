@@ -1,4 +1,9 @@
 {
+  "0030":{"dir":"run0030-mid-july-test", "cmap":"channel-map-runrun0027.json"},
+  "0029":{"dir":"run0029-test", "cmap":"channel-map-runrun0027.json"},
+  "0028":{"dir":"run0028-mid-june-sipm-test", "cmap":"channel-map-runrun0027.json"},
+  "0027":{"dir":"run0027-midjune-4gs-2mima-1mama", "cmap":"channel-map-runrun0027.json"},
+  "0026":{"dir":"run0026-test-4chan-genius", "cmap":"channel-map-run0026.json"},
   "0024":{"dir":"run0024-baseline-test-new-head-new-daq", "cmap":"pgt_mar.json"},
   "0023":{"dir":"run0023-baseline-test-new-head", "cmap":"pgt_mar.json"},
   "0022":{"dir":"run0022-baseline-test-new-head", "cmap": "pgt_mar.json"},
