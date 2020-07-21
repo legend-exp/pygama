@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import pandas as pd
 import numpy as np
-from pprint import pprint
 from pygama import DataGroup
 
 def main():
@@ -24,6 +23,11 @@ def main():
     dg.file_keys.reset_index(drop=True, inplace=True)
     
     def get_cmap(row):
+        run_str = f"{row['run']:0>4d}"
+        if run_str not in dg.runDB:
+            print("Warning: no runDB entry for run", run_str)
+            row['cmap'] = ''
+            return row
         row['cmap'] = dg.runDB[f"{row['run']:0>4d}"]["cmap"]
         return row
     
@@ -41,5 +45,4 @@ def main():
     
 if __name__=='__main__':
     main()
-    
-    
+
