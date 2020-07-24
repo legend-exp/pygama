@@ -95,7 +95,6 @@ def raw_to_dsp(ds,
     """
     Run RunDSP on a set of runs.
     [t1_run{}.h5] ---> [t2_run{}.h5]  (tier 2 file: DSP results, no waveforms)
-
     Can declare the processor list via:
     - json configuration file (recommended)
     - Intercom(default_list=True)
