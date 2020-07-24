@@ -170,6 +170,7 @@ def gauss_lin(x, mu, sigma, a, b, m):
     """
     return m * x + b + gauss(x, mu, sigma, a)
 
+
 def gauss_bkg(x, a, mu, sigma, bkg):
     """
     gaussian + const background function
@@ -205,6 +206,7 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         # return individually to make a pretty plot
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
 
+
 def gauss_tail(x,mu, sigma, tail,tau):
 
     """
@@ -215,6 +217,7 @@ def gauss_tail(x,mu, sigma, tail,tau):
     tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
     return tail_f
 
+
 def step(x, mu, sigma, bkg, a):
 
     """
@@ -224,6 +227,7 @@ def step(x, mu, sigma, bkg, a):
 
     step_f = bkg + a * erfc((x-mu)/(np.sqrt(2)*sigma))
     return step_f
+
 
 def gauss_step(x, a, mu, sigma, bkg, s, components=False):
     """

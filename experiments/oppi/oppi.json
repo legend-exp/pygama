@@ -1,0 +1,22 @@
+{
+  "experiment" : "oppi",
+  "runDB" : "./oppi_runDB.json",
+  "fileDB" : "./oppi_fileDB.csv",
+
+  "daq" : "ORCA",
+  "daq_dir" : "/data/LEGEND/Data/MJ60",
+  "daq_ignore" : [".log",".DS_Store", "openFiles"],
+  "lh5_dir" : "/data/eliza1/LEGEND/LH5/oppi",
+
+  "rocks_dir":"/data/LEGEND/Data/MJ60",
+  "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
+
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : [""],
+  "run_types" : ["",""],
+  "evt_dirs" : [""],
+
+  "unique_key" : "oppi-cyc{cycle}-{YYYY}{mm}{dd}",
+  "daq_template" : "/{YYYY}-{mm}-{dd}-BackgroundRun{cycle}",
+  "lh5_template" : "oppi_run{run}_cyc{cycle}_{tier}.lh5"
+}
