@@ -2,11 +2,27 @@
 import pandas as pd
 import numpy as np
 from pprint import pprint
+
 from pygama import DataGroup
+from pygama.io.orcadaq import parse_header
+
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    from tqdm import tqdm
+    tqdm.pandas() # suppress annoying FutureWarning
+
 
 def main():
     """
     Requires oppi.json config file.
+    """
+    # setup()
+    add_columns()
+
+
+def setup():
+    """
     Save an hdf5 file with pygama daq, raw, and dsp names + paths.
     """
     dg = DataGroup('oppi.json')
@@ -55,6 +71,30 @@ def main():
 
     dg.save_df('oppi_fileDB.h5')
 
+
+def add_columns():
+    """
+    add runtime and threshold columns to the fileDB.
+    to get threshold, read it out of the orca header.
+    to get runtime, we have to access the raw timestamps and correct for rollover
+    NOTE: we used struck channel 7 (0-indexed)
+    """
+    dg = DataGroup('oppi.json')
+    
+    df_keys = pd.read_hdf('oppi_fileDB.h5')
+    
+    def scan_orca_header(df_row):
+        
+        f_daq = dg.daq_dir + df_row['daq_dir'] + '/' + df_row['daq_file']
+        _,_, header_dict = parse_header(f_daq)
+        # pprint(header_dict)
+        run_info = header_dict["ObjectInfo"]["DataChain"][0]["Run Control"]
+        return run_info['startTime']
+    
+    df_keys['startTime'] = df_keys.progress_apply(scan_orca_header, axis=1)
+    
+    print(df_keys)
+    
 
 if __name__=='__main__':
     main()
