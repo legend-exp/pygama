@@ -52,11 +52,12 @@ def main():
 
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
+    
     if args.r2d_file:
         f_raw, f_dsp = args.r2d_file
         r2d_file(f_raw, f_dsp, args.over, nwfs, args.verbose)
-
-
+        
+    
 def load_datagroup():
     """
     """
@@ -66,10 +67,10 @@ def load_datagroup():
     # various filters can go here
 
     # que = 'run==0'
-    # que = 'cycle == 2158'
-    # dg.file_keys.query(que, inplace=True)
+    que = 'cycle == 2180'
+    dg.file_keys.query(que, inplace=True)
     # dg.file_keys = dg.file_keys[:1]
-
+    
     print('files to process:')
     print(dg.file_keys)
 
@@ -92,7 +93,8 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
     for i, row in dg.file_keys.iterrows():
 
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
-        f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        # f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        f_raw = 'test.lh5'
         subrun = row['cycle'] if 'cycle' in row else None
 
         if not overwrite and os.path.exists(f_raw):
