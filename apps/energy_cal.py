@@ -27,14 +27,12 @@ def main():
     arg, st, sf = par.add_argument, "store_true", "store_false"
     arg("-f", nargs=1, help="filename and path ie. /path/to/file/lpgta_r1.lh5")
     arg("-h5p", nargs=1, help="path to hdf5 dataset ie. g034/raw")
+    arg("-peakdet", action=st, help="run peakdet on raw spectrum for initial guesses")
     arg("-DB", nargs=1, help="json file with raw peak guesses and true energy")
     arg("-degree", nargs=1, help="What degree polynomial to calibrate to")
     arg("-write_db", action=st, help="store results in DB")
     
     args = vars(par.parse_args())
-    
-    with open(args["DB"][0]) as f:
-        pks_DB = json.load(f)
     
     #lpgta
     # "/Volumes/LaCie/Data/LPGTA/dsp/geds/LPGTA_r0018_20200302T184529Z_calib_geds_dsp.lh5"
@@ -71,7 +69,11 @@ def main():
     
     energy = get_data(files, groupname, e_param)
     hE, xE, var = histo_data(energy, 0, np.max(energy), 1)
-    # find_peaks(hE, xE, var)
+    if args["peakdet"]:
+        find_peaks(hE, xE, var)
+        exit()
+    with open(args["DB"][0]) as f:
+        pks_DB = json.load(f)
     par, perr, peaks = cal_input(hE, xE, var, energy, int(args["degree"][0]), pks_DB, write_db=args["write_db"])#, test=True)
     # resolution(par, energy, peaks, paramDB, 2)
     
