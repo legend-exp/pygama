@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import tinydb as db
+import json
 import matplotlib.pyplot as plt
 import itertools as it
 from time import process_time
@@ -24,30 +25,23 @@ def main():
     
     par = argparse.ArgumentParser(description="pygama calibration suite")
     arg, st, sf = par.add_argument, "store_true", "store_false"
-    arg("-f", nargs=1, type=str, help="filename and path ie. /path/to/file/lpgta_r1.lh5")
-    arg("-h5p", nargs=1, type=str, help="path to hdf5 dataset ie. g034/raw")
-    arg("-DB", nargs=1, type=str, help="json file with raw peak guesses and true energy")
-    # 
-    # arg("-ds", nargs='*', action="store", help="load runs for a DS")
-    # arg("-r", "--run", nargs=1, help="load a single run")
-    # arg("-s", "--spec", action=st, help="print simple spectrum")
-    # arg("-p1", "--pass1", action=st, help="run pass-1 (linear) calibration")
-    # arg("-p2", "--pass2", action=st, help="run pass-2 (peakfit) calibration")
-    # arg("-m", "--mode", nargs=1, help="set pass-2 calibration mode")
-    # arg("-e", "--etype", nargs=1, help="custom energy param (default is e_ftp)")
-    # arg("-t", "--test", action=st, help="set verbose (testing) output")
-    # arg("-db", "--writeDB", action=st, help="store results in DB")
-    # arg("-pr", "--printDB", action=st, help="print calibration results in DB")
-    # args = vars(par.parse_args())
-
-    paramDB = db.TinyDB('params.json')
+    arg("-f", nargs=1, help="filename and path ie. /path/to/file/lpgta_r1.lh5")
+    arg("-h5p", nargs=1, help="path to hdf5 dataset ie. g034/raw")
+    arg("-DB", nargs=1, help="json file with raw peak guesses and true energy")
+    arg("-degree", nargs=1, help="What degree polynomial to calibrate to")
+    arg("-write_db", action=st, help="store results in DB")
+    
+    args = vars(par.parse_args())
+    
+    with open(args["DB"][0]) as f:
+        pks_DB = json.load(f)
     
     #lpgta
-    # "/Volumes/LaCie/Data/LPGTA/dsp/geds/ LPGTA_r0018_20200302T184529Z_calib_geds_dsp.lh5"
-    # files = args['-f']
-    groupname = args['-h5p']
+    # "/Volumes/LaCie/Data/LPGTA/dsp/geds/LPGTA_r0018_20200302T184529Z_calib_geds_dsp.lh5"
+    files = args['f'][0]
+    groupname = args['h5p'][0]
     e_param = "trapE"
-    # 
+    
     #cage
     # file_location = "/Volumes/LaCie/Data/CAGE/LH5/dsp/icpc/"
     # file_list = ["cage_run8_cyc128_dsp.lh5", "cage_run8_cyc130_dsp.lh5",
@@ -78,7 +72,7 @@ def main():
     energy = get_data(files, groupname, e_param)
     hE, xE, var = histo_data(energy, 0, np.max(energy), 1)
     # find_peaks(hE, xE, var)
-    par, perr, peaks = cal_input(hE, xE, var, energy, 2)#, test=True)
+    par, perr, peaks = cal_input(hE, xE, var, energy, int(args["degree"][0]), pks_DB, write_db=args["write_db"])#, test=True)
     # resolution(par, energy, peaks, paramDB, 2)
     
     
@@ -163,26 +157,26 @@ def template_match(histogram, reference_histogram):
     -- access a file with a reference histogram for this detector, and shift/scale histogram to minimize chi2
     """
 
-def cal_input(hE, xE, var, e_array, degree, test=False):
+def cal_input(hE, xE, var, e_array, degree, pks_DB, write_db=False, test=False):
     """
     -- mode of 'calibrate'
     -- access a JSON file wth expected peak locations for several peaks, compute a quadratic calibration
     """
     
-    peak_table = {
-        '212Pb':238.6, '214Pb':351.9, 'beta+':511.0, '583':583.2, 
-        '214Bi':609.3, '228Ac':911.2, '228Ac':969.0,
-        '40K':1460.8, 'DEP':1592, '214Bi':1764.5, 'SEP':2104, '208Tl':2614.5
-    }
+    peak_table = pks_DB["peak_table"]
+    #     '212Pb':238.6, '214Pb':351.9, 'beta+':511.0, '583':583.2, 
+    #     '214Bi':609.3, '228Ac':911.2, '228Ac':969.0,
+    #     '40K':1460.8, 'DEP':1592, '214Bi':1764.5, 'SEP':2104, '208Tl':2614.5
+    # }
     #cage
-    expected_peaks = ['212Pb', 'beta+', '214Bi', '208Tl']
-    raw_peaks_guess = np.asarray([406, 872, 3009, 4461])
+    # expected_peaks = ['212Pb', 'beta+', '214Bi', '208Tl']
+    # raw_peaks_guess = np.asarray([406, 872, 3009, 4461])
     
     #lpgta
     # expected_peaks = ['212Pb', '583', 'DEP', 'SEP', '208Tl']
     # raw_peaks_guess = np.asarray([1894, 3861, 9521, 12404, 15426])
-    # expected_peaks = ['212Pb', '583', 'SEP', '208Tl']
-    # raw_peaks_guess = np.asarray([1894, 4352, 12404, 15426])
+    expected_peaks = pks_DB["expected_peaks"]
+    raw_peaks_guess = np.asarray(pks_DB["raw_peak_guesses"])
     
     #hades
     # expected_peaks = ['212Pb', '583', 'DEP', 'SEP', '208Tl']
@@ -193,7 +187,7 @@ def cal_input(hE, xE, var, e_array, degree, test=False):
     raw_error = np.array([])
     for pk in raw_peaks_guess:
         
-        h, e_range, var1 = ph.get_hist(e_array, range=[pk-15, pk+15], dx=1)
+        h, e_range, var1 = ph.get_hist(e_array, range=[pk-50, pk+50], dx=1)
         e_range = e_range[1:]
         h_sub = h - np.min(h)
         i_max = np.argmax(h)
@@ -279,28 +273,32 @@ def cal_input(hE, xE, var, e_array, degree, test=False):
         plt.vlines(true_peaks[i], 0, 30000, color=cmap(i), linestyle="--", lw=1, label=true_peaks[i])
     
     plt.semilogy(xcal, hcal, ls='steps', lw=1, c='r', label=f"a={par[0]:.4} b={par[1]:.4} c={par[2]:.4} ")
-    # plt.scatter(true_peaks, residuals, s=10)#, label="a={} b={} c={}".format(par[0], par[1], par[2]))
-    # plt.errorbar(true_peaks, residuals, yerr=raw_error, ls='none', capsize=5, marker=".", ms=10)
-    # plt.scatter(raw_peaks, true_peaks, s=10)
-    # plt.plot(raw_peaks, quadratic(raw_peaks, par[0], par[1], par[2]), color='red', label="a={} b={} c={}".format(par[0], par[1], par[2]))
-    # plt.hlines(0, 0, 3000, color= 'r')
     plt.xlabel("Energy", ha='right', x=1)
     plt.ylabel("Counts", ha='right', y=1)
-    # plt.xlabel("TrueE", ha='right', x=1)
-    # plt.ylabel("Residuals", ha='right', y=1)
-    # plt.title("Cal hist quad polyfit no constant")
-    # plt.title("Cal hist quad curvefit")
-    plt.title("Cal hist degree 2")
-    # plt.title("Poly fit linear normalized")
-    # plt.title("WLS degree 2 residuals")
+    plt.title(f"Cal hist degree {degree}")
     plt.legend()
     plt.tight_layout()
-    plt.show()
-
-    # paramDB = db.TinyDB('params.json')
-    # paramDB.insert({'par0':initial_guesses})
-    # exit()
+    if test == True:
+        plt.show()
+    plt.savefig('e_hist_cal.png')
+    plt.clf()
     
+    plt.errorbar(true_peaks, residuals, yerr=raw_error, ls='none', capsize=5, marker=".", ms=10)
+    plt.hlines(0, 0, 3000, color= 'r')
+    plt.title(f"WLS degree {degree} residuals")
+    plt.xlabel("TrueE", ha='right', x=1)
+    plt.ylabel("Residuals", ha='right', y=1)
+    if test == True:
+        plt.show()
+    plt.savefig('e_residuals.png')
+    plt.clf()
+
+    if write_db == True:
+        paramDB = db.TinyDB('cal_pars.json')
+        paramDB.insert({'params':par.tolist()})
+        paramDB.insert({'perr':perr.tolist()})
+    
+    resolution(par, e_array, true_peaks, initial_guesses, degree)
     
     return par, perr, cal_peaks
     
@@ -341,9 +339,9 @@ def init_guesses(e_cal_hist, xE, peaks, test=False):
     return initial_guesses
     
     
-def resolution(par, e_array, peaks, paramDB, degree):
+def resolution(par, e_array, peaks, initial_guesses, degree):
     
-    params = paramDB.all()[0]['par0']
+    params = initial_guesses
     
     ecal = np.zeros((1, len(e_array)))
     for i in range(len(par)):
@@ -375,20 +373,20 @@ def resolution(par, e_array, peaks, paramDB, degree):
         
         
         
-        plt.plot(e_range[1:], h, ls='steps', lw=1, c='r')
-        plt.plot(e_range[1:], gauss(e_range[1:], *par1))
-        plt.show()
+        # plt.plot(e_range[1:], h, ls='steps', lw=1, c='r')
+        # plt.plot(e_range[1:], gauss(e_range[1:], *par1))
+        # plt.show()
         
         resolution = np.append(resolution, par1[2]*2.355)
         res_error = np.append(res_error, perr[2]*2.355)
     # exit()
     
-    plt.clf()
     plt.errorbar(peaks, resolution, yerr=res_error, ls='none', capsize=5, marker=".", ms=10)
-    plt.title("Resolution vs E lpgta g034:Gaussian")
+    plt.title("Resolution vs E")
     plt.xlabel("keV")
     plt.ylabel("FWHM")
-    plt.show()
+    # plt.show()
+    plt.savefig('e_resolution.png')
     
     
 def line(x, a, b):
