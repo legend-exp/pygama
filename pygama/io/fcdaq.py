@@ -1,10 +1,12 @@
 import os
 import numpy as np
 from pprint import pprint
+from collections import defaultdict
 
 from ..utils import *
 from .io_base import DataDecoder
 from . import lh5
+from .ch_group import *
 
 
 class FlashCamEventDecoder(DataDecoder):
@@ -103,33 +105,32 @@ class FlashCamEventDecoder(DataDecoder):
 
         # all channels are read out simultaneously for each event
         for iwf in tracelist:
-            tb = lh5_tables
-            if not isinstance(tb, lh5.Table): 
+            tbl = lh5_tables
+            if not isinstance(tbl, lh5.Table): 
                 if iwf not in lh5_tables:
-                    #print('FlashCamEventDecoder Warning: no table buffer for channel', iwf)
                     if iwf not in self.skipped_channels: 
                         self.skipped_channels[iwf] = 0
                     self.skipped_channels[iwf] += 1
                     continue
-                tb = lh5_tables[iwf]
-            if eventsamples != tb['waveform']['values'].nda.shape[1]:
+                tbl = lh5_tables[iwf]
+            if eventsamples != tbl['waveform']['values'].nda.shape[1]:
                 print('FlashCamEventDecoder Warning: event wf length was',
                       eventsamples, 'when',
                       self.decoded_values['waveform']['length'], 'were expected')
-            ii = tb.loc
-            tb['channel'].nda[ii] = iwf 
-            tb['packet_id'].nda[ii] = packet_id
-            tb['ievt'].nda[ii] =  ievt
-            tb['timestamp'].nda[ii] =  timestamp
-            tb['numtraces'].nda[ii] =  numtraces
-            tb['tracelist'].set_vector(ii, tracelist)
-            tb['baseline'].nda[ii] = baselines[iwf]
-            tb['energy'].nda[ii] = energies[iwf]
+            ii = tbl.loc
+            tbl['channel'].nda[ii] = iwf 
+            tbl['packet_id'].nda[ii] = packet_id
+            tbl['ievt'].nda[ii] =  ievt
+            tbl['timestamp'].nda[ii] =  timestamp
+            tbl['numtraces'].nda[ii] =  numtraces
+            tbl['tracelist'].set_vector(ii, tracelist)
+            tbl['baseline'].nda[ii] = baselines[iwf]
+            tbl['energy'].nda[ii] = energies[iwf]
             waveform = traces[iwf]
-            tb['wf_max'].nda[ii] = np.amax(waveform)
-            tb['wf_std'].nda[ii] = np.std(waveform)
-            tb['waveform']['values'].nda[ii][:] = waveform
-            tb.push_row()
+            tbl['wf_max'].nda[ii] = np.amax(waveform)
+            tbl['wf_std'].nda[ii] = np.std(waveform)
+            tbl['waveform']['values'].nda[ii][:] = waveform
+            tbl.push_row()
 
         return 36*4 + numtraces*(1 + eventsamples + 2)*2
 
@@ -219,33 +220,33 @@ class FlashCamStatusDecoder(DataDecoder):
         access FC status (temp., log, ...)
         """
         # aliases for brevity
-        tb = lh5_table
-        ii = tb.loc
+        tbl = lh5_table
+        ii = tbl.loc
 
         # status -- 0: Errors occured, 1: no errors
-        tb['status'].nda[ii] = fcio.status 
+        tbl['status'].nda[ii] = fcio.status 
 
         # times
-        tb['statustime'].nda[ii] = fcio.statustime[0]+fcio.statustime[1]/1e6
-        tb['cputime'].nda[ii] = fcio.statustime[2]+fcio.statustime[3]/1e6
+        tbl['statustime'].nda[ii] = fcio.statustime[0]+fcio.statustime[1]/1e6
+        tbl['cputime'].nda[ii] = fcio.statustime[2]+fcio.statustime[3]/1e6
 
         # Total number of cards (number of status data to follow)
-        tb['cards'].nda[ii] = fcio.cards 
+        tbl['cards'].nda[ii] = fcio.cards 
 
         # Size of each status data
-        tb['size'].nda[ii] = fcio.size 
+        tbl['size'].nda[ii] = fcio.size 
 
         # FC card-wise environment status (temp., volt., hum., ...)
-        tb['environment'].nda[ii][:] = fcio.environment 
+        tbl['environment'].nda[ii][:] = fcio.environment 
 
         # FC card-wise list DAQ errors during data taking
-        tb['totalerrors'].nda[ii] = fcio.totalerrors 
-        tb['linkerrors'].nda[ii] = fcio.linkerrors
-        tb['ctierrors'].nda[ii] = fcio.ctierrors
-        tb['enverrors'].nda[ii] = fcio.enverrors
-        tb['othererrors'].nda[ii][:] = fcio.othererrors
+        tbl['totalerrors'].nda[ii] = fcio.totalerrors 
+        tbl['linkerrors'].nda[ii] = fcio.linkerrors
+        tbl['ctierrors'].nda[ii] = fcio.ctierrors
+        tbl['enverrors'].nda[ii] = fcio.enverrors
+        tbl['othererrors'].nda[ii][:] = fcio.othererrors
 
-        tb.push_row()
+        tbl.push_row()
 
         # sizeof(fcio_status)
         return 302132 
@@ -275,72 +276,57 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     # set up event decoder
     event_decoder = FlashCamEventDecoder()
     event_decoder.get_file_config(fcio)
-
-    # parse daq_to_raw config 
-    event_tbs = {}
-    tb_grp_file_list = [] # map LH5 table to group name and file name
+    event_tables = {}
     
-    if 'daq_to_raw' in config and 'ch_groups' in config['daq_to_raw']:
-        ch_groups = config['daq_to_raw']['ch_groups']
-        for group, attrs in ch_groups.items():
-            ch_range = attrs['ch_range']
-            try:
-               subsystem = attrs['sysn']
-            except:
-               subsystem='default'
-            
+    # parse daq_to_raw config 
+    if ('daq_to_raw' in config and 
+        'ch_groups' in config['daq_to_raw'] and 
+        'FlashCamEventDecoder' in config['daq_to_raw']['ch_groups']):
+        # get ch_groups
+        ch_groups = config['daq_to_raw']['ch_groups']['FlashCamEventDecoder']
+        expand_ch_groups(ch_groups)
+
+        # set up a table for each group
+        for group_name, group_info in ch_groups.items():
+            tbl = lh5.Table(buffer_size)
+            event_decoder.initialize_lh5_table(tbl)
+            group_info['table'] = tbl
+
+            # cache the table to a ch-indexed dict for quick look-up
+            for ch in group_info['ch_list']: event_tables[ch] = tbl
+
+            # set the output file name and in-file path (group name)
             if not single_output:
-                if subsystem not in raw_files.keys():
-                    print('Error, no output file found for subsystem:', subsystem)
+                if group_info['system'] not in raw_files.keys():
+                    print('Error, no output file found for system:', group_info['system'])
 
-            # each subsystem can output a table per channel, or a combined table
-            tb_per_ch = False
-            if 'tb_per_ch' in attrs:
-                tb_per_ch = (attrs['tb_per_ch'].lower() == "true")
-
-            if tb_per_ch:
-                try:
-                   cr = range(ch_range[0], ch_range[1]+1)
-                except:
-                   cr = [0] 
-                for ch in cr:
-                    
-                    tb = lh5.Table(buffer_size)
-                    event_tbs[ch] = tb
-                    event_decoder.initialize_lh5_table(tb)
-                    
-                    if '{ch:' in group: ch_group = group.format(ch=ch)
-                    ch_group = ch_group + '/raw'
-                    # out_file = raw_files[subsystem].format_map(attrs)
-                    out_file = f_out if single_output else raw_files[subsystem]
-                    tb_grp_file_list.append( (tb, ch_group, out_file) )
+            # out_file = raw_files[system].format_map(attrs)
+            group_info['out_file'] = f_out if single_output else raw_files[group_info['system']]
+            group_info['group_path'] = group_name + '/raw'
        
-
-            # one table for all channels in the range
-            else: 
-                tb = lh5.Table(buffer_size)
-                event_decoder.initialize_lh5_table(tb)
-                group = group + '/raw'
-                # out_file = raw_file.format_map(attrs)
-                out_file = f_out if single_output else raw_files[subsystem]
-                tb_grp_file_list.append( (tb, group, out_file) )
     else:
         print('Config not found.  Single-table mode')
-        tb = lh5.Table(buffer_size)
-        event_decoder.initialize_lh5_table(tb)
-        tb_grp_file_list.append( (tb, 'raw', f_out) )
-        event_tbs = tb
+        tbl = lh5.Table(buffer_size)
+        event_decoder.initialize_lh5_table(tbl)
+        ch_groups = { 'group' : {} }
+        ch_groups['group']['table'] = tbl
+        ch_groups['group']['out_file'] = f_out 
+        ch_groups['group']['group_path'] = 'raw'
+        #event_tables = defaultdict(lambda: tbl)
+        event_tables = tbl
     
     if verbose:
         print('Output group : output file')
-        for a, b, c in tb_grp_file_list:
-            print(b, ':', c.split('/')[-1])
+        for group_info in ch_groups.values():
+            group_path = group_info['group_path']
+            out_file = group_info['out_file']
+            print(group_path, ':', out_file.split('/')[-1])
         
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
     status_decoder.get_file_config(fcio)
-    status_tb = lh5.Table(buffer_size)
-    status_decoder.initialize_lh5_table(status_tb)
+    status_tbl = lh5.Table(buffer_size)
+    status_decoder.initialize_lh5_table(status_tbl)
     try:
       status_filename = f_out if single_output else raw_files['auxs']
     except:
@@ -354,7 +340,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     rc = 1
     bytes_processed = 0
     file_size = os.path.getsize(daq_file)
-    
+    max_numtraces = 0
     while rc and packet_id < n_max:
         rc = fcio.get_record()
         
@@ -372,19 +358,29 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
 
         # Status record
         if rc == 4: 
-            bytes_processed += status_decoder.decode_packet(fcio, status_tb, packet_id)
-            if status_tb.is_full():
-                lh5_store.write_object(status_tb, 'stat', status_filename, n_rows=status_tb.size)
-                status_tb.clear()
+            bytes_processed += status_decoder.decode_packet(fcio, status_tbl, packet_id)
+            if status_tbl.is_full():
+                lh5_store.write_object(status_tbl, 'stat', status_filename, n_rows=status_tbl.size)
+                status_tbl.clear()
 
         # Event or SparseEvent record
         if rc == 3 or rc == 6: 
-            for tb, group, filename in tb_grp_file_list:
-                if tb.size - tb.loc < fcio.numtraces: # might overflow
-                    lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
-                    tb.clear()
+            for group_info in ch_groups.values():
+                tbl = group_info['table']
+                # Check that the tables are large enough
+                if tbl.size < fcio.numtraces and fcio.numtraces > max_numtraces: 
+                    print('warning: tbl.size =', tbl.size, 'but fcio.numtraces =', fcio.numtraces)
+                    print('may overflow. suggest increasing tbl.size')
+                    max_numtraces = fcio.numtraces
+                # Pre-emptively clear tables if it might be necessary
+                if tbl.size - tbl.loc < fcio.numtraces: # might overflow
+                    group_path = group_info['group_path']
+                    out_file = group_info['out_file']
+                    lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+                    tbl.clear()
             
-            bytes_processed += event_decoder.decode_packet(fcio, event_tbs, packet_id)
+            # Looks okay: just decode
+            bytes_processed += event_decoder.decode_packet(fcio, event_tables, packet_id)
 
             # i_debug += 1
             # if i_debug == 10:
@@ -392,14 +388,17 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
             #    break # debug, deleteme
 
     # end of loop, write to file once more
-    for tb, group, filename in tb_grp_file_list:
-        if tb.loc != 0:
-            lh5_store.write_object(tb, group, filename, n_rows=tb.loc)
-            tb.clear()
-    if status_tb.loc != 0:
-        lh5_store.write_object(status_tb, 'stat', status_filename,
-                               n_rows=status_tb.loc)
-        status_tb.clear()
+    for group_info in ch_groups.values():
+        tbl = group_info['table']
+        if tbl.loc != 0:
+            group_path = group_info['group_path']
+            out_file = group_info['out_file']
+            lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+            tbl.clear()
+    if status_tbl.loc != 0:
+        lh5_store.write_object(status_tbl, 'stat', status_filename,
+                               n_rows=status_tbl.loc)
+        status_tbl.clear()
 
     if verbose:
         update_progress(1)
