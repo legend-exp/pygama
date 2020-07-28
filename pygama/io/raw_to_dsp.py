@@ -15,7 +15,6 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
                n_max=np.inf, overwrite=True, buffer_len=8):
     """
     Convert raw LH5 files with waveforms to dsp files.
-
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
     To preserve the ordering, we read in using an OrderedDict.

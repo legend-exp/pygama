@@ -57,6 +57,12 @@ def show_groups():
     for col in data.keys():
         print(col, data[col].nda.shape)
 
+    # directly access timestamps in a raw file w/o loading all the wfs
+    # groups = sto.ls(f_raw, 'ORSIS3302DecoderForEnergy/raw/')
+    # data = sto.read_object('ORSIS3302DecoderForEnergy/raw/timestamp', f_raw)
+    # ts = data.nda
+
+
     # check pandas conversion
     df_dsp = data.get_dataframe()
     print(df_dsp.columns)

@@ -27,7 +27,7 @@ class ORCAStruck3302(OrcaDecoder):
               'dtype': 'uint32',
             },
             'timestamp': {
-              'dtype': 'uint64',
+              'dtype': 'uint32',
               'units': 'clock_ticks',
             },
             'crate': {
@@ -116,7 +116,7 @@ class ORCAStruck3302(OrcaDecoder):
         wf_length32 = p32[1]
         ene_wf_length32 = p32[2]
         evt_header_id = p32[3] & 0xFF
-        tb['timestamp'].nda[ii] = ((p32[3] >> 16) & 0xFFFF) << 32 + p32[4]
+        tb['timestamp'].nda[ii] = p32[4] + ((p32[3] >> 16) & 0xFFFF)
         last_word = p32[-1]
 
         # get the footer
