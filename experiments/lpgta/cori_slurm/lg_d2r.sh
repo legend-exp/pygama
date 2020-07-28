@@ -4,10 +4,8 @@
 #SBATCH --constraint=haswell
 #SBATCH --account=m2676
 
+export HDF5_USE_FILE_LOCKING=FALSE
+
+echo "processing run $1"
 cd ..
-pwd
-ls
-whoami
-shifter --image=docker:legendexp/legend-base:latest /bin/bash -c "python processing.py --dg"
-srun shifter --image=docker:legendexp/legend-base:latest /bin/bash -c "python processing.py --dg"
-#--q "YYYYmmdd == '20200728'" --d2r -o
+srun shifter --image=docker:legendexp/legend-base:latest python processing.py --dg --q "run == $1" --d2r -o -v
