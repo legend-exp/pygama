@@ -14,8 +14,8 @@ def main():
     maybe I should make a class that handles creation of calib metadata?
     """
     # write_db()
-    view_db()
-    # modify_db()
+    # view_db()
+    modify_db()
     
     
 def write_db():
@@ -126,7 +126,7 @@ def modify_db():
     # overwrite part of a calibration table using upsert
     tb_ecal = cal_db.table('energy_cal')
     for i in range(3):
-        row = {'_run':f'{i:0>4d}', 'a':i+80, 'b':i/10, 'c':i*42,
+        row = {'_run':f'{i:0>4d}', 'a':i+20, 'b':i/10, 'c':i*42,
                'tscov':int(time.time() + i*60)}
         tb_ecal.upsert(row, query['_run'] == f'{i:0>4d}') 
         # tb_ecal.upsert(row, query.idx == i) 
