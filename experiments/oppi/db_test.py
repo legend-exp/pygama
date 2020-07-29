@@ -14,8 +14,8 @@ def main():
     maybe I should make a class that handles creation of calib metadata?
     """
     # write_db()
-    # view_db()
-    modify_db()
+    view_db()
+    # modify_db()
     
     
 def write_db():
