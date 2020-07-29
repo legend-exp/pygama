@@ -21,7 +21,8 @@ def main():
     """
     # setup()
     # scan_orca_headers()
-    get_runtimes()
+    # get_runtimes()
+    show_dg()
 
 
 def setup():
@@ -171,6 +172,23 @@ def get_runtimes():
     if write_output:
         df_keys.to_hdf('oppi_fileDB.h5', key='file_keys')
         print('Wrote output file: oppi_fileDB.h5, key: file_keys')
+    
+
+def show_dg():
+    """
+    datagroup columns:
+    ['YYYY', 'cycle', 'daq_dir', 'daq_file', 'dd', 'mm', 'run', 'runtype',
+       'unique_key', 'raw_file', 'raw_path', 'dsp_file', 'dsp_path',
+       'hit_file', 'hit_path', 'startTime', 'threshold', 'stopTime',
+       'runtime']
+    """
+    dg = DataGroup('oppi.json')
+    df_keys = pd.read_hdf('oppi_fileDB.h5')
+    # print(df_keys.columns)
+    
+    dbg_cols = ['run', 'cycle', 'unique_key', 'startTime']
+    print(df_keys[dbg_cols])
+    
     
 
 if __name__=='__main__':

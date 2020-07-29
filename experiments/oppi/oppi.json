@@ -1,7 +1,7 @@
 {
   "experiment" : "oppi",
   "runDB" : "./oppi_runDB.json",
-  "fileDB" : "./oppi_fileDB.csv",
+  "fileDB" : "./oppi_fileDB.h5",
 
   "daq" : "ORCA",
   "daq_dir" : "/data/LEGEND/Data/MJ60",
