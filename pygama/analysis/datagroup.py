@@ -36,7 +36,7 @@ class DataGroup:
 
         # load a pre-existing set of keys.  should be True by default
         if load:
-            print('load file_keys here')
+            self.load_df()
 
 
     def set_config(self, config):

@@ -18,5 +18,7 @@
 
   "unique_key" : "oppi-cyc{cycle}-{YYYY}{mm}{dd}",
   "daq_template" : "/{YYYY}-{mm}-{dd}-BackgroundRun{cycle}",
-  "lh5_template" : "oppi_run{run}_cyc{cycle}_{tier}.lh5"
+  "lh5_template" : "oppi_run{run}_cyc{cycle}_{tier}.lh5",
+  
+  "ecaldb" : "oppi_ecalDB.json"
 }

@@ -13,9 +13,13 @@ def main():
     """
     maybe I should make a class that handles creation of calib metadata?
     """
+    # test functions
     # write_db()
     # view_db()
-    modify_db()
+    # modify_db()
+    
+    # set up empty file for ecal_db to write to
+    setup_oppi_ecaldb()
     
     
 def write_db():

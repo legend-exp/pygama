@@ -1,1 +1,5 @@
-{"_default": {"1": {"name": "John", "age": 22}, "2": {"name": "John", "age": 22}}, "cal_test_name": {"1": {"a": 0, "b": 0.0, "c": 0}, "2": {"a": 1, "b": 0.5, "c": 3}, "3": {"a": 2, "b": 1.0, "c": 6}, "4": {"a": 3, "b": 1.5, "c": 9}, "5": {"a": 4, "b": 2.0, "c": 12}}}
+{ "_default": {},
+  "_file_info": { "1": { "cal_type": "energy",
+                         "created_gmt": "07/29/2020, 07:38:01",
+                         "input_table": "/ORSIS3302DecoderForEnergy/raw",
+                         "system": "oppi"}}}
