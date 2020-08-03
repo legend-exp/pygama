@@ -6,8 +6,6 @@ import itertools as it
 from scimath.units import convert
 from scimath.units.api import unit_parser
 from scimath.units.unit import unit
-import importlib
-from collections import OrderedDict
 
 from pygama.dsp.units import *
 
@@ -65,52 +63,8 @@ class ProcessingChain:
         self._buffer_len = buffer_len
         self._clk = clock_unit
         self._verbosity = verbosity
-
-
-    def set_processor_list(self, dsp_config):
-        """
-        declare a list of processors from an input list.
-        dsp_config can be a JSON filename or an OrderedDict.
-        """
-        if isinstance(dsp_config, str):
-            with open(dsp_config) as f:
-                dsp_config = json.load(f, object_pairs_hook=OrderedDict)
         
-        if not isinstance(dsp_config, OrderedDict):
-            print('Error, dsp_config must be an OrderedDict!')
-            exit()
-            
-        outputs, funcs, slist = [], [], []
-            
-        processors = dsp_config["processors"]
-        outputs = [key for key in processors]
         
-        for output in outputs:
-            function = [processors[output]["function"],
-                        processors[output]["module"]]
-            funcs.append(function)
-
-            settings = []
-            settings.append(processors[output]["args"])
-            if "kwargs" in processors[output]:
-                settings.append(processors[output]["kwargs"])
-
-            slist.append(settings)
-
-        for i in range(len(funcs)):
-            settings = slist[i]
-
-            if len(settings) == 1:
-                settings = slist[i]
-                module = importlib.import_module(funcs[i][1])
-                self.add_processor(getattr(module, funcs[i][0]), *settings[0])
-
-            elif len(slist[i]) == 2:
-                module = importlib.import_module(funcs[i][1])
-                self.add_processor(getattr(module, funcs[i][0]), 
-                                   *settings[0], **settings[1])
-
-
     def add_waveform(self, name, dtype, length):
         """Add named variable containing a waveform block with fixed type and length"""
         self.__add_variable(name, dtype, (self._block_width, length))

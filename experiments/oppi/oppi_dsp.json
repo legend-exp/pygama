@@ -1,90 +1,117 @@
 {
-  "outputs": {
-    "trapEmax":"ADC", "triE":"ADC", "bl":"ADC", "bl_sig":"ADC", "A_10":"ADC", "AoE":"ADC", "dcr": "ADC"
-  },
+  "outputs": [
+    "timestamp", "channel", "trapEmax", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr"
+  ],
   "processors":{
     "bl, bl_sig":{
       "function": "mean_stdev",
       "module": "pygama.dsp.processors",
-      "args" : ["wf[0:1000]", "bl", "bl_sig"],
+      "args" : ["waveform[0:1000]", "bl", "bl_sig"],
+      "prereqs": ["waveform"],
       "unit": ["ADC", "ADC"]
     },
     "wf_blsub":{
       "function": "subtract",
       "module": "numpy",
-      "args": ["wf", "bl", "wf_blsub"]
+      "args": ["waveform", "bl", "wf_blsub"],
+      "prereqs": ["waveform", "bl"],
+      "unit": "ADC"
     },
     "wf_pz": {
       "function": "pole_zero",
       "module": "pygama.dsp.processors",
-      "args":["wf_blsub", "72*us", "wf_pz"]
+      "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
+      "prereqs": ["wf_blsub"],
+      "unit": "ADC",
+      "defaults": { "db.pz.tau":"72*us" }
     },
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "10*us", "5*us", "wf_trap"]
+      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
+      "prereqs": ["wf_pz"],
+      "unit": "ADC"
     },
     "wf_triangle": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "100*ns", "10*ns", "wf_triangle"]
+      "args": ["wf_pz", "100*ns", "10*ns", "wf_triangle"],
+      "prereqs": ["wf_pz"],
+      "unit": "ADC"
     },
     "wf_atrap": {
       "function": "asymTrapFilter",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "0.05*us", "2*us", "3*us", "wf_atrap"]
+      "args": ["wf_pz", "0.05*us", "2*us", "3*us", "wf_atrap"],
+      "prereqs": ["wf_pz"],
+      "unit": "ADC"
     },
     "tp_0": {
       "function": "time_point_thresh",
       "module": "pygama.dsp.processors",
-      "args": ["wf_atrap[0:2000]", 0, "tp_0"]
+      "args": ["wf_atrap[0:2000]", 0, "tp_0"],
+      "unit": "ns",
+      "prereqs": ["wf_atrap"]
      },
      "trapEftp": {
        "function": "fixed_time_pickoff",
        "module": "pygama.dsp.processors",
-       "args": ["wf_trap", "tp_0+(5*us+9*us)", "trapEftp"]
+       "args": ["wf_trap", "tp_0+(5*us+9*us)", "trapEftp"],
+       "unit": "ns",
+       "prereqs": ["wf_trap", "tp_0"]
      },
      "dcr_raw": {
        "function": "trap_pickoff",
        "module": "pygama.dsp.processors",
-       "args": ["wf_pz", 200, 1000, "tp_0+1.5*us", "dcr_raw"]
+       "args": ["wf_pz", 200, 1000, "tp_0+1.5*us", "dcr_raw"],
+       "unit": "ADC",
+       "prereqs": ["wf_pz", "tp_0"]
      },
-     "dcr_frac": {
+     "dcr": {
        "function": "divide",
        "module": "numpy",
-       "args": ["dcr_raw", "trapEftp", "dcr"]
+       "args": ["dcr_raw", "trapEftp", "dcr"],
+       "unit": "ADC",
+       "prereqs": ["dcr_raw", "trapEftp"]
      },
     "trapEmax": {
       "function": "amax",
       "module": "numpy",
       "args": ["wf_trap", 1, "trapEmax"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]}
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["wf_trap"]
     },
     "triE": {
       "function": "amax",
       "module": "numpy",
       "args": ["wf_triangle", 1, "triE"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]}
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["wf_triangle"]
     },
     "curr": {
       "comment": "3rd argument allocates memory for a derivative of type float",
       "function": "avg_current",
       "module": "pygama.dsp.processors",
       "args": ["wf_pz", 10, "curr(len(wf_pz)-10, f)"],
-      "unit": "ADC/sample"
+      "unit": "ADC/sample",
+      "prereqs": ["wf_pz"]
     },
     "A_10": {
       "function": "amax",
       "module": "numpy",
       "args": ["curr", 1, "A_10"],
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
-      "unit": "ADC"
+      "unit": "ADC",
+      "prereqs": ["curr"]
     },
     "AoE": {
       "function": "divide",
       "module": "numpy",
       "args":["A_10", "trapEmax", "AoE"],
-      "unit": "1/sample"
+      "unit": "1/sample",
+      "prereqs": ["A_10", "trapEmax"]
     }
   }
 }
