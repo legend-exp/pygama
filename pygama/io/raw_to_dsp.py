@@ -124,6 +124,8 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
             parameter names for other processors. Names of the format db.name
             will look up the parameter in the metadata. 
           kwargs (opt): kwargs used when adding processors to proc_chain
+          init_args (opt): args used when initializing a processor that has
+            static data (for factory functions)
           default (opt): default value for db parameters if not found
           unit (opt): unit to be used for attr in lh5 file.
       There may also be a list called 'outputs', containing a list of parameters
@@ -225,8 +227,27 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
                 #TODO: ADD METADATA LOOKUP!
                 args[i] = recipe['defaults'][arg]
             
-        kwargs = recipe.get('kwargs', {})
-        print(func, args, kwargs)
+        kwargs = recipe.get('kwargs', {}) # might also need metadata lookup here
+        # if init_args are defined, parse any strings and then call func
+        # as a factory/constructor function
+        try:
+            init_args = recipe['init_args']
+            for i, arg in enumerate(init_args):
+                if isinstance(arg, str):
+                    if arg[0:3]=='db.':
+                        #TODO: ADD METADATA LOOKUP!
+                        init_args[i] = recipe['defaults'][arg]
+                    else:
+                        # see if string can be parsed by proc_chain
+                        try:
+                            init_args[i] = proc_chain.get_variable(arg)
+                        except:
+                            pass
+            if(verbosity>1):
+                print("Building function", func.__name__, "from init_args", init_args)
+            func = func(*init_args)
+        except:
+            pass
         proc_chain.add_processor(func, *args, **kwargs)
 
     
@@ -239,7 +260,7 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
         if buf_in is None:
             print("I don't know what to do with " + input_par + ". Building output without it!")
         elif isinstance(buf_in, lh5.Array):
-            print("adding ", buf_in, " to lh5_out")
+            print("Copying", copy_par, "to lh5_out")
             lh5_out.add_field(copy_par, buf_in)
     
     # finally, add the output buffers to lh5_out and the proc chain

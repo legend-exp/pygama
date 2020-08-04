@@ -275,7 +275,7 @@ class ProcessingChain:
         proc_strs = []
         for i, arg in enumerate(args):
             if isinstance(arg, str):
-                proc_strs.append(re.search('(\w+)', arg).group(0))
+                proc_strs.append(arg)
             else:
                 proc_strs.append(str(params[i]))
         proc_strs = tuple(proc_strs)
@@ -337,7 +337,7 @@ class ProcessingChain:
             # check if it is a unit
             val = unit_parser.parse_unit(node.id)
             if val.is_valid():
-                return val
+                return convert(1, val, self._clk)
 
             #check if it is a variable
             val = self.__vars_dict.get(node.id, None)
@@ -348,17 +348,13 @@ class ProcessingChain:
             lhs = self.__parse_expr(node.left)
             rhs = self.__parse_expr(node.right)
             op = ast_ops_dict[type(node.op)]
-            if isinstance(lhs, np.ndarray) or isinstance(lhs, np.ndarray):
+            if isinstance(lhs, np.ndarray) or isinstance(rhs, np.ndarray):
                 if not isinstance(lhs, np.ndarray):
-                    if isinstance(lhs, unit):
-                        lhs = convert(1, lhs, self._clk)
                     if np.issubdtype(rhs.dtype, np.integer):
                         lhs = rhs.dtype.type(round(lhs))
                     else:
                         lhs = rhs.dtype.type(lhs)
                 if not isinstance(rhs, np.ndarray):
-                    if isinstance(rhs, unit):
-                        rhs = convert(1, rhs, self._clk)
                     if np.issubdtype(lhs.dtype, np.integer):
                         rhs = lhs.dtype.type(round(rhs))
                     else:
