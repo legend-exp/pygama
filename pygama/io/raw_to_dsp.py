@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import h5py
 import time
@@ -13,18 +14,20 @@ from pygama.dsp.units import *
 from pygama.io import lh5
 
 
-def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
+def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
                n_max=np.inf, overwrite=True, buffer_len=8):
     """
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
-    To preserve the ordering, we read in using an OrderedDict.
     """
     t_start = time.time()
 
-    if not isinstance(dsp_config, OrderedDict):
-        print('Error, dsp_config must be an OrderedDict')
-        exit()
+    if isinstance(dsp_config, str):
+        with open(dsp_config, 'r') as config_file:
+            dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
+    
+    if not isinstance(dsp_config, dict):
+        raise Exception('Error, dsp_config must be an dict')
 
     raw_store = lh5.Store()
     lh5_file = raw_store.gimme_file(f_raw, 'r')
@@ -55,55 +58,19 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
 
         # load primary table
         data_raw = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
-        
-        # get names of non-waveform columns to carry over
-        raw_cols = [col for col in data_raw.keys() if 'waveform' not in col]
-
-        # load waveform info
-        if "waveform" not in data_raw.keys():
-            print(f"waveform data not found in table: {tb}.  skipping ...")
-            continue
-        wf_in = data_raw["waveform"]["values"].nda
-        wf_units = data_raw['waveform']['dt'].attrs['units']
-        dt = data_raw['waveform']['dt'].nda[0] * unit_parser.parse_unit(wf_units)
-
-        # set up DSP for this table (JIT-compiles functions the first time)
-        pc = ProcessingChain(block_width=buffer_len, clock_unit=dt, verbosity=1)
-        pc.add_input_buffer('wf', wf_in, dtype='float32')
-        pc.set_processor_list(dsp_config)
-
-        # set up LH5 output table
-        tb_out = lh5.Table(size = pc._buffer_len)
-        cols = dsp_config['outputs']
-        # cols = pc.get_column_names() # TODO: should add this method
-        for col in cols:
-            lh5_arr = lh5.Array(pc.get_output_buffer(col),
-                                attrs={'units':dsp_config['outputs'][col]})
-            tb_out.add_field(col, lh5_arr)
-
-        # get names of non-wf columns to copy over
-        copy_cols = [col for col in data_raw.keys() if col != 'waveform']
-        for col in copy_cols:
-            print('copying col:', col)
-            lh5_arr = lh5.Array(data_raw[col].nda)
-            tb_out.add_field(col, lh5_arr)
-
+        pc, tb_out = build_processing_chain(data_raw, dsp_config, verbosity=verbose)
         chains.append((tb, tb_out, pc))
 
 
     # run DSP.  TODO: parallelize this
     print('Writing to output file:', f_dsp)
+    
+    # write output tables
     for tb, tb_out, pc in chains:
         print(f'Processing table: {tb} ...')
         pc.execute()
 
         print(f'Done.  Writing to file ...')
-        
-        # copy over columns from raw file
-        for col in raw_cols:
-            lh5_arr = lh5.Array(data_raw[col].nda, attrs={'units':'arb'})
-            tb_out.add_field(col, lh5_arr)
-        
         raw_store.write_object(tb_out, tb, f_dsp)
 
     t_elap = (time.time() - t_start) / 60
@@ -112,7 +79,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=False,
 
 
 def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
-                           buffer_len=3200, block_width=8):
+                           block_width=8):
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
@@ -155,8 +122,6 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
             2: Print basic debug info
             3: Print friggin' everything!    
     - block_width: number of entries to process at once.
-    - buffer_len: length of input and output buffers. Should be a multiple of
-      block_width
     """
     
     if isinstance(dsp_config, str):
@@ -214,7 +179,7 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
             out_par_list.remove(out_par)
         else:
             resolve_dependencies(out_par, proc_par_list, input_par_list)
-    proc_chain = ProcessingChain(block_width, buffer_len, verbosity = verbosity)
+    proc_chain = ProcessingChain(block_width, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:
@@ -250,7 +215,7 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
 
     
     # build the output buffers
-    lh5_out = lh5.Table(size=buffer_len)
+    lh5_out = lh5.Table(size=proc_chain._buffer_len)
     
     # add inputs that are directly copied
     for copy_par in copy_par_list:
