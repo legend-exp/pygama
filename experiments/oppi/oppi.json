@@ -6,7 +6,7 @@
   "daq" : "ORCA",
   "daq_dir" : "/data/LEGEND/Data/MJ60",
   "daq_ignore" : [".log",".DS_Store", "openFiles"],
-  "lh5_dir" : "/data/eliza1/LEGEND/LH5/oppi",
+  "lh5_dir" : "$OPPI_LH5",
 
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
@@ -20,5 +20,5 @@
   "daq_template" : "/{YYYY}-{mm}-{dd}-BackgroundRun{cycle}",
   "lh5_template" : "oppi_run{run}_cyc{cycle}_{tier}.lh5",
   
-  "ecaldb" : "oppi_ecalDB.json"
+  "ecal_config": "ecal_config.json"
 }
