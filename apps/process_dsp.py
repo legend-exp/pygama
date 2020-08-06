@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(description=
 """Process a tier 1 LH5 file and produce a tier 2 LH5 file. This entails running
 sequence of DSP transforms to calculate un-calibrated parameters.""")
 
-arg = par.add_argument
+arg = parser.add_argument
 arg('file', help="Input (tier 1) LH5 file.")
 arg('-o', '--output',
                     help="Name of output file. By default, output to ./t2_[input file name].")
@@ -23,13 +23,20 @@ arg('-v', '--verbose', default=2, type=int,
                     help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
 
 arg('-b', '--block', default=8, type=int,
-                    help="Number of waveforms to process simultaneously. Default is 8")
+    help="Number of waveforms to process simultaneously. Default is 8")
 
 arg('-c', '--chunk', default=256, type=int,
-                    help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
+    help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
 
 arg('-g', '--group', default='',
-                    help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
+    help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
+defaultconfig = os.path.dirname(os.path.realpath(__path__)) + 'dsp_config.json'
+arg('-r', '--recreate', action='store_const', const=0, dest='writemode',
+    help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
+arg('-u', '--update', action='store_const', const=1, dest='writemode',
+    help="Update existing file with new values. Useful with the --outpar option. Mutually exclusive with --recreate and --append THIS IS NOT IMPLEMENTED YET!")
+arg('-a', '--append', action='store_const', const=1, dest='writemode',
+    help="Append values to existing file. Mutually exclusive with --recreate and --update THIS IS NOT IMPLEMENTED YET!")
 args = parser.parse_args()
 
 lh5_in = lh5.Store()
