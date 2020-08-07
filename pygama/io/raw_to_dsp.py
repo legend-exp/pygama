@@ -12,6 +12,7 @@ import re
 import importlib
 import git
 import argparse
+from copy import deepcopy
 
 import pygama
 from pygama.dsp.ProcessingChain import ProcessingChain
@@ -55,20 +56,18 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         if 'raw' not in tb:
             lh5_tables.remove(tb)
 
-    # set up DSP for each table
-    chains = []
-
     for tb in lh5_tables:
         print('Processing table: ', tb)
 
         # load primary table
         data_raw = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
         pc, tb_out = build_processing_chain(data_raw, dsp_config, verbosity=verbose)
-        chains.append((tb, tb_out, pc))
-
-
-    # run DSP.  TODO: parallelize this
-    print('Writing to output file:', f_dsp)
+        
+        print(f'Processing table: {tb} ...')
+        pc.execute()
+        
+        print(f'Done.  Writing to file ...')
+        raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp)
 
     # write processing metadata
     dsp_info = lh5.Struct()
@@ -83,21 +82,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
     dsp_info.add_field('pygama_commit', lh5.Scalar(repo.head.object.hexsha))
     dsp_info.add_field('dsp_config', lh5.Scalar(json.dumps(dsp_config, indent=2)))
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
-    
-    # write output tables
-    for tb, tb_out, pc in chains:
-        print(f'Processing table: {tb} ...')
-        pc.execute()
-
-        print(f'Done.  Writing to file ...')
-        raw_store.write_object(tb_out, tb, f_dsp)
 
     t_elap = (time.time() - t_start) / 60
     print(f'Done processing.  Time elapsed: {t_elap:.2f} min.')
 
 
 
-def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
+def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
                            block_width=8):
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
@@ -135,7 +126,7 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
       to put into lh5_out.
     
     Optional keyword arguments:
-    - out_par_list: list of parameters to put in the output lh5 table. If None,
+    - outputs: list of parameters to put in the output lh5 table. If None,
       use the parameters in the 'outputs' list from config
     - verbosity: verbosity level:
             0: Print nothing (except errors...)
@@ -148,9 +139,12 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
             dsp_config = json.load(f)
+    else:
+        # We don't want to modify the input!
+        dsp_config = deepcopy(dsp_config)
 
-    if out_par_list is None:
-        out_par_list = dsp_config['outputs']
+    if outputs is None:
+        outputs = dsp_config['outputs']
 
     processors = dsp_config['processors']
     
@@ -194,12 +188,13 @@ def build_processing_chain(lh5_in, dsp_config, out_par_list = None, verbosity=1,
     proc_par_list = [] # calculated from processors
     input_par_list = [] # input from file and used for processors
     copy_par_list = [] # copied from input to output
-    for out_par in out_par_list[:]:
+    out_par_list = []
+    for out_par in outputs:
         if out_par not in processors:
             copy_par_list.append(out_par)
-            out_par_list.remove(out_par)
         else:
             resolve_dependencies(out_par, proc_par_list, input_par_list)
+            out_par_list.append(out_par)
     proc_chain = ProcessingChain(block_width, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
