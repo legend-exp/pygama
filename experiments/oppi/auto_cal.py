@@ -37,7 +37,7 @@ with warnings.catch_warnings():
 
 def main():
     doc="""
-    === pygama: db_ecal.py =====================================================
+    === pygama: auto_cal.py ====================================================
     
     energy calibration app
 
@@ -87,6 +87,12 @@ def main():
         dg.file_keys.query(que, inplace=True)
     else:
         dg.file_keys = dg.file_keys[-1:]
+    
+    view_cols = ['run','cycle','daq_file','runtype','startTime','threshold',
+                 'stopTime','runtime']
+    print(dg.file_keys[view_cols].to_string())
+    print(len(dg.file_keys))
+    # exit()
     
     # merge main and ecal config JSON as dicts
     config = dg.config
@@ -203,23 +209,23 @@ def check_raw_spectrum(dg, config, db_ecal):
     """
     import h5py
     
+    # load energy data
+    lh5_dir = os.path.expandvars(config['lh5_dir'])
+    dsp_list = lh5_dir + dg.file_keys['dsp_path'] + '/' + dg.file_keys['dsp_file']
+    raw_data = load_nda(dsp_list, config['rawe'], config['input_table'])
+    runtime_min = dg.file_keys['runtime'].sum()
+    
     print('\nShowing raw spectra ...')
     for etype in config['rawe']:
         xlo, xhi, xpb = config['init_vals'][etype]["raw_range"]
 
-        # by default, only look at the first file
-        df_row = dg.file_keys.iloc[0]
-        f_dsp = dg.lh5_dir + df_row['dsp_path'] + '/' + df_row['dsp_file']
-        runtime_min = df_row['runtime']
-        
         # load energy data for this estimator
-        sto = lh5.Store()
-        file_info = db_ecal.table('_file_info').all()[0]
-        tb_in = file_info['input_table']
-        data = sto.read_object(f'{tb_in}/{etype}', f_dsp).nda
+        data = raw_data[etype]
         
         # print columns of table
-        with h5py.File(f_dsp, 'r') as hf:
+        file_info = db_ecal.table('_file_info').all()[0]
+        tb_in = file_info['input_table']
+        with h5py.File(dsp_list.iloc[0], 'r') as hf:
             print("LH5 columns:", list(hf[f'{tb_in}'].keys()))
         
         # generate histogram
@@ -315,6 +321,9 @@ def peakdet_group(df_group, config):
         hist, bins, var = pgh.get_hist(edata[et], range=(xlo, xhi), dx=xpb)
         hist_norm = np.divide(hist, runtime_min * 60)
         hist_err = np.array([np.sqrt(hbin / (runtime_min * 60)) for hbin in hist])
+        
+        plt.plot(bins[1:], hist_norm, ds='steps')
+        plt.show()
         # hist_deriv = np.diff(hist_norm)
         # hist_deriv = np.insert(hist_deriv, 0, 0)
         
@@ -334,7 +343,8 @@ def peakdet_group(df_group, config):
         exp_pks = config['expected_peaks']
         tst_pks = config['test_peaks']
         mode = config['match_mode']
-        lin_cal, mp_success = match_peaks(maxes, exp_pks, tst_pks, mode)
+        etol = config['raw_ene_tol']
+        lin_cal, mp_success = match_peaks(maxes, exp_pks, tst_pks, mode, etol)
 
         if config['show_plot']:
             
@@ -346,7 +356,7 @@ def peakdet_group(df_group, config):
             imaxes = np.asarray(imaxes)
             
             # energy, uncalibrated
-            p0.plot(bins[imaxes], hist_norm[imaxes], '.m')
+            # p0.plot(bins[imaxes], hist_norm[imaxes], '.m')
             p0.plot(bins[idx], hist_norm[idx], ds='steps', c='b', lw=1, label=et)
             p0.set_ylabel(f'cts/s, {xpb}/bin', ha='right', y=1)
             p0.set_xlabel(et, ha='right', x=1)
@@ -432,6 +442,8 @@ def match_peaks(maxes, exp_pks, tst_pks, mode='first', ene_tol=10):
             return 1, False 
         elif len(lin_cals) > 1:
             print('Warning, found multiple matches. Using first one...')
+            print(lin_cals)
+            # exit()
         
         # first pass calibration constant
         return lin_cals[0], True
