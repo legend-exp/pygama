@@ -1,0 +1,32 @@
+{
+  "ecaldb" : "oppi_ecalDB.json",
+  
+  "system":"oppi",
+  "input_table":"/ORSIS3302DecoderForEnergy/raw",
+  
+  "init_vals" : {
+    "energy" : {
+      "raw_range":[0, 1e7, 10000],
+      "peakdet_thresh": 0.05,
+      "lowe_cut": 120000
+    },
+    "trapEmax" : {
+      "raw_range":[0, 10000, 5],
+      "peakdet_thresh": 0.05,
+      "lowe_cut": 160
+    }
+  },
+  
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "583.2":"208Tl", "609.3":"214Bi",
+    "911.2":"228Ac", "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
+    "1764.6":"214Bi", "2614.5":"208Tl"
+  },
+  "extras":[1460.8],
+  "expected_peaks":[1460.8],
+  "test_peaks":[2614.5, 583.2, 1764.6, 238.6],
+  
+  "rawe_default" : ["trapEmax"],
+  "cal_range" : [0, 3000, 1],
+  "raw_ene_tol" : 5
+}
