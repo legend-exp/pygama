@@ -6,8 +6,6 @@ import itertools as it
 from scimath.units import convert
 from scimath.units.api import unit_parser
 from scimath.units.unit import unit
-import importlib
-from collections import OrderedDict
 
 from pygama.dsp.units import *
 
@@ -65,52 +63,8 @@ class ProcessingChain:
         self._buffer_len = buffer_len
         self._clk = clock_unit
         self._verbosity = verbosity
-
-
-    def set_processor_list(self, dsp_config):
-        """
-        declare a list of processors from an input list.
-        dsp_config can be a JSON filename or an OrderedDict.
-        """
-        if isinstance(dsp_config, str):
-            with open(dsp_config) as f:
-                dsp_config = json.load(f, object_pairs_hook=OrderedDict)
         
-        if not isinstance(dsp_config, OrderedDict):
-            print('Error, dsp_config must be an OrderedDict!')
-            exit()
-            
-        outputs, funcs, slist = [], [], []
-            
-        processors = dsp_config["processors"]
-        outputs = [key for key in processors]
         
-        for output in outputs:
-            function = [processors[output]["function"],
-                        processors[output]["module"]]
-            funcs.append(function)
-
-            settings = []
-            settings.append(processors[output]["args"])
-            if "kwargs" in processors[output]:
-                settings.append(processors[output]["kwargs"])
-
-            slist.append(settings)
-
-        for i in range(len(funcs)):
-            settings = slist[i]
-
-            if len(settings) == 1:
-                settings = slist[i]
-                module = importlib.import_module(funcs[i][1])
-                self.add_processor(getattr(module, funcs[i][0]), *settings[0])
-
-            elif len(slist[i]) == 2:
-                module = importlib.import_module(funcs[i][1])
-                self.add_processor(getattr(module, funcs[i][0]), 
-                                   *settings[0], **settings[1])
-
-
     def add_waveform(self, name, dtype, length):
         """Add named variable containing a waveform block with fixed type and length"""
         self.__add_variable(name, dtype, (self._block_width, length))
@@ -321,7 +275,7 @@ class ProcessingChain:
         proc_strs = []
         for i, arg in enumerate(args):
             if isinstance(arg, str):
-                proc_strs.append(re.search('(\w+)', arg).group(0))
+                proc_strs.append(arg)
             else:
                 proc_strs.append(str(params[i]))
         proc_strs = tuple(proc_strs)
@@ -383,7 +337,7 @@ class ProcessingChain:
             # check if it is a unit
             val = unit_parser.parse_unit(node.id)
             if val.is_valid():
-                return val
+                return convert(1, val, self._clk)
 
             #check if it is a variable
             val = self.__vars_dict.get(node.id, None)
@@ -394,17 +348,13 @@ class ProcessingChain:
             lhs = self.__parse_expr(node.left)
             rhs = self.__parse_expr(node.right)
             op = ast_ops_dict[type(node.op)]
-            if isinstance(lhs, np.ndarray) or isinstance(lhs, np.ndarray):
+            if isinstance(lhs, np.ndarray) or isinstance(rhs, np.ndarray):
                 if not isinstance(lhs, np.ndarray):
-                    if isinstance(lhs, unit):
-                        lhs = convert(1, lhs, self._clk)
                     if np.issubdtype(rhs.dtype, np.integer):
                         lhs = rhs.dtype.type(round(lhs))
                     else:
                         lhs = rhs.dtype.type(lhs)
                 if not isinstance(rhs, np.ndarray):
-                    if isinstance(rhs, unit):
-                        rhs = convert(1, rhs, self._clk)
                     if np.issubdtype(lhs.dtype, np.integer):
                         rhs = lhs.dtype.type(round(rhs))
                     else:
