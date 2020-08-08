@@ -10,6 +10,7 @@ from collections import OrderedDict
 from pygama import DataGroup
 from pygama.io.daq_to_raw import daq_to_raw
 from pygama.io.raw_to_dsp import raw_to_dsp
+from pygama.io.ch_group import *
 
 
 def main():
@@ -27,6 +28,7 @@ def main():
 
     # declare datagroup
     arg('--dg', action=st, help='load datagroup')
+    arg('--q', type=str, help='datagroup query')
 
     # routines
     arg('--d2r', action=st, help='run daq_to_raw')
@@ -34,7 +36,7 @@ def main():
 
     # options
     arg('-o', '--over', action=st, help='overwrite existing files')
-    arg('-n', '--nwfs', nargs='*', type=int, help='limit num. waveforms')
+    arg('-n', '--nwfs', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
 
     args = par.parse_args()
@@ -44,7 +46,7 @@ def main():
 
     # -- set options --
 
-    nwfs = args.nwfs[0] if args.nwfs is not None else np.inf
+    nwfs = args.nwfs if args.nwfs is not None else np.inf
 
     print('Processing settings:'
           '\n$LPGTA_DATA =', os.environ.get('LPGTA_DATA'),
@@ -53,14 +55,12 @@ def main():
           f'\n  limit wfs? {nwfs}')
 
     # -- run routines --
-    if args.dg:
-        dg = load_datagroup()
-
+    if args.dg: dg = load_datagroup(args.q)
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
 
 
-def load_datagroup():
+def load_datagroup(query=None):
     """
     """
     dg = DataGroup('LPGTA.json')
@@ -68,16 +68,70 @@ def load_datagroup():
     
     # NOTE: for now, we have to edit this line to choose which files to process
     # process one big cal file (64 GB)
-    que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    dg.file_keys.query(que, inplace=True)
+    #query = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
+    if query is not None: dg.file_keys.query(query, inplace=True)
     
     print('files to process:')
     print(dg.file_keys)
     
     # can add other filters here
-    dg.file_keys = dg.file_keys[:2]
+    #dg.file_keys = dg.file_keys[:2]
     
     return dg
+
+
+
+def cmap_to_ch_groups(cmap, sys_per_ged = False):
+    """
+    convert LEGEND-style json channel map in file $LEGEND_META/cmap into
+    pygama ch_groups dictionary parsable by daq_to_raw
+
+    each ged channel gets its own group
+
+    all spm channels are in the spms groups
+
+    all other channeles go in auxs for now
+
+    if sys_per_ged is True, every ged channel gets output to its own file
+    """
+    path = os.environ.get('LEGEND_META') + '/hardware/channelmaps/' + cmap
+    if not os.path.exists(path):
+        print("could not find channel map", cmap)
+        return {}
+    with open(path) as f:
+        cmap = json.load(f)
+
+    ch_groups = {}
+
+    for record in cmap.values():
+        adc = None
+        if 'trace' in record: adc = int(record['trace'])
+        elif 'adc' in record: adc = int(record['adc'])
+        if adc == None:
+            print("cmap", cmap, "- Couldn't find adc channel in record...")
+            print(record)
+
+        if record['type'] == 'ged': 
+            group = f'g{adc:0>3d}'
+            ch_groups[group] = {}
+            if sys_per_ged: ch_groups[group]['system'] = group
+            else: ch_groups[group]['system'] = 'geds'
+            ch_groups[group]['ch_list'] = [ adc ]
+
+        elif record['type'] == 'spm': 
+            if 'spms' not in ch_groups: 
+                ch_groups['spms'] = {}
+                ch_groups['spms']['system'] = 'spms'
+                ch_groups['spms']['ch_list'] = []
+            ch_groups['spms']['ch_list'].append(adc)
+
+        elif record['type'] == 'none': continue
+
+        else:
+            print("cmap", cmap, "- Unknown record type", record['type'], ": ADC = ", adc)
+            print(record)
+
+    return ch_groups
 
 
 def d2r(dg, overwrite=False, nwfs=None, vrb=False):
@@ -87,7 +141,6 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
     # print(dg.file_keys)
     # print(dg.file_keys.columns)
 
-    subs = dg.subsystems # can be blank: ['']
     # subs = ['geds'] # TODO: ignore other datastreams
     # chans = ['g035', 'g042'] # TODO: select a subset of detectors
 
@@ -95,11 +148,32 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
 
     for i, row in dg.file_keys.iterrows():
 
+        # set up I/O paths
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         subrun = row['cycle'] if 'cycle' in row else None
+        systems = dg.subsystems
 
-        daq_to_raw(f_daq, f_raw, config=dg.config, subsystems=subs, verbose=vrb,
+        # load cmap if there is one
+        if 'cmap' in row:
+            cmap = row['cmap'] 
+            if ('daq_to_raw' in dg.config and 
+                'ch_groups' in dg.config['daq_to_raw'] and
+                'FlashCamEventDecoder' in dg.config['daq_to_raw']['ch_groups']):
+                # we are going to overwrite the "default" in config with
+                # the cmap, so give a nice warnging
+                print('overwriting default ch_groups in config file with channel map info in', cmap)
+            else: 
+                if 'daq_to_raw' not in dg.config: 
+                    dg.config['daq_to_raw'] = {}
+                if 'ch_groups' not in dg.config['daq_to_raw']:
+                    dg.config['daq_to_raw']['ch_groups'] = {}
+            ch_groups = cmap_to_ch_groups(cmap)
+            dg.config['daq_to_raw']['ch_groups']['FlashCamEventDecoder'] = ch_groups
+            systems = get_list_of('system', ch_groups)
+            systems.append('auxs') # for FC status info
+        
+        daq_to_raw(f_daq, f_raw, config=dg.config, systems=systems, verbose=vrb,
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
 
 
