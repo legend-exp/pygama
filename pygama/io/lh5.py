@@ -46,6 +46,34 @@ def parse_datatype(datatype):
     else: return datatype, None, element_description.split(',')
 
 
+def load_nda(f_list, par_list, tb_in):
+    """
+    given a list of files, a list of LH5 table parameters, and the HDF5 path,
+    return a numpy array with all values for each parameter.
+    """
+    sto = Store()
+    par_data = {par : [] for par in par_list}
+    for f in f_list:
+        for par in par_list:
+            data = sto.read_object(f'{tb_in}/{par}', f)
+            par_data[par].append(data.nda)
+    par_data = {par : np.concatenate(par_data[par]) for par in par_list}
+    return par_data
+
+
+def load_dfs(f_list, par_list, tb_in):
+    """
+    given a list of files, a list of LH5 columns, and the HDF5 path,
+    return a pandas DataFrame with all values for each parameter.
+    """
+    sto = Store()
+    dfs = []
+    for f in f_list:
+        data = sto.read_object(f'{tb_in}', f)
+        dfs.append(data.get_dataframe())
+    return pd.concat(dfs)
+
+
 class Struct(dict):
     """A dictionary with an optional set of attributes.
 
