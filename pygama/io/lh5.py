@@ -85,6 +85,8 @@ class Table(Struct):
         self.size = int(size)
         self.loc = 0
 
+    def __len__(self):
+        return self.size
 
     def push_row(self):
         self.loc += 1
@@ -151,6 +153,8 @@ class Array:
                 print('dtype:', self.dtype)
         else: self.attrs['datatype'] = self.form_datatype()
 
+    def __len__(self):
+        return len(self.nda)
 
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
@@ -186,6 +190,8 @@ class ArrayOfEqualSizedArrays(Array):
         self.dims = dims
         super().__init__(*args, **kwargs)
 
+    def __len__(self):
+        return len(self.nda)
 
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
@@ -341,12 +347,17 @@ class Store:
         if datatype == 'table':
             # TODO: set the size and loc parameters
             col_dict = {}
+            size = None
             for field in elements:
-                col_dict[field] = self.read_object(name+'/'+field, 
-                                                   h5f, 
-                                                   start_row=start_row, 
-                                                   n_rows=n_rows)
-            return Table(col_dict=col_dict, attrs=h5f[name].attrs)
+                el = self.read_object(name+'/'+field, 
+                                      h5f, 
+                                      start_row=start_row, 
+                                      n_rows=n_rows)
+                col_dict[field] = el
+                if size is None: size = len(el)
+                elif size != len(el):
+                    print("Warning: column", field, "has a different length from the rest of the table")
+            return Table(size=size, col_dict=col_dict, attrs=h5f[name].attrs)
 
         # read out vector of vectors of different size
         if elements.startswith('array'):
