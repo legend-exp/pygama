@@ -3,6 +3,7 @@ import pygama.io.lh5 as lh5
 import pygama.dsp.units as units
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 class WaveformBrowser:
@@ -76,12 +77,18 @@ class WaveformBrowser:
         self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=1, block_width=block_width)
         self.current_chunk = None
         
+        self.fig = None
+        self.ax = None        
+    
+    def new_figure(self):
+        """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
-
-
     
     def draw_entry(self, entry, append=False):
         """Draw specified entry from file. If append is True, previously drawn entries will not be cleared from the current axis. Return the axis object"""
+        # Make figure/axis if needed
+        if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
+            self.new_figure()
         
         # Update the chunk as needed
         if entry//self.buffer_len != self.current_chunk:
@@ -150,13 +157,15 @@ class WaveformBrowser:
             handles.append(leg_handle)
             labels.append(legend_str)
             self.ax.legend(handles, labels, loc='upper left')
-    
+
+        self.fig.canvas.draw()
         return self.ax
 
     def draw_next(self, n_wfs = None):
         """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return the axis object"""
         # reset the axis
-        self.ax.clear()
+        if self.ax is not None:
+            self.ax.clear()
         self.labels = []
         if not n_wfs: n_wfs = self.n_wfs
 
@@ -178,8 +187,10 @@ class WaveformBrowser:
                 self.index_it = iter(range(0, len(self.lh5_in)))
             elif isinstance(self.selection, list) or isinstance(self.selection, tuple): # index list
                 self.index_it = iter(self.selection)
-            elif isinstance(self.selection, np.ndarray): # boolean mask
+            elif isinstance(self.selection, np.ndarray): # numpy boolean mask
                 self.index_it = iter(np.nonzero(self.selection)[0] )
+            elif isinstance(self.selection, pd.Series): # pandas series mask
+                self.index_it = iter(np.nonzero(self.selection.values)[0] )
             else:
                 raise Exception
         except:
