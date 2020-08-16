@@ -226,6 +226,8 @@ class VectorOfVectors:
                 print('form_datatype(): ', self.form_datatype())
         else: self.attrs['datatype'] = self.form_datatype()
 
+    def __len__(self):
+        return len(self.lensum_array)
 
     def form_datatype(self):
         et = get_lh5_element_type(self)
