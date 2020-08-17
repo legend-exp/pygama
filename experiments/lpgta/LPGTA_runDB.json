@@ -7,7 +7,7 @@
   "0024":{"dir":"run0024-baseline-test-new-head-new-daq", "cmap":"pgt-mar_channel-map.json"},
   "0023":{"dir":"run0023-baseline-test-new-head", "cmap":"pgt-mar_channel-map.json"},
   "0022":{"dir":"run0022-baseline-test-new-head", "cmap": "pgt-mar_channel-map.json"},
-  "0021":{"dir":"run0021-baseline-test-new-head", "cmap": "pgt_run0021.json"},
+  "0021":{"dir":"run0021-baseline-test-new-head", "cmap": "pgt-run0021_channel-map.json"},
   "0020":{"dir":"run0020-baseline-test-new-head", "cmap": "pgt-mar_channel-map.json"},
   "0019":{"dir":"run0019-baseline-test-new-head", "cmap": "pgt-mar_channel-map.json"},
   "0018":{"dir":"run0018-new-head-elec", "cmap": "pgt-mar_channel-map.json"},
