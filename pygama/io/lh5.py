@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import h5py
 import fnmatch
+import glob
 
 def get_lh5_datatype_name(obj):
     """Get the LH5 datatype name of an LH5 object"""
@@ -56,6 +57,7 @@ def load_nda(f_list, par_list, tb_in):
     for f in f_list:
         for par in par_list:
             data = sto.read_object(f'{tb_in}/{par}', f)
+            if not data: continue
             par_data[par].append(data.nda)
     par_data = {par : np.concatenate(par_data[par]) for par in par_list}
     return par_data
@@ -63,15 +65,14 @@ def load_nda(f_list, par_list, tb_in):
 
 def load_dfs(f_list, par_list, tb_in):
     """
-    given a list of files, a list of LH5 columns, and the HDF5 path,
-    return a pandas DataFrame with all values for each parameter.
+    given a list of files (can use wildcards), a list of LH5 columns, and the
+    HDF5 path, return a pandas DataFrame with all values for each parameter.
     """
-    sto = Store()
-    dfs = []
-    for f in f_list:
-        data = sto.read_object(f'{tb_in}', f)
-        dfs.append(data.get_dataframe())
-    return pd.concat(dfs)
+    if isinstance(f_list, str): f_list = [f_list]
+    # Expand wildcards
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(f_wc))]
+
+    return pd.DataFrame(load_nda(f_list, par_list, tb_in) )
 
 
 class Struct(dict):
@@ -113,6 +114,8 @@ class Table(Struct):
         self.size = int(size)
         self.loc = 0
 
+    def __len__(self):
+        return self.size
 
     def push_row(self):
         self.loc += 1
@@ -179,6 +182,8 @@ class Array:
                 print('dtype:', self.dtype)
         else: self.attrs['datatype'] = self.form_datatype()
 
+    def __len__(self):
+        return len(self.nda)
 
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
@@ -214,6 +219,8 @@ class ArrayOfEqualSizedArrays(Array):
         self.dims = dims
         super().__init__(*args, **kwargs)
 
+    def __len__(self):
+        return len(self.nda)
 
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
@@ -248,6 +255,8 @@ class VectorOfVectors:
                 print('form_datatype(): ', self.form_datatype())
         else: self.attrs['datatype'] = self.form_datatype()
 
+    def __len__(self):
+        return len(self.lensum_array)
 
     def form_datatype(self):
         et = get_lh5_element_type(self)
@@ -369,12 +378,17 @@ class Store:
         if datatype == 'table':
             # TODO: set the size and loc parameters
             col_dict = {}
+            size = None
             for field in elements:
-                col_dict[field] = self.read_object(name+'/'+field, 
-                                                   h5f, 
-                                                   start_row=start_row, 
-                                                   n_rows=n_rows)
-            return Table(col_dict=col_dict, attrs=h5f[name].attrs)
+                el = self.read_object(name+'/'+field, 
+                                      h5f, 
+                                      start_row=start_row, 
+                                      n_rows=n_rows)
+                col_dict[field] = el
+                if size is None: size = len(el)
+                elif size != len(el):
+                    print("Warning: column", field, "has a different length from the rest of the table")
+            return Table(size=size, col_dict=col_dict, attrs=h5f[name].attrs)
 
         # read out vector of vectors of different size
         if elements.startswith('array'):
