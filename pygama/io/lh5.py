@@ -6,13 +6,14 @@ import fnmatch
 
 def get_lh5_datatype_name(obj):
     """Get the LH5 datatype name of an LH5 object"""
-    if isinstance(obj, Table): return 'table'
-    if isinstance(obj, Struct): return 'struct'
+    if type(obj) == Table: return 'table'
+    if type(obj) == Struct: return 'struct'
+    if type(obj) == Scalar: return get_lh5_datatype_name(obj.value)
     if np.isscalar(obj): return get_lh5_element_type(obj)
-    if isinstance(obj, FixedSizeArray): return 'fixedsize_array'
-    if isinstance(obj, ArrayOfEqualSizedArrays): return 'array_of_equalsized_arrays'
-    if isinstance(obj, Array): return 'array'
-    if isinstance(obj, VectorOfVectors): return 'array'
+    if type(obj) == Array: return 'array'
+    if type(obj) == FixedSizeArray: return 'fixedsize_array'
+    if type(obj) == ArrayOfEqualSizedArrays: return 'array_of_equalsized_arrays'
+    if type(obj) == VectorOfVectors: return 'array'
     print('Cannot determine LH5 datatype name for object of type', type(obj).__name__)
     return None
 
@@ -80,10 +81,36 @@ class Struct(dict):
 class Table(Struct):
     """A special struct of array or subtable 'columns' of equal length."""
     # TODO: overload getattr to allow access to fields as object attributes?
-    def __init__(self, size=1024, col_dict={}, attrs={}):
+    def __init__(self, size=None, col_dict={}, attrs={}):
+        # if col_dict is not empty, its contents will be used directly in
+        # the Table (not copied)
         super().__init__(obj_dict=col_dict, attrs=attrs)
-        self.size = int(size)
+
+        # if col_dict is not empty, set size according to it
+        # if size is also supplied, resize all fields to match it
+        if len(col_dict) > 0: self.resize(size)
+
+        # if no col_dict, just set the size (default to 1024)
+        else: self.size = size if size is not None else 1024
+
+        # always start at loc=0
         self.loc = 0
+
+
+    def __len__(self):
+        return self.size
+
+
+    def resize(self, new_size = None, do_warn = False):
+        # if new_size = None, use the size from the first field
+        for field, obj in self.items():
+            if new_size is None: new_size = len(obj)
+            elif len(obj) != new_size:
+                if do_warn:
+                    print('warning: resizing field', field, 
+                          'with size', len(obj), '!=', new_size)
+                obj.resize(new_size)
+        self.size = new_size
 
 
     def push_row(self):
@@ -98,12 +125,15 @@ class Table(Struct):
         self.loc = 0
 
 
-    def add_field(self, name, obj):
-        if not isinstance(obj, Table) and not isinstance(obj, Array) and not isinstance(obj, VectorOfVectors):
+    def add_field(self, name, obj, use_obj_size=False, do_warn=True):
+        if not hasattr(obj, '__len__'):
             print('Table: Error: cannot add field of type', type(obj).__name__)
             return
-        # TODO: check length of obj and make sure it matches size; perhaps
-        # provide length override to for obj to be resized to self.size
+
+        # check / update sizes
+        new_size = len(obj) if use_obj_size else self.size
+        self.resize(new_size, do_warn)
+
         super().add_field(name, obj)
 
 
@@ -150,6 +180,15 @@ class Array:
                 print('form_datatype(): ', self.form_datatype())
                 print('dtype:', self.dtype)
         else: self.attrs['datatype'] = self.form_datatype()
+
+
+    def __len__(self):
+        return len(self.nda)
+
+
+    def resize(self, new_size):
+        new_shape = (new_size,) + self.nda.shape[1:]
+        self.nda.resize(new_shape)
 
 
     def form_datatype(self):
@@ -219,6 +258,14 @@ class VectorOfVectors:
                 print('datatype: ', self.attrs['datatype'])
                 print('form_datatype(): ', self.form_datatype())
         else: self.attrs['datatype'] = self.form_datatype()
+
+
+    def __len__(self):
+        return len(self.lensum_array)
+
+
+    def resize(self, new_size):
+        self.lensum_array.resize(new_size)
 
 
     def form_datatype(self):
@@ -303,9 +350,13 @@ class Store:
 
             
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
-        """Return an object and attributes for data at path=name in lh5_file
-
-        Set start_row, n_rows to read out a subset of the first data axis (when possible)
+        """
+        Returns tuple (obj, n_rows_read) for data at path=name in lh5_file
+        obj is an lh5 object. If obj_buf is provided, obj = obj_buf
+        Set start_row, n_rows to read out a subset of the first data axis (when possible).
+        When n_rows are requested but fewer are available, this will be
+        reflected in n_rows_read.
+        n_rows will be returned as '1' for objects that don't have rows.
         """
         #TODO: implement obj_buf. Ian's idea: add an iterator so one can do
         #      something like
@@ -315,61 +366,104 @@ class Store:
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
             print('Store:', name, "not in", lh5_file)
-            return None
+            return None, 0
 
         # get the datatype
         if 'datatype' not in h5f[name].attrs:
             print('Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
-            return None
+            return None, 0
         datatype = h5f[name].attrs['datatype']
         datatype, shape, elements = parse_datatype(datatype)
 
         # scalars are dim-0 datasets
         if datatype == 'scalar': 
+            if obj_buf is not None:
+                print("obj_buf not implemented for scalars.  Returning new object")
             if elements == 'bool':
-                return Scalar(value=np.bool(h5f[name][()]), attrs=h5f[name].attrs)
-            return Scalar(value=h5f[name][()], attrs=h5f[name].attrs)
+                return Scalar(value=np.bool(h5f[name][()]), attrs=h5f[name].attrs), 1
+            return Scalar(value=h5f[name][()], attrs=h5f[name].attrs), 1
 
         # recursively build a struct, return as a dictionary
         if datatype == 'struct':
+            if obj_buf is not None:
+                print("obj_buf not implemented for structs.  Returning new object")
             obj_dict = {}
             for field in elements:
                 obj_dict[field] = self.read_object(name+'/'+field, h5f, start_row, n_rows)
-            return Struct(obj_dict=obj_dict, attrs=h5f[name].attrs)
+            return Struct(obj_dict=obj_dict, attrs=h5f[name].attrs), 1
 
         # read a table into a dataframe
         if datatype == 'table':
-            # TODO: set the size and loc parameters
             col_dict = {}
+
+            # read out each of the fields
+            rows_read = []
             for field in elements:
-                col_dict[field] = self.read_object(name+'/'+field, 
-                                                   h5f, 
-                                                   start_row=start_row, 
-                                                   n_rows=n_rows)
-            return Table(col_dict=col_dict, attrs=h5f[name].attrs)
+                fld_buf = None
+                if obj_buf is not None:
+                    if not isinstance(obj_buf, Table) or field not in obj_buf:
+                        print("obj_buf for Table", name, 
+                              "not formatted correctly. returning new object")
+                        obj_buf = None
+                    else: 
+                        if n_rows is None: n_rows = len(obj_buf)
+                        fld_buf = obj_buf[name]
+                col_dict[field], n_rows_read = self.read_object(name+'/'+field, 
+                                                                h5f, 
+                                                                start_row=start_row, 
+                                                                n_rows=n_rows,
+                                                                obj_buf=fld_buf)
+                rows_read.append(n_rows_read)
+
+            # fields have been read out, now return a table
+            if obj_buf is None: 
+                return Table(col_dict=col_dict, attrs=h5f[name].attrs)
+            else:
+                # We have read all fields into the object buffer. Run
+                # checks: All columns should be the same size. So update
+                # table's size but warn if any mismatches are found
+                obj_buf.resize(do_warn=True)
+                #check attributes
+                if set(obj_buf.attrs.keys()) != set(h5f[name].attrs.keys):
+                    print('warning: attrs mismatch')
+                    print('obj_buf.attrs:', obj_buf.attrs)
+                    print('h5f['+name+'].attrs:', h5f[name].attrs)
+                return obj_buf
 
         # read out vector of vectors of different size
         if elements.startswith('array'):
-            if start_row == 0: 
-                lensum_array = self.read_object(name+'/cumulative_length', h5f, n_rows=n_rows)
-                da_start = 0
-            else:
-                lensum_array = self.read_object(name+'/cumulative_length', 
-                                                h5f, 
-                                                start_row=start_row-1, 
-                                                n_rows=n_rows+1)
-                da_start = lensum_array.nda[0]
-                lensum_array.nda = lensum_array.nda[1:]
+            if obj_buf is not None:
+                if not isinstance(obj_buf, VectorOfVectors):
+                    print("obj_buf for", name, "not a VectorOfVectors. returning new object")
+                    obj_buf = None
+                elif n_rows is None: n_rows = len(obj_buf)
+            lensum_buf = None if obj_buf is None else obj_buf.lensum_array
+            da_start = 0 if start_row == 0 else h5f[name+'/cumulative_length'][start_row-1]
+            lensum_array = self.read_object(name+'/cumulative_length', 
+                                            h5f, 
+                                            start_row=start_row, 
+                                            n_rows=n_rows,
+                                            obj_buf=lensum_buf)
             da_nrows = lensum_array.nda[-1] - da_start
+            da_buf = None if obj_buf is None else obj_buf.data_array
             data_array = self.read_object(name+'/flattened_data', 
                                           h5f, 
                                           start_row=da_start, 
-                                          n_rows=da_nrows)
-            return VectorOfVectors(data_array=data_array, lensum_array=lensum_array, attrs=h5f[name].attrs)
+                                          n_rows=da_nrows
+                                          obj_buf=da_buf)
+            if obj_buf is not None: return obj_buf
+            return VectorOfVectors(data_array=data_array, 
+                                   lensum_array=lensum_array, 
+                                   attrs=h5f[name].attrs)
 
 
         # read out all arrays by slicing
         if 'array' in datatype:
+            if obj_buf is not None:
+                if not isinstance(obj_buf, Array):
+                    print("obj_buf for", name, "not an Array. returning new object")
+                    obj_buf = None
+                elif n_rows is None: n_rows = len(obj_buf)
             ds_n_rows = h5f[name].shape[0]
             if n_rows is None or n_rows > ds_n_rows - start_row: 
                 n_rows = ds_n_rows - start_row
@@ -436,6 +530,7 @@ class Store:
                               start_row=start_row,
                               n_rows=n_rows,
                               append=append)
+            # now write data array. Only write rows with data.
             da_start = 0 if start_row == 0 else obj.lensum_array.nda[start_row-1]
             da_n_rows = obj.lensum_array.nda[n_rows-1] - da_start
             self.write_object(obj.data_array,
