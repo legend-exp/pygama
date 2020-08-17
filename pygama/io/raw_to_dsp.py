@@ -139,6 +139,8 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
             dsp_config = json.load(f)
+    elif dsp_config is None:
+        dsp_config = {'outputs':[], 'processors':{}}
     else:
         # We don't want to modify the input!
         dsp_config = deepcopy(dsp_config)
@@ -195,7 +197,14 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
         else:
             resolve_dependencies(out_par, proc_par_list, input_par_list)
             out_par_list.append(out_par)
-    proc_chain = ProcessingChain(block_width, verbosity = verbosity)
+
+    if verbosity>0:
+        print('Processing parameters:', str(proc_par_list))
+        print('Required input parameters:', str(input_par_list))
+        print('Copied output parameters:', str(copy_par_list))
+        print('Processed output parameters:', str(out_par_list))
+        
+    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:
@@ -255,11 +264,19 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
     # add inputs that are directly copied
     for copy_par in copy_par_list:
         buf_in = lh5_in.get(copy_par)
-        if buf_in is None:
-            print("I don't know what to do with " + input_par + ". Building output without it!")
-        elif isinstance(buf_in, lh5.Array):
-            print("Copying", copy_par, "to lh5_out")
+        if isinstance(buf_in, lh5.Array):
             lh5_out.add_field(copy_par, buf_in)
+        elif isinstance(buf_in, lh5.Table):
+            # check if this is waveform
+            if 't0' and 'dt' and 'values' in buf_in:
+                lh5_out.add_field(copy_par, buf_in['values'])
+                clk = buf_in['dt'].nda[0] * unit_parser.parse_unit(lh5_in['waveform']['dt'].attrs['units'])
+                if proc_chain._clk is not None and proc_chain._clk != clk:
+                    print("Somehow you managed to set multiple clock frequencies...Using " + str(proc_chain._clk))
+                else:
+                    proc_chain._clk = clk
+        else:
+            print("I don't know what to do with " + input_par + ". Building output without it!")
     
     # finally, add the output buffers to lh5_out and the proc chain
     for out_par in out_par_list:
