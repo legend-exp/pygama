@@ -162,22 +162,26 @@ class WaveformBrowser:
         return self.ax
 
     def draw_next(self, n_wfs = None):
-        """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return the axis object"""
+        """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return a list of waveform indices drawn and the axis object"""
         # reset the axis
         if self.ax is not None:
             self.ax.clear()
         self.labels = []
         if not n_wfs: n_wfs = self.n_wfs
 
+        wf_indices = []
+        
         # Draw wfs
         for _ in range(0, n_wfs):
+            i_wf = next(self.index_it)
+            wf_indices.append(i_wf)
             try:
-                self.draw_entry(next(self.index_it), True)
+                self.draw_entry(i_wf, True)
             except StopIteration:
                 self.eof = True
                 break
         
-        return self.ax
+        return wf_indices
             
     def reset(self):
         """ Reset to the start of the file for draw_next """
