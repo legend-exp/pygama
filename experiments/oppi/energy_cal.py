@@ -19,7 +19,6 @@ import pygama.analysis.peak_fitting as pf
 from pygama.io import lh5
 
 
-
 def main():
     
     par = argparse.ArgumentParser(description="pygama calibration suite")
@@ -80,10 +79,8 @@ def main():
     # find_peaks(hE, xE, var)
     par, perr, peaks = cal_input(hE, xE, var, energy, 2)#, test=True)
     # resolution(par, energy, peaks, paramDB, 2)
-    
-    
 
-
+    
 def get_data(files, groupname, e_param='trapE'):
     """
      loop over file list, access energy array from LH5, concat arrays together
@@ -113,19 +110,13 @@ def histo_data(array, elo, ehi, epb):
     """
     return histo array
     """
-    
-    hE, xE, var = ph.get_hist(array, range=[elo, ehi], dx=epb)
-
-
-    return hE, xE, var
+    return ph.get_hist(array, range=[elo, ehi], dx=epb)
 
 
 def find_peaks(hE, xE, var):
-    
     """
     run peakdet routine (use a JSON config file to set thresholds)
     """
-    
     maxes, mins = pu.peakdet(hE, 100, xE[1:])
     umaxes = np.array(sorted([x[0] for x in maxes]))
     print(f"{umaxes}")
@@ -147,21 +138,26 @@ def calibrate(histogram, peak_list, test_peaks, mode):
     return cal constants and covariance matrix,
     """
 
+
 def ratio_match():
     """
     mode of 'calibrate'
     find linear calibration by
     """
 
+
 def save_template():
     """
     after any calibration mode, save a calibrated histogram for this channel
     """
+
+
 def template_match(histogram, reference_histogram):
     """
     -- mode of 'calibrate'
     -- access a file with a reference histogram for this detector, and shift/scale histogram to minimize chi2
     """
+
 
 def cal_input(hE, xE, var, e_array, degree, test=False):
     """
@@ -310,6 +306,8 @@ def write_output():
     -- get cal constants, covariance matrix, results of peak search
     -- write to file
     """
+
+
 def init_guesses(e_cal_hist, xE, peaks, test=False):
     
     initial_guesses = []
@@ -394,8 +392,10 @@ def resolution(par, e_array, peaks, paramDB, degree):
 def line(x, a, b):
     return a*x + b
 
+
 def quadratic(x, a, b, c):
     return a*x**2 + b*x + c
+
 
 def gauss(x, *params):
     y = np.zeros_like(x)
@@ -406,6 +406,7 @@ def gauss(x, *params):
         y += a * np.exp(-(x - x0)**2 / (2 * sigma**2))
     y = y + params[-1]
     return y
+
     
 def simple_gauss(x, x0, a, sigma, b, const):
     return a * np.exp(-(x - x0)**2 / (2 * sigma**2)) + b*x + const

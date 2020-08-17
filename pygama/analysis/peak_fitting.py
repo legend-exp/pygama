@@ -208,23 +208,19 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
 
 
 def gauss_tail(x,mu, sigma, tail,tau):
-
     """
     A gaussian tail function template
     Can be used as a component of other fit functions
     """
-
     tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
     return tail_f
 
 
 def step(x, mu, sigma, bkg, a):
-
     """
     A step function template
     Can be used as a component of other fit functions
     """
-
     step_f = bkg + a * erfc((x-mu)/(np.sqrt(2)*sigma))
     return step_f
 
@@ -245,12 +241,10 @@ def gauss_step(x, a, mu, sigma, bkg, s, components=False):
 
 
 def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
-
     """
     I guess this should be similar to radford_peak (peak + tail + step)
     This is how I used it in root peak fitting scripts
     """ 
-
     peak_f = gauss(x,mu,sigma,a)                   #gauss
     tail_f = gauss_tail(x,mu,sigma,tail,tau)       #tail
     step_f = step(x,mu,sigma,bkg,s)                #step
@@ -263,9 +257,8 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
       return peak
 
 
-
-def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,components=False) :
-
+def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
+              components=False) :
     """
     A Fit function exclusevly for a 241Am 99keV and 103keV lines situation 
     Consists of 
@@ -290,8 +283,8 @@ def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,components
     else:
        return double_f
 
-def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
 
+def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation 
     Consists of 
@@ -316,7 +309,6 @@ def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
        return double_f
 
 
-
 def xtalball(x, mu, sigma, A, beta, m):
     """
     power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
@@ -328,7 +320,6 @@ def cal_slope(x, m1, m2):
     """
     Fit the calibration values
     """
-
     return np.sqrt(m1 +(m2/(x**2)))
 
 

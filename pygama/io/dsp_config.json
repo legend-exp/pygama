@@ -1,6 +1,6 @@
 {
   "outputs": [
-    "timestamp", "channel", "trapEmax", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr"
+    "timestamp", "channel", "trapEmax", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "zacE", "cuspE"
   ],
   "processors":{
     "bl, bl_sig":{
@@ -112,6 +112,38 @@
       "args":["A_10", "trapEmax", "AoE"],
       "unit": "1/sample",
       "prereqs": ["A_10", "trapEmax"]
+    },
+    "zac_wf": {
+      "function": "zac_filter",
+      "module": "pygama.dsp.processors",
+      "args": ["waveform", "zac_wf(101, f)"],
+      "init_args": ["len(waveform)", "3.5*us", "2.5*us", "72*us"],
+      "prereqs": ["waveform"],
+      "unit": "ADC"
+    },
+    "zacE": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["zac_wf", 1, "zacE"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["zac_wf"]
+    },
+    "cusp_wf": {
+      "function": "cusp_filter",
+      "module": "pygama.dsp.processors",
+      "args": ["waveform", "cusp_wf(101, f)"],
+      "init_args": ["len(waveform)", "10*us", "1*us", "200*us"],
+      "prereqs": ["waveform"],
+      "unit": "ADC"
+    },
+    "cuspE": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["cusp_wf", 1, "cuspE"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["cusp_wf"]
     }
   }
 }

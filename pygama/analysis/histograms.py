@@ -28,7 +28,7 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None, trim=False):
     if dx is not None:
         bins = int((range[1] - range[0]) / dx)
 
-    # bins includes left edge of first bin and right edge of last bin
+    # bins includes left edge of first bin and right edge of all other bins
     hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
 
     if wts is None and trim:

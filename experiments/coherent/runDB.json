@@ -1,12 +1,12 @@
 {
 
-  "loc_dir":"$DATADIR/NCSU",
-  "raw_dir":"$DATADIR/NCSU/data",
-  "tier1_dir":"$DATADIR/NCSU/tier1",
-  "tier2_dir":"$DATADIR/NCSU/tier2",
+  "loc_dir":"$DATADIR/coherent",
+  "raw_dir":"$DATADIR/coherent/data",
+  "tier1_dir":"$DATADIR/coherent/tier1",
+  "tier2_dir":"$DATADIR/coherent/tier2",
   "suffix":"",
 
-  "digitizer":"ORSIS3302Model",
+  "digitizer":"ORSIS3316Model",
   "daq":"ORCA",
 
   "t1_prefix":"t1_run",
@@ -27,7 +27,7 @@
       "daq_to_raw_options":{
         "daq":"ORCA",
         "clk" : 100e6,
-        "digitizer":"ORSIS3302DecoderForEnergy",
+        "digitizer":"ORSIS3316WaveformDecoder",
         "buffer_wrap":1,
         "window":"max",
         "n_samp":2000,
@@ -38,10 +38,7 @@
         "fit_bl" : {"ihi":600, "order":1},
         "blsub" : {},
         "pz" : {"decay":72},
-        "notch" : {"f_notch":30e6, "Q":1},
         "trap" : [
-            {"wfout":"wf_etrap", "wfin":"wf_notch", "rise":1.5, "flat":2.5, "decay":72},
-            {"wfout":"wf_ttrap", "wfin":"wf_notch", "rise":1, "flat":0, "fall":1},
             {"wfout":"wf_pztrap", "wfin":"wf_pz", "rise":1.5, "flat":2.5, "decay":72}
         ],
         "current" : [
@@ -49,13 +46,11 @@
         ],
         "get_max" : [
             {"wfin":"wf_current"},
-            {"wfin":"wf_blsub"}
+            {"wfin":"wf_pztrap"},
+            {"wfin":"wf_pz"}
         ],
-        "timepoint" : {"wfin":"wf_blsub", "pct":[5,90,100]},
-        "peakdet" : [
-            {"delta":0.5, "sigma":5, "ihi":600}
-        ],
-        "num_peaks" : {}
+        "timepoint" : {"wfin":"wf_pz", "pct":[5,50,90,100]},
+        "dcr" : {"wfin":"wf_pz"}
       }
     }
   }
