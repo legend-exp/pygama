@@ -501,7 +501,9 @@ class Store:
                                                          start_row=start_row, 
                                                          n_rows=n_rows,
                                                          obj_buf=lensum_buf)
-            da_start = 0 if start_row == 0 else h5f[name+'/cumulative_length'][start_row-1]
+            da_start = 0
+            if start_row > 0 and n_rows_read > 0: 
+                da_start = h5f[name+'/cumulative_length'][start_row-1]
             da_nrows = lensum_array.nda[n_rows_read-1] - da_start if n_rows_read > 0 else 0
             da_buf = None 
             if obj_buf is not None:
@@ -546,6 +548,7 @@ class Store:
                 else: nda = h5f[name][start_row:start_row+n_rows]
             if elements == 'bool': nda = nda.astype(np.bool)
             attrs=h5f[name].attrs
+            if n_rows < 0: n_rows = 0
             if obj_buf is None:
                 if datatype == 'array': 
                     return Array(nda=nda, attrs=attrs), n_rows
