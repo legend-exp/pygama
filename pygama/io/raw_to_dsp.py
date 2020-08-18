@@ -60,7 +60,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         print('Processing table: ', tb)
 
         # load primary table
-        data_raw = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
+        data_raw, n_rows_read = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
         pc, tb_out = build_processing_chain(data_raw, dsp_config, verbosity=verbose)
         
         print(f'Processing table: {tb} ...')
