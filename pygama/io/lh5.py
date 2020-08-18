@@ -117,7 +117,10 @@ class Table(Struct):
 
         # if col_dict is not empty, set size according to it
         # if size is also supplied, resize all fields to match it
-        if len(col_dict) > 0: self.resize(size)
+        # otherwise, warn if the supplied fields have varying size
+        if len(col_dict) > 0: 
+            do_warn = True if size is None else False
+            self.resize(new_size=size, do_warn=do_warn)
 
         # if no col_dict, just set the size (default to 1024)
         else: self.size = size if size is not None else 1024
@@ -125,8 +128,6 @@ class Table(Struct):
         # always start at loc=0
         self.loc = 0
 
-    def __len__(self):
-        return self.size
 
     def __len__(self):
         return self.size
@@ -160,12 +161,12 @@ class Table(Struct):
         if not hasattr(obj, '__len__'):
             print('Table: Error: cannot add field of type', type(obj).__name__)
             return
+        super().add_field(name, obj)
 
         # check / update sizes
-        new_size = len(obj) if use_obj_size else self.size
-        self.resize(new_size, do_warn)
-
-        super().add_field(name, obj)
+        if self.size != len(obj):
+            new_size = len(obj) if use_obj_size else self.size
+            self.resize(new_size, do_warn)
 
 
     def get_dataframe(self, *cols, copy=False):
@@ -212,8 +213,6 @@ class Array:
                 print('dtype:', self.dtype)
         else: self.attrs['datatype'] = self.form_datatype()
 
-    def __len__(self):
-        return len(self.nda)
 
     def __len__(self):
         return len(self.nda)
@@ -258,8 +257,10 @@ class ArrayOfEqualSizedArrays(Array):
         self.dims = dims
         super().__init__(*args, **kwargs)
 
+
     def __len__(self):
         return len(self.nda)
+
 
     def form_datatype(self):
         dt = get_lh5_datatype_name(self)
@@ -294,8 +295,6 @@ class VectorOfVectors:
                 print('form_datatype(): ', self.form_datatype())
         else: self.attrs['datatype'] = self.form_datatype()
 
-    def __len__(self):
-        return len(self.lensum_array)
 
     def __len__(self):
         return len(self.lensum_array)
@@ -386,6 +385,17 @@ class Store:
             return ret
 
             
+    def get_buffer(self, name, lh5_file, size=None):
+        """
+        Returns an lh5 object appropriate for use as a pre-allocated buffer
+        in a read loop. Sets size to size if object has a size.
+        """
+        obj, n_rows = self.read_object(name, lh5_file, n_rows=0)
+        if hasattr(obj, 'resize') and size is not None: obj.resize(new_size=size)
+        return obj
+
+
+
     def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
         """
         Returns tuple (obj, n_rows_read) for data at path=name in lh5_file
@@ -444,28 +454,39 @@ class Store:
                         obj_buf = None
                     else: 
                         if n_rows is None: n_rows = len(obj_buf)
-                        fld_buf = obj_buf[name]
+                        fld_buf = obj_buf[field]
                 col_dict[field], n_rows_read = self.read_object(name+'/'+field, 
                                                                 h5f, 
                                                                 start_row=start_row, 
                                                                 n_rows=n_rows,
                                                                 obj_buf=fld_buf)
                 rows_read.append(n_rows_read)
+            # warn if all columns don't read in the same number of rows
+            n_rows_read = rows_read[0]
+            for n in rows_read[1:]:
+                if n != n_rows_read:
+                    print('table', name, 'got strange n_rows_read', n)
+                    print(n_rows_read, 'was expected')
 
             # fields have been read out, now return a table
             if obj_buf is None: 
-                return Table(col_dict=col_dict, attrs=h5f[name].attrs)
+                table = Table(col_dict=col_dict, attrs=h5f[name].attrs)
+                # set (write) loc to end of tree
+                table.loc = n_rows_read
+                return table, n_rows_read
             else:
                 # We have read all fields into the object buffer. Run
                 # checks: All columns should be the same size. So update
-                # table's size but warn if any mismatches are found
+                # table's size as necessary, warn if any mismatches are found
                 obj_buf.resize(do_warn=True)
+                # set (write) loc to end of tree
+                obj_buf.loc = n_rows_read
                 #check attributes
-                if set(obj_buf.attrs.keys()) != set(h5f[name].attrs.keys):
+                if set(obj_buf.attrs.keys()) != set(h5f[name].attrs.keys()):
                     print('warning: attrs mismatch')
                     print('obj_buf.attrs:', obj_buf.attrs)
                     print('h5f['+name+'].attrs:', h5f[name].attrs)
-                return obj_buf
+                return obj_buf, n_rows_read
 
         # read out vector of vectors of different size
         if elements.startswith('array'):
@@ -475,23 +496,27 @@ class Store:
                     obj_buf = None
                 elif n_rows is None: n_rows = len(obj_buf)
             lensum_buf = None if obj_buf is None else obj_buf.lensum_array
+            lensum_array, n_rows_read = self.read_object(name+'/cumulative_length', 
+                                                         h5f, 
+                                                         start_row=start_row, 
+                                                         n_rows=n_rows,
+                                                         obj_buf=lensum_buf)
             da_start = 0 if start_row == 0 else h5f[name+'/cumulative_length'][start_row-1]
-            lensum_array = self.read_object(name+'/cumulative_length', 
-                                            h5f, 
-                                            start_row=start_row, 
-                                            n_rows=n_rows,
-                                            obj_buf=lensum_buf)
-            da_nrows = lensum_array.nda[-1] - da_start
-            da_buf = None if obj_buf is None else obj_buf.data_array
-            data_array = self.read_object(name+'/flattened_data', 
-                                          h5f, 
-                                          start_row=da_start, 
-                                          n_rows=da_nrows
-                                          obj_buf=da_buf)
-            if obj_buf is not None: return obj_buf
+            da_nrows = lensum_array.nda[n_rows_read-1] - da_start if n_rows_read > 0 else 0
+            da_buf = None 
+            if obj_buf is not None:
+                da_buf = obj_buf.data_array
+                # grow da_buf if necessary to hold the data
+                if len(da_buf) < da_nrows: da_buf.resize(da_nrows)
+            data_array, dummy_rows_read = self.read_object(name+'/flattened_data', 
+                                                           h5f, 
+                                                           start_row=da_start, 
+                                                           n_rows=da_nrows,
+                                                           obj_buf=da_buf)
+            if obj_buf is not None: return obj_buf, n_rows_read
             return VectorOfVectors(data_array=data_array, 
                                    lensum_array=lensum_array, 
-                                   attrs=h5f[name].attrs)
+                                   attrs=h5f[name].attrs), n_rows_read
 
 
         # read out all arrays by slicing
@@ -501,18 +526,42 @@ class Store:
                     print("obj_buf for", name, "not an Array. returning new object")
                     obj_buf = None
                 elif n_rows is None: n_rows = len(obj_buf)
+
+            # compute the number of rows to read
             ds_n_rows = h5f[name].shape[0]
             if n_rows is None or n_rows > ds_n_rows - start_row: 
                 n_rows = ds_n_rows - start_row
-            nda = h5f[name][start_row:start_row+n_rows]
+
+            nda = None
+            if obj_buf is not None:
+                nda = obj_buf.nda
+                if n_rows > 0:
+                    h5f[name].read_direct(nda, 
+                                          np.s_[start_row:start_row+n_rows], 
+                                          np.s_[0:n_rows])
+            else: 
+                if n_rows == 0: 
+                    tmp_shape = (0,) + h5f[name].shape[1:]
+                    nda = np.empty(tmp_shape, h5f[name].dtype)
+                else: nda = h5f[name][start_row:start_row+n_rows]
             if elements == 'bool': nda = nda.astype(np.bool)
             attrs=h5f[name].attrs
-            if datatype == 'array': 
-                return Array(nda=nda, attrs=attrs)
-            if datatype == 'fixedsize_array': 
-                return FixedSizeArray(nda=nda, attrs=attrs)
-            if datatype == 'array_of_equalsized_arrays': 
-                return ArrayOfEqualSizedArrays(nda=nda, dims=shape, attrs=attrs)
+            if obj_buf is None:
+                if datatype == 'array': 
+                    return Array(nda=nda, attrs=attrs), n_rows
+                if datatype == 'fixedsize_array': 
+                    return FixedSizeArray(nda=nda, attrs=attrs), n_rows
+                if datatype == 'array_of_equalsized_arrays': 
+                    return ArrayOfEqualSizedArrays(nda=nda, 
+                                                   dims=shape, 
+                                                   attrs=attrs), n_rows
+            else:
+                if set(obj_buf.attrs.keys()) != set(attrs.keys()):
+                    print('warning: attrs mismatch')
+                    print('obj_buf.attrs:', obj_buf.attrs)
+                    print('h5f['+name+'].attrs:', attrs)
+                return obj_buf, n_rows
+
 
         print('Store: don\'t know how to read datatype', datatype)
         return None
