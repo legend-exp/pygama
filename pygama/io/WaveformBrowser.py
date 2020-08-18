@@ -41,9 +41,9 @@ class WaveformBrowser:
         self.lh5_file = file_in
         self.lh5_group = lh5_group
         #self.buffer_len = buffer_len
-        #self.lh5_in = self.lh5_st.read_object(self.lh5_group, self.lh5_file, 0, self.buffer_len)
+        #self.lh5_in, n_rows_read = self.lh5_st.read_object(self.lh5_group, self.lh5_file, 0, self.buffer_len)
         # When chunked reading is ready use the previous two uncommented lines
-        self.lh5_in = self.lh5_st.read_object(self.lh5_group, self.lh5_file)
+        self.lh5_in, n_rows_read = self.lh5_st.read_object(self.lh5_group, self.lh5_file)
         self.buffer_len = len(self.lh5_in)
 
         # initialize stuff for iteration
