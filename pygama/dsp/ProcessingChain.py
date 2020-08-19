@@ -288,9 +288,10 @@ class ProcessingChain:
         return None
 
 
-    def execute(self):
+    def execute(self, start=0, end=None):
         """Execute the dsp chain on the entire input/output buffers"""
-        for begin in range(0, self._buffer_len, self._block_width):
+        if end is None: end = self._buffer_len
+        for begin in range(start, end, self._block_width):
             self.execute_block(begin)
 
 
