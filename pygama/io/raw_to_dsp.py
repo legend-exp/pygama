@@ -10,15 +10,14 @@ from collections import OrderedDict
 from pprint import pprint
 import re
 import importlib
-import git
 import argparse
 from copy import deepcopy
 
-import pygama
+from pygama import __version__ as pygama_version
 from pygama.dsp.ProcessingChain import ProcessingChain
 from pygama.dsp.units import *
 from pygama.io import lh5
-
+from pygama.utils import update_progress+import pygama.git as git
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
                n_max=np.inf, overwrite=True, buffer_len=8):
@@ -76,10 +75,10 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
     dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
     dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
     dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
-    repo = git.Repo.init(pygama.__path__[0] + '/..')
-    dsp_info.add_field('pygama_branch', lh5.Scalar(str(repo.active_branch)))
-    dsp_info.add_field('pygama_commit', lh5.Scalar(repo.head.object.hexsha))
+    dsp_info.add_field('pygama_version', lh5.Scalar(pygama_version))
+    dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
+    dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
+    dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
     dsp_info.add_field('dsp_config', lh5.Scalar(json.dumps(dsp_config, indent=2)))
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
 

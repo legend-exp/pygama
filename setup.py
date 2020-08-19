@@ -8,11 +8,11 @@ import subprocess
 
 from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
+from setuptools.command.egg_info import egg_info
 from setuptools.command.build_ext import build_ext
 from setuptools.command.test import test as TestCommand
 from shutil import copyfile, copymode
-
-
+            
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         Extension.__init__(self, name, sources=[])
@@ -21,6 +21,19 @@ class CMakeExtension(Extension):
 
 class CMakeBuild(build_ext):
     def run(self):
+        # update the submodule
+        print("Updating git submodules...")
+        import git
+        repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+        repo.git.submodule('update', '--init', '--recursive')
+
+        # create git commit data file
+        print("Creating pygama/git.py")
+        with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
+            f.write("branch = '" + str(repo.active_branch) + "'\n")
+            f.write("revision = '" + repo.head.commit.hexsha +"'\n")
+            f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+        
         try:
             out = subprocess.check_output(['cmake', '--version'])
         except OSError:
@@ -33,15 +46,11 @@ class CMakeBuild(build_ext):
                                          out.decode()).group(1))
             if cmake_version < '3.1.0':
                 raise RuntimeError("CMake >= 3.1.0 is required on Windows")
-
+            
         for ext in self.extensions:
             self.build_extension(ext)
 
     def build_extension(self, ext):
-        import git
-        repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
-        repo.git.submodule('update', '--init', '--recursive')
-
         extdir = os.path.abspath(
             os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
@@ -71,8 +80,7 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
-
-
+            
 setup(
     name='pygama',
     version='0.2',
@@ -90,7 +98,7 @@ setup(
         'pyFFTW'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
-    ext_modules=[CMakeExtension('pygama/cygama')],
+    #ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild),
     zip_safe=False,
 )
