@@ -57,7 +57,7 @@ def load_nda(f_list, par_list, tb_in):
     par_data = {par : [] for par in par_list}
     for f in f_list:
         for par in par_list:
-            data = sto.read_object(f'{tb_in}/{par}', f)
+            data, _ = sto.read_object(f'{tb_in}/{par}', f)
             if not data: continue
             par_data[par].append(data.nda)
     par_data = {par : np.concatenate(par_data[par]) for par in par_list}
@@ -436,7 +436,7 @@ class Store:
                 print("obj_buf not implemented for structs.  Returning new object")
             obj_dict = {}
             for field in elements:
-                obj_dict[field] = self.read_object(name+'/'+field, h5f, start_row, n_rows)
+                obj_dict[field], _ = self.read_object(name+'/'+field, h5f, start_row, n_rows)
             return Struct(obj_dict=obj_dict, attrs=h5f[name].attrs), 1
 
         # read a table into a dataframe
