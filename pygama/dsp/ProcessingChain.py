@@ -422,6 +422,9 @@ class ProcessingChain:
                     return var.shape[1]
                 else:
                     raise ValueError("len(): " + node.args[0].id + "has wrong number of dims")
+            elif func=="round" and len(node.args)==1:
+                var = self.__parse_expr(node.args[0])
+                return int(round(var))
             # if this is a valid call to construct a new array, do so; otherwise raise an exception
             else:
                 if len(node.args)==2:

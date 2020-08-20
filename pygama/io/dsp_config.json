@@ -49,7 +49,7 @@
     "tp_0": {
       "function": "time_point_thresh",
       "module": "pygama.dsp.processors",
-      "args": ["wf_atrap[0:300]", 0, "tp_0"],
+      "args": ["wf_atrap[0:30*us]", 0, "tp_0"],
       "unit": "ns",
       "prereqs": ["wf_atrap"]
      },
@@ -125,21 +125,21 @@
       "unit": "ADC",
       "prereqs": ["wf_triangle"]
     },
-    "curr": {
+    "curr10": {
       "comment": "3rd argument allocates memory for a derivative of type float",
       "function": "avg_current",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", 10, "curr(len(wf_pz)-10, f)"],
+      "args": ["wf_pz", 10, "curr10(len(wf_pz)-10, f)"],
       "unit": "ADC/sample",
       "prereqs": ["wf_pz"]
     },
     "A_10": {
       "function": "amax",
       "module": "numpy",
-      "args": ["curr", 1, "A_10"],
+      "args": ["curr10", 1, "A_10"],
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
       "unit": "ADC",
-      "prereqs": ["curr"]
+      "prereqs": ["curr10"]
     },
     "AoE": {
       "function": "divide",
@@ -180,6 +180,29 @@
       "unit": "ADC",
       "prereqs": ["cusp_wf"]
     },
+    "curr": {
+      "function": "avg_current",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz", 1, "curr(len(wf_pz)-1, f)"],
+      "unit": "ADC/sample",
+      "prereqs": ["wf_pz"]
+    },
+    "curr_psd": {
+      "function": "psd",
+      "module": "pygama.dsp.processors",
+      "args": ["curr", "curr_psd"],
+      "init_args": ["curr", "curr_psd(len(curr)//2+1, f)"],
+      "unit": "",
+      "prereqs": ["curr"]
+    },
+    "hf_max": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["curr_psd[round(10*mhz*len(curr)):]", 1, "hf_max"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "",
+      "prereqs": ["curr_psd"]
+    },
     "power_spect": {
       "function": "psd",
       "module": "pygama.dsp.processors",
@@ -188,5 +211,6 @@
       "unit": "MHz",
       "prereqs": ["wf_blsub"]
     }
+    
   }
 }
