@@ -10,9 +10,11 @@ from distutils.version import LooseVersion
 from setuptools import setup, Extension, find_packages
 from setuptools.command.egg_info import egg_info
 from setuptools.command.build_ext import build_ext
+from setuptools.command.build_py import build_py
+from setuptools.command.develop import develop
 from setuptools.command.test import test as TestCommand
 from shutil import copyfile, copymode
-            
+
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
         Extension.__init__(self, name, sources=[])
@@ -26,13 +28,6 @@ class CMakeBuild(build_ext):
         import git
         repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
         repo.git.submodule('update', '--init', '--recursive')
-
-        # create git commit data file
-        print("Creating pygama/git.py")
-        with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
-            f.write("branch = '" + str(repo.active_branch) + "'\n")
-            f.write("revision = '" + repo.head.commit.hexsha +"'\n")
-            f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
         
         try:
             out = subprocess.check_output(['cmake', '--version'])
@@ -80,7 +75,29 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
-            
+
+
+def make_git_file():
+    print("Creating pygama/git.py")
+    import git
+    repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+    with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
+        f.write("branch = '" + str(repo.active_branch) + "'\n")
+        f.write("revision = '" + repo.head.commit.hexsha +"'\n")
+        f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+
+# run during installation; this is when files get copied to build dir
+class PygamaBuild(build_py):
+    def run(self):
+        make_git_file()
+        build_py.run(self)
+
+# run during local installation; in this case build_py isn't run...
+class PygamaDev(develop):
+    def run(self):
+        make_git_file()
+        develop.run(self)
+
 setup(
     name='pygama',
     version='0.2',
@@ -99,6 +116,6 @@ setup(
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     #ext_modules=[CMakeExtension('pygama/cygama')],
-    cmdclass=dict(build_ext=CMakeBuild),
+    cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
     zip_safe=False,
 )
