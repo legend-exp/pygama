@@ -153,13 +153,13 @@ class WaveformBrowser:
         
         # lines
         for par_name in self.lines:
-            unit = self.lh5_out[par_name].attrs['units']
             try: # if unit is time, do vline
+                unit = self.lh5_out[par_name].attrs['units']
                 dt = units.convert(1, units.unit_parser.parse_unit(unit), self.x_unit)
                 x = self.lh5_out[par_name].nda[index]*dt - ref_time
                 self.ax.axvline(x)
                 
-            except units.InvalidConversion: # else do hline
+            except: # else do hline
                 dt = None
                 y = self.lh5_out[par_name].nda[index]/norm
                 self.ax.axhline(y)
@@ -170,7 +170,7 @@ class WaveformBrowser:
             for par_name in self.legend:
                 if legend_str!='':
                     legend_str += ', '
-                legend_str += "{} = {:.4g} {}".format(par_name, self.lh5_out[par_name].nda[index], self.lh5_out[par_name].attrs['units'])
+                legend_str += "{} = {:.4g} {}".format(par_name, self.lh5_out[par_name].nda[index], self.lh5_out[par_name].attrs.get('units', ''))
 
             if self.ax.legend_:
                 handles = self.ax.legend_.legendHandles
