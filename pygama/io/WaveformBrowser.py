@@ -19,8 +19,8 @@ class WaveformBrowser:
     def __init__(self, files_in, lh5_group, dsp_config = None,
                  n_drawn = 1, x_unit = 'ns', x_lim=None,
                  waveforms = 'waveform', lines = None,
-                 legend = None, norm = None, align=None,
-                 selection = None, buffer_len = 128, block_width = 8):
+                 legend = None, norm = None, align=None, selection = None,
+                 buffer_len = 128, block_width = 8, verbosity=1):
         """Constructor for WaveformBrowser:
         - file_in: name of file or list of names to browse. Can use wildcards
         - lh5_group: name of LH5 group in file to browse
@@ -37,6 +37,8 @@ class WaveformBrowser:
         - buffer_len (default 128): number of waveforms to keep in memory at a time
         - block_width (default 8): block width for processing chain
         """
+        self.verbosity = verbosity
+
         # data i/o initialization
         self.lh5_st = lh5.Store(keep_open=True)
         if isinstance(files_in, str): files_in = [files_in]
@@ -83,7 +85,7 @@ class WaveformBrowser:
 
         # make processing chain and output buffer
         outputs = self.waveforms + self.lines + self.legend + ([self.norm_par] if self.norm_par is not None else []) + ([self.align_par] if self.align_par is not None else [])
-        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=1, block_width=block_width)
+        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=self.verbosity, block_width=block_width)
         
         self.fig = None
         self.ax = None        
@@ -129,15 +131,22 @@ class WaveformBrowser:
             self.ax.clear()
             self.labels = []
             
-        self.ax.set_xlabel('Time ('+str(self.x_unit)+')')
+        self.ax.set_xlabel(self.x_unit.label)
+        self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
 
         #waveforms
         for wf_name in self.waveforms:
             y = self.lh5_out[wf_name].nda[index]/norm
-            dt = units.convert(1, self.proc_chain._clk, self.x_unit)
-            x = np.linspace(-ref_time, len(y)*dt-ref_time, len(y), 'f')
+            if self.x_unit.derivation == self.proc_chain._clk.derivation:
+                # this is a WF
+                dt = units.convert(1, self.proc_chain._clk, self.x_unit)
+                x = np.linspace(-ref_time, len(y)*dt-ref_time, len(y), 'f')
+            elif self.x_unit.derivation == (1/self.proc_chain._clk).derivation:
+                # this is a FT
+                f_nyq = units.convert(1, 0.5/self.proc_chain._clk, self.x_unit)
+                x = np.linspace(0, f_nyq, len(y), 'f')
             wf_line, = self.ax.plot(x, y, '-')
             if leg_handle is None:
                 leg_handle = wf_line

@@ -119,8 +119,8 @@ def psd(buf_in, buf_out):
     sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
     
     @guvectorize([typesig], sizesig, forceobj=True)
-    def dft(wf_in, psd_out):
+    def psd(wf_in, psd_out):
         dft_fun(wf_in, buf_dft)
         np.abs(buf_dft, psd_out)
     
-    return dft
+    return psd

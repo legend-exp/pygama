@@ -49,15 +49,50 @@
     "tp_0": {
       "function": "time_point_thresh",
       "module": "pygama.dsp.processors",
-      "args": ["wf_atrap[0:2000]", 0, "tp_0"],
+      "args": ["wf_atrap[0:300]", 0, "tp_0"],
       "unit": "ns",
       "prereqs": ["wf_atrap"]
+     },
+    "tp_95": {
+      "function": "time_point_frac",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", 0.95, "tp_max", "tp_95"],
+      "unit": "ns",
+      "prereqs": ["wf_blsub", "tp_max"]
+     },
+    "tp_80": {
+      "function": "time_point_frac",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", 0.8, "tp_max", "tp_80"],
+      "unit": "ns",
+      "prereqs": ["wf_blsub", "tp_max"]
+     },
+    "tp_50": {
+      "function": "time_point_frac",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", 0.5, "tp_max", "tp_50"],
+      "unit": "ns",
+      "prereqs": ["wf_blsub", "tp_max"]
+     },
+    "tp_20": {
+      "function": "time_point_frac",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", 0.2, "tp_max", "tp_20"],
+      "unit": "ns",
+      "prereqs": ["wf_blsub", "tp_max"]
+     },
+    "tp_05": {
+      "function": "time_point_frac",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", 0.05, "tp_max", "tp_05"],
+      "unit": "ns",
+      "prereqs": ["wf_blsub", "tp_max"]
      },
      "trapEftp": {
        "function": "fixed_time_pickoff",
        "module": "pygama.dsp.processors",
        "args": ["wf_trap", "tp_0+(5*us+9*us)", "trapEftp"],
-       "unit": "ns",
+       "unit": "ADC",
        "prereqs": ["wf_trap", "tp_0"]
      },
      "dcr_raw": {
@@ -144,6 +179,14 @@
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
       "unit": "ADC",
       "prereqs": ["cusp_wf"]
+    },
+    "power_spect": {
+      "function": "psd",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", "power_spect"],
+      "init_args": ["wf_blsub", "power_spect(len(wf_blsub)//2+1, f)"],
+      "unit": "MHz",
+      "prereqs": ["wf_blsub"]
     }
   }
 }

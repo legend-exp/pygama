@@ -10,7 +10,8 @@ from scimath.units.unit import unit
 from pygama.dsp.units import *
 
 ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
-                ast.Div: np.divide, ast.USub: np.negative}
+                ast.Div: np.divide, ast.FloorDiv: np.floor_divide,
+                ast.USub: np.negative}
 
 
 class ProcessingChain:
