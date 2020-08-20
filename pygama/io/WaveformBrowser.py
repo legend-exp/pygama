@@ -2,7 +2,7 @@ from pygama.io.raw_to_dsp import build_processing_chain
 import pygama.io.lh5 as lh5
 import pygama.dsp.units as units
 
-import glob
+import glob, os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -44,7 +44,7 @@ class WaveformBrowser:
         if isinstance(files_in, str): files_in = [files_in]
         
         # Expand wildcards and map out the files
-        self.lh5_files = [f for f_wc in files_in for f in sorted(glob.glob(f_wc))]
+        self.lh5_files = [f for f_wc in files_in for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
         self.lh5_group = lh5_group
         # file map is cumulative lenght of files up to file n. By doing searchsorted left, we can get the file for a given wf index
         self.file_map = np.array([self.lh5_st.read_n_rows(lh5_group, f) for f in self.lh5_files], 'int64')

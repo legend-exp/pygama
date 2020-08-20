@@ -71,7 +71,7 @@ def load_dfs(f_list, par_list, tb_in):
     """
     if isinstance(f_list, str): f_list = [f_list]
     # Expand wildcards
-    f_list = [f for f_wc in f_list for f in sorted(glob.glob(f_wc))]
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
 
     return pd.DataFrame(load_nda(f_list, par_list, tb_in) )
 
