@@ -46,12 +46,20 @@
       "prereqs": ["wf_pz"],
       "unit": "ADC"
     },
+    "tp_max": {
+      "function": "argmax",
+      "module": "numpy",
+      "args": ["wf_blsub", 1, "tp_max"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->i"]},
+      "unit": "ns",
+      "prereqs": ["wf_blsub"]
+    },
     "tp_0": {
       "function": "time_point_thresh",
       "module": "pygama.dsp.processors",
-      "args": ["wf_atrap[0:30*us]", 0, "tp_0"],
+      "args": ["wf_atrap", 0, "tp_max", "tp_0"],
       "unit": "ns",
-      "prereqs": ["wf_atrap"]
+      "prereqs": ["wf_atrap", "tp_max"]
      },
     "tp_95": {
       "function": "time_point_frac",

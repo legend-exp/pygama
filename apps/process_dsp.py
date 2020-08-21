@@ -83,7 +83,7 @@ for group in groups:
     proc.add_processor(time_point_frac, "wf_blsub", 0.5, "t_max", "tp_50")
     proc.add_processor(time_point_frac, "wf_blsub", 0.2, "t_max", "tp_20")
     proc.add_processor(time_point_frac, "wf_blsub", 0.05, "t_max", "tp_05")
-    proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
+    proc.add_processor(time_point_thresh, "wf_atrap", 0, "t_max", "tp_0")
 
     # Energy calculation
     proc.add_processor(np.amax, "wf_trap", 1, "trapEmax", signature='(n),()->()', types=['fi->f'])
