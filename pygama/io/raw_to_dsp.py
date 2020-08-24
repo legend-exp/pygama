@@ -351,5 +351,4 @@ json config file and raw_to_dsp.""")
     if out is None:
         out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
 
-    print(args.group, args.outpar)
     raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)
