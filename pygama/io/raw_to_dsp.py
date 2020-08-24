@@ -10,18 +10,19 @@ from collections import OrderedDict
 from pprint import pprint
 import re
 import importlib
-import git
 import argparse
 from copy import deepcopy
 
-import pygama
+from pygama import __version__ as pygama_version
 from pygama.dsp.ProcessingChain import ProcessingChain
 from pygama.dsp.units import *
 from pygama.io import lh5
-
+from pygama.utils import update_progress
+import pygama.git as git
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
-               n_max=np.inf, overwrite=True, buffer_len=8):
+               outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200, 
+               block_width=8):
     """
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
@@ -56,18 +57,31 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         if 'raw' not in tb:
             lh5_tables.remove(tb)
 
+    # delete the old file. TODO: ONCE BUGS ARE FIXED IN LH5 MODULE, DO THIS ONLY IF OVERWRITE IS TRUE!
+    try:
+        os.remove(f_dsp)
+        print("Deleted", f_dsp)
+    except:
+        pass
+    
     for tb in lh5_tables:
-        print('Processing table: ', tb)
-
-        # load primary table
-        data_raw, n_rows_read = raw_store.read_object(tb, f_raw, start_row=0, n_rows=n_max)
-        pc, tb_out = build_processing_chain(data_raw, dsp_config, verbosity=verbose)
+        # load primary table and build processing chain and output table
+        tot_n_rows = raw_store.read_n_rows(tb, f_raw)
+        if n_max and n_max<tot_n_rows: tot_n_rows=n_max
+        
+        lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, 0, buffer_len)
+        pc, tb_out = build_processing_chain(lh5_in, dsp_config, outputs, verbose, block_width)
         
         print(f'Processing table: {tb} ...')
-        pc.execute()
-        
+        for start_row in range(0, tot_n_rows, buffer_len):
+            update_progress(start_row/tot_n_rows)
+            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, obj_buf=lh5_in)
+            n_rows = min(tot_n_rows-start_row, n_rows)
+            pc.execute(0, n_rows)
+            raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
+            
+        update_progress(1)
         print(f'Done.  Writing to file ...')
-        raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp)
 
     # write processing metadata
     dsp_info = lh5.Struct()
@@ -76,10 +90,10 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
     dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
     dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
     dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
-    repo = git.Repo.init(pygama.__path__[0] + '/..')
-    dsp_info.add_field('pygama_branch', lh5.Scalar(str(repo.active_branch)))
-    dsp_info.add_field('pygama_commit', lh5.Scalar(repo.head.object.hexsha))
+    dsp_info.add_field('pygama_version', lh5.Scalar(pygama_version))
+    dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
+    dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
+    dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
     dsp_info.add_field('dsp_config', lh5.Scalar(json.dumps(dsp_config, indent=2)))
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
 
@@ -308,7 +322,7 @@ json config file and raw_to_dsp.""")
     arg('-o', '--output',
         help="Name of output file. By default, output to ./t2_[input file name].")
     
-    arg('-v', '--verbose', default=2, type=int,
+    arg('-v', '--verbose', default=1, type=int,
         help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
     
     arg('-b', '--block', default=8, type=int,
@@ -318,7 +332,7 @@ json config file and raw_to_dsp.""")
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
     arg('-n', '--nevents', default=None, type=int,
         help="Number of waveforms to process. By default do the whole file")
-    arg('-g', '--group', default='',
+    arg('-g', '--group', default=None, action='append', type=str,
         help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
     defaultconfig = os.path.dirname(os.path.realpath(__loader__.get_filename())) + '/dsp_config.json'
     arg('-j', '--jsonconfig', default=defaultconfig, type=str,
@@ -336,5 +350,6 @@ json config file and raw_to_dsp.""")
     out = args.output
     if out is None:
         out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
-    
-    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=None, verbose=args.verbose, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.block)
+
+    print(args.group, args.outpar)
+    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)

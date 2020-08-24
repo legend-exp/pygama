@@ -23,3 +23,4 @@ from ._processors.linear_fit import linear_fit
 from ._processors.zac_filter import zac_filter
 from ._processors.param_lookup import param_lookup
 from ._processors.cusp_filter import cusp_filter
+from ._processors.fftw import dft, inv_dft, psd

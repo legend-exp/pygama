@@ -57,7 +57,7 @@ def load_nda(f_list, par_list, tb_in):
     par_data = {par : [] for par in par_list}
     for f in f_list:
         for par in par_list:
-            data = sto.read_object(f'{tb_in}/{par}', f)
+            data, _ = sto.read_object(f'{tb_in}/{par}', f)
             if not data: continue
             par_data[par].append(data.nda)
     par_data = {par : np.concatenate(par_data[par]) for par in par_list}
@@ -71,7 +71,7 @@ def load_dfs(f_list, par_list, tb_in):
     """
     if isinstance(f_list, str): f_list = [f_list]
     # Expand wildcards
-    f_list = [f for f_wc in f_list for f in sorted(glob.glob(f_wc))]
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
 
     return pd.DataFrame(load_nda(f_list, par_list, tb_in) )
 
@@ -436,7 +436,7 @@ class Store:
                 print("obj_buf not implemented for structs.  Returning new object")
             obj_dict = {}
             for field in elements:
-                obj_dict[field] = self.read_object(name+'/'+field, h5f, start_row, n_rows)
+                obj_dict[field], _ = self.read_object(name+'/'+field, h5f, start_row, n_rows)
             return Struct(obj_dict=obj_dict, attrs=h5f[name].attrs), 1
 
         # read a table into a dataframe
@@ -658,3 +658,53 @@ class Store:
         else:
             print('Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
+        
+    def read_n_rows(self, name, lh5_file):
+        """Look up the number of rows in an Array-like object called name
+        in lh5_file. Return None if it is a scalar/struct."""
+        # this is basically a stripped down version of read_object
+        h5f = self.gimme_file(lh5_file, 'r')
+        if name not in h5f:
+            print('Store:', name, "not in", lh5_file)
+            return None
+
+        # get the datatype
+        if 'datatype' not in h5f[name].attrs:
+            print('Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
+            return None, 0
+        datatype = h5f[name].attrs['datatype']
+        datatype, shape, elements = parse_datatype(datatype)
+
+        # scalars are dim-0 datasets
+        if datatype == 'scalar': 
+            return None
+
+        # recursively build a struct, return as a dictionary
+        if datatype == 'struct':
+            return None
+        
+        # read a table into a dataframe
+        if datatype == 'table':
+            # read out each of the fields
+            rows_read = None
+            for field in elements:
+                fld_buf = None
+                n_rows_read = self.read_n_rows(name+'/'+field, h5f)
+                if not rows_read: rows_read = n_rows_read
+                elif rows_read != n_rows_read:
+                    print('table', name, 'got strange n_rows_read', n)
+                    print(n_rows_read, 'was expected')
+            return rows_read
+        
+        # read out vector of vectors of different size
+        if elements.startswith('array'):
+            lensum_buf = None
+            return self.read_n_rows(name+'/cumulative_length', h5f)
+        
+        # read out all arrays by slicing
+        if 'array' in datatype:
+            # compute the number of rows to read
+            return h5f[name].shape[0]
+
+        print('Store: don\'t know how to read datatype', datatype)
+        return None

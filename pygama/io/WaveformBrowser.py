@@ -2,6 +2,7 @@ from pygama.io.raw_to_dsp import build_processing_chain
 import pygama.io.lh5 as lh5
 import pygama.dsp.units as units
 
+import glob, os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,13 +16,13 @@ class WaveformBrowser:
     parameters, and filling a legend with calculated parameters.
     """
 
-    def __init__(self, file_in, lh5_group, dsp_config = None,
+    def __init__(self, files_in, lh5_group, dsp_config = None,
                  n_drawn = 1, x_unit = 'ns', x_lim=None,
                  waveforms = 'waveform', lines = None,
-                 legend = None, norm = None, align=None,
-                 selection = None, buffer_len = 128, block_width = 8):
+                 legend = None, norm = None, align=None, selection = None,
+                 buffer_len = 128, block_width = 8, verbosity=1):
         """Constructor for WaveformBrowser:
-        - file_in: name of LH5 file to browse
+        - file_in: name of file or list of names to browse. Can use wildcards
         - lh5_group: name of LH5 group in file to browse
         - dsp_config (optional): name of DSP config json file containing transforms available to draw
         - n_drawn (default 1): number of events to draw simultaneously when calling DrawNext
@@ -36,21 +37,31 @@ class WaveformBrowser:
         - buffer_len (default 128): number of waveforms to keep in memory at a time
         - block_width (default 8): block width for processing chain
         """
+        self.verbosity = verbosity
+
         # data i/o initialization
         self.lh5_st = lh5.Store(keep_open=True)
-        self.lh5_file = file_in
+        if isinstance(files_in, str): files_in = [files_in]
+        
+        # Expand wildcards and map out the files
+        self.lh5_files = [f for f_wc in files_in for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
         self.lh5_group = lh5_group
-        #self.buffer_len = buffer_len
-        #self.lh5_in, n_rows_read = self.lh5_st.read_object(self.lh5_group, self.lh5_file, 0, self.buffer_len)
-        # When chunked reading is ready use the previous two uncommented lines
-        self.lh5_in, n_rows_read = self.lh5_st.read_object(self.lh5_group, self.lh5_file)
-        self.buffer_len = len(self.lh5_in)
+        # file map is cumulative lenght of files up to file n. By doing searchsorted left, we can get the file for a given wf index
+        self.file_map = np.array([self.lh5_st.read_n_rows(lh5_group, f) for f in self.lh5_files], 'int64')
+        np.cumsum(self.file_map, out=self.file_map)
+
+        # Get the input buffer and read the first chunk
+        self.lh5_in = self.lh5_st.get_buffer(self.lh5_group, self.lh5_files[0], buffer_len)
+        self.lh5_st.read_object(self.lh5_group, self.lh5_files[0], 0, buffer_len, self.lh5_in)
+        self.buffer_len = buffer_len
+        self.current_file = None
+        self.current_chunk = None
 
         # initialize stuff for iteration
         self.selection = selection
         self.index_it = None
         self.reset()
-        self.n_wfs = n_drawn
+        self.n_drawn = n_drawn
 
         # initialize list of objects to draw
         if isinstance(waveforms, str): self.waveforms = [waveforms]
@@ -74,8 +85,7 @@ class WaveformBrowser:
 
         # make processing chain and output buffer
         outputs = self.waveforms + self.lines + self.legend + ([self.norm_par] if self.norm_par is not None else []) + ([self.align_par] if self.align_par is not None else [])
-        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=1, block_width=block_width)
-        self.current_chunk = None
+        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=self.verbosity, block_width=block_width)
         
         self.fig = None
         self.ax = None        
@@ -89,15 +99,22 @@ class WaveformBrowser:
         # Make figure/axis if needed
         if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
             self.new_figure()
+
+        # figure out which file we are reading from and the chunk/index within the file, using the file map
+        file_no = np.searchsorted(self.file_map, entry, 'left')
+        if file_no>len(self.lh5_files):
+            raise IndexError
+        # get chunk and index within this chunk
+        file_beg = self.file_map[file_no-1] if file_no>0 else 0
+        chunk, index = divmod(entry - file_beg, self.buffer_len)
         
         # Update the chunk as needed
-        if entry//self.buffer_len != self.current_chunk:
-            self.current_chunk = entry//self.buffer_len
-            self.lh5_st.read_object(self.lh5_group, self.lh5_file, start_row = self.current_chunk*self.buffer_len, obj_buf = self.lh5_in)
-            self.proc_chain.execute()
+        if file_no != self.current_file or chunk != self.current_chunk:
+            self.current_chunk = chunk
+            self.current_file = file_no
+            self.lh5_in, n_read = self.lh5_st.read_object(self.lh5_group, self.lh5_files[file_no], start_row = chunk*self.buffer_len, obj_buf = self.lh5_in)
+            self.proc_chain.execute(0, n_read)
             
-        # get index within this chunk
-        index = entry%self.buffer_len
 
         # get scaling factor/time shift if used
         norm = self.lh5_out[self.norm_par].nda[index] if self.norm_par is not None else 1.
@@ -114,28 +131,35 @@ class WaveformBrowser:
             self.ax.clear()
             self.labels = []
             
-        self.ax.set_xlabel('Time ('+str(self.x_unit)+')')
+        self.ax.set_xlabel(self.x_unit.label)
+        self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
 
         #waveforms
         for wf_name in self.waveforms:
             y = self.lh5_out[wf_name].nda[index]/norm
-            dt = units.convert(1, self.proc_chain._clk, self.x_unit)
-            x = np.linspace(-ref_time, len(y)*dt-ref_time, len(y), 'f')
+            if self.x_unit.derivation == self.proc_chain._clk.derivation:
+                # this is a WF
+                dt = units.convert(1, self.proc_chain._clk, self.x_unit)
+                x = np.linspace(-ref_time, len(y)*dt-ref_time, len(y), 'f')
+            elif self.x_unit.derivation == (1/self.proc_chain._clk).derivation:
+                # this is a FT
+                f_nyq = units.convert(1, 0.5/self.proc_chain._clk, self.x_unit)
+                x = np.linspace(0, f_nyq, len(y), 'f')
             wf_line, = self.ax.plot(x, y, '-')
             if leg_handle is None:
                 leg_handle = wf_line
         
         # lines
         for par_name in self.lines:
-            unit = self.lh5_out[par_name].attrs['units']
             try: # if unit is time, do vline
+                unit = self.lh5_out[par_name].attrs['units']
                 dt = units.convert(1, units.unit_parser.parse_unit(unit), self.x_unit)
                 x = self.lh5_out[par_name].nda[index]*dt - ref_time
                 self.ax.axvline(x)
                 
-            except units.InvalidConversion: # else do hline
+            except: # else do hline
                 dt = None
                 y = self.lh5_out[par_name].nda[index]/norm
                 self.ax.axhline(y)
@@ -146,7 +170,7 @@ class WaveformBrowser:
             for par_name in self.legend:
                 if legend_str!='':
                     legend_str += ', '
-                legend_str += "{} = {:.4g} {}".format(par_name, self.lh5_out[par_name].nda[index], self.lh5_out[par_name].attrs['units'])
+                legend_str += "{} = {:.4g} {}".format(par_name, self.lh5_out[par_name].nda[index], self.lh5_out[par_name].attrs.get('units', ''))
 
             if self.ax.legend_:
                 handles = self.ax.legend_.legendHandles
@@ -167,7 +191,7 @@ class WaveformBrowser:
         if self.ax is not None:
             self.ax.clear()
         self.labels = []
-        if not n_wfs: n_wfs = self.n_wfs
+        if not n_wfs: n_wfs = self.n_drawn
 
         wf_indices = []
         
@@ -188,7 +212,7 @@ class WaveformBrowser:
         self.eof = False
         try:
             if self.selection is None:
-                self.index_it = iter(range(0, len(self.lh5_in)))
+                self.index_it = iter(range(0, self.file_map[-1]))
             elif isinstance(self.selection, list) or isinstance(self.selection, tuple): # index list
                 self.index_it = iter(self.selection)
             elif isinstance(self.selection, np.ndarray): # numpy boolean mask
@@ -198,7 +222,7 @@ class WaveformBrowser:
             else:
                 raise Exception
         except:
-            print("Not sure what to do with selection", self.selection)
+            print("Not sure what to do with selection", self.selection, "("+str(self.selection.__class__)+")")
         
     def __iter__(self):
         self.reset()
