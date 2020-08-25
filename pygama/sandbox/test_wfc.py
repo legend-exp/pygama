@@ -10,7 +10,7 @@ def main():
         print('Start compression')
         tic = time.time()
         length = nda_to_vect(nda, flattened_data, cumulative_length)
-        flattened_data = flattened_data[:length].copy()
+        flattened_data = np.resize(flattened_data,length)
 
 
         print('Cumulative_length: ',cumulative_length)
@@ -18,8 +18,6 @@ def main():
         print('Done!')
         elapsedTime = time.time()-tic
         inputsize = sys.getsizeof(nda)*1e-6
-        outputsize = sys.getsizeof(flattened_data)*1e-6
-        print('Compression Ratio: %.2f'%(inputsize/outputsize))
         print('Compression rate: %.2f Mb per sec'%(inputsize/elapsedTime))
 
         arr = empty(flattened_data, cumulative_length)
