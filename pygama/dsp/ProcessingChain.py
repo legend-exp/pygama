@@ -10,7 +10,8 @@ from scimath.units.unit import unit
 from pygama.dsp.units import *
 
 ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
-                ast.Div: np.divide, ast.USub: np.negative}
+                ast.Div: np.divide, ast.FloorDiv: np.floor_divide,
+                ast.USub: np.negative}
 
 
 class ProcessingChain:
@@ -288,9 +289,10 @@ class ProcessingChain:
         return None
 
 
-    def execute(self):
+    def execute(self, start=0, end=None):
         """Execute the dsp chain on the entire input/output buffers"""
-        for begin in range(0, self._buffer_len, self._block_width):
+        if end is None: end = self._buffer_len
+        for begin in range(start, end, self._block_width):
             self.execute_block(begin)
 
 
@@ -420,6 +422,9 @@ class ProcessingChain:
                     return var.shape[1]
                 else:
                     raise ValueError("len(): " + node.args[0].id + "has wrong number of dims")
+            elif func=="round" and len(node.args)==1:
+                var = self.__parse_expr(node.args[0])
+                return int(round(var))
             # if this is a valid call to construct a new array, do so; otherwise raise an exception
             else:
                 if len(node.args)==2:

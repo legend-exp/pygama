@@ -229,7 +229,8 @@ def process_ds(f_grid, f_opt, f_tier1, case):
                 rise, flat, rc = row
                 proc.add_processor(trap_norm, "wf_pz", rise*us, flat*us, f"wf_trap_{i}")
                 proc.add_processor(asymTrapFilter, "wf_pz", rise*us, flat*us, rc*us, "wf_atrap")
-                proc.add_processor(time_point_thresh, "wf_atrap[0:2000]", 0, "tp_0")
+                proc.add_processor(np.argmax, "wf_atrap", 1, "tp_max", ignature='(n),()->()', types=['fi->i']
+                proc.add_processor(time_point_thresh, "wf_atrap", 0, "tp_max", "tp_0")
                 proc.add_processor(np.amax, f"wf_trap_{i}", 1, f"trapEmax_{i}", signature='(n),()->()', types=['fi->f'])
                 proc.add_processor(fixed_time_pickoff, f"wf_trap_{i}", "tp_0+(5*us+9*us)", f"trapEftp_{i}")
                 proc.add_processor(trap_pickoff, "wf_pz", 1.5*us, 0, "tp_0", "ct_corr")
