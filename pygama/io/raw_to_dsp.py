@@ -74,13 +74,15 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         
         print(f'Processing table: {tb} ...')
         for start_row in range(0, tot_n_rows, buffer_len):
-            update_progress(start_row/tot_n_rows)
+            if verbose > 0:
+                update_progress(start_row/tot_n_rows)
             lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, obj_buf=lh5_in)
             n_rows = min(tot_n_rows-start_row, n_rows)
             pc.execute(0, n_rows)
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
             
-        update_progress(1)
+        if verbose > 0:
+            update_progress(1)
         print(f'Done.  Writing to file ...')
 
     # write processing metadata

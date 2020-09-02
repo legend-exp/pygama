@@ -1,6 +1,6 @@
 {
   "outputs": [
-    "timestamp", "channel", "trapEmax", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr"
+    "timestamp", "channel", "energy", "trapEmax", "trapEftp", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "tp_max"
   ],
   "processors":{
     "bl, bl_sig":{
