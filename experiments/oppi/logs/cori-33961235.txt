@@ -1,51 +1,0 @@
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-tput: No value for $TERM and no -T specified
-Job Start:
-Tue Sep  1 16:11:09 PDT 2020
-Node(s):  nid12791
-Job ID:  33961235
-Loading file key list from: ./fileDB.h5
-   run  cycle                     daq_file  runtype   startTime
-0    0   2019  2020-6-11-BackgroundRun2019  oppi_v2  1591914293
-Files: 1
-Processing settings:
-  overwrite? True
-  limit wfs? inf
-Processing 1 files ...
-Starting daq_to_raw processing.
-  Buffer size: 8096
-  Max num. events: inf
-  Cycle (subrun) num: 2019
-  Input: /global/cfs/cdirs/m2676/data/cage/STC/Data//2020/06/Data/2020-6-11-BackgroundRun2019
-  Output:
-{'': '/global/cfs/cdirs/m2676/data/cage/STC_LH5//raw/oppi_run0_cyc2019_raw.lh5'}
-note, remove decoder input option
-Total file size: 1061.043 MB
-Run number: 2019
-Beginning daq-to-raw processing ...
-Done. Last packet ID: 64601
-WARNING, Found the following unknown data IDs:
-  5: ORRunDecoderForRun
-hopefully they weren't important!
-
-Wrote RAW File:
-    /global/cfs/cdirs/m2676/data/cage/STC_LH5//raw/oppi_run0_cyc2019_raw.lh5
-FILE INFO:
-Time elapsed: 69.67 sec
-File size: 1.062 GB
-Conversion speed: 15.249 MBps
-  Output file: /global/cfs/cdirs/m2676/data/cage/STC_LH5//raw/oppi_run0_cyc2019_raw.lh5
-Done.
-
-Processing table: ORSIS3302DecoderForEnergy/raw ...
-Progress : [--------------------] 0.0% Progress : [#-------------------] 5.0% Progress : [##------------------] 9.9% Progress : [###-----------------] 14.9% Progress : [####----------------] 19.8% Progress : [#####---------------] 24.8% Progress : [######--------------] 29.7% Progress : [#######-------------] 34.7% Progress : [########------------] 39.6% Progress : [#########-----------] 44.6% Progress : [##########----------] 49.6% Progress : [###########---------] 54.5% Progress : [############--------] 59.5% Progress : [#############-------] 64.4% Progress : [##############------] 69.4% Progress : [###############-----] 74.3% Progress : [################----] 79.3% Progress : [#################---] 84.2% Progress : [##################--] 89.2% Progress : [###################-] 94.2% Progress : [####################] 99.1% Progress : [####################] 100.0% Done...
-Done.  Writing to file ...
-Done processing.  Time elapsed: 0.89 min.
-Job Complete:
-Tue Sep  1 16:13:31 PDT 2020
