@@ -213,7 +213,10 @@ class ProcessingChain:
         dims_list = re.findall("\((.*?)\)", signature)
         dims_dict = {}
         outerdims = []
+        # print('\nsetting param:', params[-1])
+        # print('dims list is:', dims_list)
         for ipar, dims in enumerate(dims_list):
+            # print(ipar, dims, params[ipar])
             if not isinstance(params[ipar], np.ndarray):
                 continue
 
