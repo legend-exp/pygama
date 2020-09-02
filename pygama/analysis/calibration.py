@@ -1,5 +1,6 @@
 """
 routines for automatic calibration.
+- peakdet (useful to find maxima in an array without taking derivative)
 - get_most_prominent_peaks (find by looking for spikes in spectrum derivative)
 - match_peaks (identify peaks based on ratios between known gamma energies)
 - calibrate_tl208 (main routine -- fits multiple peaks w/ Radford peak shape)
@@ -15,6 +16,49 @@ from scipy.signal import argrelextrema, medfilt, find_peaks_cwt
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import norm
 import scipy.optimize as op
+
+
+def peakdet(v, delta, x):
+    """
+    Converted from MATLAB script at: http://billauer.co.il/peakdet.html
+    Returns two arrays: [maxtab, mintab] = peakdet(v, delta, x)
+    An updated (vectorized) version is in pygama.dsp.transforms.peakdet
+    """
+    maxtab, mintab = [], []
+
+    # sanity checks
+    x, v = np.asarray(x), np.asarray(v)
+    if len(v) != len(x): exit("Input vectors v and x must have same length")
+    if not np.isscalar(delta): exit("Input argument delta must be a scalar")
+    if delta <= 0: exit("Input argument delta must be positive")
+
+    maxes, mins = [], []
+    min, max = np.inf, -np.inf
+    find_max = True
+    for i in range(len(x)):
+
+        # for i=0, all 4 of these get set
+        if v[i] > max:
+            max, imax = v[i], x[i]
+        if v[i] < min:
+            min, imin = v[i], x[i]
+
+        if find_max:
+            # if the sample is less than the current max,
+            # declare the previous one a maximum, then set this as the new "min"
+            if v[i] < max - delta:
+                maxes.append((imax, max))
+                min, imin = v[i], x[i]
+                find_max = False
+        else:
+            # if the sample is more than the current min,
+            # declare the previous one a minimum, then set this as the new "max"
+            if v[i] > min + delta:
+                mins.append((imin, min))
+                max, imax = v[i], x[i]
+                find_max = True
+
+    return np.array(maxes), np.array(mins)
 
 
 def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
@@ -286,6 +330,5 @@ def get_calibration_energies(cal_type):
         #                 dtype="double")
         return np.array([239, 911, 1460, 1764, 2615],
                         dtype="double")
-
     else:
         raise ValueError

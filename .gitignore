@@ -7,6 +7,10 @@
 *.root
 *.h5
 *.lh5
+*~
+*.csv
+
+pygama/git.py
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files

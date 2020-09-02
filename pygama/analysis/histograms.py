@@ -9,7 +9,7 @@ import pygama.utils as pgu
 from pylab import rcParams
 
 
-def get_hist(np_arr, bins=None, range=None, dx=None, wts=None, trim=True):
+def get_hist(np_arr, bins=None, range=None, dx=None, wts=None, trim=False):
     """
     Wrapper for numpy.histogram, with optional weights for each element.
     Note: there are no overflow / underflow bins.
@@ -28,7 +28,7 @@ def get_hist(np_arr, bins=None, range=None, dx=None, wts=None, trim=True):
     if dx is not None:
         bins = int((range[1] - range[0]) / dx)
 
-    # bins includes left edge of first bin and right edge of last bin
+    # bins includes left edge of first bin and right edge of all other bins
     hist, bins = np.histogram(np_arr, bins=bins, range=range, weights=wts)
 
     if wts is None and trim:
@@ -71,7 +71,8 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
     plot a step histogram, with optional error bars
     """
     if var is None:
-        plt.step(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), where="post")
+        # the concat calls get the steps to draw correctly at the range boundaries
+        plt.step(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), where="post", **kwargs)
     else:
         plt.errorbar(get_bin_centers(bins), hist,
                      xerr=get_bin_widths(bins) / 2, yerr=np.sqrt(var),

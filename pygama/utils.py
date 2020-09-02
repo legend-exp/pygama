@@ -5,6 +5,16 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+class SafeDict(dict):
+    """
+    used in handling LEGEND file format strings.
+    when a key is missing, return the string value of that key.
+    """
+    def __missing__(self, key):
+        return '{' + key + '}'
+
+
 def get_dataset_from_cmdline(args, run_db, cal_db):
     """
     make it easier to call this from argparse:

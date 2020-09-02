@@ -1,0 +1,19 @@
+{
+    "0":["2019-2027", "initial oppi runs.  see uwmjlab elog 562"],
+    "1":["2028-2038", "2020/06/12 bkg runs, elog 562"],
+    "2":["2039-2099", "2020/06/13 Kr runs, elog 564"],
+    "3":["2100-2111", "2020/06/23 low-e pulser scan 1, elog 566"],
+    "4":["2112-2114", "2020/06/23 133Ba calibration 1, elog 566"],
+    "5":["2115-2123", "2020/06/23 background runs, elog 566"],
+    "6":["2124-2136", "2020/06/25 after rebias. low-e pulser scan 2, elog 566"],
+    "7":["2137-2140", "2020/06/25 133Ba calibration 2, elog 566"],
+    "8":["2141-2146", "2020/06/25 background runs, elog 566"],
+    "9":["2147-2209", "2020/06/25-6 Krypton runs, elog 566"],
+    "10":["2210-2221", "2020/06/26 low-e pulser scan 3, elog 566"],
+    "11":["2222-2224", "2020/06/26 133Ba calibration 3, elog 566"],
+    "12":["2225-2279", "2020/06/26 background runs, elog 566"],
+    "13":["2280-2331", "2020/06/27 Krypton runs, elog 566"],
+    "14":["2332-2334", "2020/06/28 133Ba calibration 4, elog 566"],
+    "15":["2335-2347", "2020/06/28 low-e pulser scan 4, elog 566"],
+    "16":["2348-2360", "2020/06/28 background runs (vac valve open), elog 566"]
+}

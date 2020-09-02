@@ -1,0 +1,19 @@
+{
+  "experiment" : "CAGE",
+  "runDB" : "./CAGE_runDB.json",
+  "fileDB" : "./CAGE_fileDB.csv",
+  
+  "daq" : "ORCA",
+  "daq_dir" : "/global/cfs/cdirs/legend/data/cage/Data",
+  "daq_ignore" : [".log",".DS_Store"],
+  "lh5_dir" : "/global/cfs/cdirs/legend/data/cage/LH5",
+  
+  "tier_dirs" : ["raw","dsp","hit"],
+  "subsystems" : [""],
+  "run_types" : ["oppi","icpc"],
+  "evt_dirs" : [""],
+  
+  "unique_key" : "cage-cyc{cycle}-{YYYY}{mm}{dd}",
+  "daq_template" : "{YYYY}-{mm}-{dd}-CAGERun{cycle}",
+  "lh5_template" : "cage_run{run}_cyc{cycle}_{tier}.lh5"
+}

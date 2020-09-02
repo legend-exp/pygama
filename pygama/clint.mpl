@@ -37,6 +37,12 @@ ytick.minor.visible  : True
 #font.family : Optima
 
 # --- this one is still distinct but should be more widely usable
-font.family : Courier New
-font.weight : bold
-axes.labelweight : bold
+#font.family : Courier New
+#font.weight : bold
+#axes.labelweight : bold
+
+# -- this font is close to phys rev
+font.family : STIXGeneral
+font.serif : STIX
+mathtext.fontset : stix
+

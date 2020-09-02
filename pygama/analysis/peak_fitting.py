@@ -171,6 +171,13 @@ def gauss_lin(x, mu, sigma, a, b, m):
     return m * x + b + gauss(x, mu, sigma, a)
 
 
+def gauss_bkg(x, a, mu, sigma, bkg):
+    """
+    gaussian + const background function
+    """
+    return bkg + gauss(x, mu, sigma, a)
+
+
 def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     """
     David Radford's HPGe peak shape function
@@ -200,10 +207,126 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
 
 
+def gauss_tail(x,mu, sigma, tail,tau):
+    """
+    A gaussian tail function template
+    Can be used as a component of other fit functions
+    """
+    tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    return tail_f
+
+
+def step(x, mu, sigma, bkg, a):
+    """
+    A step function template
+    Can be used as a component of other fit functions
+    """
+    step_f = bkg + a * erfc((x-mu)/(np.sqrt(2)*sigma))
+    return step_f
+
+
+def gauss_step(x, a, mu, sigma, bkg, s, components=False):
+    """
+    gaussian + step function for Compton spectrum
+    """
+    peak_f = gauss(x,mu,sigma,a)
+    step_f = step(x,mu,sigma,bkg,s)
+
+    peak = peak_f + step_f
+
+    if components:
+      return peak_f, step_f
+    else:
+      return peak
+
+
+def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
+    """
+    I guess this should be similar to radford_peak (peak + tail + step)
+    This is how I used it in root peak fitting scripts
+    """ 
+    peak_f = gauss(x,mu,sigma,a)                   #gauss
+    tail_f = gauss_tail(x,mu,sigma,tail,tau)       #tail
+    step_f = step(x,mu,sigma,bkg,s)                #step
+
+    peak = peak_f + tail_f + step_f
+
+    if components:
+      return peak, tail_f, step_f, peak_f
+    else:
+      return peak
+
+
+def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
+              components=False) :
+    """
+    A Fit function exclusevly for a 241Am 99keV and 103keV lines situation 
+    Consists of 
+     - three gaussian peaks (two lines + one bkg line in between)
+     - two steps (for the two lines)
+     - two tails (for the two lines)
+    """
+
+    step1 = step(x,mu1,sigma1,b1,s1)
+    step2 = step(x,mu2,sigma2,b2,s2)
+  
+    gaus1 = gauss(x,mu1,sigma1,a1)
+    gaus2 = gauss(x,mu2,sigma2,a2)
+    gaus3 = gauss(x,mu3,sigma3,a3)
+
+    #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
+    #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
+    double_f = step1 + step2 + gaus1 + gaus2 + gaus3# + tail1 + tail2  
+
+    if components:
+       return double_f, gaus1, gaus2, gaus3, step1, step2#, tail1, tail2 
+    else:
+       return double_f
+
+
+def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
+    """
+    A Fit function exclusevly for a 133Ba 81keV peak situation 
+    Consists of 
+     - two gaussian peaks (two lines)
+     - one step
+     """
+
+    step1 = step(x,mu1,sigma1,b1,s1)
+    #step2 = step(x,mu2,sigma2,b2,s2)
+
+    gaus1 = gauss(x,mu1,sigma1,a1)
+    gaus2 = gauss(x,mu2,sigma2,a2)
+    #gaus3 = gauss(x,mu3,sigma3,a3)
+
+    #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
+    #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
+    double_f = step1 +  gaus1 + gaus2  
+
+    if components:
+       return double_f, gaus1, gaus2, step1  
+    else:
+       return double_f
+
+
 def xtalball(x, mu, sigma, A, beta, m):
     """
     power-law tail plus gaussian https://en.wikipedia.org/wiki/Crystal_Ball_function
     """
     return A * crystalball.pdf(x, beta, m, loc=mu, scale=sigma)
+
+
+def cal_slope(x, m1, m2):
+    """
+    Fit the calibration values
+    """
+    return np.sqrt(m1 +(m2/(x**2)))
+
+
+
+
+
+
+
 
 

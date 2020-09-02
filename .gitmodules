@@ -1,3 +1,0 @@
-[submodule "cygama/pybind11"]
-	path = cygama/pybind11
-	url = https://github.com/pybind/pybind11.git
