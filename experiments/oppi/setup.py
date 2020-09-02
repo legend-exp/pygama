@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os
+import os, sys
 import pandas as pd
 import numpy as np
 from pprint import pprint
@@ -17,122 +17,155 @@ with warnings.catch_warnings():
 
 def main():
     """
-    Requires oppi.json config file.
-    """
-    # setup()
-    # scan_orca_headers()
-    # get_runtimes()
-    show_dg()
-
-
-def setup():
-    """
-    Save an hdf5 file with pygama daq, raw, and dsp names + paths.
     """
     dg = DataGroup('oppi.json')
-    # dg.lh5_dir_setup(create=True) # <-- run this once with create=True
+    
+    # init(dg) # only run first time
+    # update(dg) 
+    # scan_orca_headers(dg)
+    # get_runtimes(dg) # requires dsp file right now (at least raw)
+    
+    # show_dg(dg)
+
+
+def init(dg):
+    """
+    Initial setup of the fileDB.
+    """
+    dg.lh5_dir_setup(create=True)
     dg.scan_daq_dir()
 
-    # -- experiment-specific choices --
     dg.file_keys.sort_values(['cycle'], inplace=True)
     dg.file_keys.reset_index(drop=True, inplace=True)
-
-    def get_cyc_info(row):
-        """
-        map cycle numbers to physics runs, and identify detector
-        """
-        cyc = row['cycle']
-        for run, cycles in dg.runDB.items():
-            tmp = cycles[0].split(',')
-            for rng in tmp:
-                if '-' in rng:
-                    clo, chi = [int(x) for x in rng.split('-')]
-                    if clo <= cyc <= chi:
-                        row['run'] = run
-                        break
-                else:
-                    clo = int(rng)
-                    if cyc == clo:
-                        row['run'] = run
-                        break
-        # label the detector
-        row['runtype'] = 'oppi'
-        return row
-
-    dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
-
+    dg.file_keys = dg.file_keys.apply(get_cyc_info, args=[dg], axis=1)
     dg.get_lh5_cols()
-
-    for col in ['run']:
+    
+    for col in ['run', 'cycle']:
         dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
+    # dg.file_keys['run'] = dg.file_keys['run'].astype(int)
 
-    # -- filter out MJ60 runs --
-    dg.file_keys = dg.file_keys.loc[dg.file_keys.run>=0].copy()
+    print(dg.file_keys[['run', 'cycle', 'unique_key', 'daq_file']].to_string())
+    dg.save_df(dg.config['fileDB'])
+    print('Wrote output file.')
 
-    dg.file_keys['run'] = dg.file_keys['run'].astype(int)
+
+def update(dg):
+    """
+    After taking new data, run this function to add rows to fileDB.
+    New rows will not have all columns yet
+    """
+    df_scan = dg.scan_daq_dir(update=True)
+
+    df_scan.sort_values(['cycle'], inplace=True)
+    df_scan.reset_index(drop=True, inplace=True)
+    df_scan = df_scan.apply(get_cyc_info, args=[dg], axis=1)
+    df_scan = dg.get_lh5_cols(update_df=df_scan)
+    for col in ['run', 'cycle']:
+        df_scan[col] = pd.to_numeric(df_scan[col])
+        
+    # look for nan's to identify cycles not covered in runDB
+
+    # merge the new df into the existing one based on unique key
+    df_keys = pd.read_hdf(dg.config['fileDB'], key='file_keys')
+    print(df_scan)
+    print(df_keys)
+    print('clint, you need to merge by unique_key')
+    exit()
+
+    # this might work, but you have to pull out the duplicates first
+    # dg.file_keys = pd.concat([df_keys, df_scan])
 
     print(dg.file_keys)
 
-    dg.save_df('oppi_fileDB.h5')
+    ans = input('Save file key DF? y/n')
+    if ans.lower() == 'y':
+        dg.save_df(dg.config['fileDB'])
 
 
-def scan_orca_headers():
+def get_cyc_info(row, dg):
+    """
+    map cycle numbers to physics runs, and identify detector
+    """
+    myrow = row.copy() # i have no idea why mjcenpa makes me do this
+    cyc = myrow['cycle']
+    for run, cycles in dg.runDB.items():
+        tmp = cycles[0].split(',')
+        for rng in tmp:
+            if '-' in rng:
+                clo, chi = [int(x) for x in rng.split('-')]
+                if clo <= cyc <= chi:
+                    myrow['run'] = run
+                    break
+            else:
+                clo = int(rng)
+                if cyc == clo:
+                    myrow['run'] = run
+                    break
+
+    # label the detector
+    if 0 < cyc <= 2018:
+        myrow['runtype'] = 'mj60'
+    elif 2019 <= cyc <= 2360:
+        myrow['runtype'] = 'oppi'
+    return myrow
+
+
+def scan_orca_headers(dg):
     """
     add runtime and threshold columns to the fileDB.
     to get threshold, read it out of the orca header.
     to get runtime, we have to access the raw timestamps and correct for rollover
-    NOTE: we used struck channel 7 (0-indexed)
+    NOTE: we used struck channel 2 (0-indexed)
     """
     write_output = True
-    
-    dg = DataGroup('oppi.json')
-    df_keys = pd.read_hdf('oppi_fileDB.h5')
-    
+
+    df_keys = pd.read_hdf(dg.config['fileDB'])
+
     # clear new colums if they exist
     new_cols = ['startTime', 'threshold']
     for col in new_cols:
         if col in df_keys.columns:
             df_keys.drop(col, axis=1, inplace=True)
-    
+
     def scan_orca_header(df_row):
         f_daq = dg.daq_dir + df_row['daq_dir'] + '/' + df_row['daq_file']
         _,_, header_dict = parse_header(f_daq)
         # pprint(header_dict)
         info = header_dict['ObjectInfo']
         t_start = info['DataChain'][0]['Run Control']['startTime']
-        thresh = info['Crates'][0]['Cards'][1]['thresholds'][7]
+        thresh = info['Crates'][0]['Cards'][1]['thresholds'][2]
         return pd.Series({'startTime':t_start, 'threshold':thresh})
-    
+
     df_tmp = df_keys.progress_apply(scan_orca_header, axis=1)
     df_keys[new_cols] = df_tmp
-    
-    if write_output:
-        df_keys.to_hdf('oppi_fileDB.h5', key='file_keys')
-        print('Wrote output file: oppi_fileDB.h5, key: file_keys')
-    
 
-def get_runtimes():
+    if write_output:
+        df_keys.to_hdf(dg.config['fileDB'], key='file_keys')
+        print(f"Wrote output file: {dg.config['fileDB']}")
+
+
+def get_runtimes(dg):
     """
+    Requires DSP files.
     compute runtime (# minutes in run) and stopTime (unix timestamp) using
     the timestamps in the dsp file.
     """
     write_output = True
-    
-    dg = DataGroup('oppi.json')
-    df_keys = pd.read_hdf('oppi_fileDB.h5')
-    
+
+    df_keys = pd.read_hdf(dg.config['fileDB'])
+
     # clear new colums if they exist
     new_cols = ['stopTime', 'runtime']
     for col in new_cols:
         if col in df_keys.columns:
             df_keys.drop(col, axis=1, inplace=True)
-    
+
     sto = lh5.Store()
     def get_runtime(df_row):
 
         # load timestamps from dsp file
         f_dsp = dg.lh5_dir + df_row['dsp_path'] + '/' + df_row['dsp_file']
-        data = sto.read_object('ORSIS3302DecoderForEnergy/raw', f_dsp)
+        data = sto.read_object('ORSIS3302DecoderForEnergy/dsp', f_dsp)
 
         # correct for timestamp rollover
         clock = 100e6 # 100 MHz
@@ -155,26 +188,26 @@ def get_runtimes():
             t_last = ts[ilo-1]
             t_diff = t_max - t_last
             ts_new.append(ts_block + t_roll)
-            t_roll += t_last + t_diff 
+            t_roll += t_last + t_diff
         ts_corr = np.concatenate(ts_new)
 
         # calculate runtime and unix stopTime
         rt = ts_corr[-1] / 60 # minutes
         st = int(np.ceil(df_row['startTime'] + rt * 60))
-        
+
         return pd.Series({'stopTime':st, 'runtime':rt})
-    
+
     df_tmp = df_keys.progress_apply(get_runtime, axis=1)
     df_keys[new_cols] = df_tmp
-    
-    print(df_keys)
-    
-    if write_output:
-        df_keys.to_hdf('oppi_fileDB.h5', key='file_keys')
-        print('Wrote output file: oppi_fileDB.h5, key: file_keys')
-    
 
-def show_dg():
+    print(df_keys)
+
+    if write_output:
+        df_keys.to_hdf(dg.config['fileDB'], key='file_keys')
+        print(f"Wrote output file: {dg.config['fileDB']}")
+
+
+def show_dg(dg):
     """
     datagroup columns:
     ['YYYY', 'cycle', 'daq_dir', 'daq_file', 'dd', 'mm', 'run', 'runtype',
@@ -182,14 +215,14 @@ def show_dg():
        'hit_file', 'hit_path', 'startTime', 'threshold', 'stopTime',
        'runtime']
     """
-    dg = DataGroup('oppi.json')
-    df_keys = pd.read_hdf('oppi_fileDB.h5')
+    df_keys = pd.read_hdf(dg.config['fileDB'])
     # print(df_keys.columns)
-    
+
     dbg_cols = ['run', 'cycle', 'unique_key', 'startTime']
+    # print(df_keys[dbg_cols].to_string())
     print(df_keys[dbg_cols])
-    
-    
+
+
 
 if __name__=='__main__':
     main()
