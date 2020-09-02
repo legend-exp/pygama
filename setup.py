@@ -100,7 +100,7 @@ class PygamaDev(develop):
 
 setup(
     name='pygama',
-    version='0.2',
+    version='0.3',
     author='Clint Wiseman',
     author_email='wisecg.neontetra@gmail.com',
     description='Python package for decoding and processing digitizer data',
@@ -115,7 +115,6 @@ setup(
         'pyFFTW'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
-    #ext_modules=[CMakeExtension('pygama/cygama')],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
     zip_safe=False,
 )
