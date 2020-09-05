@@ -68,6 +68,11 @@ class DataGroup:
         if not os.path.isdir(self.lh5_dir):
             print('Warning, LH5 directory not found:', self.lh5_dir)
 
+        # optional: set a user directory (useful for testing file processing)
+        if 'lh5_user' in self.config:
+            self.lh5_user_dir = os.path.expandvars(self.config['lh5_user'])
+            if not os.path.isdir(self.lh5_user_dir):
+                print('Warning, LH5 user directory not found:', self.lh5_user_dir)
 
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']
