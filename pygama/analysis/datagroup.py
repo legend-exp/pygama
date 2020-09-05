@@ -86,30 +86,32 @@ class DataGroup:
         self.lh5_template = self.config['lh5_template']
 
 
-    def lh5_dir_setup(self, create=False):
+    def lh5_dir_setup(self, user_dir=False):
         """
-        view LH5 data directories.  if create is True, actually create them
+        generate paths to LH5 data directories, using `self.lh5_dir`
+        if user_dir is True, create them in `self.lh5_user` instead.
         """
         dirs = []
+        lh5_dir = self.lh5_user if user_dir else self.lh5_dir
 
         # directories for hit-level data
         t, r, s = self.tier_dirs, self.subsystems, self.run_types
         for tier, subs, rtp in itertools.product(t, s, r):
-            dirname = f'{self.lh5_dir}/{tier}/{subs}/{rtp}'
+            dirname = f'{lh5_dir}/{tier}/{subs}/{rtp}'
             print(dirname)
             dirs.append(dirname)
 
         # directories for event-level data
         for dir in self.evt_dirs:
-            dirname = f'{self.lh5_dir}/{dir}'
+            dirname = f'{lh5_dir}/{dir}'
             print(dirname)
             dirs.append(dirname)
 
-        if create:
-            ans = input('Create directories? (y/n)')
-            if ans.lower() == 'y':
-                for d in dirs:
-                    Path(d).mkdir(parents=True, exist_ok=True)
+        print('Base LH5 path:', lh5_dir)
+        ans = input('Create directories here? (y/n)')
+        if ans.lower() == 'y':
+            for d in dirs:
+                Path(d).mkdir(parents=True, exist_ok=True)
 
 
     def scan_daq_dir(self, verbose=False):
