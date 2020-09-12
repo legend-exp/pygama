@@ -73,6 +73,15 @@ class DataGroup:
             self.lh5_user_dir = os.path.expandvars(self.config['lh5_user'])
             if not os.path.isdir(self.lh5_user_dir):
                 print('Warning, LH5 user directory not found:', self.lh5_user_dir)
+                
+        # optional: run selection json file
+        if 'runSelectionDB' in self.config:
+            f_runsel = os.path.expandvars(self.config['runSelectionDB'])
+            if not os.path.exists(f_runsel):
+                print('Warning, run selection file not found:', f_runsel)
+            else:
+                with open(f_runsel) as f:
+                    self.runSelectionDB = json.load(f)
 
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']

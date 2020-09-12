@@ -207,6 +207,7 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
     input_par_list = [] # input from file and used for processors
     copy_par_list = [] # copied from input to output
     out_par_list = []
+    
     for out_par in outputs:
         if out_par not in processors:
             copy_par_list.append(out_par)
@@ -219,7 +220,7 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
         print('Required input parameters:', str(input_par_list))
         print('Copied output parameters:', str(copy_par_list))
         print('Processed output parameters:', str(out_par_list))
-        
+    
     proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
@@ -292,7 +293,7 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
                 else:
                     proc_chain._clk = clk
         else:
-            print("I don't know what to do with " + input_par + ". Building output without it!")
+            print("I don't know what to do with " + copy_par + ". Building output without it!")
     
     # finally, add the output buffers to lh5_out and the proc chain
     for out_par in out_par_list:
