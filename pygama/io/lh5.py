@@ -504,7 +504,15 @@ class Store:
             da_start = 0
             if start_row > 0 and n_rows_read > 0: 
                 da_start = h5f[name+'/cumulative_length'][start_row-1]
-            da_nrows = lensum_array.nda[n_rows_read-1] - da_start if n_rows_read > 0 else 0
+                if lensum_array.nda[n_rows_read-1] < da_start:
+                    print("warning: cumulative_length non-increasing between entries", 
+                          start_row, "and", start_row+n_rows_read, "??")
+                    print(lensum_array.nda[n_rows_read-1], da_start, start_row, n_rows_read)
+                # in-memory version of lensum_array will need to match
+                # what's in the in-memory version of data_array. So need to
+                # substract off the offset.
+                lensum_array.nda[:n_rows_read] -= da_start
+            da_nrows = lensum_array.nda[n_rows_read-1] if n_rows_read > 0 else 0
             da_buf = None 
             if obj_buf is not None:
                 da_buf = obj_buf.data_array
@@ -612,6 +620,16 @@ class Store:
             group = self.gimme_group(name, group, grp_attrs=obj.attrs)
             if n_rows is None or n_rows > obj.lensum_array.nda.shape[0] - start_row:
                 n_rows = obj.lensum_array.nda.shape[0] - start_row
+
+            # if appending we need to add an appropriate offset to the
+            # cumulative lengths as appropriate for the in-file object
+            offset = 0
+            if append and 'cumulative_length' in group:
+                len_cl = len(group['cumulative_length']) 
+                if len_cl > 0: offset = group['cumulative_length'][len_cl-1]
+            # Add offset to obj.lensum_array itself to avoid memory allocation. 
+            # Then subtract it off after writing!
+            obj.lensum_array.nda += offset
             self.write_object(obj.lensum_array,
                               'cumulative_length', 
                               lh5_file, 
@@ -619,6 +637,8 @@ class Store:
                               start_row=start_row,
                               n_rows=n_rows,
                               append=append)
+            obj.lensum_array.nda -= offset
+
             # now write data array. Only write rows with data.
             da_start = 0 if start_row == 0 else obj.lensum_array.nda[start_row-1]
             da_n_rows = obj.lensum_array.nda[n_rows-1] - da_start
