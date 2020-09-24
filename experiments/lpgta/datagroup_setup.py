@@ -41,7 +41,7 @@ def main():
     # append a column of filesizes
     sizes_GB = []
     proc_groups = []
-    proc_thresh_GB = 256
+    proc_thresh_GB = 128
     proc_LL_GB = 4
     size_sum = 0
     proc_group = 0
