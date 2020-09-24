@@ -38,6 +38,10 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
 
     raw_store = lh5.Store()
     lh5_file = raw_store.gimme_file(f_raw, 'r')
+    if lh5_file is None:
+        print(f'raw_to_dsp: input file not found: {f_raw}')
+        return
+    else: print(f'Opened file {f_raw}')
 
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
@@ -83,7 +87,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
             
         if verbose > 0:
             update_progress(1)
-        print(f'Done.  Writing to file ...')
+        print(f'Done.  Writing to file {f_dsp}')
 
     # write processing metadata
     dsp_info = lh5.Struct()
