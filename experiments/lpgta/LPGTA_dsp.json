@@ -21,12 +21,12 @@
       "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
       "prereqs": ["wf_blsub"],
       "unit": "ADC",
-      "defaults": { "db.pz.tau":"72*us" }
+      "defaults": { "db.pz.tau":"400*us" }
     },
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
+      "args": ["wf_pz", "10*us", "3*us", "wf_trap"],
       "prereqs": ["wf_pz"],
       "unit": "ADC"
     },
