@@ -185,10 +185,14 @@ class WaveformBrowser:
         self.fig.canvas.draw()
         return self.ax
 
-    def draw_next(self, n_wfs = None):
-        """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return a list of waveform indices drawn and the axis object"""
-        # reset the axis
-        if self.ax is not None:
+    def draw_next(self, n_wfs = None, append = False):
+        """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return a list of waveform indices drawn and the axis object:
+           n_wfs: number of waveforms to draw (default is self.n_wfs)
+           append: set to True to prevent clearing of axis before drawing
+           axis: set to draw on an already defined axis
+        """
+        # clear the axis
+        if not append and self.ax is not None:
             self.ax.clear()
         self.labels = []
         if not n_wfs: n_wfs = self.n_drawn
