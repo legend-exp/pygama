@@ -68,13 +68,15 @@ class WaveformBrowser:
         elif waveforms is None: self.waveforms = []
         else: self.waveforms = list(waveforms)
         
-        if isinstance(lines, str): self.lines = [lines]
-        elif lines is None: self.lines = []
-        else: self.lines = list(lines)
+        if lines is None: self.lines = []
+        elif isinstance(lines, list): self.lines = lines
+        elif isinstance(lines, tuple):  self.lines = list(lines)
+        else: self.lines = [lines]
         
-        if isinstance(legend, str): self.legend = [legend]
-        elif legend is None: self.legend = []
-        else: self.legend = list(legend)
+        if legend is None: self.legend = []
+        elif isinstance(legend, list): self.legend = legend
+        elif isinstance(legend, tuple):  self.legend = list(legend)
+        else: self.legend = [legend]
         self.labels = []
 
         self.norm_par = norm
@@ -84,7 +86,11 @@ class WaveformBrowser:
         self.x_lim = x_lim
 
         # make processing chain and output buffer
-        outputs = self.waveforms + self.lines + self.legend + ([self.norm_par] if self.norm_par is not None else []) + ([self.align_par] if self.align_par is not None else [])
+        outputs = self.waveforms + \
+                  [name for name in self.lines if isinstance(name, str)] + \
+                  [name for name in self.legend  if isinstance(name, str)]
+        if isinstance(self.norm_par, str): outputs += [self.norm_par]
+        if isinstance(self.align_par, str): outputs += [self.align_par] 
         self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=self.verbosity, block_width=block_width)
         
         self.fig = None
@@ -167,11 +173,16 @@ class WaveformBrowser:
         # legend label
         if len(self.legend)>0:
             legend_str = ''
-            for par_name in self.legend:
+            for entry in self.legend:
                 if legend_str!='':
                     legend_str += ', '
-                legend_str += "{} = {:.4g} {}".format(par_name, self.lh5_out[par_name].nda[index], self.lh5_out[par_name].attrs.get('units', ''))
-
+                if isinstance(entry, str):
+                    legend_str += "{} = {:.4g} {}".format(entry, self.lh5_out[entry].nda[index], self.lh5_out[entry].attrs.get('units', ''))
+                elif isinstance(entry, pd.Series):
+                    legend_str += "{} = {:.4g}".format(entry.name, entry[index])
+                elif isinstance(entry, np.ndarray):
+                    legend_str += "{:.4g}".format(entry[index])
+                    
             if self.ax.legend_:
                 handles = self.ax.legend_.legendHandles
                 labels = [t.get_text() for t in self.ax.legend_.texts]
