@@ -118,3 +118,4 @@ setup(
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
     zip_safe=False,
 )
+a small chance
