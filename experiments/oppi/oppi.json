@@ -1,12 +1,12 @@
 {
   "experiment" : "oppi",
-  "runDB" : "./oppi_runDB.json",
-  "fileDB" : "./oppi_fileDB.h5",
+  "runDB" : "./runDB.json",
+  "fileDB" : "./fileDB.h5",
 
   "daq" : "ORCA",
-  "daq_dir" : "/data/LEGEND/Data/MJ60",
+  "daq_dir" : "$UWSTC_DAQ",
   "daq_ignore" : [".log",".DS_Store", "openFiles"],
-  "lh5_dir" : "$OPPI_LH5",
+  "lh5_dir" : "$UWSTC_LH5",
 
   "rocks_dir":"/data/LEGEND/Data/MJ60",
   "rocks_login":"wisecg@cenpa-rocks.npl.washington.edu",
@@ -17,8 +17,8 @@
   "evt_dirs" : [""],
 
   "unique_key" : "oppi-cyc{cycle}-{YYYY}{mm}{dd}",
-  "daq_template" : "/{YYYY}-{mm}-{dd}-BackgroundRun{cycle}",
+  "daq_template" : "{YYYY}-{mm}-{dd}-BackgroundRun{cycle}",
   "lh5_template" : "oppi_run{run}_cyc{cycle}_{tier}.lh5",
   
-  "ecal_config": "ecal_config.json"
+  "ecal_config": "config_ecal.json"
 }

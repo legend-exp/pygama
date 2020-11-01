@@ -17,7 +17,7 @@ class WaveformBrowser:
     parameters, and filling a legend with calculated parameters.
     """
 
-    def __init__(self, files_in, lh5_group, dsp_config = None,
+    def __init__(self, files_in, lh5_group, dsp_config = None, database = None,
                  n_drawn = 1, x_unit = 'ns', x_lim=None,
                  waveforms = 'waveform', wf_styles = None, lines = None,
                  legend = None, norm = None, align=None, selection = None,
@@ -26,6 +26,7 @@ class WaveformBrowser:
         - file_in: name of file or list of names to browse. Can use wildcards
         - lh5_group: name of LH5 group in file to browse
         - dsp_config (optional): name of DSP config json file containing transforms available to draw
+        - database (optional): dict with database of processing parameters
         - n_drawn (default 1): number of events to draw simultaneously when calling DrawNext
         - x_unit (default ns): unit for x-axis
         - x_lim (default auto): range of x-values passes as tuple
@@ -158,7 +159,8 @@ class WaveformBrowser:
                   [name for name in self.legend_input  if isinstance(name, str)]
         if isinstance(self.norm_par, str): outputs += [self.norm_par]
         if isinstance(self.align_par, str): outputs += [self.align_par] 
-        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, outputs, verbosity=self.verbosity, block_width=block_width)
+        
+        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
 
         # if we had any unit placeholders fill now:
         while 1:

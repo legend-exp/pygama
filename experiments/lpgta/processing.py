@@ -29,6 +29,7 @@ def main():
     # declare datagroup
     arg('--dg', action=st, help='load datagroup')
     arg('--q', type=str, help='datagroup query')
+    arg('--date', type=str, help='date query')
 
     # routines
     arg('--d2r', action=st, help='run daq_to_raw')
@@ -55,7 +56,8 @@ def main():
           f'\n  limit wfs? {nwfs}')
 
     # -- run routines --
-    if args.dg: dg = load_datagroup(args.q)
+    query = "YYYYmmdd == '" + args.date + "'" if args.date else args.q
+    if args.dg: dg = load_datagroup(query)
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
 
