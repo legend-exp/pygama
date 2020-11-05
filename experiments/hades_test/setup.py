@@ -42,15 +42,19 @@ def main():
     args = par.parse_args()
 
     # declare main DataGroup
-    dg = DataGroup('cage.json')
+    dg = DataGroup('hades.json')
 
     # -- run routines --
     if args.mkdirs: dg.lh5_dir_setup(args.lh5_user)
     if args.show: show_fileDB(dg)
     if args.init: init(dg)
     if args.update: update(dg, args.batch)
-    if args.orca: scan_orca_headers(dg, args.over, args.batch)
-    if args.rt: get_runtimes(dg, args.over, args.batch)
+    
+    # not for flashcam
+    # if args.orca: scan_orca_headers(dg, args.over, args.batch)
+    
+    # need some other way to do this
+    # if args.rt: get_runtimes(dg, args.over, args.batch)
 
 
 def show_fileDB(dg):
