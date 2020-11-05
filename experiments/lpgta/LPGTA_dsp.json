@@ -73,6 +73,28 @@
       "args":["A_10", "trapE", "AoE"],
       "unit": "1/sample",
       "prereqs": ["A_10", "trapE"]
+    },
+    "tp_max": {
+      "function": "argmax",
+      "module": "numpy",
+      "args":["wf_blsub", 1, "tp_max"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->i"]},	
+      "unit": "us",
+      "prereqs": ["wf_blsub"]
+    },
+    "tp_0": {
+      "function": "time_point_thresh",
+      "module": "pygama.dsp.processors",
+      "args":["wf_atrap", 0, "tp_max", "tp_0"],
+      "unit": "us",
+      "prereqs": ["wf_atrap", "tp_max"]
+    },
+    "ct_corr": {
+      "function": "trap_pickoff",
+      "module": "pygama.dsp.processors",
+      "args":["wf_pz", "1.5*us", 0, "tp0", "ct_corr"],
+      "unit": "ADC",
+      "prereqs": ["wf_pz", "tp_0"]
     }
   }
   

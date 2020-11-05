@@ -22,7 +22,7 @@ import pygama.git as git
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200, 
-               block_width=8, verbose=1):
+               block_width=16, verbose=1):
     """
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
@@ -117,7 +117,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
 
 def build_processing_chain(lh5_in, dsp_config, db_dict = None,
-                           outputs = None, verbosity=1, block_width=8):
+                           outputs = None, verbosity=1, block_width=16):
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
@@ -372,10 +372,10 @@ json config file and raw_to_dsp.""")
     arg('-v', '--verbose', default=1, type=int,
         help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
     
-    arg('-b', '--block', default=8, type=int,
+    arg('-b', '--block', default=16, type=int,
         help="Number of waveforms to process simultaneously. Default is 8")
     
-    arg('-c', '--chunk', default=256, type=int,
+    arg('-c', '--chunk', default=3200, type=int,
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
     arg('-n', '--nevents', default=None, type=int,
         help="Number of waveforms to process. By default do the whole file")
