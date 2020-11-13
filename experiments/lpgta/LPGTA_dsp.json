@@ -48,7 +48,7 @@
     "trapEftp": {
       "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
-      "args": ["wf_trap", "tp_0+14.5*us", "trapEftp"],
+      "args": ["wf_trap", "tp_0+13.5*us", "trapEftp"],
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
       "unit": "ADC",
       "prereqs": ["wf_trap", "tp_0"]
@@ -94,7 +94,7 @@
     "ct_corr": {
       "function": "trap_pickoff",
       "module": "pygama.dsp.processors",
-      "args":["wf_pz", "4*us", 0, "tp0", "ct_corr"],
+      "args":["wf_pz", "4*us", 0, "tp_0", "ct_corr"],
       "unit": "ADC",
       "prereqs": ["wf_pz", "tp_0"]
     }
