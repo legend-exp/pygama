@@ -1,5 +1,5 @@
 {
-  "outputs": [ "trapE", "bl", "bl_sig", "A_10", "AoE" ],
+  "outputs": [ "trapE", "trapEftp", "ct_corr", "bl", "bl_sig", "A_10", "AoE" ],
   "processors":{
     "bl, bl_sig":{
       "function": "mean_stdev",
@@ -18,15 +18,15 @@
     "wf_pz": {
       "function": "pole_zero",
       "module": "pygama.dsp.processors",
-      "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
+      "args": ["wf_blsub", "db.pz_const", "wf_pz"],
       "prereqs": ["wf_blsub"],
       "unit": "ADC",
-      "defaults": { "db.pz.tau":"72*us" }
+      "defaults": { "db.pz_const":"200*us" }
     },
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
+      "args": ["wf_pz", "10*us", "4*us", "wf_trap"],
       "prereqs": ["wf_pz"],
       "unit": "ADC"
     },
@@ -37,12 +37,6 @@
       "prereqs": ["wf_pz"],
       "unit": "ADC"
     },
-    "trapmax": {
-      "function": "amax",
-      "module": "numpy",
-      "args": ["wf_trap", 1, "trapmax"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]}
-    },
     "trapE": {
       "function": "amax",
       "module": "numpy",
@@ -50,6 +44,14 @@
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
       "unit": "ADC",
       "prereqs": ["wf_trap"]
+    },
+    "trapEftp": {
+      "function": "fixed_time_pickoff",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_trap", "tp_0+14.5*us", "trapEftp"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["wf_trap", "tp_0"]
     },
     "curr10": {
       "comment": "3rd argument allocates memory for a derivative of type float",
@@ -70,9 +72,9 @@
     "AoE": {
       "function": "divide",
       "module": "numpy",
-      "args":["A_10", "trapE", "AoE"],
+      "args":["A_10", "trapEmax", "AoE"],
       "unit": "1/sample",
-      "prereqs": ["A_10", "trapE"]
+      "prereqs": ["A_10", "trapEmax"]
     },
     "tp_max": {
       "function": "argmax",
@@ -92,7 +94,7 @@
     "ct_corr": {
       "function": "trap_pickoff",
       "module": "pygama.dsp.processors",
-      "args":["wf_pz", "1.5*us", 0, "tp0", "ct_corr"],
+      "args":["wf_pz", "4*us", 0, "tp0", "ct_corr"],
       "unit": "ADC",
       "prereqs": ["wf_pz", "tp_0"]
     }

@@ -9,6 +9,7 @@
 *.lh5
 *~
 *.csv
+*.ipynb
 
 pygama/git.py
 experiments/lpgta/cori_slurm/logs/
