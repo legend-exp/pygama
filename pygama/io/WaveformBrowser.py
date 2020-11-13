@@ -20,7 +20,8 @@ class WaveformBrowser:
     def __init__(self, files_in, lh5_group, dsp_config = None, database = None,
                  n_drawn = 1, x_unit = 'ns', x_lim=None,
                  waveforms = 'waveform', wf_styles = None, lines = None,
-                 legend = None, norm = None, align=None, selection = None,
+                 legend = None, legend_opts = None, norm = None, align=None,
+                 selection = None,
                  buffer_len = 128, block_width = 8, verbosity=1):
         """Constructor for WaveformBrowser:
         - file_in: name of file or list of names to browse. Can use wildcards
@@ -37,7 +38,9 @@ class WaveformBrowser:
             None: use current matplotlib style
           If a single style cycle is given, use for all lines; if a list is given, match to waveforms list.
         - lines (default None): name of parameter or list of parameters to draw hlines and vlines for
-        - legend (default None): name or array of parameters to include in legend
+        - legend (default None): formatting string and values to include in the legend. This can be a list of values (one for each waveform in waveforms). The values can be given as a tuple whose first entry is a formatting string and subsequent entries are the values to place in the formatting string. When building a formatting string, if a name is given in the {}s, it is assumed to be a parameter from the DSP config file. An example is:
+          ("{:0.1f} keV", energy)
+        - legend_opts (default None): dict containing kwargs for formatting the legend
         - norm (default None): name of parameter (probably energy) to use to normalize WFs; useful when drawing multiple
         - align (default None): name of time parameter to set as 0 time; useful for aligning multiple waveforms
         - selection (optional): selection of events to draw. Can be either a list of event indices or a numpy array mask (ala pandas).
@@ -98,7 +101,7 @@ class WaveformBrowser:
             elif wf_styles is None:
                 self.wf_styles = itertools.repeat(None)
             else:
-                self.wf_styles = cycler(**sty)
+                self.wf_styles = cycler(**wf_styles)
         
         if lines is None: self.line_names = []
         elif isinstance(lines, list): self.line_names = lines
@@ -107,46 +110,47 @@ class WaveformBrowser:
         self.line_data = [ [] for _ in self.line_names ]
         
         if legend is None: legend = []
-        elif isinstance(legend, tuple): legend = list(legend)
         elif not isinstance(legend, list): legend = [legend]
-        
+
+        # Set up the legend format strings and collect input values
         self.legend_input = []
-        self.legend_format = ''
+        self.legend_format = []
         for entry in legend:
-            if isinstance(entry, str):
-                # check if it is a format string or just a variable name
-                if entry.find('{')==-1: # unformatted name
-                    self.legend_input.append(entry)
-                    if self.legend_format!='':
-                        self.legend_format += ', '
-                    self.legend_format += '{:.4g}'
-                    self.legend_format += 'UNIT{'+entry+'}'
-                else:
-                    for st, name, form, cv in string.Formatter().parse(entry):
-                        self.legend_format += st
+            legend_input = []
+            legend_format = ''
+            if not isinstance(entry, tuple):
+                entry = (entry,)
+
+            for val in entry:
+                if isinstance(val, str):
+                    for st, name, form, cv in string.Formatter().parse(val):
+                        legend_format += st
                         if name is not None:
-                            self.legend_format += '{'
-                            self.legend_input.append(name)
+                            legend_format += '{'
+                            legend_input.append(name)
                             if form is not None and form != '':
-                                self.legend_format += ':' + form
+                                legend_format += ':' + form
                             if cv is not None and cv != '':
-                                self.legend_format += '!' + cv
-                            self.legend_format += '}'
-            else:
-                try: # if we already have a {} to fill from the formatter
-                    i = legend_input.index('')
-                    self.legend_input[i] = entry
-                except: # also add to formatter
-                    self.legend_input.append(entry)
-                    if self.legend_format!='':
-                        self.legend_format += ', '
-                    if isinstance(entry, pd.Series):
-                        self.legend_format += entry.name + ' = {:.4g}'
-                    elif isinstance(entry, np.ndarray):
-                        self.legend_format += '{:.4g}'
+                                legend_format += '!' + cv
+                            legend_format += '}'
+                else:
+                    # find any {}s to fill from the formatter
+                    idxs = [i for i, inp in enumerate(legend_input) if isinstance(inp,str) and inp=='']
+                    if idxs: # if we found a {}. it's already in the formatter
+                        legend_input[idxs[0]] = val
+                    else: # otherwise add to formatter
+                        legend_input.append(val)
+                        if legend_format!='': legend_format += ', '
+                        if isinstance(val, pd.Series):
+                            legend_format += val.name + ' = {:.3g}'
+                        elif isinstance(val, np.ndarray):
+                            legend_format += '{:.3g}'
+            self.legend_input.append(legend_input)
+            self.legend_format.append(legend_format)
 
-        self.legend_data = []
-
+        self.legend_data = [ [] for _ in self.legend_input ]
+        self.legend_kwargs = legend_opts if legend_opts else {}
+        
         self.norm_par = norm
         self.align_par = align
 
@@ -161,18 +165,6 @@ class WaveformBrowser:
         if isinstance(self.align_par, str): outputs += [self.align_par] 
         
         self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
-
-        # if we had any unit placeholders fill now:
-        while 1:
-            pos = self.legend_format.find('UNIT{')
-            if pos==-1: break
-            end = self.legend_format.find('}', pos)
-            name = self.legend_format[pos+5:end]
-            try:
-                unit = ' '+self.lh5_out[entry].attrs['units']
-            except:
-                unit = ''
-            self.legend_format = self.legend_format[:pos] + unit + self.legend_format[end+1:] 
         
         self.fig = None
         self.ax = None        
@@ -181,10 +173,26 @@ class WaveformBrowser:
         """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
 
+    def set_figure(self, fig, ax=None):
+        """Use an already existing figure and axis; make sure to set clear to False when drawing if you don't want to clear what's already there! Can give a WaveformBrowser object to use the fig/axis from that"""
+        if isinstance(fig, WaveformBrowser):
+            self.fig = fig.fig
+            self.ax = fig.ax
+        elif isinstance(fig, plt.Figure):
+            self.fig = fig
+            if ax is None:
+                self.ax = fig.axes[0]
+            elif isinstance(ax, plt.Axes):
+                self.ax = ax
+            else:
+                raise TypeError("ax must be matplotlib.Axis")
+        else:
+            raise TypeError("fig must be matplotlib.Figure or WaveformBrowser")
+
     def clear_data(self):
         for wf_set in self.wf_data: wf_set.clear()
         for line_set in self.line_data: line_set.clear()
-        self.legend_data = []
+        for leg_data in self.legend_data: leg_data.clear()
         
     def find_entry(self, entry, append=True):
         """
@@ -215,13 +223,22 @@ class WaveformBrowser:
             
 
         # get scaling factor/time shift if used
-        norm = self.lh5_out[self.norm_par].nda[index] if self.norm_par is not None else 1.
-        if self.align_par is not None:
+        if self.norm_par is None:
+            norm = 1.
+        elif isinstance(self.norm_par, str):
+            norm = self.lh5_out[self.norm_par].nda[index]
+        else:
+            norm = self.norm_par[entry]
+
+        if self.align_par is None:
+            ref_time = 0
+        elif isinstance(self.align_par, str):
             unit = self.lh5_out[self.align_par].attrs['units']
             dt = units.convert(1, units.unit_parser.parse_unit(unit), self.x_unit)
             ref_time = self.lh5_out[self.align_par].nda[index]*dt
         else:
-            ref_time = 0
+            ref_time = self.align_par[entry]
+            
         leg_handle = None
 
         #waveforms
@@ -251,14 +268,14 @@ class WaveformBrowser:
             line_data.append(val)
 
         # legend data
-        legend_data = []
-        for legend_input in self.legend_input:
-            if isinstance(legend_input, str):
-                legend_data.append(self.lh5_out[legend_input].nda[index])
-            else:
-                legend_data.append(legend_input[entry])
-        self.legend_data.append(legend_data)
-
+        for legend_input, legend_data in zip(self.legend_input, self.legend_data):
+            leg_vals = []
+            for val in legend_input:
+                if isinstance(val, str):
+                    leg_vals.append(self.lh5_out[val].nda[index])
+                else:
+                    leg_vals.append(val[entry])
+            legend_data.append(leg_vals)
     
     def draw_current(self, clear=True):
         """
@@ -288,8 +305,9 @@ class WaveformBrowser:
                 leg_handles.append(wf_line)
 
         # draw legend
-        for leg_dat in self.legend_data:
-            leg_labels.append(self.legend_format.format(*leg_dat))
+        for legend_data, legend_format in zip(self.legend_data, self.legend_format):
+            for legend_vals in legend_data:
+                leg_labels.append(legend_format.format(*legend_vals))
 
         # draw hlines and vlines
         for lines in self.line_data:
@@ -304,7 +322,12 @@ class WaveformBrowser:
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
         if len(leg_labels)>0:
-            self.ax.legend(leg_handles, leg_labels)
+            if not clear:
+                old_leg = self.ax.get_legend()
+                if old_leg:
+                    leg_handles = old_leg.get_lines() + leg_handles
+                    leg_labels = [t.get_text() for t in old_leg.get_texts()] + leg_labels
+            self.ax.legend(leg_handles, leg_labels, **self.legend_kwargs)
         
                 
     def draw_entry(self, entry, append=False, clear=True):
