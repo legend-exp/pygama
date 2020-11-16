@@ -14,6 +14,7 @@ from pygama import __version__ as pygama_version
 from pygama.io import lh5
 from pygama.utils import update_progress
 import pygama.git as git
+from pygama.dsp.build_processing_chain import *
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200, 
