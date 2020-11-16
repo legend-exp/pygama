@@ -86,16 +86,31 @@ def make_git_file():
         f.write("revision = '" + repo.head.commit.hexsha +"'\n")
         f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
 
+#Add a git hook to clean jupyter notebooks before commiting
+def clean_jupyter_notebooks():
+    import git
+    repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+    with repo.config_writer('repository') as config:
+        config.set_value('filter "jupyter_clear_output"', 'clean',
+              """ "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+              --to notebook --ClearOutputPreprocessor.enabled=True\\
+              --ClearMetadataPreprocessor.enabled=True" """)
+        config.set_value('filter "jupyter_clear_output"', 'smudge', 'cat')
+        config.set_value('filter "jupyter_clear_output"', 'required', 'True')
+        
+
 # run during installation; this is when files get copied to build dir
 class PygamaBuild(build_py):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         build_py.run(self)
 
 # run during local installation; in this case build_py isn't run...
 class PygamaDev(develop):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         develop.run(self)
 
 setup(
