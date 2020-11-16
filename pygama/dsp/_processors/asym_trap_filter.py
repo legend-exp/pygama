@@ -1,3 +1,4 @@
+import numpy as np
 from numba import guvectorize
 
 @guvectorize(["void(float32[:], int32, int32, int32, float32[:])",

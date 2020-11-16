@@ -1,5 +1,5 @@
 {
-  "outputs": [ "trapE", "trapEftp", "ct_corr", "bl", "bl_sig", "A_10", "AoE" ],
+  "outputs": [ "trapE", "trapEftp", "ct_corr", "bl", "bl_sig", "A_10", "AoE",
              "tp_max", "tp_0", "tp_10", "tp_50", "tp_80", "tp_90",
              "dcr_raw"],
   "processors":{
@@ -120,6 +120,7 @@
       "args": ["wf_pz", 100, 3000, "tp_90+1*us", "dcr_raw"],
       "unit": "ADC",
       "prereqs": ["wf_pz", "tp_90"]
+    },
     "ct_corr": {
       "function": "trap_pickoff",
       "module": "pygama.dsp.processors",
