@@ -72,9 +72,9 @@
     "AoE": {
       "function": "divide",
       "module": "numpy",
-      "args":["A_10", "trapEmax", "AoE"],
+      "args":["A_10", "trapE", "AoE"],
       "unit": "1/sample",
-      "prereqs": ["A_10", "trapEmax"]
+      "prereqs": ["A_10", "trapE"]
     },
     "tp_max": {
       "function": "argmax",
