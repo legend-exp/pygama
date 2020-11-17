@@ -91,12 +91,22 @@ def clean_jupyter_notebooks():
     import git
     repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
     with repo.config_writer('repository') as config:
-        config.set_value('filter "jupyter_clear_output"', 'clean',
-              """ "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
-              --to notebook --ClearOutputPreprocessor.enabled=True\\
-              --ClearMetadataPreprocessor.enabled=True" """)
+        try:
+            import nbconvert
+            if nbconvert.__version__[0] < '6': #clear output
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True" """
+            else: # also clear metadata
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True\\
+                --ClearMetadataPreprocessor.enabled=True" """                
+        except:
+            # if nbconvert (part of jupyter) is not installed, disable filter
+            fil = "cat"
+
+        config.set_value('filter "jupyter_clear_output"', 'clean', fil)
         config.set_value('filter "jupyter_clear_output"', 'smudge', 'cat')
-        config.set_value('filter "jupyter_clear_output"', 'required', 'True')
+        config.set_value('filter "jupyter_clear_output"', 'required', 'false')
         
 
 # run during installation; this is when files get copied to build dir
