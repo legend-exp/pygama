@@ -86,6 +86,13 @@
       "unit": "ns",
       "prereqs": ["wf_blsub"]
     },
+    "tp_0": {
+      "function": "time_point_thresh",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_atrap", 0, "tp_max", "tp_0"],
+      "unit": "ns",
+      "prereqs": ["wf_atrap", "tp_max"]
+     },
     "tp_10": {
       "function": "time_point_frac",
       "module": "pygama.dsp.processors",

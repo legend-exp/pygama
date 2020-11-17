@@ -258,9 +258,9 @@ class WaveformBrowser:
         # lines
         for line_name, line_data in zip(self.line_names, self.line_data):
             try: # if unit is time, do vline
-                unit = self.lh5_out[line_name].attrs['units']
-                dt = units.convert(1, units.unit_parser.parse_unit(unit), self.x_unit)
-                val = (self.lh5_out[line_name].nda[index]*dt - ref_time)*self.x_unit
+                unit = units.unit_parser.parse_unit(self.lh5_out[line_name].attrs['units'])
+                val = self.lh5_out[line_name].nda[index]*unit
+                val -= ref_time*self.x_unit
                 
             except: # else do hline
                 val = self.lh5_out[line_name].nda[index]/norm
@@ -297,6 +297,9 @@ class WaveformBrowser:
         for i, wf_set in enumerate(self.wf_data):
             if isinstance(self.wf_styles, list):
                 wf_styles = self.wf_styles[i]
+            if wf_styles is None:
+                wf_styles = itertools.repeat(None)
+            
             for wf, sty in zip(wf_set, wf_styles):
                 if sty is None:
                     wf_line, = self.ax.plot(*wf, '-')
@@ -313,7 +316,7 @@ class WaveformBrowser:
         for lines in self.line_data:
             for val in lines:
                 if isinstance(val, units.unit):
-                    self.ax.axvline(val.value)
+                    self.ax.axvline(units.convert(1, val, self.x_unit))
                 else:
                     self.ax.axhline(val)
         
