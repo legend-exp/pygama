@@ -138,7 +138,11 @@ setup(
         'GitPython',
         'tinydb',
         'pyFFTW',
-        'h5py'
+        'h5py',
+        'numpy',
+        'pandas',
+        'matplotlib'
+
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
