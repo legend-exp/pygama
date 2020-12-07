@@ -19,6 +19,9 @@ def main():
     You may need to set these environment variables, check your LPGTA.json file.
       * $LPGTA_DATA : base data directory
       * $LEGEND_META : the legend-metadata repository
+      
+    By default, we move output files into place in the LH5 directory tree, but
+    there is also an option to leave it in place in CWD.
 
     TODO: parallelize, submit processing jobs
     """
@@ -40,15 +43,10 @@ def main():
     arg('-n', '--nwfs', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
     arg('-c', '--cwd', action=st, help="save output to current directory")
-    
-    by default it can move it into place in the directory tree, but have an option to leave it in place in CWD
-
     args = par.parse_args()
 
-    expDB = '$LEGEND_META/analysis/LPGTA/LPGTA.json'
-
-
     # -- set options --
+    expDB = '$LEGEND_META/analysis/LPGTA/LPGTA.json'
 
     nwfs = args.nwfs if args.nwfs is not None else np.inf
 
@@ -83,7 +81,6 @@ def load_datagroup(query=None):
     #dg.file_keys = dg.file_keys[:2]
     
     return dg
-
 
 
 def cmap_to_ch_groups(cmap, sys_per_ged = False):
