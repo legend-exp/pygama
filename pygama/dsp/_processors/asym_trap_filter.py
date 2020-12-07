@@ -5,14 +5,15 @@ from numba import guvectorize
               "void(float64[:], int32, int32, int32, float64[:])",
               "void(int32[:], int32, int32, int32, int32[:])",
               "void(int64[:], int32, int32, int32, int64[:])"],
-             "(n),(),(),()->(n)", forceobj=True, cache=True)
-def asymTrapFilter(wf_in, rise, flat, fall, wf_out): #,padAfter=False
+             "(n),(),(),()->(n)", nopython=True, cache=True)
+def asymTrapFilter(wf_in, rise, flat, fall, wf_out):
     """ Computes an asymmetric trapezoidal filter"""
-
-    wf_out[:] = wf_in[:]
-    wf_out[rise:] -= wf_in[:-rise]
-    wf_out[:] *= float(fall)/rise
-    wf_out[rise+flat:] -= wf_in[:-(rise+flat)]
-    wf_out[rise+flat+fall:] += wf_in[:-(rise+flat+fall)]
-    wf_out[:] /= fall
-    np.cumsum(wf_out, out=wf_out, axis=0)
+    wf_out[0] = wf_in[0]
+    for i in range(1, rise):
+        wf_out[i] = wf_out[i-1] + (wf_in[i])/float(rise)
+    for i in range(rise, rise+flat):
+        wf_out[i] = wf_out[i-1] + (wf_in[i] - wf_in[i-rise])/float(rise)
+    for i in range(rise+flat, rise+flat+fall):
+        wf_out[i] = wf_out[i-1] + (wf_in[i] - wf_in[i-rise])/float(rise) - wf_in[i-rise-flat]/float(fall)
+    for i in range(rise+flat+fall, len(wf_in)):
+        wf_out[i] = wf_out[i-1] + (wf_in[i] - wf_in[i-rise])/float(rise) - (wf_in[i-rise-flat] - wf_in[i-rise-flat-fall])/float(fall)
