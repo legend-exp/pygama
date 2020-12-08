@@ -25,3 +25,4 @@ from ._processors.param_lookup import param_lookup
 from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
 from ._processors.integral import sum_wf
+from ._processors.presum import presum

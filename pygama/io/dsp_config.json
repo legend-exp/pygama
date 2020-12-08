@@ -34,10 +34,10 @@
     "wf_pz": {
       "function": "pole_zero",
       "module": "pygama.dsp.processors",
-      "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
+      "args": ["wf_blsub", "db.pz_const", "wf_pz"],
       "prereqs": ["wf_blsub"],
       "unit": "ADC",
-      "defaults": { "db.pz.tau":"72*us" }
+      "defaults": { "db.pz_const":"72*us" }
     },
     "wf_trap": {
       "function": "trap_norm",

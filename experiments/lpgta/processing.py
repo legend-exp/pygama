@@ -39,6 +39,9 @@ def main():
     arg('-o', '--over', action=st, help='overwrite existing files')
     arg('-n', '--nwfs', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
+    arg('-c', '--cwd', action=st, help="save output to current directory")
+    
+    by default it can move it into place in the directory tree, but have an option to leave it in place in CWD
 
     args = par.parse_args()
 
@@ -58,8 +61,8 @@ def main():
     # -- run routines --
     query = "YYYYmmdd == '" + args.date + "'" if args.date else args.q
     if args.dg: dg = load_datagroup(query)
-    if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
-    if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
+    if args.d2r: d2r(dg, args.over, nwfs, args.verbose, args.cwd)
+    if args.r2d: r2d(dg, args.over, nwfs, args.verbose, args.cwd)
 
 
 def load_datagroup(query=None):
@@ -71,7 +74,7 @@ def load_datagroup(query=None):
     # NOTE: for now, we have to edit this line to choose which files to process
     # process one big cal file (64 GB)
     #query = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    if query is not None: dg.file_keys.query(query, inplace=True)
+    if query is not None: dg.file_keys.query(query, cwd=True)
     
     print('files to process:')
     print(dg.file_keys)
@@ -136,7 +139,7 @@ def cmap_to_ch_groups(cmap, sys_per_ged = False):
     return ch_groups
 
 
-def d2r(dg, overwrite=False, nwfs=None, vrb=False):
+def d2r(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     run daq_to_raw on the current DataGroup
     """
@@ -153,6 +156,8 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
         # set up I/O paths
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        if cwd: f_raw = f'{row['raw_file']}'
+        
         subrun = row['cycle'] if 'cycle' in row else None
         systems = dg.subsystems
 
@@ -179,7 +184,7 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
 
 
-def r2d(dg, overwrite=False, nwfs=None, vrb=False):
+def r2d(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     """
     # print(dg.file_keys)
@@ -192,6 +197,7 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
 
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
+        if cwd: f_dsp = f'{row['dsp_file']}'
 
         if "sysn" in f_raw:
             tmp = {'sysn' : 'geds'} # hack for lpgta
