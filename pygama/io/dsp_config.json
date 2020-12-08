@@ -1,20 +1,34 @@
 {
   "outputs": [
-    "timestamp", "channel", "trapEmax", "trapEftp", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "zacE", "cuspE"
+    "timestamp", "channel", "energy", "trapEmax", "trapEftp", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "zacE", "cuspE", "power_spect", "curr_psd", "curr", "hf_max", "curr_psd_sum", "curr_psd_sum10", "wf_norm", "wf_blsub", "bl_slope", "tp_0", "tp_50"
   ],
   "processors":{
     "bl, bl_sig":{
       "function": "mean_stdev",
       "module": "pygama.dsp.processors",
-      "args" : ["waveform[0:1000]", "bl", "bl_sig"],
+      "args" : ["waveform[0:500]", "bl", "bl_sig"],
       "prereqs": ["waveform"],
       "unit": ["ADC", "ADC"]
+    },
+    "bl_intercept, bl_slope":{
+      "function": "linear_fit",
+      "module": "pygama.dsp.processors",
+      "args" : ["waveform[0:500]", "bl_intercept", "bl_slope"],
+      "prereqs": ["waveform"],
+      "unit": ["", ""]
     },
     "wf_blsub":{
       "function": "subtract",
       "module": "numpy",
       "args": ["waveform", "bl", "wf_blsub"],
       "prereqs": ["waveform", "bl"],
+      "unit": "ADC"
+    },
+    "wf_norm": {
+      "function": "divide",
+      "module": "numpy",
+      "args":["wf_blsub", "wf_blsub_max", "wf_norm"],
+      "prereqs": ["wf_blsub", "wf_blsub_max"],
       "unit": "ADC"
     },
     "wf_pz": {
@@ -133,6 +147,14 @@
       "unit": "ADC",
       "prereqs": ["wf_triangle"]
     },
+    "wf_blsub_max": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_blsub", 1, "wf_blsub_max"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "unit": "ADC",
+      "prereqs": ["wf_blsub"]
+    },
     "curr10": {
       "comment": "3rd argument allocates memory for a derivative of type float",
       "function": "avg_current",
@@ -211,6 +233,20 @@
       "unit": "",
       "prereqs": ["curr_psd"]
     },
+    "curr_psd_sum": {
+       "function": "sum_wf",
+       "module": "pygama.dsp.processors",
+       "args": ["curr_psd","curr_psd_sum"],
+       "unit": "",
+       "prereqs": ["curr_psd"]
+    },
+    "curr_psd_sum10": {
+       "function": "sum_wf",
+       "module": "pygama.dsp.processors",
+       "args": ["curr_psd[round(10*mhz*len(curr)):]","curr_psd_sum10"],
+       "unit": "",
+       "prereqs": ["curr_psd"]
+    },
     "power_spect": {
       "function": "psd",
       "module": "pygama.dsp.processors",
@@ -218,7 +254,15 @@
       "init_args": ["wf_blsub", "power_spect(len(wf_blsub)//2+1, f)"],
       "unit": "MHz",
       "prereqs": ["wf_blsub"]
+    },
+    "wf_fft": {
+      "function": "dft",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", "wf_fft"],
+      "init_args": ["wf_blsub", "wf_fft(len(wf_blsub)//2+1, f)"],
+      "unit": "MHz",
+      "prereqs": ["wf_blsub"]
     }
-    
+
   }
 }
