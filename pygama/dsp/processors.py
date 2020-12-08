@@ -26,4 +26,7 @@ from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
 from ._processors.presum import presum
 from ._processors.integral import sum_wf
+<<<<<<< HEAD
 from ._processors.presum import presum
+=======
+>>>>>>> 042ffdadfc5278fbc0e366a519eb3c8364c0626a
