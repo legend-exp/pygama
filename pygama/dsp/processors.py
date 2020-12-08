@@ -24,5 +24,6 @@ from ._processors.zac_filter import zac_filter
 from ._processors.param_lookup import param_lookup
 from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
+from ._processors.presum import presum
 from ._processors.integral import sum_wf
 from ._processors.presum import presum
