@@ -1,3 +1,4 @@
+from scimath.units.unit import unit
 from scimath.units.api import unit_parser
 from scimath.units.time import *
 from scimath.units.frequency import *
