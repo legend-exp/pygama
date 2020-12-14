@@ -36,16 +36,11 @@ with warnings.catch_warnings():
 
 
 def main():
-    doc="""
-    === pygama: energy_cal.py ====================================================
-
-    energy calibration app
-
+    doc="""=== pygama: energy_cal.py ===========================================
     - Initial guesses are determined by running 'check_raw_spectrum'
     - Uses a DataGroup to organize files and processing.
     - Metadata is handled in JSON format with 'legend-metadata' conventions.
-
-    === T. Mathew, C. Wiseman (UW) =============================================
+    === T. Mathew, C. Wiseman (UW), G. Othman (UNC) ============================
     """
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
@@ -94,29 +89,23 @@ def main():
     print(dg.file_keys[view_cols].to_string())
     # print(dg.file_keys)
     # print(dg.file_keys.columns)
-    # exit()
     
-    
-    # sto.ls(f_peak)
-    
-
     # merge main and ecal config JSON as dicts
     config = dg.config
     with open(config['ecal_config']) as f:
         config = {**dg.config, **json.load(f)}
-
+        
     # initialize JSON output file.  only run this once
     if args.init_db:
         init_ecaldb(config)
     try:
         # load ecal db in memory s/t the pretty on-disk formatting isn't changed
         db_ecal = db.TinyDB(storage=MemoryStorage)
-        with open(config['ecaldb']) as f:
+        with open(config['ecal_db']) as f:
             raw_db = json.load(f)
             db_ecal.storage.write(raw_db)
     except:
         print('JSON database file not found or corrupted.  Rerun --init_db')
-        exit()
 
     # set additional options, augmenting the config dict
     config['gb_cols'] = args.group.split(' ') if args.group else ['run']
@@ -142,11 +131,13 @@ def main():
 
     # show status
     print(f'Ready to calibrate.\n'
-          f"Output file: {config['ecaldb']} \n"
+          f"Output file: {config['ecal_db']} \n"
           'Calibrating raw energy parameters:', config['rawe'], '\n'
           'Current DataGroup:')
-    print(dg.file_keys[['run', 'cycle', 'startTime', 'runtime']])
+    print(dg.file_keys)
+    # print(dg.file_keys[['run', 'cycle', 'startTime', 'runtime']])
     print('Columns:', dg.file_keys.columns.values)
+    exit()
 
     # -- main calibration routines --
     if args.show_db: show_ecaldb(config)
@@ -157,6 +148,21 @@ def main():
         config['write_db'] = True
         run_peakdet(dg, config, db_ecal)
         run_peakfit(dg, config, db_ecal)
+
+
+def show_ecaldb(config):
+    """
+    $ ./energy_cal.py --show_db
+    """
+    # show the file as-is on disk
+    with open(config['ecaldb']) as f:
+        print(f.read())
+
+    # make sure the file is usable by TinyDB
+    db_ecal = db.TinyDB(storage=MemoryStorage)
+    with open(config['ecaldb']) as f:
+        raw_db = json.load(f)
+        db_ecal.storage.write(raw_db)
 
 
 def init_ecaldb(config):
@@ -193,21 +199,6 @@ def init_ecaldb(config):
     # show the file as-is on disk
     with open(f_db) as f:
         print(f.read())
-
-
-def show_ecaldb(config):
-    """
-    $ ./energy_cal.py --show_db
-    """
-    # show the file as-is on disk
-    with open(config['ecaldb']) as f:
-        print(f.read())
-
-    # make sure the file is usable by TinyDB
-    db_ecal = db.TinyDB(storage=MemoryStorage)
-    with open(config['ecaldb']) as f:
-        raw_db = json.load(f)
-        db_ecal.storage.write(raw_db)
 
 
 def check_raw_spectrum(dg, config, db_ecal):
