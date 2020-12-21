@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 import matplotlib.pyplot as plt
 
 # show how to correct for timestamp rollover with the struck 3302,

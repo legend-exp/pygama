@@ -22,7 +22,7 @@ plt.style.use('../clint.mpl')
 
 from pygama import DataGroup
 from pygama.io.orcadaq import parse_header
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 import pygama.analysis.metadata as pmd
 import pygama.analysis.histograms as pgh
 import pygama.analysis.calibration as pgc
