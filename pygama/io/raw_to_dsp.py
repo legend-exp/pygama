@@ -20,9 +20,9 @@ from pygama.io import lh5
 from pygama.utils import update_progress
 import pygama.git as git
 
-def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
+def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200, 
-               block_width=8):
+               block_width=16, verbose=1):
     """
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
@@ -57,6 +57,16 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         if 'raw' not in tb:
             lh5_tables.remove(tb)
 
+    # get the database parameters. For now, this will just be a dict in a json
+    # file, but eventually we will want to interface with the metadata repo
+    if isinstance(database, str):
+        with open(database, 'r') as db_file:
+            database = json.load(db_file)
+
+    if database and not isinstance(database, dict):
+        database = None
+        print('database is not a valid json file or dict. Using default db values.')
+    
     # delete the old file. TODO: ONCE BUGS ARE FIXED IN LH5 MODULE, DO THIS ONLY IF OVERWRITE IS TRUE!
     try:
         os.remove(f_dsp)
@@ -68,9 +78,11 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
         # load primary table and build processing chain and output table
         tot_n_rows = raw_store.read_n_rows(tb, f_raw)
         if n_max and n_max<tot_n_rows: tot_n_rows=n_max
-        
+
+        chan_name = tb.split('/')[0]
+        db_dict = database.get(chan_name) if database else None
         lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, 0, buffer_len)
-        pc, tb_out = build_processing_chain(lh5_in, dsp_config, outputs, verbose, block_width)
+        pc, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
         
         print(f'Processing table: {tb} ...')
         for start_row in range(0, tot_n_rows, buffer_len):
@@ -104,8 +116,8 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, verbose=1,
 
 
 
-def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
-                           block_width=8):
+def build_processing_chain(lh5_in, dsp_config, db_dict = None,
+                           outputs = None, verbosity=1, block_width=16):
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
@@ -144,6 +156,11 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
     Optional keyword arguments:
     - outputs: list of parameters to put in the output lh5 table. If None,
       use the parameters in the 'outputs' list from config
+    - db_dict: a nested dict pointing to values for db args.
+      e.g. if a processor uses arg db.trap.risetime, it will look up
+          db_dict['trap']['risetime']
+      and use the found value. If no value is found, use the default defined
+      in the config file.
     - verbosity: verbosity level:
             0: Print nothing (except errors...)
             1: Print basic warnings (default)
@@ -247,25 +264,53 @@ def build_processing_chain(lh5_in, dsp_config, outputs = None, verbosity=1,
         args = recipe['args']
         for i, arg in enumerate(args):
             if isinstance(arg, str) and arg[0:3]=='db.':
-                #TODO: ADD METADATA LOOKUP!
-                args[i] = recipe['defaults'][arg]
+                lookup_path = arg[3:].split('.')
+                try:
+                    node = db_dict
+                    for key in lookup_path:
+                        node = node[key]
+                    args[i] = node
+                    if(verbosity>0):
+                        print("Database lookup: found", node, "for", arg)
+                except:
+                    try:
+                        args[i] = recipe['defaults'][arg]
+                        if(verbosity>0):
+                            print("Database lookup: using default value of", args[i], "for", arg)
+                    except:
+                        raise Exception('Did not find', arg, 'in database, and could not find default value.')
             
-        kwargs = recipe.get('kwargs', {}) # might also need metadata lookup here
+        kwargs = recipe.get('kwargs', {}) # might also need db lookup here
         # if init_args are defined, parse any strings and then call func
         # as a factory/constructor function
         try:
             init_args = recipe['init_args']
             for i, arg in enumerate(init_args):
-                if isinstance(arg, str):
-                    if arg[0:3]=='db.':
-                        #TODO: ADD METADATA LOOKUP!
-                        init_args[i] = recipe['defaults'][arg]
-                    else:
-                        # see if string can be parsed by proc_chain
+                if isinstance(arg, str) and arg[0:3]=='db.':
+                    lookup_path = arg[3:].split('.')
+                    try:
+                        node = db_dict
+                        for key in lookup_path:
+                            node = node[key]
+                        init_args[i] = node
+                        if(verbosity>0):
+                            print("Database lookup: found", node, "for", arg)
+                    except:
                         try:
-                            init_args[i] = proc_chain.get_variable(arg)
+                            init_args[i] = recipe['defaults'][arg]
+                            if(verbosity>0):
+                                print("Database lookup: using default value of", init_args[i], "for", arg)
                         except:
-                            pass
+                            raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                    arg = init_args[i]
+
+                # see if string can be parsed by proc_chain
+                if isinstance(arg, str):
+                    try:
+                        init_args[i] = proc_chain.get_variable(arg)
+                    except:
+                        pass
+                    
             if(verbosity>1):
                 print("Building function", func.__name__, "from init_args", init_args)
             func = func(*init_args)
@@ -327,10 +372,10 @@ json config file and raw_to_dsp.""")
     arg('-v', '--verbose', default=1, type=int,
         help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
     
-    arg('-b', '--block', default=8, type=int,
+    arg('-b', '--block', default=16, type=int,
         help="Number of waveforms to process simultaneously. Default is 8")
     
-    arg('-c', '--chunk', default=256, type=int,
+    arg('-c', '--chunk', default=3200, type=int,
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
     arg('-n', '--nevents', default=None, type=int,
         help="Number of waveforms to process. By default do the whole file")
@@ -341,6 +386,8 @@ json config file and raw_to_dsp.""")
         help="Name of json file used by raw_to_dsp to construct the processing routines used. By default use dsp_config in pygama/apps.")
     arg('-p', '--outpar', default=None, action='append', type=str,
         help="Add outpar to list of parameters written to file. By default use the list defined in outputs list in config json file.")
+    arg('-d', '--dbfile', default=None, type=str,
+        help="JSON file to read DB parameters from. Should be nested dict with channel at the top level, and parameters below that.")
     arg('-r', '--recreate', action='store_const', const=0, dest='writemode',
         help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
     arg('-u', '--update', action='store_const', const=1, dest='writemode',
@@ -353,4 +400,4 @@ json config file and raw_to_dsp.""")
     if out is None:
         out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
 
-    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)
+    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)
