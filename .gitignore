@@ -12,6 +12,7 @@
 
 pygama/git.py
 experiments/lpgta/cori_slurm/logs/
+experiments/oppi/logs
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
