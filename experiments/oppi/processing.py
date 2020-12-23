@@ -11,7 +11,7 @@ import tinydb as db
 from tinydb.storages import MemoryStorage
 
 from pygama import DataGroup
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 from pygama.io.daq_to_raw import daq_to_raw
 from pygama.io.raw_to_dsp import raw_to_dsp
 
