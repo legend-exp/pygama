@@ -6,7 +6,7 @@ from pprint import pprint
 
 from pygama import DataGroup
 from pygama.io.orcadaq import parse_header
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 
 import warnings
 with warnings.catch_warnings():

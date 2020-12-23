@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 plt.style.use('../../pygama/clint.mpl')
 from matplotlib.colors import LogNorm
 
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 import pygama.analysis.histograms as pgh
 import pygama.analysis.peak_fitting as pgf
 
