@@ -72,13 +72,13 @@ def load_datagroup(query=None):
     # NOTE: for now, we have to edit this line to choose which files to process
     # process one big cal file (64 GB)
     #query = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    if query is not None: dg.file_keys.query(query, cwd=True)
+    if query is not None: dg.fileDB.query(query, cwd=True)
     
     print('files to process:')
-    print(dg.file_keys)
+    print(dg.fileDB)
     
     # can add other filters here
-    #dg.file_keys = dg.file_keys[:2]
+    #dg.fileDB = dg.fileDB[:2]
     
     return dg
 
@@ -140,15 +140,15 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     run daq_to_raw on the current DataGroup
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
 
     # subs = ['geds'] # TODO: ignore other datastreams
     # chans = ['g035', 'g042'] # TODO: select a subset of detectors
 
-    print(f'Processing {dg.file_keys.shape[0]} files ...')
+    print(f'Processing {dg.fileDB.shape[0]} files ...')
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
 
         # set up I/O paths
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
@@ -184,13 +184,13 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
 def r2d(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
 
     with open(f'{dg.experiment}_dsp.json') as f:
         dsp_config = json.load(f, object_pairs_hook=OrderedDict)
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
 
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"

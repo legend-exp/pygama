@@ -30,16 +30,16 @@ def test_datagroup():
     """
     dg = DataGroup('LPGTA.json', load=True)
     query = "run==30 and rtp == 'calib' and proc_group==35"
-    dg.file_keys.query(query, inplace=True)
-    # dg.file_keys = dg.file_keys[-1:]
-    # print(dg.file_keys.columns)
+    dg.fileDB.query(query, inplace=True)
+    # dg.fileDB = dg.fileDB[-1:]
+    # print(dg.fileDB.columns)
 
     # show what has been selected
     view_cols = ['run', 'label', 'YYYYmmdd', 'hhmmss', 'rtp', 'cmap', 'runtype',
                  'daq_size_GB', 'proc_group']
-    # print(dg.file_keys[view_cols].to_string())
+    # print(dg.fileDB[view_cols].to_string())
     
-    raw_path, raw_file = dg.file_keys[['raw_path','raw_file']].iloc[0]
+    raw_path, raw_file = dg.fileDB[['raw_path','raw_file']].iloc[0]
     f_raw = f'{dg.lh5_dir}/{raw_path}/{raw_file}'
     
     if "sysn" in f_raw:

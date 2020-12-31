@@ -79,9 +79,9 @@ def main():
     dg = DataGroup('LPGTA.json', load=True)
     if args.query:
         que = args.query[0]
-        dg.file_keys.query(que, inplace=True)
+        dg.fileDB.query(que, inplace=True)
     else:
-        dg.file_keys = dg.file_keys[-1:]
+        dg.fileDB = dg.fileDB[-1:]
     
     # merge main and ecal config JSON as dicts
     config = dg.config
@@ -127,8 +127,8 @@ def main():
           f"Output file: {config['ecal_db']} \n"
           'Calibrating raw energy parameters:', config['rawe'], '\n'
           'Current DataGroup:')
-    print(dg.file_keys)
-    print('Columns:', dg.file_keys.columns.values)
+    print(dg.fileDB)
+    print('Columns:', dg.fileDB.columns.values)
     exit()
 
     # -- main calibration routines --
@@ -201,9 +201,9 @@ def check_raw_spectrum(dg, config, db_ecal):
 
     # load energy data
     lh5_dir = os.path.expandvars(config['lh5_dir'])
-    dsp_list = lh5_dir + dg.file_keys['dsp_path'] + '/' + dg.file_keys['dsp_file']
+    dsp_list = lh5_dir + dg.fileDB['dsp_path'] + '/' + dg.fileDB['dsp_file']
     raw_data = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
-    runtime_min = dg.file_keys['runtime'].sum()
+    runtime_min = dg.fileDB['runtime'].sum()
 
     print('\nShowing raw spectra ...')
     for etype in config['rawe']:
@@ -256,9 +256,9 @@ def run_peakdet(dg, config, db_ecal):
     print('\nRunning peakdet ...')
 
     # do the analysis
-    gb = dg.file_keys.groupby(config['gb_cols'])
+    gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config]
-    run_no = np.array(dg.file_keys['run'])[0]
+    run_no = np.array(dg.fileDB['run'])[0]
     
     print(f'Running peakdet for run: {run_no}')
     
@@ -521,9 +521,9 @@ def run_peakfit(dg, config, db_ecal):
     print('\nRunning peakfit ...')
 
     # do the analysis
-    gb = dg.file_keys.groupby(config['gb_cols'])
+    gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config, db_ecal]
-    run_no = np.array(dg.file_keys['run'])[0]
+    run_no = np.array(dg.fileDB['run'])[0]
     
     print(f'Running peakfit for run {run_no}')
     
