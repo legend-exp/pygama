@@ -2,6 +2,7 @@ import sys
 import numpy as np
 
 from .orcadaq import OrcaDecoder
+from pygama.lh5.table import Table
 
 class ORCAStruck3302(OrcaDecoder):
     """
@@ -182,8 +183,7 @@ class ORCAStruck3302(OrcaDecoder):
         tb.push_row()
 
 
-'''
-class ORCAGretina4M(DataTaker):
+class ORCAGretina4M(OrcaDecoder):
     """
     decode Majorana Gretina4M digitizer data
 
@@ -191,99 +191,86 @@ class ORCAGretina4M(DataTaker):
     https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
     """
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORGretina4MWaveformDecoder'
-        self.class_name = 'ORGretina4MModel'
+        self.orca_class_name = 'ORGretina4MModel'
+
         self.decoded_values = {
-            "packet_id": [],
-            "ievt": [],
-            "energy": [],
-            "timestamp": [],
-            "channel": [],
-            "board_id": [],
-            "waveform": [],
+            'packet_id': {
+               'dtype': 'uint32',
+             },
+            'ievt': {
+              'dtype': 'uint32',
+            },
+            'energy': {
+              'dtype': 'uint32',
+              'units': 'adc',
+            },
+            'timestamp': {
+              'dtype': 'uint32',
+              'units': 'clock_ticks',
+            },
+            'crate': {
+              'dtype': 'uint8',
+            },
+            'card': {
+              'dtype': 'uint8',
+            },
+            'channel': {
+              'dtype': 'uint8',
+            },
+            "board_id": {
+              'dtype': 'uint32',
+            },
+            'waveform': {
+              'dtype': 'int16',
+              'datatype': 'waveform',
+              'length': 2032, # max value. override this before initalizing buffers to save RAM
+              'sample_period': 10, # override if a different clock rate is used
+              'sample_period_units': 'ns',
+              'units': 'adc',
+            },
         }
         super().__init__(*args, **kwargs)
-        self.chan_list = None
-        self.is_multisampled = True
-        self.event_header_length = 18
-        self.sample_period = 10  # ns
-        self.gretina_event_no = 0
-        self.window = False
-        self.n_blsamp = 500
         self.ievt = 0
-
-        self.df_metadata = None # hack, this probably isn't right
-        self.active_channels = self.find_active_channels()
+        self.skipped_channels = {}
 
 
-    def crate_card_chan(self, crate, card, channel):
-        return (crate << 9) + (card << 4) + (channel)
-
-
-    def find_active_channels(self):
-        """
-        Only do this for multi-detector data
-        """
-        active_channels = []
-        if self.df_metadata is None:
-            return active_channels
-
-        for index, row in self.df_metadata.iterrows():
-            crate, card = index
-            for chan, chan_en in enumerate(row.Enabled):
-                if chan_en:
-                    active_channels.append(
-                        self.crate_card_chan(crate, card, chan))
-
-        return active_channels
-
-
-    def decode_event(self, event_data_bytes, packet_id, header_dict):
+    def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
         """
         Parse the header for an individual event
         """
-        self.gretina_event_no += 1
-        event_data = np.fromstring(event_data_bytes, dtype=np.uint16)
-        card = event_data[1] & 0x1F
-        crate = (event_data[1] >> 5) & 0xF
-        channel = event_data[4] & 0xf
-        board_id = (event_data[4] & 0xFFF0) >> 4
-        timestamp = event_data[6] + (event_data[7] << 16) + (event_data[8] << 32)
-        energy = event_data[9] + ((event_data[10] & 0x7FFF) << 16)
-        wf_data = event_data[self.event_header_length:]
 
-        ccc = self.crate_card_chan(crate, card, channel)
-        if ccc not in self.active_channels:
-            # should store this in a garbage data frame
-            return
+        pu16 = np.frombuffer(packet, dtype=np.uint16)
+        p16 = np.frombuffer(packet, dtype=np.int16)
 
-        # if the wf is too big for pytables, we can window it
-        if self.window:
-            wf = Waveform(wf_data, self.sample_period, self.decoder_name)
-            waveform = wf.window_waveform(self.win_type,
-                                          self.n_samp,
-                                          self.n_blsamp,
-                                          test=False)
-            if wf.is_garbage:
-                ievt = self.ievt_gbg
-                self.ievt_gbg += 1
-                self.garbage_count += 1
+        # aliases for brevity
+        tb = lh5_tables
+        if not isinstance(tb, Table): 
+            if iwf not in lh5_tables:
+                if iwf not in self.skipped_channels: 
+                    self.skipped_channels[iwf] = 0
+                self.skipped_channels[iwf] += 1
+                return
+            tb = lh5_tables[iwf]
+        ii = tb.loc
 
-        if len(wf_data) > 2500 and self.h5_format == "table":
-            print("WARNING: too many columns for tables output,",
-                  "         reverting to saving as fixed hdf5 ...")
-            self.h5_format = "fixed"
+        tb['packet_id'].nda[ii] = packet_id
+        tb['ievt'].nda[ii] = self.ievt
+        tb['energy'].nda[ii] = pu16[9] + ((pu16[10] & 0x7FFF) << 16)
+        tb['timestamp'].nda[ii] = pu16[6] + (pu16[7] << 16) + (pu16[8] << 32)
+        tb['crate'].nda[ii] = (pu16[1] >> 5) & 0xF
+        tb['card'].nda[ii] = pu16[1] & 0x1F
+        tb['channel'].nda[ii] = pu16[4] & 0xf
+        tb['board_id'].nda[ii] = (pu16[4] & 0xFFF0) >> 4
+        tb['waveform']['values'].nda[ii][:] = p16[18:]
+        tb.push_row()
 
-        waveform = wf_data.astype("int16")
-
-        # set the event number (searchable HDF5 column)
-        ievt = self.ievt
+        # update the event number (searchable HDF5 column)
         self.ievt += 1
 
-        # send any variable with a name in "decoded_values" to the pandas output
-        self.format_data(locals())
 
-
+'''
 class SIS3316ORCADecoder(DataTaker):
     """
     handle ORCA Struck 3316 digitizer
@@ -318,8 +305,7 @@ class SIS3316ORCADecoder(DataTaker):
         self.window = False
 
 
-    def decode_event(self, event_data_bytes, packet_id, header_dict,
-                     verbose=False):
+    def decode_event(self, event_data_bytes, packet_id, header_dict, verbose=False):
 
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)

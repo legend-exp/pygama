@@ -65,7 +65,7 @@ def parse_header(orca_filename):
         big_endian = False if sys.byteorder == "little" else True
         i = from_bytes(ba[:4], big_endian=big_endian)
         j = from_bytes(ba[4:], big_endian=big_endian)
-        if np.ceil(j/4) != i-2:
+        if (np.ceil(j/4) != i-2) and (np.ceil(j/4) != i-3):
             print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
             return i, j, {}
 
@@ -279,7 +279,7 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
         decoder = sub() # instantiate the class
         if decoder.decoder_name in dn2id_dict:
             # Later: allow to turn on / off decoders in exp.json
-            if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+            #if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
             decoder.dataID = dn2id_dict[decoder.decoder_name]
             decoder.set_object_info(get_object_info(header_dict, decoder.orca_class_name))
             decoders[decoder.dataID] = decoder
