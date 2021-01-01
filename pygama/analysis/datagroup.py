@@ -133,8 +133,11 @@ class DataGroup:
 
         file_keys = []
         stop_walk = False
+        n_files = 0
 
         for path, folders, files in os.walk(self.daq_dir):
+        
+            n_files += len(files)
 
             for f in files:
 
@@ -156,12 +159,20 @@ class DataGroup:
                     file_keys.append(finfo)
 
                 # limit number of files (debug mode)
-                if self.nfiles is not None and len(file_keys)==self.nfiles:
+                if self.nfiles is not None and len(file_keys) >= self.nfiles:
                     stop_walk = True
                 if stop_walk:
                     break
             if stop_walk:
                 break
+
+        if n_files == 0:
+            print("no daq files found...")
+            return
+
+        if len(file_keys) == 0:
+            print("no daq files matched pattern", self.daq_template)
+            return
 
         # create the main DataFrame
         self.file_keys = pd.DataFrame(file_keys)
