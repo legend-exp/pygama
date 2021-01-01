@@ -1,9 +1,9 @@
-import sys
+import sys, gzip
 import numpy as np
 import plistlib
 from ..utils import update_progress
 from .io_base import DataDecoder
-from . import lh5
+from pygama import lh5
 
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
@@ -38,7 +38,13 @@ class OrcaDecoder(DataDecoder):
 from .orca_digitizers import *
 
 
-def parse_header(xmlfile):
+def open_orca(orca_filename):
+    if orca_filename.endswith('.gz'): 
+        return gzip.open(orca_filename.encode('utf-8'), 'rb')
+    else: return open(orca_filename.encode('utf-8'), 'rb')
+
+
+def parse_header(orca_filename):
     """
     Opens the given file for binary read ('rb'), then grabs the first 8 bytes
     The first 4 bytes (1 long) of an orca data file are the total length in
@@ -46,7 +52,7 @@ def parse_header(xmlfile):
     The next 4 bytes (1 long) is the length of the header in bytes
     The header is then read in ...
     """
-    with open(xmlfile, 'rb') as xmlfile_handle:
+    with open_orca(orca_filename) as xmlfile_handle:
         #read the first word:
         ba = bytearray(xmlfile_handle.read(8))
 
@@ -59,17 +65,23 @@ def parse_header(xmlfile):
         big_endian = False if sys.byteorder == "little" else True
         i = from_bytes(ba[:4], big_endian=big_endian)
         j = from_bytes(ba[4:], big_endian=big_endian)
+        if np.ceil(j/4) != i-2:
+            print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
+            return i, j, {}
 
         #read in the next that-many bytes that occupy the plist header
-        ba = bytearray(xmlfile_handle.read(j))
+        as_bytes = xmlfile_handle.read(j)
+        ba = bytearray(as_bytes)
 
         #convert to string
         #the readPlistFromBytes method doesn't exist in 2.7
         if sys.version_info[0] < 3:
             header_string = ba.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
-        else:
+        elif sys.version_info[1] < 9:
             header_dict = plistlib.readPlistFromBytes(ba)
+        else:
+            header_dict = plistlib.loads(as_bytes, fmt=plistlib.FMT_XML)
         return i, j, header_dict
 
 
@@ -234,13 +246,13 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     """
     lh5_store = lh5.Store()
 
-    f_in = open(daq_filename.encode('utf-8'), "rb")
+    f_in = open_orca(daq_filename)
     if f_in == None:
         print("Couldn't find the file %s" % daq_filename)
         sys.exit(0)
 
     # parse the header. save the length so we can jump past it later
-    reclen, reclen2, header_dict = parse_header(daq_filename)
+    reclen, header_nbytes, header_dict = parse_header(daq_filename)
 
     # figure out the total size
     SEEK_END = 2
