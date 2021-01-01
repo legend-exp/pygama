@@ -14,6 +14,7 @@ def main():
     # dg.lh5_dir_setup() # <-- run this once with create=True
 
     dg.scan_daq_dir()
+    if dg.file_keys is None: return
     
     # -- organize and augment the dg.file_keys DataFrame -- 
     
