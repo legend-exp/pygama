@@ -7,7 +7,7 @@ base classes for decoding daq data into raw lh5 files
 from abc import ABC
 import numpy as np
 
-from . import lh5
+from pygama import lh5
 
 
 class DataDecoder(ABC):

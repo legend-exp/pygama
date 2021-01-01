@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from ..utils import *
 from .io_base import DataDecoder
-from . import lh5
+from pygama import lh5
 from .ch_group import *
 
 
