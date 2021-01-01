@@ -1,19 +1,41 @@
 import pandas as pd
 from .struct import Struct
-from .array import Array
-from .fsarray import Array
 
 
 class Table(Struct):
     """
-    A special struct of array or subtable 'columns' of equal length.
+    A special struct of array or subtable "columns" of equal length.
+
+    Holds onto an internal read/write location "loc" that is useful in managing
+    table I/O using functions like push_row(), is_full(), and clear()
     """
-    
+    # TODO: overload getattr to allow access to fields as object attributes?
+
+
     def __init__(self, size=None, col_dict={}, attrs={}):
-        # TODO: overload getattr to allow access to fields as object attributes?
-        
-        # if col_dict is not empty, its contents will be used directly in
-        # the Table (not copied)
+        """
+        Parameters
+        ----------
+        size : int (optional)
+            Sets the number of rows in the table. Arrays in col_dict will be
+            resized to match size if both are not None.  If size is left as
+            None, the number of table rows is determined from the length of the
+            first array in col_dict. If neither is provided, a default length of
+            1024 is used.
+        col_dict : dict (optional)
+            Instantiate this table using the supplied named lh5 array-like
+            objects.  
+            Note 1: no copy is performed, the objects are used directly.
+            Note 2: if size is not None, all arrays will be resized to match it
+            Note 3: if the arrays have different lengths, all will be resized to
+            match the length of the first array
+        attrs : dict (optional)
+            A set of user attributes to be carried along with this lh5 object
+
+        Initialization
+        --------------
+        self.loc is initialized to 0
+        """
         super().__init__(obj_dict=col_dict, attrs=attrs)
 
         # if col_dict is not empty, set size according to it
@@ -30,7 +52,13 @@ class Table(Struct):
         self.loc = 0
 
 
+    def datatype_name(self): 
+        """The name for this object's lh5 datatype attribute"""
+        return 'table'
+
+
     def __len__(self):
+        """Provides __len__ for this array-like class"""
         return self.size
 
 
@@ -71,8 +99,8 @@ class Table(Struct):
 
 
     def get_dataframe(self, *cols, copy=False):
-        """Get a dataframe containing each of the columns given. If no columns
-        are given, get include all fields as columns."""
+        """Get a pandase dataframe containing each of the columns given. If no
+        columns are given, get include all fields as columns."""
         df = pd.DataFrame(copy=copy)
         if len(cols)==0:
             for col, dat in self.items():
