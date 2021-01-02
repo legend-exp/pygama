@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-from .orcadaq import OrcaDecoder
+from .orcadaq import OrcaDecoder, get_ccc
 from pygama.lh5.table import Table
 
 class ORCAStruck3302(OrcaDecoder):
@@ -88,7 +88,11 @@ class ORCAStruck3302(OrcaDecoder):
             self.decoded_values['waveform']['length'] = trace_length
 
 
-    def decode_packet(self, packet, lh5_table, packet_id, header_dict, verbose=False):
+    def max_n_rows_per_packet(self):
+        return 1
+
+
+    def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
         """
         see README for the 32-bit data word diagram
         """
@@ -99,7 +103,15 @@ class ORCAStruck3302(OrcaDecoder):
         p16 = np.frombuffer(packet, dtype=np.uint16)
 
         # aliases for brevity
-        tb = lh5_table
+        tb = lh5_tables
+        if isinstance(tb, dict): 
+            if ccc not in lh5_tables:
+                if ccc not in self.skipped_channels: 
+                    self.skipped_channels[ccc] = 0
+                self.skipped_channels[ccc] += 1
+                return
+            tb = lh5_tables[ccc]
+        ii = tb.loc
         ii = tb.loc
 
         # store packet id
@@ -236,6 +248,10 @@ class ORCAGretina4M(OrcaDecoder):
         self.skipped_channels = {}
 
 
+    def max_n_rows_per_packet(self):
+        return 1
+
+
     def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
         """
         Parse the header for an individual event
@@ -244,24 +260,29 @@ class ORCAGretina4M(OrcaDecoder):
         pu16 = np.frombuffer(packet, dtype=np.uint16)
         p16 = np.frombuffer(packet, dtype=np.int16)
 
+        crate = (pu16[1] >> 5) & 0xF
+        card = pu16[1] & 0x1F
+        channel = pu16[4] & 0xf
+        ccc = get_ccc(crate, card, channel)
+
         # aliases for brevity
         tb = lh5_tables
-        if not isinstance(tb, Table): 
-            if iwf not in lh5_tables:
-                if iwf not in self.skipped_channels: 
-                    self.skipped_channels[iwf] = 0
-                self.skipped_channels[iwf] += 1
+        if isinstance(tb, dict): 
+            if ccc not in lh5_tables:
+                if ccc not in self.skipped_channels: 
+                    self.skipped_channels[ccc] = 0
+                self.skipped_channels[ccc] += 1
                 return
-            tb = lh5_tables[iwf]
+            tb = lh5_tables[ccc]
         ii = tb.loc
 
         tb['packet_id'].nda[ii] = packet_id
         tb['ievt'].nda[ii] = self.ievt
         tb['energy'].nda[ii] = pu16[9] + ((pu16[10] & 0x7FFF) << 16)
         tb['timestamp'].nda[ii] = pu16[6] + (pu16[7] << 16) + (pu16[8] << 32)
-        tb['crate'].nda[ii] = (pu16[1] >> 5) & 0xF
-        tb['card'].nda[ii] = pu16[1] & 0x1F
-        tb['channel'].nda[ii] = pu16[4] & 0xf
+        tb['crate'].nda[ii] = crate
+        tb['card'].nda[ii] = card
+        tb['channel'].nda[ii] = channel
         tb['board_id'].nda[ii] = (pu16[4] & 0xFFF0) >> 4
         tb['waveform']['values'].nda[ii][:] = p16[18:]
         tb.push_row()
