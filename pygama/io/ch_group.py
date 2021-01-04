@@ -1,4 +1,4 @@
-from pygama.lh5.table import Table
+from pygama import lh5
 
 def expand_ch_groups(ch_groups):
     """
@@ -137,9 +137,13 @@ def build_tables(ch_groups, buffer_size, init_obj=None):
     # set up a table for each group
     for group_name, group_info in ch_groups.items():
 
-        tbl = Table(buffer_size)
+        tbl = lh5.Table(buffer_size)
         if init_obj is not None:
-            init_obj.initialize_lh5_table(tbl)
+            channel = None # for dummy ch_group
+            # Note: all ch in ch_list will be written to the same table. So it
+            # should suffice to initials for first channel in the list
+            if 'ch_list' in group_info: channel = group_info['ch_list'][0]
+            init_obj.initialize_lh5_table(tbl, channel)
 
         group_info['table'] = tbl
 

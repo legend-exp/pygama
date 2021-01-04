@@ -61,7 +61,7 @@ class FlashCamEventDecoder(DataDecoder):
             },
         }
 
-        # these are read for every file (get_file_config)
+        # these are read for every file (set_file_config)
         # FIXME: push into a file header object?
         self.config_names = [
             'nsamples', # samples per channel
@@ -79,9 +79,14 @@ class FlashCamEventDecoder(DataDecoder):
     
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
+
+
+    def get_decoded_values(self, channel): 
+        # same for all channels
+        return self.decoded_values
         
         
-    def get_file_config(self, fcio):
+    def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
         """
@@ -190,7 +195,7 @@ class FlashCamStatusDecoder(DataDecoder):
             },
         }
 
-        # these are read for every file (get_file_config)
+        # these are read for every file (set_file_config)
         self.config_names = [
             'nsamples', # samples per channel
             'nadcs', # number of adc channels
@@ -208,7 +213,7 @@ class FlashCamStatusDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
         
         
-    def get_file_config(self, fcio):
+    def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
         """
@@ -275,7 +280,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     
     # set up event decoder
     event_decoder = FlashCamEventDecoder()
-    event_decoder.get_file_config(fcio)
+    event_decoder.set_file_config(fcio)
     event_tables = {}
     
     # build ch_groups and set up tables
@@ -306,7 +311,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
-    status_decoder.get_file_config(fcio)
+    status_decoder.set_file_config(fcio)
     status_tbl = lh5.Table(buffer_size)
     status_decoder.initialize_lh5_table(status_tbl)
     try:
