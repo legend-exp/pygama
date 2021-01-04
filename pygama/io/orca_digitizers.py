@@ -2,11 +2,10 @@ import sys
 import numpy as np
 
 from .orcadaq import OrcaDecoder, get_ccc
-from pygama.lh5.table import Table
 
 class ORCAStruck3302(OrcaDecoder):
     """
-    decode ORCA Struck 3302 digitizer data
+    ORCA decoder for Struck 3302 digitizer data
     """
     def __init__(self, *args, **kwargs):
 
@@ -49,9 +48,15 @@ class ORCAStruck3302(OrcaDecoder):
               'units': 'adc',
             },
         }
+
         super().__init__(*args, **kwargs) # also initializes the garbage df
         self.enabled_cccs = []
         self.ievt = 0
+
+
+    def get_decoded_values(self, channel):
+        # TODO: return channel-specific decoded_values
+        return self.decoded_values
 
 
     def set_object_info(self, object_info):
@@ -197,7 +202,7 @@ class ORCAStruck3302(OrcaDecoder):
 
 class ORCAGretina4M(OrcaDecoder):
     """
-    decode Majorana Gretina4M digitizer data
+    Decoder for Majorana Gretina4M digitizer data
 
     NOTE: Tom Caldwell made some nice new summary slides on a 2019 LEGEND call
     https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
@@ -207,7 +212,7 @@ class ORCAGretina4M(OrcaDecoder):
         self.decoder_name = 'ORGretina4MWaveformDecoder'
         self.orca_class_name = 'ORGretina4MModel'
 
-        self.decoded_values = {
+        self.decoded_values_template = {
             'packet_id': {
                'dtype': 'uint32',
              },
@@ -237,19 +242,89 @@ class ORCAGretina4M(OrcaDecoder):
             'waveform': {
               'dtype': 'int16',
               'datatype': 'waveform',
-              'length': 2032, # max value. override this before initalizing buffers to save RAM
-              'sample_period': 10, # override if a different clock rate is used
+              'length': 2016, # shorter if multispampling is used
+              'sample_period': 10,
               'sample_period_units': 'ns',
               'units': 'adc',
             },
         }
+
         super().__init__(*args, **kwargs)
+        self.decoded_values = {}
         self.ievt = 0
         self.skipped_channels = {}
+        self.use_MS = False
+        self.wf_skip = 16 # the first ~dozen samples are sometimes junk
+        # channel pars for multisampling mode
+        self.ft_len = {}
+        self.ps = {}
+        self.div = {}
+        self.rises = np.zeros(2016)
+        self.remainders = np.zeros(2016)
+
+
+    def get_decoded_values(self, channel):
+        if channel is None: 
+            dec_vals_list = self.decoded_values.items()
+            if len(dec_vals_list) == 0:
+                print("ORGretina4MModel: Error: decoded_values not built yet!")
+                return None
+            return dec_vals_list[0]
+        if channel in self.decoded_values: return self.decoded_values[channel]
+        print("ORGretina4MModel: Error: No decoded values for channel", channel)
+        return None
 
 
     def max_n_rows_per_packet(self):
         return 1
+
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+
+        # parse object_info for important info
+        for card_dict in self.object_info:
+            crate = card_dict['Crate']
+            card = card_dict['Card']
+
+            is_enabled = card_dict['Enabled']
+            ftcnt = card_dict['FtCnt']
+            presum_rates = [ 2, 4, 8, 10 ] # number presummed in MS
+            mrpsrt = card_dict['Mrpsrt'] # index for channel's presum rate
+            dividers = [1, 2, 4, 8 ] # dividers for presummed data
+            mrpsdv = card_dict['Mrpsdv'] # index for channel's divider
+            for channel in range(8):
+                # only care about enabled channels
+                if not is_enabled[channel]: continue
+                ccc = get_ccc(crate, card, channel)
+                self.decoded_values[ccc] = {}
+                self.decoded_values[ccc].update(self.decoded_values_template)
+                sd = self.decoded_values[ccc] # alias
+
+                # find MS parameters
+                # MS is on if FtCnt > 0
+                # forget pre-rising-edge MS: it's broken so MJ doesn't use it
+                # Skip samples at beginning, fully sample, then FtCnt samples of
+                # pre-sampled, divided by div. Make one long fully-sampled wf.
+                ft_len = ftcnt[channel]
+                self.ft_len[ccc] = ft_len
+                if self.is_multisampled(ccc):
+                    ps = presum_rates[mrpsrt[channel]]
+                    self.ps[ccc] = ps
+                    self.div[ccc] = dividers[mrpsdv[channel]]
+                    # chop off 3 values at the end because 2 are bad and we need
+                    # one for interpolation
+                    min_len = 2018 - ft_len - self.wf_skip + (ps-1)*(ft_len-3)
+                    sd['waveform']['length'] = min_len
+                    if min_len > len(self.remainders):
+                        self.remainders.resize(min_len)
+                else: sd['waveform']['length'] = 2016 - self.wf_skip
+
+
+    def is_multisampled(self, ccc):
+        if ccc in self.ft_len: return self.ft_len[ccc] > 0
+        else: print('channel', ccc, 'not in ft_len...')
+        return False
 
 
     def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
@@ -284,7 +359,69 @@ class ORCAGretina4M(OrcaDecoder):
         tb['card'].nda[ii] = card
         tb['channel'].nda[ii] = channel
         tb['board_id'].nda[ii] = (pu16[4] & 0xFFF0) >> 4
-        tb['waveform']['values'].nda[ii][:] = p16[18:]
+
+        # wf starts from p16[18] and is always 2018 samples
+        # we will chop off the start (~a dozen) and end (last 2), but not until
+        # after we have handled multisampling
+        wf = p16[18:]
+        wf_len = 2018
+        if self.is_multisampled(ccc):
+            # get ccc pars
+            ps = self.ps[ccc]
+            div = self.div[ccc]
+            ratio = div / ps
+
+            # find start of presummed section
+            # because it's not always self.ft_len :(
+            ift = wf_len - self.ft_len[ccc] - 2
+            min_diff = np.inf
+            min_diff_ift = ift
+            for i in range(self.wf_skip+1):
+                d1 = abs(wf[ift+i]*ratio - wf[ift+i-1])
+                if d1 < min_diff:
+                    min_diff = d1
+                    min_diff_ift = ift+i
+            ift = min_diff_ift
+            ift_out = ift - self.wf_skip
+
+            # copy over fully-sampled portion
+            tb['waveform']['values'].nda[ii][:ift_out] = wf[self.wf_skip:ift]
+
+            # compute slopes for interpolation
+            # rise[i-1] is the slope prior to sample i, while rise[i] is the
+            # slope following it
+            if len(self.rises) != len(wf): self.rises.resize(len(wf)-1)
+            self.rises[:] = wf[1:] - wf[:-1]
+            # correct the value right before ift
+            self.rises[ift-1] = wf[ift] - np.sum(wf[ift-ps:ift]) / div
+
+            # store double-precision values in self.remainders (later it will be
+            # used to compute remainders and do round-off
+            # Note: the interpolation done here is meant to preserve the
+            # presumming: re-presumming should reproduce the original waveform
+            rem_len = len(self.remainders) - ift_out
+            for ips in range(ps):
+                nn = int(np.floor( (rem_len - ips - 1) / ps ) + 1)
+                self.remainders[ift_out+ips::ps] = wf[ift:ift+nn]
+                self.remainders[ift_out+ips::ps] -= (2*ips+1)/(2*ps)*self.rises[ift-1:ift+nn-1]
+                self.remainders[ift_out+ips::ps] *= ratio
+
+            # now set the output based on rounding cumulative remainders
+            wf_out = tb['waveform']['values'].nda[ii]
+            if len(self.remainders) != len(wf_out):
+                print("Error: remainders len", len(self.remainders), "but wf_out len", len(wf_out))
+                return
+            for ips in range(ps):
+                np.rint(self.remainders[ift_out+ips::ps], out=wf_out[ift_out+ips::ps], casting='unsafe')
+                if ips == ps-1: break;
+                self.remainders[ift_out+ips::ps] -= wf_out[ift_out+ips::ps]
+                self.remainders[ift_out+ips+1::ps] += self.remainders[ift_out+ips:-1:ps]
+
+        else:
+            length = 2016 - self.wf_skip
+            start = 16+self.wf_skip
+            tb['waveform']['values'].nda[ii][:] = p16[start:start+length]
+
         tb.push_row()
 
         # update the event number (searchable HDF5 column)
