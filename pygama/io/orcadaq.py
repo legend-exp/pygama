@@ -25,14 +25,11 @@ class OrcaDecoder(DataDecoder):
         self.set_object_info(object_info)
 
     def set_header_dict(self, header_dict):
-        """Overload to e.g. update decoded_values based on object_info.
-
-        Otherwise just use header_dict and object_info as you need it
-        """
         self.header_dict = header_dict
-        self.object_info = get_object_info(header_dict, self.orca_class_name)
+        self.set_object_info(get_object_info(header_dict, self.orca_class_name))
 
     def set_object_info(self, object_info):
+        """Overload to e.g. update decoded_values based on object_info."""
         self.object_info = object_info
 
 
@@ -160,8 +157,8 @@ def get_id_to_decoder_name_dict(header_dict):
 
 def get_object_info(header_dict, orca_class_name):
     """
-    returns a dict keyed by data id with all info from the header
-    TODO: doesn't include all parts of the header yet!
+    returns a list with all info from the header for each card with name
+    orca_class_name.
     """
     object_info_list = []
 
@@ -297,7 +294,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         decoder = sub() # instantiate the class
         if decoder.decoder_name in decoders_to_run:
             decoder.dataID = dn2id_dict[decoder.decoder_name]
-            decoder.set_object_info(get_object_info(header_dict, decoder.orca_class_name))
+            decoder.set_header_dict(header_dict)
             decoders[decoder.dataID] = decoder
     if len(decoders) == 0:
         print("No decoders. Exiting...")
