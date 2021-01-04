@@ -357,7 +357,8 @@ class Store:
         else:
             print('Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
-        
+
+
     def read_n_rows(self, name, lh5_file):
         """Look up the number of rows in an Array-like object called name
         in lh5_file. Return None if it is a scalar/struct."""

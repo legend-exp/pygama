@@ -1,4 +1,5 @@
 from .lh5_utils import get_lh5_element_type
+import numpy as np
 
 class Scalar:
     """

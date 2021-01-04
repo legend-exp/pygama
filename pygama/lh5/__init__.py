@@ -7,3 +7,4 @@ from .vectorofvectors import VectorOfVectors
 from .struct import Struct
 from .table import Table
 from .store import Store
+
