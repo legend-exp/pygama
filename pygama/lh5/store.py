@@ -408,3 +408,62 @@ class Store:
 
         print('Store: don\'t know how to read datatype', datatype)
         return None
+
+
+def load_nda(f_list, par_list, group_path='', verbose=True):
+    """ Build a dictionary of ndarrays from lh5 data
+
+    Given a list of files, a list of lh5 table parameters, and an optional group
+    path, return a numpy array with all values for each parameter.
+
+    Parameters
+    ----------
+    f_list : str or list of str's
+        A list of files. Can contain wildcards
+    par_list : list of str's
+        A list of parameters to read from each file
+    group_path : str (optional)
+        Optional group path within which to find the specified parameters
+
+    Returns
+    -------
+    par_data : dict
+        A dictionary of the parameter data keyed by the elements of par_list.
+        Each entry contains the data for the specified parameter concatenated
+        over all files in f_list
+    """
+    if isinstance(f_list, str): f_list = [f_list]
+    # Expand wildcards
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
+    if verbose:
+        print("loading data for", *f_list)
+
+    sto = Store()
+    par_data = {par : [] for par in par_list}
+    for f in f_list:
+        for par in par_list:
+            data, _ = sto.read_object(f'{group_path}/{par}', f)
+            if not data: continue
+            par_data[par].append(data.nda)
+    par_data = {par : np.concatenate(par_data[par]) for par in par_list}
+    return par_data
+
+
+def load_dfs(f_list, par_list, group_path='', verbose=True):
+    """ Build a pandas dataframe from lh5 data
+
+    Given a list of files (can use wildcards), a list of lh5 columns, and
+    optionally the group path, return a pandas DataFrame with all values for
+    each parameter.
+
+    Parameters
+    ----------
+    See load_nda for parameter specification
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        Contains columns for each parameter in par_list, and rows containing all
+        data for the associated parameters concatenated over all files in f_list
+    """
+    return pd.DataFrame( load_nda(f_list, par_list, group_path, verbose) )
