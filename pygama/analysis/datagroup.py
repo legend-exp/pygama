@@ -68,6 +68,20 @@ class DataGroup:
         if not os.path.isdir(self.lh5_dir):
             print('Warning, LH5 directory not found:', self.lh5_dir)
 
+        # optional: set a user directory (useful for testing file processing)
+        if 'lh5_user' in self.config:
+            self.lh5_user_dir = os.path.expandvars(self.config['lh5_user'])
+            if not os.path.isdir(self.lh5_user_dir):
+                print('Warning, LH5 user directory not found:', self.lh5_user_dir)
+                
+        # optional: run selection json file
+        if 'runSelectionDB' in self.config:
+            f_runsel = os.path.expandvars(self.config['runSelectionDB'])
+            if not os.path.exists(f_runsel):
+                print('Warning, run selection file not found:', f_runsel)
+            else:
+                with open(f_runsel) as f:
+                    self.runSelectionDB = json.load(f)
 
         # get LH5 subdirectory names
         self.tier_dirs = self.config['tier_dirs']
@@ -81,30 +95,32 @@ class DataGroup:
         self.lh5_template = self.config['lh5_template']
 
 
-    def lh5_dir_setup(self, create=False):
+    def lh5_dir_setup(self, user_dir=False):
         """
-        view LH5 data directories.  if create is True, actually create them
+        generate paths to LH5 data directories, using `self.lh5_dir`
+        if user_dir is True, create them in `self.lh5_user` instead.
         """
         dirs = []
+        lh5_dir = self.lh5_user if user_dir else self.lh5_dir
 
         # directories for hit-level data
         t, r, s = self.tier_dirs, self.subsystems, self.run_types
         for tier, subs, rtp in itertools.product(t, s, r):
-            dirname = f'{self.lh5_dir}/{tier}/{subs}/{rtp}'
+            dirname = f'{lh5_dir}/{tier}/{subs}/{rtp}'
             print(dirname)
             dirs.append(dirname)
 
         # directories for event-level data
         for dir in self.evt_dirs:
-            dirname = f'{self.lh5_dir}/{dir}'
+            dirname = f'{lh5_dir}/{dir}'
             print(dirname)
             dirs.append(dirname)
 
-        if create:
-            ans = input('Create directories? (y/n)')
-            if ans.lower() == 'y':
-                for d in dirs:
-                    Path(d).mkdir(parents=True, exist_ok=True)
+        print('Base LH5 path:', lh5_dir)
+        ans = input('Create directories here? (y/n)')
+        if ans.lower() == 'y':
+            for d in dirs:
+                Path(d).mkdir(parents=True, exist_ok=True)
 
 
     def scan_daq_dir(self, verbose=False):
@@ -117,8 +133,11 @@ class DataGroup:
 
         file_keys = []
         stop_walk = False
+        n_files = 0
 
         for path, folders, files in os.walk(self.daq_dir):
+        
+            n_files += len(files)
 
             for f in files:
 
@@ -140,12 +159,20 @@ class DataGroup:
                     file_keys.append(finfo)
 
                 # limit number of files (debug mode)
-                if self.nfiles is not None and len(file_keys)==self.nfiles:
+                if self.nfiles is not None and len(file_keys) >= self.nfiles:
                     stop_walk = True
                 if stop_walk:
                     break
             if stop_walk:
                 break
+
+        if n_files == 0:
+            print("no daq files found...")
+            return
+
+        if len(file_keys) == 0:
+            print("no daq files matched pattern", self.daq_template)
+            return
 
         # create the main DataFrame
         self.file_keys = pd.DataFrame(file_keys)

@@ -75,15 +75,19 @@ def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
     
     t_start = time.time()
     bytes_processed = None
+
+
+    ch_groups_dict = None
+    if 'ch_groups' in d2r_conf: ch_groups_dict = d2r_conf['ch_groups']
     
     # get the DAQ mode
     if config['daq'] == 'ORCA':
         print('note, remove decoder input option')
-        process_orca(daq_filename, raw_file_pattern, n_max, None, config, verbose, run=subrun, buffer_size=buffer_size)
+        process_orca(daq_filename, raw_file_pattern, n_max, ch_groups_dict, verbose, buffer_size=buffer_size)
 
     elif config['daq'] == 'FlashCam':
         print("Processing FlashCam ...")
-        bytes_processed = process_flashcam(daq_filename, raw_files, n_max, config, verbose, buffer_size=buffer_size, chans=chans)
+        bytes_processed = process_flashcam(daq_filename, raw_files, n_max, ch_groups_dict, verbose, buffer_size=buffer_size, chans=chans)
 
     elif config['daq'] == 'SIS3316':
         process_llama_3316(daq_filename, raw_file_pattern, run, n_max, config, verbose)

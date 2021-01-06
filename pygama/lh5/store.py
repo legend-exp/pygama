@@ -3,13 +3,14 @@ import numpy as np
 import h5py
 import fnmatch
 
-from .lh5 import *
-from .struct import Struct
-from .array import Array
-from .fsarray import Array
-from .aoesa import ArrayOfEqualSizedArrays
+from .lh5_utils import *
 from .scalar import Scalar
+from .struct import Struct
 from .table import Table
+from .array import Array
+from .fixedsizearray import FixedSizeArray
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .vectorofvectors import VectorOfVectors
 
 class Store:
     def __init__(self, base_path='', keep_open=False):
@@ -173,29 +174,37 @@ class Store:
                     print("obj_buf for", name, "not a VectorOfVectors. returning new object")
                     obj_buf = None
                 elif n_rows is None: n_rows = len(obj_buf)
-            lensum_buf = None if obj_buf is None else obj_buf.lensum_array
-            lensum_array, n_rows_read = self.read_object(name+'/cumulative_length', 
-                                                         h5f, 
-                                                         start_row=start_row, 
-                                                         n_rows=n_rows,
-                                                         obj_buf=lensum_buf)
+            cumulen_buf = None if obj_buf is None else obj_buf.cumulative_length
+            cumulative_length, n_rows_read = self.read_object(name+'/cumulative_length', 
+                                                              h5f, 
+                                                              start_row=start_row, 
+                                                              n_rows=n_rows,
+                                                              obj_buf=cumulen_buf)
             da_start = 0
             if start_row > 0 and n_rows_read > 0: 
                 da_start = h5f[name+'/cumulative_length'][start_row-1]
-            da_nrows = lensum_array.nda[n_rows_read-1] - da_start if n_rows_read > 0 else 0
+                if cumulative_length.nda[n_rows_read-1] < da_start:
+                    print("warning: cumulative_length non-increasing between entries", 
+                          start_row, "and", start_row+n_rows_read, "??")
+                    print(cumulative_length.nda[n_rows_read-1], da_start, start_row, n_rows_read)
+                # in-memory version of cumulative_length will need to match
+                # what's in the in-memory version of flattened_data. So need to
+                # substract off the offset.
+                cumulative_length.nda[:n_rows_read] -= da_start
+            da_nrows = cumulative_length.nda[n_rows_read-1] if n_rows_read > 0 else 0
             da_buf = None 
             if obj_buf is not None:
-                da_buf = obj_buf.data_array
+                da_buf = obj_buf.flattened_data
                 # grow da_buf if necessary to hold the data
                 if len(da_buf) < da_nrows: da_buf.resize(da_nrows)
-            data_array, dummy_rows_read = self.read_object(name+'/flattened_data', 
-                                                           h5f, 
-                                                           start_row=da_start, 
-                                                           n_rows=da_nrows,
-                                                           obj_buf=da_buf)
+            flattened_data, dummy_rows_read = self.read_object(name+'/flattened_data', 
+                                                               h5f, 
+                                                               start_row=da_start, 
+                                                               n_rows=da_nrows,
+                                                               obj_buf=da_buf)
             if obj_buf is not None: return obj_buf, n_rows_read
-            return VectorOfVectors(data_array=data_array, 
-                                   lensum_array=lensum_array, 
+            return VectorOfVectors(flattened_data=flattened_data, 
+                                   cumulative_length=cumulative_length, 
                                    attrs=h5f[name].attrs), n_rows_read
 
 
@@ -288,19 +297,31 @@ class Store:
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):
             group = self.gimme_group(name, group, grp_attrs=obj.attrs)
-            if n_rows is None or n_rows > obj.lensum_array.nda.shape[0] - start_row:
-                n_rows = obj.lensum_array.nda.shape[0] - start_row
-            self.write_object(obj.lensum_array,
+            if n_rows is None or n_rows > obj.cumulative_length.nda.shape[0] - start_row:
+                n_rows = obj.cumulative_length.nda.shape[0] - start_row
+
+            # if appending we need to add an appropriate offset to the
+            # cumulative lengths as appropriate for the in-file object
+            offset = 0
+            if append and 'cumulative_length' in group:
+                len_cl = len(group['cumulative_length']) 
+                if len_cl > 0: offset = group['cumulative_length'][len_cl-1]
+            # Add offset to obj.cumulative_length itself to avoid memory allocation. 
+            # Then subtract it off after writing!
+            obj.cumulative_length.nda += offset
+            self.write_object(obj.cumulative_length,
                               'cumulative_length', 
                               lh5_file, 
                               group, 
                               start_row=start_row,
                               n_rows=n_rows,
                               append=append)
+            obj.cumulative_length.nda -= offset
+
             # now write data array. Only write rows with data.
-            da_start = 0 if start_row == 0 else obj.lensum_array.nda[start_row-1]
-            da_n_rows = obj.lensum_array.nda[n_rows-1] - da_start
-            self.write_object(obj.data_array,
+            da_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row-1]
+            da_n_rows = obj.cumulative_length.nda[n_rows-1] - da_start
+            self.write_object(obj.flattened_data,
                               'flattened_data', 
                               lh5_file, 
                               group, 
@@ -336,7 +357,8 @@ class Store:
         else:
             print('Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
-        
+
+
     def read_n_rows(self, name, lh5_file):
         """Look up the number of rows in an Array-like object called name
         in lh5_file. Return None if it is a scalar/struct."""
@@ -376,7 +398,7 @@ class Store:
         
         # read out vector of vectors of different size
         if elements.startswith('array'):
-            lensum_buf = None
+            cumulen_buf = None
             return self.read_n_rows(name+'/cumulative_length', h5f)
         
         # read out all arrays by slicing
@@ -386,3 +408,62 @@ class Store:
 
         print('Store: don\'t know how to read datatype', datatype)
         return None
+
+
+def load_nda(f_list, par_list, group_path='', verbose=True):
+    """ Build a dictionary of ndarrays from lh5 data
+
+    Given a list of files, a list of lh5 table parameters, and an optional group
+    path, return a numpy array with all values for each parameter.
+
+    Parameters
+    ----------
+    f_list : str or list of str's
+        A list of files. Can contain wildcards
+    par_list : list of str's
+        A list of parameters to read from each file
+    group_path : str (optional)
+        Optional group path within which to find the specified parameters
+
+    Returns
+    -------
+    par_data : dict
+        A dictionary of the parameter data keyed by the elements of par_list.
+        Each entry contains the data for the specified parameter concatenated
+        over all files in f_list
+    """
+    if isinstance(f_list, str): f_list = [f_list]
+    # Expand wildcards
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
+    if verbose:
+        print("loading data for", *f_list)
+
+    sto = Store()
+    par_data = {par : [] for par in par_list}
+    for f in f_list:
+        for par in par_list:
+            data, _ = sto.read_object(f'{group_path}/{par}', f)
+            if not data: continue
+            par_data[par].append(data.nda)
+    par_data = {par : np.concatenate(par_data[par]) for par in par_list}
+    return par_data
+
+
+def load_dfs(f_list, par_list, group_path='', verbose=True):
+    """ Build a pandas dataframe from lh5 data
+
+    Given a list of files (can use wildcards), a list of lh5 columns, and
+    optionally the group path, return a pandas DataFrame with all values for
+    each parameter.
+
+    Parameters
+    ----------
+    See load_nda for parameter specification
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        Contains columns for each parameter in par_list, and rows containing all
+        data for the associated parameters concatenated over all files in f_list
+    """
+    return pd.DataFrame( load_nda(f_list, par_list, group_path, verbose) )
