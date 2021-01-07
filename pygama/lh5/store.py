@@ -1,332 +1,16 @@
 import os
 import numpy as np
-import pandas as pd
 import h5py
 import fnmatch
-import glob
 
-def get_lh5_datatype_name(obj):
-    """Get the LH5 datatype name of an LH5 object"""
-    if type(obj) == Table: return 'table'
-    if type(obj) == Struct: return 'struct'
-    if type(obj) == Scalar: return get_lh5_datatype_name(obj.value)
-    if np.isscalar(obj): return get_lh5_element_type(obj)
-    if type(obj) == Array: return 'array'
-    if type(obj) == FixedSizeArray: return 'fixedsize_array'
-    if type(obj) == ArrayOfEqualSizedArrays: return 'array_of_equalsized_arrays'
-    if type(obj) == VectorOfVectors: return 'array'
-    print('Cannot determine LH5 datatype name for object of type', type(obj).__name__)
-    return None
-
-
-def get_lh5_element_type(obj):
-    """Get the LH5 element type of a scalar or array"""
-    if isinstance(obj, str): return 'string'
-    if hasattr(obj, 'dtype'):
-        kind = obj.dtype.kind
-        if kind == '?' or obj.dtype.name == 'bool': return 'bool'
-        #FIXME: pygama will call all uint8's "blobs" by this logic...
-        if kind in ['b', 'B', 'V']: return 'blob'
-        if kind in ['i', 'u', 'f']: return 'real'
-        if kind == 'c': return 'complex'
-        if kind in ['S', 'a', 'U']: return 'string'
-    print('Cannot determine LH5 element_type for object of type', type(obj).__name__)
-    return None
-
-
-def parse_datatype(datatype):
-    """Parse datatype string and return type, shape, elements"""
-    if '{' not in datatype: return 'scalar', (), datatype
-
-    # for other datatypes, need to parse the datatype string
-    from parse import parse
-    datatype, element_description = parse('{}{{{}}}', datatype)
-    if datatype.endswith('>'): 
-        datatype, dims = parse('{}<{}>', datatype)
-        dims = [int(i) for i in dims.split(',')]
-        return datatype, tuple(dims), element_description
-    else: return datatype, None, element_description.split(',')
-
-
-def load_nda(f_list, par_list, tb_in):
-    """
-    given a list of files, a list of LH5 table parameters, and the HDF5 path,
-    return a numpy array with all values for each parameter.
-    """
-    sto = Store()
-    par_data = {par : [] for par in par_list}
-    for f in f_list:
-        for par in par_list:
-            data, _ = sto.read_object(f'{tb_in}/{par}', f)
-            if not data: continue
-            par_data[par].append(data.nda)
-    par_data = {par : np.concatenate(par_data[par]) for par in par_list}
-    return par_data
-
-
-def load_dfs(f_list, par_list, tb_in):
-    """
-    given a list of files (can use wildcards), a list of LH5 columns, and the
-    HDF5 path, return a pandas DataFrame with all values for each parameter.
-    """
-    if isinstance(f_list, str): f_list = [f_list]
-    # Expand wildcards
-    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
-
-    return pd.DataFrame(load_nda(f_list, par_list, tb_in) )
-
-
-class Struct(dict):
-    """A dictionary with an optional set of attributes.
-
-    Don't allow to instantiate with a dictionary -- have to add fields
-    one-by-one using add_field() to keep datatype updated
-    """
-    # TODO: overload setattr to require add_field for setting?
-    def __init__(self, obj_dict={}, attrs={}):
-        self.update(obj_dict)
-        self.attrs = {}
-        self.attrs.update(attrs)
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
-                print(type(self).__name__ + ': Warning: datatype does not match obj_dict!')
-                print('datatype: ', self.attrs['datatype'])
-                print('obj_dict.keys(): ', obj_dict.keys())
-                print('form_datatype(): ', self.form_datatype())
-        else: self.attrs['datatype'] = self.form_datatype()
-
-
-    def add_field(self, name, obj):
-        self[name] = obj
-        self.attrs['datatype'] = self.form_datatype()
-
-
-    def form_datatype(self):
-        datatype = get_lh5_datatype_name(self)
-        datatype += '{' + ','.join(self.keys()) + '}'
-        return datatype
-
-
-class Table(Struct):
-    """A special struct of array or subtable 'columns' of equal length."""
-    # TODO: overload getattr to allow access to fields as object attributes?
-    def __init__(self, size=None, col_dict={}, attrs={}):
-        # if col_dict is not empty, its contents will be used directly in
-        # the Table (not copied)
-        super().__init__(obj_dict=col_dict, attrs=attrs)
-
-        # if col_dict is not empty, set size according to it
-        # if size is also supplied, resize all fields to match it
-        # otherwise, warn if the supplied fields have varying size
-        if len(col_dict) > 0: 
-            do_warn = True if size is None else False
-            self.resize(new_size=size, do_warn=do_warn)
-
-        # if no col_dict, just set the size (default to 1024)
-        else: self.size = size if size is not None else 1024
-
-        # always start at loc=0
-        self.loc = 0
-
-
-    def __len__(self):
-        return self.size
-
-
-    def resize(self, new_size = None, do_warn = False):
-        # if new_size = None, use the size from the first field
-        for field, obj in self.items():
-            if new_size is None: new_size = len(obj)
-            elif len(obj) != new_size:
-                if do_warn:
-                    print('warning: resizing field', field, 
-                          'with size', len(obj), '!=', new_size)
-                obj.resize(new_size)
-        self.size = new_size
-
-
-    def push_row(self):
-        self.loc += 1
-
-
-    def is_full(self):
-        return self.loc >= self.size
-
-
-    def clear(self):
-        self.loc = 0
-
-
-    def add_field(self, name, obj, use_obj_size=False, do_warn=True):
-        if not hasattr(obj, '__len__'):
-            print('Table: Error: cannot add field of type', type(obj).__name__)
-            return
-        super().add_field(name, obj)
-
-        # check / update sizes
-        if self.size != len(obj):
-            new_size = len(obj) if use_obj_size else self.size
-            self.resize(new_size, do_warn)
-
-
-    def get_dataframe(self, *cols, copy=False):
-        """Get a dataframe containing each of the columns given. If no columns
-        are given, get include all fields as columns."""
-        df = pd.DataFrame(copy=copy)
-        if len(cols)==0:
-            for col, dat in self.items():
-                df[col] = dat.nda
-        else:
-            for col in cols:
-                df[col] = self[col].nda
-        return df
-
-
-class Scalar:
-    """Holds just a value and some attributes (datatype, units, ...)
-    """
-    def __init__(self, value, attrs={}):
-        self.value = value
-        self.attrs = {}
-        self.attrs.update(attrs)
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != get_lh5_element_type(self.value):
-                print('Scalar: Warning: datatype does not match value!')
-                print('datatype: ', self.attrs['datatype'])
-                print('type(value): ', type(value).__name__)
-        else: self.attrs['datatype'] = get_lh5_element_type(self.value)
-
-
-class Array:
-    """Holds an ndarray and attributes
-    """
-    def __init__(self, nda=None, shape=None, dtype=None, attrs={}):
-        self.nda = nda if nda is not None else np.empty(shape, dtype=dtype)
-        self.dtype = self.nda.dtype
-        self.attrs = {}
-        self.attrs.update(attrs)
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
-                print(type(self).__name__ + ': Warning: datatype does not match nda!')
-                print('datatype: ', self.attrs['datatype'])
-                print('form_datatype(): ', self.form_datatype())
-                print('dtype:', self.dtype)
-        else: self.attrs['datatype'] = self.form_datatype()
-
-
-    def __len__(self):
-        return len(self.nda)
-
-
-    def resize(self, new_size):
-        new_shape = (new_size,) + self.nda.shape[1:]
-        self.nda.resize(new_shape)
-
-
-    def form_datatype(self):
-        dt = get_lh5_datatype_name(self)
-        nD = str(len(self.nda.shape))
-        et = get_lh5_element_type(self)
-        return dt + '<' + nD + '>{' + et + '}'
-
-
-class FixedSizeArray(Array):
-    """An array of fixed-size arrays
-
-    Arrays with guaranteed shape along axes > 0: for example, an array of
-    vectors will always length 3 on axis 1, and it will never change from
-    application to application.  This data type is used for optimized memory
-    handling on some platforms. We are not that sophisticated so we are just
-    storing this identification for .lh5 validity, i.e. for now this class is
-    just an alias.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-
-class ArrayOfEqualSizedArrays(Array):
-    """An array of equal-sized arrays
-
-    Arrays of equal size within a file but could be different from application
-    to application. Canonical example: array of same-length waveforms.
-
-    If shape is not "1D array of arrays of shape given by axes 1-N" (of nda)
-    then specify the dimensionality split in the constructor.
-    """
-    def __init__(self, *args, dims=None, **kwargs):
-        self.dims = dims
-        super().__init__(*args, **kwargs)
-
-
-    def __len__(self):
-        return len(self.nda)
-
-
-    def form_datatype(self):
-        dt = get_lh5_datatype_name(self)
-        nD = str(len(self.nda.shape))
-        if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
-        et = get_lh5_element_type(self)
-        return dt + '<' + nD + '>{' + et + '}'
-
-
-class VectorOfVectors:
-    """A variable-length array of variable-length arrays
-
-    For now only a 1D vector of 1D vectors is supported. Internal representation
-    is as two ndarrays, one to store the flattened data contiguosly and one to
-    store the cumulative sum of lengths of each vector. 
-    """ 
-    def __init__(self, data_array=None, lensum_array=None, shape_guess=None, dtype=None, attrs={}):
-        if lensum_array is None:
-            self.lensum_array = Array(shape=(shape_guess[0],), dtype='uint32')
-        else: self.lensum_array = lensum_array
-        if data_array is None:
-            length = np.prod(shape_guess)
-            self.data_array = Array(shape=(length,), dtype=dtype)
-        else: self.data_array = data_array
-        self.dtype = self.data_array.dtype
-        self.attrs = {}
-        self.attrs.update(attrs)
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
-                print('VectorOfVectors: Warning: datatype does not match dtype!')
-                print('datatype: ', self.attrs['datatype'])
-                print('form_datatype(): ', self.form_datatype())
-        else: self.attrs['datatype'] = self.form_datatype()
-
-
-    def __len__(self):
-        return len(self.lensum_array)
-
-
-    def resize(self, new_size):
-        self.lensum_array.resize(new_size)
-
-
-    def form_datatype(self):
-        et = get_lh5_element_type(self)
-        return 'array<1>{array<1>{' + et + '}}'
-
-
-    def set_vector(self, i_vec, nda):
-        """Insert vector nda at location i_vec.
-
-        self.data_array is doubled in length until nda can be appended to it.
-        """
-        if i_vec<0 or i_vec>len(self.lensum_array.nda)-1:
-            print('VectorOfVectors: Error: bad i_vec', i_vec)
-            return 
-        if len(nda.shape) != 1:
-            print('VectorOfVectors: Error: nda had bad shape', nda.shape)
-            return
-        start = 0 if i_vec == 0 else self.lensum_array.nda[i_vec-1]
-        end = start + len(nda)
-        while end >= len(self.data_array.nda):
-            self.data_array.nda.resize(2*len(self.data_array.nda))
-        self.data_array.nda[start:end] = nda
-        self.lensum_array.nda[i_vec] = end
-
+from .lh5_utils import *
+from .scalar import Scalar
+from .struct import Struct
+from .table import Table
+from .array import Array
+from .fixedsizearray import FixedSizeArray
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .vectorofvectors import VectorOfVectors
 
 class Store:
     def __init__(self, base_path='', keep_open=False):
@@ -367,19 +51,14 @@ class Store:
         if isinstance(lh5_file, str):
             lh5_file = self.gimme_file(lh5_file, 'r')
             
-            
         if group_path=='':
             group_path='*'
             
-            
-        
         splitpath = group_path.split('/', 1)
         matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
         ret = []
         
-        
         if len(splitpath)==1:
-            
             return matchingkeys
         else:
             ret = []
@@ -498,37 +177,37 @@ class Store:
                     print("obj_buf for", name, "not a VectorOfVectors. returning new object")
                     obj_buf = None
                 elif n_rows is None: n_rows = len(obj_buf)
-            lensum_buf = None if obj_buf is None else obj_buf.lensum_array
-            lensum_array, n_rows_read = self.read_object(name+'/cumulative_length', 
-                                                         h5f, 
-                                                         start_row=start_row, 
-                                                         n_rows=n_rows,
-                                                         obj_buf=lensum_buf)
+            cumulen_buf = None if obj_buf is None else obj_buf.cumulative_length
+            cumulative_length, n_rows_read = self.read_object(name+'/cumulative_length', 
+                                                              h5f, 
+                                                              start_row=start_row, 
+                                                              n_rows=n_rows,
+                                                              obj_buf=cumulen_buf)
             da_start = 0
             if start_row > 0 and n_rows_read > 0: 
                 da_start = h5f[name+'/cumulative_length'][start_row-1]
-                if lensum_array.nda[n_rows_read-1] < da_start:
+                if cumulative_length.nda[n_rows_read-1] < da_start:
                     print("warning: cumulative_length non-increasing between entries", 
                           start_row, "and", start_row+n_rows_read, "??")
-                    print(lensum_array.nda[n_rows_read-1], da_start, start_row, n_rows_read)
-                # in-memory version of lensum_array will need to match
-                # what's in the in-memory version of data_array. So need to
+                    print(cumulative_length.nda[n_rows_read-1], da_start, start_row, n_rows_read)
+                # in-memory version of cumulative_length will need to match
+                # what's in the in-memory version of flattened_data. So need to
                 # substract off the offset.
-                lensum_array.nda[:n_rows_read] -= da_start
-            da_nrows = lensum_array.nda[n_rows_read-1] if n_rows_read > 0 else 0
+                cumulative_length.nda[:n_rows_read] -= da_start
+            da_nrows = cumulative_length.nda[n_rows_read-1] if n_rows_read > 0 else 0
             da_buf = None 
             if obj_buf is not None:
-                da_buf = obj_buf.data_array
+                da_buf = obj_buf.flattened_data
                 # grow da_buf if necessary to hold the data
                 if len(da_buf) < da_nrows: da_buf.resize(da_nrows)
-            data_array, dummy_rows_read = self.read_object(name+'/flattened_data', 
-                                                           h5f, 
-                                                           start_row=da_start, 
-                                                           n_rows=da_nrows,
-                                                           obj_buf=da_buf)
+            flattened_data, dummy_rows_read = self.read_object(name+'/flattened_data', 
+                                                               h5f, 
+                                                               start_row=da_start, 
+                                                               n_rows=da_nrows,
+                                                               obj_buf=da_buf)
             if obj_buf is not None: return obj_buf, n_rows_read
-            return VectorOfVectors(data_array=data_array, 
-                                   lensum_array=lensum_array, 
+            return VectorOfVectors(flattened_data=flattened_data, 
+                                   cumulative_length=cumulative_length, 
                                    attrs=h5f[name].attrs), n_rows_read
 
 
@@ -621,8 +300,8 @@ class Store:
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):
             group = self.gimme_group(name, group, grp_attrs=obj.attrs)
-            if n_rows is None or n_rows > obj.lensum_array.nda.shape[0] - start_row:
-                n_rows = obj.lensum_array.nda.shape[0] - start_row
+            if n_rows is None or n_rows > obj.cumulative_length.nda.shape[0] - start_row:
+                n_rows = obj.cumulative_length.nda.shape[0] - start_row
 
             # if appending we need to add an appropriate offset to the
             # cumulative lengths as appropriate for the in-file object
@@ -630,22 +309,22 @@ class Store:
             if append and 'cumulative_length' in group:
                 len_cl = len(group['cumulative_length']) 
                 if len_cl > 0: offset = group['cumulative_length'][len_cl-1]
-            # Add offset to obj.lensum_array itself to avoid memory allocation. 
+            # Add offset to obj.cumulative_length itself to avoid memory allocation. 
             # Then subtract it off after writing!
-            obj.lensum_array.nda += offset
-            self.write_object(obj.lensum_array,
+            obj.cumulative_length.nda += offset
+            self.write_object(obj.cumulative_length,
                               'cumulative_length', 
                               lh5_file, 
                               group, 
                               start_row=start_row,
                               n_rows=n_rows,
                               append=append)
-            obj.lensum_array.nda -= offset
+            obj.cumulative_length.nda -= offset
 
             # now write data array. Only write rows with data.
-            da_start = 0 if start_row == 0 else obj.lensum_array.nda[start_row-1]
-            da_n_rows = obj.lensum_array.nda[n_rows-1] - da_start
-            self.write_object(obj.data_array,
+            da_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row-1]
+            da_n_rows = obj.cumulative_length.nda[n_rows-1] - da_start
+            self.write_object(obj.flattened_data,
                               'flattened_data', 
                               lh5_file, 
                               group, 
@@ -681,7 +360,8 @@ class Store:
         else:
             print('Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
-        
+
+
     def read_n_rows(self, name, lh5_file):
         """Look up the number of rows in an Array-like object called name
         in lh5_file. Return None if it is a scalar/struct."""
@@ -721,7 +401,7 @@ class Store:
         
         # read out vector of vectors of different size
         if elements.startswith('array'):
-            lensum_buf = None
+            cumulen_buf = None
             return self.read_n_rows(name+'/cumulative_length', h5f)
         
         # read out all arrays by slicing
@@ -731,3 +411,62 @@ class Store:
 
         print('Store: don\'t know how to read datatype', datatype)
         return None
+
+
+def load_nda(f_list, par_list, group_path='', verbose=True):
+    """ Build a dictionary of ndarrays from lh5 data
+
+    Given a list of files, a list of lh5 table parameters, and an optional group
+    path, return a numpy array with all values for each parameter.
+
+    Parameters
+    ----------
+    f_list : str or list of str's
+        A list of files. Can contain wildcards
+    par_list : list of str's
+        A list of parameters to read from each file
+    group_path : str (optional)
+        Optional group path within which to find the specified parameters
+
+    Returns
+    -------
+    par_data : dict
+        A dictionary of the parameter data keyed by the elements of par_list.
+        Each entry contains the data for the specified parameter concatenated
+        over all files in f_list
+    """
+    if isinstance(f_list, str): f_list = [f_list]
+    # Expand wildcards
+    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
+    if verbose:
+        print("loading data for", *f_list)
+
+    sto = Store()
+    par_data = {par : [] for par in par_list}
+    for f in f_list:
+        for par in par_list:
+            data, _ = sto.read_object(f'{group_path}/{par}', f)
+            if not data: continue
+            par_data[par].append(data.nda)
+    par_data = {par : np.concatenate(par_data[par]) for par in par_list}
+    return par_data
+
+
+def load_dfs(f_list, par_list, group_path='', verbose=True):
+    """ Build a pandas dataframe from lh5 data
+
+    Given a list of files (can use wildcards), a list of lh5 columns, and
+    optionally the group path, return a pandas DataFrame with all values for
+    each parameter.
+
+    Parameters
+    ----------
+    See load_nda for parameter specification
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        Contains columns for each parameter in par_list, and rows containing all
+        data for the associated parameters concatenated over all files in f_list
+    """
+    return pd.DataFrame( load_nda(f_list, par_list, group_path, verbose) )
