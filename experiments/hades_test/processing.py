@@ -11,14 +11,14 @@ import tinydb as db
 from tinydb.storages import MemoryStorage
 
 from pygama import DataGroup
-import pygama.lh5 as lh5
+import pygama.io.lh5 as lh5
 from pygama.io.daq_to_raw import daq_to_raw
 from pygama.io.raw_to_dsp import raw_to_dsp
 
 
 def main():
     doc="""
-    OPPI STC data processing routine.
+    CAGE data processing routine.
     """
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
@@ -38,11 +38,12 @@ def main():
     arg('-o', '--over', action=st, help='overwrite existing files')
     arg('-n', '--nwfs', nargs='*', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
+    arg('-u', '--lh5_user', action=st, help='user lh5 mode')
 
     args = par.parse_args()
 
     # load main DataGroup, select files to calibrate
-    dg = DataGroup('oppi.json', load=True)
+    dg = DataGroup('cage.json', load=True)
     if args.query:
         que = args.query[0]
         dg.fileDB.query(que, inplace=True)
@@ -53,7 +54,7 @@ def main():
                  # 'stopTime','runtime']
     print(dg.fileDB[view_cols].to_string())
     print('Files:', len(dg.fileDB))
-    # exit()
+#     exit()
 
     # -- set options --
     nwfs = args.nwfs[0] if args.nwfs is not None else np.inf
@@ -65,21 +66,22 @@ def main():
           f'\n  limit wfs? {nwfs}')
 
     # -- run routines --
-    if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
-    if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
-    if args.d2h: d2h(dg, args.over, nwfs, args.verbose)
+    if args.d2r: d2r(dg, args.over, nwfs, args.verbose, args.lh5_user)
+    if args.r2d: r2d(dg, args.over, nwfs, args.verbose, args.lh5_user)
+    if args.d2h: d2h(dg, args.over, nwfs, args.verbose, args.lh5_user)
 
     if args.r2d_file:
         f_raw, f_dsp = args.r2d_file
-        r2d_file(f_raw, f_dsp, args.over, nwfs, args.verbose)
+        r2d_file(f_raw, f_dsp, args.over, nwfs, args.verbose, args.lh5_user)
 
 
-def d2r(dg, overwrite=False, nwfs=None, vrb=False):
+def d2r(dg, overwrite=False, nwfs=None, vrb=False, user=False):
     """
     run daq_to_raw on the current DataGroup
     """
     # print(dg.fileDB)
     # print(dg.fileDB.columns)
+    
 
     subs = dg.subsystems # can be blank: ['']
     # subs = ['geds'] # TODO: ignore other datastreams
@@ -89,20 +91,28 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
 
     for i, row in dg.fileDB.iterrows():
 
+        lh5_dir = dg.lh5_user_dir if user else dg.lh5_dir
+
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
-        f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        f_raw = f"{lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         # f_raw = 'test.lh5'
         subrun = row['cycle'] if 'cycle' in row else None
 
         if not overwrite and os.path.exists(f_raw):
             print('file exists, overwrite not set, skipping f_raw:\n   ', f_raw)
             continue
+        
+        cyc = row['cycle']
+        if row.skip:
+            print(f'Cycle {cyc} has been marked junk, will not process.')
+            continue
 
+        print(f'Processing cycle {cyc}')
         daq_to_raw(f_daq, f_raw, config=dg.config, systems=subs, verbose=vrb,
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
 
 
-def r2d(dg, overwrite=False, nwfs=None, vrb=False):
+def r2d(dg, overwrite=False, nwfs=None, vrb=False, user=False):
     """
     """
     # print(dg.fileDB)
@@ -112,9 +122,10 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
         dsp_config = json.load(f, object_pairs_hook=OrderedDict)
 
     for i, row in dg.fileDB.iterrows():
+        lh5_dir = dg.lh5_user_dir if user else dg.lh5_dir
 
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
-        f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
+        f_dsp = f"{lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
 
         if "sysn" in f_raw:
             tmp = {'sysn' : 'geds'} # hack for lpgta
@@ -125,6 +136,12 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
             print('file exists, overwrite not set, skipping f_dsp:\n   ', f_dsp)
             continue
         
+        cyc = row['cycle']
+        if row.skip:
+            print(f'Cycle {cyc} has been marked junk, will not process.')
+            continue
+        
+        print(f'Processing cycle {cyc}')
         raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb,
                    overwrite=overwrite)
 
@@ -148,7 +165,7 @@ def r2d_file(f_raw, f_dsp, overwrite=True, nwfs=None, vrb=False):
                overwrite=overwrite)
 
 
-def d2h(dg, overwrite=False, nwfs=None, vrb=False):
+def d2h(dg, overwrite=False, nwfs=None, vrb=False, user=False):
     """
     """
     # merge main and ecal config JSON as dicts
@@ -158,16 +175,23 @@ def d2h(dg, overwrite=False, nwfs=None, vrb=False):
     dg.config = config
 
     for i, row in dg.fileDB.iterrows():
+        lh5_dir = dg.lh5_user_dir if user else dg.lh5_dir
 
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
-        f_hit = f"{dg.lh5_dir}/{row['hit_path']}/{row['hit_file']}"
+        f_hit = f"{lh5_dir}/{row['hit_path']}/{row['hit_file']}"
 
         if not overwrite and os.path.exists(f_hit):
             print('file exists, overwrite not set, skipping f_hit:\n   ', f_dsp)
             continue
+        
+        cyc = row['cycle']
+        if row.skip:
+            print(f'Cycle {cyc} has been marked junk, will not process.')
+            continue
 
         t_start = row['startTime']
-        dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=nwfs, verbose=vrb, t_start=t_start)
+#         dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=nwfs, verbose=vrb, t_start=t_start)
+        uncal_dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=nwfs, verbose=vrb, t_start=t_start)
 
 
 def dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=None, verbose=False, t_start=None):
@@ -186,7 +210,7 @@ def dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=None, verbose=False, t_start=None):
     
     # create initial 'hit' DataFrame from dsp data
     hit_store = lh5.Store()
-    data = hit_store.read_object(dg.config['input_table'], f_dsp)
+    data, n_rows = hit_store.read_object(dg.config['input_table'], f_dsp)
     df_hit = data.get_dataframe()
     
     # 1. get energy calibration for this run from peakfit 
@@ -247,7 +271,81 @@ def dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=None, verbose=False, t_start=None):
     sto.write_object(tb_lh5, tb_name, f_hit)
     
 
+def uncal_dsp_to_hit_cage(f_dsp, f_hit, dg, n_max=None, verbose=False, t_start=None):
+    """
+    non-general placeholder for creating a pygama 'hit' file.  uses pandas.
+    for every file, apply:
+    - energy calibration (peakfit results)
+    - timestamp correction
+    for a more general dsp_to_hit, maybe each function could be given in terms
+    of an 'apply' on a dsp dataframe ...
+    
+    TODO: create entry config['rawe'] with list of energy pars to calibrate, as 
+    in energy_cal.py
+    """
+    rawe = ['trapEmax']
+    
+    # create initial 'hit' DataFrame from dsp data
+    hit_store = lh5.Store()
+    data, n_rows = hit_store.read_object(dg.config['input_table'], f_dsp)
+    df_hit = data.get_dataframe()
+    
+#     # 1. get energy calibration for this run from peakfit 
+#     cal_db = db.TinyDB(storage=MemoryStorage)
+#     with open(dg.config['ecaldb']) as f:
+#         raw_db = json.load(f)
+#         cal_db.storage.write(raw_db)
+#     runs = dg.fileDB.run.unique()
+#     if len(runs) > 1:
+#         print("sorry, I can't do combined runs yet")
+#         exit()
+#     run = runs[0]
+#     for etype in rawe:
+#         tb = cal_db.table(f'peakfit_{etype}').all()
+#         df_cal = pd.DataFrame(tb)
+#         df_cal['run'] = df_cal['run'].astype(int)
+#         df_run = df_cal.loc[df_cal.run==run]
+#         cal_pars = df_run.iloc[0][['cal0','cal1','cal2']]
+#         pol = np.poly1d(cal_pars) # handy numpy polynomial object
+#         df_hit[f'{etype}_cal'] = pol(df_hit[f'{etype}'])
 
+    # 2. compute timestamp rollover correction (specific to struck 3302)
+    clock = 100e6 # 100 MHz
+    UINT_MAX = 4294967295 # (0xffffffff)
+    t_max = UINT_MAX / clock
+    ts = df_hit['timestamp'].values / clock
+    tdiff = np.diff(ts)
+    tdiff = np.insert(tdiff, 0 , 0)
+    iwrap = np.where(tdiff < 0)
+    iloop = np.append(iwrap[0], len(ts))
+    ts_new, t_roll = [], 0
+    for i, idx in enumerate(iloop):
+        ilo = 0 if i==0 else iwrap[0][i-1]
+        ihi = idx
+        ts_block = ts[ilo:ihi]
+        t_last = ts[ilo-1]
+        t_diff = t_max - t_last
+        ts_new.append(ts_block + t_roll)
+        t_roll += t_last + t_diff
+    df_hit['ts_sec'] = np.concatenate(ts_new)
+    
+    # 3. compute global timestamp
+    if t_start is not None:
+        df_hit['ts_glo'] = df_hit['ts_sec'] + t_start 
+    
+    # write to LH5 file
+    if os.path.exists(f_hit):
+        os.remove(f_hit)
+    sto = lh5.Store()
+    tb_name = dg.config['input_table'].replace('dsp', 'hit')
+    tb_lh5 = lh5.Table(size=len(df_hit))
+    
+    for col in df_hit.columns:
+        tb_lh5.add_field(col, lh5.Array(df_hit[col].values, attrs={'units':''}))
+        print(col)
+    
+    print(f'Writing table: {tb_name} in file:\n   {f_hit}')
+    sto.write_object(tb_lh5, tb_name, f_hit)
 
 if __name__=="__main__":
     main()

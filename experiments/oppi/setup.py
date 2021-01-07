@@ -35,16 +35,16 @@ def init(dg):
     dg.lh5_dir_setup(create=True)
     dg.scan_daq_dir()
 
-    dg.file_keys.sort_values(['cycle'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
-    dg.file_keys = dg.file_keys.apply(get_cyc_info, args=[dg], axis=1)
+    dg.fileDB.sort_values(['cycle'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
+    dg.fileDB = dg.fileDB.apply(get_cyc_info, args=[dg], axis=1)
     dg.get_lh5_cols()
     
     for col in ['run', 'cycle']:
-        dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
-    # dg.file_keys['run'] = dg.file_keys['run'].astype(int)
+        dg.fileDB[col] = pd.to_numeric(dg.fileDB[col])
+    # dg.fileDB['run'] = dg.fileDB['run'].astype(int)
 
-    print(dg.file_keys[['run', 'cycle', 'unique_key', 'daq_file']].to_string())
+    print(dg.fileDB[['run', 'cycle', 'unique_key', 'daq_file']].to_string())
     dg.save_df(dg.config['fileDB'])
     print('Wrote output file.')
 
@@ -73,9 +73,9 @@ def update(dg):
     exit()
 
     # this might work, but you have to pull out the duplicates first
-    # dg.file_keys = pd.concat([df_keys, df_scan])
+    # dg.fileDB = pd.concat([df_keys, df_scan])
 
-    print(dg.file_keys)
+    print(dg.fileDB)
 
     ans = input('Save file key DF? y/n')
     if ans.lower() == 'y':

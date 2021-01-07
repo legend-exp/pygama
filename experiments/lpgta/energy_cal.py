@@ -15,14 +15,14 @@ import tinydb as db
 from tinydb.storages import MemoryStorage
 
 import matplotlib
-if os.environ.get('HOSTNAME'): # cenpa-rocks
+if os.environ.get('HOSTNAME'):
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-plt.style.use('../clint.mpl')
+plt.style.use('../../pygama/clint.mpl')
 
 from pygama import DataGroup
 from pygama.io.orcadaq import parse_header
-import pygama.lh5 as lh5
+import pygama.io.lh5 as lh5
 import pygama.analysis.metadata as pmd
 import pygama.analysis.histograms as pgh
 import pygama.analysis.calibration as pgc
@@ -36,16 +36,11 @@ with warnings.catch_warnings():
 
 
 def main():
-    doc="""
-    === pygama: energy_cal.py ==================================================
-
-    energy calibration app
-
+    doc="""=== pygama: energy_cal.py ===========================================
     - Initial guesses are determined by running 'check_raw_spectrum'
     - Uses a DataGroup to organize files and processing.
     - Metadata is handled in JSON format with 'legend-metadata' conventions.
-
-    === T. Mathew, C. Wiseman (UW) =============================================
+    === T. Mathew, C. Wiseman (UW), G. Othman (UNC) ============================
     """
     rthf = argparse.RawTextHelpFormatter
     par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
@@ -81,36 +76,29 @@ def main():
     # -- setup --
 
     # load main DataGroup, select files to calibrate
-    dg = DataGroup('cage.json', load=True)
+    dg = DataGroup('LPGTA.json', load=True)
     if args.query:
         que = args.query[0]
         dg.fileDB.query(que, inplace=True)
     else:
         dg.fileDB = dg.fileDB[-1:]
-
-    view_cols = ['run','cycle','daq_file','runtype','startTime','threshold',
-                 'stopTime','runtime']
-    print(dg.fileDB[view_cols].to_string())
-    print(len(dg.fileDB))
-    # exit()
-
+    
     # merge main and ecal config JSON as dicts
     config = dg.config
     with open(config['ecal_config']) as f:
         config = {**dg.config, **json.load(f)}
-
+        
     # initialize JSON output file.  only run this once
     if args.init_db:
         init_ecaldb(config)
     try:
         # load ecal db in memory s/t the pretty on-disk formatting isn't changed
         db_ecal = db.TinyDB(storage=MemoryStorage)
-        with open(config['ecaldb']) as f:
+        with open(config['ecal_db']) as f:
             raw_db = json.load(f)
             db_ecal.storage.write(raw_db)
     except:
         print('JSON database file not found or corrupted.  Rerun --init_db')
-        exit()
 
     # set additional options, augmenting the config dict
     config['gb_cols'] = args.group.split(' ') if args.group else ['run']
@@ -136,11 +124,12 @@ def main():
 
     # show status
     print(f'Ready to calibrate.\n'
-          f"Output file: {config['ecaldb']} \n"
+          f"Output file: {config['ecal_db']} \n"
           'Calibrating raw energy parameters:', config['rawe'], '\n'
           'Current DataGroup:')
-    print(dg.fileDB[['run', 'cycle', 'startTime', 'runtime']])
+    print(dg.fileDB)
     print('Columns:', dg.fileDB.columns.values)
+    exit()
 
     # -- main calibration routines --
     if args.show_db: show_ecaldb(config)
@@ -153,8 +142,24 @@ def main():
         run_peakfit(dg, config, db_ecal)
 
 
+def show_ecaldb(config):
+    """
+    $ ./energy_cal.py --show_db
+    """
+    # show the file as-is on disk
+    with open(config['ecaldb']) as f:
+        print(f.read())
+
+    # make sure the file is usable by TinyDB
+    db_ecal = db.TinyDB(storage=MemoryStorage)
+    with open(config['ecaldb']) as f:
+        raw_db = json.load(f)
+        db_ecal.storage.write(raw_db)
+
+
 def init_ecaldb(config):
     """
+    $ ./energy_cal.py --init
     one-time set up of primary database file
     """
     ans = input('(Re)create main ecal JSON file?  Are you really sure? (y/n) ')
@@ -186,21 +191,6 @@ def init_ecaldb(config):
     # show the file as-is on disk
     with open(f_db) as f:
         print(f.read())
-
-
-def show_ecaldb(config):
-    """
-    $ ./energy_cal.py --show_db
-    """
-    # show the file as-is on disk
-    with open(config['ecaldb']) as f:
-        print(f.read())
-
-    # make sure the file is usable by TinyDB
-    db_ecal = db.TinyDB(storage=MemoryStorage)
-    with open(config['ecaldb']) as f:
-        raw_db = json.load(f)
-        db_ecal.storage.write(raw_db)
 
 
 def check_raw_spectrum(dg, config, db_ecal):
@@ -247,7 +237,7 @@ def check_raw_spectrum(dg, config, db_ecal):
         plt.ylabel(f'cts/sec, {xpb}/bin', ha='right', y=1)
 
         if config['batch_mode']:
-            plt.savefig('./plots/cal_spec_test.png')
+            plt.savefig('./plots/energy_cal/cal_spec_test.png')
         else:
             plt.show()
         plt.close()
@@ -268,6 +258,10 @@ def run_peakdet(dg, config, db_ecal):
     # do the analysis
     gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config]
+    run_no = np.array(dg.fileDB['run'])[0]
+    
+    print(f'Running peakdet for run: {run_no}')
+    
     result = gb.apply(peakdet_group, *gb_args)
 
     # write the results
@@ -305,11 +299,17 @@ def peakdet_group(df_group, config):
     # get file list and load energy data
     lh5_dir = os.path.expandvars(config['lh5_dir'])
     dsp_list = lh5_dir + df_group['dsp_path'] + '/' + df_group['dsp_file']
+    dsp_list = [d.format_map({'sysn':'geds'}) for d in dsp_list]
+    print(lh5_dir)
+    exit()
 
-    edata = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
-    print('Found energy data:', [(et, len(ev)) for et, ev in edata.items()])
+    # edata = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
+    # print('Found energy data:', [(et, len(ev)) for et, ev in edata.items()])
+    exit()
 
     runtime_min = df_group['runtime'].sum()
+    run_no = np.array(df_group['run'])[0]
+    print(f'In group peakdet for run {run_no}')
     print(f'Runtime (min): {runtime_min:.2f}')
 
     # loop over energy estimators of interest
@@ -390,7 +390,7 @@ def peakdet_group(df_group, config):
             p1.legend(fontsize=10)
 
             if config['batch_mode']:
-                plt.savefig('./plots/peakdet_cal_{et}.pdf')
+                plt.savefig(f'./plots/energy_cal/run{run_no}peakdet_cal_{et}.pdf')
             else:
                 plt.show()
 
@@ -523,6 +523,10 @@ def run_peakfit(dg, config, db_ecal):
     # do the analysis
     gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config, db_ecal]
+    run_no = np.array(dg.fileDB['run'])[0]
+    
+    print(f'Running peakfit for run {run_no}')
+    
     result = gb.apply(peakfit_group, *gb_args)
 
     # write the results
@@ -561,7 +565,11 @@ def peakfit_group(df_group, config, db_ecal):
     # right now a lookup by 'run' is hardcoded.
     # in principle the lookup should stay general using the gb_cols,
     # but it's kind of hard to see right now how to write the right db queries
+
     gb_run = df_group['run'].unique()
+    run_no = np.array(df_group['run'])[0]
+    print(f'In group peakfit for run {run_no}')
+
     if len(gb_run) > 1:
         print("Multi-run (or other) groupbys aren't supported yet, sorry")
         exit()
@@ -571,6 +579,7 @@ def peakfit_group(df_group, config, db_ecal):
     dsp_list = lh5_dir + df_group['dsp_path'] + '/' + df_group['dsp_file']
     raw_data = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
     runtime_min = df_group['runtime'].sum()
+    print(f'runtime: {runtime_min} mins')
 
     # loop over energy estimators of interest
     pf_results = {}
@@ -582,12 +591,14 @@ def peakfit_group(df_group, config, db_ecal):
         lin_cal = df_cal.loc[df_cal.run == str(gb_run[0])]['lincal'].values[0]
         cal_data = raw_data[et] * lin_cal
 
+
         # compute expected peak locations and widths (fit to Gaussians)
         fit_results = {}
         for ie, epk in enumerate(epeaks):
 
             # adjust the window.  resolution goes as roughly sqrt(energy)
-            window = np.sqrt(epk) * 0.5
+            print(epk)
+            window = np.sqrt(epk) + 0.0105*epk
             xlo, xhi = epk - window/2, epk + window/2
             nbins = int(window) * 5
             xpb = (xhi-xlo)/nbins
@@ -607,43 +618,106 @@ def peakfit_group(df_group, config, db_ecal):
             bot_half = b[np.where((b < b[imax]) & (h <= np.amax(h)/2))][-1]
             fwhm = upr_half - bot_half
             sig0 = fwhm / 2.355
+        
+#     exit()
+            
+            
+#             # fit to simple gaussian
+#             amp0 = np.amax(h) * fwhm
+#             p_init = [amp0, bins[imax], sig0, bkg0] # a, mu, sigma, bkg
+#             p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
+#                                         var=hist_var, guess=p_init)
+#             fit_func = pgf.gauss_bkg
+            
+#             p_err = np.sqrt(np.diag(p_cov))
+            
+#             # goodness of fit
+#             chisq = []
+#             for i, h in enumerate(hist_norm):
+#                 model = fit_func(b[i], *p_fit)
+#                 diff = (model - h)**2 / model
+#                 chisq.append(abs(diff))
+#             rchisq = sum(np.array(chisq) / len(hist_norm))
+#             # fwhm_err = p_err[1] * 2.355 * e_peak / e_fit
+
+#             # collect interesting results for this row
+#             fit_results[ie] = {
+#                 'epk':epk,
+#                 'mu':p_fit[1], 'fwhm':p_fit[2]*2.355, 'sig':p_fit[2],
+#                 'amp':p_fit[0], 'bkg':p_fit[3], 'rchisq':rchisq,
+#                 'mu_raw':p_fit[1] / lin_cal, # <-- this is in terms of raw E
+#                 'mu_unc':p_err[1] / lin_cal
+#                 }
+#             print(fit_results[ie])
+
+        
+            # fit to radford peak: mu, sigma, hstep, htail, tau, bg0, amp
             amp0 = np.amax(h) * fwhm
-            p_init = [amp0, bins[imax], sig0, bkg0] # a, mu, sigma, bkg
-            p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
-                                        var=hist_var, guess=p_init)
+            hstep = 0.001 # fraction that the step contributes
+            htail = 0.1
+            tau = 10
+            p_init = [bins[imax], sig0, hstep, htail, tau, bkg0, amp0]
+            p_fit, p_cov = pgf.fit_hist(pgf.radford_peak, hist_norm, bins, var=hist_var, guess=p_init)
+            fit_func = pgf.radford_peak
+            
+            #just for debugging
+            print('Len Fit params:', len(p_fit))
+            
             p_err = np.sqrt(np.diag(p_cov))
-
-            # diagnostic plot, don't delete
-            if config['show_plot']:
-                plt.axvline(bins[ibin_bkg], c='m', label='bkg region')
-                xfit = np.arange(xlo, xhi, xpb * 0.1)
-                plt.plot(xfit, pgf.gauss_bkg(xfit, *p_init), '-', c='orange',
-                         label='init')
-                plt.plot(xfit, pgf.gauss_bkg(xfit, *p_fit), '-', c='red',
-                         label='fit')
-                plt.plot(bins[1:], hist_norm, c='b', lw=1.5, ds='steps')
-                plt.xlabel('pass-1 energy (kev)', ha='right', x=1)
-                plt.legend(fontsize=12)
-                plt.show()
-                plt.close()
-
+            
             # goodness of fit
             chisq = []
             for i, h in enumerate(hist_norm):
-                model = pgf.gauss_bkg(b[i], *p_fit)
+                model = fit_func(b[i], *p_fit)
                 diff = (model - h)**2 / model
                 chisq.append(abs(diff))
             rchisq = sum(np.array(chisq) / len(hist_norm))
             # fwhm_err = p_err[1] * 2.355 * e_peak / e_fit
 
             # collect interesting results for this row
+            # fit_results[ie] = {
+                # 'epk':epk,
+                # 'mu':p_fit[1], 'fwhm':p_fit[2]*2.355, 'sig':p_fit[2],
+                # 'amp':p_fit[0], 'bkg':p_fit[3], 'rchisq':rchisq,
+                # 'mu_raw':p_fit[1] / lin_cal, # <-- this is in terms of raw E
+                # 'mu_unc':p_err[1] / lin_cal
+                # }
+            
+            # collect interesting results for this row
+            # this block for Radford peak shape
             fit_results[ie] = {
                 'epk':epk,
-                'mu':p_fit[1], 'fwhm':p_fit[2]*2.355, 'sig':p_fit[2],
-                'amp':p_fit[0], 'bkg':p_fit[3], 'rchisq':rchisq,
-                'mu_raw':p_fit[1] / lin_cal, # <-- this is in terms of raw E
-                'mu_unc':p_err[1] / lin_cal
+                'mu':p_fit[0], 'fwhm':p_fit[1]*2.355, 'sig':p_fit[1],
+                'amp':p_fit[6], 'bkg':p_fit[5], 'rchisq':rchisq,
+                'mu_raw':p_fit[0] / lin_cal, # <-- this is in terms of raw E
+                'mu_unc':p_err[0] / lin_cal
                 }
+            
+#             print('Len Fit params:', len(p_fit))
+            print('Fit results: ', fit_results[ie])
+            
+            
+
+            # diagnostic plot, don't delete
+            if config['show_plot']:
+                plt.axvline(bins[ibin_bkg], c='m', label='bkg region')
+                xfit = np.arange(xlo, xhi, xpb * 0.1)
+                plt.plot(xfit, fit_func(xfit, *p_init), '-', c='orange',
+                         label='init')
+                plt.plot(xfit, fit_func(xfit, *p_fit), '-', c='red',
+                         label='fit')
+                plt.plot(bins[1:], hist_norm, c='b', lw=1.5, ds='steps')
+                plt.xlabel('pass-1 energy (kev)', ha='right', x=1)
+                plt.legend(fontsize=12)
+                if config['batch_mode']:
+                    plt.savefig(f'./plots/energy_cal/run{run_no}_fit{ie}_peakfit.png')
+                else:
+                    plt.show()
+                plt.close()
+                
+#         exit()
+
+
 
         # ----------------------------------------------------------------------
         # compute energy calibration by matrix inversion (thanks Tim and Jason!)
@@ -693,25 +767,43 @@ def peakfit_group(df_group, config, db_ecal):
         cal_data = pol(raw_data[et])
 
         fit_results = {}
+#         print('fit_results', fit_results)
+        print('cal_data', cal_data)
         for ie, epk in enumerate(epeaks):
+            print('epk:', epk, '\n epeaks:', epeaks)
 
             # adjust the window.  resolution goes as roughly sqrt(energy)
-            window = np.sqrt(epk) * 0.5
+            window = np.sqrt(epk) + 0.0105*epk
+            print(f'window: {window}')
             xlo, xhi = epk - window/2, epk + window/2
+#             xlo, xhi = epk - window*20, epk + window*20
             nbins = int(window) * 5
             xpb = (xhi-xlo)/nbins
             ibin_bkg = int(nbins * 0.2)
+            print('xhi: ', xhi, 'xlo:', xlo)
 
             # get histogram, error, normalize by runtime
             pk_data = cal_data[(cal_data >= xlo) & (cal_data <= xhi)]
             hist, bins, _ = pgh.get_hist(pk_data, range=(xlo, xhi), dx=xpb)
             hist_norm = np.divide(hist, runtime_min * 60)
             hist_var = np.array([np.sqrt(h / (runtime_min * 60)) for h in hist])
+            
+            print('cal_data:', cal_data)
+            
+            print('bins:', bins)
+#             print(pk_data)
+#             exit()
+#             print(hist)
+            print(hist_norm)
 
             # compute expected peak location and width (simple Gaussian)
             bkg0 = np.mean(hist_norm[:ibin_bkg])
+            print(f'bkg0: {bkg0}')
+#             exit()
             b, h = bins[1:], hist_norm - bkg0
             imax = np.argmax(h)
+            print(f'h: {h}')
+#             exit()
             upr_half = b[np.where((b > b[imax]) & (h <= np.amax(h)/2))][0]
             bot_half = b[np.where((b < b[imax]) & (h <= np.amax(h)/2))][-1]
             fwhm = upr_half - bot_half
@@ -721,12 +813,15 @@ def peakfit_group(df_group, config, db_ecal):
             p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
                                         var=hist_var, guess=p_init)
             p_err = np.sqrt(np.diag(p_cov))
+            
+            print('p_err: ', p_err)
 
             # save results
             fit_results[ie] = {
                 'epk':epk,
                 'mu':p_fit[1], 'fwhm':p_fit[2] * 2.355, 'sig':p_fit[2], 'amp':p_fit[0], 'bkg':p_fit[3],
                 }
+            print('fit results:', fit_results[ie])
 
         # consolidate results again
         view_cols = ['epk', 'mu', 'fwhm', 'residual']
@@ -796,7 +891,8 @@ def peakfit_group(df_group, config, db_ecal):
             p1.legend(fontsize=11)
 
             if config['batch_mode']:
-                plt.savefig('./plots/peakdet_test.png')
+                print('Saving plot')
+                plt.savefig(f'./plots/energy_cal/run{run_no}_peakfit.png')
             else:
                 plt.show()
 

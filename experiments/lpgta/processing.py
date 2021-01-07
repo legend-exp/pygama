@@ -19,6 +19,9 @@ def main():
     You may need to set these environment variables, check your LPGTA.json file.
       * $LPGTA_DATA : base data directory
       * $LEGEND_META : the legend-metadata repository
+      
+    By default, we move output files into place in the LH5 directory tree, but
+    there is also an option to leave it in place in CWD.
 
     TODO: parallelize, submit processing jobs
     """
@@ -39,13 +42,11 @@ def main():
     arg('-o', '--over', action=st, help='overwrite existing files')
     arg('-n', '--nwfs', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
-
+    arg('-c', '--cwd', action=st, help="save output to current directory")
     args = par.parse_args()
 
-    expDB = '$LEGEND_META/analysis/LPGTA/LPGTA.json'
-
-
     # -- set options --
+    expDB = '$LEGEND_META/analysis/LPGTA/LPGTA.json'
 
     nwfs = args.nwfs if args.nwfs is not None else np.inf
 
@@ -58,8 +59,8 @@ def main():
     # -- run routines --
     query = "YYYYmmdd == '" + args.date + "'" if args.date else args.q
     if args.dg: dg = load_datagroup(query)
-    if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
-    if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
+    if args.d2r: d2r(dg, args.over, nwfs, args.verbose, args.cwd)
+    if args.r2d: r2d(dg, args.over, nwfs, args.verbose, args.cwd)
 
 
 def load_datagroup(query=None):
@@ -71,16 +72,15 @@ def load_datagroup(query=None):
     # NOTE: for now, we have to edit this line to choose which files to process
     # process one big cal file (64 GB)
     #query = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    if query is not None: dg.file_keys.query(query, inplace=True)
+    if query is not None: dg.fileDB.query(query, cwd=True)
     
     print('files to process:')
-    print(dg.file_keys)
+    print(dg.fileDB)
     
     # can add other filters here
-    #dg.file_keys = dg.file_keys[:2]
+    #dg.fileDB = dg.fileDB[:2]
     
     return dg
-
 
 
 def cmap_to_ch_groups(cmap, sys_per_ged = False):
@@ -136,23 +136,25 @@ def cmap_to_ch_groups(cmap, sys_per_ged = False):
     return ch_groups
 
 
-def d2r(dg, overwrite=False, nwfs=None, vrb=False):
+def d2r(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     run daq_to_raw on the current DataGroup
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
 
     # subs = ['geds'] # TODO: ignore other datastreams
     # chans = ['g035', 'g042'] # TODO: select a subset of detectors
 
-    print(f'Processing {dg.file_keys.shape[0]} files ...')
+    print(f'Processing {dg.fileDB.shape[0]} files ...')
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
 
         # set up I/O paths
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
+        if cwd: f_raw = f'{row['raw_file']}'
+        
         subrun = row['cycle'] if 'cycle' in row else None
         systems = dg.subsystems
 
@@ -179,19 +181,20 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
 
 
-def r2d(dg, overwrite=False, nwfs=None, vrb=False):
+def r2d(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
     """
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
 
     with open(f'{dg.experiment}_dsp.json') as f:
         dsp_config = json.load(f, object_pairs_hook=OrderedDict)
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
 
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
+        if cwd: f_dsp = f'{row['dsp_file']}'
 
         if "sysn" in f_raw:
             tmp = {'sysn' : 'geds'} # hack for lpgta
