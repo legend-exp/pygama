@@ -2,6 +2,7 @@
   "experiment" : "LPGTA",
   "runDB" : "LPGTA_runDB.json",
   "fileDB" : "LPGTA_fileDB.h5",
+  "ecal_config" : "config_ecal.json",
   
   "daq": "FlashCam",
   "daq_dir" : "$LPGTA_DATA/daq",

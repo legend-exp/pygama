@@ -28,6 +28,9 @@ class Store:
             directory = os.path.dirname(full_path)
             if directory != '' and not os.path.exists(directory): 
                 os.makedirs(directory)
+        if mode == 'r' and not os.path.exists(full_path):
+            print('file not found:', full_path)
+            return None
         h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f

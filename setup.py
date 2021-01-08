@@ -86,16 +86,41 @@ def make_git_file():
         f.write("revision = '" + repo.head.commit.hexsha +"'\n")
         f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
 
+#Add a git hook to clean jupyter notebooks before commiting
+def clean_jupyter_notebooks():
+    import git
+    repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+    with repo.config_writer('repository') as config:
+        try:
+            import nbconvert
+            if nbconvert.__version__[0] < '6': #clear output
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True" """
+            else: # also clear metadata
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True\\
+                --ClearMetadataPreprocessor.enabled=True" """                
+        except:
+            # if nbconvert (part of jupyter) is not installed, disable filter
+            fil = "cat"
+
+        config.set_value('filter "jupyter_clear_output"', 'clean', fil)
+        config.set_value('filter "jupyter_clear_output"', 'smudge', 'cat')
+        config.set_value('filter "jupyter_clear_output"', 'required', 'false')
+        
+
 # run during installation; this is when files get copied to build dir
 class PygamaBuild(build_py):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         build_py.run(self)
 
 # run during local installation; in this case build_py isn't run...
 class PygamaDev(develop):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         develop.run(self)
 
 setup(
@@ -112,7 +137,12 @@ setup(
         'parse',
         'GitPython',
         'tinydb',
-        'pyFFTW'
+        'pyFFTW',
+        'h5py',
+        'numpy',
+        'pandas',
+        'matplotlib'
+
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),

@@ -22,7 +22,7 @@ plt.style.use('../clint.mpl')
 
 from pygama import DataGroup
 from pygama.io.orcadaq import parse_header
-import pygama.lh5 as lh5
+import pygama.io.lh5 as lh5
 import pygama.analysis.metadata as pmd
 import pygama.analysis.histograms as pgh
 import pygama.analysis.calibration as pgc
@@ -37,7 +37,7 @@ with warnings.catch_warnings():
 
 def main():
     doc="""
-    === pygama: energy_cal.py ==================================================
+    === pygama: energy_cal.py ====================================================
 
     energy calibration app
 
@@ -390,7 +390,7 @@ def peakdet_group(df_group, config):
             p1.legend(fontsize=10)
 
             if config['batch_mode']:
-                plt.savefig('./plots/peakdet_cal_{et}.pdf')
+                plt.savefig(f'./plots/peakdet_cal_{et}.pdf')
             else:
                 plt.show()
 
@@ -561,6 +561,7 @@ def peakfit_group(df_group, config, db_ecal):
     # right now a lookup by 'run' is hardcoded.
     # in principle the lookup should stay general using the gb_cols,
     # but it's kind of hard to see right now how to write the right db queries
+
     gb_run = df_group['run'].unique()
     if len(gb_run) > 1:
         print("Multi-run (or other) groupbys aren't supported yet, sorry")
@@ -582,12 +583,13 @@ def peakfit_group(df_group, config, db_ecal):
         lin_cal = df_cal.loc[df_cal.run == str(gb_run[0])]['lincal'].values[0]
         cal_data = raw_data[et] * lin_cal
 
+
         # compute expected peak locations and widths (fit to Gaussians)
         fit_results = {}
         for ie, epk in enumerate(epeaks):
 
             # adjust the window.  resolution goes as roughly sqrt(energy)
-            window = np.sqrt(epk) * 0.5
+            window = np.sqrt(epk) * 0.8
             xlo, xhi = epk - window/2, epk + window/2
             nbins = int(window) * 5
             xpb = (xhi-xlo)/nbins
@@ -607,30 +609,55 @@ def peakfit_group(df_group, config, db_ecal):
             bot_half = b[np.where((b < b[imax]) & (h <= np.amax(h)/2))][-1]
             fwhm = upr_half - bot_half
             sig0 = fwhm / 2.355
+            
+            
+#             # fit to simple gaussian
+#             amp0 = np.amax(h) * fwhm
+#             p_init = [amp0, bins[imax], sig0, bkg0] # a, mu, sigma, bkg
+#             p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
+#                                         var=hist_var, guess=p_init)
+#             fit_func = pgf.gauss_bkg
+            
+#             p_err = np.sqrt(np.diag(p_cov))
+            
+#             # goodness of fit
+#             chisq = []
+#             for i, h in enumerate(hist_norm):
+#                 model = fit_func(b[i], *p_fit)
+#                 diff = (model - h)**2 / model
+#                 chisq.append(abs(diff))
+#             rchisq = sum(np.array(chisq) / len(hist_norm))
+#             # fwhm_err = p_err[1] * 2.355 * e_peak / e_fit
+
+#             # collect interesting results for this row
+#             fit_results[ie] = {
+#                 'epk':epk,
+#                 'mu':p_fit[1], 'fwhm':p_fit[2]*2.355, 'sig':p_fit[2],
+#                 'amp':p_fit[0], 'bkg':p_fit[3], 'rchisq':rchisq,
+#                 'mu_raw':p_fit[1] / lin_cal, # <-- this is in terms of raw E
+#                 'mu_unc':p_err[1] / lin_cal
+#                 }
+#             print(fit_results[ie])
+
+        
+            # fit to radford peak: mu, sigma, hstep, htail, tau, bg0, amp
             amp0 = np.amax(h) * fwhm
-            p_init = [amp0, bins[imax], sig0, bkg0] # a, mu, sigma, bkg
-            p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
-                                        var=hist_var, guess=p_init)
+            hstep = 0.001 # fraction that the step contributes
+            htail = 0.1
+            tau = 10
+            p_init = [bins[imax], sig0, hstep, htail, tau, bkg0, amp0]
+            p_fit, p_cov = pgf.fit_hist(pgf.radford_peak, hist_norm, bins, var=hist_var, guess=p_init)
+            fit_func = pgf.radford_peak
+            
+            #just for debugging
+            print('Len Fit params:', len(p_fit))
+            
             p_err = np.sqrt(np.diag(p_cov))
-
-            # diagnostic plot, don't delete
-            if config['show_plot']:
-                plt.axvline(bins[ibin_bkg], c='m', label='bkg region')
-                xfit = np.arange(xlo, xhi, xpb * 0.1)
-                plt.plot(xfit, pgf.gauss_bkg(xfit, *p_init), '-', c='orange',
-                         label='init')
-                plt.plot(xfit, pgf.gauss_bkg(xfit, *p_fit), '-', c='red',
-                         label='fit')
-                plt.plot(bins[1:], hist_norm, c='b', lw=1.5, ds='steps')
-                plt.xlabel('pass-1 energy (kev)', ha='right', x=1)
-                plt.legend(fontsize=12)
-                plt.show()
-                plt.close()
-
+            
             # goodness of fit
             chisq = []
             for i, h in enumerate(hist_norm):
-                model = pgf.gauss_bkg(b[i], *p_fit)
+                model = fit_func(b[i], *p_fit)
                 diff = (model - h)**2 / model
                 chisq.append(abs(diff))
             rchisq = sum(np.array(chisq) / len(hist_norm))
@@ -644,6 +671,32 @@ def peakfit_group(df_group, config, db_ecal):
                 'mu_raw':p_fit[1] / lin_cal, # <-- this is in terms of raw E
                 'mu_unc':p_err[1] / lin_cal
                 }
+            
+#             print('Len Fit params:', len(p_fit))
+            print('Fit results: ', fit_results[ie])
+            
+            
+
+            # diagnostic plot, don't delete
+            if config['show_plot']:
+                plt.axvline(bins[ibin_bkg], c='m', label='bkg region')
+                xfit = np.arange(xlo, xhi, xpb * 0.1)
+                plt.plot(xfit, fit_func(xfit, *p_init), '-', c='orange',
+                         label='init')
+                plt.plot(xfit, fit_func(xfit, *p_fit), '-', c='red',
+                         label='fit')
+                plt.plot(bins[1:], hist_norm, c='b', lw=1.5, ds='steps')
+                plt.xlabel('pass-1 energy (kev)', ha='right', x=1)
+                plt.legend(fontsize=12)
+                if config['batch_mode']:
+                    plt.savefig('./plots/fit%d_peakfit.png' %ie)
+                else:
+                    plt.show()
+                plt.close()
+                
+        exit()
+
+
 
         # ----------------------------------------------------------------------
         # compute energy calibration by matrix inversion (thanks Tim and Jason!)
@@ -693,7 +746,10 @@ def peakfit_group(df_group, config, db_ecal):
         cal_data = pol(raw_data[et])
 
         fit_results = {}
+#         print('fit_results', fit_results)
+        print('cal_data', cal_data)
         for ie, epk in enumerate(epeaks):
+            print('epk:', epk, '\n epeaks:', epeaks)
 
             # adjust the window.  resolution goes as roughly sqrt(energy)
             window = np.sqrt(epk) * 0.5
@@ -701,15 +757,21 @@ def peakfit_group(df_group, config, db_ecal):
             nbins = int(window) * 5
             xpb = (xhi-xlo)/nbins
             ibin_bkg = int(nbins * 0.2)
+            print('xhi: ', xhi, 'xlo:', xlo)
 
             # get histogram, error, normalize by runtime
             pk_data = cal_data[(cal_data >= xlo) & (cal_data <= xhi)]
             hist, bins, _ = pgh.get_hist(pk_data, range=(xlo, xhi), dx=xpb)
             hist_norm = np.divide(hist, runtime_min * 60)
             hist_var = np.array([np.sqrt(h / (runtime_min * 60)) for h in hist])
+            
+            print('cal_data:', cal_data)
+            
+            print('bins:', bins)
 
             # compute expected peak location and width (simple Gaussian)
             bkg0 = np.mean(hist_norm[:ibin_bkg])
+#             print(bkg0)
             b, h = bins[1:], hist_norm - bkg0
             imax = np.argmax(h)
             upr_half = b[np.where((b > b[imax]) & (h <= np.amax(h)/2))][0]
@@ -721,12 +783,15 @@ def peakfit_group(df_group, config, db_ecal):
             p_fit, p_cov = pgf.fit_hist(pgf.gauss_bkg, hist_norm, bins,
                                         var=hist_var, guess=p_init)
             p_err = np.sqrt(np.diag(p_cov))
+            
+            print('p_err: ', p_err)
 
             # save results
             fit_results[ie] = {
                 'epk':epk,
                 'mu':p_fit[1], 'fwhm':p_fit[2] * 2.355, 'sig':p_fit[2], 'amp':p_fit[0], 'bkg':p_fit[3],
                 }
+            print('fit results:', fit_results[ie])
 
         # consolidate results again
         view_cols = ['epk', 'mu', 'fwhm', 'residual']
@@ -796,7 +861,7 @@ def peakfit_group(df_group, config, db_ecal):
             p1.legend(fontsize=11)
 
             if config['batch_mode']:
-                plt.savefig('./plots/peakdet_test.png')
+                plt.savefig('./plots/peakfit.png')
             else:
                 plt.show()
 
