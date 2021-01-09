@@ -44,17 +44,17 @@ class Store:
         return group
 
 
-    def ls(self, lh5_file, group_path=''):
+    def ls(self, lh5_file, lh5_group=''):
         """Print a list of the group names in the lh5 file in the style of a
         Unix ls command. Supports wildcards."""
         # To use recursively, make lh5_file a h5group instead of a string
         if isinstance(lh5_file, str):
             lh5_file = self.gimme_file(lh5_file, 'r')
             
-        if group_path=='':
-            group_path='*'
+        if lh5_group=='':
+            lh5_group='*'
             
-        splitpath = group_path.split('/', 1)
+        splitpath = lh5_group.split('/', 1)
         matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
         ret = []
         
@@ -78,7 +78,7 @@ class Store:
 
 
 
-    def read_object(self, name, lh5_file, start_row=0, n_rows=None, obj_buf=None):
+    def read_object(self, name, lh5_file, start_row=0, n_rows=None, idx=None, obj_buf=None):
         """
         Returns tuple (obj, n_rows_read) for data at path=name in lh5_file
         obj is an lh5 object. If obj_buf is provided, obj = obj_buf
@@ -86,9 +86,10 @@ class Store:
         When n_rows are requested but fewer are available, this will be
         reflected in n_rows_read.
         n_rows will be returned as '1' for objects that don't have rows.
+        idx is a numpy-style fancy indexing array for reading array-like
+        columns. Note: idx gets added to start_row and n_rows is ignored.
         """
-        #TODO: implement obj_buf. Ian's idea: add an iterator so one can do
-        #      something like
+        #TODO: Ian's idea: add an iterator so one can do something like
         #      for data in lh5iterator(file, chunksize, nentries, ...):
         #          proc.execute()
 
@@ -118,7 +119,11 @@ class Store:
                 print("obj_buf not implemented for structs.  Returning new object")
             obj_dict = {}
             for field in elements:
-                obj_dict[field], _ = self.read_object(name+'/'+field, h5f, start_row, n_rows)
+                obj_dict[field], _ = self.read_object(name+'/'+field, 
+                                                      h5f, 
+                                                      start_row=start_row, 
+                                                      n_rows=n_rows, 
+                                                      idx=idx)
             return Struct(obj_dict=obj_dict, attrs=h5f[name].attrs), 1
 
         # read a table into a dataframe
@@ -141,6 +146,7 @@ class Store:
                                                                 h5f, 
                                                                 start_row=start_row, 
                                                                 n_rows=n_rows,
+                                                                idx=idx,
                                                                 obj_buf=fld_buf)
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
@@ -182,8 +188,11 @@ class Store:
                                                               h5f, 
                                                               start_row=start_row, 
                                                               n_rows=n_rows,
+                                                              idx=idx,
                                                               obj_buf=cumulen_buf)
             da_start = 0
+            if idx is not None:
+                print("warning: fancy indexed readout not implemented for vector of vectors, ignoring idx")
             if start_row > 0 and n_rows_read > 0: 
                 da_start = h5f[name+'/cumulative_length'][start_row-1]
                 if cumulative_length.nda[n_rows_read-1] < da_start:
@@ -204,6 +213,7 @@ class Store:
                                                                h5f, 
                                                                start_row=da_start, 
                                                                n_rows=da_nrows,
+                                                               idx=idx,
                                                                obj_buf=da_buf)
             if obj_buf is not None: return obj_buf, n_rows_read
             return VectorOfVectors(flattened_data=flattened_data, 
@@ -217,25 +227,37 @@ class Store:
                 if not isinstance(obj_buf, Array):
                     print("obj_buf for", name, "not an Array. returning new object")
                     obj_buf = None
+                elif idx is not None:
+                    # chop idx if it is too long for obj_buf
+                    if len(idx[0]) > len(obj_buf): idx[0] = idx[0][:len(obj_buf)]
+                    n_rows = len(idx[0])
                 elif n_rows is None: n_rows = len(obj_buf)
 
             # compute the number of rows to read
             ds_n_rows = h5f[name].shape[0]
-            if n_rows is None or n_rows > ds_n_rows - start_row: 
+            if idx is not None:
+                while len(idx[0]) > 0 and idx[0][-1] >= ds_n_rows: 
+                    idx = (idx[0][:-1],)
+                if len(idx[0]) == 0: 
+                    print("warning: idx empty after culling.")
+                    return None, 0
+                n_rows = len(idx[0])
+            elif n_rows is None or n_rows > ds_n_rows - start_row: 
                 n_rows = ds_n_rows - start_row
 
             nda = None
+            source_sel = np.s_[start_row:start_row+n_rows]
+            if idx is not None: source_sel = idx
+
             if obj_buf is not None:
                 nda = obj_buf.nda
                 if n_rows > 0:
-                    h5f[name].read_direct(nda, 
-                                          np.s_[start_row:start_row+n_rows], 
-                                          np.s_[0:n_rows])
+                    h5f[name].read_direct(nda, source_sel, np.s_[0:n_rows])
             else: 
                 if n_rows == 0: 
                     tmp_shape = (0,) + h5f[name].shape[1:]
                     nda = np.empty(tmp_shape, h5f[name].dtype)
-                else: nda = h5f[name][start_row:start_row+n_rows]
+                else: nda = h5f[name][source_sel]
             if elements == 'bool': nda = nda.astype(np.bool)
             attrs=h5f[name].attrs
             if n_rows < 0: n_rows = 0
@@ -413,7 +435,7 @@ class Store:
         return None
 
 
-def load_nda(f_list, par_list, group_path='', verbose=True):
+def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
     """ Build a dictionary of ndarrays from lh5 data
 
     Given a list of files, a list of lh5 table parameters, and an optional group
@@ -425,8 +447,12 @@ def load_nda(f_list, par_list, group_path='', verbose=True):
         A list of files. Can contain wildcards
     par_list : list of str's
         A list of parameters to read from each file
-    group_path : str (optional)
+    lh5_group : str (optional)
         Optional group path within which to find the specified parameters
+    idx_list : list of index arrays
+        For fancy-indexed reads. Must be one idx array for each file in f_list
+    verbose : bool
+        Print info on loaded data
 
     Returns
     -------
@@ -445,14 +471,14 @@ def load_nda(f_list, par_list, group_path='', verbose=True):
     par_data = {par : [] for par in par_list}
     for f in f_list:
         for par in par_list:
-            data, _ = sto.read_object(f'{group_path}/{par}', f)
+            data, _ = sto.read_object(f'{lh5_group}/{par}', f)
             if not data: continue
             par_data[par].append(data.nda)
     par_data = {par : np.concatenate(par_data[par]) for par in par_list}
     return par_data
 
 
-def load_dfs(f_list, par_list, group_path='', verbose=True):
+def load_dfs(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
     """ Build a pandas dataframe from lh5 data
 
     Given a list of files (can use wildcards), a list of lh5 columns, and
@@ -469,4 +495,4 @@ def load_dfs(f_list, par_list, group_path='', verbose=True):
         Contains columns for each parameter in par_list, and rows containing all
         data for the associated parameters concatenated over all files in f_list
     """
-    return pd.DataFrame( load_nda(f_list, par_list, group_path, verbose) )
+    return pd.DataFrame( load_nda(f_list, par_list, lh5_group, verbose) )

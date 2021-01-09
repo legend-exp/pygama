@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from pygama.dsp.ProcessingChain import ProcessingChain
 from pygama.dsp.units import *
-from pygama.io import lh5
+from pygama import lh5
 
 
 def build_processing_chain(lh5_in, dsp_config, db_dict = None,
