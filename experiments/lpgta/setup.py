@@ -50,8 +50,8 @@ def show_db(dg):
     $ ./setup.py --show_db
     """
     dg.load_df()
-    print(dg.file_keys)
-    print(dg.file_keys.columns)
+    print(dg.fileDB)
+    print(dg.fileDB.columns)
     
 
 def create_dirs(dg):
@@ -69,13 +69,13 @@ def init_fileDB(dg):
     """
     dg.scan_daq_dir()
     
-    # -- organize and augment the dg.file_keys DataFrame -- 
+    # -- organize and augment the dg.fileDB DataFrame -- 
     
     # run 1 & 2 files don't match template
-    dg.file_keys.query('run > 2', inplace=True) 
+    dg.fileDB.query('run > 2', inplace=True) 
     
-    dg.file_keys.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
+    dg.fileDB.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
     
     def get_cmap(row):
         run_str = f"{row['run']:0>4d}"
@@ -86,9 +86,9 @@ def init_fileDB(dg):
         row['cmap'] = dg.runDB[f"{row['run']:0>4d}"]["cmap"]
         return row
     
-    dg.file_keys = dg.file_keys.apply(get_cmap, axis=1)
+    dg.fileDB = dg.fileDB.apply(get_cmap, axis=1)
     
-    dg.file_keys['runtype'] = dg.file_keys['rtp']
+    dg.fileDB['runtype'] = dg.fileDB['rtp']
     
     dg.get_lh5_cols()
 
@@ -97,7 +97,7 @@ def init_fileDB(dg):
     proc_LL_GB = 4 # lower limit
     sizes_GB, proc_groups = [], []
     size_sum, proc_group = 0, 0
-    df = dg.file_keys
+    df = dg.fileDB
     for daq_path, daq_file in zip(df['daq_dir'], df['daq_file']):
         filename = os.path.expandvars('$LPGTA_DATA/daq')+daq_path+'/'+daq_file
         sizes_GB.append(os.path.getsize(filename) / (1024**3))
@@ -114,8 +114,8 @@ def init_fileDB(dg):
     df['proc_group'] = proc_groups
     
     # save to file used by processing.py
-    print(dg.file_keys)
-    print(dg.file_keys.columns)
+    print(dg.fileDB)
+    print(dg.fileDB.columns)
     print('FileDB location:', dg.config['fileDB'])
     ans = input('Save new fileDB? (y/n)')
     if ans.lower() == 'y':
@@ -131,13 +131,13 @@ def get_runtimes(dg):
     Requires the raw LH5 files.
     """
     dg.load_df()
-    # dg.file_keys = dg.file_keys[50:55] # debug only
+    # dg.fileDB = dg.fileDB[50:55] # debug only
     
     # reset columns of interest
     new_cols = ['runtime', 'rt_std']
     for col in new_cols:
-        if col in dg.file_keys.columns:
-            dg.file_keys.drop(col, axis=1, inplace=True)
+        if col in dg.fileDB.columns:
+            dg.fileDB.drop(col, axis=1, inplace=True)
     
     sto = lh5.Store()
     
@@ -168,14 +168,14 @@ def get_runtimes(dg):
         
         return pd.Series({'runtime':runtime, 'rt_std':rt_std})
         
-    # df_tmp = dg.file_keys.apply(runtime_cycle, axis=1)
-    dg.file_keys[new_cols] = dg.file_keys.progress_apply(runtime_cycle, axis=1)
+    # df_tmp = dg.fileDB.apply(runtime_cycle, axis=1)
+    dg.fileDB[new_cols] = dg.fileDB.progress_apply(runtime_cycle, axis=1)
     
     print(f'Done. Time elapsed: {(time.time()-t_start)/60:.2f} mins.')
     
     # save to fileDB if everything looks OK
-    print(dg.file_keys)
-    print(dg.file_keys.columns)
+    print(dg.fileDB)
+    print(dg.fileDB.columns)
     print('FileDB location:', dg.config['fileDB'])
     ans = input('Save new fileDB? (y/n)')
     if ans.lower() == 'y':
