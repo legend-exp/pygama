@@ -353,7 +353,7 @@ class ORCAGretina4M(OrcaDecoder):
 
         tb['packet_id'].nda[ii] = packet_id
         tb['ievt'].nda[ii] = self.ievt
-        tb['energy'].nda[ii] = pu16[9] + ((pu16[10] & 0x7FFF) << 16)
+        tb['energy'].nda[ii] = pu16[9] + ((pu16[10] & 0x1FF) << 16)
         tb['timestamp'].nda[ii] = pu16[6] + (pu16[7] << 16) + (pu16[8] << 32)
         tb['crate'].nda[ii] = crate
         tb['card'].nda[ii] = card

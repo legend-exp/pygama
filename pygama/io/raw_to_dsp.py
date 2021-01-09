@@ -11,7 +11,9 @@ from pprint import pprint
 import argparse
 
 from pygama import __version__ as pygama_version
-from pygama.io import lh5
+from pygama.dsp.ProcessingChain import ProcessingChain
+from pygama.dsp.units import *
+from pygama import lh5
 from pygama.utils import update_progress
 import pygama.git as git
 from pygama.dsp.build_processing_chain import *
@@ -42,10 +44,10 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = []
-        lh5_tables_temp = raw_store.ls(f_raw)
+        lh5_keys = raw_store.ls(f_raw)
 
         # sometimes 'raw' is nested, e.g g024/raw
-        for tb in lh5_tables_temp:
+        for tb in lh5_keys:
             if "raw" not in tb:
                 tbname = raw_store.ls(lh5_file[tb])[0]
                 if "raw" in tbname:
@@ -56,6 +58,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     for tb in lh5_tables:
         if 'raw' not in tb:
             lh5_tables.remove(tb)
+    if len(lh5_tables) == 0:
+        print("Empty lh5_tables, exiting...")
+        sys.exit(1)
 
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
