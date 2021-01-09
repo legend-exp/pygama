@@ -229,18 +229,19 @@ class Store:
                     obj_buf = None
                 elif idx is not None:
                     # chop idx if it is too long for obj_buf
-                    if len(idx) > len(obj_buf): idx = idx[:len(obj_buf)]
-                    n_rows = len(idx)
+                    if len(idx[0]) > len(obj_buf): idx[0] = idx[0][:len(obj_buf)]
+                    n_rows = len(idx[0])
                 elif n_rows is None: n_rows = len(obj_buf)
 
             # compute the number of rows to read
             ds_n_rows = h5f[name].shape[0]
             if idx is not None:
-                while len(idx) > 0 and idx[-1] >= ds_n_rows: idx = idx[:-1]
-                if len(idx) == 0: 
+                while len(idx[0]) > 0 and idx[0][-1] >= ds_n_rows: 
+                    idx = (idx[0][:-1],)
+                if len(idx[0]) == 0: 
                     print("warning: idx empty after culling.")
                     return None, 0
-                n_rows = len(idx)
+                n_rows = len(idx[0])
             elif n_rows is None or n_rows > ds_n_rows - start_row: 
                 n_rows = ds_n_rows - start_row
 
