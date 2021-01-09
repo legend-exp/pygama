@@ -84,9 +84,9 @@ def main():
         dg.file_keys = dg.file_keys[-1:]
 
     # show what has been selected
-    view_cols = ['run', 'label', 'YYYYmmdd', 'hhmmss', 'rtp', 'cmap', 'runtype',
-                 'daq_size_GB', 'proc_group']
-    print(dg.file_keys[view_cols].to_string())
+    # view_cols = ['run', 'label', 'YYYYmmdd', 'hhmmss', 'rtp', 'cmap', 'runtype',
+    #              'daq_size_GB', 'proc_group']
+    # print(dg.file_keys[view_cols].to_string())
     # print(dg.file_keys)
     # print(dg.file_keys.columns)
     
@@ -136,8 +136,7 @@ def main():
           'Current DataGroup:')
     print(dg.file_keys)
     # print(dg.file_keys[['run', 'cycle', 'startTime', 'runtime']])
-    print('Columns:', dg.file_keys.columns.values)
-    exit()
+    # print('Columns:', dg.file_keys.columns)
 
     # -- main calibration routines --
     if args.show_db: show_ecaldb(config)
@@ -307,6 +306,9 @@ def peakdet_group(df_group, config):
     # get file list and load energy data
     lh5_dir = os.path.expandvars(config['lh5_dir'])
     dsp_list = lh5_dir + df_group['dsp_path'] + '/' + df_group['dsp_file']
+    # print('hi clint')
+    print(dsp_list.values)
+    exit()
 
     edata = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
     print('Found energy data:', [(et, len(ev)) for et, ev in edata.items()])
