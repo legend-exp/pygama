@@ -2,7 +2,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 import pygama.analysis.histograms as pgh
 
 def main():
