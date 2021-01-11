@@ -62,7 +62,7 @@ class WaveformBrowser:
 
         # Get the input buffer and read the first chunk
         self.lh5_in = self.lh5_st.get_buffer(self.lh5_group, self.lh5_files[0], buffer_len)
-        self.lh5_st.read_object(self.lh5_group, self.lh5_files[0], 0, buffer_len, self.lh5_in)
+        self.lh5_st.read_object(self.lh5_group, self.lh5_files[0], start_row=0, n_rows=buffer_len, obj_buf=self.lh5_in)
         self.buffer_len = buffer_len
         self.current_file = None
         self.current_chunk = None
@@ -218,7 +218,11 @@ class WaveformBrowser:
         if file_no != self.current_file or chunk != self.current_chunk:
             self.current_chunk = chunk
             self.current_file = file_no
-            self.lh5_in, n_read = self.lh5_st.read_object(self.lh5_group, self.lh5_files[file_no], start_row = chunk*self.buffer_len, obj_buf = self.lh5_in)
+            self.lh5_in, n_read = self.lh5_st.read_object(self.lh5_group,
+                                                          self.lh5_files[file_no],
+                                                          start_row=chunk*self.buffer_len,
+                                                          n_rows=len(self.lh5_in),
+                                                          obj_buf=self.lh5_in)
             self.proc_chain.execute(0, n_read)
             
 
