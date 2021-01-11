@@ -3,7 +3,7 @@ from .build_processing_chain import build_processing_chain
 from collections import namedtuple
 
 
-def run_one_dsp(tb_data, dsp_config, fom_function=None, verbosity=0):
+def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0):
     """
     run one iteration of DSP on tb_data 
 
@@ -19,6 +19,8 @@ def run_one_dsp(tb_data, dsp_config, fom_function=None, verbosity=0):
         Specifies the DSP to be performed for this iteration (see
         build_processing_chain()) and the list of output variables to appear in
         the output table
+    db_dict : dict (optional)
+        DSP parameters database. See build_processing_chain for formatting info
     fom_function : function or None (optional)
         When given the output lh5 table of this DSP iteration, the
         fom_function must return a scalar figure-of-merit value upon which the
@@ -34,7 +36,7 @@ def run_one_dsp(tb_data, dsp_config, fom_function=None, verbosity=0):
         If fom_function is None, returns the output lh5 table for the DSP iteration
     """
     
-    pc, tb_out = build_processing_chain(tb_data, dsp_config, verbosity=verbosity)
+    pc, tb_out = build_processing_chain(tb_data, dsp_config, db_dict=db_dict, verbosity=verbosity)
     pc.execute()
     if fom_function is not None: return fom_function(tb_out, verbosity)
     else: return tb_out
@@ -123,7 +125,7 @@ class ParGrid():
             dsp_config['processors'][name]['args'][i_arg] = value_str
 
 
-def run_grid(tb_data, dsp_config, grid, fom_function, verbosity=0):
+def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=0):
     """Extract a table of optimization values for a grid of DSP parameters 
 
     The grid argument defines a list of parameters and values over which to run
@@ -148,6 +150,8 @@ def run_grid(tb_data, dsp_config, grid, fom_function, verbosity=0):
         When given the output lh5 table of this DSP iteration, the fom_function
         must return a scalar figure-of-merit. Should accept verbosity as a
         second keyword argument
+    db_dict : dict (optional)
+        DSP parameters database. See build_processing_chain for formatting info
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
 
@@ -164,7 +168,11 @@ def run_grid(tb_data, dsp_config, grid, fom_function, verbosity=0):
     while True:    
         grid.set_dsp_pars(dsp_config, iii)
         if verbosity > 0: grid.print_data(iii)
-        grid_values[tuple(iii)] = run_one_dsp(tb_data, dsp_config, fom_function, verbosity)
+        grid_values[tuple(iii)] = run_one_dsp(tb_data,
+                                              dsp_config,
+                                              db_dict=db_dict,
+                                              fom_function=fom_function,
+                                              verbosity=verbosity)
         if verbosity > 0: print("value:", grid_values[tuple(iii)])
         if not grid.iterate_indices(iii): break
     return grid_values
