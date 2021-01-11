@@ -79,7 +79,7 @@ class Store:
 
 
 
-    def read_object(self, name, lh5_file, start_row=0, n_rows=sys.maxsize, idx=None, field_mask=None, obj_buf=None, obj_buf_start=0):
+    def read_object(self, name, lh5_file, start_row=0, n_rows=sys.maxsize, idx=None, field_mask=None, obj_buf=None, obj_buf_start=0, verbosity=0):
         """ Read LH5 object data from a file
 
         Parameters
@@ -119,6 +119,8 @@ class Store:
         obj_buf_start : int (optional)
             Start location in obj_buf for read. For concatenating data to
             array-like objects
+        verbosity : bool (optional)
+            Turn on verbosity for debugging
 
         Returns
         -------
@@ -146,7 +148,8 @@ class Store:
                                                           idx=idx_i,
                                                           field_mask=field_mask,
                                                           obj_buf=obj_buf,
-                                                          obj_buf_start=obj_buf_start)
+                                                          obj_buf_start=obj_buf_start,
+                                                          verbosity=verbosity)
                 n_rows_read += n_rows_read_i
                 if n_rows_read >= n_rows or obj_buf == None:
                     return obj_buf, n_rows_read
@@ -155,6 +158,8 @@ class Store:
             return obj_buf, n_rows_read
 
         # start read from single file. fail if the object is not found
+        if verbosity > 0: print("reading", name, "from", lh5_file)
+
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
             print('Store:', name, "not in", lh5_file)
@@ -213,7 +218,8 @@ class Store:
                                                       h5f, 
                                                       start_row=start_row, 
                                                       n_rows=n_rows, 
-                                                      idx=idx)
+                                                      idx=idx,
+                                                      verbosity=verbosity)
             # modify datatype in attrs if a field_mask was used
             attrs = dict(h5f[name].attrs)
             if field_mask is not None:
@@ -225,8 +231,10 @@ class Store:
 
         # Below here is all array-like types. So trim idx if needed
         if idx is not None:
-            while len(idx)>0 and idx[0] < start_row: idx = idx[1:]
-            idx = idx[:n_rows] # works even if n_rows > len(idx)
+            idxa = idx[0] # pull out the index array
+            while len(idxa)>0 and idxa[0] < start_row: idxa = idxa[1:]
+            idxa = idxa[:n_rows] # works even if n_rows > len(idx[0])
+            idx = (idxa,)
 
         # Table
         # read a table into a dataframe
@@ -261,9 +269,10 @@ class Store:
                                                                 n_rows=n_rows,
                                                                 idx=idx,
                                                                 obj_buf=fld_buf,
-                                                                obj_buf_start=obj_buf_start)
+                                                                obj_buf_start=obj_buf_start,
+                                                                verbosity=verbosity)
                 if obj_buf is not None and n_rows_read > len(obj_buf):
-                    obj_buf.resize(n_rows_read)
+                    obj_buf.resize(n_rows_read, do_warn=True)
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
             n_rows_read = rows_read[0]
@@ -320,7 +329,8 @@ class Store:
                                                               start_row=start_row, 
                                                               n_rows=n_rows,
                                                               obj_buf=cumulen_buf,
-                                                              obj_buf_start=obj_buf_start)
+                                                              obj_buf_start=obj_buf_start,
+                                                              verbosity=verbosity)
             # get a view of just what was read out for cleaner code below
             this_cumulen_nda = cumulative_length.nda[obj_buf_start:obj_buf_start+n_rows_read]
 
@@ -373,7 +383,8 @@ class Store:
                                                                n_rows=da_nrows,
                                                                idx=idx,
                                                                obj_buf=da_buf,
-                                                               obj_buf_start=da_buf_start)
+                                                               obj_buf_start=da_buf_start,
+                                                               verbosity=verbosity)
             if obj_buf is not None: return obj_buf, n_rows_read
             return VectorOfVectors(flattened_data=flattened_data, 
                                    cumulative_length=cumulative_length, 
@@ -398,7 +409,7 @@ class Store:
                 while len(idx[0]) > 0 and idx[0][-1] >= ds_n_rows: 
                     idx = (idx[0][:-1],)
                 if len(idx[0]) == 0: print("warning: idx empty after culling.")
-                n_rows_to_read = len(idx)
+                n_rows_to_read = len(idx[0])
             else: n_rows_to_read = ds_n_rows - start_row
             if n_rows_to_read > n_rows: n_rows_to_read = n_rows
 
@@ -408,6 +419,7 @@ class Store:
 
             # Now read the array
             if obj_buf is not None and n_rows_to_read > 0:
+                if len(obj_buf) < n_rows_to_read: obj_buf.resize(n_rows_to_read)
                 dest_sel = np.s_[obj_buf_start:obj_buf_start+n_rows_to_read]
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
             else: 
