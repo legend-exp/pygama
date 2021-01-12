@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 import fnmatch
 from collections import defaultdict
+from bisect import bisect_left
 
 from .lh5_utils import *
 from .scalar import Scalar
@@ -101,9 +102,11 @@ class Store:
             Numpy-style "fancying indexing" for the read. Used to read out rows
             that pass some selection criteria. If n_rows is not false, idx will
             be truncated to n_rows before reading. To use with a list of files,
-            need to pass in a list of idx's, one to be used with each file. If
+            can pass in a list of idx's (one for each file) or use a long
+            contiguous list (e.g. built from a previous identical read). If
             used in conjunction with start_row and n_rows, will be sliced to
-            obey those constraints
+            obey those constraints, where n_rows is interpreted as the (max)
+            number of -selected- values (in idx) to be read out.
         field_mask : dict or defaultdict { str : bool } (optional)
             For tables and structs, determines which fields get written out.
             Only applies to immediate fields of the requested objects. If a dict
@@ -139,10 +142,20 @@ class Store:
         if isinstance(lh5_file, list):
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
-                idx_i = idx[0] if isinstance(idx, list) else None
+                if isinstance(idx, list): idx_i = idx[i]
+                elif idx is not None: 
+                    # idx is a long continuous array
+                    n_rows_i = self.read_n_rows(name, h5f)
+                    # find the length of the subset of idx that contains indices
+                    # that are less than n_rows_i
+                    n_rows_to_read_i = bisect_left(idx[0], n_rows_i)
+                    # now split idx into idx_i and the remainder
+                    idx_i = (idx[0][:n_rows_to_read_i],)
+                    idx = (idx[0][n_rows_to_read_i:]-n_rows_i,)
+                else: idx_i = None
                 n_rows_i = n_rows-n_rows_read
                 obj_buf, n_rows_read_i = self.read_object(name,
-                                                          lh5_file[0],
+                                                          lh5_file[i],
                                                           start_row=start_row,
                                                           n_rows=n_rows_i,
                                                           idx=idx_i,
@@ -231,10 +244,11 @@ class Store:
 
         # Below here is all array-like types. So trim idx if needed
         if idx is not None:
-            idxa = idx[0] # pull out the index array
-            while len(idxa)>0 and idxa[0] < start_row: idxa = idxa[1:]
-            idxa = idxa[:n_rows] # works even if n_rows > len(idx[0])
-            idx = (idxa,)
+            # chop off indices < start_row
+            i_first_valid = bisect_left(idx[0], start_row)
+            idxa = idx[0][i_first_valid:]
+            # don't readout more than n_rows indices
+            idx = (idxa[:n_rows],) # works even if n_rows > len(idxa)
 
         # Table
         # read a table into a dataframe
@@ -402,12 +416,14 @@ class Store:
                     obj_buf = None
 
             # compute the number of rows to read
+            # we culled idx above for start_row and n_rows, now we have to apply
+            # the constraint of the length of the dataset
             ds_n_rows = h5f[name].shape[0]
             if idx is not None:
                 if len(idx[0]) > 0 and idx[0][-1] >= ds_n_rows:
                     print("warning: idx indexed past the end of the array in the file. Culling...")
-                while len(idx[0]) > 0 and idx[0][-1] >= ds_n_rows: 
-                    idx = (idx[0][:-1],)
+                    n_rows_to_read = bisect_left(idx[0], ds_n_rows)
+                    idx = (idx[0][:n_rows_to_read],)
                 if len(idx[0]) == 0: print("warning: idx empty after culling.")
                 n_rows_to_read = len(idx[0])
             else: n_rows_to_read = ds_n_rows - start_row
@@ -419,8 +435,12 @@ class Store:
 
             # Now read the array
             if obj_buf is not None and n_rows_to_read > 0:
-                if len(obj_buf) < n_rows_to_read: obj_buf.resize(n_rows_to_read)
-                dest_sel = np.s_[obj_buf_start:obj_buf_start+n_rows_to_read]
+                buf_size = obj_buf_start + n_rows_to_read
+                if len(obj_buf) < buf_size: obj_buf.resize(buf_size)
+                dest_sel = np.s_[obj_buf_start:buf_size]
+                # NOTE: if your script fails on this line, it may be because you
+                # have to apply this patch to h5py (or update h5py, if it's
+                # fixed): https://github.com/h5py/h5py/issues/1792
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
             else: 
                 if n_rows == 0: 
