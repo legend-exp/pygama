@@ -285,8 +285,8 @@ class Store:
                                                                 obj_buf=fld_buf,
                                                                 obj_buf_start=obj_buf_start,
                                                                 verbosity=verbosity)
-                if obj_buf is not None and n_rows_read > len(obj_buf):
-                    obj_buf.resize(n_rows_read, do_warn=(verbosity>0))
+                if obj_buf is not None and obj_buf_start+n_rows_read > len(obj_buf):
+                    obj_buf.resize(obj_buf_start+n_rows_read, do_warn=(verbosity>0))
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
             n_rows_read = rows_read[0]
@@ -315,7 +315,7 @@ class Store:
                 # table's size as necessary, warn if any mismatches are found
                 obj_buf.resize(do_warn=True)
                 # set (write) loc to end of tree
-                obj_buf.loc = n_rows_read
+                obj_buf.loc = obj_buf_start+n_rows_read
                 #check attributes
                 if set(obj_buf.attrs.keys()) != set(attrs.keys()):
                     print('warning: attrs mismatch')
