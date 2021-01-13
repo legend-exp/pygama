@@ -98,15 +98,17 @@ class Store:
             The maximum number of rows to read (for array-like objects). The
             actual number of rows read will be returned as one of the return
             values (see below)
-        idx : one-tuple containing an array of ints, or a list of those (optional)
-            Numpy-style "fancying indexing" for the read. Used to read out rows
-            that pass some selection criteria. If n_rows is not false, idx will
-            be truncated to n_rows before reading. To use with a list of files,
-            can pass in a list of idx's (one for each file) or use a long
-            contiguous list (e.g. built from a previous identical read). If
-            used in conjunction with start_row and n_rows, will be sliced to
-            obey those constraints, where n_rows is interpreted as the (max)
-            number of -selected- values (in idx) to be read out.
+        idx : index array or index tuple, or a list of index arrays/tuples (optional)
+            For numpy-style "fancying indexing" for the read. Used to read out
+            rows that pass some selection criteria. Only selection along the 1st
+            axis is supported, so tuple arguments must be one-tuples.  If n_rows
+            is not false, idx will be truncated to n_rows before reading. To use
+            with a list of files, can pass in a list of idx's (one for each
+            file) or use a long contiguous list (e.g. built from a previous
+            identical read). If used in conjunction with start_row and n_rows,
+            will be sliced to obey those constraints, where n_rows is
+            interpreted as the (max) number of -selected- values (in idx) to be
+            read out.
         field_mask : dict or defaultdict { str : bool } (optional)
             For tables and structs, determines which fields get written out.
             Only applies to immediate fields of the requested objects. If a dict
@@ -142,8 +144,12 @@ class Store:
         if isinstance(lh5_file, list):
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
-                if isinstance(idx, list): idx_i = idx[i]
+                if isinstance(idx, list) and len(idx) > 0 and not np.isscalar(idx[0]):
+                    # a list of lists: must be one per file
+                    idx_i = idx[i]
                 elif idx is not None: 
+                    # make idx a proper tuple if it's not one already
+                    if not (isinstance(idx, tuple) and len(idx) == 1): idx = (idx,)
                     # idx is a long continuous array
                     n_rows_i = self.read_n_rows(name, h5f)
                     # find the length of the subset of idx that contains indices
@@ -173,10 +179,15 @@ class Store:
         # start read from single file. fail if the object is not found
         if verbosity > 0: print("reading", name, "from", lh5_file)
 
+        # get the file from the store
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
             print('Store:', name, "not in", lh5_file)
             return None, 0
+
+        # make idx a proper tuple if it's not one already
+        if not (isinstance(idx, tuple) and len(idx) == 1): 
+            if idx is not None: idx = (idx,)
 
         # get the object's datatype
         if 'datatype' not in h5f[name].attrs:
