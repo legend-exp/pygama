@@ -86,14 +86,14 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
-        lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, 0, buffer_len)
+        lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, start_row=0, n_rows=buffer_len)
         pc, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
         
         print(f'Processing table: {tb} ...')
         for start_row in range(0, tot_n_rows, buffer_len):
             if verbose > 0:
                 update_progress(start_row/tot_n_rows)
-            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, obj_buf=lh5_in)
+            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, obj_buf=lh5_in)
             n_rows = min(tot_n_rows-start_row, n_rows)
             pc.execute(0, n_rows)
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
