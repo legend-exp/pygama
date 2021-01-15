@@ -1,5 +1,5 @@
 from pygama.io.raw_to_dsp import build_processing_chain
-import pygama.io.lh5 as lh5
+from pygama import lh5
 import pygama.dsp.units as units
 
 import glob, os, itertools, contextlib, string

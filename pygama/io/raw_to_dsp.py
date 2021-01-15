@@ -11,7 +11,9 @@ from pprint import pprint
 import argparse
 
 from pygama import __version__ as pygama_version
-from pygama.io import lh5
+from pygama.dsp.ProcessingChain import ProcessingChain
+from pygama.dsp.units import *
+from pygama import lh5
 from pygama.utils import update_progress
 import pygama.git as git
 from pygama.dsp.build_processing_chain import *
@@ -42,10 +44,10 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = []
-        lh5_tables_temp = raw_store.ls(f_raw)
+        lh5_keys = raw_store.ls(f_raw)
 
         # sometimes 'raw' is nested, e.g g024/raw
-        for tb in lh5_tables_temp:
+        for tb in lh5_keys:
             if "raw" not in tb:
                 tbname = raw_store.ls(lh5_file[tb])[0]
                 if "raw" in tbname:
@@ -56,6 +58,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     for tb in lh5_tables:
         if 'raw' not in tb:
             lh5_tables.remove(tb)
+    if len(lh5_tables) == 0:
+        print("Empty lh5_tables, exiting...")
+        sys.exit(1)
 
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
@@ -113,3 +118,48 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
     t_elap = (time.time() - t_start) / 60
     print(f'Done processing.  Time elapsed: {t_elap:.2f} min.')
+
+
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser(description=
+"""Process a single tier 1 LH5 file and produce a tier 2 LH5 file using a
+json config file and raw_to_dsp.""")
+    
+    arg = parser.add_argument
+    arg('file', help="Input (tier 1) LH5 file.")
+    arg('-o', '--output',
+        help="Name of output file. By default, output to ./t2_[input file name].")
+    
+    arg('-v', '--verbose', default=1, type=int,
+        help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
+    
+    arg('-b', '--block', default=16, type=int,
+        help="Number of waveforms to process simultaneously. Default is 8")
+    
+    arg('-c', '--chunk', default=3200, type=int,
+        help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
+    arg('-n', '--nevents', default=None, type=int,
+        help="Number of waveforms to process. By default do the whole file")
+    arg('-g', '--group', default=None, action='append', type=str,
+        help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
+    defaultconfig = os.path.dirname(os.path.realpath(__loader__.get_filename())) + '/dsp_config.json'
+    arg('-j', '--jsonconfig', default=defaultconfig, type=str,
+        help="Name of json file used by raw_to_dsp to construct the processing routines used. By default use dsp_config in pygama/apps.")
+    arg('-p', '--outpar', default=None, action='append', type=str,
+        help="Add outpar to list of parameters written to file. By default use the list defined in outputs list in config json file.")
+    arg('-d', '--dbfile', default=None, type=str,
+        help="JSON file to read DB parameters from. Should be nested dict with channel at the top level, and parameters below that.")
+    arg('-r', '--recreate', action='store_const', const=0, dest='writemode',
+        help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
+    arg('-u', '--update', action='store_const', const=1, dest='writemode',
+        help="Update existing file with new values. Useful with the --outpar option. Mutually exclusive with --recreate and --append THIS IS NOT IMPLEMENTED YET!")
+    arg('-a', '--append', action='store_const', const=1, dest='writemode',
+        help="Append values to existing file. Mutually exclusive with --recreate and --update THIS IS NOT IMPLEMENTED YET!")
+    args = parser.parse_args()
+
+    out = args.output
+    if out is None:
+        out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
+
+    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)
