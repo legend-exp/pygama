@@ -9,7 +9,7 @@ routines for automatic calibration.
 import sys
 import numpy as np
 from pygama.analysis.peak_fitting import *
-from pygama.analysis.histograms import get_bin_centers
+from pygama.analysis.histograms import get_bin_centers, get_gaussian_guess
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy.signal import argrelextrema, medfilt, find_peaks_cwt
@@ -78,7 +78,7 @@ def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
     hist = hist - hist_med
 
     # identify peaks with a scipy function (could be improved ...)
-    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=5)
+    peak_idxs = find_peaks_cwt(hist, np.arange(5, 10, 0.1), min_snr=5) #changed range from (0,6,0.1)
     peak_energies = bin_centers[peak_idxs]
 
     # pick the num_peaks most prominent peaks
@@ -89,19 +89,19 @@ def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
         peak_energies = np.sort(bin_centers[peak_idxs_max])
 
     if test:
-        plt.plot(bin_centers, hist, ls='steps', lw=1, c='b')
+        plt.plot(bin_centers, hist, ds='steps', lw=1, c='b')
         for e in peak_energies:
             plt.axvline(e, color="r", lw=1, alpha=0.6)
-        plt.xlabel("Energy [uncal]", ha='right', x=1)
+        plt.xlabel("Energy [ADC]", ha='right', x=1)
         plt.ylabel("Filtered Spectrum", ha='right', y=1)
         plt.tight_layout()
         plt.show()
-        exit()
+        #exit()
 
     return peak_energies
 
 
-def match_peaks(data_pks, cal_pks):
+def match_peaks(data_pks, cal_pks, plotFigure=None):
     """
     Match uncalibrated peaks with literature energy values.
     """
@@ -131,16 +131,19 @@ def match_peaks(data_pks, cal_pks):
     print(i, best_err)
     print("cal:",cal)
     print("data:",data)
-    plt.scatter(data, cal, label='min.err:{:.2e}'.format(err))
-    xs = np.linspace(data[0], data[-1], 10)
-    plt.plot(xs, best_m * xs + best_b , c="r",
+    
+    if plotFigure is not None:
+        
+        plt.scatter(data, cal, label='min.err:{:.2e}'.format(best_err))
+        xs = np.linspace(data[0], data[-1], 10)
+        plt.plot(xs, best_m * xs + best_b , c="r",
              label="y = {:.2f} x + {:.2f}".format(best_m,best_b) )
-    plt.xlabel("Energy (uncal)", ha='right', x=1)
-    plt.ylabel("Energy (keV)", ha='right', y=1)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-    exit()
+        plt.xlabel("Energy [ADC]", ha='right', x=1)
+        plt.ylabel("Energy (keV)", ha='right', y=1)
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+    #exit()
 
     return best_m, best_b
 
@@ -168,9 +171,12 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
     #get 10 most prominent ~high e peaks
     max_adc = np.amax(energy_series)
-    energy_hi = energy_series  #[ (energy_series > np.percentile(energy_series, 20)) & (energy_series < np.percentile(energy_series, 99.9))]
-
-    peak_energies, peak_e_err = get_most_prominent_peaks(energy_hi,)
+    energy_hi = energy_series[(energy_series > np.percentile(energy_series, 20)) & \
+                              (energy_series < np.percentile(energy_series, 99.9))] #uncommented range
+    peak_energies = get_most_prominent_peaks(energy_hi,
+                                            xlo=np.percentile(energy_series, 20),
+                                            xhi=np.percentile(energy_series, 99.9),
+                                            xpb=2) #modified limits and binwidth
     rough_kev_per_adc, rough_kev_offset = match_peaks(peak_energies, cal_peaks)
     e_cal_rough = rough_kev_per_adc * energy_series + rough_kev_offset
 
@@ -276,12 +282,12 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
     if plotFigure is not None:
 
-        plt.figure(plotFigure.number)
+        plt.figure(plotFigure.number) 
         plt.clf()
-
-        grid = gs.GridSpec(peak_num, 3)
-        ax_line = plt.subplot(grid[:, 1])
-        ax_spec = plt.subplot(grid[:, 2])
+        
+        grid = gs.GridSpec(peak_num, 1, hspace=0.5)
+        #ax_line = plt.subplot(grid[:, 1])  #changed plotting arrangement, added 2 figure objects
+        #ax_spec = plt.subplot(grid[:, 2])
 
         for i, energy in enumerate(cal_peaks):
             ax_peak = plt.subplot(grid[i, 0])
@@ -290,30 +296,38 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
             ax_peak.plot(
                 bin_centers * rough_kev_per_adc + rough_kev_offset,
                 peak_hist,
-                ls="steps-mid",
-                color="k")
+                ds="steps-mid",
+                color="b",
+                label="data")
             fit = radford_peak(bin_centers, *params)
             ax_peak.plot(
                 bin_centers * rough_kev_per_adc + rough_kev_offset,
                 fit,
-                color="b")
+                color="r",
+                label="fit")
 
         ax_peak.set_xlabel("Energy [keV]")
-
+        ax_peak.legend()
+        
+        plt.figure()
+        ax_line = plt.subplot()
         ax_line.scatter(
             centers,
-            cal_peaks,
-        )
-
+            cal_peaks)
         x = np.arange(0, max_adc, 1)
         ax_line.plot(x, linear_cal[0] * x + linear_cal[1])
-        ax_line.set_xlabel("ADC")
+        ax_line.set_xlabel("Energy [ADC]")
         ax_line.set_ylabel("Energy [keV]")
-
+        
+        plt.figure()
+        ax_spec = plt.subplot()
         energies_cal = energy_series * linear_cal[0] + linear_cal[1]
         peak_hist, bins = np.histogram(energies_cal, bins=np.arange(0, 2700))
-        ax_spec.semilogy(get_bin_centers(bins), peak_hist, ls="steps-mid")
+        ax_spec.semilogy(get_bin_centers(bins), peak_hist, ds="steps-mid")
+        for pk in cal_peaks:
+            ax_spec.axvline(pk, 0, 1e5, color='r')
         ax_spec.set_xlabel("Energy [keV]")
+        ax_spec.set_ylabel("Counts")
 
     return linear_cal
 
