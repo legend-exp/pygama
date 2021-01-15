@@ -40,6 +40,9 @@ def main():
     arg('-n', '--nwfs', type=int, help='limit num. waveforms')
     arg('-v', '--verbose', action=st, help='verbose mode')
 
+    arg('-l', '--bl', type=int, default=3200, help='buffer length for chunked reads for DSP')
+    arg('-w', '--bw', type=int, default=8, help='buffer width for DSP')
+
     args = par.parse_args()
 
     expDB = '$LEGEND_META/analysis/LPGTA/LPGTA.json'
@@ -59,7 +62,7 @@ def main():
     query = "YYYYmmdd == '" + args.date + "'" if args.date else args.q
     if args.dg: dg = load_datagroup(query)
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose)
-    if args.r2d: r2d(dg, args.over, nwfs, args.verbose)
+    if args.r2d: r2d(dg, args.over, nwfs, args.verbose, args.bl, args.bw)
 
 
 def load_datagroup(query=None):
@@ -179,7 +182,7 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
                    n_max=nwfs, overwrite=overwrite, subrun=subrun)#, chans=chans)
 
 
-def r2d(dg, overwrite=False, nwfs=None, vrb=False):
+def r2d(dg, overwrite=False, nwfs=None, vrb=False, buffer_len=3200, block_width=8):
     """
     """
     # print(dg.file_keys)
@@ -199,7 +202,7 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
             f_dsp = f_dsp.format_map(tmp)
 
         raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb,
-                   overwrite=overwrite)
+                   overwrite=overwrite, buffer_len=buffer_len, block_width=block_width)
 
 
 
