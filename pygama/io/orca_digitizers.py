@@ -50,7 +50,8 @@ class ORCAStruck3302(OrcaDecoder):
         }
 
         super().__init__(*args, **kwargs) # also initializes the garbage df
-        self.enabled_cccs = []
+        # self.enabled_cccs = []
+        self.skipped_channels = {}
         self.ievt = 0
 
 
