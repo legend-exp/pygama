@@ -1,6 +1,6 @@
 {
   "outputs": [
-    "timestamp", "channel", "energy", "trapEmax", "trapEftp", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "zacE", "cuspE", "power_spect", "curr_psd", "curr", "hf_max", "curr_psd_sum", "curr_psd_sum10", "wf_norm", "wf_blsub", "bl_slope", "tp_0", "tp_50"
+    "timestamp", "channel", "energy", "trapEmax", "trapEftp", "triE", "bl", "bl_sig", "A_10", "AoE", "dcr", "zacE", "cuspE", "power_spect", "curr_psd", "curr", "hf_max", "curr_psd_sum", "curr_psd_sum10", "wf_norm", "wf_blsub", "bl_slope", "tp_0", "tp_50", "waveform"
   ],
   "processors":{
     "bl, bl_sig":{
@@ -42,7 +42,7 @@
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
+      "args": ["wf_pz", "10*us", "2.5*us", "wf_trap"],
       "prereqs": ["wf_pz"],
       "unit": "ADC"
     },
