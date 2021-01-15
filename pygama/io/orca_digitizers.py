@@ -106,7 +106,13 @@ class ORCAStruck3302(OrcaDecoder):
         # does not copy data. p32 and p16 are read-only
         p32 = np.frombuffer(packet, dtype=np.uint32)
         p16 = np.frombuffer(packet, dtype=np.uint16)
-
+        
+        # read the crate/card/channel first
+        crate = (p32[0] >> 21) & 0xF
+        card = (p32[0] >> 16) & 0x1F
+        channel = (p32[0] >> 8) & 0xFF
+        ccc = get_ccc(crate, card, channel)
+        
         # aliases for brevity
         tb = lh5_tables
         if isinstance(tb, dict): 
@@ -122,7 +128,7 @@ class ORCAStruck3302(OrcaDecoder):
         # store packet id
         tb['packet_id'].nda[ii] = packet_id
 
-        # start reading the binary, baby
+        # read the rest of the record
         n_lost_msb = (p32[0] >> 25) & 0x7F
         n_lost_lsb = (p32[0] >> 2) & 0x7F
         n_lost_records = (n_lost_msb << 7) + n_lost_lsb
@@ -130,7 +136,6 @@ class ORCAStruck3302(OrcaDecoder):
         tb['card'].nda[ii] = (p32[0] >> 16) & 0x1F
         tb['channel'].nda[ii] = (p32[0] >> 8) & 0xFF
         buffer_wrap = p32[0] & 0x1
-        #crate_card_chan = (tb['crate'].nda[ii] << 9) + (tb['card'].nda[ii] << 4) + tb['channel'].nda[ii]
         wf_length32 = p32[1]
         ene_wf_length32 = p32[2]
         evt_header_id = p32[3] & 0xFF
