@@ -102,7 +102,6 @@ class ORCAStruck3302(OrcaDecoder):
         """
         see README for the 32-bit data word diagram
         """
-
         # interpret the raw event data into numpy arrays of 16 and 32 bit ints
         # does not copy data. p32 and p16 are read-only
         p32 = np.frombuffer(packet, dtype=np.uint32)
@@ -116,14 +115,15 @@ class ORCAStruck3302(OrcaDecoder):
         
         # aliases for brevity
         tb = lh5_tables
-        if isinstance(tb, dict): 
+        # if the first key is an int, then there are different tables for 
+        # each channel.
+        if isinstance(list(tb.keys())[0], int):
             if ccc not in lh5_tables:
                 if ccc not in self.skipped_channels: 
                     self.skipped_channels[ccc] = 0
                 self.skipped_channels[ccc] += 1
                 return
             tb = lh5_tables[ccc]
-        ii = tb.loc
         ii = tb.loc
 
         # store packet id
@@ -337,7 +337,6 @@ class ORCAGretina4M(OrcaDecoder):
         """
         Parse the header for an individual event
         """
-
         pu16 = np.frombuffer(packet, dtype=np.uint16)
         p16 = np.frombuffer(packet, dtype=np.int16)
 
