@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from ..utils import *
 from .io_base import DataDecoder
-from . import lh5
+from pygama import lh5
 from .ch_group import *
 
 
@@ -61,7 +61,7 @@ class FlashCamEventDecoder(DataDecoder):
             },
         }
 
-        # these are read for every file (get_file_config)
+        # these are read for every file (set_file_config)
         # FIXME: push into a file header object?
         self.config_names = [
             'nsamples', # samples per channel
@@ -79,9 +79,14 @@ class FlashCamEventDecoder(DataDecoder):
     
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
+
+
+    def get_decoded_values(self, channel): 
+        # same for all channels
+        return self.decoded_values
         
         
-    def get_file_config(self, fcio):
+    def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
         """
@@ -190,7 +195,7 @@ class FlashCamStatusDecoder(DataDecoder):
             },
         }
 
-        # these are read for every file (get_file_config)
+        # these are read for every file (set_file_config)
         self.config_names = [
             'nsamples', # samples per channel
             'nadcs', # number of adc channels
@@ -208,7 +213,7 @@ class FlashCamStatusDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
         
         
-    def get_file_config(self, fcio):
+    def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
         """
@@ -252,7 +257,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=8092, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8092, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -275,45 +280,27 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
     
     # set up event decoder
     event_decoder = FlashCamEventDecoder()
-    event_decoder.get_file_config(fcio)
+    event_decoder.set_file_config(fcio)
     event_tables = {}
     
-    # parse daq_to_raw config 
-    if ('daq_to_raw' in config and 
-        'ch_groups' in config['daq_to_raw'] and 
-        'FlashCamEventDecoder' in config['daq_to_raw']['ch_groups']):
+    # build ch_groups and set up tables
+    ch_groups = None
+    if (ch_groups_dict is not None) and ('FlashCamEventDecoder' in ch_groups_dict):
         # get ch_groups
-        ch_groups = config['daq_to_raw']['ch_groups']['FlashCamEventDecoder']
+        ch_groups = ch_groups_dict['FlashCamEventDecoder']
         expand_ch_groups(ch_groups)
-
-        # set up a table for each group
-        for group_name, group_info in ch_groups.items():
-            tbl = lh5.Table(buffer_size)
-            event_decoder.initialize_lh5_table(tbl)
-            group_info['table'] = tbl
-
-            # cache the table to a ch-indexed dict for quick look-up
-            for ch in group_info['ch_list']: event_tables[ch] = tbl
-
-            # set the output file name and in-file path (group name)
-            if not single_output:
-                if group_info['system'] not in raw_files.keys():
-                    print('Error, no output file found for system:', group_info['system'])
-
-            # out_file = raw_files[system].format_map(attrs)
-            group_info['out_file'] = f_out if single_output else raw_files[group_info['system']]
-            group_info['group_path'] = group_name + '/raw'
-       
-    else:
+    else: 
         print('Config not found.  Single-table mode')
-        tbl = lh5.Table(buffer_size)
-        event_decoder.initialize_lh5_table(tbl)
-        ch_groups = { 'group' : {} }
-        ch_groups['group']['table'] = tbl
-        ch_groups['group']['out_file'] = f_out 
-        ch_groups['group']['group_path'] = 'raw'
-        #event_tables = defaultdict(lambda: tbl)
-        event_tables = tbl
+        ch_groups = create_dummy_ch_group()
+
+    # set up ch_group-to-output-file-and-group info
+    if single_output:
+        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='raw')
+    else:
+        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='raw')
+
+    # set up tables
+    event_tables = build_tables(ch_groups, buffer_size, event_decoder)
     
     if verbose:
         print('Output group : output file')
@@ -324,7 +311,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
         
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
-    status_decoder.get_file_config(fcio)
+    status_decoder.set_file_config(fcio)
     status_tbl = lh5.Table(buffer_size)
     status_decoder.initialize_lh5_table(status_tbl)
     try:
@@ -368,6 +355,7 @@ def process_flashcam(daq_file, raw_files, n_max, config, verbose, buffer_size=80
             for group_info in ch_groups.values():
                 tbl = group_info['table']
                 # Check that the tables are large enough
+                # TODO: don't need to check this every event, only if sum(numtraces) >= buffer_size
                 if tbl.size < fcio.numtraces and fcio.numtraces > max_numtraces: 
                     print('warning: tbl.size =', tbl.size, 'but fcio.numtraces =', fcio.numtraces)
                     print('may overflow. suggest increasing tbl.size')

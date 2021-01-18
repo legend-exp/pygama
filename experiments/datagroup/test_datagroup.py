@@ -26,24 +26,24 @@ def analyze_lpgta():
     # -- experiment-specific choices --
 
     # run 1 & 2 files don't match template
-    dg.file_keys.query('run > 2', inplace=True)
+    dg.fileDB.query('run > 2', inplace=True)
 
-    dg.file_keys.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
+    dg.fileDB.sort_values(['run','YYYYmmdd','hhmmss'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
 
     def get_cmap(row):
         row['cmap'] = dg.runDB[f"{row['run']:0>4d}"]["cmap"]
         return row
 
-    dg.file_keys = dg.file_keys.apply(get_cmap, axis=1)
+    dg.fileDB = dg.fileDB.apply(get_cmap, axis=1)
 
-    dg.file_keys['runtype'] = dg.file_keys['rtp']
+    dg.fileDB['runtype'] = dg.fileDB['rtp']
 
     dg.get_lh5_cols()
 
     dg.save_df('./LPGTA_fileDB.h5')
 
-    print(dg.file_keys)
+    print(dg.fileDB)
 
 
 def analyze_cage():
@@ -54,8 +54,8 @@ def analyze_cage():
     dg.scan_daq_dir()
 
     # -- experiment-specific choices --
-    dg.file_keys.sort_values(['cycle'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
+    dg.fileDB.sort_values(['cycle'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
 
     def get_cyc_info(row):
         """
@@ -82,14 +82,14 @@ def analyze_cage():
             row['runtype'] = 'icpc'
         return row
 
-    dg.file_keys = dg.file_keys.apply(get_cyc_info, axis=1)
+    dg.fileDB = dg.fileDB.apply(get_cyc_info, axis=1)
 
     dg.get_lh5_cols()
 
     for col in ['run']:
-        dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
+        dg.fileDB[col] = pd.to_numeric(dg.fileDB[col])
 
-    print(dg.file_keys)
+    print(dg.fileDB)
 
     dg.save_df('CAGE_fileDB.h5')
 
@@ -105,18 +105,18 @@ def analyze_hades():
     dg.scan_daq_dir()
 
     # -- experiment-specific stuff --
-    dg.file_keys['runtype'] = dg.file_keys['detSN']
+    dg.fileDB['runtype'] = dg.fileDB['detSN']
 
     # add a sortable timestamp column
     def get_ts(row):
         ts = f"{row['YYmmdd']} {row['hhmmss']}"
         row['date'] = pd.to_datetime(ts, format='%y%m%d %H%M%S')
         return row
-    dg.file_keys = dg.file_keys.apply(get_ts, axis=1)
-    dg.file_keys.sort_values('date', inplace=True)
+    dg.fileDB = dg.fileDB.apply(get_ts, axis=1)
+    dg.fileDB.sort_values('date', inplace=True)
 
     dg.get_lh5_cols()
-    print(dg.file_keys['raw_file'].values)
+    print(dg.fileDB['raw_file'].values)
 
     dg.save_df('HADES_fileDB.h5')
 
@@ -128,12 +128,12 @@ def analyze_ornl():
     dg.scan_daq_dir()
 
     # expt-specific organization
-    dg.file_keys.sort_values(['cycle'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
+    dg.fileDB.sort_values(['cycle'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
 
     dg.save_keys()
     dg.load_keys()
-    print(dg.file_keys)
+    print(dg.fileDB)
 
 
 
@@ -148,16 +148,16 @@ def analyze_surf():
     dg.scan_daq_dir()
 
     # -- experiment-specific choices --
-    dg.file_keys.sort_values(['cycle'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
+    dg.fileDB.sort_values(['cycle'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
 
     # TODO: adapt "get_cyc_info" function from analyze_cage to
     # fill in serial numbers for each detector
-    dg.file_keys['runtype'] = "P9999A"
+    dg.fileDB['runtype'] = "P9999A"
 
     dg.get_lh5_cols()
 
-    # print(dg.file_keys.query('cycle < 10'))
+    # print(dg.fileDB.query('cycle < 10'))
 
     dg.save_df('SURFCHAR_fileDB.h5')
 

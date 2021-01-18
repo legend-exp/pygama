@@ -22,7 +22,7 @@ plt.style.use('../clint.mpl')
 
 from pygama import DataGroup
 from pygama.io.orcadaq import parse_header
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 import pygama.analysis.metadata as pmd
 import pygama.analysis.histograms as pgh
 import pygama.analysis.calibration as pgc
@@ -84,14 +84,14 @@ def main():
     dg = DataGroup('cage.json', load=True)
     if args.query:
         que = args.query[0]
-        dg.file_keys.query(que, inplace=True)
+        dg.fileDB.query(que, inplace=True)
     else:
-        dg.file_keys = dg.file_keys[-1:]
+        dg.fileDB = dg.fileDB[-1:]
 
     view_cols = ['run','cycle','daq_file','runtype','startTime','threshold',
                  'stopTime','runtime']
-    print(dg.file_keys[view_cols].to_string())
-    print(len(dg.file_keys))
+    print(dg.fileDB[view_cols].to_string())
+    print(len(dg.fileDB))
     # exit()
 
     # merge main and ecal config JSON as dicts
@@ -139,8 +139,8 @@ def main():
           f"Output file: {config['ecaldb']} \n"
           'Calibrating raw energy parameters:', config['rawe'], '\n'
           'Current DataGroup:')
-    print(dg.file_keys[['run', 'cycle', 'startTime', 'runtime']])
-    print('Columns:', dg.file_keys.columns.values)
+    print(dg.fileDB[['run', 'cycle', 'startTime', 'runtime']])
+    print('Columns:', dg.fileDB.columns.values)
 
     # -- main calibration routines --
     if args.show_db: show_ecaldb(config)
@@ -211,9 +211,9 @@ def check_raw_spectrum(dg, config, db_ecal):
 
     # load energy data
     lh5_dir = os.path.expandvars(config['lh5_dir'])
-    dsp_list = lh5_dir + dg.file_keys['dsp_path'] + '/' + dg.file_keys['dsp_file']
+    dsp_list = lh5_dir + dg.fileDB['dsp_path'] + '/' + dg.fileDB['dsp_file']
     raw_data = lh5.load_nda(dsp_list, config['rawe'], config['input_table'])
-    runtime_min = dg.file_keys['runtime'].sum()
+    runtime_min = dg.fileDB['runtime'].sum()
 
     print('\nShowing raw spectra ...')
     for etype in config['rawe']:
@@ -266,7 +266,7 @@ def run_peakdet(dg, config, db_ecal):
     print('\nRunning peakdet ...')
 
     # do the analysis
-    gb = dg.file_keys.groupby(config['gb_cols'])
+    gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config]
     result = gb.apply(peakdet_group, *gb_args)
 
@@ -521,7 +521,7 @@ def run_peakfit(dg, config, db_ecal):
     print('\nRunning peakfit ...')
 
     # do the analysis
-    gb = dg.file_keys.groupby(config['gb_cols'])
+    gb = dg.fileDB.groupby(config['gb_cols'])
     gb_args = [config, db_ecal]
     result = gb.apply(peakfit_group, *gb_args)
 

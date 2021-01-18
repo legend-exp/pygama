@@ -1,11 +1,11 @@
 import sys
 import numpy as np
 
-from .orcadaq import OrcaDecoder
+from .orcadaq import OrcaDecoder, get_ccc
 
 class ORCAStruck3302(OrcaDecoder):
     """
-    decode ORCA Struck 3302 digitizer data
+    ORCA decoder for Struck 3302 digitizer data
     """
     def __init__(self, *args, **kwargs):
 
@@ -48,9 +48,16 @@ class ORCAStruck3302(OrcaDecoder):
               'units': 'adc',
             },
         }
+
         super().__init__(*args, **kwargs) # also initializes the garbage df
-        self.enabled_cccs = []
+        # self.enabled_cccs = []
+        self.skipped_channels = {}
         self.ievt = 0
+
+
+    def get_decoded_values(self, channel):
+        # TODO: return channel-specific decoded_values
+        return self.decoded_values
 
 
     def set_object_info(self, object_info):
@@ -87,24 +94,42 @@ class ORCAStruck3302(OrcaDecoder):
             self.decoded_values['waveform']['length'] = trace_length
 
 
-    def decode_packet(self, packet, lh5_table, packet_id, header_dict, verbose=False):
+    def max_n_rows_per_packet(self):
+        return 1
+
+
+    def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
         """
         see README for the 32-bit data word diagram
         """
-
         # interpret the raw event data into numpy arrays of 16 and 32 bit ints
         # does not copy data. p32 and p16 are read-only
         p32 = np.frombuffer(packet, dtype=np.uint32)
         p16 = np.frombuffer(packet, dtype=np.uint16)
-
+        
+        # read the crate/card/channel first
+        crate = (p32[0] >> 21) & 0xF
+        card = (p32[0] >> 16) & 0x1F
+        channel = (p32[0] >> 8) & 0xFF
+        ccc = get_ccc(crate, card, channel)
+        
         # aliases for brevity
-        tb = lh5_table
+        tb = lh5_tables
+        # if the first key is an int, then there are different tables for 
+        # each channel.
+        if isinstance(list(tb.keys())[0], int):
+            if ccc not in lh5_tables:
+                if ccc not in self.skipped_channels: 
+                    self.skipped_channels[ccc] = 0
+                self.skipped_channels[ccc] += 1
+                return
+            tb = lh5_tables[ccc]
         ii = tb.loc
 
         # store packet id
         tb['packet_id'].nda[ii] = packet_id
 
-        # start reading the binary, baby
+        # read the rest of the record
         n_lost_msb = (p32[0] >> 25) & 0x7F
         n_lost_lsb = (p32[0] >> 2) & 0x7F
         n_lost_records = (n_lost_msb << 7) + n_lost_lsb
@@ -112,11 +137,10 @@ class ORCAStruck3302(OrcaDecoder):
         tb['card'].nda[ii] = (p32[0] >> 16) & 0x1F
         tb['channel'].nda[ii] = (p32[0] >> 8) & 0xFF
         buffer_wrap = p32[0] & 0x1
-        #crate_card_chan = (tb['crate'].nda[ii] << 9) + (tb['card'].nda[ii] << 4) + tb['channel'].nda[ii]
         wf_length32 = p32[1]
         ene_wf_length32 = p32[2]
         evt_header_id = p32[3] & 0xFF
-        tb['timestamp'].nda[ii] = p32[4] + ((p32[3] >> 16) & 0xFFFF)
+        tb['timestamp'].nda[ii] = p32[4] + ((p32[3] & 0xFFFF0000) << 16)
         last_word = p32[-1]
 
         # get the footer
@@ -182,108 +206,234 @@ class ORCAStruck3302(OrcaDecoder):
         tb.push_row()
 
 
-'''
-class ORCAGretina4M(DataTaker):
+class ORCAGretina4M(OrcaDecoder):
     """
-    decode Majorana Gretina4M digitizer data
+    Decoder for Majorana Gretina4M digitizer data
 
     NOTE: Tom Caldwell made some nice new summary slides on a 2019 LEGEND call
     https://indico.legend-exp.org/event/117/contributions/683/attachments/467/717/mjd_data_format.pdf
     """
     def __init__(self, *args, **kwargs):
+
         self.decoder_name = 'ORGretina4MWaveformDecoder'
-        self.class_name = 'ORGretina4MModel'
-        self.decoded_values = {
-            "packet_id": [],
-            "ievt": [],
-            "energy": [],
-            "timestamp": [],
-            "channel": [],
-            "board_id": [],
-            "waveform": [],
+        self.orca_class_name = 'ORGretina4MModel'
+
+        self.decoded_values_template = {
+            'packet_id': {
+               'dtype': 'uint32',
+             },
+            'ievt': {
+              'dtype': 'uint32',
+            },
+            'energy': {
+              'dtype': 'uint32',
+              'units': 'adc',
+            },
+            'timestamp': {
+              'dtype': 'uint32',
+              'units': 'clock_ticks',
+            },
+            'crate': {
+              'dtype': 'uint8',
+            },
+            'card': {
+              'dtype': 'uint8',
+            },
+            'channel': {
+              'dtype': 'uint8',
+            },
+            "board_id": {
+              'dtype': 'uint32',
+            },
+            'waveform': {
+              'dtype': 'int16',
+              'datatype': 'waveform',
+              'length': 2016, # shorter if multispampling is used
+              'sample_period': 10,
+              'sample_period_units': 'ns',
+              'units': 'adc',
+            },
         }
+
         super().__init__(*args, **kwargs)
-        self.chan_list = None
-        self.is_multisampled = True
-        self.event_header_length = 18
-        self.sample_period = 10  # ns
-        self.gretina_event_no = 0
-        self.window = False
-        self.n_blsamp = 500
+        self.decoded_values = {}
         self.ievt = 0
-
-        self.df_metadata = None # hack, this probably isn't right
-        self.active_channels = self.find_active_channels()
-
-
-    def crate_card_chan(self, crate, card, channel):
-        return (crate << 9) + (card << 4) + (channel)
-
-
-    def find_active_channels(self):
-        """
-        Only do this for multi-detector data
-        """
-        active_channels = []
-        if self.df_metadata is None:
-            return active_channels
-
-        for index, row in self.df_metadata.iterrows():
-            crate, card = index
-            for chan, chan_en in enumerate(row.Enabled):
-                if chan_en:
-                    active_channels.append(
-                        self.crate_card_chan(crate, card, chan))
-
-        return active_channels
+        self.skipped_channels = {}
+        self.use_MS = False
+        self.wf_skip = 16 # the first ~dozen samples are sometimes junk
+        # channel pars for multisampling mode
+        self.ft_len = {}
+        self.ps = {}
+        self.div = {}
+        self.rises = np.zeros(2016)
+        self.remainders = np.zeros(2016)
 
 
-    def decode_event(self, event_data_bytes, packet_id, header_dict):
+    def get_decoded_values(self, channel):
+        if channel is None: 
+            dec_vals_list = self.decoded_values.items()
+            if len(dec_vals_list) == 0:
+                print("ORGretina4MModel: Error: decoded_values not built yet!")
+                return None
+            return dec_vals_list[0]
+        if channel in self.decoded_values: return self.decoded_values[channel]
+        print("ORGretina4MModel: Error: No decoded values for channel", channel)
+        return None
+
+
+    def max_n_rows_per_packet(self):
+        return 1
+
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+
+        # parse object_info for important info
+        for card_dict in self.object_info:
+            crate = card_dict['Crate']
+            card = card_dict['Card']
+
+            is_enabled = card_dict['Enabled']
+            ftcnt = card_dict['FtCnt']
+            presum_rates = [ 2, 4, 8, 10 ] # number presummed in MS
+            mrpsrt = card_dict['Mrpsrt'] # index for channel's presum rate
+            dividers = [1, 2, 4, 8 ] # dividers for presummed data
+            mrpsdv = card_dict['Mrpsdv'] # index for channel's divider
+            for channel in range(8):
+                # only care about enabled channels
+                if not is_enabled[channel]: continue
+                ccc = get_ccc(crate, card, channel)
+                self.decoded_values[ccc] = {}
+                self.decoded_values[ccc].update(self.decoded_values_template)
+                sd = self.decoded_values[ccc] # alias
+
+                # find MS parameters
+                # MS is on if FtCnt > 0
+                # forget pre-rising-edge MS: it's broken so MJ doesn't use it
+                # Skip samples at beginning, fully sample, then FtCnt samples of
+                # pre-sampled, divided by div. Make one long fully-sampled wf.
+                ft_len = ftcnt[channel]
+                self.ft_len[ccc] = ft_len
+                if self.is_multisampled(ccc):
+                    ps = presum_rates[mrpsrt[channel]]
+                    self.ps[ccc] = ps
+                    self.div[ccc] = dividers[mrpsdv[channel]]
+                    # chop off 3 values at the end because 2 are bad and we need
+                    # one for interpolation
+                    min_len = 2018 - ft_len - self.wf_skip + (ps-1)*(ft_len-3)
+                    sd['waveform']['length'] = min_len
+                    if min_len > len(self.remainders):
+                        self.remainders.resize(min_len)
+                else: sd['waveform']['length'] = 2016 - self.wf_skip
+
+
+    def is_multisampled(self, ccc):
+        if ccc in self.ft_len: return self.ft_len[ccc] > 0
+        else: print('channel', ccc, 'not in ft_len...')
+        return False
+
+
+    def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
         """
         Parse the header for an individual event
         """
-        self.gretina_event_no += 1
-        event_data = np.fromstring(event_data_bytes, dtype=np.uint16)
-        card = event_data[1] & 0x1F
-        crate = (event_data[1] >> 5) & 0xF
-        channel = event_data[4] & 0xf
-        board_id = (event_data[4] & 0xFFF0) >> 4
-        timestamp = event_data[6] + (event_data[7] << 16) + (event_data[8] << 32)
-        energy = event_data[9] + ((event_data[10] & 0x7FFF) << 16)
-        wf_data = event_data[self.event_header_length:]
+        pu16 = np.frombuffer(packet, dtype=np.uint16)
+        p16 = np.frombuffer(packet, dtype=np.int16)
 
-        ccc = self.crate_card_chan(crate, card, channel)
-        if ccc not in self.active_channels:
-            # should store this in a garbage data frame
-            return
+        crate = (pu16[1] >> 5) & 0xF
+        card = pu16[1] & 0x1F
+        channel = pu16[4] & 0xf
+        ccc = get_ccc(crate, card, channel)
 
-        # if the wf is too big for pytables, we can window it
-        if self.window:
-            wf = Waveform(wf_data, self.sample_period, self.decoder_name)
-            waveform = wf.window_waveform(self.win_type,
-                                          self.n_samp,
-                                          self.n_blsamp,
-                                          test=False)
-            if wf.is_garbage:
-                ievt = self.ievt_gbg
-                self.ievt_gbg += 1
-                self.garbage_count += 1
+        # aliases for brevity
+        tb = lh5_tables
+        if isinstance(tb, dict): 
+            if ccc not in lh5_tables:
+                if ccc not in self.skipped_channels: 
+                    self.skipped_channels[ccc] = 0
+                self.skipped_channels[ccc] += 1
+                return
+            tb = lh5_tables[ccc]
+        ii = tb.loc
 
-        if len(wf_data) > 2500 and self.h5_format == "table":
-            print("WARNING: too many columns for tables output,",
-                  "         reverting to saving as fixed hdf5 ...")
-            self.h5_format = "fixed"
+        tb['packet_id'].nda[ii] = packet_id
+        tb['ievt'].nda[ii] = self.ievt
+        tb['energy'].nda[ii] = pu16[9] + ((pu16[10] & 0x1FF) << 16)
+        tb['timestamp'].nda[ii] = pu16[6] + (pu16[7] << 16) + (pu16[8] << 32)
+        tb['crate'].nda[ii] = crate
+        tb['card'].nda[ii] = card
+        tb['channel'].nda[ii] = channel
+        tb['board_id'].nda[ii] = (pu16[4] & 0xFFF0) >> 4
 
-        waveform = wf_data.astype("int16")
+        # wf starts from p16[18] and is always 2018 samples
+        # we will chop off the start (~a dozen) and end (last 2), but not until
+        # after we have handled multisampling
+        wf = p16[18:]
+        wf_len = 2018
+        if self.is_multisampled(ccc):
+            # get ccc pars
+            ps = self.ps[ccc]
+            div = self.div[ccc]
+            ratio = div / ps
 
-        # set the event number (searchable HDF5 column)
-        ievt = self.ievt
+            # find start of presummed section
+            # because it's not always self.ft_len :(
+            ift = wf_len - self.ft_len[ccc] - 2
+            min_diff = np.inf
+            min_diff_ift = ift
+            for i in range(self.wf_skip+1):
+                d1 = abs(wf[ift+i]*ratio - wf[ift+i-1])
+                if d1 < min_diff:
+                    min_diff = d1
+                    min_diff_ift = ift+i
+            ift = min_diff_ift
+            ift_out = ift - self.wf_skip
+
+            # copy over fully-sampled portion
+            tb['waveform']['values'].nda[ii][:ift_out] = wf[self.wf_skip:ift]
+
+            # compute slopes for interpolation
+            # rise[i-1] is the slope prior to sample i, while rise[i] is the
+            # slope following it
+            if len(self.rises) != len(wf): self.rises.resize(len(wf)-1)
+            self.rises[:] = wf[1:] - wf[:-1]
+            # correct the value right before ift
+            self.rises[ift-1] = wf[ift] - np.sum(wf[ift-ps:ift]) / div
+
+            # store double-precision values in self.remainders (later it will be
+            # used to compute remainders and do round-off
+            # Note: the interpolation done here is meant to preserve the
+            # presumming: re-presumming should reproduce the original waveform
+            rem_len = len(self.remainders) - ift_out
+            for ips in range(ps):
+                nn = int(np.floor( (rem_len - ips - 1) / ps ) + 1)
+                self.remainders[ift_out+ips::ps] = wf[ift:ift+nn]
+                self.remainders[ift_out+ips::ps] -= (2*ips+1)/(2*ps)*self.rises[ift-1:ift+nn-1]
+                self.remainders[ift_out+ips::ps] *= ratio
+
+            # now set the output based on rounding cumulative remainders
+            wf_out = tb['waveform']['values'].nda[ii]
+            if len(self.remainders) != len(wf_out):
+                print("Error: remainders len", len(self.remainders), "but wf_out len", len(wf_out))
+                return
+            for ips in range(ps):
+                np.rint(self.remainders[ift_out+ips::ps], out=wf_out[ift_out+ips::ps], casting='unsafe')
+                if ips == ps-1: break;
+                self.remainders[ift_out+ips::ps] -= wf_out[ift_out+ips::ps]
+                self.remainders[ift_out+ips+1::ps] += self.remainders[ift_out+ips:-1:ps]
+
+        else:
+            length = 2016 - self.wf_skip
+            start = 16+self.wf_skip
+            tb['waveform']['values'].nda[ii][:] = p16[start:start+length]
+
+        tb.push_row()
+
+        # update the event number (searchable HDF5 column)
         self.ievt += 1
 
-        # send any variable with a name in "decoded_values" to the pandas output
-        self.format_data(locals())
 
-
+'''
 class SIS3316ORCADecoder(DataTaker):
     """
     handle ORCA Struck 3316 digitizer
@@ -318,8 +468,7 @@ class SIS3316ORCADecoder(DataTaker):
         self.window = False
 
 
-    def decode_event(self, event_data_bytes, packet_id, header_dict,
-                     verbose=False):
+    def decode_event(self, event_data_bytes, packet_id, header_dict, verbose=False):
 
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)

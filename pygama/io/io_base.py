@@ -7,7 +7,7 @@ base classes for decoding daq data into raw lh5 files
 from abc import ABC
 import numpy as np
 
-from . import lh5
+from pygama import lh5
 
 
 class DataDecoder(ABC):
@@ -38,13 +38,26 @@ class DataDecoder(ABC):
                                      lh5.Array(shape=garbage_length, dtype='uint32'))
 
 
-    def initialize_lh5_table(self, lh5_table):
+    def get_decoded_values(self, channel):
+        """ must overload for your decoder
+        Note: implement channel = None returns a "default" decoded_values
+        """
+        name = type(self).__name__
+        print("you need to implement get_decoded_values for", name)
+        return None
+
+
+    def initialize_lh5_table(self, lh5_table, channel):
+        """ initialize and lh5 Table based on decoded_values 
+        channel is the channel according to ch_group
+        """
         if not hasattr(self, 'decoded_values'):
             name = type(self).__name__
             print(name, 'Error: no decoded_values available for setting up buffer')
             return
+        dec_vals = self.get_decoded_values(channel)
         size = lh5_table.size
-        for field, fld_attrs in self.decoded_values.items():
+        for field, fld_attrs in dec_vals.items():
             attrs = fld_attrs.copy()
             if 'dtype' not in attrs:
                 name = type(self).__name__

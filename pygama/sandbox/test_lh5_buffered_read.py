@@ -1,5 +1,5 @@
 import sys
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 
 if len(sys.argv) != 5:
     print('Usage: python', sys.argv[0], '[filename] [table_path] [buffer_size] [arr_col]')
