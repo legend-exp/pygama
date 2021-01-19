@@ -79,12 +79,16 @@ class CMakeBuild(build_ext):
 
 def make_git_file():
     print("Creating pygama/git.py")
-    import git
-    repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
-    with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
-        f.write("branch = '" + str(repo.active_branch) + "'\n")
-        f.write("revision = '" + repo.head.commit.hexsha +"'\n")
-        f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+    try:
+        import git
+        repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+        with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
+            f.write("branch = '" + repo.git.describe('--all') + "'\n")
+            f.write("revision = '" + repo.head.commit.hexsha +"'\n")
+            f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+    except Exception as ex:
+        print(ex)
+        print('continuing...')
 
 #Add a git hook to clean jupyter notebooks before commiting
 def clean_jupyter_notebooks():
