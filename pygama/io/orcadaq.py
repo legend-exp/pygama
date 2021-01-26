@@ -313,7 +313,6 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         else: new_dtr.append(decoder_name)
     decoders_to_run = new_dtr
     
-
     # prepare ch groups
     if ch_groups_dict is None:
         ch_groups_dict = {}
@@ -327,14 +326,14 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             expand_ch_groups(ch_groups)
             set_outputs(ch_groups, out_file_template=raw_file_pattern, grp_path_template='{system}/{group_name}/raw')
 
-    #  Set up tables for data
+    # Set up tables for data
     ch_tables_dict = {}
     for data_id, dec in decoders.items():
         decoder_name = id2dn_dict[data_id]
         ch_groups = ch_groups_dict[decoder_name]
         ch_tables_dict[data_id] = build_tables(ch_groups, buffer_size, dec)
     max_tbl_size = 0
-
+    
     # -- scan over raw data --
     print("Beginning daq-to-raw processing ...")
 
@@ -367,7 +366,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
 
         if data_id not in decoders: continue
         decoder = decoders[data_id]
-
+        
         # Clear the tables if the next read could overflow them.
         # Only have to check this when the max table size is within
         # max_n_rows_per_packet of being full.
@@ -399,6 +398,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             group_path = group_info['group_path']
             out_file = group_info['out_file']
             lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+            print('last write')
             tbl.clear()
 
     if verbose:
