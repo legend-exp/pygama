@@ -70,7 +70,8 @@ class Table(Struct):
                 if do_warn:
                     print('warning: resizing field', field, 
                           'with size', len(obj), '!=', new_size)
-                obj.resize(new_size)
+                if isinstance(obj, Table): obj.resize(new_size, do_warn)
+                else: obj.resize(new_size)
         self.size = new_size
 
 

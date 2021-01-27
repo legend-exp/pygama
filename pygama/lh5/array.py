@@ -27,8 +27,7 @@ class Array:
         """
         self.nda = nda if nda is not None else np.empty(shape, dtype=dtype)
         self.dtype = self.nda.dtype
-        self.attrs = {}
-        self.attrs.update(attrs)
+        self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 print(type(self).__name__ + ': Warning: datatype does not match nda!')
