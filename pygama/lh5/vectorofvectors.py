@@ -46,8 +46,7 @@ class VectorOfVectors:
             self.flattened_data = Array(shape=(length,), dtype=dtype)
         else: self.flattened_data = flattened_data
         self.dtype = self.flattened_data.dtype
-        self.attrs = {}
-        self.attrs.update(attrs)
+        self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 print('VectorOfVectors: Warning: datatype does not match dtype!')
