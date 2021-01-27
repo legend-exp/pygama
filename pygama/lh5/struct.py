@@ -19,8 +19,7 @@ class Struct(dict):
             A set of user attributes to be carried along with this lh5 object
         """
         self.update(obj_dict)
-        self.attrs = {}
-        self.attrs.update(attrs)
+        self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 print(type(self).__name__ + ': Warning: datatype does not match obj_dict!')
