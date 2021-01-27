@@ -21,8 +21,7 @@ class Scalar:
             print('Setting value = 0')
             value = 0
         self.value = value
-        self.attrs = {}
-        self.attrs.update(attrs)
+        self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 print('Scalar: Warning: datatype does not match value!')

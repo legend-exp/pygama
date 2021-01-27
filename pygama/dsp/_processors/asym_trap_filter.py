@@ -8,7 +8,7 @@ from numba import guvectorize
              "(n),(),(),()->(n)", nopython=True, cache=True)
 def asymTrapFilter(wf_in, rise, flat, fall, wf_out):
     """ Computes an asymmetric trapezoidal filter"""
-    wf_out[0] = wf_in[0]
+    wf_out[0] = wf_in[0]/float(rise)
     for i in range(1, rise):
         wf_out[i] = wf_out[i-1] + (wf_in[i])/float(rise)
     for i in range(rise, rise+flat):
