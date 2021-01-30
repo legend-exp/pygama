@@ -202,11 +202,8 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
             f_dsp = f_dsp.format_map(tmp)
 
         raw_to_dsp(f_raw, f_dsp, dsp_config, n_max=nwfs, verbose=vrb,
-                   overwrite=overwrite)
-
-
-
-
+                   overwrite=overwrite, buffer_len=buffer_len, block_width=block_width)
+        
 
 if __name__=="__main__":
     main()
