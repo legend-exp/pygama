@@ -81,11 +81,6 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
-    def get_decoded_values(self, channel): 
-        # same for all channels
-        return self.decoded_values
-        
-        
     def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
