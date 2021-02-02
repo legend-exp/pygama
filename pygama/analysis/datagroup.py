@@ -272,11 +272,7 @@ class DataGroup:
     def load_df(self, fname=None):
         """
         """
-        if fname is None:
-            fname = self.f_fileDB
-        print('Loading file key list from:', fname)
-
-        # self.fileDB = pd.read_json(fname)
+        if fname is None: fname = self.f_fileDB
         self.fileDB = pd.read_hdf(fname, key='file_keys')
 
 

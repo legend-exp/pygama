@@ -65,6 +65,19 @@ def fit_hist(func, hist, bins, var=None, guess=None,
     return coeff, cov_matrix
 
 
+def goodness_of_fit(hist, bins, func, p_fit):
+    """
+    compute reduced chisq and fwhm_err for 
+    """
+    chisq = []
+    for i, h in enumerate(hist):
+        model = func(bins[i], *p_fit)
+        diff = (model - h)**2 / model
+        chisq.append(abs(diff))
+    rchisq = sum(np.array(chisq) / len(hist))
+    return rchisq
+
+
 def neg_log_like(params, f_likelihood, data, **kwargs):
     """
     given a likelihood function and data, return the negative log likelihood.
@@ -145,7 +158,7 @@ def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
 def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     """
     The Poisson likelihood does not give a good GOF until the counts are very
-    high and all the poisson stats are roughly guassian and you don't need it
+    high and all the poisson stats are roughly gaussian and you don't need it
     anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
     it here.
     """
@@ -408,9 +421,9 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
     I guess this should be similar to radford_peak (peak + tail + step)
     This is how I used it in root peak fitting scripts
     """ 
-    peak_f = gauss(x,mu,sigma,a)                   #gauss
-    tail_f = gauss_tail(x,mu,sigma,tail,tau)       #tail
-    step_f = step(x,mu,sigma,bkg,s)                #step
+    peak_f = gauss(x, mu, sigma, a)
+    tail_f = gauss_tail(x, mu, sigma, tail, tau)
+    step_f = step(x, mu, sigma, bkg, s)
 
     peak = peak_f + tail_f + step_f
 
