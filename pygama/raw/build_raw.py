@@ -13,9 +13,9 @@ from ..io.compassdaq import *
 from ..io.fcdaq import *
 
 
-def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None, 
-               n_max=np.inf, verbose=False, out_dir=None, chans=None,
-               overwrite=True, config={}):
+def build_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None, 
+              n_max=np.inf, verbose=False, out_dir=None, chans=None,
+              overwrite=True, config={}):
     """
     Convert DAQ files into LEGEND-HDF5 `raw` format.  
     Takes an input file (daq_filename) and an output file (raw_file_pattern).
@@ -24,7 +24,7 @@ def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
     containing `{sysn}`, which is used to create a list of output files for
     each data taker.
 
-    Config options for daq_to_raw:
+    Config options for build_raw:
         buffer_size (int): default length to use for tables
         ch_groups (dict): associates groups of channels to be in the same or
             a different output LH5 table. See ch_group.py
@@ -37,7 +37,7 @@ def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
     if isinstance(config, str):
         with open(os.path.expandvars(config)) as f:
             config = json.load(f)
-    d2r_conf = config['daq_to_raw'] if 'daq_to_raw' in config else config
+    d2r_conf = config['build_raw'] if 'build_raw' in config else config
     buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8096
 
     # if we're not given a raw filename, make a simple one with subrun number
@@ -66,7 +66,7 @@ def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
                 os.remove(file)
     
     # if verbose:
-    print('Starting daq_to_raw processing.'
+    print('Starting build_raw processing.'
           f'\n  Buffer size: {buffer_size}'
           f'\n  Max num. events: {n_max}'
           f'\n  Cycle (subrun) num: {subrun}'
