@@ -21,15 +21,19 @@ def fit_hist(func, hist, bins, var=None, guess=None,
                   bounds to make sure that func does not go negative over the
                   x-range of the histogram.
     - method, bounds : options to pass to scipy.optimize.minimize
+
+    Returns
+    ------
+    coeff, cov_matrix : tuple(array, matrix)
     """
     if guess is None:
         print("auto-guessing not yet implemented, you must supply a guess.")
-        return
+        return None, None
 
     if poissonLL:
         if var is not None and not np.array_equal(var, hist):
             print("variances are not appropriate for a poisson-LL fit!")
-            return
+            return None, None
 
         if method is None:
             method = "L-BFGS-B"
@@ -59,6 +63,19 @@ def fit_hist(func, hist, bins, var=None, guess=None,
                                       p0=guess, sigma=sigma, bounds=bounds)
 
     return coeff, cov_matrix
+
+
+def goodness_of_fit(hist, bins, func, p_fit):
+    """
+    compute reduced chisq and fwhm_err for 
+    """
+    chisq = []
+    for i, h in enumerate(hist):
+        model = func(bins[i], *p_fit)
+        diff = (model - h)**2 / model
+        chisq.append(abs(diff))
+    rchisq = sum(np.array(chisq) / len(hist))
+    return rchisq
 
 
 def neg_log_like(params, f_likelihood, data, **kwargs):
@@ -141,7 +158,7 @@ def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
 def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     """
     The Poisson likelihood does not give a good GOF until the counts are very
-    high and all the poisson stats are roughly guassian and you don't need it
+    high and all the poisson stats are roughly gaussian and you don't need it
     anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
     it here.
     """
@@ -149,12 +166,171 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 
-def gauss(x, mu, sigma, A=1, C=0):
+def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+    """ Get the max, mode, and width of a peak based on gauss fit near the max
+
+    Returns the parameters of a gaussian fit over n_bins in the vicinity of the
+    maximum of the hist (or the max near mode_guess, if provided). This is
+    equivalent to a Taylor expansion around the peak maximum because near its
+    maximum a Gaussian can be approximated by a 2nd-order polynomial in x:
+
+    A exp[ -(x-mu)^2 / 2 sigma^2 ] ~= A [ 1 - (x-mu)^2 / 2 sigma^2 ]
+                                    = A - (1/2!) (A/sigma^2) (x-mu)^2
+
+    The advantage of using a gaussian over a polynomial directly is that the
+    gaussian parameters are the ones we care about most for a peak, whereas for
+    a poly we would have to extract them after the fit, accounting for
+    covariances. The guassian also better approximates most peaks farther down
+    the peak. However, the gauss fit is nonlinear and thus less stable.
+
+    Parameters
+    ----------
+    hist : array-like
+        The values of the histogram to be fit
+    bins : array-like
+        The bin edges of the histogram to be fit
+    var : array-like (optional)
+        The variances of the histogram values. If not provided, square-root
+        variances are assumed.
+    mode_guess : float (optional)
+        An x-value (not a bin index!) near which a peak is expected. The
+        algorithm fits around the maximum within +/- n_bins of the guess. If not
+        provided, the center of the max bin of the histogram is used.
+    n_bins : int
+        The number of bins (including the max bin) to be used in the fit. Also
+        used for searching for a max near mode_guess
+
+    Returns
+    -------
+    (pars, cov) : tuple (array, matrix)
+        pars : 3-tuple containing the parameters (mode, sigma, maximum) of the
+               gaussian fit
+            mode : the estimated x-position of the maximum
+            sigma : the estimated width of the peak. Equivalent to a guassian
+                width (sigma), but based only on the curvature within n_bins of
+                the peak.  Note that the Taylor-approxiamted curvature of the
+                underlying function in the vicinity of the max is given by max /
+                sigma^2
+            maximum : the estimated maximum value of the peak
+        cov : 3x3 matrix of floats
+            The covariance matrix for the 3 parameters in pars
+    """
+
+    bin_centers = ph.get_bin_centers(bins)
+    if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
+    else:
+        i_0 = np.argmax(hist) 
+        mode_guess = bin_centers[i_0]
+    amp_guess = hist[i_0]
+    i_0 -= int(np.floor(n_bins/2))
+    i_n = i_0 + n_bins
+    width_guess = (bin_centers[i_n] - bin_centers[i_0])
+    vv = None if var is None else var[i_0:i_n]
+    guess = (mode_guess, width_guess, amp_guess)
+    pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
+                         guess=guess, poissonLL=poissonLL)
+    if pars[1] < 0: pars[1] = -pars[1]
+    return pars, cov
+
+
+def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+    """ Alias for gauss_mode_width_max that just returns the max and mode 
+
+    Parameters
+    --------
+    See gauss_mode_width_max
+
+    Returns
+    -------
+    (pars, cov) : tuple (array, matrix)
+        pars : 2-tuple with the parameters (maximum, mode) of the gaussian fit     
+            maximum : the estimated maximum value of the peak
+            mode : the estimated x-position of the maximum
+        cov : 2x2 matrix of floats
+            The covariance matrix for the 2 parameters in pars
+
+    Examples
+    --------
+    >>> import pygama.analysis.histograms as pgh
+    >>> from numpy.random import normal
+    >>> import pygama.analysis.peak_fitting as pgf
+    >>> hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5,5))
+    >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
+    """
+    pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
+    return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
+
+
+
+def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+    """ Get the max and mode of a peak based on Taylor exp near the max
+
+    Returns the amplitude and position of a peak based on a poly fit over n_bins
+    in the vicinity of the maximum of the hist (or the max near mode_guess, if provided)
+
+    Parameters
+    ----------
+    hist : array-like
+        The values of the histogram to be fit. Often: send in a slice around a peak
+    bins : array-like
+        The bin edges of the histogram to be fit
+    var : array-like (optional)
+        The variances of the histogram values. If not provided, square-root
+        variances are assumed.
+    mode_guess : float (optional)
+        An x-value (not a bin index!) near which a peak is expected. The
+        algorithm fits around the maximum within +/- n_bins of the guess. If not
+        provided, the center of the max bin of the histogram is used.
+    n_bins : int
+        The number of bins (including the max bin) to be used in the fit. Also
+        used for searching for a max near mode_guess
+
+    Returns
+    -------
+    (maximum, mode) : tuple (float, float)
+        maximum : the estimated maximum value of the peak
+        mode : the estimated x-position of the maximum
+
+    Examples
+    --------
+    >>> import pygama.analysis.histograms as pgh
+    >>> from numpy.random import normal
+    >>> import pygama.analysis.peak_fitting as pgf
+    >>> hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5,5))
+    >>> pgf.taylor_mode_max(hist, bins, var, n_bins=5)
+    """
+
+    if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
+    else: i_0 = np.argmax(hist) 
+    i_0 -= int(np.floor(n_bins/2))
+    i_n = i_0 + n_bins
+    wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
+
+    pars, cov = np.polyfit(ph.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
+    mode = -pars[1] / 2 / pars[0]
+    maximum = pars[2] - pars[0] * mode**2
+    # build the jacobian to compute the output covariance matrix
+    jac = np.array( [ [pars[1]/2/pars[0]**2,    -1/2/pars[0],       0],
+                      [pars[1]**2/4/pars[0]**2, -pars[1]/2/pars[0], 1] ] )
+    cov_jact = np.matmul(cov, jac.transpose())
+    cov = np.matmul(jac, cov_jact)
+    return (mode, maximum), cov
+
+
+def gauss_basic(x, mu, sigma, height=1, C=0):
+    """
+    define a gaussian distribution, w/ args: mu, sigma, height
+    (behaves differently than gauss() in fits)
+    """
+    return height * np.exp(-(x - mu)**2 / (2. * sigma**2)) + C
+
+
+def gauss(x, mu, sigma, A=1, const=0):
     """
     define a gaussian distribution, w/ args: mu, sigma, area, const.
     """
-    norm = A / sigma / np.sqrt(2 * np.pi)
-    return norm * np.exp(-(x - mu)**2 / (2. * sigma**2)) + C
+    height = A / sigma / np.sqrt(2 * np.pi)
+    return gauss_basic(x, mu, sigma, height, const)
 
 
 def gauss_int(x, mu, sigma, A=1):
@@ -171,11 +347,11 @@ def gauss_lin(x, mu, sigma, a, b, m):
     return m * x + b + gauss(x, mu, sigma, a)
 
 
-def gauss_bkg(x, a, mu, sigma, bkg):
+def gauss_bkg(x, a, mu, sigma, bkg): # deprecate this?
     """
     gaussian + const background function
     """
-    return bkg + gauss(x, mu, sigma, a)
+    return gauss(x, mu, sigma, a, bkg)
 
 
 def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
@@ -245,9 +421,9 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
     I guess this should be similar to radford_peak (peak + tail + step)
     This is how I used it in root peak fitting scripts
     """ 
-    peak_f = gauss(x,mu,sigma,a)                   #gauss
-    tail_f = gauss_tail(x,mu,sigma,tail,tau)       #tail
-    step_f = step(x,mu,sigma,bkg,s)                #step
+    peak_f = gauss(x, mu, sigma, a)
+    tail_f = gauss_tail(x, mu, sigma, tail, tau)
+    step_f = step(x, mu, sigma, bkg, s)
 
     peak = peak_f + tail_f + step_f
 
@@ -321,12 +497,4 @@ def cal_slope(x, m1, m2):
     Fit the calibration values
     """
     return np.sqrt(m1 +(m2/(x**2)))
-
-
-
-
-
-
-
-
 

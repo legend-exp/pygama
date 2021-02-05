@@ -27,7 +27,7 @@ class ORCAStruck3302(OrcaDecoder):
               'dtype': 'uint32',
             },
             'timestamp': {
-              'dtype': 'uint32',
+              'dtype': 'uint64',
               'units': 'clock_ticks',
             },
             'crate': {
