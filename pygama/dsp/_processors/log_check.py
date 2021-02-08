@@ -7,6 +7,11 @@ from numba import guvectorize
 
 
 def log_check(wf, log_wf):
+'''
+This processor will take in a slice of the baseline subtracted waveform and returns the log of this 
+slice if all are positive and an array of nan if any value is negative
+'''
+
     if np.any(wf<0) == True:
         log_wf[0:len(wf)] = np.nan
     else:
