@@ -37,7 +37,7 @@ class DataGroup:
         # load a pre-existing set of keys.  should be True by default
         if load:
             self.load_df()
-
+            
 
     def set_config(self, config):
         """
@@ -54,9 +54,10 @@ class DataGroup:
             with open(self.f_runDB) as f:
                 self.runDB = json.load(f, object_pairs_hook=OrderedDict)
 
-        # experiment-specific fileDB (csv list of file keys)
+        # experiment-specific fileDB (h5 list of file keys)
         self.f_fileDB = os.path.expandvars(self.config['fileDB'])
-
+        self.config['fileDB'] = os.path.expandvars(self.config['fileDB'])
+        
         # set DAQ data directory
         self.daq_dir = os.path.expandvars(self.config['daq_dir'])
         self.daq_ignore = self.config['daq_ignore']
