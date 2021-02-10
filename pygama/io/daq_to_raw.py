@@ -38,7 +38,7 @@ def daq_to_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
         with open(os.path.expandvars(config)) as f:
             config = json.load(f)
     d2r_conf = config['daq_to_raw'] if 'daq_to_raw' in config else config
-    buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8096
+    buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8192
 
     # if we're not given a raw filename, make a simple one with subrun number
     if raw_file_pattern is None:

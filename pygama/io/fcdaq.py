@@ -133,7 +133,7 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
-    def get_decoded_values(self, channel): 
+    def get_decoded_values(self, channel=None): 
         # same for all channels
         return self.decoded_values
         
@@ -348,7 +348,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8092, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
