@@ -363,7 +363,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         f_out = raw_files
     elif len(raw_files) == 1:
         single_output = True
-        f_out = raw_files['']
+        f_out = list(raw_files.values())[0]
     else:
         single_output = False
         
