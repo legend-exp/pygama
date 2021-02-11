@@ -34,7 +34,7 @@ class Scalar:
 
     def datatype_name(self):
         """The name for this object's lh5 datatype attribute"""
-        if hasattr(self.value, datatype_name): return self.value.datatype_name
+        if hasattr(self.value, 'datatype_name'): return self.value.datatype_name
         return get_lh5_element_type(self.value)
 
 
