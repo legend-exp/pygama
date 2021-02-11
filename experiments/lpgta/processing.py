@@ -72,7 +72,9 @@ def load_datagroup(query=None):
     # NOTE: for now, we have to edit this line to choose which files to process
     # process one big cal file (64 GB)
     #query = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    if query is not None: dg.fileDB.query(query, cwd=True)
+    if query is not None: 
+        print(query)
+        dg.fileDB.query(query, inplace=True)
     
     print('files to process:')
     print(dg.fileDB)
@@ -153,7 +155,7 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
         # set up I/O paths
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
-        if cwd: f_raw = f'{row['raw_file']}'
+        if cwd: f_raw = f"{row['raw_file']}"
         
         subrun = row['cycle'] if 'cycle' in row else None
         systems = dg.subsystems
@@ -194,7 +196,7 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False, cwd=False):
 
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"
-        if cwd: f_dsp = f'{row['dsp_file']}'
+        if cwd: f_dsp = f"{row['dsp_file']}"
 
         if "sysn" in f_raw:
             tmp = {'sysn' : 'geds'} # hack for lpgta
