@@ -4,6 +4,8 @@ import numpy as np
 class Scalar:
     """
     Holds just a value and some attributes (datatype, units, ...)
+
+    #TODO: do scalars need proper numpy dtypes?
     """
 
 
