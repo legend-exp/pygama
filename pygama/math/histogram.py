@@ -79,6 +79,7 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
 
     if wts is None: 
         # no weights: var = hist
+        # careful: hist and var will point to the same object in memory
         return hist, bins, hist
     else:
         # get the variances by binning with double the weight
