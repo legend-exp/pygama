@@ -24,8 +24,12 @@ class FlashCamEventDecoder(DataDecoder):
             'ievt': { # index of event
               'dtype': 'int32',
             },
-            'timestamp': { # time since beginning of file
-              'dtype': 'float32',
+            'timestamp': { # time since epoch
+              'dtype': 'float64',
+              'units': 's',
+            },
+            'runtime': { # time since beginning of file
+              'dtype': 'float64',
               'units': 's',
             },
             'numtraces': { # number of triggered adc channels
@@ -44,6 +48,54 @@ class FlashCamEventDecoder(DataDecoder):
             },
             'channel': { # right now, index of the trigger (trace)
               'dtype': 'uint32',
+            },
+            'ts_pps': { # PPS timestamp in sec
+              'dtype': 'int32',
+            },
+            'ts_ticks': { # clock ticks
+            'dtype': 'int32',
+              },
+            'ts_maxticks': { # max clock ticks
+              'dtype': 'int32',
+            },
+            'to_mu_sec': { # the offset in sec between the master and unix
+              'dtype': 'int64',
+            },
+            'to_mu_usec': { # the offset in usec between master and unix
+              'dtype': 'int32',
+            },
+            'to_master_sec': { # the calculated sec which must be added to the master
+              'dtype': 'int64',
+            },
+            'to_dt_mu_usec': { # the delta time between master and unix in usec
+              'dtype': 'int32',
+            },
+            'to_abs_mu_usec': { # the abs(time) between master and unix in usec
+              'dtype': 'int32',
+            },
+            'to_start_sec': { # startsec
+              'dtype': 'int64',
+            },
+            'to_start_usec': { # startusec
+              'dtype': 'int32',
+            },
+            'dr_start_pps': { # start pps of the next dead window
+              'dtype': 'float32',
+            },
+            'dr_start_ticks': { # start ticks of the next dead window
+              'dtype': 'float32',
+            },
+            'dr_stop_pps': { # stop pps of the next dead window
+              'dtype': 'float32',
+            },
+            'dr_stop_ticks': { # stop ticks of the next dead window
+              'dtype': 'float32',
+            },
+            'dr_maxticks': { # maxticks of the dead window
+              'dtype': 'float32',
+            },
+            'deadtime': { # current dead time calculated from deadregion (dr) fields. Give the total dead time if summed up.
+              'dtype': 'float32',
             },
             'wf_max': { # ultra-simple np.max energy estimation
               'dtype': 'uint16',
@@ -81,6 +133,11 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
+    def get_decoded_values(self, channel=None): 
+        # same for all channels
+        return self.decoded_values
+        
+        
     def set_file_config(self, fcio):
         """
         access FCIOConfig members once when each file is opened
@@ -95,13 +152,30 @@ class FlashCamEventDecoder(DataDecoder):
         """
 
         ievt      = fcio.eventnumber # the eventnumber since the beginning of the file
-        timestamp = fcio.eventtime   # the time since the beginning of the file in seconds
+        timestamp = fcio.eventtime   # the time since epoch in seconds
+        runtime   = fcio.runtime     # the time since the beginning of the file in seconds
         eventsamples = fcio.nsamples   # number of sample per trace
         numtraces = fcio.numtraces   # number of triggered adcs
         tracelist = fcio.tracelist   # list of triggered adcs
         traces    = fcio.traces      # the full traces for the event: (nadcs, nsamples)
         baselines = fcio.baseline    # the fpga baseline values for each channel in LSB
         energies  = fcio.daqenergy   # the fpga energy values for each channel in LSB
+        ts_pps         = fcio.timestamp_pps
+        ts_ticks       = fcio.timestamp_ticks
+        ts_maxticks    = fcio.timestamp_maxticks
+        to_mu_sec      = fcio.timeoffset_mu_sec
+        to_mu_usec     = fcio.timeoffset_mu_usec
+        to_master_sec  = fcio.timeoffset_master_sec
+        to_dt_mu_usec  = fcio.timeoffset_dt_mu_usec
+        to_abs_mu_usec = fcio.timeoffset_abs_mu_usec
+        to_start_sec   = fcio.timeoffset_start_sec
+        to_start_usec  = fcio.timeoffset_start_usec
+        dr_start_pps   = fcio.deadregion_start_pps
+        dr_start_ticks = fcio.deadregion_start_ticks
+        dr_stop_pps    = fcio.deadregion_stop_pps
+        dr_stop_ticks  = fcio.deadregion_stop_ticks
+        dr_maxticks    = fcio.deadregion_maxticks
+        deadtime       = fcio.deadtime
 
         # all channels are read out simultaneously for each event
         for iwf in tracelist:
@@ -122,10 +196,27 @@ class FlashCamEventDecoder(DataDecoder):
             tbl['packet_id'].nda[ii] = packet_id
             tbl['ievt'].nda[ii] =  ievt
             tbl['timestamp'].nda[ii] =  timestamp
+            tbl['runtime'].nda[ii] =  runtime
             tbl['numtraces'].nda[ii] =  numtraces
             tbl['tracelist'].set_vector(ii, tracelist)
             tbl['baseline'].nda[ii] = baselines[iwf]
             tbl['energy'].nda[ii] = energies[iwf]
+            tbl['ts_pps'].nda[ii]         = ts_pps
+            tbl['ts_ticks'].nda[ii]       = ts_ticks
+            tbl['ts_maxticks'].nda[ii]    = ts_maxticks
+            tbl['to_mu_sec'].nda[ii]      = to_mu_sec
+            tbl['to_mu_usec'].nda[ii]     = to_mu_usec
+            tbl['to_master_sec'].nda[ii]  = to_master_sec
+            tbl['to_dt_mu_usec'].nda[ii]  = to_dt_mu_usec
+            tbl['to_abs_mu_usec'].nda[ii] = to_abs_mu_usec
+            tbl['to_start_sec'].nda[ii]   = to_start_sec
+            tbl['to_start_usec'].nda[ii]  = to_start_usec
+            tbl['dr_start_pps'].nda[ii]   = dr_start_pps
+            tbl['dr_start_ticks'].nda[ii] = dr_start_ticks
+            tbl['dr_stop_pps'].nda[ii]    = dr_stop_pps
+            tbl['dr_stop_ticks'].nda[ii]  = dr_stop_ticks
+            tbl['dr_maxticks'].nda[ii]    = dr_maxticks
+            tbl['deadtime'].nda[ii]       = deadtime
             waveform = traces[iwf]
             tbl['wf_max'].nda[ii] = np.amax(waveform)
             tbl['wf_std'].nda[ii] = np.std(waveform)
@@ -150,6 +241,10 @@ class FlashCamStatusDecoder(DataDecoder):
               'units': 's',
             },
             'cputime': { # CPU seconds, microseconds, dummy, startsec startusec 
+              'dtype': 'float64',
+              'units': 's',
+            },
+            'startoffset': { # fc250 seconds, microseconds, dummy, startsec startusec
               'dtype': 'float32',
               'units': 's',
             },
@@ -228,7 +323,8 @@ class FlashCamStatusDecoder(DataDecoder):
 
         # times
         tbl['statustime'].nda[ii] = fcio.statustime[0]+fcio.statustime[1]/1e6
-        tbl['cputime'].nda[ii] = fcio.statustime[2]+fcio.statustime[3]/1e6
+        tbl['cputime'].nda[ii]    = fcio.statustime[2]+fcio.statustime[3]/1e6
+        tbl['startoffset'].nda[ii]= fcio.statustime[5]+fcio.statustime[6]/1e6
 
         # Total number of cards (number of status data to follow)
         tbl['cards'].nda[ii] = fcio.cards 
@@ -252,7 +348,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8092, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -267,7 +363,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         f_out = raw_files
     elif len(raw_files) == 1:
         single_output = True
-        f_out = raw_files['']
+        f_out = list(raw_files.values())[0]
     else:
         single_output = False
         
@@ -290,9 +386,9 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
     # set up ch_group-to-output-file-and-group info
     if single_output:
-        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='{group_name}/raw')
     else:
-        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='{group_name}/raw')
 
     # set up tables
     event_tables = build_tables(ch_groups, buffer_size, event_decoder)
