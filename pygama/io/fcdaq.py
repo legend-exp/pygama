@@ -146,6 +146,18 @@ class FlashCamEventDecoder(DataDecoder):
         self.decoded_values['waveform']['length'] = self.file_config['nsamples']
 
 
+    def get_file_config_struct(self):
+        '''
+        Get an lh5 struct containing the file config info
+        '''
+        fcio_config = lh5.Struct()
+        for key, value in self.file_config.items():
+            scalar = lh5.Scalar(np.int32(value))
+            fcio_config.add_field(key, scalar)
+        return fcio_config
+
+
+
     def decode_packet(self, fcio, lh5_tables, packet_id, verbose=False):
         """
         access FCIOEvent members for each event in the raw file
@@ -407,10 +419,18 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     status_decoder.initialize_lh5_table(status_tbl)
     try:
       status_filename = f_out if single_output else raw_files['auxs']
+      config_filename = f_out if single_output else raw_files['auxs']
     except:
-      status_filename = "stat"
+      status_filename = "fcio_status"
+      config_filename = "fcio_config"
+
+    # Set up the store
     # TODO: add overwrite capability
     lh5_store = lh5.Store()
+
+    # write fcio_config
+    fcio_config = event_decoder.get_file_config_struct()
+    lh5_store.write_object(fcio_config, 'fcio_config', config_filename)
     
     # loop over raw data packets
     i_debug = 0
@@ -438,7 +458,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         if rc == 4: 
             bytes_processed += status_decoder.decode_packet(fcio, status_tbl, packet_id)
             if status_tbl.is_full():
-                lh5_store.write_object(status_tbl, 'stat', status_filename, n_rows=status_tbl.size)
+                lh5_store.write_object(status_tbl, 'fcio_status', status_filename, n_rows=status_tbl.size)
                 status_tbl.clear()
 
         # Event or SparseEvent record
