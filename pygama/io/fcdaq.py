@@ -133,7 +133,7 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
-    def get_decoded_values(self, channel): 
+    def get_decoded_values(self, channel=None): 
         # same for all channels
         return self.decoded_values
         
@@ -348,7 +348,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132 
 
 
-def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8092, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -386,9 +386,9 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
     # set up ch_group-to-output-file-and-group info
     if single_output:
-        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='{group_name}/raw')
     else:
-        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='{group_name}/raw')
 
     # set up tables
     event_tables = build_tables(ch_groups, buffer_size, event_decoder)

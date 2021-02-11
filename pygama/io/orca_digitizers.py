@@ -55,7 +55,7 @@ class ORCAStruck3302(OrcaDecoder):
         self.ievt = 0
 
 
-    def get_decoded_values(self, channel):
+    def get_decoded_values(self, channel=None):
         # TODO: return channel-specific decoded_values
         return self.decoded_values
 
@@ -269,7 +269,7 @@ class ORCAGretina4M(OrcaDecoder):
         self.remainders = np.zeros(2016)
 
 
-    def get_decoded_values(self, channel):
+    def get_decoded_values(self, channel=None):
         if channel is None: 
             dec_vals_list = self.decoded_values.items()
             if len(dec_vals_list) == 0:
