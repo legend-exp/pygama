@@ -620,7 +620,7 @@ class Store:
                 n_rows_read = self.read_n_rows(name+'/'+field, h5f)
                 if not rows_read: rows_read = n_rows_read
                 elif rows_read != n_rows_read:
-                    print('table', name, 'got strange n_rows_read', n)
+                    print('table', name, 'got strange n_rows_read', rows_read)
                     print(n_rows_read, 'was expected')
             return rows_read
         

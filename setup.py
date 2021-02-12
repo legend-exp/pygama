@@ -129,9 +129,9 @@ class PygamaDev(develop):
 
 setup(
     name='pygama',
-    version='0.3',
-    author='Clint Wiseman',
-    author_email='wisecg.neontetra@gmail.com',
+    version='0.5',
+    author='LEGEND',
+    author_email='wisecg@uw.edu',
     description='Python package for decoding and processing digitizer data',
     long_description='',
     packages=find_packages(),
@@ -146,7 +146,6 @@ setup(
         'numpy',
         'pandas',
         'matplotlib'
-
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
