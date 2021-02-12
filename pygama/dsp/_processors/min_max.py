@@ -13,13 +13,6 @@ def min_max(wf, argmin, argmax, wf_min, wf_max, ):
     Finds the min, max and their time position for a waveform
     '''
 
-    
-def min_max(wf, argmin, argmax, wf_min, wf_max, ):
-    '''
-    Finds the min, max and their time position for a waveform
-    '''
-
-
     wf_min[0] = float(math.inf)
     wf_max[0] = float(-math.inf)
     argmin[0] = 0
