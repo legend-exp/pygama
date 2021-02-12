@@ -26,4 +26,3 @@ from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
 from ._processors.linear_slope_fit import linear_slope_fit
 from ._processors.log_check import log_check
-from ._processors.min_max import min_max
