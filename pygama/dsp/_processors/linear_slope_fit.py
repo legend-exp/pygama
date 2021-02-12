@@ -28,4 +28,4 @@ def linear_slope_fit(wf, mean_y, sigma_y, slope, intercept):
 
 
     slope[0] = (isum * sum_xy - sum_x * sum_y) / (isum * sum_x2 - sum_x * sum_x)
-    intercept[0] = (sum_x2 * sum_y - sum_x * sum_xy) / (isum * sum_x2 - sum_x ** 2)
+    intercept[0] = (sum_y - sum_x * slope[0])/isum
