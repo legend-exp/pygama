@@ -25,7 +25,7 @@ class DataGroup:
         """
         """
         # master table
-        self.file_keys = None
+        self.fileDB = None
 
         # typical usage: JSON config file
         if config is not None:
@@ -37,7 +37,7 @@ class DataGroup:
         # load a pre-existing set of keys.  should be True by default
         if load:
             self.load_df()
-
+            
 
     def set_config(self, config):
         """
@@ -54,9 +54,10 @@ class DataGroup:
             with open(self.f_runDB) as f:
                 self.runDB = json.load(f, object_pairs_hook=OrderedDict)
 
-        # experiment-specific fileDB (csv list of file keys)
+        # experiment-specific fileDB (h5 list of file keys)
         self.f_fileDB = os.path.expandvars(self.config['fileDB'])
-
+        self.config['fileDB'] = os.path.expandvars(self.config['fileDB'])
+        
         # set DAQ data directory
         self.daq_dir = os.path.expandvars(self.config['daq_dir'])
         self.daq_ignore = self.config['daq_ignore']
@@ -133,8 +134,11 @@ class DataGroup:
 
         file_keys = []
         stop_walk = False
+        n_files = 0
 
         for path, folders, files in os.walk(self.daq_dir):
+        
+            n_files += len(files)
 
             for f in files:
 
@@ -156,36 +160,44 @@ class DataGroup:
                     file_keys.append(finfo)
 
                 # limit number of files (debug mode)
-                if self.nfiles is not None and len(file_keys)==self.nfiles:
+                if self.nfiles is not None and len(file_keys) >= self.nfiles:
                     stop_walk = True
                 if stop_walk:
                     break
             if stop_walk:
                 break
 
+        if n_files == 0:
+            print("no daq files found...")
+            return
+
+        if len(file_keys) == 0:
+            print("no daq files matched pattern", self.daq_template)
+            return
+
         # create the main DataFrame
-        self.file_keys = pd.DataFrame(file_keys)
+        self.fileDB = pd.DataFrame(file_keys)
 
         # grab the unique key and sort the DataFrame by it
         fk = lambda x: self.unique_key.format_map(x)
-        self.file_keys['unique_key'] = self.file_keys.apply(fk, axis=1)
+        self.fileDB['unique_key'] = self.fileDB.apply(fk, axis=1)
 
         # reorder cols to match the daq_template string
         cols = ['unique_key']
         cols.extend([fn for _,fn,_,_ in Formatter().parse(dt) if fn is not None])
         cols.extend(['daq_dir','daq_file'])
-        self.file_keys = self.file_keys[cols]
+        self.fileDB = self.fileDB[cols]
 
         # convert cols to numeric dtypes where possible
-        for col in self.file_keys.columns:
+        for col in self.fileDB.columns:
             if col != 'YYmmdd' and col != 'hhmmss':
              try:
-                self.file_keys[col] = pd.to_numeric(self.file_keys[col])
+                self.fileDB[col] = pd.to_numeric(self.fileDB[col])
              except:
                 pass
 
         if verbose:
-            print(self.file_keys.to_string())
+            print(self.fileDB.to_string())
 
 
     def save_keys(self, fname=None):
@@ -200,7 +212,7 @@ class DataGroup:
             fname = self.f_fileDB
         print('Saving file key list to: ', fname)
 
-        df_keys = self.file_keys
+        df_keys = self.fileDB
         df_keys['rel_daq_path'] = df_keys['daq_dir'] + '/' + df_keys['daq_file']
 
         # export to csv
@@ -237,36 +249,32 @@ class DataGroup:
             row['daq_file'] = daq_file
             return row
 
-        self.file_keys = df_keys.apply(parse_key, axis=1)
+        self.fileDB = df_keys.apply(parse_key, axis=1)
 
         # reorder cols to match the daq_template string
         cols = ['unique_key']
         cols.extend([fn for _,fn,_,_ in Formatter().parse(dt) if fn is not None])
         cols.extend(['daq_dir','daq_file'])
-        self.file_keys = self.file_keys[cols]
+        self.fileDB = self.fileDB[cols]
 
 
     def save_df(self, fname=None):
         """
-        save the current self.file_keys dataframe. If we've added extra columns
+        save the current self.fileDB dataframe. If we've added extra columns
         specific to an experiment (outside this class), this will preserve them.
         """
         if fname is None:
             fname = self.f_fileDB
         print('Saving file key list to: ', fname)
-        # self.file_keys.to_json(fname, indent=2)
-        self.file_keys.to_hdf(fname, key='file_keys')
+        # self.fileDB.to_json(fname, indent=2)
+        self.fileDB.to_hdf(fname, key='file_keys')
 
 
     def load_df(self, fname=None):
         """
         """
-        if fname is None:
-            fname = self.f_fileDB
-        print('Loading file key list from:', fname)
-
-        # self.file_keys = pd.read_json(fname)
-        self.file_keys = pd.read_hdf(fname, key='file_keys')
+        if fname is None: fname = self.f_fileDB
+        self.fileDB = pd.read_hdf(fname, key='file_keys')
 
 
     def get_lh5_cols(self):
@@ -276,7 +284,7 @@ class DataGroup:
         need to generate the file names, and then figure out which folder
         to store them in.  probably best to separate these tasks
         """
-        if 'runtype' not in self.file_keys.columns:
+        if 'runtype' not in self.fileDB.columns:
             print("You must add a 'runtype' column to the file key DF.")
             exit()
 
@@ -306,4 +314,4 @@ class DataGroup:
                 row[f'{tier}_path'] = path
             return row
 
-        self.file_keys = self.file_keys.apply(get_files, axis=1)
+        self.fileDB = self.fileDB.apply(get_files, axis=1)

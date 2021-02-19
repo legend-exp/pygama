@@ -1,5 +1,5 @@
 import numpy as np
-from . import lh5
+from pygama import lh5
 from .io_base import DataDecoder
 import ROOT
 

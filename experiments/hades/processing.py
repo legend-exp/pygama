@@ -57,7 +57,7 @@ def d2r(dg, st,det,overwrite=False):
     """
     dg.load_df("HADES_DF.h5")
     qu = 'detSN=="' + det + '" & runtype == "' + st +'"' 
-    keys = dg.file_keys.query(qu)
+    keys = dg.fileDB.query(qu)
     keys.reset_index(inplace=True)
     daq_path  = dg.daq_dir
     sub_dir   = keys['daq_subdir'][0]
@@ -76,7 +76,7 @@ def r2d(dg, overwrite=False, nwfs=None, vrb=False):
     dg.load_df("HADES_DF.h5")
     qu = 'detSN=="' + det + '" & runtype == "' + st +'"'
     
-    keys = dg.file_keys.query(qu)
+    keys = dg.fileDB.query(qu)
     keys.reset_index(inplace=True)
 
     raw_path  = dg.daq_dir

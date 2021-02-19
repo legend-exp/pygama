@@ -10,7 +10,7 @@ the ufunc interface, they can also be called to return a numpy array, but if
 
 # I think there's a way to do this recursively, but I'll figure it out later...
 from ._processors.mean_stdev import mean_stdev
-from ._processors.pole_zero import pole_zero
+from ._processors.pole_zero import pole_zero, double_pole_zero
 from ._processors.trap_filter import trap_filter
 from ._processors.current import avg_current
 from ._processors.asym_trap_filter import asymTrapFilter
@@ -27,3 +27,4 @@ from ._processors.fftw import dft, inv_dft, psd
 from ._processors.linear_slope_fit import linear_slope_fit
 from ._processors.log_check import log_check
 from ._processors.min_max import min_max
+from ._processors.presum import presum
