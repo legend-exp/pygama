@@ -25,3 +25,6 @@ from ._processors.param_lookup import param_lookup
 from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
 from ._processors.presum import presum
+from ._processors.pulse_injector import inject_sig_pulse
+from ._processors.pulse_injector import inject_exp_pulse
+
