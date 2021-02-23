@@ -22,7 +22,7 @@ To run pygama at NERSC (and set up JupyterHub), we have additional instructions 
 The basic steps for a typical analysis are:
 
 1. Convert DAQ output to "raw" lh5 format using `daq_to_raw`
-2. Browse the [LEGEND data objects](lgdo/README.md) in the lh5 files to verify its integrity
+2. Browse the [LEGEND data objects](pygama/lgdo/README.md) in the lh5 files to verify its integrity
 3. Run `raw_to_dsp` on the raw files to generate "dsp" lh5 output
   a. Optimize the DSP parameters
   b. Build an analysis parameter database storing the optimized parameters
