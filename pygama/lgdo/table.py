@@ -123,7 +123,7 @@ class Table(Struct):
         self.add_field(self, name, obj, use_obj_size=use_obj_size, do_warn=do_warn)
 
 
-    def join(self, other_table, do_warn=True)
+    def join(self, other_table, do_warn=True):
         """Add the columns of other_table to this table
 
         Note: following the join, both tables have access to other_table's
