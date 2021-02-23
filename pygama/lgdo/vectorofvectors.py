@@ -1,5 +1,5 @@
 import numpy as np
-import .lgdo_utils
+from .lgdo_utils import *
 from .array import Array
 
 class VectorOfVectors:
@@ -71,7 +71,7 @@ class VectorOfVectors:
 
     def form_datatype(self):
         """Return this lgdo's datatype attribute string"""
-        et = lgdo_utils.get_element_type(self)
+        et = get_element_type(self)
         return 'array<1>{array<1>{' + et + '}}'
 
 

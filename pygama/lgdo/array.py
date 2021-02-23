@@ -1,5 +1,5 @@
 import numpy as np
-import .lgdo_utils
+from .lgdo_utils import *
 
 class Array:
     """
@@ -57,7 +57,7 @@ class Array:
         """Return this lgdo's datatype attribute string"""
         dt = self.dataype_name()
         nD = str(len(self.nda.shape))
-        et = lgdo_utils.get_element_type(self)
+        et = get_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
 
 

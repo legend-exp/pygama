@@ -1,5 +1,5 @@
 import numpy as np
-import .lgdo_utils
+from .lgdo_utils import *
 
 class Scalar:
     """
@@ -29,13 +29,13 @@ class Scalar:
                 print('Scalar: Warning: datatype does not match value!')
                 print('datatype: ', self.attrs['datatype'])
                 print('type(value): ', type(value).__name__)
-        else: self.attrs['datatype'] = lgdo_utils.get_element_type(self.value)
+        else: self.attrs['datatype'] = get_element_type(self.value)
 
 
     def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
         if hasattr(self.value, 'datatype_name'): return self.value.datatype_name
-        else: return lgdo_utils.get_element_type(self.value)
+        else: return get_element_type(self.value)
 
 
     def form_datatype(self):

@@ -1,5 +1,5 @@
+from .lgdo_utils import *
 from .array import Array
-import .lgdo_utils
 
 class ArrayOfEqualSizedArrays(Array):
     """
@@ -37,7 +37,7 @@ class ArrayOfEqualSizedArrays(Array):
         dt = self.dataype_name()
         nD = str(len(self.nda.shape))
         if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
-        et = lgdo_utils.get_element_type(self)
+        et = get_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
 
 
