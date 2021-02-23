@@ -1,5 +1,5 @@
-from .lh5_utils import get_lh5_element_type
 import numpy as np
+import .lgdo_utils
 
 class Scalar:
     """
@@ -16,7 +16,7 @@ class Scalar:
         value : scalar-like
             The value for this scalar
         attrs : dict (optional)
-            A set of user attributes to be carried along with this lh5 object
+            A set of user attributes to be carried along with this lgdo
         """
         if not np.isscalar(value):
             print('Cannot instantiate a Scalar with a non-scalar value...')
@@ -29,15 +29,15 @@ class Scalar:
                 print('Scalar: Warning: datatype does not match value!')
                 print('datatype: ', self.attrs['datatype'])
                 print('type(value): ', type(value).__name__)
-        else: self.attrs['datatype'] = get_lh5_element_type(self.value)
+        else: self.attrs['datatype'] = lgdo_utils.get_element_type(self.value)
 
 
     def datatype_name(self):
-        """The name for this object's lh5 datatype attribute"""
+        """The name for this lgdo's datatype attribute"""
         if hasattr(self.value, 'datatype_name'): return self.value.datatype_name
-        return get_lh5_element_type(self.value)
+        else: return lgdo_utils.get_element_type(self.value)
 
 
     def form_datatype(self):
-        """Return this object's lh5 datatype attribute string"""
+        """Return this lgdo's datatype attribute string"""
         return self.datatype_name()

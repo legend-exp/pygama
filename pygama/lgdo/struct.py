@@ -12,11 +12,11 @@ class Struct(dict):
         """
         Parameters
         ----------
-        obj_dict : dict { str : lh5 objects } (optional)
-            Instantiate this struct using the supplied named lh5 objects.
+        obj_dict : dict { str : lgdo } (optional)
+            Instantiate this struct using the supplied named lgdo's.
             Note: no copy is performed, the objects are used directly.
         attrs : dict (optional)
-            A set of user attributes to be carried along with this lh5 object
+            A set of user attributes to be carried along with this lgdo
         """
         self.update(obj_dict)
         self.attrs = dict(attrs)
@@ -31,12 +31,12 @@ class Struct(dict):
 
 
     def datatype_name(self):
-        """The name for this object's lh5 datatype attribute"""
+        """The name for this lgdo's datatype attribute"""
         return 'struct'
 
 
     def form_datatype(self):
-        """Return this object's lh5 datatype attribute string"""
+        """Return this lgdo's datatype attribute string"""
         return self.datatype_name() + '{' + ','.join(self.keys()) + '}'
 
 

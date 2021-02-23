@@ -5,7 +5,7 @@ import fnmatch
 from collections import defaultdict
 from bisect import bisect_left
 
-from .lh5_utils import *
+from .lgdo_utils import *
 from .scalar import Scalar
 from .struct import Struct
 from .table import Table
@@ -14,7 +14,8 @@ from .fixedsizearray import FixedSizeArray
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .vectorofvectors import VectorOfVectors
 
-class Store:
+
+class LH5Store:
     def __init__(self, base_path='', keep_open=False):
         self.base_path = base_path
         self.keep_open = keep_open
@@ -182,7 +183,7 @@ class Store:
         # get the file from the store
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
-            print('Store:', name, "not in", lh5_file)
+            print('LH5Store:', name, "not in", lh5_file)
             return None, 0
 
         # make idx a proper tuple if it's not one already
@@ -191,10 +192,10 @@ class Store:
 
         # get the object's datatype
         if 'datatype' not in h5f[name].attrs:
-            print('Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
+            print('LH5Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
             return None, 0
         datatype = h5f[name].attrs['datatype']
-        datatype, shape, elements = parse_datatype(datatype)
+        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
 
         # Scalar
         # scalars are dim-0 datasets
@@ -481,7 +482,7 @@ class Store:
                 return obj_buf, n_rows_to_read
 
 
-        print('Store: don\'t know how to read datatype', datatype)
+        print('LH5Store: don\'t know how to read datatype', datatype)
         return None
 
 
@@ -583,7 +584,7 @@ class Store:
             return
 
         else:
-            print('Store: do not know how to write', name, 'of type', type(obj).__name__)
+            print('LH5Store: do not know how to write', name, 'of type', type(obj).__name__)
             return
 
 
@@ -593,15 +594,15 @@ class Store:
         # this is basically a stripped down version of read_object
         h5f = self.gimme_file(lh5_file, 'r')
         if name not in h5f:
-            print('Store:', name, "not in", lh5_file)
+            print('LH5Store:', name, "not in", lh5_file)
             return None
 
         # get the datatype
         if 'datatype' not in h5f[name].attrs:
-            print('Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
+            print('LH5Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
             return None, 0
         datatype = h5f[name].attrs['datatype']
-        datatype, shape, elements = parse_datatype(datatype)
+        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
 
         # scalars are dim-0 datasets
         if datatype == 'scalar': 
@@ -634,7 +635,7 @@ class Store:
             # compute the number of rows to read
             return h5f[name].shape[0]
 
-        print('Store: don\'t know how to read datatype', datatype)
+        print('LH5Store: don\'t know how to read datatype', datatype)
         return None
 
 
@@ -670,7 +671,7 @@ def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
     if verbose:
         print("loading data for", *f_list)
 
-    sto = Store()
+    sto = LH5Store()
     par_data = {par : [] for par in par_list}
     for f in f_list:
         for par in par_list:

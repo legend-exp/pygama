@@ -1,12 +1,7 @@
-import os, glob
-import numpy as np
-import pandas as pd
+def get_element_type(obj):
+    """Get the lgdo element type of a scalar or array
 
-
-def get_lh5_element_type(obj):
-    """Get the lh5 element type of a scalar or array
-
-    For use in the datatype attribute of lh5 objects
+    For use in lgdo datatype attributes
 
     Parameters
     ----------
@@ -26,7 +21,7 @@ def get_lh5_element_type(obj):
         if kind in ['i', 'u', 'f']: return 'real'
         if kind == 'c': return 'complex'
         if kind in ['S', 'a', 'U']: return 'string'
-    print('Cannot determine lh5 element_type for object of type', type(obj).__name__)
+    print('Cannot determine lgdo element_type for object of type', type(obj).__name__)
     return None
 
 
@@ -36,7 +31,7 @@ def parse_datatype(datatype):
     Parameters
     ----------
     datatype : str
-        a lh5-formatted datatype string
+        a lgdo-formatted datatype string
 
     Returns
     -------
@@ -44,9 +39,9 @@ def parse_datatype(datatype):
         type : str
             the datatype name
         dims : tuple(ints) or None
-            if not None, a tuple of dimensions for the lh5 object. Note this is
+            if not None, a tuple of dimensions for the lgdo. Note this is
             not the same as the np shape of the underlying data object. See the
-            lh5 specification for more information. Also see
+            lgdo specification for more information. Also see
             ArrayOfEqualSizedArrays and Store.read_object() for example code
         elements: str or list of str's
             for numeric objects, the element type

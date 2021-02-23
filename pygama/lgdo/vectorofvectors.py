@@ -1,5 +1,5 @@
 import numpy as np
-from .lh5_utils import get_lh5_element_type
+import .lgdo_utils
 from .array import Array
 
 class VectorOfVectors:
@@ -16,11 +16,11 @@ class VectorOfVectors:
         """
         Parameters
         ----------
-        flattened_data : lh5.Array (optional)
+        flattened_data : lgdo.Array (optional)
             If not None, used as the internal memory array for flattened_data.
             Otherwise, an internal flattened_data is allocated based on
             shape_guess and dtype
-        cumulative_length : lh5.Array (optional)
+        cumulative_length : lgdo.Array (optional)
             If not None, used as the internal memory array for
             cumulative_length. Should be dtype uint32. If cumulative_length is
             None, an internal cumulative_length is allocated based on the first
@@ -36,7 +36,7 @@ class VectorOfVectors:
             Sets the type of data stored in flattened_data. Required if
             flattened_data is None
         attrs : dict (optional)
-            A set of user attributes to be carried along with this lh5 object
+            A set of user attributes to be carried along with this lgdo
         """
         if cumulative_length is None:
             self.cumulative_length = Array(shape=(shape_guess[0],), dtype='uint32')
@@ -56,7 +56,7 @@ class VectorOfVectors:
 
 
     def datatype_name(self):
-        """The name for this object's lh5 datatype attribute"""
+        """The name for this lgod's datatype attribute"""
         return 'array'
 
 
@@ -70,8 +70,8 @@ class VectorOfVectors:
 
 
     def form_datatype(self):
-        """Return this object's lh5 datatype attribute string"""
-        et = get_lh5_element_type(self)
+        """Return this lgdo's datatype attribute string"""
+        et = lgdo_utils.get_element_type(self)
         return 'array<1>{array<1>{' + et + '}}'
 
 

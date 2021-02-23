@@ -8,7 +8,7 @@ class FixedSizeArray(Array):
     vectors will always length 3 on axis 1, and it will never change from
     application to application.  This data type is used for optimized memory
     handling on some platforms. We are not that sophisticated so we are just
-    storing this identification for .lh5 validity, i.e. for now this class is
+    storing this identification for lgdo validity, i.e. for now this class is
     just an alias for Array, but keeps track of the datatype name.
     """
 

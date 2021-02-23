@@ -1,5 +1,5 @@
 from .array import Array
-from .lh5_utils import get_lh5_element_type
+import .lgdo_utils
 
 class ArrayOfEqualSizedArrays(Array):
     """
@@ -28,16 +28,16 @@ class ArrayOfEqualSizedArrays(Array):
 
 
     def dataype_name(self):
-        """The name for this object's lh5 datatype attribute"""
+        """The name for this lgdo's datatype attribute"""
         return 'array_of_equalsized_arrays'
 
 
     def form_datatype(self):
-        """Return this object's lh5 datatype attribute string"""
+        """Return this lgdo's datatype attribute string"""
         dt = self.dataype_name()
         nD = str(len(self.nda.shape))
         if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
-        et = get_lh5_element_type(self)
+        et = lgdo_utils.get_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
 
 
