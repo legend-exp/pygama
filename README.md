@@ -125,3 +125,8 @@ TBD
 ## automation
 
 TBD
+
+
+## testing
+
+pygama testing uses the pytest framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines).
