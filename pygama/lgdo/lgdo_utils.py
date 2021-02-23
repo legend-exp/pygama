@@ -1,3 +1,5 @@
+import numpy as np
+
 def get_element_type(obj):
     """Get the lgdo element type of a scalar or array
 
@@ -5,22 +7,31 @@ def get_element_type(obj):
 
     Parameters
     ----------
-    obj : str or any object with a numpy dtype
+    obj : any python object
+        if a str, will automatically return "string"
+        if the object has a dtype, that will be used for determining the element type
+        otherwise will attempt to case the type of the object to a dtype
 
     Returns
     -------
     el_type : str
         A string stating the determined element type of the object.
     """
+
+    # special handling for strings
     if isinstance(obj, str): return 'string'
-    if hasattr(obj, 'dtype'):
-        kind = obj.dtype.kind
-        if kind == '?' or obj.dtype.name == 'bool': return 'bool'
-        #FIXME: pygama will call all uint8's "blobs" by this logic...
-        if kind in ['b', 'B', 'V']: return 'blob'
-        if kind in ['i', 'u', 'f']: return 'real'
-        if kind == 'c': return 'complex'
-        if kind in ['S', 'a', 'U']: return 'string'
+
+    # the rest use dtypes
+    dt = obj.dtype if hasattr(obj, 'dtype') else np.dtype(type(obj))
+    kind = dt.kind
+
+    if kind == 'b': return 'bool'
+    if kind == 'V': return 'blob'
+    if kind in ['i', 'u', 'f']: return 'real'
+    if kind == 'c': return 'complex'
+    if kind in ['S', 'U']: return 'string'
+
+    # couldn't figure it out
     print('Cannot determine lgdo element_type for object of type', type(obj).__name__)
     return None
 
