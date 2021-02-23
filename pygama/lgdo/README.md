@@ -31,4 +31,4 @@ Tutorial coming soon. LEGEND collaborators can view a presentation on J. Detwile
 * Flecher32 md5sums
 * unit tests
 * tutorial
-
+* "provenance" into lgdo attrs: spec version, creator, creation time
