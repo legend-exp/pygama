@@ -61,21 +61,6 @@ Partial support is in place but requires updating for
    * Add a few additional lh5 fields for lh5 tests
 * Optimization
 
-## lh5 files
-
-Pygama works with "LEGEND HDF5" (lh5) format data. [The lh5 specification can be found here](https://github.com/legend-exp/legend-data-format-specs). Our python implementation is in [pygama.lh5](pygama/lh5).
-
-lh5 files can be browsed easily in python like any [hdf5](https://www.hdfgroup.org/) file using [h5py](https://www.h5py.org/). (link to lh5 browsing tutorial in lh5 readme... LEGEND collaborators can [view J. Detwiler's presentation here](https://indico.legend-exp.org/event/371/contributions/1915/attachments/1167/1696/20200730_PGTProcessing.pdf))
-
-In addition to the standard h5py interface, pygama provides a [WaveformBrowser](pygama/dsp/WaveformBrowser.py). (link to waveform browser tutorial... LEGEND collaborators can [view I. Guinn's presentation here](https://indico.legend-exp.org/event/455/contributions/2368/attachments/1439/2173/201217_WaveformBrowser.pdf))
-
-#### lh5 to-do's
-* table joins
-* waveform object definition and compression
-* fix overwrite
-* Flecher32 md5sums
-* unit tests
-
 
 ## raw_to_dsp
 
@@ -129,4 +114,4 @@ TBD
 
 ## testing
 
-pygama testing uses the pytest framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines).
+pygama testing uses the [pytest](https://pytest.org) framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines).
