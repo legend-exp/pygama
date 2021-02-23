@@ -145,7 +145,8 @@ setup(
         'h5py',
         'numpy',
         'pandas',
-        'matplotlib'
+        'matplotlib',
+        'pytest'
 
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
