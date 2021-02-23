@@ -53,12 +53,12 @@ def parse_datatype(datatype):
             if not None, a tuple of dimensions for the lgdo. Note this is
             not the same as the np shape of the underlying data object. See the
             lgdo specification for more information. Also see
-            ArrayOfEqualSizedArrays and Store.read_object() for example code
+            ArrayOfEqualSizedArrays and LH5Store.read_object() for example code
         elements: str or list of str's
             for numeric objects, the element type
             for struct-like  objects, the list of fields in the struct
     """
-    if '{' not in datatype: return 'scalar', (), datatype
+    if '{' not in datatype: return 'scalar', None, datatype
 
     # for other datatypes, need to parse the datatype string
     from parse import parse
