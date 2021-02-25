@@ -1,7 +1,7 @@
 """
 io_base.py
 
-base classes for decoding daq data into raw lh5 files
+base classes for decoding daq data into raw lgdo tables / files
 """
 
 from abc import ABC
@@ -148,7 +148,3 @@ class DataDecoder(ABC):
 
 
 
-# TODO: remove this after all DataTaker references have been removed from old
-# code
-class DataTaker(DataDecoder):
-    pass
