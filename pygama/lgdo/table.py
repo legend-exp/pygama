@@ -123,18 +123,30 @@ class Table(Struct):
         self.add_field(self, name, obj, use_obj_size=use_obj_size, do_warn=do_warn)
 
 
-    def join(self, other_table, do_warn=True):
+    def join(self, other_table, cols=None, do_warn=True):
         """Add the columns of other_table to this table
 
         Note: following the join, both tables have access to other_table's
         fields (but other_table doesn't have access to this table's fields). No
         memory is allocated in this process. Other_table can go out of scope and
         this table will retain access to the joined data.
+
+        Parameters
+        ----------
+        other_table : Table
+            the table whose columns are to be joined into this table
+        cols : list or None (optional)
+            a list of names of columns from other_table to be joined into this
+            table
+        do_warn : bool (optional)
+            set to False to turn off error warnings associated with mismatched
+            loc parameter or add_column() warnings
         """
         if other_table.loc != self.loc and do_warn:
             print(f'warning: other_table.loc ({other_table.loc}) != self.loc({self.loc})')
-        for name, obj in other_table.items():
-            self.add_column(self, name, obj, do_warn=do_warn)
+        if cols is None: cols = other_table.keys()
+        for name in cols:
+            self.add_column(self, name, other_table[name], do_warn=do_warn)
 
 
     def get_dataframe(self, cols=None, copy=False):
