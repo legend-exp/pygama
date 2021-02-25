@@ -133,7 +133,7 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
-    def get_decoded_values(self, channel):
+    def get_decoded_values(self, channel=None): 
         # same for all channels
         return self.decoded_values
 
@@ -144,6 +144,18 @@ class FlashCamEventDecoder(DataDecoder):
         """
         self.file_config = {c:getattr(fcio, c) for c in self.config_names}
         self.decoded_values['waveform']['length'] = self.file_config['nsamples']
+
+
+    def get_file_config_struct(self):
+        '''
+        Get an lh5 struct containing the file config info
+        '''
+        fcio_config = lh5.Struct()
+        for key, value in self.file_config.items():
+            scalar = lh5.Scalar(np.int32(value))
+            fcio_config.add_field(key, scalar)
+        return fcio_config
+
 
 
     def decode_packet(self, fcio, lh5_tables, packet_id, verbose=False):
@@ -348,7 +360,7 @@ class FlashCamStatusDecoder(DataDecoder):
         return 302132
 
 
-def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8092, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
     """
     decode FlashCam data, using the fcutils package to handle file access,
     and the FlashCam DataTaker to save the results and write to output.
@@ -363,7 +375,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         f_out = raw_files
     elif len(raw_files) == 1:
         single_output = True
-        f_out = raw_files
+        f_out = list(raw_files.values())[0]
     else:
         single_output = False
 
@@ -386,9 +398,9 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
     # set up ch_group-to-output-file-and-group info
     if single_output:
-        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='{group_name}/raw')
     else:
-        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='raw')
+        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='{group_name}/raw')
 
     # set up tables
     event_tables = build_tables(ch_groups, buffer_size, event_decoder)
@@ -407,11 +419,19 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     status_decoder.initialize_lh5_table(status_tbl)
     try:
       status_filename = f_out if single_output else raw_files['auxs']
+      config_filename = f_out if single_output else raw_files['auxs']
     except:
-      status_filename = "stat"
+      status_filename = "fcio_status"
+      config_filename = "fcio_config"
+
+    # Set up the store
     # TODO: add overwrite capability
     lh5_store = lh5.Store()
 
+    # write fcio_config
+    fcio_config = event_decoder.get_file_config_struct()
+    lh5_store.write_object(fcio_config, 'fcio_config', config_filename)
+    
     # loop over raw data packets
     i_debug = 0
     packet_id = 0
@@ -438,7 +458,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         if rc == 4:
             bytes_processed += status_decoder.decode_packet(fcio, status_tbl, packet_id)
             if status_tbl.is_full():
-                lh5_store.write_object(status_tbl, 'stat', status_filename, n_rows=status_tbl.size)
+                lh5_store.write_object(status_tbl, 'fcio_status', status_filename, n_rows=status_tbl.size)
                 status_tbl.clear()
 
         # Event or SparseEvent record

@@ -12,7 +12,7 @@ class Struct(dict):
         """
         Parameters
         ----------
-        obj_dict : dict (optional)
+        obj_dict : dict { str : lh5 objects } (optional)
             Instantiate this struct using the supplied named lh5 objects.
             Note: no copy is performed, the objects are used directly.
         attrs : dict (optional)
