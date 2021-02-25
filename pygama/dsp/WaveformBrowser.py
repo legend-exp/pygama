@@ -173,6 +173,12 @@ class WaveformBrowser:
         """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
 
+    def save_figure(self, f_out=None):
+        if f_out is not None:
+            self.fig.savefig(f_out)
+        else:
+            print("You need to specify an output filename!")
+
     def set_figure(self, fig, ax=None):
         """Use an already existing figure and axis; make sure to set clear to False when drawing if you don't want to clear what's already there! Can give a WaveformBrowser object to use the fig/axis from that"""
         if isinstance(fig, WaveformBrowser):
