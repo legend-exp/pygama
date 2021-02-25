@@ -21,9 +21,12 @@ length (number of rows)
 
 Currently the primary on-disk format for lgdo's is LEGEND HDF5 (lh5) files. IO
 is done via the class LH5Store.
-lh5 files can also be browsed easily in python like any [hdf5](https://www.hdfgroup.org/) file using [h5py](https://www.h5py.org/). 
+lh5 files can also be browsed easily in python like any
+[hdf5](https://www.hdfgroup.org/) file using [h5py](https://www.h5py.org/).
 
-Tutorial coming soon. LEGEND collaborators can view a presentation on J. Detwiler showing basic data browsing methods [here](https://indico.legend-exp.org/event/371/contributions/1915/attachments/1167/1696/20200730_PGTProcessing.pdf).
+Tutorial coming soon. LEGEND collaborators can view a presentation on J.
+Detwiler showing basic data browsing methods
+[here](https://indico.legend-exp.org/event/371/contributions/1915/attachments/1167/1696/20200730_PGTProcessing.pdf).
 
 #### lh5 to-do's
 * waveform object definition and compression
