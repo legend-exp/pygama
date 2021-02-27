@@ -195,7 +195,7 @@ class LH5Store:
             print('LH5Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
             return None, 0
         datatype = h5f[name].attrs['datatype']
-        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
+        datatype, shape, elements = parse_datatype(datatype)
 
         # Scalar
         # scalars are dim-0 datasets
@@ -602,7 +602,7 @@ class LH5Store:
             print('LH5Store:', name, 'in file', lh5_file, 'is missing the datatype attribute')
             return None, 0
         datatype = h5f[name].attrs['datatype']
-        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
+        datatype, shape, elements = parse_datatype(datatype)
 
         # scalars are dim-0 datasets
         if datatype == 'scalar': 
