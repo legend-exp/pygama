@@ -2,10 +2,10 @@
 
 ## build_raw
 
-The primary function for DAQ output conversion into raw lh5 files is [`build_raw` in `pygama.raw`](pygama/io/build_raw.py). This is a one-to many function: one input DAQ file can generate one or more output raw files. Control of which data ends up in which files, and in which hdf5 groups inside of each file, is controlled via [channel groups](pygama/io/ch_group.py). If no `ch_group` is specified, all decoded data should be written to a single output file, with all fields from each hardware decoder in their own output table.
+The primary function for DAQ output conversion into raw lh5 files is [`build_raw` in `pygama.raw`](build_raw.py). This is a one-to many function: one input DAQ file can generate one or more output raw files. Control of which data ends up in which files, and in which hdf5 groups inside of each file, is controlled via [channel groups](ch_group.py). If no `ch_group` is specified, all decoded data should be written to a single output file, with all fields from each hardware decoder in their own output table.
 
 Currently we support only the following hardware:
-* FlashCams
+* FlashCams (requires [pyfcutils](https://github.com/legend-exp/pyfcutils))
 * SIS3302 read out with [ORCA](https://github.com/unc-enap/Orca)
 * GRETINA digitizer (MJD firmware) read out with ORCA
 
