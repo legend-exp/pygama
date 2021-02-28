@@ -1,45 +1,48 @@
-"""
-pygama tier 0 processing
-raw daq data --> pandas dfs saved to hdf5 file (tier 1)
-"""
-import os, sys, time, json
+import os, time, json
 import numpy as np
-from parse import parse
 
 from ..utils import *
-from ..io.orcadaq import *
-from ..io.llamadaq import *
-from ..io.compassdaq import *
-from ..io.fcdaq import *
+from orca.stream_orca import *
+from stream_llama import *
+from stream_compass import *
+from stream_fc import *
 
 
-def build_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None, 
-              n_max=np.inf, verbose=False, out_dir=None, chans=None,
-              overwrite=True, config={}):
+def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None, 
+              ch_groups=None, n_max=np.inf, verbose=False, overwrite=True, buffer_size=8192)
     """
-    Convert DAQ files into LEGEND-HDF5 `raw` format.  
-    Takes an input file (daq_filename) and an output file (raw_file_pattern).
-    
-    If the list `systems` is supplied, the raw_file_pattern should be a string
-    containing `{sysn}`, which is used to create a list of output files for
-    each data taker.
+    Convert data into LEGEND hdf5 `raw` format.  
+    Takes an input file (in_filename) and an output file (raw_file_pattern).
 
+
+    Parameters
+    ----------
+    in_filename : str or f 
+        The name of the input file to be converted, including path. Can use
+        environment variables.
+    stream_type : str
+        Options are "ORCA", "FlashCams", "Llama", "Compass", "MGDO"
+    raw_file_pattern : str or f string (optional)
+        The name or a pattern for names of the output file(s), including path.
+        Can use environment variables.
+        
+    rfp_subs : dict (optional)
+    ch_groups : dict (optional)
+    n_max : int (optional)
+    verbose : bool (optional)
+    overwrite : bool (optional)
+    buffer_size : int (optional)
+
+    
     Config options for build_raw:
         buffer_size (int): default length to use for tables
         ch_groups (dict): associates groups of channels to be in the same or
             a different output LH5 table. See ch_group.py
     """
     # convert any environment variables
-    daq_filename = os.path.expandvars(daq_filename)
+    in_filename = os.path.expandvars(in_filename)
     raw_file_pattern = os.path.expandvars(raw_file_pattern)
     
-    # load options from config (can be dict or JSON filename)
-    if isinstance(config, str):
-        with open(os.path.expandvars(config)) as f:
-            config = json.load(f)
-    d2r_conf = config['daq_to_raw'] if 'daq_to_raw' in config else config
-    buffer_size = d2r_conf['buffer_size'] if 'buffer_size' in d2r_conf else 8192
-
     # if we're not given a raw filename, make a simple one with subrun number
     if raw_file_pattern is None:
         if subrun is None:
@@ -70,31 +73,27 @@ def build_raw(daq_filename, raw_file_pattern=None, subrun=None, systems=None,
           f'\n  Buffer size: {buffer_size}'
           f'\n  Max num. events: {n_max}'
           f'\n  Cycle (subrun) num: {subrun}'
-          f'\n  Input: {daq_filename}\n  Output:')
+          f'\n  Input: {in_filename}\n  Output:')
     pprint(raw_files)
     
     t_start = time.time()
     bytes_processed = None
 
-
-    ch_groups_dict = None
-    if 'ch_groups' in d2r_conf: ch_groups_dict = d2r_conf['ch_groups']
-    
     # get the DAQ mode
     if config['daq'] == 'ORCA':
         print('note, remove decoder input option')
-        process_orca(daq_filename, raw_file_pattern, n_max, ch_groups_dict, verbose, buffer_size=buffer_size)
+        process_orca(in_filename, raw_file_pattern, n_max, ch_groups, verbose, buffer_size=buffer_size)
 
     elif config['daq'] == 'FlashCam':
         print("Processing FlashCam ...")
-        bytes_processed = process_flashcam(daq_filename, raw_files, n_max, ch_groups_dict, verbose, buffer_size=buffer_size, chans=chans)
+        bytes_processed = process_flashcam(in_filename, raw_files, n_max, ch_groups, verbose, buffer_size=buffer_size, chans=chans)
 
     elif config['daq'] == 'SIS3316':
-        process_llama_3316(daq_filename, raw_file_pattern, run, n_max, config, verbose)
+        process_llama_3316(in_filename, raw_file_pattern, run, n_max, config, verbose)
 
     elif config['daq'] == 'CAENDT57XXDecoder':
         print('note, remove decoder input option')
-        process_compass(daq_filename, raw_file_pattern, None, out_dir)
+        process_compass(in_filename, raw_file_pattern, None, out_dir)
 
     else:
         print(f"DAQ: {config['daq']} not recognized.  Exiting ...")
