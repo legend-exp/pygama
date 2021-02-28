@@ -6,5 +6,6 @@ from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .vectorofvectors import VectorOfVectors
 from .struct import Struct
 from .table import Table
+from .waveform_table import WaveformTable
 from .lh5_store import LH5Store, load_nda, load_dfs
 

@@ -13,7 +13,7 @@ class ArrayOfEqualSizedArrays(Array):
     """
 
 
-    def __init__(self, dims=None, nda=None, shape=None, dtype=None, attrs={}):
+    def __init__(self, dims=None, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
         """ 
         Parameters
         ----------
@@ -24,7 +24,7 @@ class ArrayOfEqualSizedArrays(Array):
         See Array.__init__ for optional args 
         """
         self.dims = dims
-        super().__init__(nda, shape, dtype, attrs)
+        super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
 
 
     def dataype_name(self):

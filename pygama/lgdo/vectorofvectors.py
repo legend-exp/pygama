@@ -39,7 +39,7 @@ class VectorOfVectors:
             A set of user attributes to be carried along with this lgdo
         """
         if cumulative_length is None:
-            self.cumulative_length = Array(shape=(shape_guess[0],), dtype='uint32')
+            self.cumulative_length = Array(shape=(shape_guess[0],), dtype='uint32', fill_val=0)
         else: self.cumulative_length = cumulative_length
         if flattened_data is None:
             length = np.prod(shape_guess)

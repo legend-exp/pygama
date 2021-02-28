@@ -13,9 +13,9 @@ class FixedSizeArray(Array):
     """
 
 
-    def __init__(self, nda=None, shape=None, dtype=None, attrs={}):
+    def __init__(self, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
         """ See Array.__init__ for optional args """
-        super().__init__(nda, shape, dtype, attrs)
+        super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
         
 
     def dataype_name(self):

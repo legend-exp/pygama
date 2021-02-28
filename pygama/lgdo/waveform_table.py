@@ -1,3 +1,4 @@
+import numpy as np
 from .table import Table
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
@@ -74,7 +75,7 @@ class WaveformTable(Table):
             t0_dtype = t0.dtype if hasattr(t0, 'dtype') else np.float32
             nda = t0 if isinstance(t0, np.ndarray) else np.full(shape, t0, dtype=t0_dtype)
             if nda.shape != shape: nda.resize(shape)
-            t0 = Array(nda)
+            t0 = Array(nda=nda)
         if t0_units is not None: t0.attrs['units'] = f'{t0_units}'
             
         if not isinstance(dt, Array):
@@ -82,7 +83,7 @@ class WaveformTable(Table):
             dt_dtype = dt.dtype if hasattr(dt, 'dtype') else np.float32
             nda = dt if isinstance(dt, np.ndarray) else np.full(shape, dt, dtype=dt_dtype)
             if nda.shape != shape: nda.resize(shape)
-            dt = Array(nda)
+            dt = Array(nda=nda)
         if dt_units is not None: dt.attrs['units'] = f'{dt_units}'
 
         if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(values, VectorOfVectors):
@@ -97,7 +98,7 @@ class WaveformTable(Table):
                     dtype = values.dtype if hasattr(values, 'dtype') else np.float64
                 nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
                 if nda.shape != shape: nda.resize(shape)
-                values = ArrayOfEqualSizedArrays(dims=(1,1), nda)
+                values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
         if values_units is not None: values.attrs['units'] = f'{values_units}'
 
         col_dict = {}
