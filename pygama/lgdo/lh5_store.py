@@ -262,8 +262,7 @@ class LH5Store:
             # don't readout more than n_rows indices
             idx = (idxa[:n_rows],) # works even if n_rows > len(idxa)
 
-        # Table
-        # read a table into a dataframe
+        # Table or WaveformTable
         if datatype == 'table':
             col_dict = {}
 
@@ -317,7 +316,14 @@ class LH5Store:
 
             # fields have been read out, now return a table
             if obj_buf is None: 
-                table = Table(col_dict=col_dict, attrs=attrs)
+                # if col_dict contains just 3 objects called t0, dt, and values,
+                # return a WaveformTable
+                if len(col_dict) == 3:
+                    if 't0' in col_dict and 'dt' in col_dict and 'values' in col_dict:
+                        table = WaveformTable(t0=col_dict['t0'], 
+                                              dt=col_dict['dt'], 
+                                              values=col_dict['values'])
+                else: table = Table(col_dict=col_dict, attrs=attrs)
                 # set (write) loc to end of tree
                 table.loc = n_rows_read
                 return table, n_rows_read
@@ -502,7 +508,7 @@ class LH5Store:
         # FIXME: even in append mode, if you try to overwrite a ds, it will fail
         # unless you delete the ds first
 
-        # struct or table
+        # struct or table or waveform table
         if isinstance(obj, Struct):
             group = self.gimme_group(name, group, grp_attrs=obj.attrs)
             fields = obj.keys()
@@ -522,7 +528,6 @@ class LH5Store:
             ds.attrs.update(obj.attrs)
             return
 
- 
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):
             group = self.gimme_group(name, group, grp_attrs=obj.attrs)
