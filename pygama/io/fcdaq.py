@@ -133,7 +133,7 @@ class FlashCamEventDecoder(DataDecoder):
         self.skipped_channels = {}
 
 
-    def get_decoded_values(self, channel=None): 
+    def get_decoded_values(self, channel=None):
         # same for all channels
         return self.decoded_values
 
@@ -412,6 +412,9 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             out_file = group_info['out_file']
             print(group_path, ':', out_file.split('/')[-1])
 
+    # dictionary with the unique file names as keys
+    file_info = dict.fromkeys(set(group_info['out_file'] for group_info in ch_groups.values()), False)
+
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
     status_decoder.set_file_config(fcio)
@@ -431,7 +434,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     # write fcio_config
     fcio_config = event_decoder.get_file_config_struct()
     lh5_store.write_object(fcio_config, 'fcio_config', config_filename)
-    
+
     # loop over raw data packets
     i_debug = 0
     packet_id = 0
@@ -476,6 +479,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
                     group_path = group_info['group_path']
                     out_file = group_info['out_file']
                     lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+                    if out_file in file_info: file_info[out_file] = True
                     tbl.clear()
 
             # Looks okay: just decode
@@ -493,11 +497,17 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             group_path = group_info['group_path']
             out_file = group_info['out_file']
             lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+            if out_file in file_info: file_info[out_file] = True
             tbl.clear()
     if status_tbl.loc != 0:
         lh5_store.write_object(status_tbl, 'stat', status_filename,
                                n_rows=status_tbl.loc)
         status_tbl.clear()
+
+    # alert user to any files not actually saved in the end
+    for out_file, is_saved in file_info.items():
+        if not is_saved:
+            print('Not saving file since no data were found:', out_file)
 
     if verbose:
         update_progress(1)
