@@ -1,20 +1,14 @@
 import os
 import numpy as np
-from pprint import pprint
-from collections import defaultdict
+from ..data_decoder.py import *
 
-from ..utils import *
-from .io_base import DataDecoder
-from pygama import lh5
-from .ch_group import *
-
-
-class FlashCamStatusDecoder(DataDecoder):
+class FCStatusDecoder(DataDecoder):
     """
     decode FlashCam digitizer status data.
     """
     def __init__(self, *args, **kwargs):
-
+        """
+        """
         self.decoded_values = {
             'status': { # 0: Errors occured, 1: no errors
               'dtype': 'int32',
@@ -67,30 +61,17 @@ class FlashCamStatusDecoder(DataDecoder):
               'length': 5,
             },
         }
-
-        # these are read for every file (set_file_config)
-        self.config_names = [
-            'nsamples', # samples per channel
-            'nadcs', # number of adc channels
-            'ntriggers', # number of triggertraces
-            'telid', # id of telescope
-            'adcbits', # bit range of the adc channels
-            'sumlength', # length of the fpga integrator
-            'blprecision', # precision of the fpga baseline
-            'mastercards', # number of attached mastercards
-            'triggercards', # number of attached triggercards
-            'adccards', # number of attached fadccards
-            'gps', # gps mode (0: not used, 1: external pps and 10MHz)
-        ]
-
         super().__init__(*args, **kwargs)
 
 
-    def set_file_config(self, fcio):
+    def set_file_config(self, fc_config):
         """
         access FCIOConfig members once when each file is opened
+
+        fc_config is a lgdo Struct extracted via
+        fc_config = FCConfigDecoder.decode_config(fcio)
         """
-        self.file_config = {c:getattr(fcio, c) for c in self.config_names}
+        self.fc_config = fc_config
 
 
     def decode_packet(self, fcio, lh5_table, packet_id, verbose=False):
