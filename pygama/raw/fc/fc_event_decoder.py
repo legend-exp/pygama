@@ -1,15 +1,11 @@
 import os
 import numpy as np
-from pprint import pprint
-from collections import defaultdict
-
-from ..utils import *
-from .io_base import DataDecoder
-from pygama import lh5
+from ..data_decoder.py import *
+from pygama import lgdo
 from .ch_group import *
 
 
-class FlashCamEventDecoder(DataDecoder):
+class FCEventDecoder(DataDecoder):
     """
     decode FlashCam digitizer event data.
     """
@@ -43,7 +39,7 @@ class FlashCamEventDecoder(DataDecoder):
             'baseline': { # fpga baseline
               'dtype': 'uint16',
             },
-            'energy': {  # fpga energy
+            'onboard_E': {  # fpga energy
               'dtype': 'uint16',
             },
             'channel': { # right now, index of the trigger (trace)
@@ -97,38 +93,15 @@ class FlashCamEventDecoder(DataDecoder):
             'deadtime': { # current dead time calculated from deadregion (dr) fields. Give the total dead time if summed up.
               'dtype': 'float32',
             },
-            'wf_max': { # ultra-simple np.max energy estimation
-              'dtype': 'uint16',
-            },
-            'wf_std': { # ultra-simple np.std noise estimation
-              'dtype': 'float32',
-            },
             'waveform': { # digitizer data
               'dtype': 'uint16',
               'datatype': 'waveform',
-              'length': 65532, # max value. override this before initializing buffers to save RAM
-              'sample_period': 16, # override if a different clock rate is used
-              'sample_period_units': 'ns',
+              'wf_len': 65532, # max value. override this before initializing buffers to save RAM
+              'dt': 16, # override if a different clock rate is used
+              'dt_units': 'ns',
               't0_units': 'ns',
             },
         }
-
-        # these are read for every file (set_file_config)
-        # FIXME: push into a file header object?
-        self.config_names = [
-            'nsamples', # samples per channel
-            'nadcs', # number of adc channels
-            'ntriggers', # number of triggertraces
-            'telid', # id of telescope
-            'adcbits', # bit range of the adc channels
-            'sumlength', # length of the fpga integrator
-            'blprecision', # precision of the fpga baseline
-            'mastercards', # number of attached mastercards
-            'triggercards', # number of attached triggercards
-            'adccards', # number of attached fadccards
-            'gps', # gps mode (0: not used, 1: external pps and 10MHz)
-        ]
-
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
 
@@ -138,27 +111,18 @@ class FlashCamEventDecoder(DataDecoder):
         return self.decoded_values
 
 
-    def set_file_config(self, fcio):
+    def set_file_config(self, fc_config):
         """
         access FCIOConfig members once when each file is opened
+
+        fc_config is a lgdo Struct extracted via
+        fc_config = FCConfigDecoder.decode_config(fcio)
         """
-        self.file_config = {c:getattr(fcio, c) for c in self.config_names}
-        self.decoded_values['waveform']['length'] = self.file_config['nsamples']
+        self.fc_config = fc_config
+        self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples']
 
 
-    def get_file_config_struct(self):
-        '''
-        Get an lh5 struct containing the file config info
-        '''
-        fcio_config = lh5.Struct()
-        for key, value in self.file_config.items():
-            scalar = lh5.Scalar(np.int32(value))
-            fcio_config.add_field(key, scalar)
-        return fcio_config
-
-
-
-    def decode_packet(self, fcio, lh5_tables, packet_id, verbose=False):
+    def decode_packet(self, fcio, lgdo_tables, packet_id, verbose=False):
         """
         access FCIOEvent members for each event in the raw file
         """
@@ -191,18 +155,18 @@ class FlashCamEventDecoder(DataDecoder):
 
         # all channels are read out simultaneously for each event
         for iwf in tracelist:
-            tbl = lh5_tables
+            tbl = lgdo_tables
             if not isinstance(tbl, lh5.Table):
-                if iwf not in lh5_tables:
+                if iwf not in lgdo_tables:
                     if iwf not in self.skipped_channels:
                         self.skipped_channels[iwf] = 0
                     self.skipped_channels[iwf] += 1
                     continue
-                tbl = lh5_tables[iwf]
+                tbl = lgdo_tables[iwf]
             if eventsamples != tbl['waveform']['values'].nda.shape[1]:
-                print('FlashCamEventDecoder Warning: event wf length was',
+                print('FCEventDecoder Warning: event wf length was',
                       eventsamples, 'when',
-                      self.decoded_values['waveform']['length'], 'were expected')
+                      self.decoded_values['waveform']['wf_len'], 'were expected')
             ii = tbl.loc
             tbl['channel'].nda[ii] = iwf
             tbl['packet_id'].nda[ii] = packet_id
@@ -212,7 +176,7 @@ class FlashCamEventDecoder(DataDecoder):
             tbl['numtraces'].nda[ii] =  numtraces
             tbl['tracelist'].set_vector(ii, tracelist)
             tbl['baseline'].nda[ii] = baselines[iwf]
-            tbl['energy'].nda[ii] = energies[iwf]
+            tbl['onboard_E'].nda[ii] = energies[iwf]
             tbl['ts_pps'].nda[ii]         = ts_pps
             tbl['ts_ticks'].nda[ii]       = ts_ticks
             tbl['ts_maxticks'].nda[ii]    = ts_maxticks
@@ -230,8 +194,6 @@ class FlashCamEventDecoder(DataDecoder):
             tbl['dr_maxticks'].nda[ii]    = dr_maxticks
             tbl['deadtime'].nda[ii]       = deadtime
             waveform = traces[iwf]
-            tbl['wf_max'].nda[ii] = np.amax(waveform)
-            tbl['wf_std'].nda[ii] = np.std(waveform)
             tbl['waveform']['values'].nda[ii][:] = waveform
             tbl.push_row()
 
