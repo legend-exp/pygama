@@ -12,6 +12,8 @@ dictionary with the following fields:
   ch_group is associated.
 * out_path (str, optional): the name of the output path to which the ch_group's
   data should be written. Format: "/path/to/file:/in/file/path"
+* During processing, ch_groups will be given a field 'table' pointing to the
+  lgdo.Table containing the ch_group's data
 
 The key behavior is: all channels in the same group get written to the
 same table, which then gets written to the specified out_path.
