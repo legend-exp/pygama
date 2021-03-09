@@ -17,48 +17,180 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import norm
 import scipy.optimize as op
 
+# match_peaks replacement
+def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8)
+    """
+    Find the polynomial function best matching pol(xx) = yy
 
-def peakdet(v, delta, x):
+    Finds the poly fit of xx to yy that obtains the most matches between pol(xx)
+    and yy in the np.isclose() sense. If multiple fits give the same number of
+    matches, the fit with the best gof is used, where gof is computed only among
+    the matches.
+
+    Assumes that the relationship between xx and yy is monotonic
+
+    Parameters
+    ----------
+    xx : array-like
+        domain data array. Must be sorted from least to largest. Must satisfy
+        len(xx) >= len(yy)
+    yy : array-like
+        range data array: the values to which pol(xx) will be compared. Must be
+        sorted from least to largest. Must satisfy len(yy) > max(2, deg+2)
+    deg : int
+        degree of the polynomial to be used. If deg = -1, will fit for a simple
+        scaling: scale * xx = yy. If deg = 0, fits to a simple shift in the
+        data: xx + shift = yy. Otherwise, deg is equivalent to the deg argument
+        of np.polyfit()
+    rtol : float
+        the relative tolerance to be sent to np.isclose()
+    atol : float
+        the absolute tolerance to be sent to np.isclose(). Has the same units
+        as yy.
+
+    Returns
+    -------
+    pars, n_matches : None or float or array of floats, int
+        pars: the parameters of the best poly fit. If deg = -1 (0) returns the best
+        scaling (shifting) parameter. Otherwise, pars follows the convention
+        used for the return value "p" of polyfit. Returns None when the inputs
+        are bad.
+        n_matches : the number of matches
     """
+
+    # input handling
+    xx = np.asarray(xx)
+    yy = np.asarray(yy)
+    if len(xx) <= len(yy):
+        print(f"poly_match: len(xx)={len(xx)} <= len(yy)={len(yy)}")
+        return None, 0
+    deg = int(deg)
+    if deg < -1:
+        print(f"poly_match: got bad deg = {deg}")
+        return None, 0
+    req_ylen = max(2, deg+2)
+    if len(yy) < req_ylen:
+        print(f"poly_match: len(yy) must be at least {req_ylen} for deg={deg}, got {len(yy)}")
+        return None, 0
+
+    # build itup: the indices in xx to compare with the values in yy
+    itup = list(range(len(yy)))
+    n_close = 0
+    gof = np.inf # lower is better gof
+    while True:
+        xx_i = xx[itup]
+        gof_i = np.inf
+
+        # simple scaling
+        if deg == -1:
+            pars_i = np.sum(yy) / np.sum(xx_i)
+            polxx = pars_i * xx_i
+
+        # simple shift
+        elif deg == 0:
+            pars_i = (np.sum(yy) - np.sum(xx_i)) / len(yy)
+            polxx = xx_i + shift
+
+        # generic poly of degree >= 1
+        else:
+            pars_i = np.polyfit(xx_i, yy, deg)
+            polxx = np.zeros(len(yy))
+            xxn = np.ones(len(yy))
+            for j in len(pars_i)
+                polxx += xxn*pars_i[-j-1]
+                xxn *= xx_i
+
+        # by here we have the best polxx. Search for matches and store pars_i if
+        # its the best so far
+        matches = np.isclose(polxx, yy, rtol=rtol, atol=atol)
+        n_close_i = np.sum(matches)
+        if n_close_i >= n_close_i:
+            gof_i = np.sum(np.power(polxx[matches] - yy[matches], 2))
+            if n_close_i > n_close or (n_close_i == n_close and gof_i < gof):
+                n_close = n_close_i
+                gof = gof_i
+                pars = pars_i
+
+        # increment itup
+        # first find the index of itup that needs to be incremented
+        ii = 0
+        while ii < len(yy)-1:
+            if itup[ii] < itup[ii+1]-1: break
+            ii += 1
+        # quit if ii is the last index of itup and it's already maxed out
+        if ii == len(yy) and itup[ii] == len(xx)-1: break
+        # otherwise increment ii and reset indices < ii
+        itup[ii]
+        itup[0:ii] = list(range(ii))
+
+    return pars
+
+
+def get_i_local_extrema(data, delta):
+    """
+    Get lists of indices of the local maxima and minima of data
+
+    The "local" extrema are those maxima / minima that have heights / depths of
+    at least delta.
+
     Converted from MATLAB script at: http://billauer.co.il/peakdet.html
-    Returns two arrays: [maxtab, mintab] = peakdet(v, delta, x)
-    An updated (vectorized) version is in pygama.dsp.transforms.peakdet
+
+    Parameters
+    ----------
+    data : array-like
+        the array of data within which extrema will be found
+    delta : scalar
+        the absolute level by which data must vary (in one direction) about an
+        extremum in order for it to be tagged
+
+    Returns
+    -------
+    maxes, mins : 2-tuple ( array, array )
+        A 2-tuple containing arrays of variable length that hold the indices of
+        the identified local maxima (first tuple element) and minima (second
+        tuple element)
     """
-    maxtab, mintab = [], []
+
+    # prepare output
+    maxes, mins = [], []
 
     # sanity checks
-    x, v = np.asarray(x), np.asarray(v)
-    if len(v) != len(x): exit("Input vectors v and x must have same length")
-    if not np.isscalar(delta): exit("Input argument delta must be a scalar")
-    if delta <= 0: exit("Input argument delta must be positive")
+    data = np.asarray(data)
+    if not np.isscalar(delta):
+        print("get_i_local_extrema: Input argument delta must be a scalar")
+        return np.array(maxes), np.array(mins)
+    if delta <= 0:
+        print(f"get_i_local_extrema: delta ({delta}) must be positive")
+        return np.array(maxes), np.array(mins)
 
-    maxes, mins = [], []
-    min, max = np.inf, -np.inf
+    # now loop over data
+    imax, imin = 0, 0
     find_max = True
-    for i in range(len(x)):
+    for i in range(len(data)):
 
-        # for i=0, all 4 of these get set
-        if v[i] > max:
-            max, imax = v[i], x[i]
-        if v[i] < min:
-            min, imin = v[i], x[i]
+        if data[i] > data[imax]: imax = i
+        if data[i] < data[imin]: imin = i
 
         if find_max:
-            # if the sample is less than the current max,
+            # if the sample is less than the current max by more than delta,
             # declare the previous one a maximum, then set this as the new "min"
-            if v[i] < max - delta:
-                maxes.append((imax, max))
-                min, imin = v[i], x[i]
+            if data[i] < data[imax] - delta:
+                maxes.append(imax)
+                imin = i
                 find_max = False
         else:
-            # if the sample is more than the current min,
+            # if the sample is more than the current min by more than delta,
             # declare the previous one a minimum, then set this as the new "max"
-            if v[i] > min + delta:
-                mins.append((imin, min))
-                max, imax = v[i], x[i]
+            if data[i] > data[imin] + delta:
+                mins.append(imin)
+                imax = i
                 find_max = True
 
     return np.array(maxes), np.array(mins)
+
+def get_i_local_maxima(data, delta): return get_i_local_extrema(data, delta)[0]
+
+def get_i_local_minima(data, delta): return get_i_local_extrema(data, delta)[1]
 
 
 def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
