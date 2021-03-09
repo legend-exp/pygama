@@ -1,0 +1,56 @@
+name: pygama
+
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+jobs:
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [2.7, 3.5, 3.6, 3.7, 3.8]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install
+      run: |
+        sudo apt-get install -y llvm
+        python -m pip install --upgrade pip numpy
+        pip install .
+    # - name: Test
+    #   run: |
+    #     pytest
+
+  deploy-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install and Build 🔧
+        run: |
+          sudo apt-get install -y llvm
+          python -m pip install --upgrade pip numpy
+          pip install .
+          pip install sphinx sphinx-rtd-theme
+          sphinx-apidoc -f -o docs/source pygama
+          cd docs
+          make clean
+          make html
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@4.1.0
+        with:
+          branch: gh-pages
+          folder: docs/build/html

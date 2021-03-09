@@ -28,7 +28,7 @@ class CMakeBuild(build_ext):
         import git
         repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
         repo.git.submodule('update', '--init', '--recursive')
-        
+
         try:
             out = subprocess.check_output(['cmake', '--version'])
         except OSError:
@@ -41,7 +41,7 @@ class CMakeBuild(build_ext):
                                          out.decode()).group(1))
             if cmake_version < '3.1.0':
                 raise RuntimeError("CMake >= 3.1.0 is required on Windows")
-            
+
         for ext in self.extensions:
             self.build_extension(ext)
 
@@ -103,7 +103,7 @@ def clean_jupyter_notebooks():
             else: # also clear metadata
                 fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
                 --to notebook --ClearOutputPreprocessor.enabled=True\\
-                --ClearMetadataPreprocessor.enabled=True" """                
+                --ClearMetadataPreprocessor.enabled=True" """
         except:
             # if nbconvert (part of jupyter) is not installed, disable filter
             fil = "cat"
@@ -111,7 +111,7 @@ def clean_jupyter_notebooks():
         config.set_value('filter "jupyter_clear_output"', 'clean', fil)
         config.set_value('filter "jupyter_clear_output"', 'smudge', 'cat')
         config.set_value('filter "jupyter_clear_output"', 'required', 'false')
-        
+
 
 # run during installation; this is when files get copied to build dir
 class PygamaBuild(build_py):
@@ -136,6 +136,7 @@ setup(
     long_description='',
     packages=find_packages(),
     install_requires=[
+        'numpy',
         'scimath',
         'numba',
         'parse',
@@ -143,7 +144,6 @@ setup(
         'tinydb',
         'pyFFTW',
         'h5py',
-        'numpy',
         'pandas',
         'matplotlib'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
