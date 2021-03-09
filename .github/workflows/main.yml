@@ -11,6 +11,7 @@ on:
 jobs:
 
   build-and-test:
+    name: Test pygama 
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -23,7 +24,7 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install
+    - name: Run unit tests
       run: |
         sudo apt-get install -y llvm
         python -m pip install --upgrade pip numpy
@@ -31,15 +32,26 @@ jobs:
     # - name: Test
     #   run: |
     #     pytest
+  
+  test-in-legend-container:
+    name: Test pygama in LEGEND container (CentOS Linux)
+    runs-on: ubuntu-latest
+    container: docker://legendexp/legend-base:latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run unit tests
+      run: pip install .
 
   deploy-docs:
+    name: Deploy documentation on legend-exp.github.io/pygama
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Install and Build 🔧
+      - name: Build with Sphinx
         run: |
           sudo apt-get install -y llvm
           python -m pip install --upgrade pip numpy
@@ -48,7 +60,7 @@ jobs:
           cd docs
           make clean
           make html
-      - name: Deploy 🚀
+      - name: Deploy to GitHub pages
         uses: JamesIves/github-pages-deploy-action@4.1.0
         with:
           branch: gh-pages
