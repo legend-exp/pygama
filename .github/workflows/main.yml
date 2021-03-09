@@ -26,8 +26,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Run unit tests
       run: |
-        sudo apt-get install -y llvm
-        python -m pip install --upgrade pip numpy
+        .github/workflows/get-dependencies.sh
         pip install .
     # - name: Test
     #   run: |
@@ -53,8 +52,7 @@ jobs:
           python-version: 3.8
       - name: Build with Sphinx
         run: |
-          sudo apt-get install -y llvm
-          python -m pip install --upgrade pip numpy
+          .github/workflows/get-dependencies.sh
           pip install .
           pip install sphinx sphinx-rtd-theme
           cd docs
