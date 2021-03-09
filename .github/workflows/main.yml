@@ -45,7 +45,6 @@ jobs:
           python -m pip install --upgrade pip numpy
           pip install .
           pip install sphinx sphinx-rtd-theme
-          sphinx-apidoc -f -o docs/source pygama
           cd docs
           make clean
           make html
