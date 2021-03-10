@@ -11,7 +11,6 @@ Subpackages
    pygama.dsp
    pygama.io
    pygama.lh5
-   pygama.sandbox
 
 Submodules
 ----------
