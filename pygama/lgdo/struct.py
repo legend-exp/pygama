@@ -1,6 +1,6 @@
 class Struct(dict):
     """
-    A dictionary with an optional set of attributes.
+    A dictionary of lgdo's with an optional set of attributes.
 
     After instantiation, add fields using add_field() to keep datatype updated,
     or call update_datatype() after adding.
