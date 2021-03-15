@@ -78,12 +78,81 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
     hist, bins = np.histogram(data, bins=bins, range=range, weights=wts)
 
     if wts is None: 
-        # no weights: var = hist
-        return hist, bins, hist
+        # no weights: var = hist, but return a copy so that mods to var don't
+        # modify hist.
+        # Note: If you don't want a var copy, just call np.histogram()
+        return hist, bins, hist.copy()
     else:
         # get the variances by binning with double the weight
         var, bins = np.histogram(data, bins=bins, weights=wts*wts)
         return hist, bins, var
+
+
+def better_int_binning(x_lo=0, x_hi=None, dx=None, n_bins=None):
+    """ Get a good binning for integer data.
+
+    Guarantees an integer bin width.
+
+    At least two of x_hi, dx, or n_bins must be provided.
+
+    Parameters
+    ----------
+    x_lo : float
+        Desired low x value for the binning
+    x_hi : float
+        Desired high x value for the binning
+    dx : float
+        Desired bin width
+    n_bins : float
+        Desired number of bins
+
+    Returns
+    -------
+    x_lo: int
+        int values for best x_lo
+    x_hi: int
+        int values for best x_hi, returned if x_hi is not None
+    dx : int
+        best int bin width, returned if arg dx is not None
+    n_bins : int
+        best int n_bins, returned if arg n_bins is not None
+    """
+    # process inputs
+    n_Nones = int(x_hi is None) + int(dx is None) + int(n_bins is None)
+    if n_Nones > 1:
+        print('better_int_binning: must provide two of x_hi, dx or n_bins')
+        return
+    if n_Nones == 0:
+        print('better_int_binning: overconstrained. Ignoring x_hi.')
+        x_hi = None
+
+    # get valid dx or n_bins
+    if dx is not None:
+        if dx <= 0:
+            print(f'better_int_binning: invalid dx={dx}')
+            return
+        dx = np.round(dx)
+        if dx == 0: dx = 1
+    if n_bins is not None:
+        if n_bins <= 0:
+            print(f'better_int_binning: invalid n_bins={n_bins}')
+            return
+        n_bins = np.round(n_bins)
+
+    # can already return if no x_hi
+    if x_hi is None: # must have both dx and n_bins
+        return int(x_lo), int(dx), int(n_bins)
+
+    # x_hi is valid. Get a valid dx if we don't have one
+    if dx is None: # must have n_bins
+        dx = np.round((x_hi-x_lo)/n_bins)
+
+    # Finally, build a good binning from dx
+    n_bins = np.ceil((x_hi-x_lo)/dx)
+    x_lo = np.floor(x_lo)
+    x_hi = x_lo + n_bins*dx
+    if n_bins is None: return int(x_lo), int(x_hi), int(dx)
+    else: return int(x_lo), int(x_hi), int(n_bins)
 
 
 def get_bin_centers(bins):
@@ -229,9 +298,11 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # compute rough uncertainty as [bin width] (+) [dheight / slope]
         dx = bin_centers[bin_lo] - bin_centers[bin_lo-1]
         dy = hist[bin_lo] - hist[bin_lo-1]
+        if dy == 0: dy = (hist[bin_lo+1] - hist[bin_lo-2])/3
         dfwfm2 = dx**2 + dheight2 * (dx/dy)**2
         dx = bin_centers[bin_hi+1] - bin_centers[bin_hi]
         dy = hist[bin_hi] - hist[bin_hi+1]
+        if dy == 0: dy = (hist[bin_hi-1] - hist[bin_hi+2])/3
         dfwfm2 += dx**2 + dheight2 * (dx/dy)**2
         return fwfm, np.sqrt(dfwfm2)
 
