@@ -167,7 +167,7 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
 
 
 def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
-    """ Get the max, mode, and width of a peak based on gauss fit near the max
+    """ Get the mode, width, and max of a peak based on a gauss fit near the max
 
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
     maximum of the hist (or the max near mode_guess, if provided). This is
@@ -243,9 +243,9 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     Returns
     -------
     (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (maximum, mode) of the gaussian fit     
-            maximum : the estimated maximum value of the peak
+        pars : 2-tuple with the parameters (mode, max) of the gaussian fit
             mode : the estimated x-position of the maximum
+            max : the estimated maximum value of the peak
         cov : 2x2 matrix of floats
             The covariance matrix for the 2 parameters in pars
 
@@ -287,9 +287,12 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
 
     Returns
     -------
-    (maximum, mode) : tuple (float, float)
-        maximum : the estimated maximum value of the peak
-        mode : the estimated x-position of the maximum
+    (pars, cov) : tuple (array, matrix)
+        pars : 2-tuple with the parameters (mode, max) of the fit
+            mode : the estimated x-position of the maximum
+            maximum : the estimated maximum value of the peak
+        cov : 2x2 matrix of floats
+            The covariance matrix for the 2 parameters in pars
 
     Examples
     --------
@@ -498,3 +501,15 @@ def cal_slope(x, m1, m2):
     """
     return np.sqrt(m1 +(m2/(x**2)))
 
+
+def poly(x, pars):
+    """
+    A polynomial function with pars following the polyfit convention
+    """
+    result = x*0 # do x*0 to keep shape of x (scalar or array)
+    if len(pars) == 0: return result
+    result += pars[-1]
+    for i in range(1, len(pars)):
+        result += pars[-i-1]*x
+        x = x*x
+    return result
