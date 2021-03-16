@@ -81,19 +81,18 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7):
 
     Returns
     -------
-    pars : list of array
+    pars_list : list of array
         a list of best-fit parameters (mode, sigma, max) for each peak-top fit
-    covs : list of 2D arrays
+    cov_list : list of 2D arrays
         a list of covariance matrices for each pars
     """
-    pars = []
-    covs = []
-    for i_peak in len(peaks_locs):
-        guess = pgh.find_bin(peak_locs[i_peak], bins)
-        max_pars, max_cov = pgp.gauss_mode_width_max(hist, bins, var, mode_guess=guess, n_bins=n_to_fit)
-        pars.append(max_pars)
-        covs.append(max_cov)
-    return pars, covs
+    pars_list = []
+    cov_list = []
+    for E_peak in peak_locs:
+        pars, cov = pgp.gauss_mode_width_max(hist, bins, var, mode_guess=E_peak, n_bins=n_to_fit)
+        pars_list.append(pars)
+        cov_list.append(cov)
+    return np.array(pars_list), np.array(cov_list)
 
 
 def get_hpge_E_peak_par_guess(hist, bins, var, func):
@@ -201,17 +200,16 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     Returns
     -------
     pars : array
-        parameters of the best fit. If deg=0, len(pars) = 1 and contains just
-        the scale parameter. Otherwise, follows the definition in np.polyfit
+        parameters of the best fit. Follows the convention in np.polyfit
     cov : 2D array
         covariance matrix for the best fit parameters.
     """
     if deg == 0:
-        scale, scale_cov = pgu.fit_simple_scaling(peaks_keV, mus, var=mu_vars)
-        pars = np.array([scale])
-        cov = np.array([[scale_cov]])
+        scale, scale_cov = pgu.fit_simple_scaling(Es_keV, mus, var=mu_vars)
+        pars = np.array([scale, 0])
+        cov = np.array([[scale_cov, 0], [0, 0]])
     else:
-        pars, cov = np.polyfit(peaks_keV, mus, deg=deg, w=1/np.sqrt(mu_vars), cov=True)
+        pars, cov = np.polyfit(Es_keV, mus, deg=deg, w=1/np.sqrt(mu_vars), cov=True)
     return pars, cov
 
 
@@ -230,8 +228,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
         variances in the mus
     Es_keV : array
         energies to fit to, in keV
-    E_scale_pars : array
-        array of parameters for the function mu = poly(E) (e.g. return value of
+    k
         hpge_fit_E_scale)
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
@@ -240,16 +237,15 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     Returns
     -------
     pars : array
-        parameters of the best fit. If deg=0, len(pars) = 1 and contains just
-        the scale parameter. Otherwise, follows the definition in np.polyfit
+        parameters of the best fit. Follows the convention in np.polyfit
     cov : 2D array
         covariance matrix for the best fit parameters.
     """
     if deg == 0:
         E_vars = mu_vars/E_scale_pars[0]**2
-        scale, scale_cov = pgu.fit_simple_scaling(mus, peaks_keV, var=E_vars)
-        pars = np.array([scale])
-        cov = np.array([[scale_cov]])
+        scale, scale_cov = pgu.fit_simple_scaling(mus, Es_keV, var=E_vars)
+        pars = np.array([scale, 0])
+        cov = np.array([[scale_cov, 0], [0, 0]])
     else:
         mu_ns = np.ones(len(mus))
         dmudEs = np.zeros(len(mus))
@@ -257,7 +253,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
             dmudEs += mu_ns*E_scale_pars[-n-1]
             mu_ns *= mus
         E_weights = dmudEs/np.sqrt(mu_vars)
-        pars, cov = np.polyfit(mus, peaks_keV, deg=deg, w=E_weights, cov=True)
+        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=E_weights, cov=True)
     return pars, cov
 
 
@@ -450,7 +446,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
             pars_i = np.polyfit(xx_i, yy, deg)
             polxx = np.zeros(len(yy))
             xxn = np.ones(len(yy))
-            for j in len(pars_i):
+            for j in range(len(pars_i)):
                 polxx += xxn*pars_i[-j-1]
                 xxn *= xx_i
 
