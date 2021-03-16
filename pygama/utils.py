@@ -300,6 +300,8 @@ def fit_simple_scaling(x, y, var=1):
     scale, scale_var: tuple (float, float)
         The scale parameter and its variance
     """
+    x = np.asarray(x)
+    y = np.asarray(y)
     scale_var = 1/np.sum(x*x/var)
     scale = np.sum(y*x/var) * scale_var
     return scale, scale_var
