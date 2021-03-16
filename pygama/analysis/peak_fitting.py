@@ -65,17 +65,59 @@ def fit_hist(func, hist, bins, var=None, guess=None,
     return coeff, cov_matrix
 
 
-def goodness_of_fit(hist, bins, func, p_fit):
+def goodness_of_fit(hist, bins, var, func, pars, method='var'):
+    """ Compute chisq and dof of fit
+
+    Parameters
+    ----------
+    hist, bins, var : array, array, array or None
+        histogram data. var can be None if hist is integer counts
+    func : function
+        the function that was fit to the hist
+    pars : array
+        the best-fit pars of func. Assumes all pars are free parameters
+    method : str
+        Sets the choice of "denominator" in the chi2 sum
+        'var': user passes in the variances in var (must not have zeros)
+        'Pearson': use func (hist must contain integer counts)
+        'Neyman': use hist (hist must contain integer counts and no zeros)
+
+    Returns
+    -------
+    chisq : float
+        the summed up value of chisquared
+    dof : int
+        the number of degrees of freedom
     """
-    compute reduced chisq and fwhm_err for 
-    """
-    chisq = []
-    for i, h in enumerate(hist):
-        model = func(bins[i], *p_fit)
-        diff = (model - h)**2 / model
-        chisq.append(abs(diff))
-    rchisq = sum(np.array(chisq) / len(hist))
-    return rchisq
+    # arg checks
+    if method == 'var':
+        if var is None:
+            print("goodness_of_fit: var must be non-None to use method 'var'")
+            return 0, 0
+        if np.any(var==0):
+            print("goodness_of_fit: var cannot contain zeros")
+            return 0, 0
+    if method == 'Neyman' and np.any(hist==0):
+        print("goodness_of_fit: hist cannot contain zeros for Neyman method")
+        return 0, 0
+
+    # compute chi2 numerator and denominator
+    yy = func(ph.get_bin_centers(bins), *pars)
+    numerator = (hist - yy)**2
+    if method == 'var':
+        denominator = var
+    elif method == 'Pearson':
+        denominator = yy
+    elif method == 'Neyman':
+        denominator = hist
+    else:
+        print(f"goodness_of_fit: unknown method {method}")
+        return 0, 0
+
+    # compute chi2 and dof 
+    chisq = np.sum(numerator/denominator)
+    dof = len(hist) - len(pars)
+    return chisq, dof
 
 
 def neg_log_like(params, f_likelihood, data, **kwargs):
@@ -166,7 +208,8 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 
-def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, 
+                         poissonLL=False, inflate_errors=False, gof_method='var'):
     """ Get the mode, width, and max of a peak based on a gauss fit near the max
 
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
@@ -196,9 +239,16 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poisso
         An x-value (not a bin index!) near which a peak is expected. The
         algorithm fits around the maximum within +/- n_bins of the guess. If not
         provided, the center of the max bin of the histogram is used.
-    n_bins : int
+    n_bins : int (optional)
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
+    poissonLL : bool (optional)
+        Flag passed to fit_hist()
+    inflate_errors : bool (optional)
+        If true, the parameter uncertainties are inflated by sqrt(chi2red)
+        if it is greater than 1
+    gof_method : str (optional)
+        method flag for goodness_of_fit
 
     Returns
     -------
@@ -230,10 +280,13 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poisso
     pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, poissonLL=poissonLL)
     if pars[1] < 0: pars[1] = -pars[1]
+    if inflate_errors:
+        chi2, dof = goodness_of_fit(hist, bins, var, gauss_basic, pars)
+        if chi2 > dof: cov *= chi2/dof
     return pars, cov
 
 
-def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
     """ Alias for gauss_mode_width_max that just returns the max and mode 
 
     Parameters
