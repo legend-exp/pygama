@@ -67,7 +67,8 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=10,
     return detected_max_locs[i_matches], pars
 
 
-def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7):
+def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
+                         poissonLL=False, inflate_errors=False, gof_method='var'):
     """ Fit gaussians to the tops of peaks
 
     Parameters
@@ -78,6 +79,12 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7):
         locations of peaks in hist. Must be accurate two within +/- 2*n_to_fit
     n_to_fit : int
         number of hist bins near the peak top to include in the gaussian fit
+    poissonLL : bool (optional)
+        Flag passed to gauss_mode_width_max()
+    inflate_errors : bool (optional)
+        Flag passed to gauss_mode_width_max()
+    gof_method : str (optional)
+        method flag passed to gauss_mode_width_max()
 
     Returns
     -------
@@ -89,7 +96,12 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7):
     pars_list = []
     cov_list = []
     for E_peak in peak_locs:
-        pars, cov = pgp.gauss_mode_width_max(hist, bins, var, mode_guess=E_peak, n_bins=n_to_fit)
+        pars, cov = pgp.gauss_mode_width_max(hist, bins, var, 
+                                             mode_guess=E_peak, 
+                                             n_bins=n_to_fit, 
+                                             poissonLL=poissonLL, 
+                                             inflate_errors=inflate_errors, 
+                                             gof_method=gof_method)
         pars_list.append(pars)
         cov_list.append(cov)
     return np.array(pars_list), np.array(cov_list)
