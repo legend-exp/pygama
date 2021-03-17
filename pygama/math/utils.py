@@ -6,14 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class SafeDict(dict):
-    """
-    used in handling LEGEND file format strings.
-    when a key is missing, return the string value of that key.
-    """
-    def __missing__(self, key):
-        return '{' + key + '}'
-
 
 def get_dataset_from_cmdline(args, run_db, cal_db):
     """
@@ -35,22 +27,6 @@ def get_dataset_from_cmdline(args, run_db, cal_db):
         ds = DataSet(run=int(args["run"][0]), md=run_db, cal=cal_db, 
                      v=args["verbose"])
     return ds
-
-
-def sh(cmd, sh=False):
-    """
-    input a shell command as you would type it on the command line.
-    """
-    decoders = []
-    for sub in DataTaker.__subclasses__():
-        for subsub in sub.__subclasses__():
-            try:
-                decoder = subsub(object_info) # initialize the decoder
-                decoders.append(decoder)
-            except Exception as e:
-                print(e)
-                pass
-    return decoders
 
 
 def update_progress(progress, run=None):
@@ -233,18 +209,6 @@ def peakdet(v, delta, x=None):
                 find_max = True
 
     return np.array(maxes), np.array(mins)
-
-
-def sh(cmd, sh=False):
-    """
-    input a shell command as you would type it on the command line.
-    """
-    import shlex
-    import subprocess as sp
-    if not sh:
-        sp.call(shlex.split(cmd))  # "safe"
-    else:
-        sp.call(cmd, shell=sh)  # "less safe"
 
 
 def linear_fit_by_sums(x, y, var=1):

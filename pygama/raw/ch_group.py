@@ -1,55 +1,85 @@
-from pygama import lh5
+"""
+ch_group.py: manages channel grouping for raw data conversion
 
-def expand_ch_groups(ch_groups):
+Often input streams contain multiple types of data that need to get written out
+into separate files, or into separate groups within a file. In pygama such data
+flow control is provided via ch_groups. 
+
+ch_groups is a dictionary of named channel groupings, each of which is itself a
+dictionary with the following fields:
+* ch_list (list): a list of channels and channel ranges associated with the
+  group. The channel numbering scheme is specific to the decoder with which the
+  ch_group is associated.
+* out_path (str, optional): the name of the output path to which the ch_group's
+  data should be written. Format: "/path/to/file:/in/file/path"
+* During processing, ch_groups will be given a field 'table' pointing to the
+  lgdo.Table containing the ch_group's data
+
+The key behavior is: all channels in the same group get written to the
+same table, which then gets written to the specified out_path.
+Since each data decoder has its own set of channels, the ch_groups must be
+specified in a ch_group_library, which is a dictionary whose keys are the names
+of data decoders, and whose corresponding values are the ch_groups for the
+specified decoder.
+
+Example json yielding a valid ch_group_library (see expand_ch_groups() for
+documentation on allowed shorthand notations):
+
+{
+"FlashCamEventDecoder" : {
+  "g{ch:0>3d}" : {
+    "ch_list" : [ [24,64] ],
+    "out_path" : "$DATADIR/{file_key}_geds:geds"
+  },
+  "spms" : {
+    "ch_list" : [ [6,23] ],
+    "out_path" : "$DATADIR/{file_key}_spms:spms"
+  },
+  "puls" : {
+    "ch_list" : [ 0 ],
+    "out_path" : "$DATADIR/{file_key}_auxs:auxs"
+  },
+  "muvt" : {
+    "ch_list" : [ 1, 5 ],
+    "out_path" : "$DATADIR/{file_key}_auxs:auxs"
+  }
+}
+"""
+
+import os
+from pygama import lgdo
+
+def expand_ch_groups_library(ch_groups_library, out_path_kwargs):
+    for ch_groups in ch_groups_library.values():
+        expand_ch_groups(ch_groups, out_path_kwargs)
+
+def expand_ch_groups(ch_groups, out_path_kwargs):
     """
-    Expand a ch_group from its json shorthand
+    Expand a ch_group from its shorthands
 
-    ch_groups: a dictionary whose keys are the names of channel groupings,
-        and whose values have the following fields:
-        ch_list (list): a list of channels and channel ranges associated
-            with this group
-        system (str, optional): name of the (sub)system to which this group
-            belongs. Used to set e.g. the name of the output file or group path,
-            etc.
+    Allowed shorthands, in order of exapansion:
+    * ch_list may have entries that are 2-integer lists corresponding to the
+      first and last channels in a continguous range of channels that belong in
+      the group. These simply get replaced with the explicit list of integers in
+      the range.
+    * The ch_group name can include {ch:xxx} format specifiers, indicating that
+      each channel in ch_list should be given its own group with the
+      corresponding name.  The same specifier can appear in out_path to write
+      the channel's data to its own output path.
+    * You may also include variables in your out_path specification that get
+      sent in as kwargs to ch_groups.expand_ch_groups(ch_groups, kwargs). These
+      get evaluated simultaneously with the {ch:xxx} specifiers.
+    * Environment variables can also be used in out_path, they get expanded
+      after kwargs are handled and thus can be used inside the kwargs themselves.
 
-    In json we allow a shorthand where the group name and system name can
-    include a {ch:xxx} format specifier, indicating that each channel in
-    ch_list should be given its own group with the corresponding name. In
-    this function, we expand this formatting to give a list of
-    properly-named groups with the right channel specified in each.
-
-    In json we also allow ch_list to have entries that are 2-integer lists
-    corresponding to the first and last channels in a continguous range of
-    channels that belong in the group. In this function we expand those
-    ranges to give a properly formated list of ints.
-
-    Note: the intent is that channels in the same group get written to the
-    same table, and that groups in the same system get written out to the
-    same file. 
-
-    Note 2: during run time, a ch group's info can be updated with things like
-    the lh5 table to which this channel's data gets written, the name of the
-    output file, etc.
-
-    Example valid json:
-    "FlashCamEventDecoder" : {
-      "g{ch:0>3d}" : {
-        "ch_list" : [ [24,64] ],
-        "system" : "geds"
-      },
-      "spms" : {
-        "ch_list" : [ [6,23] ],
-        "system" : "spms"
-      },
-      "puls" : {
-        "ch_list" : [ 0 ],
-        "system" : "auxs"
-      },
-      "muvt" : {
-        "ch_list" : [ 1, 5 ],
-        "system" : "auxs"
-      }
-    }
+    Parameters
+    ----------
+    ch_groups : dict
+        A ch_groups dictionary (NOT a ch_groups_library). See module docstring
+        for format info. Gets modified in-place
+    out_path_kwargs : dict { str : value }
+        Variable names and values used to substitue into f-string-format
+        specifiers in out_path strings
     """
     # get the original list of keys because we are going to change the keys
     # of ch_groups inside the next list. Note: we have to convert from
@@ -95,6 +125,14 @@ def expand_ch_groups(ch_groups):
                     ch_groups[expanded_group]['system'] = expanded_system
             ch_groups.pop(group)
 
+    # now re-iterate and exand out_paths
+    for group, info in ch_groups.items():
+        if 'out_path' not in group: continue
+        if len(group['ch_list']) == 1: 
+            out_path_kwargs['ch'] = group['ch_list'][0]
+        group['out_path'].format(**out_path_kwargs)
+        group['out_path'] = os.path.expandvars(group['out_path'])
+
 
 
 def get_list_of(key, ch_groups):
@@ -105,9 +143,9 @@ def get_list_of(key, ch_groups):
     ch_groups (dict): a group-name-indexed dict whose values are
         dictionaries of group information (see expand_ch_groups)
 
-    Example: get_list_of('system', ch_groups)
+    Example: get_list_of('out_path', ch_groups)
         If ch_groups is the one specified in the json in the expand_ch_groups
-        example, this will return the list [ 'geds', 'spms', 'auxs' ]
+        example, this will return the list output files
     """
     values = []
     for ch_info in ch_groups.values():
@@ -124,7 +162,7 @@ def build_tables(ch_groups, buffer_size, init_obj=None):
     ----------
     ch_groups : dict
     buffer_size : int
-    init_obj : object with initialize_lh5_table() function
+    init_obj : object with initialize_lgdo_table() function
 
     Returns
     -------
@@ -138,13 +176,13 @@ def build_tables(ch_groups, buffer_size, init_obj=None):
     # set up a table for each group
     for group_name, group_info in ch_groups.items():
 
-        tbl = lh5.Table(buffer_size)
+        tbl = lgdo.Table(buffer_size)
         if init_obj is not None:
             channel = None # for dummy ch_group
             # Note: all ch in ch_list will be written to the same table. So it
             # should suffice to initials for first channel in the list
             if 'ch_list' in group_info: channel = group_info['ch_list'][0]
-            init_obj.initialize_lh5_table(tbl, channel)
+            init_obj.initialize_lgdo_table(tbl, channel)
 
         group_info['table'] = tbl
 
@@ -160,8 +198,10 @@ def build_tables(ch_groups, buffer_size, init_obj=None):
     return ch_to_tbls
 
 
+# can be removed?
+'''
 def set_outputs(ch_groups, out_file_template=None, grp_path_template='{group_name}'):
-    ''' Set up output filenames and/or group paths for the channel group
+    """ Set up output filenames and/or group paths for the channel group
 
     Parameters
     ----------
@@ -178,7 +218,7 @@ def set_outputs(ch_groups, out_file_template=None, grp_path_template='{group_nam
         corresponding group info will be filled in for you.  If a dict, the
         grp_path_template is keyed by the ch_group's name Example:
         grp_path_template='/data/{system}/{group_name}/raw'
-    '''
+    """
     for group_name, group_info in ch_groups.items():
 
         # set the output file name and group path
@@ -199,7 +239,7 @@ def set_outputs(ch_groups, out_file_template=None, grp_path_template='{group_nam
         gpt = grp_path_template
         if isinstance(gpt, dict): gpt = group_path_template[group_name]
         group_info['group_path'] = gpt.format(**format_dict)
-
+'''
 
 
 def create_dummy_ch_group():

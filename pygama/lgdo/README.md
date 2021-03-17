@@ -29,8 +29,7 @@ Detwiler showing basic data browsing methods
 [here](https://indico.legend-exp.org/event/371/contributions/1915/attachments/1167/1696/20200730_PGTProcessing.pdf).
 
 #### lh5 to-do's
-* waveform object definition and compression
-* fix overwrite
+* waveform compression
 * Flecher32 md5sums
 * unit tests
 * tutorial

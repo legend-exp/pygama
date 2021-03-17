@@ -18,7 +18,7 @@ class Array:
     """
 
 
-    def __init__(self, nda=None, shape=None, dtype=None, attrs={}):
+    def __init__(self, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
         """
         Parameters
         ----------
@@ -33,10 +33,18 @@ class Array:
         dtype : numpy dtype (optional)
             Specifies the type of the data in the array. Required if nda is
             None, otherwise unused.
+        fill_val: scalar or None
+            If None, memory is allocated without initialization. Otherwise, the
+            array is allocated with all elements set to the corresponding fill
+            value. If nda is not None, this parameter is ignored
         attrs : dict (optional)
             A set of user attributes to be carried along with this lgdo
         """
-        self.nda = nda if nda is not None else np.empty(shape, dtype=dtype)
+        if nda is None:
+            if fill_val is None: nda = np.empty(shape, dtype=dtype)
+            elif fill_val == 0: nda = np.zeros(shape, dtype=dtype)
+            else: nda = np.fill(shape, fill_val, dtype=dtype)
+        self.nda = nda 
         self.dtype = self.nda.dtype
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
