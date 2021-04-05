@@ -618,7 +618,7 @@ class LH5Store:
             if nda.dtype.name == 'bool': nda = nda.astype(np.uint8)
             # need to create dataset from ndarray the first time for speed
             # creating an empty dataset and appending to that is super slow!
-            if (wo_mode != 'a' && write_start == 0) or name not in group:
+            if (wo_mode != 'a' and write_start == 0) or name not in group:
                 if verbosity > 0 and wo_mode == 'o' and name in group:
                     print(f'write_object: overwriting {name} in {group}')
                 maxshape = list(nda.shape)
