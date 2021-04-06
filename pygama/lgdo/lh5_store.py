@@ -537,7 +537,7 @@ class LH5Store:
             print(f'Unknown wo_mode {wo_mode}')
             return
 
-        mode = 'w' if wo_mode == 'of' else mode = 'a'
+        mode = 'w' if wo_mode == 'of' else 'a'
         lh5_file = self.gimme_file(lh5_file, mode=mode, verbosity=verbosity)
         group = self.gimme_group(group, lh5_file, verbosity=verbosity)
         if wo_mode == 'w' and name in group:
