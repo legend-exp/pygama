@@ -244,7 +244,7 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     Returns
     -------
     (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (maximum, mode) of the gaussian fit
+        pars : 2-tuple with the parameters (mode, maximum) of the gaussian fit
             maximum : the estimated maximum value of the peak
             mode : the estimated x-position of the maximum
         cov : 2x2 matrix of floats
