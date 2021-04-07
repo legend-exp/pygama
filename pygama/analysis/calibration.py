@@ -422,9 +422,9 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
     # input handling
     xx = np.asarray(xx)
     yy = np.asarray(yy)
-    if len(xx) <= len(yy):
-        print(f"poly_match error: len(xx)={len(xx)} <= len(yy)={len(yy)}")
-        return None, 0
+#    if len(xx) <= len(yy):
+#        print(f"poly_match error: len(xx)={len(xx)} <= len(yy)={len(yy)}")
+#        return None, 0
     deg = int(deg)
     if deg < -1:
         print(f"poly_match error: got bad deg = {deg}")
@@ -434,57 +434,99 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         print(f"poly_match error: len(yy) must be at least {req_ylen} for deg={deg}, got {len(yy)}")
         return None, 0
 
-    # build itup: the indices in xx to compare with the values in yy
-    itup = np.array(list(range(len(yy))))
-    best_itup = None
+    maxoverlap = min(len(xx), len(yy))
+
+    # build ixtup: the indices in xx to compare with the values in yy
+    ixtup = np.array(list(range(maxoverlap)))
+    iytup = np.array(list(range(maxoverlap)))
+    best_ixtup = None
+    best_iytup = None
     n_close = 0
     gof = np.inf # lower is better gof
     while True:
-        xx_i = xx[itup]
+        xx_i = xx[ixtup]
+        yy_i = yy[iytup]
         gof_i = np.inf
 
         # simple shift
         if deg == -1:
-            pars_i = np.array([1, (np.sum(yy) - np.sum(xx_i)) / len(yy)])
+            pars_i = np.array([1, (np.sum(yy_i) - np.sum(xx_i)) / len(yy_i)])
             polxx = xx_i + pars_i[1]
+
 
         # simple scaling
         elif deg == 0:
-            pars_i = np.array([np.sum(yy*xx_i) / np.sum(xx_i*xx_i), 0])
+            pars_i = np.array([np.sum(yy_i*xx_i) / np.sum(xx_i*xx_i), 0])
             polxx = pars_i[0] * xx_i
+
 
         # generic poly of degree >= 1
         else:
-            pars_i = np.polyfit(xx_i, yy, deg)
-            polxx = np.zeros(len(yy))
-            xxn = np.ones(len(yy))
+            pars_i = np.polyfit(xx_i, yy_i, deg)
+            polxx = np.zeros(len(yy_i))
+            xxn = np.ones(len(yy_i))
             for j in range(len(pars_i)):
                 polxx += xxn*pars_i[-j-1]
                 xxn *= xx_i
 
         # by here we have the best polxx. Search for matches and store pars_i if
         # its the best so far
-        matches = np.isclose(polxx, yy, rtol=rtol, atol=atol)
+        matches = np.isclose(polxx, yy_i, rtol=rtol, atol=atol)
         n_close_i = np.sum(matches)
         if n_close_i >= n_close_i:
-            gof_i = np.sum(np.power(polxx[matches] - yy[matches], 2))
+            gof_i = np.sum(np.power(polxx[matches] - yy_i[matches], 2))
             if n_close_i > n_close or (n_close_i == n_close and gof_i < gof):
-                i_matches = itup[np.where(matches)]
+                i_matches = ixtup[np.where(matches)]
                 n_close = n_close_i
                 gof = gof_i
                 pars = pars_i
 
-        # increment itup
-        # first find the index of itup that needs to be incremented
+        # increment ixtup
+        # first find the index of ixtup that needs to be incremented
         ii = 0
-        while ii < len(itup)-1:
-            if itup[ii] < itup[ii+1]-1: break
+        while ii < len(ixtup)-1:
+            if ixtup[ii] < ixtup[ii+1]-1: break
             ii += 1
-        # quit if ii is the last index of itup and it's already maxed out
-        if ii == len(itup) - 1 and itup[ii] == len(xx)-1: break
-        # otherwise increment ii and reset indices < ii
-        itup[ii] += 1
-        itup[0:ii] = list(range(ii))
+
+        # quit if ii is the last index of ixtup and it's already maxed out
+        if not( ii == len(ixtup) - 1 and ixtup[ii] == len(xx)-1 ):
+
+            # otherwise increment ii and reset indices < ii
+            ixtup[ii] += 1
+            ixtup[0:ii] = list(range(ii))
+            continue
+
+        # increment iytup
+        # first find the index of iytup that needs to be incremented
+        ii = 0
+        while ii < len(iytup)-1:
+            if iytup[ii] < iytup[ii+1]-1: break
+            ii += 1
+
+        # quit if ii is the last index of iytup and it's already maxed out
+        if not( ii == len(iytup) - 1 and iytup[ii] == len(yy)-1 ):
+
+            # otherwise increment ii and reset indices < ii
+            iytup[ii] += 1
+            iytup[0:ii] = list(range(ii))
+            ixtup = np.array(list(range(len(iytup)))) #(reset ix)
+            continue
+
+        if n_close == len(iytup): #found best
+            break
+
+        #reduce overlap
+        new_len = len(iytup) - 1
+        if new_len < req_ylen:
+            break
+        ixtup = np.array(list(range(new_len)))
+        iytup = np.array(list(range(new_len)))
+
+        best_ixtup = None
+        best_iytup = None
+        n_close = 0
+        gof = np.inf
+
 
     return pars, i_matches
 
