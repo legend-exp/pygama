@@ -65,17 +65,59 @@ def fit_hist(func, hist, bins, var=None, guess=None,
     return coeff, cov_matrix
 
 
-def goodness_of_fit(hist, bins, func, p_fit):
+def goodness_of_fit(hist, bins, var, func, pars, method='var'):
+    """ Compute chisq and dof of fit
+
+    Parameters
+    ----------
+    hist, bins, var : array, array, array or None
+        histogram data. var can be None if hist is integer counts
+    func : function
+        the function that was fit to the hist
+    pars : array
+        the best-fit pars of func. Assumes all pars are free parameters
+    method : str
+        Sets the choice of "denominator" in the chi2 sum
+        'var': user passes in the variances in var (must not have zeros)
+        'Pearson': use func (hist must contain integer counts)
+        'Neyman': use hist (hist must contain integer counts and no zeros)
+
+    Returns
+    -------
+    chisq : float
+        the summed up value of chisquared
+    dof : int
+        the number of degrees of freedom
     """
-    compute reduced chisq and fwhm_err for 
-    """
-    chisq = []
-    for i, h in enumerate(hist):
-        model = func(bins[i], *p_fit)
-        diff = (model - h)**2 / model
-        chisq.append(abs(diff))
-    rchisq = sum(np.array(chisq) / len(hist))
-    return rchisq
+    # arg checks
+    if method == 'var':
+        if var is None:
+            print("goodness_of_fit: var must be non-None to use method 'var'")
+            return 0, 0
+        if np.any(var==0):
+            print("goodness_of_fit: var cannot contain zeros")
+            return 0, 0
+    if method == 'Neyman' and np.any(hist==0):
+        print("goodness_of_fit: hist cannot contain zeros for Neyman method")
+        return 0, 0
+
+    # compute chi2 numerator and denominator
+    yy = func(ph.get_bin_centers(bins), *pars)
+    numerator = (hist - yy)**2
+    if method == 'var':
+        denominator = var
+    elif method == 'Pearson':
+        denominator = yy
+    elif method == 'Neyman':
+        denominator = hist
+    else:
+        print(f"goodness_of_fit: unknown method {method}")
+        return 0, 0
+
+    # compute chi2 and dof 
+    chisq = np.sum(numerator/denominator)
+    dof = len(hist) - len(pars)
+    return chisq, dof
 
 
 def neg_log_like(params, f_likelihood, data, **kwargs):
@@ -147,7 +189,7 @@ def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
         ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
     """
     mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
-    
+
     # func and/or integral should never give a negative value: let negative
     # values cause errors that get passed to the user. However, mu=0 is okay,
     # but causes problems for np.log(). When mu is zero there had better not be
@@ -166,8 +208,10 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 
-def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
-    """ Get the max, mode, and width of a peak based on gauss fit near the max
+def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, 
+                         poissonLL=False, inflate_errors=False, gof_method='var'):
+    """
+    Get the max, mode, and width of a peak based on gauss fit near the max
 
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
     maximum of the hist (or the max near mode_guess, if provided). This is
@@ -196,9 +240,16 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poisso
         An x-value (not a bin index!) near which a peak is expected. The
         algorithm fits around the maximum within +/- n_bins of the guess. If not
         provided, the center of the max bin of the histogram is used.
-    n_bins : int
+    n_bins : int (optional)
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
+    poissonLL : bool (optional)
+        Flag passed to fit_hist()
+    inflate_errors : bool (optional)
+        If true, the parameter uncertainties are inflated by sqrt(chi2red)
+        if it is greater than 1
+    gof_method : str (optional)
+        method flag for goodness_of_fit
 
     Returns
     -------
@@ -219,7 +270,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poisso
     bin_centers = ph.get_bin_centers(bins)
     if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
     else:
-        i_0 = np.argmax(hist) 
+        i_0 = np.argmax(hist)
         mode_guess = bin_centers[i_0]
     amp_guess = hist[i_0]
     i_0 -= int(np.floor(n_bins/2))
@@ -230,11 +281,14 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, poisso
     pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, poissonLL=poissonLL)
     if pars[1] < 0: pars[1] = -pars[1]
+    if inflate_errors:
+        chi2, dof = goodness_of_fit(hist, bins, var, gauss_basic, pars)
+        if chi2 > dof: cov *= chi2/dof
     return pars, cov
 
 
-def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
-    """ Alias for gauss_mode_width_max that just returns the max and mode 
+def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
+    """ Alias for gauss_mode_width_max that just returns the max and mode
 
     Parameters
     --------
@@ -243,9 +297,9 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     Returns
     -------
     (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (maximum, mode) of the gaussian fit     
-            maximum : the estimated maximum value of the peak
+        pars : 2-tuple with the parameters (mode, max) of the gaussian fit
             mode : the estimated x-position of the maximum
+            max : the estimated maximum value of the peak
         cov : 2x2 matrix of floats
             The covariance matrix for the 2 parameters in pars
 
@@ -287,9 +341,12 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
 
     Returns
     -------
-    (maximum, mode) : tuple (float, float)
-        maximum : the estimated maximum value of the peak
-        mode : the estimated x-position of the maximum
+    (pars, cov) : tuple (array, matrix)
+        pars : 2-tuple with the parameters (mode, max) of the fit
+            mode : the estimated x-position of the maximum
+            maximum : the estimated maximum value of the peak
+        cov : 2x2 matrix of floats
+            The covariance matrix for the 2 parameters in pars
 
     Examples
     --------
@@ -301,7 +358,7 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     """
 
     if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
-    else: i_0 = np.argmax(hist) 
+    else: i_0 = np.argmax(hist)
     i_0 -= int(np.floor(n_bins/2))
     i_n = i_0 + n_bins
     wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
@@ -359,13 +416,13 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     David Radford's HPGe peak shape function
     """
     # make sure the fractional amplitude parameters stay reasonable
-    if htail < 0 or htail > 1: 
+    if htail < 0 or htail > 1:
         return np.zeros_like(x)
-    if hstep < 0 or hstep > 1: 
+    if hstep < 0 or hstep > 1:
         return np.zeros_like(x)
 
     bg_term = bg0  #+ x*bg1
-    if np.any(bg_term < 0): 
+    if np.any(bg_term < 0):
         return np.zeros_like(x)
 
     # compute the step and the low energy tail
@@ -420,7 +477,7 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
     """
     I guess this should be similar to radford_peak (peak + tail + step)
     This is how I used it in root peak fitting scripts
-    """ 
+    """
     peak_f = gauss(x, mu, sigma, a)
     tail_f = gauss_tail(x, mu, sigma, tail, tau)
     step_f = step(x, mu, sigma, bkg, s)
@@ -436,8 +493,9 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
 def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
               components=False) :
     """
-    A Fit function exclusevly for a 241Am 99keV and 103keV lines situation 
-    Consists of 
+    A Fit function exclusevly for a 241Am 99keV and 103keV lines situation
+    Consists of
+
      - three gaussian peaks (two lines + one bkg line in between)
      - two steps (for the two lines)
      - two tails (for the two lines)
@@ -445,25 +503,26 @@ def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
 
     step1 = step(x,mu1,sigma1,b1,s1)
     step2 = step(x,mu2,sigma2,b2,s2)
-  
+
     gaus1 = gauss(x,mu1,sigma1,a1)
     gaus2 = gauss(x,mu2,sigma2,a2)
     gaus3 = gauss(x,mu3,sigma3,a3)
 
     #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
     #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
-    double_f = step1 + step2 + gaus1 + gaus2 + gaus3# + tail1 + tail2  
+    double_f = step1 + step2 + gaus1 + gaus2 + gaus3# + tail1 + tail2
 
     if components:
-       return double_f, gaus1, gaus2, gaus3, step1, step2#, tail1, tail2 
+       return double_f, gaus1, gaus2, gaus3, step1, step2#, tail1, tail2
     else:
        return double_f
 
 
 def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
     """
-    A Fit function exclusevly for a 133Ba 81keV peak situation 
-    Consists of 
+    A Fit function exclusevly for a 133Ba 81keV peak situation
+    Consists of
+
      - two gaussian peaks (two lines)
      - one step
      """
@@ -477,10 +536,10 @@ def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
 
     #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
     #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
-    double_f = step1 +  gaus1 + gaus2  
+    double_f = step1 +  gaus1 + gaus2
 
     if components:
-       return double_f, gaus1, gaus2, step1  
+       return double_f, gaus1, gaus2, step1
     else:
        return double_f
 
@@ -498,3 +557,15 @@ def cal_slope(x, m1, m2):
     """
     return np.sqrt(m1 +(m2/(x**2)))
 
+
+def poly(x, pars):
+    """
+    A polynomial function with pars following the polyfit convention
+    """
+    result = x*0 # do x*0 to keep shape of x (scalar or array)
+    if len(pars) == 0: return result
+    result += pars[-1]
+    for i in range(1, len(pars)):
+        result += pars[-i-1]*x
+        x = x*x
+    return result

@@ -244,3 +244,29 @@ def linear_fit_by_sums(x, y, var=1):
     return m, b
 
 
+def fit_simple_scaling(x, y, var=1):
+    """
+    Fast computation of weighted linear least squares fit to a simple scaling
+
+    I.e. y = scale * x. Returns the best fit scale parameter and its variance.
+
+    Parameters
+    ----------
+    x : array like
+        x values for the fit
+    y : array like
+        y values for the fit
+    var : array like (optional)
+        The variances for each y-value
+
+    Returns
+    -------
+    scale, scale_var: tuple (float, float)
+        The scale parameter and its variance
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+    scale_var = 1/np.sum(x*x/var)
+    scale = np.sum(y*x/var) * scale_var
+    return scale, scale_var
+

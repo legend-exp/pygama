@@ -32,7 +32,6 @@ def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None
     verbose : bool (optional)
     overwrite : bool (optional)
     buffer_size : int (optional)
-
     
     Config options for build_raw:
         buffer_size (int): default length to use for tables
@@ -42,7 +41,7 @@ def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None
     # convert any environment variables
     in_filename = os.path.expandvars(in_filename)
     raw_file_pattern = os.path.expandvars(raw_file_pattern)
-    
+
     # if we're not given a raw filename, make a simple one with subrun number
     if raw_file_pattern is None:
         if subrun is None:
@@ -59,15 +58,15 @@ def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None
         raw_files = {sysn: raw_file_pattern.replace('{sysn}', sysn) for sysn in systems}
     else:
         raw_files = {'default': raw_file_pattern}
-        
+
     # clear existing output files
     if overwrite:
         for sysn, file in raw_files.items():
             if os.path.isfile(file):
                 if verbose:
-                    print('Overwriting existing file :', file)
+                    print('Overwriting existing file:', file)
                 os.remove(file)
-    
+
     # if verbose:
     print('Starting build_raw processing.'
           f'\n  Buffer size: {buffer_size}'
@@ -75,7 +74,7 @@ def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None
           f'\n  Cycle (subrun) num: {subrun}'
           f'\n  Input: {in_filename}\n  Output:')
     pprint(raw_files)
-    
+
     t_start = time.time()
     bytes_processed = None
 
@@ -111,5 +110,5 @@ def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None
     else:
         print('Total converted: {}'.format(sizeof_fmt(bytes_processed)))
         print('Conversion speed: {}ps'.format(sizeof_fmt(bytes_processed/elapsed)))
-    
+
     print('Done.\n')
