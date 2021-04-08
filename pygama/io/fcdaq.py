@@ -80,22 +80,22 @@ class FlashCamEventDecoder(DataDecoder):
               'dtype': 'int32',
             },
             'dr_start_pps': { # start pps of the next dead window
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             'dr_start_ticks': { # start ticks of the next dead window
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             'dr_stop_pps': { # stop pps of the next dead window
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             'dr_stop_ticks': { # stop ticks of the next dead window
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             'dr_maxticks': { # maxticks of the dead window
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             'deadtime': { # current dead time calculated from deadregion (dr) fields. Give the total dead time if summed up.
-              'dtype': 'float32',
+              'dtype': 'float64',
             },
             'wf_max': { # ultra-simple np.max energy estimation
               'dtype': 'uint16',
