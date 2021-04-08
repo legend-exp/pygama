@@ -189,7 +189,7 @@ def neg_poisson_log_like(pars, func, hist, bins, integral=None, **kwargs):
         ln[ f(x)^n / n! exp(-f(x) ] = const + n ln(f(x)) - f(x)
     """
     mu = get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
-    
+
     # func and/or integral should never give a negative value: let negative
     # values cause errors that get passed to the user. However, mu=0 is okay,
     # but causes problems for np.log(). When mu is zero there had better not be
@@ -210,7 +210,8 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
 
 def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, 
                          poissonLL=False, inflate_errors=False, gof_method='var'):
-    """ Get the mode, width, and max of a peak based on a gauss fit near the max
+    """
+    Get the max, mode, and width of a peak based on gauss fit near the max
 
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
     maximum of the hist (or the max near mode_guess, if provided). This is
@@ -269,7 +270,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     bin_centers = ph.get_bin_centers(bins)
     if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
     else:
-        i_0 = np.argmax(hist) 
+        i_0 = np.argmax(hist)
         mode_guess = bin_centers[i_0]
     amp_guess = hist[i_0]
     i_0 -= int(np.floor(n_bins/2))
@@ -287,7 +288,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 
 
 def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
-    """ Alias for gauss_mode_width_max that just returns the max and mode 
+    """ Alias for gauss_mode_width_max that just returns the max and mode
 
     Parameters
     --------
@@ -357,7 +358,7 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     """
 
     if mode_guess is not None: i_0 = ph.find_bin(mode_guess, bins)
-    else: i_0 = np.argmax(hist) 
+    else: i_0 = np.argmax(hist)
     i_0 -= int(np.floor(n_bins/2))
     i_n = i_0 + n_bins
     wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
@@ -415,13 +416,13 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     David Radford's HPGe peak shape function
     """
     # make sure the fractional amplitude parameters stay reasonable
-    if htail < 0 or htail > 1: 
+    if htail < 0 or htail > 1:
         return np.zeros_like(x)
-    if hstep < 0 or hstep > 1: 
+    if hstep < 0 or hstep > 1:
         return np.zeros_like(x)
 
     bg_term = bg0  #+ x*bg1
-    if np.any(bg_term < 0): 
+    if np.any(bg_term < 0):
         return np.zeros_like(x)
 
     # compute the step and the low energy tail
@@ -476,7 +477,7 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
     """
     I guess this should be similar to radford_peak (peak + tail + step)
     This is how I used it in root peak fitting scripts
-    """ 
+    """
     peak_f = gauss(x, mu, sigma, a)
     tail_f = gauss_tail(x, mu, sigma, tail, tau)
     step_f = step(x, mu, sigma, bkg, s)
@@ -492,8 +493,9 @@ def gauss_cdf(x, a, mu, sigma, tail, tau, bkg, s, components=False):
 def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
               components=False) :
     """
-    A Fit function exclusevly for a 241Am 99keV and 103keV lines situation 
-    Consists of 
+    A Fit function exclusevly for a 241Am 99keV and 103keV lines situation
+    Consists of
+
      - three gaussian peaks (two lines + one bkg line in between)
      - two steps (for the two lines)
      - two tails (for the two lines)
@@ -501,25 +503,26 @@ def Am_double(x,a1,mu1,sigma1,a2,mu2,sigma2,a3,mu3,sigma3,b1,b2,s1,s2,
 
     step1 = step(x,mu1,sigma1,b1,s1)
     step2 = step(x,mu2,sigma2,b2,s2)
-  
+
     gaus1 = gauss(x,mu1,sigma1,a1)
     gaus2 = gauss(x,mu2,sigma2,a2)
     gaus3 = gauss(x,mu3,sigma3,a3)
 
     #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
     #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
-    double_f = step1 + step2 + gaus1 + gaus2 + gaus3# + tail1 + tail2  
+    double_f = step1 + step2 + gaus1 + gaus2 + gaus3# + tail1 + tail2
 
     if components:
-       return double_f, gaus1, gaus2, gaus3, step1, step2#, tail1, tail2 
+       return double_f, gaus1, gaus2, gaus3, step1, step2#, tail1, tail2
     else:
        return double_f
 
 
 def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
     """
-    A Fit function exclusevly for a 133Ba 81keV peak situation 
-    Consists of 
+    A Fit function exclusevly for a 133Ba 81keV peak situation
+    Consists of
+
      - two gaussian peaks (two lines)
      - one step
      """
@@ -533,10 +536,10 @@ def double_gauss(x,a1,mu1,sigma1,a2,mu2,sigma2,b1,s1,components=False) :
 
     #tail1 = gauss_tail(x,mu1,sigma1,t1,tau1)
     #tail2 = gauss_tail(x,mu2,sigma2,t2,tau2)
-    double_f = step1 +  gaus1 + gaus2  
+    double_f = step1 +  gaus1 + gaus2
 
     if components:
-       return double_f, gaus1, gaus2, step1  
+       return double_f, gaus1, gaus2, step1
     else:
        return double_f
 
