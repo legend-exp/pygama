@@ -23,7 +23,8 @@ class DataDecoder(ABC):
     DataDecoder in anticipation of future functionality
 
     Subclasses should define a method for decoding data to a buffer like
-    decode_packet(packet, data_buffer, packet_id, verbose=False)
+    decode_packet(packet, data_buffer, packet_id, verbosity=0)
+    that returns the number of bytes read
 
     Garbage collection writes binary data as an array of uint32s to a
     variable-length array in the output file. If a problematic packet is found,
