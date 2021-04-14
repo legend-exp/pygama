@@ -19,7 +19,7 @@ import pygama.git as git
 from pygama.dsp.build_processing_chain import *
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
-               outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200, 
+               outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200,
                block_width=16, verbose=1):
     """
     Uses the ProcessingChain class.
@@ -30,7 +30,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     if isinstance(dsp_config, str):
         with open(dsp_config, 'r') as config_file:
             dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
-    
+
     if not isinstance(dsp_config, dict):
         raise Exception('Error, dsp_config must be an dict')
 
@@ -53,7 +53,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 if "raw" in tbname:
                     tb = tb +'/'+ tbname # g024 + /raw
             lh5_tables.append(tb)
-    
+
     # make sure every group points to waveforms, if not, remove the group
     for tb in lh5_tables:
         if 'raw' not in tb:
@@ -71,14 +71,14 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     if database and not isinstance(database, dict):
         database = None
         print('database is not a valid json file or dict. Using default db values.')
-    
-    # delete the old file. TODO: ONCE BUGS ARE FIXED IN LH5 MODULE, DO THIS ONLY IF OVERWRITE IS TRUE!
-    try:
-        os.remove(f_dsp)
-        print("Deleted", f_dsp)
-    except:
-        pass
-    
+
+    # clear existing output files
+    if overwrite:
+        if os.path.isfile(f_dsp):
+            if verbose:
+                print('Overwriting existing file:', f_dsp)
+            os.remove(f_dsp)
+
     for tb in lh5_tables:
         # load primary table and build processing chain and output table
         tot_n_rows = raw_store.read_n_rows(tb, f_raw)
@@ -88,7 +88,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         db_dict = database.get(chan_name) if database else None
         lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, start_row=0, n_rows=buffer_len)
         pc, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
-        
+
         print(f'Processing table: {tb} ...')
         for start_row in range(0, tot_n_rows, buffer_len):
             if verbose > 0:
@@ -97,7 +97,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
             n_rows = min(tot_n_rows-start_row, n_rows)
             pc.execute(0, n_rows)
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
-            
+
         if verbose > 0:
             update_progress(1)
         print(f'Done.  Writing to file {f_dsp}')
@@ -125,18 +125,18 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(description=
 """Process a single tier 1 LH5 file and produce a tier 2 LH5 file using a
 json config file and raw_to_dsp.""")
-    
+
     arg = parser.add_argument
     arg('file', help="Input (tier 1) LH5 file.")
     arg('-o', '--output',
         help="Name of output file. By default, output to ./t2_[input file name].")
-    
+
     arg('-v', '--verbose', default=1, type=int,
         help="Verbosity level: 0=silent, 1=basic warnings, 2=verbose output, 3=debug. Default is 2.")
-    
+
     arg('-b', '--block', default=16, type=int,
         help="Number of waveforms to process simultaneously. Default is 8")
-    
+
     arg('-c', '--chunk', default=3200, type=int,
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
     arg('-n', '--nevents', default=None, type=int,

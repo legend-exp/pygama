@@ -15,6 +15,7 @@ class DataGroup:
     """
     A class to create an in-memory or on-disk set of files, according to the
     LEGEND data convention.  Typically requires a JSON config file with:
+
       - path to DAQ and LH5 directories
       - format strings for daq/lh5 files
       - partitions for the LH5 data directory
@@ -205,6 +206,7 @@ class DataGroup:
         default: save the unique_key and the relative path to the DAQ file,
         as a CSV file.  this will probably change in the future, but at least
         this way we can:
+
           - easily get a list of available DAQ files
           - regenerate the DataFrame from scan_daq_dir by parsing format string
         """

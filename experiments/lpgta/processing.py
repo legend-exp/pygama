@@ -31,8 +31,8 @@ def main():
 
     # declare datagroup
     arg('--dg', action=st, help='load datagroup')
-    arg('--q', type=str, help='datagroup query')
-    arg('--date', type=str, help='date query')
+    arg('--q', type=str, help='datagroup query (AND-ed with the date query)')
+    arg('--date', type=str, help='date query (AND-ed with the datagroup query)')
 
     # routines
     arg('--d2r', action=st, help='run daq_to_raw')
@@ -47,6 +47,10 @@ def main():
     arg('-c', '--cwd', action=st, help="save output to current directory")
     args = par.parse_args()
 
+    # print out the arguments for log files
+    if args.verbose:
+        print('Arguments:', args)
+
     # -- set options --
     nwfs = args.nwfs if args.nwfs is not None else np.inf
 
@@ -58,7 +62,9 @@ def main():
 
     # -- run routines --
     query = "YYYYmmdd == '" + args.date + "'" if args.date else args.q
-    if args.dg: dg = load_datagroup(query)
+    if args.date and args.q:
+        query += ' and ' + args.q
+    if args.dg or args.d2r or args.r2d: dg = load_datagroup(query)
     if args.d2r: d2r(dg, args.over, nwfs, args.verbose, args.cwd)
     if args.r2d: r2d(dg, args.over, nwfs, args.verbose, args.cwd, args.bl, args.bw)
 
