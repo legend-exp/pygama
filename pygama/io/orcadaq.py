@@ -1,9 +1,11 @@
-import sys
+import sys, gzip
 import numpy as np
 import plistlib
 from ..utils import update_progress
 from .io_base import DataDecoder
-from . import lh5
+from pygama import lh5
+from .ch_group import *
+
 
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
@@ -23,22 +25,21 @@ class OrcaDecoder(DataDecoder):
         self.set_object_info(object_info)
 
     def set_header_dict(self, header_dict):
-        """Overload to e.g. update decoded_values based on object_info.
-
-        Otherwise just use header_dict and object_info as you need it
-        """
         self.header_dict = header_dict
-        self.object_info = get_object_info(header_dict, self.orca_class_name)
+        self.set_object_info(get_object_info(header_dict, self.orca_class_name))
 
     def set_object_info(self, object_info):
+        """Overload to e.g. update decoded_values based on object_info."""
         self.object_info = object_info
 
-# NOTE: this import has to be after OrcaDecoder is defined.
-# TODO: organize these classes better
-from .orca_digitizers import *
+
+def open_orca(orca_filename):
+    if orca_filename.endswith('.gz'): 
+        return gzip.open(orca_filename.encode('utf-8'), 'rb')
+    else: return open(orca_filename.encode('utf-8'), 'rb')
 
 
-def parse_header(xmlfile):
+def parse_header(orca_filename):
     """
     Opens the given file for binary read ('rb'), then grabs the first 8 bytes
     The first 4 bytes (1 long) of an orca data file are the total length in
@@ -46,7 +47,7 @@ def parse_header(xmlfile):
     The next 4 bytes (1 long) is the length of the header in bytes
     The header is then read in ...
     """
-    with open(xmlfile, 'rb') as xmlfile_handle:
+    with open_orca(orca_filename) as xmlfile_handle:
         #read the first word:
         ba = bytearray(xmlfile_handle.read(8))
 
@@ -59,17 +60,23 @@ def parse_header(xmlfile):
         big_endian = False if sys.byteorder == "little" else True
         i = from_bytes(ba[:4], big_endian=big_endian)
         j = from_bytes(ba[4:], big_endian=big_endian)
+        if (np.ceil(j/4) != i-2) and (np.ceil(j/4) != i-3):
+            print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
+            return i, j, {}
 
         #read in the next that-many bytes that occupy the plist header
-        ba = bytearray(xmlfile_handle.read(j))
+        as_bytes = xmlfile_handle.read(j)
+        ba = bytearray(as_bytes)
 
         #convert to string
         #the readPlistFromBytes method doesn't exist in 2.7
         if sys.version_info[0] < 3:
             header_string = ba.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
-        else:
+        elif sys.version_info[1] < 9:
             header_dict = plistlib.readPlistFromBytes(ba)
+        else:
+            header_dict = plistlib.loads(as_bytes, fmt=plistlib.FMT_XML)
         return i, j, header_dict
 
 
@@ -150,8 +157,8 @@ def get_id_to_decoder_name_dict(header_dict):
 
 def get_object_info(header_dict, orca_class_name):
     """
-    returns a dict keyed by data id with all info from the header
-    TODO: doesn't include all parts of the header yet!
+    returns a list with all info from the header for each card with name
+    orca_class_name.
     """
     object_info_list = []
 
@@ -213,7 +220,7 @@ def get_next_packet(f_in):
 
 
 def get_ccc(crate, card, channel):
-    return (crate << 9) + ((card & 0xf) << 4) + (channel & 0xf)
+    return (crate << 9) + ((card & 0x1f) << 4) + (channel & 0xf)
 
 
 def get_crate(ccc):
@@ -228,19 +235,25 @@ def get_channel(ccc):
     return ccc & 0xf
 
 
-def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, run=None, buffer_size=1024):
+# Import orca_digitizers so that the list of OrcaDecoder.__subclasses__ gets populated
+# Do it here so that orca_digitizers can import the functions above here
+from . import orca_digitizers
+
+def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """
     convert ORCA DAQ data to "raw" lh5
+
+    ch_groups_dict: keyed by decoder_name
     """
     lh5_store = lh5.Store()
 
-    f_in = open(daq_filename.encode('utf-8'), "rb")
+    f_in = open_orca(daq_filename)
     if f_in == None:
         print("Couldn't find the file %s" % daq_filename)
         sys.exit(0)
 
     # parse the header. save the length so we can jump past it later
-    reclen, reclen2, header_dict = parse_header(daq_filename)
+    reclen, header_nbytes, header_dict = parse_header(daq_filename)
 
     # figure out the total size
     SEEK_END = 2
@@ -249,44 +262,80 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
     print("Total file size: {:.3f} MB".format(file_size_MB))
+    print("Run number:", get_run_number(header_dict))
 
-    if run is not None:
-        run = get_run_number(header_dict)
-    print("Run number:", run)
 
-    # figure out which decoders we can use and build a dictionary from
-    # dataID to decoder
+    # Build the dict used in the inner loop for passing data packets to decoders
     decoders = {}
+
+    # First build a list of all decoder names that might be in the data
+    # This is a dict of names keyed off of data_id
     id2dn_dict = get_id_to_decoder_name_dict(header_dict)
     if verbose:
         print("Data IDs present in ORCA file header are:")
         for data_id in id2dn_dict:
             print(f"    {data_id}: {id2dn_dict[data_id]}")
+
+    # Invert the previous list, to get a list of decoder ids keyed off of
+    # decoder names
     dn2id_dict = {name:data_id for data_id, name in id2dn_dict.items()}
+
+    # By default we decode all data for which we have decoders. If the user
+    # provides a ch_group_dict, we will only decode data from decoders keyed in
+    # the dict. 
+    decode_all_data = True
+    decoders_to_run = dn2id_dict.keys()
+    if ch_groups_dict is not None: 
+        decode_all_data = False
+        decoders_to_run = ch_groups_dict.keys()
+
+    # Now get the actual requested decoders
     for sub in OrcaDecoder.__subclasses__():
         decoder = sub() # instantiate the class
-        if decoder.decoder_name in dn2id_dict:
-            # Later: allow to turn on / off decoders in exp.json
-            if decoder.decoder_name != 'ORSIS3302DecoderForEnergy': continue
+        if decoder.decoder_name in decoders_to_run:
             decoder.dataID = dn2id_dict[decoder.decoder_name]
-            decoder.set_object_info(get_object_info(header_dict, decoder.orca_class_name))
+            decoder.set_header_dict(header_dict)
             decoders[decoder.dataID] = decoder
+    if len(decoders) == 0:
+        print("No decoders. Exiting...")
+        sys.exit(1)
     if verbose:
         print("pygama will run these decoders:")
         for data_id, dec in decoders.items():
             print("   ", dec.decoder_name+ ", id =", data_id)
 
-    # Set up dataframe buffers -- for now, one for each decoder
-    # Later: control in intercom
-    tbs = {}
-    for data_id, dec in decoders.items():
-        tbs[data_id] = lh5.Table(buffer_size)
-        dec.initialize_lh5_table(tbs[data_id])
+    # Now cull the decoders_to_run list
+    new_dtr = []
+    for decoder_name in decoders_to_run:
+        data_id = dn2id_dict[decoder_name]
+        if data_id not in decoders.keys():
+            print("warning: no decoder exists for", decoder_name, "... will skip its data.")
+        else: new_dtr.append(decoder_name)
+    decoders_to_run = new_dtr
+    
+    # prepare ch groups
+    if ch_groups_dict is None:
+        ch_groups_dict = {}
+        for decoder_name in decoders_to_run:
+            ch_groups = create_dummy_ch_group()
+            ch_groups_dict[decoder_name] = ch_groups
+            grp_path_template = f'{decoder_name}/raw'
+            set_outputs(ch_groups, out_file_template=raw_file_pattern, grp_path_template=grp_path_template)
+    else:
+        for decoder_name, ch_groups in ch_groups_dict.items():
+            expand_ch_groups(ch_groups)
+            set_outputs(ch_groups, out_file_template=raw_file_pattern, grp_path_template='{system}/{group_name}/raw')
 
+    # Set up tables for data
+    ch_tables_dict = {}
+    for data_id, dec in decoders.items():
+        decoder_name = id2dn_dict[data_id]
+        ch_groups = ch_groups_dict[decoder_name]
+        ch_tables_dict[data_id] = build_tables(ch_groups, buffer_size, dec)
+    max_tbl_size = 0
+    
     # -- scan over raw data --
     print("Beginning daq-to-raw processing ...")
-
-
 
     packet_id = 0  # number of events decoded
     unrecognized_data_ids = []
@@ -310,32 +359,47 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
             print("Failed to get the next event ... Exception:", e)
             break
 
-        if data_id not in decoders:
+        if decode_all_data and data_id not in decoders:
             if data_id not in unrecognized_data_ids:
                 unrecognized_data_ids.append(data_id)
             continue
 
-        if data_id in tbs.keys():
-            tb = tbs[data_id]
-            tb_grpname = f'{id2dn_dict[data_id]}/raw'
-            decoder.decode_packet(packet, tb, packet_id, header_dict)
-            # write to the output file when a buffer gets full
-            if tb.is_full():
-                lh5_store.write_object(tb, tb_grpname, raw_filename,
-                                        n_rows=tb.size)
-                tb.clear()
+        if data_id not in decoders: continue
+        decoder = decoders[data_id]
+        
+        # Clear the tables if the next read could overflow them.
+        # Only have to check this when the max table size is within
+        # max_n_rows_per_packet of being full.
+        if max_tbl_size + decoder.max_n_rows_per_packet() >= buffer_size:
+            ch_groups = ch_groups_dict[id2dn_dict[data_id]]
+            max_tbl_size = 0
+            for group_info in ch_groups.values():
+                tbl = group_info['table']
+                if tbl.is_full(): 
+                    group_path = group_info['group_path']
+                    out_file = group_info['out_file']
+                    lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+                    tbl.clear()
+                if tbl.loc > max_tbl_size: max_tbl_size = tbl.loc
+        else: max_tbl_size += decoder.max_n_rows_per_packet()
+
+        tables = ch_tables_dict[data_id]
+        decoder.decode_packet(packet, tables, packet_id, header_dict)
+
 
     print("Done. Last packet ID:", packet_id)
     f_in.close()
 
     # final write to file
-    for data_id in tbs.keys():
-        tb = tbs[data_id]
-        tb_grpname = f'{id2dn_dict[data_id]}/raw'
-        if tb.loc == 0: continue
-        lh5_store.write_object(tb, tb_grpname, raw_filename,
-                                n_rows=tb.loc)
-        tb.clear()
+    for dec_name, ch_groups in ch_groups_dict.items():
+        for group_info in ch_groups.values():
+            tbl = group_info['table']
+            if tbl.loc == 0: continue
+            group_path = group_info['group_path']
+            out_file = group_info['out_file']
+            lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+            print('last write')
+            tbl.clear()
 
     if verbose:
         update_progress(1)
@@ -346,4 +410,5 @@ def process_orca(daq_filename, raw_filename, n_max, decoders, config, verbose, r
             print("  {}: {}".format(data_id, id2dn_dict[data_id]))
         print("hopefully they weren't important!\n")
 
-    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_filename))
+    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
+

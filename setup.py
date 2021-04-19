@@ -28,7 +28,7 @@ class CMakeBuild(build_ext):
         import git
         repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
         repo.git.submodule('update', '--init', '--recursive')
-        
+
         try:
             out = subprocess.check_output(['cmake', '--version'])
         except OSError:
@@ -41,7 +41,7 @@ class CMakeBuild(build_ext):
                                          out.decode()).group(1))
             if cmake_version < '3.1.0':
                 raise RuntimeError("CMake >= 3.1.0 is required on Windows")
-            
+
         for ext in self.extensions:
             self.build_extension(ext)
 
@@ -79,34 +79,64 @@ class CMakeBuild(build_ext):
 
 def make_git_file():
     print("Creating pygama/git.py")
+    try:
+        import git
+        repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
+        with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
+            f.write("branch = '" + repo.git.describe('--all') + "'\n")
+            f.write("revision = '" + repo.head.commit.hexsha +"'\n")
+            f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+    except Exception as ex:
+        print(ex)
+        print('continuing...')
+
+#Add a git hook to clean jupyter notebooks before commiting
+def clean_jupyter_notebooks():
     import git
     repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))
-    with open(repo.working_tree_dir + '/pygama/git.py', 'w') as f:
-        f.write("branch = '" + str(repo.active_branch) + "'\n")
-        f.write("revision = '" + repo.head.commit.hexsha +"'\n")
-        f.write("commit_date = '" + str(repo.head.commit.committed_datetime) + "'\n")
+    with repo.config_writer('repository') as config:
+        try:
+            import nbconvert
+            if nbconvert.__version__[0] < '6': #clear output
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True" """
+            else: # also clear metadata
+                fil=""" "jupyter nbconvert --stdin --stdout --log-level=ERROR\\
+                --to notebook --ClearOutputPreprocessor.enabled=True\\
+                --ClearMetadataPreprocessor.enabled=True" """
+        except:
+            # if nbconvert (part of jupyter) is not installed, disable filter
+            fil = "cat"
+
+        config.set_value('filter "jupyter_clear_output"', 'clean', fil)
+        config.set_value('filter "jupyter_clear_output"', 'smudge', 'cat')
+        config.set_value('filter "jupyter_clear_output"', 'required', 'false')
+
 
 # run during installation; this is when files get copied to build dir
 class PygamaBuild(build_py):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         build_py.run(self)
 
 # run during local installation; in this case build_py isn't run...
 class PygamaDev(develop):
     def run(self):
         make_git_file()
+        clean_jupyter_notebooks()
         develop.run(self)
 
 setup(
     name='pygama',
-    version='0.3',
-    author='Clint Wiseman',
-    author_email='wisecg.neontetra@gmail.com',
+    version='0.5',
+    author='LEGEND',
+    author_email='wisecg@uw.edu',
     description='Python package for decoding and processing digitizer data',
     long_description='',
     packages=find_packages(),
     install_requires=[
+        'numpy',
         'scimath',
         'numba',
         'parse',
@@ -114,10 +144,8 @@ setup(
         'tinydb',
         'pyFFTW',
         'h5py',
-        'numpy',
         'pandas',
         'matplotlib'
-
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),

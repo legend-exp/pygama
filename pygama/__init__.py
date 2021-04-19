@@ -29,5 +29,4 @@ in ipython, etc.
 """
 __version__ = "0.1.0"
 
-from .analysis.dataset import DataSet
 from .analysis.datagroup import DataGroup

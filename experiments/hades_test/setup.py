@@ -42,15 +42,19 @@ def main():
     args = par.parse_args()
 
     # declare main DataGroup
-    dg = DataGroup('cage.json')
+    dg = DataGroup('hades.json')
 
     # -- run routines --
     if args.mkdirs: dg.lh5_dir_setup(args.lh5_user)
     if args.show: show_fileDB(dg)
     if args.init: init(dg)
     if args.update: update(dg, args.batch)
-    if args.orca: scan_orca_headers(dg, args.over, args.batch)
-    if args.rt: get_runtimes(dg, args.over, args.batch)
+    
+    # not for flashcam
+    # if args.orca: scan_orca_headers(dg, args.over, args.batch)
+    
+    # need some other way to do this
+    # if args.rt: get_runtimes(dg, args.over, args.batch)
 
 
 def show_fileDB(dg):
@@ -70,14 +74,14 @@ def show_fileDB(dg):
 
     dbg_cols = ['run', 'cycle', 'unique_key']
 
-    if 'startTime' in dg.file_keys.columns:
+    if 'startTime' in dg.fileDB.columns:
         dbg_cols += ['startTime']
 
-    if 'runtime' in dg.file_keys.columns:
+    if 'runtime' in dg.fileDB.columns:
         dbg_cols += ['runtime']
 
-    print(dg.file_keys[dbg_cols])
-    print(dg.file_keys.columns)
+    print(dg.fileDB[dbg_cols])
+    print(dg.fileDB.columns)
 
 
 def init(dg):
@@ -89,18 +93,18 @@ def init(dg):
     
     # scan over DAQ directory, then organize by cycle (ORCA run number)
     dg.scan_daq_dir()
-    dg.file_keys.sort_values(['cycle'], inplace=True)
-    dg.file_keys.reset_index(drop=True, inplace=True)
-    dg.file_keys = dg.file_keys.apply(get_cyc_info, args=[dg], axis=1)
+    dg.fileDB.sort_values(['cycle'], inplace=True)
+    dg.fileDB.reset_index(drop=True, inplace=True)
+    dg.fileDB = dg.fileDB.apply(get_cyc_info, args=[dg], axis=1)
 
     # compute lh5 column names (uses $CAGE_LH5, don't use $CAGE_LH5_USER here)
     dg.get_lh5_cols()
 
     # attempt to convert to integer (will fail if nan's are present)
     for col in ['run', 'cycle']:
-        dg.file_keys[col] = pd.to_numeric(dg.file_keys[col])
+        dg.fileDB[col] = pd.to_numeric(dg.fileDB[col])
 
-    print(dg.file_keys[['run', 'cycle', 'daq_file', 'runtype', 'skip']].to_string())
+    print(dg.fileDB[['run', 'cycle', 'daq_file', 'runtype', 'skip']].to_string())
 
     print('Ready to save.  This will overwrite any existing fileDB.')
     ans = input('Continue? (y/n) ')
@@ -122,7 +126,7 @@ def update(dg, batch_mode=False):
 
     # load existing file keys
     dg.load_df()
-    # print(dg.file_keys[dbg_cols])
+    # print(dg.fileDB[dbg_cols])
 
     # scan daq dir for new file keys
     dg_new = DataGroup('cage.json')
@@ -136,7 +140,7 @@ def update(dg, batch_mode=False):
     # print(dg_new.file_keys[dbg_cols])
 
     # identify new keys, save new indexes
-    df1 = dg.file_keys['unique_key']
+    df1 = dg.fileDB['unique_key']
     df2 = dg_new.file_keys['unique_key']
     new_keys = pd.concat([df1, df2]).drop_duplicates(keep=False)
     new_idx = new_keys.index
@@ -146,23 +150,23 @@ def update(dg, batch_mode=False):
         print(new_keys)
 
         print('Merging with existing fileDB:')
-        df_upd = pd.concat([dg.file_keys, dg_new.file_keys.loc[new_idx]])
+        df_upd = pd.concat([dg.fileDB, dg_new.file_keys.loc[new_idx]])
         print(df_upd[dbg_cols])
 
         if not batch_mode:
             print("RunDB Check -- did you update runDB.json?  Are there any NaN's in filenames/paths above?")
             ans = input('Save updated fileDB? (y/n):')
             if ans.lower() == 'y':
-                dg.file_keys = df_upd
+                dg.fileDB = df_upd
                 dg.save_df(dg.config['fileDB'])
                 print('fileDB updated.')
         else:
-            dg.file_keys = df_upd
+            dg.fileDB = df_upd
             dg.save_df(dg.config['fileDB'])
             print('fileDB updated.')
     else:
         print('No new files found!  current fileDB:')
-        print(dg.file_keys[dbg_cols])
+        print(dg.fileDB[dbg_cols])
 
 
 def get_cyc_info(row, dg):
@@ -170,7 +174,7 @@ def get_cyc_info(row, dg):
     using the runDB, map cycle numbers to physics runs, identify detector,
     physics run type, etc.
     """
-    # loop over the runDB and add columns to each row of dg.file_keys
+    # loop over the runDB and add columns to each row of dg.fileDB
     cyc = row['cycle']
     for run, cycles in dg.runDB.items():
         tmp = cycles[0].split(',')
@@ -215,16 +219,16 @@ def scan_orca_headers(dg, overwrite=False, batch_mode=False):
     dg.load_df()
 
     # first-time setup
-    if 'startTime' not in dg.file_keys.columns or overwrite:
-        df_keys = dg.file_keys.copy()
+    if 'startTime' not in dg.fileDB.columns or overwrite:
+        df_keys = dg.fileDB.copy()
         update_existing = False
         print('Re-scanning entire fileDB')
 
-    elif 'startTime' in dg.file_keys.columns:
+    elif 'startTime' in dg.fileDB.columns:
         # look for any rows with nans to update
-        idx = dg.file_keys.loc[pd.isna(dg.file_keys['startTime']), :].index
+        idx = dg.fileDB.loc[pd.isna(dg.fileDB['startTime']), :].index
         if len(idx) > 0:
-            df_keys = dg.file_keys.loc[idx].copy()
+            df_keys = dg.fileDB.loc[idx].copy()
             print(f'Found {len(df_keys)} new files without startTime:')
             print(df_keys)
             update_existing = True
@@ -266,13 +270,13 @@ def scan_orca_headers(dg, overwrite=False, batch_mode=False):
     df_keys[new_cols] = df_tmp
 
     if update_existing:
-        idx = dg.file_keys.loc[pd.isna(dg.file_keys['startTime']), :].index
-        dg.file_keys.loc[idx] = df_keys
+        idx = dg.fileDB.loc[pd.isna(dg.fileDB['startTime']), :].index
+        dg.fileDB.loc[idx] = df_keys
     else:
-        dg.file_keys = df_keys
+        dg.fileDB = df_keys
 
     dbg_cols = ['run', 'cycle', 'daq_file', 'startTime', 'daq_gb']
-    print(dg.file_keys[dbg_cols])
+    print(dg.fileDB[dbg_cols])
 
     print('Ready to save.  This will overwrite any existing fileDB.')
     if not batch_mode:
@@ -302,16 +306,16 @@ def get_runtimes(dg, overwrite=False, batch_mode=False):
     dg.load_df()
 
     # first-time setup
-    if 'runtime' not in dg.file_keys.columns or overwrite:
-        df_keys = dg.file_keys.copy()
+    if 'runtime' not in dg.fileDB.columns or overwrite:
+        df_keys = dg.fileDB.copy()
         update_existing = False
         print('Re-scanning entire fileDB')
 
-    elif 'runtime' in dg.file_keys.columns:
+    elif 'runtime' in dg.fileDB.columns:
         # look for any rows with nans to update
-        idx = dg.file_keys.loc[pd.isna(dg.file_keys['runtime']), :].index
+        idx = dg.fileDB.loc[pd.isna(dg.fileDB['runtime']), :].index
         if len(idx) > 0:
-            df_keys = dg.file_keys.loc[idx].copy()
+            df_keys = dg.fileDB.loc[idx].copy()
             print(f'Found {len(df_keys)} new files without runtime:')
             print(df_keys)
             update_existing = True
@@ -378,23 +382,23 @@ def get_runtimes(dg, overwrite=False, batch_mode=False):
     df_keys[new_cols] = df_tmp
 
     if update_existing:
-        idx = dg.file_keys.loc[pd.isna(dg.file_keys['runtime']), :].index
-        dg.file_keys.loc[idx] = df_keys
+        idx = dg.fileDB.loc[pd.isna(dg.fileDB['runtime']), :].index
+        dg.fileDB.loc[idx] = df_keys
     else:
-        dg.file_keys = df_keys
+        dg.fileDB = df_keys
 
     dbg_cols = ['run', 'cycle', 'unique_key', 'startTime', 'runtime']
-    print(dg.file_keys[dbg_cols])
+    print(dg.fileDB[dbg_cols])
 
     print('Ready to save.  This will overwrite any existing fileDB.')
     if not batch_mode:
         ans = input('Save updated fileDB? (y/n):')
         if ans.lower() == 'y':
-            dg.file_keys = df_keys
+            dg.fileDB = df_keys
             dg.save_df(dg.config['fileDB'])
             print('fileDB updated.')
     else:
-        dg.file_keys = df_keys
+        dg.fileDB = df_keys
         dg.save_df(dg.config['fileDB'])
         print('fileDB updated.')
 

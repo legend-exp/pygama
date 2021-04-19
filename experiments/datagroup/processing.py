@@ -70,15 +70,15 @@ def load_datagroup():
     # # det 60B, first th scan
     # # que = "detSN=='I02160B' and scantype=='th_HS2_top_psa'"
     # 
-    # dg.file_keys.query(que, inplace=True)
-    # dg.file_keys = dg.file_keys[:3]
+    # dg.fileDB.query(que, inplace=True)
+    # dg.fileDB = dg.fileDB[:3]
     
     
     # # -- CAGE mode -- 
     # dg = DataGroup('CAGE.json')
     # dg.load_df('CAGE_fileDB.h5')
     # que = 'run==8'
-    # dg.file_keys.query(que, inplace=True)
+    # dg.fileDB.query(que, inplace=True)
     
     
     # # -- LPGTA mode -- 
@@ -86,17 +86,17 @@ def load_datagroup():
     # dg.load_df('LPGTA_fileDB.h5')
     # # process one big cal file (64 GB)
     # que = "run==18 and YYYYmmdd == '20200302' and hhmmss == '184529'"
-    # dg.file_keys.query(que, inplace=True)
+    # dg.fileDB.query(que, inplace=True)
     
     # print('files to process:')
-    # print(dg.file_keys)
+    # print(dg.fileDB)
     
     # -- SURF mode -- 
     dg = DataGroup('SURFCHAR.json')
     dg.load_df('SURFCHAR_fileDB.h5')
     
     # can add other filters here
-    dg.file_keys = dg.file_keys[:2]
+    dg.fileDB = dg.fileDB[:2]
     
     
     return dg
@@ -106,16 +106,16 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
     """
     run daq_to_raw on the current DataGroup
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
     
     subs = dg.subsystems # can be blank: ['']
     # subs = ['geds'] # TODO: ignore other datastreams
     # chans = ['g035', 'g042'] # TODO: select a subset of detectors
     
-    print(f'Processing {dg.file_keys.shape[0]} files ...')
+    print(f'Processing {dg.fileDB.shape[0]} files ...')
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
         
         f_daq = f"{dg.daq_dir}/{row['daq_dir']}/{row['daq_file']}"
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
@@ -128,13 +128,13 @@ def d2r(dg, overwrite=False, nwfs=None, vrb=False):
 def r2d(dg, overwrite=False, nwfs=None, vrb=False):
     """
     """
-    # print(dg.file_keys)
-    # print(dg.file_keys.columns)
+    # print(dg.fileDB)
+    # print(dg.fileDB.columns)
     
     with open(f'{dg.experiment}_dsp.json') as f:
         dsp_config = json.load(f, object_pairs_hook=OrderedDict)
 
-    for i, row in dg.file_keys.iterrows():
+    for i, row in dg.fileDB.iterrows():
     
         f_raw = f"{dg.lh5_dir}/{row['raw_path']}/{row['raw_file']}"
         f_dsp = f"{dg.lh5_dir}/{row['dsp_path']}/{row['dsp_file']}"

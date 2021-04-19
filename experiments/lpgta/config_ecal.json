@@ -1,0 +1,31 @@
+{
+  "system":"LPGTA",
+  "ecal_db" : "ecalDB.json",
+  "input_table":"/{sysn}/dsp",
+
+  "init_vals" : {
+    "trapE" : {
+      "raw_range":[0, 10000, 5],
+      "peakdet_thresh": 0.025,
+      "lowe_cut": 500
+    },
+    "trapEftp" : {
+      "raw_range":[0, 10000, 5],
+      "peakdet_thresh": 0.025,
+      "lowe_cut": 500
+    }
+  },
+
+  "pks":{
+    "238.6":"212Pb", "351.9":"214Pb", "583.2":"208Tl", "609.3":"214Bi",
+    "911.2":"228Ac", "969.0":"228Ac", "1120.3":"214Bi", "1460.8":"40K",
+    "1764.6":"214Bi", "2614.5":"208Tl"
+  },
+  "extras":[238.6],
+  "expected_peaks":[1460.8],
+  "test_peaks":[583.2, 351.9, 609.3, 911.2, 2614.5],
+
+  "rawe_default" : ["trapE"],
+  "cal_range" : [0, 3000, 5],
+  "raw_ene_tol" : 5
+}

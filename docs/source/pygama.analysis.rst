@@ -28,14 +28,6 @@ pygama.analysis.datagroup module
    :undoc-members:
    :show-inheritance:
 
-pygama.analysis.dataset module
-------------------------------
-
-.. automodule:: pygama.analysis.dataset
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pygama.analysis.histograms module
 ---------------------------------
 

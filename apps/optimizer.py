@@ -15,7 +15,7 @@ import pygama.utils as pu
 import pygama.analysis.histograms as ph
 import pygama.analysis.peak_fitting as pf
 import h5py, sys
-import pygama.io.lh5 as lh5
+import pygama.lh5 as lh5
 
 from pygama.dsp.ProcessingChain import ProcessingChain
 from pygama.dsp.processors import *

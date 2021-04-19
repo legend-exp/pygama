@@ -14,12 +14,12 @@ def trap_pickoff(wf_in, rise, flat, pickoff_time, value_out):
     """
     I_1 = 0.
     I_2 = 0.
-    start_time = pickoff_time
+    start_time = pickoff_time + 1 # the +1 makes slicing prettier
     
-    for i in range(start_time,(start_time + rise)):
+    for i in range(start_time-rise, start_time):
         I_1 += wf_in[i]
 
-    for k in range((start_time + rise + flat), (start_time + 2*rise + flat)):
+    for k in range(start_time - 2*rise - flat, start_time - rise - flat):
         I_2 += wf_in[k]
 
-    value_out[0] = (I_2- I_1)/rise
+    value_out[0] = (I_1 - I_2)/rise
