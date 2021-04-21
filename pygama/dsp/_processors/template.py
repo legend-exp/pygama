@@ -9,12 +9,14 @@ from numba import guvectorize
 # https://numba.pydata.org/numba-doc/latest/user/vectorize.html#the-guvectorize-decorator
 #
 # Notes:
-# - use `nopython=True` and `cache=True`         (@ian, is this correct?)
-# - use 64-bit variables, e.g. int64 and float64 (@all, this is up for discussion)
-# - use [:] for al output parameters             (@ian, is this correct?)
+# - use `nopython=True` and `cache=True`
+# - use two declarations, one for 32-bit variables and one for 64-bit variables
+# - do not use ints as they do not support NaN values.
+# - use [:] for al output parameters
 #
-@guvectorize("void(float64[:], float64, int64, float64[:], int64[:])",
-             "(n),(),()->()", nopython=True, cache=True)
+@guvectorize(["void(float32[:], float32, float32, float32[:], int32[:])",
+              "void(float64[:], float64, float64, float64[:], int64[:])"],
+              "(n),(),()->()", nopython=True, cache=True)
 
 # 3) Define the processor interface
 #
