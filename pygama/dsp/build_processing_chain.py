@@ -109,7 +109,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         if par in resolved:
             return
         elif par in unresolved:
-            raise Exception('Circular references detected: %s -> %s' % (par, edge))
+            raise ProcessingChainError('Circular references detected: %s -> %s' % (par, edge))
 
         # if we don't find a node, this is a leaf
         node = processors.get(par)
@@ -180,13 +180,13 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     args[i] = node
                     if(verbosity>0):
                         print("Database lookup: found", node, "for", arg)
-                except:
+                except (KeyError, TypeError):
                     try:
                         args[i] = recipe['defaults'][arg]
                         if(verbosity>0):
                             print("Database lookup: using default value of", args[i], "for", arg)
-                    except:
-                        raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                    except (KeyError, TypeError):
+                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
             
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
         # if init_args are defined, parse any strings and then call func
@@ -203,26 +203,23 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                         init_args[i] = node
                         if(verbosity>0):
                             print("Database lookup: found", node, "for", arg)
-                    except:
+                    except (KeyError, TypeError):
                         try:
                             init_args[i] = recipe['defaults'][arg]
                             if(verbosity>0):
                                 print("Database lookup: using default value of", init_args[i], "for", arg)
-                        except:
-                            raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                        except (KeyError, TypeError):
+                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
                     arg = init_args[i]
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
-                    try:
-                        init_args[i] = proc_chain.get_variable(arg)
-                    except:
-                        pass
+                    init_args[i] = proc_chain.get_variable(arg)
                     
             if(verbosity>1):
                 print("Building function", func.__name__, "from init_args", init_args)
             func = func(*init_args)
-        except:
+        except KeyError:
             pass
         proc_chain.add_processor(func, *args, **kwargs)
 
