@@ -192,7 +192,7 @@ def find_bin(x, bins):
     if bins[index] <= x and bins[index+1] > x: return index
 
     # bins are non-uniform: find by binary search
-    return np.searchsorted(hist, x, side='right')
+    return np.searchsorted(bins, x, side='right')
 
 
 def range_slice(x_min, x_max, hist, bins, var=None):
