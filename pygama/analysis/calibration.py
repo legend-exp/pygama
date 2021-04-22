@@ -47,6 +47,8 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=10,
     -------
     detected_peak_locations : list
         list of uncalibrated energies of detected peaks
+    detected_peak_energies : list
+        list of calibrated energies of detected peaks
     pars : list of floats
         the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
     """
@@ -55,16 +57,17 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=10,
         if verbosity > 0:
             print(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
         var[np.where(var == 0)] = var_zero
+    peaks_keV = np.asarray(peaks_keV)
 
     # Find all maxes with > n_sigma significance
     imaxes = get_i_local_maxima(hist/np.sqrt(var), n_sigma)
 
     # Now pattern match to peaks_keV within Etol_keV using poly_match
     detected_max_locs = pgh.get_bin_centers(bins)[imaxes]
-    pars, i_matches = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
-    if verbosity > 0 and len(i_matches) != len(peaks_keV):
-        print(f'hpge_find_E_peaks: only found {len(i_matches)} of {len(peaks_keV)} expected peaks')
-    return detected_max_locs[i_matches], pars
+    pars, ixtup, iytup = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
+    if verbosity > 0 and len(ixtup) != len(peaks_keV):
+        print(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
+    return detected_max_locs[ixtup], peaks_keV[iytup], pars
 
 
 def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
@@ -528,7 +531,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         gof = np.inf
 
 
-    return pars, i_matches
+    return pars, ixtup, iytup
 
 
 def get_i_local_extrema(data, delta):
