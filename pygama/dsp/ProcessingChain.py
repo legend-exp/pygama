@@ -3,11 +3,9 @@ import json
 import re
 import ast
 import itertools as it
-from scimath.units import convert
-from scimath.units.api import unit_parser
-from scimath.units.unit import unit
 
 from pygama.dsp.units import *
+from pygama.dsp.errors import *
 
 ast_ops_dict = {ast.Add: np.add, ast.Sub: np.subtract, ast.Mult: np.multiply,
                 ast.Div: np.divide, ast.FloorDiv: np.floor_divide,
@@ -194,7 +192,7 @@ class ProcessingChain:
         types = kwargs.get("types", None)
         if(types == None): types = func.types.copy()
         if(types == None):
-            raise TypeError("Could not find a type signature list for " + func.__name__ + ". Please supply a valid list of types.")
+            raise ProcessingChainError("Could not find a type signature list for " + func.__name__ + ". Please supply a valid list of types.")
         for i, typestr in enumerate(types):
             types[i]=typestr.replace('->', '')
 
@@ -229,7 +227,7 @@ class ProcessingChain:
                 if(isinstance(fd, str)):
                     # Define the dimension or make sure it is consistent
                     if not ad or dims_dict.setdefault(fd, ad)!=ad:
-                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+fd)
+                        raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+fd)
                 elif not fd:
                     # if we ran out of function dimensions, add a new outer dim
                     outerdims.insert(0, ad)
@@ -243,7 +241,7 @@ class ProcessingChain:
                         outerdims.insert(len(fun_dims)-i, ad)
                         fun_dims.insert(len(fun_dims)-i, ad)
                     else:
-                        raise ValueError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions.")
+                        raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions.")
 
             # find type signatures that match type of array
             arr_type = params[ipar].dtype.char
@@ -251,9 +249,11 @@ class ProcessingChain:
 
         # Get the type signature we are using
         if(not types):
-            raise TypeError("Could not find a type signature matching the types of the variables given for " + func.__name__)
-        elif(len(types)>1):
-            self.__print(1, "Found multiple compatible type signatures for this function:", types, "Using signature " + types[0] + ".")
+            error_str = "Could not find a type signature matching the types of the variables given for " + func.__name__ + str(tuple(args))
+            for param, name in zip(params, args):
+                if not isinstance(param, np.ndarray): continue
+                error_str += '\n' + name + ': ' + str(param.dtype)
+            raise ProcessingChainError(error_str)
         types = [np.dtype(t) for t in types[0]]
 
         # Reshape variable arrays to add broadcast dimensions and allocate new arrays as needed
@@ -284,7 +284,7 @@ class ProcessingChain:
                 proc_strs.append(str(params[i]))
         proc_strs = tuple(proc_strs)
 
-        self.__print(2, 'Added processor: ' + func.__name__ + str(proc_strs).replace("'", ""))
+        self.__print(2, 'Added processor:', func.__name__ + str(proc_strs).replace("'", ""))
 
         # Add the function and bound parameters to the list of processors
         self.__proc_list.append((func, tuple(params)))
@@ -304,10 +304,7 @@ class ProcessingChain:
         starting at entry offset, with length equal to the internal block size.
         """
         end = min(offset+self._block_width, self._buffer_len)
-        if self._verbosity<3:
-            self.__execute_procs(offset, end)
-        else:
-            self.__execute_procs_verbose(offset, end)
+        self.__execute_procs(offset, end)
 
 
     def get_variable(self, varname):
@@ -424,7 +421,7 @@ class ProcessingChain:
                 if isinstance(var, np.ndarray) and len(var.shape)==2:
                     return var.shape[1]
                 else:
-                    raise ValueError("len(): " + node.args[0].id + "has wrong number of dims")
+                    raise ProcessingChainError("len(): " + node.args[0].id + "has wrong number of dims")
             elif func=="round" and len(node.args)==1:
                 var = self.__parse_expr(node.args[0])
                 return int(round(var))
@@ -437,25 +434,25 @@ class ProcessingChain:
                     elif isinstance(shape, tuple):
                         shape = (self._block_width, ) + shape
                     else:
-                        raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+                        raise ProcessingChainError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
                     try: dtype = np.dtype(node.args[1].id)
-                    except: raise ValueError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
+                    except: raise ProcessingChainError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
 
                     if func in self.__vars_dict:
                         var = self.__vars_dict[func]
                         if not var.shape==shape and var.dtype==dtype:
-                            raise ValueError("Requested shape and type for " + func + " do not match existing values")
+                            raise ProcessingChainError("Requested shape and type for " + func + " do not match existing values")
                         return var
                     else:
                         var = np.zeros(shape, dtype, 'F')
                         self.__vars_dict[func] = var
-                        self.__print(2, 'Added variable ' + func + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
+                        self.__print(2, 'Added variable', func, 'with shape', tuple(shape), 'and type', dtype)
 
                         return var
                 else:
-                    raise ValueError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
+                    raise ProcessingChainError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
 
-        raise ValueError("Cannot parse AST nodes of type " + str(node.__dict__))
+        raise ProcessingChainError("Cannot parse AST nodes of type " + str(node.__dict__))
 
 
     def __add_var(self, name, dtype, shape):
@@ -463,67 +460,64 @@ class ProcessingChain:
         Add an array of zeros to the vars dict called name and return it
         """
         if not re.match("\A\w+$", name):
-            raise KeyError(name+' is not a valid alphanumeric name')
+            raise ProcessingChainError(name+' is not a valid alphanumeric name')
         if name in self.__vars_dict:
-            raise KeyError(name+' is already in variable list')
+            raise ProcessingChainError(name+' is already in variable list')
         arr = np.zeros(shape, dtype)
         self.__vars_dict[name] = arr
-        self.__print(2, 'Added variable ' + re.search('(\w+)', name).group(0) + ' with shape ' + str(tuple(shape)) + ' and type ' + str(dtype))
+        self.__print(2, 'Added variable', re.search('(\w+)', name).group(0), 'with shape', tuple(shape), 'and type', dtype)
         return arr
 
-
+    
     def __execute_procs(self, start, end):
         """
         copy from input buffers to variables
         call all the processors on their paired arg tuples
         copy from variables to list of output buffers
         """
-        for buf, var, scale in self.__input_buffers.values():
-            if scale:
-                np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
-            else:
-                np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
-        for func, args in self.__proc_list:
-            func(*args)
-        for buf, var, scale in self.__output_buffers.values():
-            if scale:
-                np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
-            else:
-                np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
+        # Track names that have been printed so we only print each variable once
+        if self._verbosity >= 3:
+            names = set(self.__vars_dict.keys())
+            self.__print(3, 'Input:')
 
-    
-    def __execute_procs_verbose(self, start, end):
-        """
-        verbose version of __execute_procs. This is probably overkill, but it
-        was done to minimize python calls in the non-verbose version
-        """
-        names = set(self.__vars_dict.keys())
-        self.__print(3, 'Input:')
+        # Copy input buffers into proc chain buffers
         for name, (buf, var, scale) in self.__input_buffers.items():
             if scale:
                 np.multiply(buf[start:end, ...], scale, var[0:end-start, ...])
             else:
                 np.copyto(var[0:end-start, ...], buf[start:end, ...], 'unsafe')
-            self.__print(3, name+' = '+str(var))
-            names.discard(name)
 
+            if self._verbosity >= 3:
+                self.__print(3, name, '=', var)
+                names.discard(name)
+
+        # Loop through processors and run each one
         self.__print(3, 'Processing:')
         for (func, args), strs in zip(self.__proc_list, self.__proc_strs):
-            func(*args)
-            self.__print(3, func.__name__ + str(strs).replace("'", ""))
-            for name, arg in zip(strs, args):
-                try:
-                    names.remove(name)
-                    self.__print(3, name+' = '+str(arg))
-                except: pass
+            try:
+                func(*args)
+            except DSPFatal as e:
+                e.processor = func.__name__ + str(strs).replace("'", "")
+                e.wf_range = (start, end)
+                raise e
+                
+            if self._verbosity >= 3:
+                self.__print(3, func.__name__ + str(strs).replace("'", ""))
+                for name, arg in zip(strs, args):
+                    try:
+                        names.remove(name)
+                        self.__print(3, name, '=', arg)
+                    except: pass
 
+        # copy from processing chain buffers into output buffers
         self.__print(3, 'Output:')
         for name, (buf, var, scale) in self.__output_buffers.items():
             if scale:
                 np.divide(var[0:end-start, ...], scale, buf[start:end, ...])
             else:
                 np.copyto(buf[start:end, ...], var[0:end-start, ...], 'unsafe')
-            self.__print(3, name+' = '+str(var))
+
+            self.__print(3, name, '=', var)
 
     
     def __add_io_buffer(self, buff, varname, input, dtype, buffer_len, scale):
@@ -534,18 +528,18 @@ class ProcessingChain:
         """
         var = self.get_variable(varname)
         if buff is not None and not isinstance(buff, np.ndarray):
-            raise ValueError("Buffers must be ndarrays.")
+            raise ProcessingChainError("Buffers must be ndarrays.")
 
         # if buffer length is not defined, figure out what it should be
         if buffer_len is not None:
             if self._buffer_len is None:
                 self._buffer_len = buffer_len
             elif self._buffer_len != buffer_len:
-                raise ValueError("Buffer length was already set to a number different than the one provided. To change the buffer length, you must reset the buffers.")
+                raise ProcessingChainError("Buffer length was already set to a number different than the one provided. To change the buffer length, you must reset the buffers.")
         if not self._buffer_len:
             if buff is not None: self._buffer_len = buff.shape[0]
             else: self._buffer_len = self._block_width
-            self.__print(1, "Setting i/o buffer length to " + str(self._buffer_len))
+            self.__print(1, "Setting i/o buffer length to", self._buffer_len)
 
         # if a unit is given, convert it to a scaling factor
         if isinstance(scale, unit):
@@ -555,7 +549,7 @@ class ProcessingChain:
         returnbuffer=False
         if buff is None:
             if var is None:
-                raise ValueError("Cannot make buffer for non-existent variable " + varname)
+                raise ProcessingChainError("Cannot make buffer for non-existent variable " + varname)
             # deduce dtype. If scale is used, force float type
             if not dtype:
                 if not scale:
@@ -571,7 +565,7 @@ class ProcessingChain:
             if buff.ndim==1 and len(buff)%self._buffer_len==0:
                 buff = buff.reshape(self._buffer_len, len(buff)//self._buffer_len)
             else:
-                raise ValueError("Buffer provided for " + varname + " is the wrong length.")
+                raise ProcessingChainError("Buffer provided for " + varname + " is the wrong length.")
 
         # Check that shape of buffer is compatible with shape of variable.
         # If variable does not yet exist, add it here
@@ -583,22 +577,26 @@ class ProcessingChain:
                     dtype=np.dtype('float'+str(buff.dtype.itemsize*8))
             var = self.__add_var(varname, dtype, (self._block_width,)+buff.shape[1:])
         elif var.shape[1:] != buff.shape[1:]:
-            raise ValueError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
+            raise ProcessingChainError("Provided buffer has shape " + str(buff.shape) + " which is not compatible with " + str(varname) + " shape " + str(var.shape))
 
         varname = re.search('(\w+)', varname).group(0)
         if input:
             self.__input_buffers[varname]=(buff, var, scale)
-            self.__print(2, 'Binding input buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
+            self.__print(2, 'Binding input buffer of shape', buff.shape, 'and type', buff.dtype, 'to variable', varname, 'with shape', var.shape, 'and type', var.dtype)
         else:
             self.__output_buffers[varname]=(buff, var, scale)
-            self.__print(2, 'Binding output buffer of shape ' + str(buff.shape) + ' and type ' + str(buff.dtype) + ' to variable ' + varname + ' with shape ' + str(var.shape) + ' and type ' + str(var.dtype))
+            self.__print(2, 'Binding output buffer of shape', buff.shape, 'and type', buff.dtype, 'to variable', varname, 'with shape', var.shape, 'and type', var.dtype)
 
         if returnbuffer: return buff
 
 
-    def __print(self, verbosity, *args):
+    def __print(self, verbosity, *args, **kwargs):
+        """Helper for output that checks verbosity before printing and
+        converts things into strings. At verbosity 0, print to stderr"""
+        if verbosity==0 and not 'file' in kwargs:
+            kwargs['file']=sys.stderr
         if self._verbosity >= verbosity:
-            print(*args)
+            print(*[str(arg) for arg in args], **kwargs)
 
 
     def __str__(self):
