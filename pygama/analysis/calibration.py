@@ -134,7 +134,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         step = np.sum(hist[:5])/5 - bg
 
         # get sigma from fwfm with f = 1/sqrt(e)
-        sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg+step/2, method='interpolate')
+        sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg+step/2, method='interpolate')[0]
 
         # now compute amp and return
         height -= (bg + step/2)
