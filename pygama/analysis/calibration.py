@@ -139,7 +139,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         # now compute amp and return
         height -= (bg + step/2)
         amp = height * sigma * np.sqrt(2 * np.pi)
-        return [amp, mu, sigma, bkg, step]
+        return [amp, mu, sigma, bg, step]
 
     else:
         print(f'get_hpge_E_peak_par_guess not implementes for {func.__name__}')
@@ -182,13 +182,13 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         func_i = funcs[i_peak] if hasattr(funcs, '__len__') else funcs
 
         # bin a histogram
-        Euc_min = mode_guesses[i_peak] - width_i/2
-        Euc_max = mode_guesses[i_peak] + width_i/2
+        Euc_min = mode_guesses[i_peak] - wwidth_i/2
+        Euc_max = mode_guesses[i_peak] + wwidth_i/2
         Euc_min, Euc_max, n_bins_i = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, n_bins=n_bins_i)
         hist, bins, var = pgh.get_hist(E_uncal, bins=n_bins_i, range=(Euc_min,Euc_max))
 
         # get parameters guesses
-        par_guesses = hpge_E_peak_par_guess(hist, bins, var, func_i)
+        par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
         pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
 
         pars.append(pars_i)
@@ -357,7 +357,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
 
     # Do a first calibration to the results of the peak top fits
     mus = pt_pars[:,0]
-    mu_vars.pt_covs[:,0,0]
+    mu_vars = pt_covs[:,0,0]
     pars, cov = hpge_fit_E_scale(mus, mu_vars, peaks_keV, deg=deg)
     results['pt_cal_pars'] = pars
     results['pt_cal_cov'] = cov
@@ -366,8 +366,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     wwidths = pt_pars[:,1]*10 # 10 sigma windows
     pk_pars, pk_covs = hpge_fit_E_peaks(E_uncal, mus, wwidths, n_bins=50,
                                         funcs=pgp.gauss_step, uncal_is_int=uncal_is_int)
-    results['pk_pars'] = pt_pars
-    results['pk_covs'] = pt_covs
+    results['pk_pars'] = pk_pars
+    results['pk_covs'] = pk_covs
 
     # Do a second calibration to the results of the full peak fits
     mus = pk_pars[:,1] # mu is the i=1 fit par of gauss_step
@@ -377,7 +377,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     results['pk_cal_cov'] = cov
 
     # Finally, invert the E scale fit to get a calibration function
-    pars, cov = hpge_fit_E_cal_func(mus, mu_vars, Es_keV, pars, deg=deg)
+    pars, cov = hpge_fit_E_cal_func(mus, mu_vars, peaks_keV, pars, deg=deg)
 
     return pars, cov, results
 
