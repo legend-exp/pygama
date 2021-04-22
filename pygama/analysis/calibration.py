@@ -370,8 +370,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     results['pk_covs'] = pk_covs
 
     # Do a second calibration to the results of the full peak fits
-    mus = pk_pars[:,1] # mu is the i=1 fit par of gauss_step
-    mu_vars.pt_covs[:,1,1]
+    mus = np.asarray(pk_pars)[:,1] # mu is the i=1 fit par of gauss_step
+    mu_vars = np.asarray(pt_covs)[:,1,1]
     pars, cov = hpge_fit_E_scale(mus, mu_vars, peaks_keV, deg=deg)
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov
