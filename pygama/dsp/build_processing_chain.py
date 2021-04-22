@@ -60,6 +60,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             3: Print friggin' everything!    
     - block_width: number of entries to process at once.
     """
+    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
@@ -75,12 +76,29 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     processors = dsp_config['processors']
     
-    # for processors with multiple outputs, add separate entries to the processor list
-    for key in list(processors):
+    # prepare the processor list
+    multi_out_procs = {}
+    for key, node in processors.items():
+        # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
         if len(keys)>1:
             for k in keys:
-                processors[k] = key
+                multi_out_procs[k] = key
+
+        # parse the arguments list for prereqs, if not included explicitly
+        if not 'prereqs' in node:
+            prereqs = []
+            for arg in node['args']:
+                if not isinstance(arg, str): continue
+                for prereq in proc_chain.get_variable(arg, True):
+                    if prereq not in prereqs and prereq not in keys and prereq != 'db':
+                        prereqs.append(prereq)
+            node['prereqs'] = prereqs
+
+        if verbosity>=2:
+            print("Prereqs for", key, "are", node['prereqs'])
+
+    processors.update(multi_out_procs)
     
     # Recursive function to crawl through the parameters/processors and get
     # a sequence of unique parameters such that parameters always appear after
@@ -128,8 +146,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         print('Required input parameters:', str(input_par_list))
         print('Copied output parameters:', str(copy_par_list))
         print('Processed output parameters:', str(out_par_list))
-        
-    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:

@@ -308,20 +308,44 @@ class ProcessingChain:
         self.__execute_procs(offset, end)
 
 
-    def get_variable(self, varname):
-        """Get the numpy array holding the internal memory buffer used for a
-        named variable. The varname has the format
-          "varname(length, type)[range]"
-        The optional (length, type) field is used to initialize a new variable
-        if necessary. The optional [range] field fetches only a subrange
-        of the array to the function."""
-        return self.__parse_expr(ast.parse(varname, mode='eval').body)
+    def get_variable(self, expr, get_names_only=False):
+        """Parse string expr into a numpy array or value, using the following
+        syntax:
+          - numeric values are parsed into ints or floats
+          - units found in the dsp.units module are parsed into floats
+          - other strings are parsed into variable names. If get_name_only is
+            False, fetch the internal buffer (creating it as needed). Else,
+            return a string of the name
+          - if a string is followed by (...), try parsing into one of the
+            following expressions:
+              len(expr): return the length of the array found with expr
+              round(expr): return the value found with expr to the nearest int
+              varname(shape, type): allocate a new buffer with the specified
+                shape and type, using varname. This is used if the automatic
+                type and shape deduction for allocating variables fails
+          - Unary and binary operators +, -, *, /, // are available. If
+              a variable name is included in the expression, a processor
+              will be added to the ProcChain and a new buffer allocated
+              to store the output
+          - varname[slice]: return the variable with a slice applied. Slice
+              values can be floats, and will have round applied to them
+        If get_names_only is set to True, do not fetch or allocate new arrays,
+          instead return a list of variable names found in the expression
+        """
+        names = []
+        var = self.__parse_expr(ast.parse(expr, mode='eval').body, \
+                                not get_names_only, names)
+        if not get_names_only: return var
+        else: return names
 
     
-    def __parse_expr(self, node):
+    def __parse_expr(self, node, allocate_memory, var_name_list):
         """
         helper function for get_variable that recursively evaluates the AST tree
-        based on: https://stackoverflow.com/a/9558001.
+        based on: https://stackoverflow.com/a/9558001. Whenever we encounter
+        a variable name, add it to var_name_list (which should begin as an
+        empty list). Only add new variables and processors to the chain if
+        allocate_memory is True
         """
         if node is None:
             return None
@@ -340,16 +364,22 @@ class ProcessingChain:
             # check if it is a unit
             val = unit_parser.parse_unit(node.id)
             if val.is_valid():
-                return convert(1, val, self._clk)
+                try:
+                    return convert(1, val, self._clk)
+                except:
+                    return None
 
             #check if it is a variable
+            var_name_list.append(node.id)
             val = self.__vars_dict.get(node.id, None)
             return val
 
         # define binary operators (+,-,*,/)
         elif isinstance(node, ast.BinOp):
-            lhs = self.__parse_expr(node.left)
-            rhs = self.__parse_expr(node.right)
+            lhs = self.__parse_expr(node.left, allocate_memory, var_name_list)
+            if lhs is None: return None
+            rhs = self.__parse_expr(node.right, allocate_memory, var_name_list)
+            if rhs is None: return None
             op = ast_ops_dict[type(node.op)]
             if isinstance(lhs, np.ndarray) or isinstance(rhs, np.ndarray):
                 if not isinstance(lhs, np.ndarray):
@@ -363,52 +393,55 @@ class ProcessingChain:
                     else:
                         rhs = lhs.dtype.type(rhs)
                 out = op(lhs, rhs)
-                self.__proc_list.append((op, (lhs, rhs, out)))
-                self.__proc_strs.append("Binary operator: " + op.__name__)
+                if allocate_memory:
+                    self.__proc_list.append((op, (lhs, rhs, out)))
+                    self.__proc_strs.append("Binary operator: " + op.__name__)
                 return out
             return op(lhs, rhs)
 
         # define unary operators (-)
         elif isinstance(node, ast.UnaryOp):
-            operand = self.__parse_expr(node.operand)
+            operand = self.__parse_expr(node.operand, allocate_memory, var_name_list)
+            if operand is None: return None
             op = ast_ops_dict[type(node.op)]
             out = op(operand)
             # if we have a np array, add to processor list
-            if isinstance(out, np.ndarray):
+            if isinstance(out, np.ndarray) and allocate_memory:
                 self.__proc_list.append((op, (operand, out)))
                 self.__proc_strs.append("Unary operator: " + op.__name__)
             return out
 
         elif isinstance(node, ast.Subscript):
             # print(ast.dump(node))
-            val = self.__parse_expr(node.value)
+            val = self.__parse_expr(node.value, allocate_memory, var_name_list)
+            if val is None: return None
             if isinstance(node.slice, ast.Index):
                 if isinstance(val, np.ndarray):
-                    return val[..., self.__parse_expr(node.slice.value)]
+                    return val[..., self.__parse_expr(node.slice.value, allocate_memory, var_name_list)]
                 else:
-                    return val[self.__parse_expr(node.slice.value)]
+                    return val[self.__parse_expr(node.slice.value, allocate_memory, var_name_list)]
             elif isinstance(node.slice, ast.Slice):
                 if isinstance(val, np.ndarray):
-                    return val[..., slice(self.__parse_expr(node.slice.lower),
-                                          self.__parse_expr(node.slice.upper),
-                                          self.__parse_expr(node.slice.step) )]
+                    return val[..., slice(self.__parse_expr(node.slice.lower, allocate_memory, var_name_list),
+                                          self.__parse_expr(node.slice.upper, allocate_memory, var_name_list),
+                                          self.__parse_expr(node.slice.step, allocate_memory, var_name_list) )]
                 else:
-                    print(self.__parse_expr(node.slice.upper))
-                    return val[slice(self.__parse_expr(node.slice.upper),self.__parse_expr(node.slice.lower),self.__parse_expr(node.slice.step))]
+                    return val[slice(self.__parse_expr(node.slice.upper, allocate_memory, var_name_list),self.__parse_expr(node.slice.lower, allocate_memory, var_name_list),self.__parse_expr(node.slice.step, allocate_memory, var_name_list))]
             elif isinstance(node.slice, ast.ExtSlice):
                 slices = tuple(node.slice.dims)
                 for i, sl in enumerate(slices):
                     if isinstance(sl, ast.index):
-                        slices[i] = self.__parse_expr(sl.value)
+                        slices[i] = self.__parse_expr(sl.value, allocate_memory, var_name_list)
                     else:
-                        slices[i] = slice(self.__parse_expr(sl.upper),
-                                          self.__parse_expr(sl.lower),
-                                          self.__parse_expr(sl.step) )
+                        slices[i] = slice(self.__parse_expr(sl.upper, allocate_memory, var_name_list),
+                                          self.__parse_expr(sl.lower, allocate_memory, var_name_list),
+                                          self.__parse_expr(sl.step, allocate_memory, var_name_list) )
                 return val[..., slices]
 
         # for name.attribute
         elif isinstance(node, ast.Attribute):
-            val = self.__parse_expr(node.value)
+            val = self.__parse_expr(node.value, allocate_memory, var_name_list)
+            if val is None: return None
             # get shape with buffer_len dimension removed
             if node.attr=='shape' and isinstance(val, np.ndarray):
                 return val.shape[1:]
@@ -418,18 +451,22 @@ class ProcessingChain:
             func = node.func.id
             # get length of 1D array variable
             if func=="len" and len(node.args)==1 and isinstance(node.args[0], ast.Name):
-                var = self.__parse_expr(node.args[0])
+                var = self.__parse_expr(node.args[0], allocate_memory, var_name_list)
+                if var is None: return None
                 if isinstance(var, np.ndarray) and len(var.shape)==2:
                     return var.shape[1]
                 else:
                     raise ProcessingChainError("len(): " + node.args[0].id + "has wrong number of dims")
             elif func=="round" and len(node.args)==1:
-                var = self.__parse_expr(node.args[0])
+                var = self.__parse_expr(node.args[0], allocate_memory, var_name_list)
+                if var is None: return None
                 return int(round(var))
             # if this is a valid call to construct a new array, do so; otherwise raise an exception
             else:
                 if len(node.args)==2:
-                    shape = self.__parse_expr(node.args[0])
+                    shape = self.__parse_expr(node.args[0], allocate_memory, var_name_list)
+                    if shape is None:
+                        shape = (self._block_width,)
                     if isinstance(shape, (int, np.int32, np.int64)):
                         shape = (self._block_width, shape)
                     elif isinstance(shape, tuple):
@@ -438,7 +475,9 @@ class ProcessingChain:
                         raise ProcessingChainError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
                     try: dtype = np.dtype(node.args[1].id)
                     except: raise ProcessingChainError("Do not recognize call to "+func+" with arguments of types " + str([arg.__dict__ for arg in node.args]))
-
+                    
+                    var_name_list.append(func)
+                    
                     if func in self.__vars_dict:
                         var = self.__vars_dict[func]
                         if not var.shape==shape and var.dtype==dtype:
@@ -446,8 +485,9 @@ class ProcessingChain:
                         return var
                     else:
                         var = np.zeros(shape, dtype, 'F')
-                        self.__vars_dict[func] = var
-                        self.__print(2, 'Added variable', func, 'with shape', tuple(shape), 'and type', dtype)
+                        if allocate_memory:
+                            self.__vars_dict[func] = var
+                            self.__print(2, 'Added variable', func, 'with shape', tuple(shape), 'and type', dtype)
 
                         return var
                 else:
