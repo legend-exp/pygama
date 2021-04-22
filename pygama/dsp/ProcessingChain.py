@@ -333,9 +333,14 @@ class ProcessingChain:
           instead return a list of variable names found in the expression
         """
         names = []
-        var = self.__parse_expr(ast.parse(expr, mode='eval').body, \
-                                not get_names_only, names)
-        if not get_names_only: return var
+        try:
+            var = self.__parse_expr(ast.parse(expr, mode='eval').body, \
+                                    not get_names_only, names)
+        except Exception as e:
+            raise ProcessingChainError("Could not parse expression:\n  " + expr) from e
+        
+        if not get_names_only:
+            return var
         else: return names
 
     
