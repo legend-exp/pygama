@@ -11,6 +11,7 @@ import numpy as np
 import pygama.utils as pgu
 import pygama.analysis.peak_fitting as pgp
 import pygama.analysis.histograms as pgh
+import pygama.analysis.peak_fitting as pgf
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy.signal import argrelextrema, medfilt, find_peaks_cwt
@@ -124,7 +125,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
     if func == pgp.gauss_step:
         # pars are: amp, mu, sigma, bkg, step
         # get mu and hieght from a gaus fit
-        pars, cov = gauss_mode_max(hist, bins, var)
+        pars, cov = pgf.gauss_mode_max(hist, bins, var)
         mu = pars[0]
         height = pars[1]
 
