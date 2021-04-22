@@ -175,7 +175,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
     """
     pars = []
     covs = []
-    for i_peak in len(mode_guesses):
+    for i_peak in range(len(mode_guesses)):
         # get args for this peak
         wwidth_i = wwidths if np.isscalar(wwidths) else wwidths[i_peak]
         n_bins_i = n_bins if np.isscalar(n_bins) else n_bins[i_peak]
