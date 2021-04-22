@@ -243,9 +243,9 @@ class ProcessingChain:
                     else:
                         raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions.")
 
-            # find type signatures that match type of array
+            # find type signatures that array can be cast into
             arr_type = params[ipar].dtype.char
-            types = [type_sig for type_sig in types if arr_type==type_sig[ipar]]
+            types = [type_sig for type_sig in types if np.can_cast(arr_type, type_sig[ipar])]
 
         # Get the type signature we are using
         if(not types):
@@ -254,6 +254,7 @@ class ProcessingChain:
                 if not isinstance(param, np.ndarray): continue
                 error_str += '\n' + name + ': ' + str(param.dtype)
             raise ProcessingChainError(error_str)
+        # Use the first types in the list that all our types can be cast to
         types = [np.dtype(t) for t in types[0]]
 
         # Reshape variable arrays to add broadcast dimensions and allocate new arrays as needed
