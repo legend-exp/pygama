@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize, curve_fit
+from scipy.optimize import minimize, curve_fit, minimize_scalar, brentq
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
 
@@ -383,7 +383,35 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         # return individually to make a pretty plot
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
 
+def radford_fwhm(sigma, htail, tau):
+    """
+    Return the FWHM of the radford_peak function, ignoring background and
+    step components. TODO: also get the uncertainty
+    """
+    # optimize this to find max value
+    def neg_radford_peak_bgfree(E, sigma, htail, tau):
+        return -radford_peak(E, 0, sigma, 0, htail, tau, 0, 1)
+    
+    res = minimize_scalar( neg_radford_peak_bgfree,
+                           args=(sigma, htail, tau),
+                           bounds=(-sigma-htail, sigma+htail) )
+    Emax = res.x
+    half_max = -neg_radford_peak_bgfree(Emax, sigma, htail, tau)/2.
 
+    # root find this to find the half-max energies
+    def radford_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
+        return radford_peak(E, 0, sigma, 0, htail, tau, 0, 1) - half_max
+    
+    lower_hm = brentq( radford_peak_bgfree_halfmax,
+                       Emax - 2*(sigma+htail), Emax,
+                       args = (sigma, htail, tau, half_max) )
+    upper_hm = brentq( radford_peak_bgfree_halfmax,
+                       Emax, Emax + 2*(sigma+htail),
+                       args = (sigma, htail, tau, half_max) )
+    
+    return upper_hm - lower_hm
+    
+    
 def gauss_tail(x,mu, sigma, tail,tau):
     """
     A gaussian tail function template
