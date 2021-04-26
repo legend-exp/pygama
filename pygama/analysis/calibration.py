@@ -477,13 +477,15 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         # its the best so far
         matches = np.isclose(polxx, yy_i, rtol=rtol, atol=atol)
         n_close_i = np.sum(matches)
-        if n_close_i >= n_close_i:
+        if n_close_i >= n_close:
             gof_i = np.sum(np.power(polxx[matches] - yy_i[matches], 2))
             if n_close_i > n_close or (n_close_i == n_close and gof_i < gof):
                 i_matches = ixtup[np.where(matches)]
                 n_close = n_close_i
                 gof = gof_i
                 pars = pars_i
+                best_ixtup = np.copy(ixtup)
+                best_iytup = np.copy(iytup)
 
         # increment ixtup
         # first find the index of ixtup that needs to be incremented
@@ -531,8 +533,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         n_close = 0
         gof = np.inf
 
-
-    return pars, ixtup, iytup
+    return pars, best_ixtup, best_iytup
 
 
 def get_i_local_extrema(data, delta):
