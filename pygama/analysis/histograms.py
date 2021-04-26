@@ -311,7 +311,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # works well for high stats 
         if bin_lo < 1 or bin_hi >= len(hist)-1:
             print(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
-            return 0
+            return 0, 0
 
         val_f = bl + fraction*(mx-bl)
 
@@ -370,7 +370,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
     else:
         print(f"get_fwhm: unrecognized method {method}")
-        return 0
+        return 0, 0
 
 
 def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, **kwargs):
