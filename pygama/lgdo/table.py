@@ -170,8 +170,7 @@ class Table(Struct):
         df = pd.DataFrame(copy=copy)
         if cols is None: cols = self.keys()
         for col in cols: 
-            if not hasattr(self[col].nda):
+            if not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')
             else: df[col] = self[col].nda
         return df
-
