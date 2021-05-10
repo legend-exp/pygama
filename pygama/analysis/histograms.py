@@ -146,6 +146,7 @@ def better_int_binning(x_lo=0, x_hi=None, dx=None, n_bins=None):
     # x_hi is valid. Get a valid dx if we don't have one
     if dx is None: # must have n_bins
         dx = np.round((x_hi-x_lo)/n_bins)
+    if dx == 0: dx = 1
 
     # Finally, build a good binning from dx
     n_bins = np.ceil((x_hi-x_lo)/dx)
