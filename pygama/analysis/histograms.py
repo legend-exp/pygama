@@ -281,7 +281,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         mx = np.amax(hist)
         if var is not None and dmx == 0: 
             dmx = np.sqrt(var[np.argmax(hist)])
-    idxs_over_f = hist > (bl + fraction * mx)
+    idxs_over_f = hist > (bl + fraction * (mx-bl))
 
     # argmax will return the index of the first occurence of a maximum
     # so we can use it to find the first and last time idxs_over_f is "True"
