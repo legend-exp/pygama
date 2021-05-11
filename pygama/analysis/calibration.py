@@ -320,8 +320,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
         overwhelmingly dominated by the linear term. pars follows convention in
         np.polyfit unless deg=0, in which case it is the (lone) scale factor
     results : dict with the following elements
-        'matches' : array
-            array of rough uncalibrated energies at which the fit peaks were
+        'detected_peaks_locs', 'detected_peaks_keV' : array, array
+            array of rough uncalibrated/calibrated energies at which the fit peaks were
             found in the initial peak search
         'pt_pars', 'pt_cov' : list of (array), list of (2D array)
             arrays of gaussian parameters / covariances fit to the peak tops in
@@ -359,7 +359,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
 
     # Run the initial rough peak search
-    detected_peak_locs, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
+    detected_peaks_locs, detected_peaks_keV, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
     guess_keV = guess_keV[0]
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
@@ -370,21 +370,22 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
         Euc_min, Euc_max, dEuc = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, dx=dEuc)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
 
-    #run peak search again
-    detected_peak_locs, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
-    results['matches'] = detected_peak_locs
+    #run peak search again after rebinning
+    detected_peaks_locs, detected_peaks_keV, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
+    results['detected_peaks_locs'] = detected_peaks_locs
+    results['detected_peaks_keV'] = detected_peaks_keV
     guess_keV = guess_keV[0]
 
     # Now do a series of peak-top fits to get a good first calibration
     # We will fit over the 7 bins near the max.
-    pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_peak_locs, n_to_fit=7)
+    pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_peaks_locs, n_to_fit=7)
     results['pt_pars'] = pt_pars
     results['pt_covs'] = pt_covs
 
     # Do a first calibration to the results of the peak top fits
     mus = pt_pars[:,0]
     mu_vars = pt_covs[:,0,0]
-    pars, cov = hpge_fit_E_scale(mus, mu_vars, peaks_keV, deg=deg)
+    pars, cov = hpge_fit_E_scale(mus, mu_vars, detected_peaks_keV, deg=deg)
     results['pt_cal_pars'] = pars
     results['pt_cal_cov'] = cov
 
@@ -400,12 +401,13 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     # Do a second calibration to the results of the full peak fits
     mus = np.asarray(pk_pars)[:,1] # mu is the i=1 fit par of gauss_step
     mu_vars = np.asarray(pt_covs)[:,1,1]
-    pars, cov = hpge_fit_E_scale(mus, mu_vars, peaks_keV, deg=deg)
+    pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov
 
     # Finally, invert the E scale fit to get a calibration function
-    pars, cov = hpge_fit_E_cal_func(mus, mu_vars, peaks_keV, pars, deg=deg)
+    pars, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
+
 
     return pars, cov, results
 
