@@ -100,15 +100,18 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
     pars_list = []
     cov_list = []
     for E_peak in peak_locs:
-        pars, cov = pgp.gauss_mode_width_max(hist, bins, var, 
-                                             mode_guess=E_peak, 
-                                             n_bins=n_to_fit, 
-                                             poissonLL=poissonLL, 
-                                             inflate_errors=inflate_errors, 
-                                             gof_method=gof_method)
+        try:
+            pars, cov = pgp.gauss_mode_width_max(hist, bins, var,
+                                                 mode_guess=E_peak,
+                                                 n_bins=n_to_fit,
+                                                 poissonLL=poissonLL,
+                                                 inflate_errors=inflate_errors,
+                                                 gof_method=gof_method)
+        except: pars, cov = None, None
+
         pars_list.append(pars)
         cov_list.append(cov)
-    return np.array(pars_list), np.array(cov_list)
+    return np.array(pars_list, dtype = object), np.array(cov_list, dtype = object)
 
 
 def get_hpge_E_peak_par_guess(hist, bins, var, func):
@@ -202,7 +205,10 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
 
         # get parameters guesses
         par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
-        pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
+        try:
+            pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
+
+        except: pars_i, cov_i = None, None
 
         #get binning
         binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
@@ -212,7 +218,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         binws.append(binw_1)
         ranges.append([Euc_min, Euc_max])
 
-    return pars, covs, binws, ranges
+    return np.array(pars, dtype = object), np.array(covs, dtype = object), np.array(binws), np.array(ranges)
 
 
 def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
