@@ -388,6 +388,12 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     results['pt_pars'] = pt_pars
     results['pt_covs'] = pt_covs
 
+    # Drop failed fits
+    fitidx = [i is not None for i in pt_pars]
+    fitted_peaks_keV = results['fitted_keV'] = detected_peaks_keV[fitidx]
+    pt_pars = results['pt_pars'] = np.asarray(pt_pars)[fitidx]
+    pt_covs = results['pt_covs'] = np.asarray(pt_covs)[fitidx]
+
     # Do a first calibration to the results of the peak top fits
     mus = pt_pars[:,0]
     mu_vars = pt_covs[:,0,0]
@@ -403,6 +409,14 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     results['pk_covs'] = pk_covs
     results['pk_binws'] = pk_binws
     results['pk_ranges'] = pk_ranges
+
+    # Drop failed fits
+    fitidx = [i is not None for i in pk_pars]
+    fitted_peaks_keV = results['fitted_keV'] = fitted_peaks_keV[fitidx]
+    pk_pars = results['pk_pars'] = np.asarray(pk_pars, dtype=object)[fitidx] #ragged
+    pk_covs = results['pk_covs'] = np.asarray(pk_covs, dtype=object)[fitidx]
+    pk_binws = results['pk_binws'] = np.asarray(pk_binws)[fitidx]
+    pk_ranges = results['pk_ranges'] = np.asarray(pk_ranges)[fitidx]
 
     # Do a second calibration to the results of the full peak fits
     mus = np.asarray(pk_pars)[:,1] # mu is the i=1 fit par of gauss_step
