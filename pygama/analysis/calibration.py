@@ -178,9 +178,16 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         a list of best-fit parameters for each peak fit
     covs : list of 2D arrays
         a list of covariance matrices for each pars
+    binwidths : list
+        a list of bin widths used for each peak fit
+    ranges: list of array
+        a list of [Euc_min, Euc_max] used for each peak fit
     """
     pars = []
     covs = []
+    binws = []
+    ranges = []
+
     for i_peak in range(len(mode_guesses)):
         # get args for this peak
         wwidth_i = wwidths if np.isscalar(wwidths) else wwidths[i_peak]
@@ -197,9 +204,15 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
         pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
 
+        #get binning
+        binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
+
         pars.append(pars_i)
         covs.append(cov_i)
-    return pars, covs
+        binws.append(binw_1)
+        ranges.append([Euc_min, Euc_max])
+
+    return pars, covs, binws, ranges
 
 
 def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
@@ -316,8 +329,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
         'pt_cal_pars', 'pt_cal_cov' : array, 2D array
             array of calibraiton parameters E_uncal = poly(E_keV) for fit to
             means of gausses fit to tops of each peak
-        'pk_pars', 'pk_cov' : list of (array), list of (2D array)
-            the best fit parameters and covariances for the local fit to each peak
+        'pk_pars', 'pk_cov', 'pk_binws', 'pk_ranges' : list of (array), list of (2D array), list, list of (array)
+            the best fit parameters, covariances, bin width and energy range for the local fit to each peak
         'pk_cal_pars', 'pk_cal_cov' : array, 2D array
             array of calibraiton parameters E_uncal = poly(E_keV) for fit to
             means from full peak fits
@@ -370,10 +383,12 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
 
     # Now do a series of full fits to the peak shapes
     wwidths = pt_pars[:,1]*10 # 10 sigma windows
-    pk_pars, pk_covs = hpge_fit_E_peaks(E_uncal, mus, wwidths, n_bins=50,
+    pk_pars, pk_covs, pk_binws, pk_ranges = hpge_fit_E_peaks(E_uncal, mus, wwidths, n_bins=50,
                                         funcs=pgp.gauss_step, uncal_is_int=uncal_is_int)
     results['pk_pars'] = pk_pars
     results['pk_covs'] = pk_covs
+    results['pk_binws'] = pk_binws
+    results['pk_ranges'] = pk_ranges
 
     # Do a second calibration to the results of the full peak fits
     mus = np.asarray(pk_pars)[:,1] # mu is the i=1 fit par of gauss_step
