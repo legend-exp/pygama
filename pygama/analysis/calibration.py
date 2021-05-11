@@ -360,7 +360,6 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
 
     # Run the initial rough peak search
     detected_peak_locs, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
-    results['matches'] = detected_peak_locs
     guess_keV = guess_keV[0]
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
@@ -370,6 +369,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     if uncal_is_int:
         Euc_min, Euc_max, dEuc = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, dx=dEuc)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
+
+    #run peak search again
+    detected_peak_locs, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
+    results['matches'] = detected_peak_locs
+    guess_keV = guess_keV[0]
 
     # Now do a series of peak-top fits to get a good first calibration
     # We will fit over the 7 bins near the max.
