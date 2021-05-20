@@ -1,6 +1,6 @@
 import numpy as np
 from numba import guvectorize
-
+from pygama.dsp.errors import DSPFatal
 
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
               "void(float64[:], int32, int32, float64[:])",
@@ -11,6 +11,9 @@ def trap_filter(wf_in, rise, flat, wf_out):
     """
     Symmetric trapezoidal filter
     """
+    if 2*rise+flat > len(wf_in):
+        raise DSPFatal("Trap length is longer than waveform!")
+    
     wf_out[0] = wf_in[0]
     for i in range(1, rise):
         wf_out[i] = wf_out[i-1] + wf_in[i]
