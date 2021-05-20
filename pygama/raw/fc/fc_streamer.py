@@ -167,6 +167,9 @@ def process_flashcam(daq_file, raw_files, n_max, raw_groups_dict=None, verbose=F
             out_file = group_info['out_file']
             print(group_path, ':', out_file.split('/')[-1])
 
+    # dictionary with the unique file names as keys
+    file_info = dict.fromkeys(set(group_info['out_file'] for group_info in ch_groups.values()), False)
+
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
     status_decoder.set_file_config(fcio)

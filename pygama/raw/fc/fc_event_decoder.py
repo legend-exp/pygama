@@ -93,28 +93,28 @@ class FCEventDecoder(DataDecoder):
             },
             # start pps of the next dead window
             'dr_start_pps': {
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             # start ticks of the next dead window
             'dr_start_ticks': {
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             # stop pps of the next dead window
             'dr_stop_pps': {
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             # stop ticks of the next dead window
             'dr_stop_ticks': {
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             # maxticks of the dead window
             'dr_maxticks': {
-              'dtype': 'float32',
+              'dtype': 'int32',
             },
             # current dead time calculated from deadregion (dr) fields.
             # Give the total dead time if summed up.
             'deadtime': {
-              'dtype': 'float32',
+              'dtype': 'float64',
             },
             # waveform data
             'waveform': {
