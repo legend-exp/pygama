@@ -16,7 +16,6 @@ from ._processors.asym_trap_filter import asymTrapFilter
 from ._processors.fixed_time_pickoff import fixed_time_pickoff
 from ._processors.trap_norm import trap_norm
 from ._processors.trap_pickoff import trap_pickoff
-from ._processors.time_point_frac import time_point_frac
 from ._processors.time_point_thresh import time_point_thresh
 from ._processors.zac_filter import zac_filter
 from ._processors.param_lookup import param_lookup
