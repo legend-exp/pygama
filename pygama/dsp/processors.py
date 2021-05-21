@@ -26,3 +26,4 @@ from ._processors.log_check import log_check
 from ._processors.min_max import min_max
 from ._processors.presum import presum
 from ._processors.windower import windower
+from ._processors.bl_subtract import bl_subtract
