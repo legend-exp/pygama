@@ -336,6 +336,9 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
             print(f"get_fwhm: interpolation failed, dh == 0")
             return 0, 0
         x_hi = bin_centers[bin_hi] + dx * dhf/dh 
+        if x_hi < x_lo:
+            print(f"get_fwfm: interpolation produced negative fwfm")
+            return 0, 0
         # uncertainty
         dx2_hi = 0
         if var is not None: 
@@ -366,6 +369,10 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
         (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         x_hi = (val_f-b)/m
+        if x_hi < x_lo:
+            print(f"get_fwfm: fit slopes produced negative fwfm")
+            return 0, 0
+
         #uncertainty
         dxh2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
         dxh2 *= x_hi**2

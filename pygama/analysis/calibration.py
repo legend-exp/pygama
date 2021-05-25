@@ -395,14 +395,14 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     pt_covs = results['pt_covs'] = np.asarray(pt_covs)[fitidx]
 
     # Do a first calibration to the results of the peak top fits
-    mus = pt_pars[:,0]
-    mu_vars = pt_covs[:,0,0]
-    pars, cov = hpge_fit_E_scale(mus, mu_vars, detected_peaks_keV, deg=deg)
+    mus = np.stack(pt_pars)[:,0].astype(float)
+    mu_vars = np.stack(pt_covs)[:,0,0].astype(float)
+    pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
     results['pt_cal_pars'] = pars
     results['pt_cal_cov'] = cov
 
     # Now do a series of full fits to the peak shapes
-    wwidths = pt_pars[:,1]*10 # 10 sigma windows
+    wwidths = np.stack(pt_pars)[:,1].astype(float)*20 # 20 sigma windows
     pk_pars, pk_covs, pk_binws, pk_ranges = hpge_fit_E_peaks(E_uncal, mus, wwidths, n_bins=50,
                                         funcs=pgp.gauss_step, uncal_is_int=uncal_is_int)
     results['pk_pars'] = pk_pars
@@ -419,8 +419,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     pk_ranges = results['pk_ranges'] = np.asarray(pk_ranges)[fitidx]
 
     # Do a second calibration to the results of the full peak fits
-    mus = np.asarray(pk_pars)[:,1] # mu is the i=1 fit par of gauss_step
-    mu_vars = np.asarray(pt_covs)[:,1,1]
+    mus = np.stack(pk_pars)[:,1].astype(float) # mu is the i=1 fit par of gauss_step
+    mu_vars = np.stack(pk_covs)[:,1,1].astype(float)
     pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov
