@@ -172,10 +172,10 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
         w_out[i] = w_out[i-1] + w_in[i]/rise
     for i in range(rise_int, rise_int+flat_int):
         w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int])/rise
-    for i in range(rise_int+flat_int, 2*rise_int+flat_int):
+    for i in range(rise_int+flat_int, rise_int+flat_int+fall_int):
         w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int])/rise - w_in[i-rise_int-flat_int]/fall
     for i in range(rise_int+flat_int+fall_int, len(w_in)):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int])/rise - (w_in[i-rise_int-flat_int] + w_in[i-rise_int-flat_int-fall_int])/fall
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int])/rise - (w_in[i-rise_int-flat_int] - w_in[i-rise_int-flat_int-fall_int])/fall
 
 @guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
               "void(float64[:], float32, float32, float32, float64[:])"],
