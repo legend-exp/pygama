@@ -19,7 +19,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import norm
 import scipy.optimize as op
 
-def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=3, deg=0, Etol_keV=None, var_zero=1, verbosity=0):
+def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
 
     Note: the specialization here to units "keV" in peaks and Etol is
@@ -55,7 +55,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=3, deg=0, Etol_keV=Non
     """
     # clean up var if necessary
     if np.any(var == 0):
-        if verbosity > 0:
+        if verbose:
             print(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
         var[np.where(var == 0)] = var_zero
     peaks_keV = np.asarray(peaks_keV)
@@ -74,7 +74,8 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=3, deg=0, Etol_keV=Non
 
         Etol_keV = 10. * (med_sigma_ratio / 0.003)
     pars, ixtup, iytup = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
-    if verbosity > 0 and len(ixtup) != len(peaks_keV):
+
+    if verbose and len(ixtup) != len(peaks_keV):
         print(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
     return detected_max_locs[ixtup], peaks_keV[iytup], pars
 
@@ -369,7 +370,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     return pars, cov
 
 
-def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None):
+def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None, verbose=True):
     """ Calibrate HPGe data to a set of known peaks
 
     Parameters
@@ -441,6 +442,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     # Run the initial rough peak search
     detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg)
     guess_keV = roughpars[0]
+    if verbose:
+        print(f"{len(detected_peaks_locs)} peaks found:")
+        print(f'\t   Energy   | Position  ')
+        for i, (Li, Ei) in enumerate(zip(detected_peaks_locs, detected_peaks_keV)):
+            print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
     Euc_min = peaks_keV[0]/guess_keV * 0.6
@@ -454,6 +460,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     got_peaks_locs, got_peaks_keV, roughpars = hpge_get_E_peaks(hist, bins, var, roughpars, peaks_keV, n_sigma=3)
     results['got_peaks_locs'] = got_peaks_locs
     results['got_peaks_keV'] = got_peaks_keV
+    if verbose:
+        print(f"{len(got_peaks_locs)} peaks obtained:")
+        print(f'\t   Energy   | Position  ')
+        for i, (Li, Ei) in enumerate(zip(got_peaks_locs, got_peaks_keV)):
+            print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # Now do a series of full fits to the peak shapes
 
@@ -501,6 +512,18 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     pk_covs = results['pk_covs'] = np.asarray(pk_covs, dtype=object)[fitidx]
     pk_binws = results['pk_binws'] = np.asarray(pk_binws)[fitidx]
     pk_ranges = results['pk_ranges'] = np.asarray(pk_ranges)[fitidx]
+    if verbose:
+        print(f"{sum(fitidx)} peaks fitted:")
+        varnames = pgp.gauss_step.__code__.co_varnames[1:len(pk_pars[-1])+1]
+        for (Ei, parsi, covsi) in zip(fitted_peaks_keV, pk_pars, pk_covs):
+            parsi = np.asarray(parsi, dtype=float)
+            covsi = np.asarray(covsi, dtype=float)
+            parsigsi = np.sqrt(covsi.diagonal())
+            print(f'\tEnergy: {str(Ei)}')
+            print(f'\t\tParameter  |    Value +/- Sigma  ')
+            for (vari, pari, parsigi) in zip(varnames, parsi, parsigsi):
+                print(f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % parsigi).ljust(8)}')
+                #fwhm??
 
     # Do a second calibration to the results of the full peak fits
     mus = np.stack(pk_pars)[:,1].astype(float) # mu is the i=1 fit par of gauss_step
