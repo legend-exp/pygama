@@ -137,6 +137,8 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         # pars are: amp, mu, sigma, bkg, step
         # get mu and hieght from a gaus fit
         pars, cov = pgf.gauss_mode_max(hist, bins, var)
+        if pars is None:
+            return []
         mu = pars[0]
         height = pars[1]
 
