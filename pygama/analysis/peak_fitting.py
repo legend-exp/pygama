@@ -278,8 +278,11 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     width_guess = (bin_centers[i_n] - bin_centers[i_0])
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
-    pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
+    try:
+        pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, poissonLL=poissonLL)
+    except:
+        return None, None
     if pars[1] < 0: pars[1] = -pars[1]
     if inflate_errors:
         chi2, dof = goodness_of_fit(hist, bins, var, gauss_basic, pars)
@@ -312,6 +315,7 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
     """
     pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
+    if pars is None or cov is None: return None, None
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
 
 
