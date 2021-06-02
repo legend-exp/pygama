@@ -19,7 +19,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import norm
 import scipy.optimize as op
 
-def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbosity=0):
+def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=3, deg=0, Etol_keV=None, var_zero=1, verbosity=0):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
 
     Note: the specialization here to units "keV" in peaks and Etol is
@@ -77,6 +77,65 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     if verbosity > 0 and len(ixtup) != len(peaks_keV):
         print(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
     return detected_max_locs[ixtup], peaks_keV[iytup], pars
+
+
+def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5, var_zero=1, verbose = False):
+    """ Get uncalibrated E peaks at the energies of peaks_keV
+
+    Parameters
+    ----------
+    hist, bins, var: array, array, array
+        Histogram of uncalibrated energies, see pgh.get_hist()
+        var cannot contain any zero entries.
+    cal_pars : array
+        Estimated energy calibration parameters used to search for peaks
+    peaks_keV : array
+        Energies of peaks to search for (in keV)
+    n_sigma : float
+        Threshold for detecting a peak in sigma (i.e. sqrt(var))
+    Etol_keV : float
+        absolute tolerance in energy for matching peaks
+    var_zero : float
+        number used to replace zeros of var to avoid divide-by-zero in
+        hist/sqrt(var). Default value is 1. Usually when var = 0 its because
+        hist = 0, and any value here is fine.
+
+    Returns
+    -------
+    got_peak_locations : list
+        list of uncalibrated energies of found peaks
+    got_peak_energies : list
+        list of calibrated energies of found peaks
+    pars : list of floats
+        the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
+    """
+    # clean up var if necessary
+    if np.any(var == 0):
+        if verbose:
+            print(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
+        var[np.where(var == 0)] = var_zero
+    peaks_keV = np.asarray(peaks_keV)
+
+    # Find all maxes with > n_sigma significance
+    with open('data.txt', 'w') as f:
+        for x in hist/np.sqrt(var):
+            f.write(str(x)+'\n')
+    imaxes = get_i_local_maxima(hist/np.sqrt(var), n_sigma)
+
+    # Keep maxes if they coincide with expected peaks
+    test_peaks_keV = np.asarray([pgf.poly(i, cal_pars) for i in bins[imaxes]])
+    imatch = [abs(peaks_keV - i).min() < Etol_keV for i in test_peaks_keV]
+
+    got_peak_locations = bins[imaxes[imatch]]
+    got_peak_energies = test_peaks_keV[imatch]
+
+    # Match calculated and true peak energies
+    matched_energies = peaks_keV[[np.argmin(abs(peaks_keV - i)) for i in got_peak_energies]]
+
+    # Calculate updated calibration curve
+    pars = np.polyfit(got_peak_locations, matched_energies, len(cal_pars))
+
+    return got_peak_locations, matched_energies, pars
 
 
 def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
@@ -310,7 +369,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     return pars, cov
 
 
-def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False):
+def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None):
     """ Calibrate HPGe data to a set of known peaks
 
     Parameters
@@ -329,6 +388,9 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
+    range_keV : float, tuple, array of floats, or array of tuples of floats
+        ranges around which the peak fitting is performed
+        if tuple(s) are supplied, they provide the left and right ranges
 
     Returns
     -------
@@ -377,8 +439,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
 
     # Run the initial rough peak search
-    detected_peaks_locs, detected_peaks_keV, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
-    guess_keV = guess_keV[0]
+    detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg)
+    guess_keV = roughpars[0]
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
     Euc_min = peaks_keV[0]/guess_keV * 0.6
@@ -388,34 +450,44 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
         Euc_min, Euc_max, dEuc = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, dx=dEuc)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
 
-    #run peak search again after rebinning
-    detected_peaks_locs, detected_peaks_keV, guess_keV = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg, Etol_keV=10)
-    results['detected_peaks_locs'] = detected_peaks_locs
-    results['detected_peaks_keV'] = detected_peaks_keV
-    guess_keV = guess_keV[0]
-
-    # Now do a series of peak-top fits to get a good first calibration
-    # We will fit over the 7 bins near the max.
-    pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_peaks_locs, n_to_fit=7)
-    results['pt_pars'] = pt_pars
-    results['pt_covs'] = pt_covs
-
-    # Drop failed fits
-    fitidx = [i is not None for i in pt_pars]
-    fitted_peaks_keV = results['fitted_keV'] = detected_peaks_keV[fitidx]
-    pt_pars = results['pt_pars'] = np.asarray(pt_pars)[fitidx]
-    pt_covs = results['pt_covs'] = np.asarray(pt_covs)[fitidx]
-
-    # Do a first calibration to the results of the peak top fits
-    mus = np.stack(pt_pars)[:,0].astype(float)
-    mu_vars = np.stack(pt_covs)[:,0,0].astype(float)
-    pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
-    results['pt_cal_pars'] = pars
-    results['pt_cal_cov'] = cov
+    #run peak getter after rebinning
+    got_peaks_locs, got_peaks_keV, roughpars = hpge_get_E_peaks(hist, bins, var, roughpars, peaks_keV, n_sigma=3)
+    results['got_peaks_locs'] = got_peaks_locs
+    results['got_peaks_keV'] = got_peaks_keV
 
     # Now do a series of full fits to the peak shapes
-    wwidths = np.stack(pt_pars)[:,1].astype(float)*20 # 20 sigma windows
-    pk_pars, pk_covs, pk_binws, pk_ranges = hpge_fit_E_peaks(E_uncal, mus, wwidths, n_bins=50,
+
+    # First calculate range around peaks to fit
+    if range_keV is None:
+        #Need to do initial fit
+        pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, got_peaks_locs, n_to_fit=7)
+        # Drop failed fits
+        fitidx = [i is not None for i in pt_pars]
+        results['got_peaks_locs'] = got_peaks_locs = got_peaks_locs[fitidx]
+        results['got_peaks_keV'] = got_peaks_keV = got_peaks_keV[fitidx]
+        pt_pars = np.asarray(pt_pars)[fitidx]
+        pt_covs = np.asarray(pt_covs)[fitidx]
+        range_uncal = np.stack(pt_pars)[:,1].astype(float)*20
+        n_bins = 50
+    elif np.isscalar(range_keV):
+        derco = np.polyder(np.poly1d(roughpars)).coefficients
+        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
+        range_uncal = [float(range_keV) / d for d in der]
+        n_bins = [range_keV/0.5 /d for d in der]
+    elif isinstance(range_keV, tuple):
+        rangeleft_keV, rangeright_keV = range_keV
+        derco = np.polyder(np.poly1d(roughpars)).coefficients
+        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
+        range_uncal = [(rangeleft_keV/d, rangeright_keV/d) for d in der]
+        n_bins = [sum(range_keV)/0.5 /d for d in der]
+    elif isinstance(range_keV, list):
+        derco = np.polyder(np.poly1d(roughpars)).coefficients
+        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
+        range_uncal = [(r[0]/d, r[1]/d) if isinstance(r, tuple) else r/d for r, d in zip(range_keV, der)]
+        n_bins = [sum(r)/0.5/d if isinstance(r, tuple) else r/0.2/d for r, d in zip(range_keV, der)]
+
+
+    pk_pars, pk_covs, pk_binws, pk_ranges = hpge_fit_E_peaks(E_uncal, got_peaks_locs, range_uncal, n_bins=n_bins,
                                         funcs=pgp.gauss_step, uncal_is_int=uncal_is_int)
     results['pk_pars'] = pk_pars
     results['pk_covs'] = pk_covs
@@ -424,7 +496,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False)
 
     # Drop failed fits
     fitidx = [i is not None for i in pk_pars]
-    fitted_peaks_keV = results['fitted_keV'] = fitted_peaks_keV[fitidx]
+    fitted_peaks_keV = results['fitted_keV'] = got_peaks_keV[fitidx]
     pk_pars = results['pk_pars'] = np.asarray(pk_pars, dtype=object)[fitidx] #ragged
     pk_covs = results['pk_covs'] = np.asarray(pk_covs, dtype=object)[fitidx]
     pk_binws = results['pk_binws'] = np.asarray(pk_binws)[fitidx]
