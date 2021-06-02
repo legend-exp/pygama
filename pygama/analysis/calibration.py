@@ -203,13 +203,15 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
 
     for i_peak in range(len(mode_guesses)):
         # get args for this peak
-        wwidth_i = wwidths if np.isscalar(wwidths) else wwidths[i_peak]
+        wwidth_i = wwidths if not isinstance(wwidths, list) else wwidths[i_peak]
         n_bins_i = n_bins if np.isscalar(n_bins) else n_bins[i_peak]
         func_i = funcs[i_peak] if hasattr(funcs, '__len__') else funcs
+        wleft_i = wwidth_i/2 if np.isscalar(wwidth_i) else wwidth_i[0]
+        wright_i = wwidth_i/2 if np.isscalar(wwidth_i) else wwidth_i[1]
 
         # bin a histogram
-        Euc_min = mode_guesses[i_peak] - wwidth_i/2
-        Euc_max = mode_guesses[i_peak] + wwidth_i/2
+        Euc_min = mode_guesses[i_peak] - wleft_i
+        Euc_max = mode_guesses[i_peak] + wright_i
         Euc_min, Euc_max, n_bins_i = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, n_bins=n_bins_i)
         hist, bins, var = pgh.get_hist(E_uncal, bins=n_bins_i, range=(Euc_min,Euc_max))
 
