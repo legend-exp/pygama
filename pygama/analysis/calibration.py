@@ -19,7 +19,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import norm
 import scipy.optimize as op
 
-def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=10, var_zero=1, verbosity=0):
+def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbosity=0):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
 
     Note: the specialization here to units "keV" in peaks and Etol is
@@ -65,6 +65,14 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=10,
 
     # Now pattern match to peaks_keV within Etol_keV using poly_match
     detected_max_locs = pgh.get_bin_centers(bins)[imaxes]
+
+    if Etol_keV is None:
+        #estimate Etol_keV
+        pt_pars, _ = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
+        pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
+        med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
+
+        Etol_keV = 10. * (med_sigma_ratio / 0.003)
     pars, ixtup, iytup = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
     if verbosity > 0 and len(ixtup) != len(peaks_keV):
         print(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
