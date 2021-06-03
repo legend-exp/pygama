@@ -376,7 +376,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     return pars, cov
 
 
-def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None, verbose=True):
+def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None, funcs=pgp.gauss_step, verbose=True):
     """ Calibrate HPGe data to a set of known peaks
 
     Parameters
@@ -472,6 +472,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         for i, (Li, Ei) in enumerate(zip(got_peaks_locs, got_peaks_keV)):
             print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
+    # Drop non-gotten peaks
+    idx = [i for i, E in enumerate(peaks_keV) if E in got_peaks_keV]
+    range_keV = [range_keV[i] for i in idx]
+    funcs = [funcs[i] for i in idx]
+
     # Now do a series of full fits to the peak shapes
 
     # First calculate range around peaks to fit
@@ -503,9 +508,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         range_uncal = [(r[0]/d, r[1]/d) if isinstance(r, tuple) else r/d for r, d in zip(range_keV, der)]
         n_bins = [sum(r)/0.5/d if isinstance(r, tuple) else r/0.2/d for r, d in zip(range_keV, der)]
 
-
     pk_pars, pk_covs, pk_binws, pk_ranges = hpge_fit_E_peaks(E_uncal, got_peaks_locs, range_uncal, n_bins=n_bins,
-                                        funcs=pgp.gauss_step, uncal_is_int=uncal_is_int)
+                                        funcs=funcs, uncal_is_int=uncal_is_int)
     results['pk_pars'] = pk_pars
     results['pk_covs'] = pk_covs
     results['pk_binws'] = pk_binws
@@ -514,14 +518,16 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     # Drop failed fits
     fitidx = [i is not None for i in pk_pars]
     fitted_peaks_keV = results['fitted_keV'] = got_peaks_keV[fitidx]
+    funcs = [f for i, f in zip(fitidx, funcs) if i]
     pk_pars = results['pk_pars'] = np.asarray(pk_pars, dtype=object)[fitidx] #ragged
     pk_covs = results['pk_covs'] = np.asarray(pk_covs, dtype=object)[fitidx]
     pk_binws = results['pk_binws'] = np.asarray(pk_binws)[fitidx]
     pk_ranges = results['pk_ranges'] = np.asarray(pk_ranges)[fitidx]
     if verbose:
         print(f"{sum(fitidx)} peaks fitted:")
-        varnames = pgp.gauss_step.__code__.co_varnames[1:len(pk_pars[-1])+1]
-        for (Ei, parsi, covsi) in zip(fitted_peaks_keV, pk_pars, pk_covs):
+        for i, (Ei, parsi, covsi) in enumerate(zip(fitted_peaks_keV, pk_pars, pk_covs)):
+            func_i = funcs[i] if hasattr(funcs, '__len__') else funcs
+            varnames = func_i.__code__.co_varnames[1:len(pk_pars[-1])+1]
             parsi = np.asarray(parsi, dtype=float)
             covsi = np.asarray(covsi, dtype=float)
             parsigsi = np.sqrt(covsi.diagonal())
@@ -532,8 +538,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
                 #fwhm??
 
     # Do a second calibration to the results of the full peak fits
-    mus = np.stack(pk_pars)[:,1].astype(float) # mu is the i=1 fit par of gauss_step
-    mu_vars = np.stack(pk_covs)[:,1,1].astype(float)
+    mus = np.array([pars[1] for pars in pk_pars]).astype(float) # mu is the i=1 fit par of gauss_step
+    mu_vars = np.array([covs[1,1] for covs in pk_covs]).astype(float)
     pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov
