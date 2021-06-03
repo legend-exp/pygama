@@ -222,11 +222,16 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         return [amp, mu, sigma, bg, step]
 
     else:
-        print(f'get_hpge_E_peak_par_guess not implementes for {func.__name__}')
+        print(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
         return []
 
+def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
+    if True:
+        print(f'get_hpge_E_peak_bounds not implemented for {func.__name__}')
+        return None
+    return None
 
-def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_step, uncal_is_int=False):
+def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_step, uncal_is_int=False, getbounds=True):
     """ Fit gaussians to the tops of peaks
 
     Parameters
@@ -245,6 +250,8 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
+    getbounds : bool or array of bools determining whether to pass bounds
+        to scipy.optimize.minimize via pgf.fit_hist for each peak
 
     Returns
     -------
@@ -269,6 +276,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         func_i = funcs[i_peak] if hasattr(funcs, '__len__') else funcs
         wleft_i = wwidth_i/2 if np.isscalar(wwidth_i) else wwidth_i[0]
         wright_i = wwidth_i/2 if np.isscalar(wwidth_i) else wwidth_i[1]
+        getbounds_i = getbounds if np.isscalar(getbounds) else getbounds[1]
 
         # bin a histogram
         Euc_min = mode_guesses[i_peak] - wleft_i
@@ -278,8 +286,13 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
 
         # get parameters guesses
         par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
+        if getbounds_i:
+            bounds = get_hpge_E_peak_bounds(hist, bins, var, func_i, par_guesses)
+        else:
+            bounds = None
+
         try:
-            pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
+            pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses, bounds=bounds)
 
             if sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf:
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
