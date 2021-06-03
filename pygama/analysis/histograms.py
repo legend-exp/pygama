@@ -333,12 +333,10 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         dhf = hist[bin_hi] - val_f
         dh = hist[bin_hi] - hist[bin_hi+1]
         if dh == 0:
-            print(f"get_fwhm: interpolation failed, dh == 0")
-            return 0, 0
+            raise ValueError(f"get_fwhm: interpolation failed, dh == 0")
         x_hi = bin_centers[bin_hi] + dx * dhf/dh 
         if x_hi < x_lo:
-            print(f"get_fwfm: interpolation produced negative fwfm")
-            return 0, 0
+            raise ValueError(f"get_fwfm: interpolation produced negative fwfm")
         # uncertainty
         dx2_hi = 0
         if var is not None: 
