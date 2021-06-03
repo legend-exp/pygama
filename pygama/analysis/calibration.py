@@ -68,7 +68,8 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
 
     if Etol_keV is None:
         #estimate Etol_keV
-        pt_pars, _ = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
+        pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
+        if sum(sum([sum(c) if c is not None else 0 for c in pt_covs])) == np.inf: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
@@ -280,7 +281,12 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         try:
             pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses)
 
+            if sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf:
+                print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
+                pars_i, cov_i = None, None
+
         except: pars_i, cov_i = None, None
+
 
         #get binning
         binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
