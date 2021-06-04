@@ -1,27 +1,49 @@
 """
-raw_groups.py: manages data grouping for raw data conversion
+raw_buffers.py: manages data buffering for raw data conversion
 
 Often input streams contain multiple types of data that need to get written out
 into separate files, or into separate groups within a file. In pygama such data
-flow control is provided via raw_groups. 
+flow control is provided via raw_buffers. 
+"""
 
-Main concepts:
+import os
+from pygama import lgdo
 
-raw_group
-A "raw_group" consists of a list of "keys" that get written to the same table, which
-then gets written to a specified out_path. Implemented as a dictionary with the
-following contents:
-* key_list (list): a list of keys (e.g. channel numbers) associated with the
-  group. The key scheme is specific to the decoder with which the raw_group is
-  associated. This is called "key_list" instead of "keys" to avoid confusion
-  with the dict function "keys()", e.g. raw_group.keys()
-* out_path (str, optional): the name of the output path to which the raw_group's
-  data should be written. Format: "/path/to/file:/in/file/path"
-* During processing, each raw_group will be given a field "table" pointing to the
-  lgdo.Table containing the raw_group's data
+class RawBuffer:
+    '''
+    A "raw_buffer" is in essence a an lgdo object (typically a Table) to which
+    detecoded data will be written, along with some meta-data defining what data
+    goes into the lgdo, and where the lgdo gets written out
 
+    Attributes
+    ----------
+    key_list : list
+        a list of keys (e.g. channel numbers) identifying data to be written
+        into this buffer. The key scheme is specific to the decoder with which
+        the raw_group is associated. This is called "key_list" instead of "keys"
+        to avoid confusion with the dict function "keys()", e.g.
+        raw_group.keys()
+    file_path : str (optional)
+        the name of the output file path to which the raw_buffer's lgdo should
+        be written
+    group_path : str (optional)
+        the name of the hdf5 group to with the raw_buffer's lgdo should be written
+    lgdo : lgdo 
+        the lgdo used as the actual buffer. Typically a table. Set to None upon
+        creation so that the user can initialize it later.
+    '''
+
+    def __init__(self):
+        key_list = []
+        file_path = ''
+        group_path = ''
+        lgdo = None
+
+
+"""
 raw_groups 
-"raw_groups" is a dictionary of named raw_group's
+"raw_groups" is a dictionary of named raw_group's. Typically, the names are the
+same as group_path in each raw_group
 
 raw_group_library
 Different data decoders can use different key schemes, so the raw_groups must be
@@ -53,8 +75,6 @@ documentation on allowed shorthand notations):
 }
 """
 
-import os
-from pygama import lgdo
 
 
 def expand_raw_groups_library(raw_groups_library, out_path_kwargs):
