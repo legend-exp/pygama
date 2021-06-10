@@ -1,0 +1,89 @@
+
+{
+  "outputs": [
+   "max_index", "bl","bl_sig","slope","intercept", "tail_slope", "pz_slope","pz_std","trapEmax"
+  ],
+  "processors":{
+
+
+    "max_index":{
+      "function": "argmax",
+      "module": "numpy",
+      "args": ["waveform", 1, "max_index"],
+      "kwargs": {"signature":"(n),()->()", "types":["fi->i"]},
+      "unit": "ADC",
+      "prereqs":["waveform"]
+    },
+
+
+    "bl , bl_sig, slope, intercept":{
+      "function": "linear_slope_fit",
+      "module": "pygama.dsp.processors",
+      "args" : ["waveform[:1650]", "bl","bl_sig", "slope","intercept"],
+      "prereqs": ["waveform"],
+      "unit": ["ADC","ADC","ADC","ADC"]
+    },
+
+     "wf_blsub":{
+       "function": "subtract",
+       "module": "numpy",
+       "args": ["waveform", "bl", "wf_blsub"],
+       "prereqs": ["waveform", "bl"],
+       "unit": "ADC"
+    },
+
+
+      "wf_logged":{
+          "function": "log_check",
+          "module": "pygama.dsp.processors",
+          "args": ["wf_blsub[2100:]", "wf_logged"],
+          "prereqs": ["wf_blsub"],
+          "unit": "ADC"
+       },
+
+      "tail_mean , tail_std, tail_slope, tail_intercept":{
+         "function": "linear_slope_fit",
+         "module": "pygama.dsp.processors",
+         "args" : ["wf_logged", "tail_mean","tail_std", "tail_slope","tail_intercept"],
+         "prereqs": ["wf_logged"],
+         "unit": ["ADC","ADC","ADC","ADC"]
+      },
+
+      "wf_pz": {
+        "function": "pole_zero",
+        "module": "pygama.dsp.processors",
+        "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
+        "prereqs": ["wf_blsub"],
+        "unit": "ADC",
+        "defaults": { "db.pz.tau":"44.56*us" }
+      },
+
+      "pz_mean , pz_std, pz_slope, pz_intercept":{
+        "function": "linear_slope_fit",
+        "module": "pygama.dsp.processors",
+        "args" : ["wf_pz[2100:]", "pz_mean","pz_std", "pz_slope","pz_intercept"],
+        "prereqs": ["wf_pz"],
+        "unit": ["ADC","ADC","ADC","ADC"]
+      },
+      "wf_trap": {
+        "function": "trap_norm",
+        "module": "pygama.dsp.processors",
+        "args": ["wf_pz", "8*us", "2*us", "wf_trap"],
+        "prereqs": ["wf_pz"],
+        "unit": "ADC"
+      },
+      "trapEmax": {
+        "function": "amax",
+        "module": "numpy",
+        "args": ["wf_trap", 1, "trapEmax"],
+        "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+        "unit": "ADC",
+        "prereqs": ["wf_trap"]
+    }
+
+
+  }
+}
+
+
+
