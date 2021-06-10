@@ -443,6 +443,18 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         # return individually to make a pretty plot
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
 
+def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
+    """
+    A wrapped version of David Radford's HPGe peak shape function, such that
+    the argument order and definition follows gauss_step
+    """
+
+    a = A + T
+    htail = T / a
+    hstep = S / a
+
+    return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
+
 def radford_fwhm(sigma, htail, tau):
     """
     Return the FWHM of the radford_peak function, ignoring background and
