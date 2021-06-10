@@ -267,7 +267,39 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         return []
 
 def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
-    if True:
+    """
+    Returns: Sequence of (min, max) pairs for each element in x.
+    """
+    if not pars_guess:
+        print(f'non-zero pars_guess must be passed to get_hpge_E_peak_bounds')
+        return None
+
+    if func == pgf.gauss_step:
+        # pars are: amp, mu, sigma, bkg, step
+        amp, mu, sigma, bkg, step = pars_guess
+
+        ampLims = [0, 5*amp]
+        muLims = [mu - 10*sigma, mu + 10*sigma]
+        sigmaLims = [0, 10*sigma]
+        bkgLims = [0, amp]
+        stepLims = [-amp, amp]
+
+        return list(zip(ampLims, muLims, sigmaLims, bkgLims, stepLims))
+    if func == pgf.radford_peak_wrapped:
+
+        # pars are: A, mu, sigma, bg0, S, T, tau
+        A, mu, sigma, bg0, S, T, tau = pars_guess
+
+        ALims = [0, 5*A]
+        muLims = [mu - 10*sigma, mu + 10*sigma]
+        sigmaLims = [0, 10*sigma]
+        bg0Lims = [0, A]
+        SLims = [-A, 5*A]
+        TLims = [0, 5*A]
+        tauLims = [sigma, 100*sigma]
+
+        return list(zip(ALims, muLims, sigmaLims, bg0Lims, SLims, TLims, tauLims))
+    else:
         print(f'get_hpge_E_peak_bounds not implemented for {func.__name__}')
         return None
     return None
@@ -703,7 +735,6 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         if n_close_i >= n_close:
             gof_i = np.sum(np.power(polxx[matches] - yy_i[matches], 2))
             if n_close_i > n_close or (n_close_i == n_close and gof_i < gof):
-                i_matches = ixtup[np.where(matches)]
                 n_close = n_close_i
                 gof = gof_i
                 pars = pars_i
