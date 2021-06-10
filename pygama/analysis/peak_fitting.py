@@ -463,10 +463,10 @@ def radford_fwhm(sigma, htail, tau):
         return radford_peak(E, 0, sigma, 0, htail, tau, 0, 1) - half_max
     
     lower_hm = brentq( radford_peak_bgfree_halfmax,
-                       Emax - 2*(sigma+htail), Emax,
+                       -(2.5*sigma/2 + htail*tau), Emax,
                        args = (sigma, htail, tau, half_max) )
     upper_hm = brentq( radford_peak_bgfree_halfmax,
-                       Emax, Emax + 2*(sigma+htail),
+                       Emax, 2.5*sigma/2,
                        args = (sigma, htail, tau, half_max) )
     
     return upper_hm - lower_hm
