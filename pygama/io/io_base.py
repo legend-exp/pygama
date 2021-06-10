@@ -38,16 +38,22 @@ class DataDecoder(ABC):
                                      lh5.Array(shape=garbage_length, dtype='uint32'))
 
 
-    def get_decoded_values(self, channel):
-        """ must overload for your decoder
-        Note: implement channel = None returns a "default" decoded_values
+    def get_decoded_values(self, channel=None):
+        """ Get decoded values (optionally for a given channel)
+
+        Must overload for your decoder if it has channel-specific decoded
+        values. Note: implement channel = None returns a "default" decoded_values
+
+        Otherwise, just returns self.decoded_values, which should be defined in
+        the constructor
         """
+        if channel is None: return self.decoded_values
         name = type(self).__name__
-        print("you need to implement get_decoded_values for", name)
+        print("You need to implement channel-specific get_decoded_values for", name)
         return None
 
 
-    def initialize_lh5_table(self, lh5_table, channel):
+    def initialize_lh5_table(self, lh5_table, channel=None):
         """ initialize and lh5 Table based on decoded_values 
         channel is the channel according to ch_group
         """
