@@ -14,10 +14,7 @@ import pygama.analysis.histograms as pgh
 import pygama.analysis.peak_fitting as pgf
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
-from scipy.signal import argrelextrema, medfilt, find_peaks_cwt
-from scipy.ndimage.filters import gaussian_filter1d
-from scipy.stats import norm
-import scipy.optimize as op
+from scipy.signal import medfilt, find_peaks_cwt
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
