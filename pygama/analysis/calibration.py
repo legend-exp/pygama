@@ -220,6 +220,48 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         amp = height * sigma * np.sqrt(2 * np.pi)
         return [amp, mu, sigma, bg, step]
 
+    if func == pgp.radford_peak_wrapped:
+        # pars are: mu, sigma, hstep, htail, tau, bg0, amp
+        # get mu and height from a gaus fit
+        #pars, cov = pgf.gauss_mode_max(hist, bins, var)
+
+        #guess mu, height
+        i_0 = np.argmax(hist)
+        mu = pgh.get_bin_centers(bins)[i_0]
+        height = hist[i_0]
+
+        # get bg and step from edges of hist
+        bg0 = np.sum(hist[-5:])/5
+        step = np.sum(hist[:5])/5 - bg0
+
+        # get sigma from fwfm with f = 1/sqrt(e)
+        try:
+            sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='interpolate')[0]
+            if sigma == 0: raise ValueError
+        except:
+            sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='fit_slopes')[0]
+            if sigma == 0: print("get_hpge_E_peak_par_guess: sigma estimation failed")
+            return []
+        sigma = sigma*.5 # roughly remove some amount due to tail
+
+        # for now hard-coded
+        htail = 1./5
+        tau = 6.*sigma
+
+        # now compute amp and return
+        height -= (bg0 + step/2)
+        amp = height * sigma * np.sqrt(2 * np.pi)
+
+        hstep = step/amp
+
+        # convert to wrapped parameters
+        A = amp*(1-htail)
+        S = amp*hstep
+        T = amp*htail
+
+        parguess = [A, mu, sigma, bg0, S, T, tau]
+
+        return parguess
     else:
         print(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
         return []
