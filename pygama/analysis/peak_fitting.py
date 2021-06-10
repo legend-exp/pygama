@@ -482,7 +482,27 @@ def radford_fwhm(sigma, htail, tau):
                        args = (sigma, htail, tau, half_max) )
     
     return upper_hm - lower_hm
-    
+
+def get_fwhm_func(func, pars):
+
+    if func == gauss_step:
+        amp, mu, sigma, bkg, step = pars
+        return sigma*2*np.sqrt(2*np.log(2))
+
+    if func == radford_peak:
+        mu, sigma, hstep, htail, tau, bg0, a = pars
+        return radford_fwhm(sigma, htail, tau)
+
+    if func == radford_peak_wrapped:
+        A, mu, sigma, bg0, S, T, tau = pars
+        a = A + T
+        htail = T / a
+        hstep = S / a
+        newpars = mu, sigma, hstep, htail, tau, bg0, a
+        return get_fwhm_func(radford_peak, newpars)
+    else:
+        print(f'get_fwhm_func not implemented for {func.__name__}')
+        return None
     
 def gauss_tail(x,mu, sigma, tail,tau):
     """
