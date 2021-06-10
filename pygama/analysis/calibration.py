@@ -196,6 +196,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         # get mu and hieght from a gaus fit
         pars, cov = pgf.gauss_mode_max(hist, bins, var)
         if pars is None:
+            print("get_hpge_E_peak_par_guess: gauss_mode_max failed")
             return []
         mu = pars[0]
         height = pars[1]
@@ -210,8 +211,9 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
             if sigma == 0: raise ValueError
         except:
             sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg+step/2, method='fit_slopes')[0]
-            if sigma == 0: print("get_hpge_E_peak_par_guess: sigma estimation failed")
-            return []
+            if sigma == 0:
+                print("get_hpge_E_peak_par_guess: sigma estimation failed")
+                return []
 
         # now compute amp and return
         height -= (bg + step/2)
