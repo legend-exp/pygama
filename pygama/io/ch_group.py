@@ -75,12 +75,13 @@ def expand_ch_groups(ch_groups):
         while i < len(info['ch_list']):
             ch_range = info['ch_list'][i]
             # expand any 2-int lists
-            if isinstance(ch_range, list) and len(ch_range) != 2:
+            if isinstance(ch_range, list) and len(ch_range) == 2:
                 info['ch_list'][i:i+1] = range(ch_range[0], ch_range[1]+1)
                 i += ch_range[1]-ch_range[0]
             # any other entry should be an int!
-            if not isinstance(ch_range, int): 
+            elif not isinstance(ch_range, int): 
                 print('ch_group', group, 'has malformed channel list:', ch_range)
+                print(type(ch_range), len(ch_range))
             i += 1
         
         # Expand groups if group name contains a ch-based formatter

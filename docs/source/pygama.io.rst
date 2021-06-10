@@ -12,14 +12,6 @@ pygama.io.MGDODecoder module
    :undoc-members:
    :show-inheritance:
 
-pygama.io.WaveformBrowser module
---------------------------------
-
-.. automodule:: pygama.io.WaveformBrowser
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 pygama.io.ch\_group module
 --------------------------
 
@@ -40,14 +32,6 @@ pygama.io.daq\_to\_raw module
 -----------------------------
 
 .. automodule:: pygama.io.daq_to_raw
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-pygama.io.digitizers module
----------------------------
-
-.. automodule:: pygama.io.digitizers
    :members:
    :undoc-members:
    :show-inheritance:
