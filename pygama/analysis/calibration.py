@@ -176,7 +176,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
     peak_energies = get_most_prominent_peaks(energy_hi,
                                             xlo=np.percentile(energy_series, 20),
                                             xhi=np.percentile(energy_series, 99.9),
-                                            xpb=2) #modified limits and binwidth
+                                            xpb=4,
+                                            max_num_peaks = len(cal_peaks)) #modified limits and binwidth
     rough_kev_per_adc, rough_kev_offset = match_peaks(peak_energies, cal_peaks)
     e_cal_rough = rough_kev_per_adc * energy_series + rough_kev_offset
 
@@ -203,7 +204,7 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
     peak_num = len(cal_peaks)
     centers = np.zeros(peak_num)
     fit_result_map = {}
-    bin_size = 0.2  #keV
+    bin_size = 0.3  #keV
 
     if plotFigure is not None:
         plot_map = {}
@@ -255,16 +256,17 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
         # inpu = input("q to quit...")
         # if inpu == "q": exit()
 
-        bounds = ([0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, 0], [
+        bounds = ([0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, -0.1, 0], [
             1.1 * guess_e, 2 * guess_sigma, 0.1, 0.75, window_width_in_adc, 10,
-            5 * guess_area
+            0.1, 5 * guess_area
         ])
-        params = fit_binned(
+        params, _ = fit_hist(
             radford_peak,
             peak_hist,
-            bin_centers,
-            [guess_e, guess_sigma, 1E-3, 0.7, 5, 0, guess_area],
-        )  #bounds=bounds)
+            bins,
+            guess = [guess_e, guess_sigma, 1E-3, 0.7, 5, 0, 0, guess_area],
+            bounds=bounds)
+        print(params[1], params[5], params[6])
 
         plt.plot(bin_centers, radford_peak(bin_centers, *params), color="r")
 
@@ -282,32 +284,32 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
     if plotFigure is not None:
 
-        plt.figure(plotFigure.number) 
-        plt.clf()
+        fig, axs = plt.subplots(peak_num, 1, figsize=(12,16)) 
         
-        grid = gs.GridSpec(peak_num, 1, hspace=0.5)
+        #grid = gs.GridSpec(peak_num, 1, hspace=0.5)
         #ax_line = plt.subplot(grid[:, 1])  #changed plotting arrangement, added 2 figure objects
         #ax_spec = plt.subplot(grid[:, 2])
 
         for i, energy in enumerate(cal_peaks):
-            ax_peak = plt.subplot(grid[i, 0])
+            ax_peak = plt.subplot(axs[i])
             bin_centers, peak_hist = plot_map[energy]
+            bin_centers_keV = bin_centers * rough_kev_per_adc + rough_kev_offset
             params = fit_result_map[energy]
             ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset,
+                bin_centers_keV,
                 peak_hist,
                 ds="steps-mid",
                 color="b",
                 label="data")
             fit = radford_peak(bin_centers, *params)
-            ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset,
-                fit,
-                color="r",
-                label="fit")
-
-        ax_peak.set_xlabel("Energy [keV]")
-        ax_peak.legend()
+            _, gaussian, bg, st, le = radford_peak(bin_centers, *params, components=True)
+            ax_peak.plot(bin_centers_keV, fit, color="r", label="total fit")
+            ax_peak.plot(bin_centers_keV, gaussian, color="c", label="gauss")
+            ax_peak.plot(bin_centers_keV, le, color="g", label="le_tail")
+            ax_peak.plot(bin_centers_keV, st, color="y", label="step")
+            ax_peak.plot(bin_centers_keV, bg, color="k", label="linear bg")
+            ax_peak.legend(loc="upper right")
+            ax_peak.set_xlabel("Energy [keV]")
         
         plt.figure()
         ax_line = plt.subplot()

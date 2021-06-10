@@ -39,6 +39,13 @@
       "unit": "ADC",
       "defaults": { "db.pz_const":"72*us" }
     },
+    "fltp, fltp_sig": {
+      "function": "mean_stdev",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz[-1500:]", "fltp", "fltp_sig"],
+      "prereqs": ["wf_pz"],
+      "unit": ["ADC", "ADC"]
+    },
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",

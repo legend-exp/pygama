@@ -178,7 +178,7 @@ def gauss_bkg(x, a, mu, sigma, bkg):
     return bkg + gauss(x, mu, sigma, a)
 
 
-def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
+def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, bg1, a=1, components=False):
     """
     David Radford's HPGe peak shape function
     """
@@ -188,9 +188,9 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     if hstep < 0 or hstep > 1: 
         return np.zeros_like(x)
 
-    bg_term = bg0  #+ x*bg1
-    if np.any(bg_term < 0): 
-        return np.zeros_like(x)
+    bg_term = bg0 + x*bg1
+    #if np.any(bg_term < 0): 
+        #return np.zeros_like(x)
 
     # compute the step and the low energy tail
     step = a * hstep * erfc((x - mu) / (sigma * np.sqrt(2)))

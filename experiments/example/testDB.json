@@ -1,7 +1,7 @@
 {
-  "loc_dir":"$DATADIR/LNGS",
-  "raw_dir":"$DATADIR/LNGS",
-  "tier_dir":"$DATADIR/LNGS/pygama",
+  "loc_dir":"$LEGENDDATADIR/LNGS-old",
+  "raw_dir":"$LEGENDDATADIR/LNGS-old",
+  "tier_dir":"$LEGENDDATADIR/LNGS-old/pygama",
   
   "t1_prefix":"t1_run",
   "t2_prefix":"t2_run",
@@ -10,6 +10,7 @@
   "rollover":1,
   "mass_note":"(5.323 g/cm^3) * ((pi * 3.1^2 * 4.6) cm^3) / 1000",
   "det_mass_kg":0.739,
+  "suffix":"h5",
 
   "ds":{
     "0":["204", "2019/03/18 thorium calibration, pos 2 (corner of rm)"]

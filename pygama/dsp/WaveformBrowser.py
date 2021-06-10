@@ -325,7 +325,7 @@ class WaveformBrowser:
                     self.ax.axhline(val)
         
         self.ax.set_xlabel(self.x_unit.label)
-        self.ax.xaxis.set_label_coords(0.98, -0.05)
+        #self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
         if len(leg_labels)>0:
