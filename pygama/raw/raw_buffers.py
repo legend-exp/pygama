@@ -1,9 +1,8 @@
 """
 raw_buffers.py: manages data buffering for raw data conversion
 
-Often input streams contain multiple types of data that need to get written out
-into separate files, or into separate groups within a file. In pygama such data
-flow control is provided via raw_buffers. 
+Manages LGDO buffers and their corresponding output streams. Allows for
+one-to-many mapping of input sreams to output streams.
 """
 
 import os
