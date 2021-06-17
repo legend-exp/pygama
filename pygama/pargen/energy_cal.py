@@ -8,9 +8,9 @@ routines for automatic calibration.
 """
 import sys
 import numpy as np
-import pygama.utils as pgu
-import pygama.analysis.peak_fitting as pgp
-import pygama.analysis.histograms as pgh
+import pygama.math.utils as pgu
+import pygama.math.peak_fitting as pgp
+import pygama.math.histogram as pgh
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
 from scipy.signal import argrelextrema, medfilt, find_peaks_cwt

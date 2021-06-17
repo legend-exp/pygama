@@ -3,7 +3,7 @@ from scipy.optimize import minimize, curve_fit, minimize_scalar, brentq
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
 
-import pygama.analysis.histograms as ph
+import pygama.math.histogram as ph
 
 
 def fit_hist(func, hist, bins, var=None, guess=None,

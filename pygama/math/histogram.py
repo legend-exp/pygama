@@ -16,7 +16,7 @@ they will help you if you need to do something trickier than is provided (e.g.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pygama.utils as pgu
+import pygama.math.utils as pgu
 from pylab import rcParams
 
 
