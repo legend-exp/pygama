@@ -358,7 +358,12 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
             return 0, 0
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
-        (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+
+        try:
+            (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+        except np.linalg.LinAlgError:
+            print(f"get_fwfm: LinAlgError")
+            return 0, 0
         x_lo = (val_f-b)/m
         #uncertainty
         dxl2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
