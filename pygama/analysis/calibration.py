@@ -130,6 +130,19 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
 
     # Match calculated and true peak energies
     matched_energies = peaks_keV[[np.argmin(abs(peaks_keV - i)) for i in got_peak_energies]]
+    while not all([list(matched_energies).count(x) == 1 for x in matched_energies]):
+        for i in range(len(matched_energies)):
+            if matched_energies[i+1] == matched_energies[i]:
+                #remove duplicates
+                if np.argmin(abs(got_peak_energies[i:i+2] - matched_energies[i])): #i+1 is best match
+                    got_peak_locations = np.delete(got_peak_locations, i)
+                    got_peak_energies = np.delete(got_peak_energies, i)
+                else: #i is best match
+                    got_peak_locations = np.delete(got_peak_locations, i+1)
+                    got_peak_energies = np.delete(got_peak_energies, i+1)
+                matched_energies = np.delete(matched_energies, i)
+                break
+            i+=1
 
     # Calculate updated calibration curve
     pars = np.polyfit(got_peak_locations, matched_energies, len(cal_pars))
