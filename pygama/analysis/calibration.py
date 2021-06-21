@@ -70,7 +70,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
-        Etol_keV = 10. * (med_sigma_ratio / 0.003)
+        Etol_keV = 5. * (med_sigma_ratio / 0.003)
     pars, ixtup, iytup = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
 
     if verbose and len(ixtup) != len(peaks_keV):
