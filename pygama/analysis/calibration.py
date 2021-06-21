@@ -263,7 +263,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
 
         # now compute amp and return
         height -= (bg0 + step/2)
-        amp = height * sigma * np.sqrt(2 * np.pi)
+        amp = height / (htail*0.87/35 + (1-htail)/(sigma*np.sqrt(2*np.pi))) #numerical factors from definition of tail_func @ mu
 
         hstep = step/amp
 

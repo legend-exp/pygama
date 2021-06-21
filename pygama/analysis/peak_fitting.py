@@ -451,7 +451,7 @@ def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
 
     a = A + T
     htail = T / a
-    hstep = S / a
+    hstep = S / (2*a)
 
     return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
 
