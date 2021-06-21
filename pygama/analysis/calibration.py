@@ -546,7 +546,6 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
 
     # Run the initial rough peak search
     detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg)
-    guess_keV = roughpars[0]
     if verbose:
         print(f"{len(detected_peaks_locs)} peaks found:")
         print(f'\t   Energy   | Position  ')
@@ -554,9 +553,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
             print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
-    Euc_min = peaks_keV[0]/guess_keV * 0.6
-    Euc_max = peaks_keV[-1]/guess_keV * 1.1
-    dEuc = 0.2/guess_keV
+    Euc_min, Euc_max = [(np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1)]
+    Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
+    Euc_max = Euc_max[np.logical_and(Euc_max >= Euc_min, Euc_max <= max(E_uncal))][0]
+    dEuc = 0.2/roughpars[-2]
+
     if uncal_is_int:
         Euc_min, Euc_max, dEuc = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, dx=dEuc)
     hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
