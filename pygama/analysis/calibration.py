@@ -577,6 +577,12 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     range_keV = [range_keV[i] for i in idx]
     funcs = [funcs[i] for i in idx]
 
+    # Drop peaks to not be fitted
+    tmp = zip(*[a for a in zip(got_peaks_locs, got_peaks_keV, range_keV, funcs) if a[2] and a[3]])
+    got_peaks_locs, got_peaks_keV, range_keV, funcs = list(map(list, tmp))
+    got_peaks_locs = np.asarray(got_peaks_locs)
+    got_peaks_keV = np.asarray(got_peaks_keV)
+
     # Now do a series of full fits to the peak shapes
 
     # First calculate range around peaks to fit
