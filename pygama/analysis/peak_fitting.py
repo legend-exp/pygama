@@ -422,15 +422,16 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     # make sure the fractional amplitude parameters stay reasonable
     if htail < 0 or htail > 1:
         return np.zeros_like(x)
-    if hstep < 0 or hstep > 1:
+    if hstep < -1 or hstep > 1:
         return np.zeros_like(x)
 
-    bg_term = bg0  #+ x*bg1
-    if np.any(bg_term < 0):
-        return np.zeros_like(x)
-
-    # compute the step and the low energy tail
+    # compute the step, check the background isn't negative
     step = a * hstep * erfc((x - mu) / (sigma * np.sqrt(2)))
+    bg_term = bg0 # x*bg1... (maybe bg should be list of coefficients?)
+    if np.any(bg_term + step < 0):
+        return np.zeros_like(x)
+
+    # compute the low energy tail
     le_tail = a * htail
     le_tail *= erfc((x - mu) / (sigma * np.sqrt(2)) + sigma / (tau * np.sqrt(2)))
     le_tail *= np.exp((x - mu) / tau)
