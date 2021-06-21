@@ -357,7 +357,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
             print(f"get_fwfm: fit slopes failed")
             return 0, 0
         i_n = i_0 + n_slope
-        wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
+        wts = None if var is None else 1/np.sqrt(var[i_0:i_n]) #fails for any var = 0
+        wts = [w if w != np.inf else 0 for w in wts]
 
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
@@ -377,6 +378,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
+        wts = [w if w != np.inf else 0 for w in wts]
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         except np.linalg.LinAlgError:
