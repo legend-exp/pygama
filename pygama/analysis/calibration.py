@@ -527,7 +527,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
 
     # sanity checks
     E_uncal = np.asarray(E_uncal)
-    peaks_keV = np.sort(peaks_keV)
+    peaks_keV = np.asarray(peaks_keV) #peaks_keV = np.sort(peaks_keV)
     deg = int(deg)
     if guess_keV <= 0:
         print(f'hpge_E_cal warning: invalid guess_keV = {guess_keV}')
