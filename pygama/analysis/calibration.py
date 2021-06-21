@@ -737,9 +737,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
             pars_i = np.polyfit(xx_i, yy_i, deg)
             polxx = np.zeros(len(yy_i))
             xxn = np.ones(len(yy_i))
-            for j in range(len(pars_i)):
-                polxx += xxn*pars_i[-j-1]
-                xxn *= xx_i
+            polxx = pgf.poly(xx_i, pars_i)
 
         # by here we have the best polxx. Search for matches and store pars_i if
         # its the best so far
