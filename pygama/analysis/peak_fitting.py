@@ -426,23 +426,20 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         return np.zeros_like(x)
 
     # compute the step, check the background isn't negative
-    step = a * hstep * erfc((x - mu) / (sigma * np.sqrt(2)))
+    step_f = step(x, mu, sigma, 0, a*hstep)
     bg_term = bg0 # x*bg1... (maybe bg should be list of coefficients?)
-    if np.any(bg_term + step < 0):
+    if np.any(bg_term + step_f < 0):
         return np.zeros_like(x)
 
     # compute the low energy tail
-    le_tail = a * htail
-    le_tail *= erfc((x - mu) / (sigma * np.sqrt(2)) + sigma / (tau * np.sqrt(2)))
-    le_tail *= np.exp((x - mu) / tau)
-    le_tail /= (2 * tau * np.exp(-(sigma / (np.sqrt(2) * tau))**2))
+    le_tail = gauss_tail(x, mu, sigma, a * htail, tau)
 
     if not components:
         # add up all the peak shape components
-        return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
+        return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step_f + le_tail
     else:
         # return individually to make a pretty plot
-        return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
+        return (1 - htail), gauss(x, mu, sigma, a), bg_term, step_f, le_tail
 
 def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
     """
