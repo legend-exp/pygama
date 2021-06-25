@@ -233,6 +233,41 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         amp = height * sigma * np.sqrt(2 * np.pi)
         return [amp, mu, sigma, bg, step]
 
+    if func == pgp.radford_peak:
+        # pars are: mu, sigma, hstep, htail, tau, bg0, amp
+
+        #guess mu, height
+        i_0 = np.argmax(hist)
+        mu = pgh.get_bin_centers(bins)[i_0]
+        height = hist[i_0]
+
+        # get bg and step from edges of hist
+        bg0 = np.sum(hist[-5:])/5
+        step = np.sum(hist[:5])/5 - bg0
+
+        # get sigma from fwfm with f = 1/sqrt(e)
+        try:
+            sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='interpolate')[0]
+            if sigma == 0: raise ValueError
+        except:
+            sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='fit_slopes')[0]
+            if sigma == 0: print("get_hpge_E_peak_par_guess: sigma estimation failed")
+            return []
+        sigma = sigma*.5 # roughly remove some amount due to tail
+
+        # for now hard-coded
+        htail = 1./5
+        tau = 6.*sigma
+
+        # now compute amp and return
+        height -= (bg0 + step/2)
+        amp = height / (htail*0.87/35 + (1-htail)/(sigma*np.sqrt(2*np.pi))) #numerical factors from definition of tail_func @ mu
+
+        hstep = step/(2*amp)
+
+        parguess = [mu, sigma, hstep, htail, tau, bg0, amp]
+
+        return parguess
     if func == pgp.radford_peak_wrapped:
         # pars are: mu, sigma, hstep, htail, tau, bg0, amp
         # get mu and height from a gaus fit
@@ -265,11 +300,11 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         height -= (bg0 + step/2)
         amp = height / (htail*0.87/35 + (1-htail)/(sigma*np.sqrt(2*np.pi))) #numerical factors from definition of tail_func @ mu
 
-        hstep = step/amp
+        hstep = step/(2*amp)
 
         # convert to wrapped parameters
         A = amp*(1-htail)
-        S = amp*hstep
+        S = amp*2*hstep
         T = amp*htail
 
         parguess = [A, mu, sigma, bg0, S, T, tau]
@@ -298,6 +333,21 @@ def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
         stepLims = [-amp, amp]
 
         return list(zip(ampLims, muLims, sigmaLims, bkgLims, stepLims))
+
+    if func == pgp.radford_peak:
+        # pars are: mu, sigma, hstep, htail, tau, bg0, amp
+        mu, sigma, hstep, htail, tau, bg0, amp = pars_guess
+
+        muLims = [mu - 10*sigma, mu + 10*sigma]
+        sigmaLims = [0, 10*sigma]
+        hstepLims = [-1, 1]
+        htailLims = [0, 1]
+        tauLims = [sigma, 100*sigma]
+        bg0Lims = [0, amp]
+        ampLims = [0, 5*amp]
+
+        return list(zip(muLims, sigmaLims, hstepLims, htailLims, tauLims, bg0Lims, ampLims))
+
     if func == pgf.radford_peak_wrapped:
 
         # pars are: A, mu, sigma, bg0, S, T, tau
@@ -307,7 +357,7 @@ def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
         muLims = [mu - 10*sigma, mu + 10*sigma]
         sigmaLims = [0, 10*sigma]
         bg0Lims = [0, A]
-        SLims = [-A, 5*A]
+        SLims = [-5*A, 5*A]
         TLims = [0, 5*A]
         tauLims = [sigma, 100*sigma]
 
