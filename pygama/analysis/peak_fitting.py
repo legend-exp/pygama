@@ -2,9 +2,11 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit, minimize_scalar, brentq
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
+import sys
 
 import pygama.analysis.histograms as ph
 
+limit = np.log(sys.float_info.max)/10
 
 def fit_hist(func, hist, bins, var=None, guess=None,
              poissonLL=False, integral=None, method=None, bounds=None):
@@ -591,9 +593,29 @@ def gauss_tail(x,mu, sigma, tail,tau):
     A gaussian tail function template
     Can be used as a component of other fit functions
     """
-    tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    x = np.asarray(x)
+    scalar_input = False
+    if x.ndim == 0:
+        x = x[None] # makes x1d
+        scalar_input = True
+
+    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
+    tail_f = np.where(tmp < limit, gauss_tail_exact(x, mu, sigma, tail, tau), gauss_tail_approx(x, mu, sigma, tail, tau))
+
+    if scalar_input:
+        return np.squeeze(tail_f)
     return tail_f
 
+def gauss_tail_exact(x, mu, sigma, tail, tau):
+    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
+    tmp = np.where(tmp < limit, tmp, limit)
+    tail_f = tail/(2*tau) * np.exp(tmp) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    return tail_f
+
+def gauss_tail_approx(x, mu, sigma, tail, tau):
+    den = 1./(sigma + tau*(x-mu)/sigma)
+    tail_f = sigma * gauss(x, mu, sigma) * den * (1.-tau*tau*den*den)
+    return tail_f
 
 def step(x, mu, sigma, bkg, a):
     """
