@@ -453,7 +453,7 @@ def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
 
     return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
 
-def radford_fwhm(sigma, htail, tau):
+def radford_fwhm(sigma, htail, tau, cov = None):
     """
     Return the FWHM of the radford_peak function, ignoring background and
     step components. TODO: also get the uncertainty
@@ -479,17 +479,75 @@ def radford_fwhm(sigma, htail, tau):
                        Emax, 2.5*sigma/2,
                        args = (sigma, htail, tau, half_max) )
     
-    return upper_hm - lower_hm
+    if cov is None: return upper_hm - lower_hm
 
-def get_fwhm_func(func, pars):
+    #calculate uncertainty
+    #amp set to 1, mu to 1, hstep+bg set to 0
+    pars = [1, sigma, 0, htail, tau, 0, 1]
+    grad1 = radford_parameter_gradient(lower_hm, pars);
+    grad2 = radford_parameter_gradient(upper_hm, pars);
+    grad1 *= 1./radford_peakshape_derivative(lower_hm, pars);
+    grad2 *= 1./radford_peakshape_derivative(upper_hm, pars);
+    grad2 -= grad1;
+    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
+
+    return upper_hm - lower_hm, fwfm_unc
+
+def radford_peakshape_derivative(E, pars):
+    mu, sigma, hstep, htail, tau, bg0, a = pars
+
+    sigma = abs(sigma)
+    gaus = gauss(E, mu, sigma)
+    y = (E-mu)/sigma
+    sigtauL = sigma/tau
+    ret = -(1-htail)*y/sigma*gaus
+
+    ret -= htail/tau*(-gauss_tail(E, mu, sigma, 1, tau)+gaus)
+
+    return a*(ret - hstep*gaus)
+
+def radford_parameter_gradient(E, pars):
+    mu, sigma, hstep, htail, tau, bg0, amp = pars #bk gradient zero?
+
+    gaus = gauss(E, mu, sigma)
+    tailL = gauss_tail(E, mu, sigma, 1, tau)
+    step_f = step(E, mu, sigma, 0, 1)
+
+    #some unitless numbers that show up a bunch
+    y = (E-mu)/sigma
+    sigtauL = sigma/tau
+
+    g_amp = htail*tailL + (1-htail)*gaus + hstep*step_f
+    g_hs = amp*step_f
+    g_ft = amp*(tailL-gaus)
+
+    #gradient of gaussian part
+    g_mu = (1-htail)*y/sigma*gaus
+    g_sigma = (1-htail)*(y*y-1)/sigma*gaus
+
+    #gradient of low tail, use approximation if necessary
+    g_mu += htail/tau*(-tailL+gaus)
+    g_sigma += htail/tau*(sigtauL*tailL-(sigtauL-y)*gaus)
+    g_tau = -htail/tau*( (1.+sigtauL*y+sigtauL*sigtauL)*tailL - sigtauL*sigtauL*gaus) * amp
+
+    g_mu = amp*(g_mu + hstep*gaus)
+    g_sigma = amp*(g_sigma + hstep*y*gaus)
+
+    gradient = g_mu, g_sigma, g_hs, g_ft, g_tau, 0, g_amp
+    return np.array(gradient)
+
+def get_fwhm_func(func, pars, cov = None):
 
     if func == gauss_step:
         amp, mu, sigma, bkg, step = pars
-        return sigma*2*np.sqrt(2*np.log(2))
+        if cov is None:
+            return sigma*2*np.sqrt(2*np.log(2))
+        else:
+            return sigma*2*np.sqrt(2*np.log(2)), np.sqrt(cov[2][2])*2*np.sqrt(2*np.log(2))
 
     if func == radford_peak:
         mu, sigma, hstep, htail, tau, bg0, a = pars
-        return radford_fwhm(sigma, htail, tau)
+        return radford_fwhm(sigma, htail, tau, cov)
 
     if func == radford_peak_wrapped:
         A, mu, sigma, bg0, S, T, tau = pars
@@ -497,7 +555,7 @@ def get_fwhm_func(func, pars):
         htail = T / a
         hstep = S / a
         newpars = mu, sigma, hstep, htail, tau, bg0, a
-        return get_fwhm_func(radford_peak, newpars)
+        return get_fwhm_func(radford_peak, newpars) #couldn't work out how to transform covariance matrix, use simple radford_peak for uncertainty
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None

@@ -653,9 +653,17 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov
 
-    # Finally, invert the E scale fit to get a calibration function
+    # Invert the E scale fit to get a calibration function
     pars, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
 
+    # Finally, calculate fwhms in keV
+    uncal_fwhms = [pgf.get_fwhm_func(func_i, pars_i, covs_i) for func_i, pars_i, covs_i in zip(funcs, pk_pars, pk_covs)]
+    uncal_fwhms, uncal_fwhm_errs = zip(*uncal_fwhms)
+    uncal_fwhms = np.asarray(uncal_fwhms)
+    uncal_fwhm_errs = np.asarray(uncal_fwhm_errs)
+    derco = np.polyder(np.poly1d(pars)).coefficients
+    der = [pgf.poly(Ei, derco) for Ei in fitted_peaks_keV]
+    results['pk_fwhms'] = np.asarray([(u*d, e*d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)])
 
     return pars, cov, results
 
