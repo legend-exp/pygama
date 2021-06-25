@@ -430,12 +430,11 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgp.gauss_
         try:
             pars_i, cov_i = pgp.fit_hist(func_i, hist, bins, var=var, guess=par_guesses, bounds=bounds)
 
-            if sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or sum([sum(c) if c is not None else 0 for c in cov_i]) == 0:
+            if sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or (np.sqrt(np.diagonal(cov_i))/pars_i < 1e-7).any():
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
                 pars_i, cov_i = None, None
 
         except: pars_i, cov_i = None, None
-
 
         #get binning
         binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
