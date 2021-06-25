@@ -644,8 +644,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
                 #fwhm??
 
     # Do a second calibration to the results of the full peak fits
-    mus = np.array([pars[1] for pars in pk_pars]).astype(float) # mu is the i=1 fit par of gauss_step
-    mu_vars = np.array([covs[1,1] for covs in pk_covs]).astype(float)
+    mus = [pgf.get_mu_func(func_i, pars_i, covs_i) for func_i, pars_i, covs_i in zip(funcs, pk_pars, pk_covs)]
+    mus, mu_vars = zip(*mus)
+    mus = np.asarray(mus)
+    mu_vars = np.asarray(mu_vars)**2
+
     pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
     results['pk_cal_pars'] = pars
     results['pk_cal_cov'] = cov

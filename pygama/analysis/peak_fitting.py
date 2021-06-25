@@ -501,6 +501,32 @@ def get_fwhm_func(func, pars):
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
+
+def get_mu_func(func, pars, cov = None):
+
+    if func == gauss_step:
+        amp, mu, sigma, bkg, step = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[2][2])
+
+    if func == radford_peak:
+        mu, sigma, hstep, htail, tau, bg0, a = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[0][0])
+
+    if func == radford_peak_wrapped:
+        A, mu, sigma, bg0, S, T, tau = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[1][1])
+    else:
+        print(f'get_fwhm_func not implemented for {func.__name__}')
+        return None
     
 def gauss_tail(x,mu, sigma, tail,tau):
     """
