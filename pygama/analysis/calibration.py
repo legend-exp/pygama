@@ -116,9 +116,6 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
     peaks_keV = np.asarray(peaks_keV)
 
     # Find all maxes with > n_sigma significance
-    with open('data.txt', 'w') as f:
-        for x in hist/np.sqrt(var):
-            f.write(str(x)+'\n')
     imaxes = get_i_local_maxima(hist/np.sqrt(var), n_sigma)
 
     # Keep maxes if they coincide with expected peaks
