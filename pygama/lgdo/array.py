@@ -43,7 +43,7 @@ class Array:
         if nda is None:
             if fill_val is None: nda = np.empty(shape, dtype=dtype)
             elif fill_val == 0: nda = np.zeros(shape, dtype=dtype)
-            else: nda = np.fill(shape, fill_val, dtype=dtype)
+            else: nda = np.full(shape, fill_val, dtype=dtype)
         self.nda = nda 
         self.dtype = self.nda.dtype
         self.attrs = dict(attrs)

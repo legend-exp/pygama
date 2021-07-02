@@ -120,7 +120,7 @@ class Table(Struct):
 
     def add_column(self, name, obj, use_obj_size=False, do_warn=True):
         """Alias for add_field using table terminology 'column'"""
-        self.add_field(self, name, obj, use_obj_size=use_obj_size, do_warn=do_warn)
+        self.add_field(name, obj, use_obj_size=use_obj_size, do_warn=do_warn)
 
 
     def join(self, other_table, cols=None, do_warn=True):
@@ -146,7 +146,7 @@ class Table(Struct):
             print(f'warning: other_table.loc ({other_table.loc}) != self.loc({self.loc})')
         if cols is None: cols = other_table.keys()
         for name in cols:
-            self.add_column(self, name, other_table[name], do_warn=do_warn)
+            self.add_column(name, other_table[name], do_warn=do_warn)
 
 
     def get_dataframe(self, cols=None, copy=False):
@@ -170,8 +170,7 @@ class Table(Struct):
         df = pd.DataFrame(copy=copy)
         if cols is None: cols = self.keys()
         for col in cols: 
-            if not hasattr(self[col].nda):
+            if not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')
             else: df[col] = self[col].nda
         return df
-
