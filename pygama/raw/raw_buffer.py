@@ -71,11 +71,19 @@ class RawBuffer:
         (e.g. '/group/obj_name')
     '''
 
+
     def __init__(self, lgdo=None, key_list=[], out_stream='', out_name=''):
         self.lgdo = lgdo
         self.key_list = key_list
         self.out_stream = out_stream
         self.out_name = out_name
+        self.loc = 0
+
+
+    def __len__(self):
+        if lgdo is None or not hasattr(lgdo, __len__): return 0
+        return len(lgdo)
+
 
     def init_lgdo(self, lgdo_class=lgdo.Table, init_obj=None, key=None, **lgdo_args):
         ''' initialize this buffer's lgdo
