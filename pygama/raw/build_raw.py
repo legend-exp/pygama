@@ -8,8 +8,9 @@ from stream_compass import *
 from stream_fc import *
 
 
-def build_raw(in_filename, stream_type, raw_file_pattern=None, pattern_dict=None, 
-              ch_groups=None, n_max=np.inf, verbose=False, overwrite=True, buffer_size=8192)
+def build_raw_files(in_filename, stream_type, rb_lib=None, buffer_size=8192,
+                    n_max=np.inf, overwrite=True, verbose=False)
+              #raw_file_pattern=None, pattern_dict=None, ch_groups=None,
     """
     Convert data into LEGEND hdf5 `raw` format.  
     Takes an input file (in_filename) and an output file (raw_file_pattern).
