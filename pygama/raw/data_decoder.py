@@ -12,19 +12,20 @@ from pygama import lgdo
 class DataDecoder(ABC):
     """Decodes packets from a data stream
 
-    The values that get decoded need to be described by a dict called
+    Most decoders will repeatedly decode the same set of values from each
+    packet.  The values that get decoded need to be described by a dict called
     'decoded_values' that helps determine how to set up the buffers and write
     them to file. lgdo Tables are made whose columns correspond to the elements
     of decoded_values, and packet data gets pushed to the end of the table one
     row at a time. See FlashCamEventDecoder or ORCAStruck3302 for an example.
 
-    Some decoders (like for file headers) may not need to push to a table, so they
+    Some decoders (like for file headers) do not need to push to a table, so they
     do not need decoded_values. Such classes should still derive from
-    DataDecoder in anticipation of future functionality
+    DataDecoder and define how data gets formatted into lgdo's
 
     Subclasses should define a method for decoding data to a buffer like
-    decode_packet(packet, data_buffer, packet_id, verbosity=0)
-    that returns the number of bytes read
+    decode_packet(packet, raw_buffer_list, packet_id, verbosity=0)
+    This function should return the number of bytes read
 
     Garbage collection writes binary data as an array of uint32s to a
     variable-length array in the output file. If a problematic packet is found,
@@ -60,16 +61,34 @@ class DataDecoder(ABC):
         return None
 
 
-    def initialize_lgdo_table(self, table, key=None):
-        """ Initialize an lgdo Table based on decoded_values.
-        key is typically the channel according to ch_group
+    def init_lgdo(self, data_obj=None, key=None, **lgdo_args):
+        """ Initialize an lgdo for this DataDecoder
+
+        Parameters
+        ----------
+        data_obj : lgdo or None
+            the object to be initialized. If None, allocate the lgdo based on
+            lgdo_args (use Table unless overloaded)
+        key : str or int or other or None
+            if non-none, the decoder supports key-specific buffer structures
+            (for example, some channels of a digitizer might need longer
+            waveforms)
+        lgdo_args : dict
+            arguments for the __init__ function for data_obj. Only used when
+            data_obj is None
+
+        Returns 
+        -------
+        data_obj : lgdo
+            Returns the object itself (in case it was newly allocated)
         """
         if not hasattr(self, 'decoded_values'):
             name = type(self).__name__
             print(name, 'Error: no decoded_values available for setting up buffer')
             return
         dec_vals = self.get_decoded_values(key)
-        size = table.size
+        if data_obj is None: data_obj = lgdo.Table(**lgdo_args)
+        size = len(data_obj)
         for field, fld_attrs in dec_vals.items():
             # make a copy of fld_attrs: pop off the ones we use, then keep any
             # remaining user-set attrs and store into the lgdo
@@ -87,7 +106,7 @@ class DataDecoder(ABC):
                 # allow to override "kind" for the dtype for lgdo
                 if 'kind' in attrs:
                     attrs['datatype'] = 'array<1>{' + attrs.pop('kind') + '}'
-                table.add_field(field, lgdo.Array(shape=size, dtype=dtype, attrs=attrs))
+                data_obj.add_field(field, lgdo.Array(shape=size, dtype=dtype, attrs=attrs))
                 continue
 
             # get datatype for complex objects
@@ -103,7 +122,7 @@ class DataDecoder(ABC):
                                               dt=dt, dt_units=dt_units,
                                               wf_len=wf_len, dtype=dtype,
                                               attrs=attrs)
-                table.add_field(field, wf_table)
+                data_obj.add_field(field, wf_table)
                 continue
 
             # Parse datatype for remaining lgdos
@@ -115,7 +134,7 @@ class DataDecoder(ABC):
                 # only arrays of 1D arrays are supported at present
                 dims = (1,1)
                 aoesa = lgdo.ArrayOfEqualSizedArrays(shape=(size,length), dtype=dtype, dims=dims, attrs=attrs)
-                table.add_field(field, aoesa)
+                data_obj.add_field(field, aoesa)
                 continue
 
             # VectorOfVectors
@@ -123,7 +142,7 @@ class DataDecoder(ABC):
                 length_guess = size
                 if 'length_guess' in attrs: length_guess = attrs.pop('length_guess')
                 vov = lgdo.VectorOfVectors(shape_guess=(size,length_guess), dtype=dtype, attrs=attrs)
-                table.add_field(field, vov)
+                data_obj.add_field(field, vov)
                 continue
 
             # if we get here, got a bad datatype
