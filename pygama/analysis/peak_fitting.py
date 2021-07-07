@@ -297,9 +297,9 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     Returns
     -------
     (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (mode, max) of the gaussian fit
+        pars : 2-tuple with the parameters (mode, maximum) of the gaussian fit
             mode : the estimated x-position of the maximum
-            max : the estimated maximum value of the peak
+            maximum : the estimated maximum value of the peak
         cov : 2x2 matrix of floats
             The covariance matrix for the 2 parameters in pars
 
