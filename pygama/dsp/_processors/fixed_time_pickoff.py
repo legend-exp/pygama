@@ -42,4 +42,3 @@ def fixed_time_pickoff(w_in, t_in, a_out):
         raise DSPFatal('Pickoff Time is not an integer')
 
     a_out[0] = w_in[int(t_in)]
-© 2021 GitHub, Inc.
