@@ -38,7 +38,4 @@ def fixed_time_pickoff(w_in, t_in, a_out):
     if (not int(t_in) in range(len(w_in))):
         return
   
-    if (not np.floor(t_in)==t_in):
-        raise DSPFatal('Pickoff Time is not an integer')
-
     a_out[0] = w_in[int(t_in)]
