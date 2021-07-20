@@ -61,34 +61,35 @@ class DataDecoder(ABC):
         return None
 
 
-    def init_lgdo(self, data_obj=None, key=None, **lgdo_args):
-        """ Initialize an lgdo for this DataDecoder
+    def make_lgdo(self, key=None, size=None):
+        """ Make an lgdo for this DataDecoder
+
+        This default version of this function allocates a Table using
+        the decoded_values for key. If a different type of lgdo object is
+        required for this decoder, overload this function.
 
         Parameters
         ----------
-        data_obj : lgdo or None
-            the object to be initialized. If None, allocate the lgdo based on
-            lgdo_args (use Table unless overloaded)
-        key : str or int or other or None
-            if non-none, the decoder supports key-specific buffer structures
-            (for example, some channels of a digitizer might need longer
-            waveforms)
-        lgdo_args : dict
-            arguments for the __init__ function for data_obj. Only used when
-            data_obj is None
+        key : int, str, etc
+            used by init_obj to initialize the lgdo for a particular key (e.g.
+            to have different trace lengths for different channels of a piece of
+            hardware). Leave as None if such specialization is not necessary
+        size : int
+            the size to be allocated for the lgdo, if applicable
 
-        Returns 
+        Returns
         -------
         data_obj : lgdo
-            Returns the object itself (in case it was newly allocated)
+            the newly allocated lgdo
         """
+
         if not hasattr(self, 'decoded_values'):
             name = type(self).__name__
-            print(name, 'Error: no decoded_values available for setting up buffer')
-            return
+            print(name, 'Error: no decoded_values available for setting up table')
+            return None
+
+        data_obj = lgdo.Table()
         dec_vals = self.get_decoded_values(key)
-        if data_obj is None: data_obj = lgdo.Table(**lgdo_args)
-        size = len(data_obj)
         for field, fld_attrs in dec_vals.items():
             # make a copy of fld_attrs: pop off the ones we use, then keep any
             # remaining user-set attrs and store into the lgdo
@@ -148,6 +149,7 @@ class DataDecoder(ABC):
             # if we get here, got a bad datatype
             name = type(self).__name__
             print(name, 'Error: do not know how to make a', datatype, 'for', field)
+        return data_obj
 
 
     def put_in_garbage(self, packet, packet_id, code):
@@ -167,4 +169,14 @@ class DataDecoder(ABC):
         self.garbage_table.clear()
 
 
+    def get_max_rows_in_packet(self):
+        """ Returns the max number of rows that could be read out in a packet
 
+        1 by default, overload as necessary to avoid writing past the ends of
+        buffers.
+        """
+        return 1
+
+    def buffer_is_full(self, rb):
+        """ Returns whether the buffer is too full to read in another packet """
+        return len(rb.lgdo) - rb.loc < self.get_max_rows_in_packet()
