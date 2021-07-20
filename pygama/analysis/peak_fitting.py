@@ -2,9 +2,11 @@ import numpy as np
 from scipy.optimize import minimize, curve_fit, minimize_scalar, brentq
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
+import sys
 
 import pygama.analysis.histograms as ph
 
+limit = np.log(sys.float_info.max)/10
 
 def fit_hist(func, hist, bins, var=None, guess=None,
              poissonLL=False, integral=None, method=None, bounds=None):
@@ -278,8 +280,11 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     width_guess = (bin_centers[i_n] - bin_centers[i_0])
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
-    pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
+    try:
+        pars, cov = fit_hist(gauss_basic, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, poissonLL=poissonLL)
+    except:
+        return None, None
     if pars[1] < 0: pars[1] = -pars[1]
     if inflate_errors:
         chi2, dof = goodness_of_fit(hist, bins, var, gauss_basic, pars)
@@ -312,6 +317,7 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
     """
     pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
+    if pars is None or cov is None: return None, None
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
 
 
@@ -418,28 +424,32 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
     # make sure the fractional amplitude parameters stay reasonable
     if htail < 0 or htail > 1:
         return np.zeros_like(x)
-    if hstep < 0 or hstep > 1:
+    if hstep < -1 or hstep > 1:
         return np.zeros_like(x)
 
-    bg_term = bg0  #+ x*bg1
-    if np.any(bg_term < 0):
+    # compute the step, check the background isn't negative
+    step_f = step(x, mu, sigma, 0, a*hstep)
+    bg_term = bg0 # x*bg1... (maybe bg should be list of coefficients?)
+    if np.any(bg_term + step_f < 0):
         return np.zeros_like(x)
 
-    # compute the step and the low energy tail
-    step = a * hstep * erfc((x - mu) / (sigma * np.sqrt(2)))
-    le_tail = a * htail
-    le_tail *= erfc((x - mu) / (sigma * np.sqrt(2)) + sigma / (tau * np.sqrt(2)))
-    le_tail *= np.exp((x - mu) / tau)
-    le_tail /= (2 * tau * np.exp(-(sigma / (np.sqrt(2) * tau))**2))
+    # compute the low energy tail
+    le_tail = gauss_tail(x, mu, sigma, a * htail, tau)
 
     if not components:
         # add up all the peak shape components
-        return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step + le_tail
+        return (1 - htail) * gauss(x, mu, sigma, a) + bg_term + step_f + le_tail
     else:
         # return individually to make a pretty plot
-        return (1 - htail), gauss(x, mu, sigma, a), bg_term, step, le_tail
+        return (1 - htail), gauss(x, mu, sigma, a), bg_term, step_f, le_tail
 
-def radford_fwhm(sigma, htail, tau):
+def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
+    """
+    A wrapped version of David Radford's HPGe peak shape function, such that
+    the argument order and definition follows gauss_step
+    """
+
+def radford_fwhm(sigma, htail, tau, cov = None):
     """
     Return the FWHM of the radford_peak function, ignoring background and
     step components. TODO: also get the uncertainty
@@ -459,23 +469,151 @@ def radford_fwhm(sigma, htail, tau):
         return radford_peak(E, 0, sigma, 0, htail, tau, 0, 1) - half_max
     
     lower_hm = brentq( radford_peak_bgfree_halfmax,
-                       Emax - 2*(sigma+htail), Emax,
+                       -(2.5*sigma/2 + htail*tau), Emax,
                        args = (sigma, htail, tau, half_max) )
     upper_hm = brentq( radford_peak_bgfree_halfmax,
-                       Emax, Emax + 2*(sigma+htail),
+                       Emax, 2.5*sigma/2,
                        args = (sigma, htail, tau, half_max) )
     
-    return upper_hm - lower_hm
-    
+    if cov is None: return upper_hm - lower_hm
+
+    #calculate uncertainty
+    #amp set to 1, mu to 1, hstep+bg set to 0
+    pars = [1, sigma, 0, htail, tau, 0, 1]
+    grad1 = radford_parameter_gradient(lower_hm, pars);
+    grad2 = radford_parameter_gradient(upper_hm, pars);
+    grad1 *= 1./radford_peakshape_derivative(lower_hm, pars);
+    grad2 *= 1./radford_peakshape_derivative(upper_hm, pars);
+    grad2 -= grad1;
+
+    grad2 = np.delete(grad2, (0, 5), axis = 0)
+    grad2 = np.delete(grad2, (0, 5), axis = 0)
+
+    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
+
+    return upper_hm - lower_hm, fwfm_unc
+
+def radford_peakshape_derivative(E, pars):
+    mu, sigma, hstep, htail, tau, bg0, a = pars
+
+    sigma = abs(sigma)
+    gaus = gauss(E, mu, sigma)
+    y = (E-mu)/sigma
+    sigtauL = sigma/tau
+    ret = -(1-htail)*y/sigma*gaus
+
+    ret -= htail/tau*(-gauss_tail(E, mu, sigma, 1, tau)+gaus)
+
+    return a*(ret - hstep*gaus)
+
+def radford_parameter_gradient(E, pars):
+    mu, sigma, hstep, htail, tau, bg0, amp = pars #bk gradient zero?
+
+    gaus = gauss(E, mu, sigma)
+    tailL = gauss_tail(E, mu, sigma, 1, tau)
+    step_f = step(E, mu, sigma, 0, 1)
+
+    #some unitless numbers that show up a bunch
+    y = (E-mu)/sigma
+    sigtauL = sigma/tau
+
+    g_amp = htail*tailL + (1-htail)*gaus + hstep*step_f
+    g_hs = amp*step_f
+    g_ft = amp*(tailL-gaus)
+
+    #gradient of gaussian part
+    g_mu = (1-htail)*y/sigma*gaus
+    g_sigma = (1-htail)*(y*y-1)/sigma*gaus
+
+    #gradient of low tail, use approximation if necessary
+    g_mu += htail/tau*(-tailL+gaus)
+    g_sigma += htail/tau*(sigtauL*tailL-(sigtauL-y)*gaus)
+    g_tau = -htail/tau*( (1.+sigtauL*y+sigtauL*sigtauL)*tailL - sigtauL*sigtauL*gaus) * amp
+
+    g_mu = amp*(g_mu + hstep*gaus)
+    g_sigma = amp*(g_sigma + hstep*y*gaus)
+
+    gradient = g_mu, g_sigma, g_hs, g_ft, g_tau, 0, g_amp
+    return np.array(gradient)
+
+def get_fwhm_func(func, pars, cov = None):
+
+    if func == gauss_step:
+        amp, mu, sigma, bkg, step = pars
+        if cov is None:
+            return sigma*2*np.sqrt(2*np.log(2))
+        else:
+            return sigma*2*np.sqrt(2*np.log(2)), np.sqrt(cov[2][2])*2*np.sqrt(2*np.log(2))
+
+    if func == radford_peak:
+        mu, sigma, hstep, htail, tau, bg0, a = pars
+        return radford_fwhm(sigma, htail, tau, cov)
+
+    if func == radford_peak_wrapped:
+        A, mu, sigma, bg0, S, T, tau = pars
+        a = A + T
+        htail = T / a
+        hstep = S / a
+        newpars = mu, sigma, hstep, htail, tau, bg0, a
+        return get_fwhm_func(radford_peak, newpars) #couldn't work out how to transform covariance matrix, use simple radford_peak for uncertainty
+    else:
+        print(f'get_fwhm_func not implemented for {func.__name__}')
+        return None
+
+def get_mu_func(func, pars, cov = None):
+
+    if func == gauss_step:
+        amp, mu, sigma, bkg, step = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[2][2])
+
+    if func == radford_peak:
+        mu, sigma, hstep, htail, tau, bg0, a = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[0][0])
+
+    if func == radford_peak_wrapped:
+        A, mu, sigma, bg0, S, T, tau = pars
+        if cov is None:
+            return mu
+        else:
+            return mu, np.sqrt(cov[1][1])
+    else:
+        print(f'get_fwhm_func not implemented for {func.__name__}')
+        return None
     
 def gauss_tail(x,mu, sigma, tail,tau):
     """
     A gaussian tail function template
     Can be used as a component of other fit functions
     """
-    tail_f = tail/(2*tau) * np.exp( (x-mu)/tau + sigma**2/(np.sqrt(2) * tau)**2) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    x = np.asarray(x)
+    scalar_input = False
+    if x.ndim == 0:
+        x = x[None] # makes x1d
+        scalar_input = True
+
+    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
+    tail_f = np.where(tmp < limit, gauss_tail_exact(x, mu, sigma, tail, tau), gauss_tail_approx(x, mu, sigma, tail, tau))
+
+    if scalar_input:
+        return np.squeeze(tail_f)
     return tail_f
 
+def gauss_tail_exact(x, mu, sigma, tail, tau):
+    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
+    tmp = np.where(tmp < limit, tmp, limit)
+    tail_f = tail/(2*tau) * np.exp(tmp) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    return tail_f
+
+def gauss_tail_approx(x, mu, sigma, tail, tau):
+    den = 1./(sigma + tau*(x-mu)/sigma)
+    tail_f = sigma * gauss(x, mu, sigma) * den * (1.-tau*tau*den*den)
+    return tail_f
 
 def step(x, mu, sigma, bkg, a):
     """
