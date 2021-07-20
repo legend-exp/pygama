@@ -16,6 +16,9 @@ class FCConfigDecoder(DataDecoder):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.config = None
+
+    def
 
     @staticmethod
     def decode_config(fcio):
@@ -32,9 +35,9 @@ class FCConfigDecoder(DataDecoder):
             'adccards', # number of attached fadccards
             'gps', # gps mode (0: not used, 1: external pps and 10MHz)
         ]
-        struct = lgdo.Struct()
+        self.config = lgdo.Struct()
         for name in config_names:
             value = np.int32(getattr(fcio, name)) # all config fields are int32
-            struct.add_field(name, lgdo.Scalar(value))
+            self.config.add_field(name, lgdo.Scalar(value))
         return struct
 

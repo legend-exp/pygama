@@ -14,29 +14,34 @@ class FCStreamer(DataStreamer):
     and the FlashCam DataDecoders to save the results and write to output.
     """
     def __init__(self):
-        """
-        """
+        super().__init__(self)
+        self.config_decoder = FCConfigDecoder()
+        self.status_decoder = FCStatusDecoder()
         self.event_decoder = FCEventDecoder()
         self.event_tables = {}
-        self.status_decoder = FCStatusDecoder()
 
 
-    def initialize(self, fcio_file, raw_groups_library=None, buffer_size=8192, verbosity=0):
+    def initialize(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
         """ Initialize the FC data stream
 
         Parameters
         ----------
-        data_source : str
-            typically a filename or e.g. a port for streaming
-        chunk_size : int
+        fcio_file : str
+            the FCIO filename 
+        rb_lib : RawBufferLibrary
+            library of buffers for this stream
+        buffer_size : int
             length of tables to be read out in read_chunk
         verbosity : int
             verbosity level for the initialize function
  
         Returns
         -------
-        header_data : list of lgdos
-            a list of length 1 containing the fc_config table
+        header_data, n_bytes : list(RawBuffer), int
+            header_data is a list of length 1 containing the raw buffer holding
+                the fc_config table
+            n_bytes is the number of bytes read from the file to extract the
+                header data
         """
         self.fcio = fcutils.fcio(fcio_file)
 
