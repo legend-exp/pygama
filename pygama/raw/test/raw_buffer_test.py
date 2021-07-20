@@ -27,6 +27,13 @@ rb_json = '''
       "out_stream" : "$DATADIR/{file_key}_auxs",
       "out_name" : "auxs/{name}"
     }
+  },
+  "*" : {
+    "{name}" : {
+      "key_list" : [ "*" ],
+      "out_stream" : "$DATADIR/{file_key}_others",
+      "out_name" : "auxs/{name}"
+    }
   }
 }
 '''
@@ -37,6 +44,7 @@ def test_rb_json_load():
     rblib = prb.RawBufferLibrary(json_dict=json_dict, kw_dict=kw_dict)
     rb_keyed = rblib['FlashCamEventDecoder'].get_keyed_dict()
     name = rb_keyed[41].out_name
+    #print(rblib['*'][0].__dict__)
     assert_(name == 'geds/g041', f'got {name}')
 
 
