@@ -16,32 +16,47 @@ data-generating DAQ object
 
 RawBuffers support a json short-hand notation, see
 RawBufferLibrary.set_from_json_dict() for full specification.
-Example json yielding a valid RawBufferLibrary: 
 
+Example json yielding a valid RawBufferLibrary is below. In the example, the
+user would call RawBufferLibrary.set_from_json_dict(json_dict, kw_dict) with
+kw_dict containing an entry for 'file_key'. The other keywords {key} and {name}
+are understood by and filled in during set_from_json_dict() unless overloaded in
+kw_dict. Note the use of the wildcard "*": this will match all other decoder
+names / keys
 {
   "FlashCamEventDecoder" : {
-    "g{key:0>3d}" : {
+    "geds" : {
       "key_list" : [ [24,64] ],
       "out_stream" : "$DATADIR/{file_key}_geds",
-      "out_name" : "geds/{name}"
+      "out_name" : "geds/g{key:0>3d}"
     },
     "spms" : {
       "key_list" : [ [6,23] ],
       "out_stream" : "$DATADIR/{file_key}_spms",
-      "out_name" : "spms/{name}"
+      "out_name" : "spms"
     },
     "puls" : {
       "key_list" : [ 0 ],
       "out_stream" : "$DATADIR/{file_key}_auxs",
-      "out_name" : "auxs/{name}"
+      "out_name" : "auxs/puls"
     },
     "muvt" : {
       "key_list" : [ 1, 5 ],
       "out_stream" : "$DATADIR/{file_key}_auxs",
-      "out_name" : "auxs/{name}"
+      "out_name" : "auxs/muvt"
+    }
+  },
+  "*" : {
+    "{name}" : {
+      "key_list" : [ "*" ],
+      "out_stream" : "$DATADIR/{file_key}_{name}",
+      "out_name" : "{name}"
     }
   }
 }
+
+later: could make field "lgdo" a dict of args for lgdo.__init__(), e.g. to have
+object-specific buffer sizes
 """
 
 import os
@@ -85,28 +100,19 @@ class RawBuffer:
         return len(lgdo)
 
 
-    def init_lgdo(self, lgdo_class=lgdo.Table, init_obj=None, key=None, **lgdo_args):
-        ''' initialize this buffer's lgdo
+    def make_lgdo(self, maker, size=None):
+        ''' Make this buffer's lgdo
+
+        Uses the first key in key_list for initialization
 
         Parameters
         ----------
-        lgdo_class : class name or None
-            the class of the lgdo for this buffer. Only used if self.lgdo is None.
-            If lgdo_class is None, init_obj will allocate the lgdo
-        init_obj : obj
-            an object with an init_lgdo(lgdo, key, **lgdo_args) function that can be
+        maker : obj
+            an object with an make_lgdo(key, size) function that can be
             used to initialize the lgdo (e.g. set up the columns of the Table)
-        key : int, str, etc
-            used by init_obj to initialize the lgdo for a particular key (e.g. to
-            have different trace lengths for different channels of a piece of
-            hardware). Leave as None if such specialization is not necessary
-        lgdo_args : dict
-            arguments used for the lgdo's __init__ function. Only used if self.lgdo
-            is not None
         '''
-        if self.lgdo is None and lgdo_class is not None: 
-            self.lgdo = lgdo_class(**lgdo_args)
-        if init_obj is not None: init_obj.init_lgdo(self.lgdo, key, **lgdo_args)
+        key = None if len(self.key_list) == 0 else self.key_list[0]
+        self.lgdo = maker.make_lgdo(key=key, size=size)
 
 
 
@@ -117,19 +123,19 @@ class RawBufferList(list):
     '''
 
 
-    def init_lgdos(self, lgdo_class=lgdo.Table, init_obj=None, key=None, **lgdo_args):
-        ''' Initialize the lgdos in this list 
+    def make_lgdos(self, maker, size=None):
+        ''' Make the lgdos in this raw buffer list 
 
-        See RawBuffer.init_lgdo for parameter info
+        See RawBuffer.make_lgdo for parameter info
         '''
-        for rb in self: rb.init_lgdo(lgdo_class, init_obj, key, **lgdo_args)
+        for rb in self: rb.make_lgdo(maker, size=size)
 
 
     def get_keyed_dict(self):
         ''' returns a dict of RawBuffers built from the buffers' key_lists
 
-        Different keys may point to the same buffer.
-        Requires the buffers in the list to have non-overlapping key lists
+        Different keys may point to the same buffer. Requires the buffers in the
+        RawBufferList to have non-overlapping key lists.
         '''
         keyed_dict = {}
         for rb in self:
@@ -156,19 +162,19 @@ class RawBufferList(list):
             self.append(rb);
 
 
-    def get_list_of(self, key):
+    def get_list_of(self, attribute):
         """
-        Return a list of values of RawBuffer.key
+        Return a list of values of RawBuffer.attribute
 
         Parameters
         ----------
-        key : str
+        attribute : str
             The RawBuffer attribute queried to make the list
 
         Returns
         -------
         values : list
-            The list of values of RawBuffer.key
+            The list of values of RawBuffer.attribute
 
         Example
         -------
@@ -176,8 +182,8 @@ class RawBufferList(list):
         """
         values = []
         for rb in self:
-            if not hasattr(rb, key): continue
-            val = getattr(rb, key)
+            if not hasattr(rb, attribute): continue
+            val = getattr(rb, attribute)
             if val not in values: values.append(val)
         return values
 
@@ -191,6 +197,7 @@ class RawBufferLibrary(dict):
     def __init__(self, json_dict=None, kw_dict={}):
         if json_dict is not None: 
             self.set_from_json_dict(json_dict, kw_dict)
+
 
     def set_from_json_dict(self, json_dict, kw_dict={}):
         ''' set up a RawBufferLibrary from a dict written in json shorthand
@@ -220,8 +227,11 @@ class RawBufferLibrary(dict):
           simultaneously with the {key:xxx} specifiers.
         * Environment variables can also be used in out_stream. They get
           expanded after kw_dict is handled and thus can be used inside kw_dict
+        * list_name can use the wildcard "*" to match any other list_name known
+          to a streamer
         * out_stream and out_name can also include {name}, to be replaced with
-          the buffer's "name"
+          the buffer's "name". In the case of list_name="*", {name} evaluates to
+          list_name
 
         Parameters
         ----------
@@ -235,6 +245,30 @@ class RawBufferLibrary(dict):
         for list_name in json_dict:
             if list_name not in self: self[list_name] = RawBufferList()
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
+
+
+    def get_list_of(self, attribute):
+        """
+        Return a list of values of RawBuffer.attribute
+
+        Parameters
+        ----------
+        attribute : str
+            The RawBuffer attribute queried to make the list
+
+        Returns
+        -------
+        values : list
+            The list of values of RawBuffer.attribute
+
+        Example
+        -------
+        output_file_list = rbl.get_list_of('out_stream')
+        """
+        values = []
+        for rb_list in self.values(): 
+            values += rb_list.get_list_of(attribute)
+        return values
 
 
 
@@ -252,9 +286,7 @@ def expand_rblist_json_dict(json_dict, kw_dict):
     buffer_names = list(json_dict.keys())
     for name in buffer_names:
         if name == '':
-            if len(json_dict) != 1:
-                print("Error: got dummy name ('') in non-dummy json_dict")
-                return None
+            print("Error: name can't be ''")
             return
         info = json_dict[name] # changes to info will change json_dict[name]
         # make sure we have a key list
@@ -284,16 +316,43 @@ def expand_rblist_json_dict(json_dict, kw_dict):
 
     # now re-iterate and exand out_paths
     for name, info in json_dict.items():
-        if len(info['key_list']) == 1: 
+        if len(info['key_list']) == 1 and info['key_list'][0] != "*": 
             kw_dict['key'] = info['key_list'][0]
         if 'out_stream' in info:
-            if '{name' in info['out_stream']: kw_dict['name'] = name
+            if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
             info['out_stream'] = info['out_stream'].format(**kw_dict)
             info['out_stream'] = os.path.expandvars(info['out_stream'])
         if 'out_name' in info:
-            if '{name' in info['out_name']: kw_dict['name'] = name
+            if name != '*' and '{name' in info['out_name']: kw_dict['name'] = name
             info['out_name'] = info['out_name'].format(**kw_dict)
             info['out_name'] = os.path.expandvars(info['out_name'])
 
+
+def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbosity=0):
+    ''' Write a list of RawBuffers to lh5 files and then clears them
+
+    Parameters
+    ----------
+    raw_buffers : list(RawBuffer)
+        The list of RawBuffers to be written to file. Note this is not a
+        RawBufferList because the RawBuffers may not have the same structure.
+    lh5_store : LH5Store or None
+        Allows user to send in a store holding a collection of already open
+        files (saves some time opening / closing files)
+    '''
+    if lh5_store is None: lh5_store = lgdo.LH5Store()
+    for rb in raw_buffers:
+        if rb.lgdo is None or rb.loc == 0: continue # no data to write
+        name = rb.out_name
+        group = '/'
+        if '/' in name:
+            ii = name.rfind('/')
+            group = name[:ii]
+            name = name[ii+1:]
+        # write...
+        lh5_store.write_obj(rb.lgdo, name, rb.out_stream, group=group,
+                            n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+        # and clear
+        rb.loc = 0
 
 
