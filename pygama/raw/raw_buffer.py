@@ -25,38 +25,33 @@ kw_dict. Note the use of the wildcard "*": this will match all other decoder
 names / keys
 {
   "FlashCamEventDecoder" : {
-    "geds" : {
+    "g{key:0>3d}" : {
       "key_list" : [ [24,64] ],
-      "out_stream" : "$DATADIR/{file_key}_geds",
-      "out_name" : "geds/g{key:0>3d}"
+      "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
     },
     "spms" : {
       "key_list" : [ [6,23] ],
-      "out_stream" : "$DATADIR/{file_key}_spms",
-      "out_name" : "spms"
+      "out_stream" : "$DATADIR/{file_key}_spms.lh5"
     },
     "puls" : {
       "key_list" : [ 0 ],
-      "out_stream" : "$DATADIR/{file_key}_auxs",
-      "out_name" : "auxs/puls"
+      "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
     },
     "muvt" : {
       "key_list" : [ 1, 5 ],
-      "out_stream" : "$DATADIR/{file_key}_auxs",
-      "out_name" : "auxs/muvt"
+      "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
     }
   },
   "*" : {
     "{name}" : {
       "key_list" : [ "*" ],
-      "out_stream" : "$DATADIR/{file_key}_{name}",
-      "out_name" : "{name}"
+      "out_stream" : "$DATADIR/{file_key}_{name}.lh5"
     }
   }
 }
 
-later: could make field "lgdo" a dict of args for lgdo.__init__(), e.g. to have
-object-specific buffer sizes
+later: could initially make field "lgdo" a dict of args for lgdo.__init__(),
+e.g. to have object-specific buffer sizes
 """
 
 import os
@@ -80,10 +75,12 @@ class RawBuffer:
         to avoid confusion with the dict function "keys()", i.e. raw_group.keys()
     out_stream : str (optional)
         the output stream to which the raw_buffer's lgdo should be sent or
-        written (e.g. '/path/filename')
+        written. A colon can be used to separate the stream name/address from an
+        in-stream path / port:
+        File example: '/path/filename.lh5:/group'
+        Socket example: '198.0.0.100:8000'
     out_name : str (optional)
         the name / identifier of the object in the ouput stream 
-        (e.g. '/group/obj_name')
     '''
 
 
@@ -159,6 +156,7 @@ class RawBufferList(list):
                 rb.out_stream = json_dict[name]['out_stream']
             if 'out_name' in json_dict[name]: 
                 rb.out_name = json_dict[name]['out_name']
+            else: rb.out_name = name
             self.append(rb);
 
 
@@ -208,9 +206,12 @@ class RawBufferLibrary(dict):
           "name" : {
               "key_list" : [ key1, key2, ... ],
               "out_stream" : "out_stream_str",
-              "out_name" : "out_name_str"
+              "out_name" : "out_name_str" (optional)
           }
         }
+
+        By default "name" is used for the RawBuffer's "out_name" attribute, but
+        this can be overrided if desired by providing an explicit "out_name"
 
         Allowed shorthands, in order of exapansion:
         * key_list may have entries that are 2-integer lists corresponding to
@@ -322,10 +323,6 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
             info['out_stream'] = info['out_stream'].format(**kw_dict)
             info['out_stream'] = os.path.expandvars(info['out_stream'])
-        if 'out_name' in info:
-            if name != '*' and '{name' in info['out_name']: kw_dict['name'] = name
-            info['out_name'] = info['out_name'].format(**kw_dict)
-            info['out_name'] = os.path.expandvars(info['out_name'])
 
 
 def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbosity=0):
@@ -343,14 +340,12 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0: continue # no data to write
-        name = rb.out_name
-        group = '/'
-        if '/' in name:
-            ii = name.rfind('/')
-            group = name[:ii]
-            name = name[ii+1:]
+        ii = out_stream.find(':')
+        filename = out_stream[:ii]
+        group = out_stream[ii+1:]
+        if len(group) == 0: group = '/'
         # write...
-        lh5_store.write_obj(rb.lgdo, name, rb.out_stream, group=group,
+        lh5_store.write_obj(rb.lgdo, rb.out_name, filename, group=group,
                             n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0

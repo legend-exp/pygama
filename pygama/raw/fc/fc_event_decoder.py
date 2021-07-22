@@ -1,4 +1,4 @@
-from ..data_decoder.py import *
+from pygama.raw.data_decoder import *
 from pygama import lgdo
 
 

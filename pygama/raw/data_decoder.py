@@ -88,7 +88,7 @@ class DataDecoder(ABC):
             print(name, 'Error: no decoded_values available for setting up table')
             return None
 
-        data_obj = lgdo.Table()
+        data_obj = lgdo.Table(size=size)
         dec_vals = self.get_decoded_values(key)
         for field, fld_attrs in dec_vals.items():
             # make a copy of fld_attrs: pop off the ones we use, then keep any
@@ -118,6 +118,7 @@ class DataDecoder(ABC):
                 t0_units = attrs.pop('t0_units')
                 dt = attrs.pop('dt')
                 dt_units = attrs.pop('dt_units')
+                wf_len = attrs.pop('wf_len')
                 wf_table = lgdo.WaveformTable(size=size,
                                               t0=0, t0_units=t0_units,
                                               dt=dt, dt_units=dt_units,
