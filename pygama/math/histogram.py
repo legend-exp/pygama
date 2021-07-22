@@ -146,6 +146,7 @@ def better_int_binning(x_lo=0, x_hi=None, dx=None, n_bins=None):
     # x_hi is valid. Get a valid dx if we don't have one
     if dx is None: # must have n_bins
         dx = np.round((x_hi-x_lo)/n_bins)
+    if dx == 0: dx = 1
 
     # Finally, build a good binning from dx
     n_bins = np.ceil((x_hi-x_lo)/dx)
@@ -192,7 +193,7 @@ def find_bin(x, bins):
     if bins[index] <= x and bins[index+1] > x: return index
 
     # bins are non-uniform: find by binary search
-    return np.searchsorted(hist, x, side='right')
+    return np.searchsorted(bins, x, side='right')
 
 
 def range_slice(x_min, x_max, hist, bins, var=None):
@@ -280,7 +281,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         mx = np.amax(hist)
         if var is not None and dmx == 0: 
             dmx = np.sqrt(var[np.argmax(hist)])
-    idxs_over_f = hist > (bl + fraction * mx)
+    idxs_over_f = hist > (bl + fraction * (mx-bl))
 
     # argmax will return the index of the first occurence of a maximum
     # so we can use it to find the first and last time idxs_over_f is "True"
@@ -311,7 +312,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # works well for high stats 
         if bin_lo < 1 or bin_hi >= len(hist)-1:
             print(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
-            return 0
+            return 0, 0
 
         val_f = bl + fraction*(mx-bl)
 
@@ -331,7 +332,11 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         dx = bin_centers[bin_hi+1] - bin_centers[bin_hi]
         dhf = hist[bin_hi] - val_f
         dh = hist[bin_hi] - hist[bin_hi+1]
+        if dh == 0:
+            raise ValueError(f"get_fwhm: interpolation failed, dh == 0")
         x_hi = bin_centers[bin_hi] + dx * dhf/dh 
+        if x_hi < x_lo:
+            raise ValueError(f"get_fwfm: interpolation produced negative fwfm")
         # uncertainty
         dx2_hi = 0
         if var is not None: 
@@ -348,9 +353,18 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
         # x_lo
         i_0 = bin_lo - int(np.floor(n_slope/2))
+        if i_0 < 0:
+            print(f"get_fwfm: fit slopes failed")
+            return 0, 0
         i_n = i_0 + n_slope
-        wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
-        (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+        wts = None if var is None else 1/np.sqrt(var[i_0:i_n]) #fails for any var = 0
+        wts = [w if w != np.inf else 0 for w in wts]
+
+        try:
+            (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+        except np.linalg.LinAlgError:
+            print(f"get_fwfm: LinAlgError")
+            return 0, 0
         x_lo = (val_f-b)/m
         #uncertainty
         dxl2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
@@ -358,10 +372,23 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
         # x_hi
         i_0 = bin_hi - int(np.floor(n_slope/2)) + 1
+        if i_0 == len(hist):
+            print(f"get_fwfm: fit slopes failed")
+            return 0, 0
+
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
-        (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+        wts = [w if w != np.inf else 0 for w in wts]
+        try:
+            (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
+        except np.linalg.LinAlgError:
+            print(f"get_fwfm: LinAlgError")
+            return 0, 0
         x_hi = (val_f-b)/m
+        if x_hi < x_lo:
+            print(f"get_fwfm: fit slopes produced negative fwfm")
+            return 0, 0
+
         #uncertainty
         dxh2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
         dxh2 *= x_hi**2
@@ -370,7 +397,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
     else:
         print(f"get_fwhm: unrecognized method {method}")
-        return 0
+        return 0, 0
 
 
 def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, **kwargs):
