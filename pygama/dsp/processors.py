@@ -9,23 +9,17 @@ the ufunc interface, they can also be called to return a numpy array, but if
 """
 
 # I think there's a way to do this recursively, but I'll figure it out later...
-from ._processors.mean_stdev import mean_stdev
 from ._processors.pole_zero import pole_zero, double_pole_zero
-from ._processors.trap_filter import trap_filter
-from ._processors.current import avg_current
-from ._processors.asym_trap_filter import asymTrapFilter
 from ._processors.fixed_time_pickoff import fixed_time_pickoff
-from ._processors.trap_norm import trap_norm
-from ._processors.trap_pickoff import trap_pickoff
-from ._processors.time_point_frac import time_point_frac
 from ._processors.time_point_thresh import time_point_thresh
-from ._processors.linear_fit import linear_fit
-from ._processors.zac_filter import zac_filter
 from ._processors.param_lookup import param_lookup
-from ._processors.cusp_filter import cusp_filter
 from ._processors.fftw import dft, inv_dft, psd
 from ._processors.linear_slope_fit import linear_slope_fit
 from ._processors.log_check import log_check
 from ._processors.min_max import min_max
 from ._processors.presum import presum
 from ._processors.windower import windower
+from ._processors.bl_subtract import bl_subtract
+from ._processors.convolutions import cusp_filter, zac_filter, t0_filter
+from ._processors.trap_filters import trap_filter, trap_norm, asym_trap_filter, trap_pickoff
+from ._processors.moving_windows import moving_window_left, moving_window_right, moving_window_multi, avg_current
