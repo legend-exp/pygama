@@ -20,6 +20,11 @@ class FCStreamer(DataStreamer):
         self.event_decoder = FCEventDecoder()
         self.event_tables = {}
 
+    def get_decoder_list(self):
+        dec_list = []
+        dec_list.append(self.config_decoder)
+        dec_list.append(self.status_decoder)
+        dec_list.append(self.event_decoder)
 
     def initialize(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
         """ Initialize the FC data stream
@@ -45,9 +50,11 @@ class FCStreamer(DataStreamer):
         """
         self.fcio = fcutils.fcio(fcio_file)
 
-        fc_config = FCConfigDecoder.decode_config(fcio)
+        # read in file header (config) info
+        fc_config = self.config_decoder.decode_config(fcio)
         self.event_decoder.set_file_config(fc_config)
-        self.status_decoder.set_file_config(fc_config)
+
+        super().initialize(fcio_file, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
 
         # build raw_groups and set up tables
         self.raw_groups = None

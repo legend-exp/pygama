@@ -128,6 +128,10 @@ class FCEventDecoder(DataDecoder):
         }
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
+        self.fc_config = None
+
+
+    def get_keys_list(self): return range(self.fc_config.nadcs)
 
 
     def get_decoded_values(self, channel=None):

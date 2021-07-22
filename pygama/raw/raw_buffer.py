@@ -128,7 +128,7 @@ class RawBufferList(list):
         for rb in self: rb.make_lgdo(maker, size=size)
 
 
-    def get_keyed_dict(self):
+    def get_keyed_dict(self, default=None):
         ''' returns a dict of RawBuffers built from the buffers' key_lists
 
         Different keys may point to the same buffer. Requires the buffers in the
