@@ -1,8 +1,5 @@
-import os
-import numpy as np
-from ..data_decoder.py import *
+from pygama.raw.data_decoder import *
 from pygama import lgdo
-from .ch_group import *
 
 
 class FCEventDecoder(DataDecoder):
@@ -14,86 +11,113 @@ class FCEventDecoder(DataDecoder):
         """
         # these are read for every event (decode_event)
         self.decoded_values = {
-            'packet_id': { # packet index in file
+            # packet index in file
+            'packet_id': {
                'dtype': 'uint32',
              },
-            'ievt': { # index of event
+            # index of event
+            'ievt': {
               'dtype': 'int32',
             },
-            'timestamp': { # time since epoch
+            # time since epoch
+            'timestamp': {
               'dtype': 'float64',
               'units': 's',
             },
-            'runtime': { # time since beginning of file
+            # time since beginning of file
+            'runtime': {
               'dtype': 'float64',
               'units': 's',
             },
-            'numtraces': { # number of triggered adc channels
+            # number of triggered adc channels
+            'numtraces': {
               'dtype': 'int32',
             },
-            'tracelist': { # list of triggered adc channels
+            # list of triggered adc channels
+            'tracelist': {
               'dtype': 'int16',
               'datatype': 'array<1>{array<1>{real}}', # vector of vectors
               'length_guess': 16,
             },
-            'baseline': { # fpga baseline
+            # fpga baseline
+            'baseline': {
               'dtype': 'uint16',
             },
-            'onboard_E': {  # fpga energy
+            # fpga energy
+            'onboard_E': {
               'dtype': 'uint16',
             },
-            'channel': { # right now, index of the trigger (trace)
+            # right now, index of the trigger (trace)
+            'channel': {
               'dtype': 'uint32',
             },
-            'ts_pps': { # PPS timestamp in sec
+            # PPS timestamp in sec
+            'ts_pps': {
               'dtype': 'int32',
             },
-            'ts_ticks': { # clock ticks
-            'dtype': 'int32',
-              },
-            'ts_maxticks': { # max clock ticks
+            # clock ticks
+            'ts_ticks': {
               'dtype': 'int32',
             },
-            'to_mu_sec': { # the offset in sec between the master and unix
+            # max clock ticks
+            'ts_maxticks': {
+              'dtype': 'int32',
+            },
+            # the offset in sec between the master and unix
+            'to_mu_sec': {
               'dtype': 'int64',
             },
-            'to_mu_usec': { # the offset in usec between master and unix
+            # the offset in usec between master and unix
+            'to_mu_usec': {
               'dtype': 'int32',
             },
-            'to_master_sec': { # the calculated sec which must be added to the master
+            # the calculated sec which must be added to the master
+            'to_master_sec': {
               'dtype': 'int64',
             },
-            'to_dt_mu_usec': { # the delta time between master and unix in usec
+            # the delta time between master and unix in usec
+            'to_dt_mu_usec': {
               'dtype': 'int32',
             },
-            'to_abs_mu_usec': { # the abs(time) between master and unix in usec
+            # the abs(time) between master and unix in usec
+            'to_abs_mu_usec': {
               'dtype': 'int32',
             },
-            'to_start_sec': { # startsec
+            # startsec
+            'to_start_sec': {
               'dtype': 'int64',
             },
-            'to_start_usec': { # startusec
+            # startusec
+            'to_start_usec': {
               'dtype': 'int32',
             },
-            'dr_start_pps': { # start pps of the next dead window
-              'dtype': 'float32',
+            # start pps of the next dead window
+            'dr_start_pps': {
+              'dtype': 'int32',
             },
-            'dr_start_ticks': { # start ticks of the next dead window
-              'dtype': 'float32',
+            # start ticks of the next dead window
+            'dr_start_ticks': {
+              'dtype': 'int32',
             },
-            'dr_stop_pps': { # stop pps of the next dead window
-              'dtype': 'float32',
+            # stop pps of the next dead window
+            'dr_stop_pps': {
+              'dtype': 'int32',
             },
-            'dr_stop_ticks': { # stop ticks of the next dead window
-              'dtype': 'float32',
+            # stop ticks of the next dead window
+            'dr_stop_ticks': {
+              'dtype': 'int32',
             },
-            'dr_maxticks': { # maxticks of the dead window
-              'dtype': 'float32',
+            # maxticks of the dead window
+            'dr_maxticks': {
+              'dtype': 'int32',
             },
-            'deadtime': { # current dead time calculated from deadregion (dr) fields. Give the total dead time if summed up.
-              'dtype': 'float32',
+            # current dead time calculated from deadregion (dr) fields.
+            # Give the total dead time if summed up.
+            'deadtime': {
+              'dtype': 'float64',
             },
-            'waveform': { # digitizer data
+            # waveform data
+            'waveform': {
               'dtype': 'uint16',
               'datatype': 'waveform',
               'wf_len': 65532, # max value. override this before initializing buffers to save RAM
@@ -104,9 +128,13 @@ class FCEventDecoder(DataDecoder):
         }
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
+        self.fc_config = None
 
 
-    def get_decoded_values(self, channel=None): 
+    def get_keys_list(self): return range(self.fc_config.nadcs)
+
+
+    def get_decoded_values(self, channel=None):
         # same for all channels
         return self.decoded_values
 
@@ -122,9 +150,28 @@ class FCEventDecoder(DataDecoder):
         self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples']
 
 
-    def decode_packet(self, fcio, lgdo_tables, packet_id, verbose=False):
+    def decode_packet(self, fcio, lgdo_tables, packet_id, verbosity=0):
         """
         access FCIOEvent members for each event in the raw file
+
+        Parameters
+        ----------
+        fcio : fcio reader object
+            The interface to the fcio data. Enters this function after a call to
+            fcio.get_record() so that data for packet_id ready to be read out
+        lgdo_tables : lgdo.Table or dict
+            A single table for readign out all data, or a dict of tables keyed
+            by channel number (i.e. as returned by raw_groups.build_tables())
+        packet_id : int
+            The index of the packet in the fcio stream. Incremented by
+            fc_streamer
+        verbosity : int
+            verbosity level for packet decoding
+
+        Returns
+        -------
+        n_bytes : int
+            (estimated) number of bytes in the packet that was just decoded.
         """
 
         ievt      = fcio.eventnumber # the eventnumber since the beginning of the file
@@ -168,15 +215,15 @@ class FCEventDecoder(DataDecoder):
                       eventsamples, 'when',
                       self.decoded_values['waveform']['wf_len'], 'were expected')
             ii = tbl.loc
-            tbl['channel'].nda[ii] = iwf
-            tbl['packet_id'].nda[ii] = packet_id
-            tbl['ievt'].nda[ii] =  ievt
-            tbl['timestamp'].nda[ii] =  timestamp
-            tbl['runtime'].nda[ii] =  runtime
-            tbl['numtraces'].nda[ii] =  numtraces
+            tbl['channel'].nda[ii]        = iwf
+            tbl['packet_id'].nda[ii]      = packet_id
+            tbl['ievt'].nda[ii]           =  ievt
+            tbl['timestamp'].nda[ii]      =  timestamp
+            tbl['runtime'].nda[ii]        =  runtime
+            tbl['numtraces'].nda[ii]      =  numtraces
             tbl['tracelist'].set_vector(ii, tracelist)
-            tbl['baseline'].nda[ii] = baselines[iwf]
-            tbl['onboard_E'].nda[ii] = energies[iwf]
+            tbl['baseline'].nda[ii]       = baselines[iwf]
+            tbl['onboard_E'].nda[ii]      = energies[iwf]
             tbl['ts_pps'].nda[ii]         = ts_pps
             tbl['ts_ticks'].nda[ii]       = ts_ticks
             tbl['ts_maxticks'].nda[ii]    = ts_maxticks
@@ -193,8 +240,11 @@ class FCEventDecoder(DataDecoder):
             tbl['dr_stop_ticks'].nda[ii]  = dr_stop_ticks
             tbl['dr_maxticks'].nda[ii]    = dr_maxticks
             tbl['deadtime'].nda[ii]       = deadtime
-            waveform = traces[iwf]
-            tbl['waveform']['values'].nda[ii][:] = waveform
+            tbl['waveform']['values'].nda[ii][:] = traces[iwf]
             tbl.push_row()
 
-        return 36*4 + numtraces*(1 + eventsamples + 2)*2
+        # see pyfcutils/src/libs/fcio.h's fcio_event struct: contains 5 ints, 3
+        # arrays of 10 ints, one float, and two arrays of shorts: one
+        # (trace_list) of length numtraces, and another (traces) of length
+        # numtraces*(eventsamples+2)
+        return 144 + numtraces*(eventsamples + 3)*2

@@ -16,8 +16,8 @@ class FCConfigDecoder(DataDecoder):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.config = lgdo.Struct()
 
-    @staticmethod
     def decode_config(fcio):
         config_names = [
             'nsamples', # samples per channel
@@ -32,9 +32,14 @@ class FCConfigDecoder(DataDecoder):
             'adccards', # number of attached fadccards
             'gps', # gps mode (0: not used, 1: external pps and 10MHz)
         ]
-        struct = lgdo.Struct()
         for name in config_names:
+            if name in self.config:
+                print(f'warning: {name} already in self.config. skipping...')
+                continue
             value = np.int32(getattr(fcio, name)) # all config fields are int32
-            struct.add_field(name, lgdo.Scalar(value))
-        return struct
+            self.config.add_field(name, lgdo.Scalar(value))
+        return self.config
 
+    def make_lgdo(self, key=None, size=None): return self.config
+
+    def buffer_is_full(self, rb): return rb.loc > 0

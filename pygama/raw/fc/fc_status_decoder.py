@@ -64,17 +64,7 @@ class FCStatusDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
 
 
-    def set_file_config(self, fc_config):
-        """
-        access FCIOConfig members once when each file is opened
-
-        fc_config is a lgdo Struct extracted via
-        fc_config = FCConfigDecoder.decode_config(fcio)
-        """
-        self.fc_config = fc_config
-
-
-    def decode_packet(self, fcio, lh5_table, packet_id, verbose=False):
+    def decode_packet(self, fcio, lh5_table, packet_id, verbosity=0):
         """
         access FC status (temp., log, ...)
         """
@@ -108,6 +98,6 @@ class FCStatusDecoder(DataDecoder):
 
         tbl.push_row()
 
-        # sizeof(fcio_status)
+        # sizeof(fcio_status): (3 + 10 + 256*(10 + 9 + 16 + 4 + 256))*4
         return 302132
 

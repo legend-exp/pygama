@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from pygama import lgdo
-from ..ch_group import *
+from ..raw_groups import *
 from ..data_streamer import DataStreamer
 from .fc_config_decoder import FCConfigDecoder
 from .fc_event_decoder import FCEventDecoder
@@ -14,37 +14,58 @@ class FCStreamer(DataStreamer):
     and the FlashCam DataDecoders to save the results and write to output.
     """
     def __init__(self):
-        """
-        """
+        super().__init__(self)
+        self.config_decoder = FCConfigDecoder()
+        self.status_decoder = FCStatusDecoder()
         self.event_decoder = FCEventDecoder()
         self.event_tables = {}
-        self.status_decoder = FCStatusDecoder()
 
+    def get_decoder_list(self):
+        dec_list = []
+        dec_list.append(self.config_decoder)
+        dec_list.append(self.status_decoder)
+        dec_list.append(self.event_decoder)
 
-    def initialize(self, daq_file, ch_groups_library=None, buffer_size=8192, verbosity=0):
-        """
+    def initialize(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
+        """ Initialize the FC data stream
+
+        Parameters
+        ----------
+        fcio_file : str
+            the FCIO filename 
+        rb_lib : RawBufferLibrary
+            library of buffers for this stream
+        buffer_size : int
+            length of tables to be read out in read_chunk
+        verbosity : int
+            verbosity level for the initialize function
+ 
         Returns
         -------
-        header_data : list of lgdos
-            the returned header_data is ready for writing to file or further
-            processing
+        header_data, n_bytes : list(RawBuffer), int
+            header_data is a list of length 1 containing the raw buffer holding
+                the fc_config table
+            n_bytes is the number of bytes read from the file to extract the
+                header data
         """
-        self.fcio = fcutils.fcio(daq_file)
+        self.fcio = fcutils.fcio(fcio_file)
 
-        fc_config = FCConfigDecoder.decode_config(fcio)
+        # read in file header (config) info
+        fc_config = self.config_decoder.decode_config(fcio)
         self.event_decoder.set_file_config(fc_config)
-        self.status_decoder.set_file_config(fc_config)
 
-        # build ch_groups and set up tables
-        self.ch_groups = None
-        if (ch_groups_library is not None) and ('FCEventDecoder' in ch_groups_dict):
-            # get ch_groups
-            self.ch_groups = ch_groups_dict['FCEventDecoder']
-            expand_ch_groups(self.ch_groups)
+        super().initialize(fcio_file, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+
+        # build raw_groups and set up tables
+        self.raw_groups = None
+        if (raw_groups_library is not None) and ('FCEventDecoder' in raw_groups_dict):
+            # get raw_groups
+            self.raw_groups = raw_groups_dict['FCEventDecoder']
+            expand_raw_groups(self.raw_groups)
         else:
             if verbosity > 0: print('Config not found.  Single-table mode')
-            self.ch_groups = create_dummy_ch_group()
-        self.event_tables = build_tables(self.ch_groups, buffer_size, init_obj=event_decoder)
+            self.raw_groups = create_dummy_raw_groups()
+        self.event_tables = build_tables(self.raw_groups, buffer_size, init_obj=event_decoder)
 
         self.status_tbl = lgdo.Table(buffer_size)
         self.status_decoder.initialize_lgdo_table(status_tbl)
@@ -86,7 +107,7 @@ class FCStreamer(DataStreamer):
                 # check that tables are large enough to read in this packet. If
                 # not, exit and return the ones that might overflow
                 full_tables = []
-                for group_info in self.ch_groups.values():
+                for group_info in self.raw_groups.values():
                     tbl = group_info['table']
                     # Check that the tables are large enough
                     # TODO: don't need to check this every event, only if sum(numtraces) >= buffer_size
@@ -104,14 +125,14 @@ class FCStreamer(DataStreamer):
 
     # finished with loop. return any tables with data
     tables = []
-    for group_info in self.ch_groups.values():
+    for group_info in self.raw_groups.values():
         tbl = group_info['table']
         if tbl.loc != 0: tables.append(tbl)
     if self.status_tbl.loc != 0: tables.append(tbl)
     if len(full_tables) > 0: return tables, n_bytes
 
 
-def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
+def process_flashcam(daq_file, raw_files, n_max, raw_groups_dict=None, verbose=False, buffer_size=8192, chans=None, f_out = ''):
     """
     `raw_files` can be a string, or a dict with a label for each file:
       `{'geds':'filename_geds.lh5', 'muvt':'filename_muvt.lh5}`
@@ -132,31 +153,34 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     event_decoder.set_file_config(fcio)
     event_tables = {}
 
-    # build ch_groups and set up tables
-    ch_groups = None
-    if (ch_groups_dict is not None) and ('FlashCamEventDecoder' in ch_groups_dict):
-        # get ch_groups
-        ch_groups = ch_groups_dict['FlashCamEventDecoder']
-        expand_ch_groups(ch_groups)
+    # build raw_groups and set up tables
+    raw_groups = None
+    if (raw_groups_dict is not None) and ('FlashCamEventDecoder' in raw_groups_dict):
+        # get raw_groups
+        raw_groups = raw_groups_dict['FlashCamEventDecoder']
+        expand_raw_groups(raw_groups)
     else:
         print('Config not found.  Single-table mode')
-        ch_groups = create_dummy_ch_group()
+        raw_groups = create_dummy_raw_groups()
 
-    # set up ch_group-to-output-file-and-group info
+    # set up raw_group-to-output-file-and-group info
     if single_output:
-        set_outputs(ch_groups, out_file_template=f_out, grp_path_template='{group_name}/raw')
+        set_outputs(raw_groups, out_file_template=f_out, grp_path_template='{group_name}/raw')
     else:
-        set_outputs(ch_groups, out_file_template=raw_files, grp_path_template='{group_name}/raw')
+        set_outputs(raw_groups, out_file_template=raw_files, grp_path_template='{group_name}/raw')
 
     # set up tables
-    event_tables = build_tables(ch_groups, buffer_size, event_decoder)
+    event_tables = build_tables(raw_groups, buffer_size, event_decoder)
 
     if verbose:
         print('Output group : output file')
-        for group_info in ch_groups.values():
+        for group_info in raw_groups.values():
             group_path = group_info['group_path']
             out_file = group_info['out_file']
             print(group_path, ':', out_file.split('/')[-1])
+
+    # dictionary with the unique file names as keys
+    file_info = dict.fromkeys(set(group_info['out_file'] for group_info in ch_groups.values()), False)
 
     # set up status decoder (this is 'auxs' output)
     status_decoder = FlashCamStatusDecoder()
@@ -177,7 +201,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     # write fcio_config
     fcio_config = event_decoder.get_file_config_struct()
     lh5_store.write_object(fcio_config, 'fcio_config', config_filename)
-    
+
     # loop over raw data packets
     i_debug = 0
     packet_id = 0
@@ -209,7 +233,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
         # Event or SparseEvent record
         if rc == 3 or rc == 6:
-            for group_info in ch_groups.values():
+            for group_info in raw_groups.values():
                 tbl = group_info['table']
                 # Check that the tables are large enough
                 # TODO: don't need to check this every event, only if sum(numtraces) >= buffer_size
@@ -222,6 +246,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
                     group_path = group_info['group_path']
                     out_file = group_info['out_file']
                     lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+                    if out_file in file_info: file_info[out_file] = True
                     tbl.clear()
 
             # Looks okay: just decode
@@ -233,17 +258,23 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             #    break # debug, deleteme
 
     # end of loop, write to file once more
-    for group_info in ch_groups.values():
+    for group_info in raw_groups.values():
         tbl = group_info['table']
         if tbl.loc != 0:
             group_path = group_info['group_path']
             out_file = group_info['out_file']
             lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
+            if out_file in file_info: file_info[out_file] = True
             tbl.clear()
     if status_tbl.loc != 0:
         lh5_store.write_object(status_tbl, 'stat', status_filename,
                                n_rows=status_tbl.loc)
         status_tbl.clear()
+
+    # alert user to any files not actually saved in the end
+    for out_file, is_saved in file_info.items():
+        if not is_saved:
+            print('Not saving file since no data were found:', out_file)
 
     if verbose:
         update_progress(1)

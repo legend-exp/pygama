@@ -12,18 +12,20 @@ from pygama import lgdo
 class DataDecoder(ABC):
     """Decodes packets from a data stream
 
-    The values that get decoded need to be described by a dict called
+    Most decoders will repeatedly decode the same set of values from each
+    packet.  The values that get decoded need to be described by a dict called
     'decoded_values' that helps determine how to set up the buffers and write
     them to file. lgdo Tables are made whose columns correspond to the elements
     of decoded_values, and packet data gets pushed to the end of the table one
     row at a time. See FlashCamEventDecoder or ORCAStruck3302 for an example.
 
-    Some decoders (like for file headers) may not need to push to a table, so they
+    Some decoders (like for file headers) do not need to push to a table, so they
     do not need decoded_values. Such classes should still derive from
-    DataDecoder in anticipation of future functionality
+    DataDecoder and define how data gets formatted into lgdo's
 
     Subclasses should define a method for decoding data to a buffer like
-    decode_packet(packet, data_buffer, packet_id, verbose=False)
+    decode_packet(packet, raw_buffer_list, packet_id, verbosity=0)
+    This function should return the number of bytes read
 
     Garbage collection writes binary data as an array of uint32s to a
     variable-length array in the output file. If a problematic packet is found,
@@ -43,6 +45,9 @@ class DataDecoder(ABC):
                                      lgdo.Array(shape=garbage_length, dtype='uint32'))
 
 
+    def get_keys_list(self): pass
+
+
     def get_decoded_values(self, key=None):
         """ Get decoded values (optionally for a given key, typically a channel)
 
@@ -59,16 +64,35 @@ class DataDecoder(ABC):
         return None
 
 
-    def initialize_lgdo_table(self, table, key=None):
-        """ Initialize an lgdo Table based on decoded_values.
-        key is typically the channel according to ch_group
+    def make_lgdo(self, key=None, size=None):
+        """ Make an lgdo for this DataDecoder
+
+        This default version of this function allocates a Table using
+        the decoded_values for key. If a different type of lgdo object is
+        required for this decoder, overload this function.
+
+        Parameters
+        ----------
+        key : int, str, etc
+            used by init_obj to initialize the lgdo for a particular key (e.g.
+            to have different trace lengths for different channels of a piece of
+            hardware). Leave as None if such specialization is not necessary
+        size : int
+            the size to be allocated for the lgdo, if applicable
+
+        Returns
+        -------
+        data_obj : lgdo
+            the newly allocated lgdo
         """
+
         if not hasattr(self, 'decoded_values'):
             name = type(self).__name__
-            print(name, 'Error: no decoded_values available for setting up buffer')
-            return
+            print(name, 'Error: no decoded_values available for setting up table')
+            return None
+
+        data_obj = lgdo.Table(size=size)
         dec_vals = self.get_decoded_values(key)
-        size = table.size
         for field, fld_attrs in dec_vals.items():
             # make a copy of fld_attrs: pop off the ones we use, then keep any
             # remaining user-set attrs and store into the lgdo
@@ -86,7 +110,7 @@ class DataDecoder(ABC):
                 # allow to override "kind" for the dtype for lgdo
                 if 'kind' in attrs:
                     attrs['datatype'] = 'array<1>{' + attrs.pop('kind') + '}'
-                table.add_field(field, lgdo.Array(shape=size, dtype=dtype, attrs=attrs))
+                data_obj.add_field(field, lgdo.Array(shape=size, dtype=dtype, attrs=attrs))
                 continue
 
             # get datatype for complex objects
@@ -97,12 +121,13 @@ class DataDecoder(ABC):
                 t0_units = attrs.pop('t0_units')
                 dt = attrs.pop('dt')
                 dt_units = attrs.pop('dt_units')
+                wf_len = attrs.pop('wf_len')
                 wf_table = lgdo.WaveformTable(size=size,
                                               t0=0, t0_units=t0_units,
                                               dt=dt, dt_units=dt_units,
                                               wf_len=wf_len, dtype=dtype,
                                               attrs=attrs)
-                table.add_field(field, wf_table)
+                data_obj.add_field(field, wf_table)
                 continue
 
             # Parse datatype for remaining lgdos
@@ -114,7 +139,7 @@ class DataDecoder(ABC):
                 # only arrays of 1D arrays are supported at present
                 dims = (1,1)
                 aoesa = lgdo.ArrayOfEqualSizedArrays(shape=(size,length), dtype=dtype, dims=dims, attrs=attrs)
-                table.add_field(field, aoesa)
+                data_obj.add_field(field, aoesa)
                 continue
 
             # VectorOfVectors
@@ -122,12 +147,13 @@ class DataDecoder(ABC):
                 length_guess = size
                 if 'length_guess' in attrs: length_guess = attrs.pop('length_guess')
                 vov = lgdo.VectorOfVectors(shape_guess=(size,length_guess), dtype=dtype, attrs=attrs)
-                table.add_field(field, vov)
+                data_obj.add_field(field, vov)
                 continue
 
             # if we get here, got a bad datatype
             name = type(self).__name__
             print(name, 'Error: do not know how to make a', datatype, 'for', field)
+        return data_obj
 
 
     def put_in_garbage(self, packet, packet_id, code):
@@ -147,4 +173,14 @@ class DataDecoder(ABC):
         self.garbage_table.clear()
 
 
+    def get_max_rows_in_packet(self):
+        """ Returns the max number of rows that could be read out in a packet
 
+        1 by default, overload as necessary to avoid writing past the ends of
+        buffers.
+        """
+        return 1
+
+    def buffer_is_full(self, rb):
+        """ Returns whether the buffer is too full to read in another packet """
+        return len(rb.lgdo) - rb.loc < self.get_max_rows_in_packet()

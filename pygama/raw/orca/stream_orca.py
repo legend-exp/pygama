@@ -317,7 +317,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     if ch_groups_dict is None:
         ch_groups_dict = {}
         for decoder_name in decoders_to_run:
-            ch_groups = create_dummy_ch_group()
+            ch_groups = create_dummy_ch_groups()
             ch_groups_dict[decoder_name] = ch_groups
             grp_path_template = f'{decoder_name}/raw'
             set_outputs(ch_groups, out_file_template=raw_file_pattern, grp_path_template=grp_path_template)

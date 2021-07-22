@@ -36,4 +36,4 @@ The basic steps for a typical analysis are:
 
 ## testing
 
-pygama testing uses the [pytest](https://pytest.org) framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines).
+pygama testing uses the [pytest](https://pytest.org) framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines). To run tests, just enter `pytest` at the command line.
