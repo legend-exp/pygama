@@ -449,6 +449,12 @@ def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
     the argument order and definition follows gauss_step
     """
 
+    a = A + T
+    htail = T / a
+    hstep = S / (2*a)
+
+    return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
+
 def radford_fwhm(sigma, htail, tau, cov = None):
     """
     Return the FWHM of the radford_peak function, ignoring background and
