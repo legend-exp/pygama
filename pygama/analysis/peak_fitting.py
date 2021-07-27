@@ -494,9 +494,6 @@ def radford_fwhm(sigma, htail, tau, cov = None):
     grad2 *= 1./radford_peakshape_derivative(upper_hm, pars);
     grad2 -= grad1;
 
-    grad2 = np.delete(grad2, (0, 5), axis = 0)
-    grad2 = np.delete(grad2, (0, 5), axis = 0)
-
     fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
 
     return upper_hm - lower_hm, fwfm_unc
