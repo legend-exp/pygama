@@ -443,6 +443,7 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         # return individually to make a pretty plot
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step_f, le_tail
 
+
 def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
     """
     A wrapped version of David Radford's HPGe peak shape function, such that
@@ -454,6 +455,7 @@ def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
     hstep = S / (2*a)
 
     return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
+
 
 def radford_fwhm(sigma, htail, tau, cov = None):
     """
@@ -499,6 +501,7 @@ def radford_fwhm(sigma, htail, tau, cov = None):
 
     return upper_hm - lower_hm, fwfm_unc
 
+
 def radford_peakshape_derivative(E, pars):
     mu, sigma, hstep, htail, tau, bg0, a = pars
 
@@ -511,6 +514,7 @@ def radford_peakshape_derivative(E, pars):
     ret -= htail/tau*(-gauss_tail(E, mu, sigma, 1, tau)+gaus)
 
     return a*(ret - hstep*gaus)
+
 
 def radford_parameter_gradient(E, pars):
     mu, sigma, hstep, htail, tau, bg0, amp = pars #bk gradient zero?
@@ -542,6 +546,7 @@ def radford_parameter_gradient(E, pars):
     gradient = g_mu, g_sigma, g_hs, g_ft, g_tau, 0, g_amp
     return np.array(gradient)
 
+
 def get_fwhm_func(func, pars, cov = None):
 
     if func == gauss_step:
@@ -565,6 +570,7 @@ def get_fwhm_func(func, pars, cov = None):
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
+
 
 def get_mu_func(func, pars, cov = None):
 
@@ -592,11 +598,13 @@ def get_mu_func(func, pars, cov = None):
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
     
-def gauss_tail(x,mu, sigma, tail,tau):
+
+def gauss_tail(x, mu, sigma, tail, tau):
     """
     A gaussian tail function template
     Can be used as a component of other fit functions
     """
+    if tail == 0: return 0
     x = np.asarray(x)
     scalar_input = False
     if x.ndim == 0:
@@ -604,11 +612,14 @@ def gauss_tail(x,mu, sigma, tail,tau):
         scalar_input = True
 
     tmp = (x-mu)/tau + sigma**2/(2*tau)**2
-    tail_f = np.where(tmp < limit, gauss_tail_exact(x, mu, sigma, tail, tau), gauss_tail_approx(x, mu, sigma, tail, tau))
+    tail_f = np.where(tmp < limit, 
+                      gauss_tail_exact(x, mu, sigma, tail, tau), 
+                      gauss_tail_approx(x, mu, sigma, tail, tau))
 
     if scalar_input:
         return np.squeeze(tail_f)
     return tail_f
+
 
 def gauss_tail_exact(x, mu, sigma, tail, tau):
     tmp = (x-mu)/tau + sigma**2/(2*tau)**2
@@ -616,10 +627,12 @@ def gauss_tail_exact(x, mu, sigma, tail, tau):
     tail_f = tail/(2*tau) * np.exp(tmp) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
     return tail_f
 
+
 def gauss_tail_approx(x, mu, sigma, tail, tau):
     den = 1./(sigma + tau*(x-mu)/sigma)
     tail_f = sigma * gauss(x, mu, sigma) * den * (1.-tau*tau*den*den)
     return tail_f
+
 
 def step(x, mu, sigma, bkg, a):
     """
