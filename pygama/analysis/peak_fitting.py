@@ -443,11 +443,19 @@ def radford_peak(x, mu, sigma, hstep, htail, tau, bg0, a=1, components=False):
         # return individually to make a pretty plot
         return (1 - htail), gauss(x, mu, sigma, a), bg_term, step_f, le_tail
 
+
 def radford_peak_wrapped(x, A, mu, sigma, bkg, S, T, tau, components=False):
     """
     A wrapped version of David Radford's HPGe peak shape function, such that
     the argument order and definition follows gauss_step
     """
+
+    a = A + T
+    htail = T / a
+    hstep = S / (2*a)
+
+    return radford_peak(x, mu, sigma, hstep, htail, tau, bkg, a, components=components)
+
 
 def radford_fwhm(sigma, htail, tau, cov = None):
     """
@@ -478,20 +486,22 @@ def radford_fwhm(sigma, htail, tau, cov = None):
     if cov is None: return upper_hm - lower_hm
 
     #calculate uncertainty
-    #amp set to 1, mu to 1, hstep+bg set to 0
-    pars = [1, sigma, 0, htail, tau, 0, 1]
+    #amp set to 1, mu to 0, hstep+bg set to 0
+    pars = [0, sigma, 0, htail, tau, 0, 1]
+    gradmax = radford_parameter_gradient(Emax, pars);
+    gradmax *= 0.5
     grad1 = radford_parameter_gradient(lower_hm, pars);
+    grad1 -= gradmax
+    grad1 /= radford_peakshape_derivative(lower_hm, pars);
     grad2 = radford_parameter_gradient(upper_hm, pars);
-    grad1 *= 1./radford_peakshape_derivative(lower_hm, pars);
-    grad2 *= 1./radford_peakshape_derivative(upper_hm, pars);
+    grad2 -= gradmax
+    grad2 /= radford_peakshape_derivative(upper_hm, pars);
     grad2 -= grad1;
-
-    grad2 = np.delete(grad2, (0, 5), axis = 0)
-    grad2 = np.delete(grad2, (0, 5), axis = 0)
 
     fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
 
     return upper_hm - lower_hm, fwfm_unc
+
 
 def radford_peakshape_derivative(E, pars):
     mu, sigma, hstep, htail, tau, bg0, a = pars
@@ -499,12 +509,11 @@ def radford_peakshape_derivative(E, pars):
     sigma = abs(sigma)
     gaus = gauss(E, mu, sigma)
     y = (E-mu)/sigma
-    sigtauL = sigma/tau
     ret = -(1-htail)*y/sigma*gaus
-
     ret -= htail/tau*(-gauss_tail(E, mu, sigma, 1, tau)+gaus)
 
     return a*(ret - hstep*gaus)
+
 
 def radford_parameter_gradient(E, pars):
     mu, sigma, hstep, htail, tau, bg0, amp = pars #bk gradient zero?
@@ -536,6 +545,7 @@ def radford_parameter_gradient(E, pars):
     gradient = g_mu, g_sigma, g_hs, g_ft, g_tau, 0, g_amp
     return np.array(gradient)
 
+
 def get_fwhm_func(func, pars, cov = None):
 
     if func == gauss_step:
@@ -559,6 +569,7 @@ def get_fwhm_func(func, pars, cov = None):
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
+
 
 def get_mu_func(func, pars, cov = None):
 
@@ -586,34 +597,42 @@ def get_mu_func(func, pars, cov = None):
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
     
-def gauss_tail(x,mu, sigma, tail,tau):
+
+def gauss_tail(x, mu, sigma, tail, tau):
     """
     A gaussian tail function template
     Can be used as a component of other fit functions
     """
+    if tail == 0: return 0
     x = np.asarray(x)
     scalar_input = False
     if x.ndim == 0:
         x = x[None] # makes x1d
         scalar_input = True
 
-    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
-    tail_f = np.where(tmp < limit, gauss_tail_exact(x, mu, sigma, tail, tau), gauss_tail_approx(x, mu, sigma, tail, tau))
+    tmp = (x-mu)/tau + sigma**2/2/tau**2
+    tail_f = np.where(tmp < limit, 
+                      gauss_tail_exact(x, mu, sigma, tail, tau), 
+                      gauss_tail_approx(x, mu, sigma, tail, tau))
 
     if scalar_input:
         return np.squeeze(tail_f)
     return tail_f
 
+
 def gauss_tail_exact(x, mu, sigma, tail, tau):
-    tmp = (x-mu)/tau + sigma**2/(2*tau)**2
+    tmp = (x-mu)/tau + sigma**2/2/tau**2
+    abstau = np.absolute(tau)
     tmp = np.where(tmp < limit, tmp, limit)
-    tail_f = tail/(2*tau) * np.exp(tmp) * erfc( (x-mu)/(np.sqrt(2)*sigma) + sigma/(np.sqrt(2)*tau))
+    tail_f = tail/(2*abstau) * np.exp(tmp) * erfc( (tau*(x-mu)/sigma + sigma)/(np.sqrt(2)*abstau))
     return tail_f
 
+
 def gauss_tail_approx(x, mu, sigma, tail, tau):
-    den = 1./(sigma + tau*(x-mu)/sigma)
-    tail_f = sigma * gauss(x, mu, sigma) * den * (1.-tau*tau*den*den)
+    den = 1/(sigma + tau*(x-mu)/sigma)
+    tail_f = tail * sigma * gauss(x, mu, sigma) * den * (1.-tau*tau*den*den)
     return tail_f
+
 
 def step(x, mu, sigma, bkg, a):
     """
