@@ -9,7 +9,7 @@ from pygama.dsp.errors import DSPFatal
               "void(int32[:], int32, int32[:], int32[:], int32[:], int32[:], int32[:], int32[:])",
               "void(int64[:], int64, int64[:], int64[:], int64[:], int64[:], int64[:], int32[:])"],
              "(n),(),(m) -> (m),(m),(),(),()", nopython=True, cache=True)
-def get_multi_local_extrema(w_in, delta_in, t_arbitrary_in, vt_max_out,vt_min_out,n_max_out,n_min_out,flag_out):
+def get_multi_local_extrema(w_in, delta_in, t_arbitrary_in, vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out):
     """
     Get lists of indices of the local maxima and minima of data
     The "local" extrema are those maxima / minima that have heights / depths of
@@ -18,10 +18,12 @@ def get_multi_local_extrema(w_in, delta_in, t_arbitrary_in, vt_max_out,vt_min_ou
     Parameters
     ----------
     w_in : array-like
-        the array of data within which extrema will be found
+        The array of data within which extrema will be found
     delta_in : scalar
-        the absolute level by which data must vary (in one direction) about an
+        The absolute level by which data must vary (in one direction) about an
         extremum in order for it to be tagged
+    t_arbitrary_in : array-like
+        An array of fixed length that tells numba to expect to return a list of amplitudes of the same length
     Returns
     -------
     vt_max_out, vt_min_out : array-like, array-like
@@ -31,7 +33,7 @@ def get_multi_local_extrema(w_in, delta_in, t_arbitrary_in, vt_max_out,vt_min_ou
         The number of maxima and minima found in a waveform
     flag_out: scalar
         Returns 0 if there is only one maximum and it is a simple waveform, 
-        returns 1 if there are multiple peaks in a waveform
+        Returns 1 if there are multiple peaks in a waveform
         
     """
 
