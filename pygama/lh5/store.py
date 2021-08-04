@@ -141,7 +141,7 @@ class Store:
         #          proc.execute()
 
         # Handle list-of-files recursively
-        if not isinstance(lh5_file, str):
+        if not isinstance(lh5_file, (str, h5py._hl.files.File)):
             lh5_file = list(lh5_file)
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
