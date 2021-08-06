@@ -12,6 +12,12 @@ class DataStreamer(ABC):
 
         Open the in_stream, read in the header, set up the buffers
 
+        Call super().initialize([args]) from derived class to run this default
+        version that sets up buffers in rb_lib using the stream's decoders 
+
+        Note: this default version has no actual return value! You must overload
+        this function and return the header info
+
         Parameters
         ----------
         in_stream : str
@@ -33,7 +39,7 @@ class DataStreamer(ABC):
             n_bytes is the number of bytes read from the file to extract the
                 header data
         """
-        # call super().initialize(*args, **kwargs) to run this default code
+        # call super().initialize([args]) to run this default code
         # after loading header info, then follow it with the return call.
         self.rb_lib = rb_lib
         decoders = self.get_decoder_list()
@@ -71,6 +77,8 @@ class DataStreamer(ABC):
         Note: user is responsible for resetting / clearing the raw buffers prior
         to calling read_chunk again.
 
+        Default version handles the full_only arg and return value.
+
         Parameters
         ----------
         full_only : bool
@@ -94,8 +102,17 @@ class DataStreamer(ABC):
             n_bytes is the number of bytes read from the file during this
                 iteration.
         """
+        list_of_rbs = []
+        for rb_list in rb_lib.items():
+            for rb in rb_list:
+                if not full_only and rb.loc > 0: list_of_rbs.append(rb)
+                else:
+                    if not hasattr(rb.lgod, __len__):
+                        if rb.loc > 0: list_of_rbs.append(rb)
+                    else:
+                        if rb.loc == len(rb.lgdo): list_of_rbs.append(rb)
+
         
-        pass
 
 
     def get_decoder_list(self):
