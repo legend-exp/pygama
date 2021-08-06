@@ -15,16 +15,21 @@ class FCStreamer(DataStreamer):
     """
     def __init__(self):
         super().__init__(self)
+        self.fcio = None
         self.config_decoder = FCConfigDecoder()
         self.status_decoder = FCStatusDecoder()
         self.event_decoder = FCEventDecoder()
         self.event_tables = {}
+
+
 
     def get_decoder_list(self):
         dec_list = []
         dec_list.append(self.config_decoder)
         dec_list.append(self.status_decoder)
         dec_list.append(self.event_decoder)
+
+
 
     def initialize(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
         """ Initialize the FC data stream
@@ -51,33 +56,24 @@ class FCStreamer(DataStreamer):
         self.fcio = fcutils.fcio(fcio_file)
 
         # read in file header (config) info
-        fc_config = self.config_decoder.decode_config(fcio)
+        fc_config = self.config_decoder.decode_config(fcio) # returns an lgdo.Struct
         self.event_decoder.set_file_config(fc_config)
 
+        # initialize the buffers in rb_lib
         super().initialize(fcio_file, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
-
-        # build raw_groups and set up tables
-        self.raw_groups = None
-        if (raw_groups_library is not None) and ('FCEventDecoder' in raw_groups_dict):
-            # get raw_groups
-            self.raw_groups = raw_groups_dict['FCEventDecoder']
-            expand_raw_groups(self.raw_groups)
-        else:
-            if verbosity > 0: print('Config not found.  Single-table mode')
-            self.raw_groups = create_dummy_raw_groups()
-        self.event_tables = build_tables(self.raw_groups, buffer_size, init_obj=event_decoder)
-
-        self.status_tbl = lgdo.Table(buffer_size)
-        self.status_decoder.initialize_lgdo_table(status_tbl)
 
         # set up data loop variables
         self.packet_id = 0
         self.max_numtraces = 0
-        return [fc_config]
+
+        if 'FCConfigDecoder' in rb_lib: rb = rb_lib['FCConfigDecoder']
+        else: rb = RawBuffer(lgdo=fc_config)
+        rb.loc = 1 # we have filled this buffer
+        return [rb], 11*4 # there are 11 ints in the fcio_config struct
 
 
 
-    def read_chunk(self, verbosity=0):
+    def read_chunk(self, full_only=True, verbosity=0):
         """
         Returns
         -------
