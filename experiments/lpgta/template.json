@@ -1,0 +1,18 @@
+{
+    "pyg_dir": "../../",
+    "fig_dir": "fig/",
+    "idx_dir": "idx/",
+    "cal_dir": "cal/",
+    "opt_dir": "opt/",
+    "dsp_dir": "dsp/",
+    "ana_dir": "ana/",
+    "files_raw": [
+        "${DATADIR}/lngs/pgt/v01.01/raw/geds/LPGTA_r0033_*_calib_geds_raw.lh5"
+    ],
+    "lines": {
+        "tl583": 583.191,
+        "tl860": 860.564,
+        "tldep": 1592.53,
+        "tlfep": 2614.511
+    }
+}
