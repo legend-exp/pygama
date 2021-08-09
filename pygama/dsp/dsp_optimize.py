@@ -6,7 +6,7 @@ from pprint import pprint
 
 def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0):
     """
-    run one iteration of DSP on tb_data 
+    Run one iteration of DSP on tb_data 
 
     Optionally returns a value for optimization
 
@@ -51,17 +51,21 @@ class ParGrid():
 
     Each ParGrid entry corresponds to a dsp parameter to be varied.
     The ntuples must follow the pattern: 
-    ( name, i_arg, value_strs companions) : ( str, int, list of str, list or None )
-    where name is the name of the dsp routine in dsp_config whose  be
+    ( name, i_arg, value_strs, companions) : ( str, int, list of str, list, or None )
+    where name is the name of the dsp routine in dsp_config whose to be
     optimized, i_arg is the index of the argument to be varied, value_strs is
     the array of strings to set the argument to, and companions is an optional
     list of ( name, i_arg, value_strs ) tuples for companion arguments that
     need to change along with this one
+    
+    Optionally, i_arg can be a list of the argument indices to be varied together,
+    where value_strs is a list of lists correponding to the strings to set the
+    arguments to in the same order.
     """
     def __init__(self):
         self.dims = []
 
-    def add_dimension(self, name, i_arg, value_strs, companions = None):
+    def add_dimension(self, name, i_arg, value_strs, companions=None):
         self.dims.append( ParGridDimension(name, i_arg, value_strs, companions) )
 
     def get_n_dimensions(self):
@@ -126,13 +130,17 @@ class ParGrid():
     def set_dsp_pars(self, dsp_config, indices):
         for i_dim, i_par in enumerate(indices):
             name, i_arg, value_str, companions = self.get_data(i_dim, i_par)
-            dsp_config['processors'][name]['args'][i_arg] = value_str
+            if np.isscalar(i_arg):
+                dsp_config['processors'][name]['args'][i_arg] = value_str
+            else:
+                for i in range(len(i_arg)):
+                    dsp_config['processors'][name]['args'][i_arg[i]] = value_str[i]
             if companions is None: continue
             for ( c_name, c_i_arg, c_value_str ) in companions:
-               dsp_config['processors'][c_name]['args'][c_i_arg] = c_value_str[i_par]
+                dsp_config['processors'][c_name]['args'][c_i_arg] = c_value_str[i_par]
 
 
-def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=0):
+def run_grid(tb_data, dsp_config, grid, fom_function, dtype=np.float64, db_dict=None, verbosity=0):
     """Extract a table of optimization values for a grid of DSP parameters 
 
     The grid argument defines a list of parameters and values over which to run
@@ -157,10 +165,13 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=0)
         When given the output lh5 table of this DSP iteration, the fom_function
         must return a scalar figure-of-merit. Should accept verbosity as a
         second keyword argument
+    dtype : dtype (optional)
+        The data type of the fom_function's return object. Should be np.ndarray if
+        fom_function is set to None
     db_dict : dict (optional)
         DSP parameters database. See build_processing_chain for formatting info
     verbosity : int (optional)
-        verbosity for the processing chain and fom_function calls
+        Verbosity for the processing chain and fom_function calls
 
     Returns:
     --------
@@ -169,19 +180,16 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=0)
         of the grid argument
     """
 
-    grid_values = np.ndarray(shape=grid.get_shape())
+    grid_values = np.ndarray(shape=grid.get_shape(), dtype=dtype)
     iii = grid.get_zero_indices()
-    if verbosity > 0: print("starting grid calculations...")
+    if verbosity > 0: print("Starting grid calculations...")
     while True:    
         grid.set_dsp_pars(dsp_config, iii)
         if verbosity > 1: pprint(dsp_config)
         if verbosity > 0: grid.print_data(iii)
-        grid_values[tuple(iii)] = run_one_dsp(tb_data,
-                                              dsp_config,
-                                              db_dict=db_dict,
-                                              fom_function=fom_function,
-                                              verbosity=verbosity)
-        if verbosity > 0: print("value:", grid_values[tuple(iii)])
+        grid_values[tuple(iii)] = run_one_dsp(
+            tb_data, dsp_config, db_dict=db_dict, fom_function=fom_function, verbosity=verbosity)
+        if verbosity > 0: print('Value:', grid_values[tuple(iii)])
         if not grid.iterate_indices(iii): break
     return grid_values
         
