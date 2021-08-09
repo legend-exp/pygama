@@ -1,0 +1,4 @@
+# https://matplotlib.org/users/customizing.html
+
+figure.figsize: 12, 5.5
+font.size     : 14
