@@ -1,0 +1,29 @@
+{
+  "outputs": ["tp_max", "wf_max", "q_out"],
+  "processors": {
+      
+  "wf_bl": {
+      "function": "bl_estimator",
+      "module": "pygama.dsp.processors",
+      "args": ["waveform", "wf_bl"],
+      "unit": "ADC",
+      "prereqs": ["waveform"]
+    },
+      
+    "tp_min, tp_max, wf_min, wf_max": {
+      "function": "min_max",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_bl", "tp_min", "tp_max", "wf_min", "wf_max"],
+      "unit": ["ns", "ns", "ADC", "ADC"],
+      "prereqs": ["wf_bl"]
+    },
+      
+    "q_out": {
+      "function": "wave_integrator",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_bl", "q_out"],
+      "unit": "ADC",
+      "prereqs": ["wf_bl"]
+    }   
+  }
+}

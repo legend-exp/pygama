@@ -23,3 +23,6 @@ from ._processors.bl_subtract import bl_subtract
 from ._processors.convolutions import cusp_filter, zac_filter, t0_filter
 from ._processors.trap_filters import trap_filter, trap_norm, asym_trap_filter, trap_pickoff
 from ._processors.moving_windows import moving_window_left, moving_window_right, moving_window_multi, avg_current
+
+from ._processors.bl_estimator import bl_estimator
+from ._processors.wave_integrator import wave_integrator
