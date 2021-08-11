@@ -5,7 +5,8 @@
   "wf_bl": {
       "function": "bl_estimator",
       "module": "pygama.dsp.processors",
-      "args": ["waveform", "wf_bl"],
+      "args": ["waveform", "db.window" ,"wf_bl"],
+      "defaults": {"db.window":"250"},
       "unit": "ADC",
       "prereqs": ["waveform"]
     },

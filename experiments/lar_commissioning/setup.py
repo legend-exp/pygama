@@ -38,6 +38,11 @@ pyg_dir = '../../'
 # update the system path
 if pyg_dir  != '':
     sys.path = [os.getcwd() + '/' + pyg_dir ] + sys.path
+    
+__database__ = 'database.json'
+
+with open(__database__, 'r') as f:
+        db = json.load(f)
 
 # import pygama modules
 import pygama.analysis.histograms as ph

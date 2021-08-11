@@ -2,12 +2,14 @@
 # import python modules
 from setup import *
 
+# The database file has the length of the window you want to average the waveform over to estimate the baseline
+
 
 # set the channels you want to analyze sipm data from
 channels = [18, 19, 20, 21]
 
 # set the files you want to analyze
-files_raw = glob.glob("/global/project/projectdirs/legend/data/lngs/pgt/raw/spms/LPGTA_r0030*_phys_*.lh5")
+files_raw = glob.glob("/global/project/projectdirs/legend/data/lngs/pgt/raw/spms/LPGTA_r0028*_phys_*.lh5")
 
 # the lock to synchronize the processes
 lock = mp.Lock()
@@ -29,27 +31,24 @@ def process_events(args):
 
     # build the table for processing
     tb_data = lh5.Table(col_dict={'waveform': waveform})
+
     
     # build the processing chain
-    pc, tb_out = bpc.build_processing_chain(tb_data, processors, verbosity=0)
-
+    pc, tb_out = bpc.build_processing_chain(tb_data, processors,db_dict=db, verbosity=0)
+    
     # process the events
     pc.execute()
-    
-    
 
     # write the output to disk
     lock .acquire()
     store.write_object(tb_out, f'{channels[i_ch]}', f'sipm_outputs.lh5')
     lock .release()
     
-
 # loop over the files
 for i_fi in range(len(files_raw)):
         
     channel, _ = store.read_object(f'spms/raw/channel', files_raw[i_fi])
 
-    
     # the argument list
     args = [[
         i_fi, 
@@ -59,4 +58,3 @@ for i_fi in range(len(files_raw)):
     # launch the parallel processes
     with mp.Pool(len(channels)) as p:
         p.map(process_events, args)
-        
