@@ -458,7 +458,7 @@ class Store:
                 if n_rows == 0: 
                     tmp_shape = (0,) + h5f[name].shape[1:]
                     nda = np.empty(tmp_shape, h5f[name].dtype)
-                else: nda = h5f[name][source_sel]
+                else: nda = h5f[name][:][source_sel]
 
             # special handling for bools
             if elements == 'bool': nda = nda.astype(np.bool)
