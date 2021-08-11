@@ -34,7 +34,7 @@ prefix = ''
 logging.basicConfig(format=f'{prefix}%(message)s', level=logging.INFO, datefmt='%H:%M:%S')
     
 # set the path to pygama
-pyg_dir = "../pygama/pygama"
+pyg_dir = '../../'
 # update the system path
 if pyg_dir  != '':
     sys.path = [os.getcwd() + '/' + pyg_dir ] + sys.path
