@@ -1,0 +1,34 @@
+name: pygama
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+      - 'releases/**'
+    tags: '*'
+  release:
+
+jobs:
+
+  deploy-docs:
+    name: Deploy documentation on legend-exp.github.io/pygama
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Build with Sphinx
+        run: |
+          .github/workflows/get-dependencies.sh
+          pip install .
+          pip install sphinx sphinx-rtd-theme
+          cd docs
+          make clean
+          make html
+      - name: Deploy to GitHub pages
+        uses: JamesIves/github-pages-deploy-action@4.1.0
+        with:
+          branch: gh-pages
+          folder: docs/build/html
