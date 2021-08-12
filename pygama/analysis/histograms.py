@@ -29,13 +29,14 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
     Note: there are no overflow / underflow bins.
 
     Available binning methods:
-    - Default (no binning arguments) : 100 bins over an auto-detected range
-    - bins=N, range=(x_lo, x_hi) : N bins over the specified range (or leave
-      range=None for auto-detected range)
-    - bins=[str] : use one of np.histogram's automatic binning algorithms
-    - bins=bin_edges_array : array lower bin edges, supports non-uniform binning
-    - dx=dx, range=(x_lo, x_hi): bins of width dx over the specified range.
-      Note: dx overrides the bins argument!
+
+      - Default (no binning arguments) : 100 bins over an auto-detected range
+      - bins=N, range=(x_lo, x_hi) : N bins over the specified range (or leave
+        range=None for auto-detected range)
+      - bins=[str] : use one of np.histogram's automatic binning algorithms
+      - bins=bin_edges_array : array lower bin edges, supports non-uniform binning
+      - dx=dx, range=(x_lo, x_hi): bins of width dx over the specified range.
+        Note: dx overrides the bins argument!
 
     Parameters
     ----------
@@ -67,7 +68,6 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
                include underflow or overflow bins. So len(bins) = len(hist) + 1
         var : array of variances in each bin of the histogram
     """
-
     if bins is None:
         bins = 100 # override np.histogram default of just 10
 
