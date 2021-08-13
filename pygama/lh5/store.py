@@ -141,7 +141,8 @@ class Store:
         #          proc.execute()
 
         # Handle list-of-files recursively
-        if isinstance(lh5_file, list):
+        if not isinstance(lh5_file, (str, h5py._hl.files.File)):
+            lh5_file = list(lh5_file)
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
                 if isinstance(idx, list) and len(idx) > 0 and not np.isscalar(idx[0]):
@@ -457,7 +458,7 @@ class Store:
                 if n_rows == 0: 
                     tmp_shape = (0,) + h5f[name].shape[1:]
                     nda = np.empty(tmp_shape, h5f[name].dtype)
-                else: nda = h5f[name][source_sel]
+                else: nda = h5f[name][:][source_sel]
 
             # special handling for bools
             if elements == 'bool': nda = nda.astype(np.bool)

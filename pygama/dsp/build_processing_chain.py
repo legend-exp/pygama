@@ -60,6 +60,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             3: Print friggin' everything!    
     - block_width: number of entries to process at once.
     """
+    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
@@ -75,12 +76,29 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     processors = dsp_config['processors']
     
-    # for processors with multiple outputs, add separate entries to the processor list
-    for key in list(processors):
+    # prepare the processor list
+    multi_out_procs = {}
+    for key, node in processors.items():
+        # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
         if len(keys)>1:
             for k in keys:
-                processors[k] = key
+                multi_out_procs[k] = key
+
+        # parse the arguments list for prereqs, if not included explicitly
+        if not 'prereqs' in node:
+            prereqs = []
+            for arg in node['args']:
+                if not isinstance(arg, str): continue
+                for prereq in proc_chain.get_variable(arg, True):
+                    if prereq not in prereqs and prereq not in keys and prereq != 'db':
+                        prereqs.append(prereq)
+            node['prereqs'] = prereqs
+
+        if verbosity>=2:
+            print("Prereqs for", key, "are", node['prereqs'])
+
+    processors.update(multi_out_procs)
     
     # Recursive function to crawl through the parameters/processors and get
     # a sequence of unique parameters such that parameters always appear after
@@ -91,7 +109,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         if par in resolved:
             return
         elif par in unresolved:
-            raise Exception('Circular references detected: %s -> %s' % (par, edge))
+            raise ProcessingChainError('Circular references detected: %s -> %s' % (par, edge))
 
         # if we don't find a node, this is a leaf
         node = processors.get(par)
@@ -128,8 +146,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         print('Required input parameters:', str(input_par_list))
         print('Copied output parameters:', str(copy_par_list))
         print('Processed output parameters:', str(out_par_list))
-        
-    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:
@@ -164,13 +180,13 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     args[i] = node
                     if(verbosity>0):
                         print("Database lookup: found", node, "for", arg)
-                except:
+                except (KeyError, TypeError):
                     try:
                         args[i] = recipe['defaults'][arg]
                         if(verbosity>0):
                             print("Database lookup: using default value of", args[i], "for", arg)
-                    except:
-                        raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                    except (KeyError, TypeError):
+                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
             
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
         # if init_args are defined, parse any strings and then call func
@@ -187,26 +203,23 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                         init_args[i] = node
                         if(verbosity>0):
                             print("Database lookup: found", node, "for", arg)
-                    except:
+                    except (KeyError, TypeError):
                         try:
                             init_args[i] = recipe['defaults'][arg]
                             if(verbosity>0):
                                 print("Database lookup: using default value of", init_args[i], "for", arg)
-                        except:
-                            raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                        except (KeyError, TypeError):
+                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
                     arg = init_args[i]
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
-                    try:
-                        init_args[i] = proc_chain.get_variable(arg)
-                    except:
-                        pass
+                    init_args[i] = proc_chain.get_variable(arg)
                     
             if(verbosity>1):
                 print("Building function", func.__name__, "from init_args", init_args)
             func = func(*init_args)
-        except:
+        except KeyError:
             pass
         proc_chain.add_processor(func, *args, **kwargs)
 

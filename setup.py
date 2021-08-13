@@ -143,7 +143,7 @@ setup(
         'GitPython',
         'tinydb',
         'pyFFTW',
-        'h5py',
+        'h5py>=3.2.0',
         'pandas',
         'matplotlib'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
