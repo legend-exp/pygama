@@ -75,14 +75,15 @@ def process_events(args):
         frac = db['channels'][channels[i_ch]]['pole_zero']['avg_frac']
 
         # the new argument list
-        args = ['wf_bl', f'{tau1}*us', f'{tau2}*us', f'{frac}', 'wf_pz']
+        args     = ['wf_bl'    , f'{tau1}*us', f'{tau2}*us', f'{frac}', 'wf_pz'    ]
+        args_dqc = ['wf_bl_dqc', f'{tau1}*us', f'{tau2}*us', f'{frac}', 'wf_pz_dqc']
 
         # update the processors
         pcs['processors']['wf_bl'    ]['args'    ][2] = f'{tau2}*us'
         pcs['processors']['wf_pz'    ]['function']    = 'double_pole_zero'
         pcs['processors']['wf_pz'    ]['args'    ]    = args
         pcs['processors']['wf_pz_dqc']['function']    = 'double_pole_zero'
-        pcs['processors']['wf_pz_dqc']['args'    ]    = args
+        pcs['processors']['wf_pz_dqc']['args'    ]    = args_dqc
 
     # check the processing label
     if proc_label == 'dsp':

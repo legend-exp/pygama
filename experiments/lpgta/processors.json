@@ -150,9 +150,9 @@
     "tp_min_dqc, tp_max_dqc, wf_min_dqc, wf_max_dqc": {
       "function": "min_max",
       "module": "pygama.dsp.processors",
-      "args": ["wf_bl", "tp_min_dqc", "tp_max_dqc", "wf_min_dqc", "wf_max_dqc"],
+      "args": ["wf_bl_dqc", "tp_min_dqc", "tp_max_dqc", "wf_min_dqc", "wf_max_dqc"],
       "unit": ["ns", "ns", "ADC", "ADC"],
-      "prereqs": ["wf_bl"]
+      "prereqs": ["wf_bl_dqc"]
     },
     "wf_pz_dqc": {
       "function": "pole_zero",
