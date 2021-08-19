@@ -7,7 +7,8 @@ from pygama.dsp.errors import DSPFatal
              "(n),()->()", nopython=True, cache=True)
 def fixed_time_pickoff(w_in, t_in, a_out):
     """
-    Pick off the waveform value at the provided index.
+    Pick off the waveform value at the provided index.  If the
+    provided index is out of range, return NaN.
 
     Parameters
     ----------
@@ -32,8 +33,11 @@ def fixed_time_pickoff(w_in, t_in, a_out):
 
     if np.isnan(w_in).any() or np.isnan(t_in):
         return
-    
+
+    if np.floor(t_in) != t_in:
+        raise DSPFatal('The pick-off index must be an integer')
+
     if int(t_in) < 0 or int(t_in) >= len(w_in):
-        raise DSPFatal('The pick-off index is out of range')
+        return
   
     a_out[0] = w_in[int(t_in)]

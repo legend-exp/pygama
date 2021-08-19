@@ -36,16 +36,16 @@ def trap_filter(w_in, rise, flat, w_out):
         return
 
     if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise secion must be an integer')
+        raise DSPFatal('The number of samples in the rise section must be an integer')
 
     if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat secion must be an integer')
+        raise DSPFatal('The number of samples in the flat section must be an integer')
 
     if int(rise) < 0:
-        raise DSPFatal('The number of samples in the rise secion must be positive')
+        raise DSPFatal('The number of samples in the rise section must be positive')
     
     if int(flat) < 0:
-        raise DSPFatal('The number of samples in the flat secion must be positive')
+        raise DSPFatal('The number of samples in the flat section must be positive')
     
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
@@ -97,16 +97,16 @@ def trap_norm(w_in, rise, flat, w_out):
         return
 
     if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise secion must be an integer')
+        raise DSPFatal('The number of samples in the rise section must be an integer')
 
     if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat secion must be an integer')
+        raise DSPFatal('The number of samples in the flat section must be an integer')
 
     if int(rise) < 0:
-        raise DSPFatal('The number of samples in the rise secion must be positive')
+        raise DSPFatal('The number of samples in the rise section must be positive')
 
     if int(flat) < 0:
-        raise DSPFatal('The number of samples in the flat secion must be positive')
+        raise DSPFatal('The number of samples in the flat section must be positive')
 
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
@@ -160,22 +160,22 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
         return
 
     if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise secion must be an integer')
+        raise DSPFatal('The number of samples in the rise section must be an integer')
 
     if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat secion must be an integer')
+        raise DSPFatal('The number of samples in the flat section must be an integer')
 
     if np.floor(fall) != fall:
-        raise DSPFatal('The number of samples in the fall secion must be an integer')
+        raise DSPFatal('The number of samples in the fall section must be an integer')
 
     if int(rise) < 0:
-        raise DSPFatal('The number of samples in the rise secion must be positive')
+        raise DSPFatal('The number of samples in the rise section must be positive')
 
     if int(flat) < 0:
-        raise DSPFatal('The number of samples in the flat secion must be positive')
+        raise DSPFatal('The number of samples in the flat section must be positive')
 
     if int(fall) < 0:
-        raise DSPFatal('The number of samples in the fall secion must be positive')
+        raise DSPFatal('The number of samples in the fall section must be positive')
 
     if int(rise) + int(flat) + int(fall) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
@@ -231,19 +231,19 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
         return
 
     if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise secion must be an integer')
+        raise DSPFatal('The number of samples in the rise section must be an integer')
 
     if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat secion must be an integer')
+        raise DSPFatal('The number of samples in the flat section must be an integer')
 
     if np.floor(t_pickoff) != t_pickoff:
         raise DSPFatal('The pick-off index must be an integer')
 
     if int(rise) < 0:
-        raise DSPFatal('The number of samples in the rise secion must be positive')
+        raise DSPFatal('The number of samples in the rise section must be positive')
 
     if int(flat) < 0:
-        raise DSPFatal('The number of samples in the flat secion must be positive')
+        raise DSPFatal('The number of samples in the flat section must be positive')
 
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
