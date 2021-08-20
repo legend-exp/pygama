@@ -95,7 +95,7 @@ def process_events(args):
         pcs['processors']['wf_tf'                         ]['args'][1] = f'{rise}'
         pcs['processors']['wf_tf'                         ]['args'][2] = f'{flat}'
         pcs['processors']['tf_avg, tf_std, tf_ftm, tf_ftb']['args'][0] = f'wf_tf[{1702+rise}:{1702+rise+flat}]'
-        pcs['processors']['tftp_tp'                       ]['args'][1] = f'tp_00+{rise+flat}-0.5*us'
+        pcs['processors']['tftp_tp'                       ]['args'][1] = f'tp_00+{rise+flat}-0.496*us'
 
     # check the processing label
     if proc_label == 'opt':
