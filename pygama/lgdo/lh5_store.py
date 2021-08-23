@@ -13,6 +13,7 @@ from .array import Array
 from .fixedsizearray import FixedSizeArray
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .vectorofvectors import VectorOfVectors
+from .waveform_table import WaveformTable
 
 
 class LH5Store:

@@ -137,7 +137,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         'numpy',
-        'scimath',
         'numba',
         'parse',
         'GitPython',
@@ -146,7 +145,8 @@ setup(
         'h5py>=3.2.0',
         'pandas',
         'matplotlib',
-        'pytest'
+        'pytest',
+        'pint'
 
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
