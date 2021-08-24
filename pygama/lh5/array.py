@@ -58,5 +58,5 @@ class Array:
     def resize(self, new_size):
         """Resize the array to new_size (int)"""
         new_shape = (new_size,) + self.nda.shape[1:]
-        self.nda.resize(new_shape)
+        self.nda = np.resize(self.nda, new_shape)
 
