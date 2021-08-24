@@ -164,7 +164,7 @@ class WaveformBrowser:
         if isinstance(self.norm_par, str): outputs += [self.norm_par]
         if isinstance(self.align_par, str): outputs += [self.align_par] 
         
-        self.proc_chain, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
+        self.proc_chain, self.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
         
         self.fig = None
         self.ax = None        
@@ -228,6 +228,7 @@ class WaveformBrowser:
                                                           self.lh5_files[file_no],
                                                           start_row=chunk*self.buffer_len,
                                                           n_rows=len(self.lh5_in),
+                                                          field_mask = self.field_mask,
                                                           obj_buf=self.lh5_in)
             self.proc_chain.execute(0, n_read)
             
