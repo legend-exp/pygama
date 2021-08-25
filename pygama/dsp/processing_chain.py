@@ -1015,51 +1015,66 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
-
-    Returns (proc_chain, lh5_out):
-    - proc_chain: ProcessingChain object that is bound to lh5_in and lh5_out;
-      all you need to do is handle file i/o for lh5_in/out and run execute
-    - lh5_out: output LH5 table
-
-    Required arguments:
-    - lh5_in: input LH5 table
-    - config: dict or name of json file containing a recipe for
-      constructing the ProcessingChain object produced by this function.
-      config is formated as a json dict with different processors. Config
-      should have a dictionary called processors, containing dictionaries
-      of the following format:
-        Key: parameter name: name of parameter produced by the processor.
-             can optionally provide multiple, separated by spaces
-        Values:
-          processor (req): name of gufunc
-          module (req): name of module in which to find processor
-          prereqs (req): name of parameters from other processors and from
-            input that are required to exist to run this
-          args (req): list of arguments for processor, with variables passed
-            by name or value. Names should either be inputs from lh5_in, or
-            parameter names for other processors. Names of the format db.name
-            will look up the parameter in the metadata.
-          kwargs (opt): kwargs used when adding processors to proc_chain
-          init_args (opt): args used when initializing a processor that has
-            static data (for factory functions)
-          default (opt): default value for db parameters if not found
-          unit (opt): unit to be used for attr in lh5 file.
-      There may also be a list called 'outputs', containing a list of parameters
-      to put into lh5_out.
-
-    Optional keyword arguments:
-    - outputs: list of parameters to put in the output lh5 table. If None,
-      use the parameters in the 'outputs' list from config
-    - db_dict: a nested dict pointing to values for db args.
-      e.g. if a processor uses arg db.trap.risetime, it will look up
+    
+    Parameters
+    ----------
+    lh5_in : lgdo.Table
+        HDF5 table from which raw data is read. At least one row of entries
+        should be read in prior to calling this!
+    dsp_config: dict or str
+        A dict or json filename containing the recipes for computing DSP
+        parameter from raw parameters. The format is as follows:
+        {
+            "outputs" : [ "parnames", ... ] -> list of output parameters
+                 to compute by default; see outputs parameter.
+            "processors" : {
+                 "name1, ..." : { -> names of parameters computed
+                      "function" : str -> name of function to call. Function
+                           should implement the gufunc interface, a factory
+                           function returning a gufunc, or an arbitrary
+                           function that can be mapped onto a gufunc
+                      "module" : str -> name of module containing function
+                      "args" : [ str or numeric, ... ] -> list of names of
+                           computed and input parameters or constant values
+                           used as inputs to function. Note that outputs
+                           should be fed by reference as args! Arguments read
+                           from the database are prepended with db.
+                      "kwargs" : dict -> keyword arguments for
+                           ProcesssingChain.add_processor.
+                      "init_args" : [ str or numeric, ... ] -> list of names
+                           of computed and input parameters or constant values
+                           used to initialize a gufunc via a factory function
+                      "unit" : str or [ strs, ... ] -> units for parameters
+                      "defaults" : dict -> default value to be used for
+                           arguments read from the database
+                      "prereqs" : DEPRECATED [ strs, ...] -> list of parameters
+                           that must be computed before these can
+                 }
+    outputs: [str, ...] (optional)
+        List of parameters to put in the output lh5 table. If None,
+        use the parameters in the 'outputs' list from config
+    db_dict: dict (optional)
+        A nested dict pointing to values for db args. e.g. if a processor
+        uses arg db.trap.risetime, it will look up
           db_dict['trap']['risetime']
-      and use the found value. If no value is found, use the default defined
-      in the config file.
-    - verbosity: verbosity level:
-            0: Print nothing (except errors...)
-            1: Print basic warnings (default)
-            2: Print basic debug info
-    - block_width: number of entries to process at once.
+        and use the found value. If no value is found, use the default
+        defined in the config file.
+    verbosity : int (optional)
+        0: Print nothing (except errors...)
+        1: Print basic warnings (default)
+        2: Print basic debug info
+        3: Print friggin' everything!    
+    block_width : int (optional)
+        number of entries to process at once. To optimize performance,
+        a multiple of 16 is preferred, but if performance is not an issue
+        any value can be used.
+    
+    Returns
+    -------
+    (proc_chain, field_mask, lh5_out) : tuple
+        proc_chain : ProcessingChain object that is executed
+        field_mask : List of input fields that are used
+        lh5_out : output lh5 table containing processed values
     """
     proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
 
@@ -1244,5 +1259,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         buf_out = proc_chain.link_output_buffer(out_par)
         lh5_out.add_field(out_par, lh5.Array(buf_out, attrs={"units":unit}) )
     
-    return (proc_chain, lh5_out)
+    field_mask = input_par_list + copy_par_list
+    return (proc_chain, field_mask, lh5_out)
 
