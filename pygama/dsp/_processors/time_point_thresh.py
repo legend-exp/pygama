@@ -3,8 +3,8 @@ from numba import guvectorize
 import math
 from pygama.dsp.errors import DSPFatal
 
-@guvectorize(["void(float32[:], float32, float32, int32 ,float32[:])",
-              "void(float64[:], float64, float32, int32 ,float32[:])"],
+@guvectorize(["void(float32[:], float32, float64, int32 ,float32[:])",
+              "void(float64[:], float64, float64, int32 ,float32[:])"],
              "(n),(),(),()->()", nopython=True, cache=True)
 
 def time_point_thresh(w_in, a_threshold, t_start, walk_forward, t_out):

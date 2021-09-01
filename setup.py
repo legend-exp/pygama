@@ -135,6 +135,13 @@ setup(
     description='Python package for decoding and processing digitizer data',
     long_description='',
     packages=find_packages(),
+    scripts=[
+        'pygama/dsp/build_dsp.py'
+    ],
+    include_package_data=True,
+    package_data={
+        "":["*.json"]
+    },
     install_requires=[
         'numpy',
         'numba',

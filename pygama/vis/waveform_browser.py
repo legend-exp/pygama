@@ -1,11 +1,18 @@
-from pygama.io.raw_to_dsp import build_processing_chain
-from pygama import lh5
-import pygama.dsp.units as units
-
-import glob, os, itertools, contextlib, string
+import sys
+import os
+import glob
+import itertools
+import string
+import math
 import numpy as np
 import pandas as pd
+
+from pygama.dsp.processing_chain import build_processing_chain
+import pygama.lgdo.lh5_store as lh5
+from pygama.math.units import unit_registry as ureg
+
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from cycler import cycler
 
 class WaveformBrowser:
@@ -15,156 +22,211 @@ class WaveformBrowser:
     drawing transformed waveforms defined using raw_to_dsp style json files,
     drawing horizontal and verticle lines at the values of calculated
     parameters, and filling a legend with calculated parameters.
+    
+    
     """
 
-    def __init__(self, files_in, lh5_group, dsp_config = None, database = None,
-                 n_drawn = 1, x_unit = 'ns', x_lim=None,
-                 waveforms = 'waveform', wf_styles = None, lines = None,
-                 legend = None, legend_opts = None, norm = None, align=None,
-                 selection = None,
+    def __init__(self, files_in, lh5_group, base_path = '',
+                 entry_list = None, entry_mask = None,
+                 dsp_config = None, database = None,
+                 aux_values = None,
+                 lines = 'waveform', styles = None,
+                 legend = None, legend_opts = None,
+                 n_drawn = 1, x_unit = None, x_lim = None, y_lim = None,
+                 norm = None, align=None,
                  buffer_len = 128, block_width = 8, verbosity=1):
-        """Constructor for WaveformBrowser:
-        - file_in: name of file or list of names to browse. Can use wildcards
-        - lh5_group: name of LH5 group in file to browse
-        - dsp_config (optional): name of DSP config json file containing transforms available to draw
-        - database (optional): dict with database of processing parameters
-        - n_drawn (default 1): number of events to draw simultaneously when calling DrawNext
-        - x_unit (default ns): unit for x-axis
-        - x_lim (default auto): range of x-values passes as tuple
-        - waveforms (default 'waveform'): name of wf or list of wf names to draw
-        - wf_styles (default None): waveform colors and other style parameters to cycle through when drawing waveforms. Can be given as:
-            dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
-            name of predefined style; see matplotlib.style documentation
-            None: use current matplotlib style
-          If a single style cycle is given, use for all lines; if a list is given, match to waveforms list.
-        - lines (default None): name of parameter or list of parameters to draw hlines and vlines for
-        - legend (default None): formatting string and values to include in the legend. This can be a list of values (one for each waveform in waveforms). The values can be given as a tuple whose first entry is a formatting string and subsequent entries are the values to place in the formatting string. When building a formatting string, if a name is given in the {}s, it is assumed to be a parameter from the DSP config file. An example is:
-          ("{:0.1f} keV", energy)
-        - legend_opts (default None): dict containing kwargs for formatting the legend
-        - norm (default None): name of parameter (probably energy) to use to normalize WFs; useful when drawing multiple
-        - align (default None): name of time parameter to set as 0 time; useful for aligning multiple waveforms
-        - selection (optional): selection of events to draw. Can be either a list of event indices or a numpy array mask (ala pandas).
-        - buffer_len (default 128): number of waveforms to keep in memory at a time
-        - block_width (default 8): block width for processing chain
+        """
+        Parameters
+        ----------
+        file_in : str
+            name of file or list of names to browse. Can use wildcards
+        lh5_group : str
+            name of LH5 group in file to browse
+        base_path : str
+            base path for file. See LH5Store
+        entry_list : list-like or nested list-like (optional)
+            List of event indices to draw. If it is a nested list, use local
+            indices for each file, otherwise use global indices
+        entry_mask : array-like or list of array-likes (optional)
+            Boolean mask indicating which events to draw. If a nested list, use
+            a mask for each file, else use a global mask. Cannot be used with
+            entry_list...
+        dsp_config : str (optional)
+            name of DSP config json file containing a list of processors that
+            can be applied to waveforms
+        database : str or dict-like (optional)
+            dict or JSON file with database of processing parameters
+        aux_values : pandas dataframe (optional)
+            table of auxiliary values that are one-to-one with the input
+            waveforms that can be drawn or placed in the legend
+        lines : str or [strs] (default 'waveform')
+            name(s) of objects to draw 2D lines for. Waveforms will be drawn
+            as a time-series. Scalar quantities will be drawn as horizontal
+            or vertical lines, depending on units. Vectors will be drawn
+            as multiple horizontal/vertical lines
+        styles : (default None)
+            line colors and other style parameters to cycle through when
+            drawing waveforms. Can be given as:
+            - dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
+            - name of predefined style; see matplotlib.style documentation
+            - None: use current matplotlib rcparams style
+            If a single style cycle is given, use for all lines; if a list is
+            given, match to lines list.
+        legend : str or [strs] (default None)
+            Formatting string and values to include in the legend. This can
+            be a list of values (one for each drawn object). If just a name
+            is given, it will be auto-formatted to 3 digits. Otherwise,
+            formatting strings in brackets can be used:
+              "{energy:0.1f} keV, {timestamp:d} ns"
+            Names will be searched in the input file, DSP processed parameters,
+            or auxiliary data-table
+        legend_opts : dict (default None)
+            dict containing additional kwargs for matplotlib.legend
+        n_drawn : int (default 1)
+            number of events to draw simultaneously when calling DrawNext
+        x_lim : tuple-pair of float, pint.Quantity or str (default auto)
+            range of x-values and units passes as tuple.
+            - None: Get range from first waveform drawn
+            - pint.Quantity: set value and x-unit
+            - float: get unit from first waveform drawn
+            - str: convert to pint.Quanity (e.g. ('0*us', '10*us'))
+        x_unit : pint.Unit or str (default auto)
+            unit of x-axis
+        norm : str (default None)
+            name of parameter (probably energy) to use to normalize WFs
+            useful when drawing multiple WFs
+        align : str (default None)
+            name of parameter to use for x-offset; useful, e.g., for aligning
+            multiple waveforms at a particular timepoint
+        buffer_len (default 16): number of waveforms to keep in memory at a time
+        block_width (default 16): block width for processing chain
         """
         self.verbosity = verbosity
-
-        # data i/o initialization
-        self.lh5_st = lh5.Store(keep_open=True)
-        if isinstance(files_in, str): files_in = [files_in]
-        
-        # Expand wildcards and map out the files
-        self.lh5_files = [f for f_wc in files_in for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
-        self.lh5_group = lh5_group
-        # file map is cumulative lenght of files up to file n. By doing searchsorted left, we can get the file for a given wf index
-        self.file_map = np.array([self.lh5_st.read_n_rows(lh5_group, f) for f in self.lh5_files], 'int64')
-        np.cumsum(self.file_map, out=self.file_map)
-
-        # Get the input buffer and read the first chunk
-        self.lh5_in = self.lh5_st.get_buffer(self.lh5_group, self.lh5_files[0], buffer_len)
-        self.lh5_st.read_object(self.lh5_group, self.lh5_files[0], start_row=0, n_rows=buffer_len, obj_buf=self.lh5_in)
-        self.buffer_len = buffer_len
-        self.current_file = None
-        self.current_chunk = None
-
-        # initialize stuff for iteration
-        self.selection = selection
-        self.index_it = None
-        self.reset()
-        self.n_drawn = n_drawn
-
-        # initialize list of objects to draw
-        if isinstance(waveforms, str): self.wf_names = [waveforms]
-        elif waveforms is None: self.wf_names = []
-        else: self.wf_names = list(waveforms)
-        self.wf_data = [ [] for _ in self.wf_names ]
-
-        # wf_styles
-        if isinstance(wf_styles, list) or isinstance(wf_styles, tuple):
-            self.wf_styles = [ None for _ in self.wf_data ]
-            for i, sty in enumerate(wf_styles):
-                if isinstance(sty, str):
-                    try:
-                        self.wf_styles[i] = plt.style.library[sty]['axes.prop_cycle']
-                    except:
-                        self.wf_styles[i] = itertools.repeat(None)
-                elif sty is None:
-                    self.wf_styles[i] = itertools.repeat(None)
-                else:
-                    self.wf_styles[i] = cycler(**sty)
-        else:
-            if isinstance(wf_styles, str):
-                try:
-                    self.wf_styles = plt.style.library[wf_styles]['axes.prop_cycle']
-                except:
-                    self.wf_styles = itertools.repeat(None)
-            elif wf_styles is None:
-                self.wf_styles = itertools.repeat(None)
-            else:
-                self.wf_styles = cycler(**wf_styles)
-        
-        if lines is None: self.line_names = []
-        elif isinstance(lines, list): self.line_names = lines
-        elif isinstance(lines, tuple):  self.line_names = list(lines)
-        else: self.line_names = [lines]
-        self.line_data = [ [] for _ in self.line_names ]
-        
-        if legend is None: legend = []
-        elif not isinstance(legend, list): legend = [legend]
-
-        # Set up the legend format strings and collect input values
-        self.legend_input = []
-        self.legend_format = []
-        for entry in legend:
-            legend_input = []
-            legend_format = ''
-            if not isinstance(entry, tuple):
-                entry = (entry,)
-
-            for val in entry:
-                if isinstance(val, str):
-                    for st, name, form, cv in string.Formatter().parse(val):
-                        legend_format += st
-                        if name is not None:
-                            legend_format += '{'
-                            legend_input.append(name)
-                            if form is not None and form != '':
-                                legend_format += ':' + form
-                            if cv is not None and cv != '':
-                                legend_format += '!' + cv
-                            legend_format += '}'
-                else:
-                    # find any {}s to fill from the formatter
-                    idxs = [i for i, inp in enumerate(legend_input) if isinstance(inp,str) and inp=='']
-                    if idxs: # if we found a {}. it's already in the formatter
-                        legend_input[idxs[0]] = val
-                    else: # otherwise add to formatter
-                        legend_input.append(val)
-                        if legend_format!='': legend_format += ', '
-                        if isinstance(val, pd.Series):
-                            legend_format += val.name + ' = {:.3g}'
-                        elif isinstance(val, np.ndarray):
-                            legend_format += '{:.3g}'
-            self.legend_input.append(legend_input)
-            self.legend_format.append(legend_format)
-
-        self.legend_data = [ [] for _ in self.legend_input ]
-        self.legend_kwargs = legend_opts if legend_opts else {}
         
         self.norm_par = norm
         self.align_par = align
-
-        self.x_unit = units.unit_parser.parse_unit(x_unit)
-        self.x_lim = x_lim
-
-        # make processing chain and output buffer
-        outputs = self.wf_names + \
-                  [name for name in self.line_names if isinstance(name, str)] + \
-                  [name for name in self.legend_input  if isinstance(name, str)]
-        if isinstance(self.norm_par, str): outputs += [self.norm_par]
-        if isinstance(self.align_par, str): outputs += [self.align_par] 
+        self.n_drawn = n_drawn
+        self.next_entry = 0
         
-        self.proc_chain, self.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
+        # data i/o initialization
+        self.lh5_it = lh5.LH5Iterator(files_in,
+                                      lh5_group,
+                                      base_path=base_path,
+                                      entry_list=entry_list,
+                                      entry_mask=entry_mask,
+                                      buffer_len=buffer_len )
+        
+
+        # Get the input buffer and read the first chunk
+        self.lh5_in, _ = self.lh5_it.read(0)
+
+        self.aux_vals = aux_values
+        # Apply entry selection to aux_vals if needed
+        if self.aux_vals is not None and len(self.aux_vals)>len(self.lh5_it):
+            entries = []
+            for i, f_entries in enumerate(self.lh5_it.entry_list):
+                entry_offset = self.lh5_it.file_map[i-1] if i>0 else 0
+                entries += [ entry_offset + entry for entry in f_entries ]
+            self.aux_vals = self.aux_vals.iloc[entries].reset_index()
+        
+        # initialize objects to draw: dict from name to list of 2DLines
+        if isinstance(lines, str): self.lines = { lines:[] }
+        elif lines is None: self.lines = {}
+        else: self.lines = { l:[] for l in lines }
+        
+        # styles
+        if isinstance(styles, (list, tuple)):
+            self.styles = [ None for _ in self.lines ]
+            for i, sty in enumerate(styles):
+                if isinstance(sty, str):
+                    try:
+                        self.styles[i] = plt.style.library[sty]['axes.prop_cycle']
+                    except:
+                        self.styles[i] = itertools.repeat(None)
+                elif sty is None:
+                    self.styles[i] = itertools.repeat(None)
+                else:
+                    self.styles[i] = cycler(**sty)
+        else:
+            if isinstance(styles, str):
+                try:
+                    self.styles = plt.style.library[styles]['axes.prop_cycle']
+                except:
+                    self.styles = itertools.repeat(None)
+            elif styles is None:
+                self.styles = itertools.repeat(None)
+            else:
+                self.styles = cycler(**styles)
+
+
+        self.legend_format = [] # list of formatter strings
+        self.legend_vals = {}  # Set up dict from names to lists of values
+        
+        if legend is None: legend = []
+        elif isinstance(legend, str): legend = [legend]
+        
+        for entry in legend:
+            legend_format = ""
+            for st, name, form, cv in string.Formatter().parse(entry):
+                if name is None:
+                    # If name is none, this is the last batch of characters
+                    legend_format += st
+                    break
+                
+                if name=='':
+                    raise KeyError("Cannot use empty formatter in "+entry)
+                self.legend_vals[name] = []
+
+                if form is None or form=='':
+                    form = '~0.3P'
+                cv = '' if cv is None or cv=='' else "!"+cv
+                legend_format += "{}{{{}:{}{}}}".format(st, name, form, cv)
+            self.legend_format.append(legend_format)
+
+        self.legend_kwargs = legend_opts if isinstance(legend_opts, dict) else {}
+        
+        # make processing chain and output buffer
+        outputs = list(self.lines) + list(self.legend_vals)
+        if isinstance(self.norm_par, str): outputs += [self.norm_par]
+        if isinstance(self.align_par, str): outputs += [self.align_par]
+
+            
+        # Remove any values not found in aux_vals
+        if self.aux_vals is not None:
+            outputs = [ o for o in outputs if o not in self.aux_vals ]
+        
+        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
+        self.proc_chain.execute()
+        
+        # Check if all of our outputs can be found
+        for name in outputs:
+            if not name in self.lh5_out:
+                raise KeyError("Could not find "+name+" in input lh5 file, DSP config file, or aux values")
+        
+        self.x_unit = ureg[x_unit] if x_unit else None
+        self.x_lim = x_lim
+        self.y_lim = y_lim
+        self.auto_x_lim = [np.inf, -np.inf]
+        self.auto_y_lim = [np.inf, -np.inf]
+        
+        # Set limit and convert to x-unit if needed; also set x_unit if needed
+        if self.x_lim is not None:
+            self.x_lim = list(self.x_lim)
+            for i in range(2):
+                if isinstance(self.x_lim[i], str):
+                    self.x_lim[i] = ureg.Quantity(x_lim[i])
+                if isinstance(self.x_lim[i], ureg.Quantity):
+                    if self.x_unit:
+                        self.x_lim[i] = float(self.x_lim[i]/self.x_unit)
+                    else:
+                        self.x_unit = self.x_lim[i].u
+                        self.x_lim[i] = self.x_lim[i].m
+        
+        # If we still have no x_unit get it from the first waveform we can find
+        if self.x_unit is None:
+            for wf in self.lh5_out.values():
+                if not isinstance(wf, lh5.WaveformTable): continue
+                self.x_unit = ureg[wf.dt_units]
         
         self.fig = None
         self.ax = None        
@@ -173,14 +235,15 @@ class WaveformBrowser:
         """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
 
-    def save_figure(self, f_out=None):
-        if f_out is not None:
-            self.fig.savefig(f_out)
-        else:
-            print("You need to specify an output filename!")
+    def save_figure(self, f_out, *args, **kwargs):
+        """ Write figure to file named f_out. See matplotlib.pyplot.savefig
+        for args and kwargs """
+        self.fig.savefig(f_out)
 
     def set_figure(self, fig, ax=None):
-        """Use an already existing figure and axis; make sure to set clear to False when drawing if you don't want to clear what's already there! Can give a WaveformBrowser object to use the fig/axis from that"""
+        """Use an already existing figure and axis; make sure to set clear
+        to False when drawing if you don't want to clear what's already there!
+        Can give a WaveformBrowser object to use the fig/axis from that"""
         if isinstance(fig, WaveformBrowser):
             self.fig = fig.fig
             self.ax = fig.ax
@@ -196,97 +259,121 @@ class WaveformBrowser:
             raise TypeError("fig must be matplotlib.Figure or WaveformBrowser")
 
     def clear_data(self):
-        for wf_set in self.wf_data: wf_set.clear()
-        for line_set in self.line_data: line_set.clear()
-        for leg_data in self.legend_data: leg_data.clear()
+        """ Reset the currently stored data """
+        for line_data in self.lines.values(): line_data.clear()
+        for leg_data in self.legend_vals.values(): leg_data.clear()
+        self.auto_x_lim = [np.inf, -np.inf]
+        self.auto_y_lim = [np.inf, -np.inf]
+        self.n_stored = 0
         
-    def find_entry(self, entry, append=True):
+    def find_entry(self, entry, append=True, safe=False):
         """
         Find the requested data associated with entry in input files and
-        place it in self.wf_data, self.line_data and self.legend_data. Set
-        append to False to clear these buffers before fetching the entry/ies.
-        Can give a list/tuple to find multiple entries.
+        place store it internally without drawing it.
+        
+        Parameters
+        ----------
+        entry : int or [ints]
+            index of entry or list of entries to find
+        append : bool (default True)
+            if False, clear previously found data before finding more
+        safe : bool (default False)
+            if False, throw an exception for out of range entries
         """
         if not append: self.clear_data()
-        if isinstance(entry, list) or isinstance(entry, tuple):
+        if hasattr(entry, '__iter__'):
             for idx in entry: self.find_entry(idx)
             return
-        
-        # figure out which file we are reading from and the chunk/index within the file, using the file map
-        file_no = np.searchsorted(self.file_map, entry, 'left')
-        if file_no>len(self.lh5_files):
-            raise IndexError
-        # get chunk and index within this chunk
-        file_beg = self.file_map[file_no-1] if file_no>0 else 0
-        chunk, index = divmod(entry - file_beg, self.buffer_len)
-        
-        # Update the chunk as needed
-        if file_no != self.current_file or chunk != self.current_chunk:
-            self.current_chunk = chunk
-            self.current_file = file_no
-            self.lh5_in, n_read = self.lh5_st.read_object(self.lh5_group,
-                                                          self.lh5_files[file_no],
-                                                          start_row=chunk*self.buffer_len,
-                                                          n_rows=len(self.lh5_in),
-                                                          field_mask = self.field_mask,
-                                                          obj_buf=self.lh5_in)
-            self.proc_chain.execute(0, n_read)
-            
 
+        if entry > len(self.lh5_it):
+            if safe: raise IndexError
+            else: return
+
+        # Get our current position in the I/O buffers; update if needed
+        i_tb = entry - self.lh5_it.current_entry
+        if not ( self.lh5_it.n_rows > i_tb >= 0 ):
+            self.lh5_it.read(entry)
+            self.proc_chain.execute()
+            i_tb = 0
+        
         # get scaling factor/time shift if used
         if self.norm_par is None:
             norm = 1.
         elif isinstance(self.norm_par, str):
-            norm = self.lh5_out[self.norm_par].nda[index]
+            norm = self.lh5_out[self.norm_par].nda[entry]
         else:
             norm = self.norm_par[entry]
 
         if self.align_par is None:
             ref_time = 0
         elif isinstance(self.align_par, str):
-            unit = self.lh5_out[self.align_par].attrs['units']
-            dt = units.convert(1, units.unit_parser.parse_unit(unit), self.x_unit)
-            ref_time = self.lh5_out[self.align_par].nda[index]*dt
-        else:
-            ref_time = self.align_par[entry]
+            data = self.lh5_out.get(self.align_par, None)
+            if isinstance(data, lh5.Array):
+                ref_time = data.nda[i_tb]
+                unit = data.attrs.get('units', None)
+                if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
+                    ref_time *= float(ureg[unit]/self.x_unit)
+            elif data is None:
+                ref_time = self.aux_vals[self.align_par][entry]
+            else:
+                raise
             
         leg_handle = None
 
-        #waveforms
-        for wf_name, wf_data in zip(self.wf_names, self.wf_data):
-            # Get the data; note this is implicitly copying it!
-            y = self.lh5_out[wf_name].nda[index]/norm
-            if self.x_unit.derivation == self.proc_chain._clk.derivation:
-                # this is a WF
-                dt = units.convert(1, self.proc_chain._clk, self.x_unit)
-                x = np.linspace(-ref_time, len(y)*dt-ref_time, len(y), 'f')
-            elif self.x_unit.derivation == (1/self.proc_chain._clk).derivation:
-                # this is a FT
-                f_nyq = units.convert(1, 0.5/self.proc_chain._clk, self.x_unit)
-                x = np.linspace(0, f_nyq, len(y), 'f')
-            wf_data.append((x, y))
-                    
         # lines
-        for line_name, line_data in zip(self.line_names, self.line_data):
-            try: # if unit is time, do vline
-                unit = units.unit_parser.parse_unit(self.lh5_out[line_name].attrs['units'])
-                val = self.lh5_out[line_name].nda[index]*unit
-                val -= ref_time*self.x_unit
+        lim = math.sqrt(sys.float_info.max) # limits for v/h lines
+        for name, lines in self.lines.items():
+            # Get the data; note this is implicitly copying it!
+            data = self.lh5_out.get(name, None)
+            if isinstance(data, lh5.WaveformTable):
+                y = data.values.nda[i_tb,:]/norm - ref_time
+                dt = data.dt.nda[i_tb] * float(ureg[data.dt_units]/self.x_unit)
+                t0 = data.t0.nda[i_tb] * float(ureg[data.t0_units]/self.x_unit)
+                x = np.linspace(t0, t0+dt*(data.wf_len-1), data.wf_len)
+                lines.append(Line2D(x, y))
+                self._update_auto_limit(x, y)
                 
-            except: # else do hline
-                val = self.lh5_out[line_name].nda[index]/norm
+            elif isinstance(data, lh5.Array):
+                val = data.nda[i_tb]
+                unit = data.attrs.get('units', None)
+                if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
+                    # Vertical line
+                    val = val*float(ureg[unit]/self.x_unit) - ref_time 
+                    lines.append(Line2D([val]*2, [-lim, lim]))
+                    self._update_auto_limit(val, None)
+                else:
+                    # Horizontal line
+                    lines.append(Line2D([-lim, lim], [val/norm]*2))
+                    self._update_auto_limit(None, val)
+                    
+            elif data is None:
+                # Check for data in auxiliary table. It's unitless so I guess just do an hline...
+                val = self.aux_vals[name][entry]/norm
+                lines.append(Line2D([-lim, lim], [val]*2))
+                self._update_auto_limit(None, val)
 
-            line_data.append(val)
+            else:
+                raise TypeError("Cannot draw "+name+". WaveformBrowser does not support drawing lines for data of type " + str(data.__class__))
 
         # legend data
-        for legend_input, legend_data in zip(self.legend_input, self.legend_data):
-            leg_vals = []
-            for val in legend_input:
-                if isinstance(val, str):
-                    leg_vals.append(self.lh5_out[val].nda[index])
+        for name, vals in self.legend_vals.items():
+            data = self.lh5_out.get(name, None)
+
+            if not data:
+                data = ureg.Quantity(self.aux_vals[name][entry])
+            elif isinstance(data, lh5.Array):
+                unit = data.attrs.get('units', None)
+                if unit and unit in ureg:
+                    data = data.nda[i_tb]*ureg[unit]
                 else:
-                    leg_vals.append(val[entry])
-            legend_data.append(leg_vals)
+                    data = ureg.Quantity(data.nda[i_tb])
+            else:
+                raise TypeError("WaveformBrowser does not adding legend entries for data of type " + data.__class__)
+            
+            vals.append(data)
+
+        self.n_stored += 1
+        self.next_entry = entry + 1
     
     def draw_current(self, clear=True):
         """
@@ -299,39 +386,48 @@ class WaveformBrowser:
         if clear:
             self.ax.clear()
 
+        x_lim = self.x_lim if self.x_lim else self.auto_x_lim
+        y_lim = self.y_lim
+        if not y_lim:
+            y_range = self.auto_y_lim[1] - self.auto_y_lim[0]
+            y_lim = [self.auto_y_lim[0] - 0.05*y_range, self.auto_y_lim[1] + 0.05*y_range]
+        self.ax.set_xlim(*x_lim)
+        self.ax.set_ylim(*y_lim)
+
         leg_handles = []
         leg_labels = []
-        if not isinstance(self.wf_styles, list):
-            wf_styles = self.wf_styles
+        if not isinstance(self.styles, list):
+            styles = self.styles
             
-        # draw waveforms
-        for i, wf_set in enumerate(self.wf_data):
-            if isinstance(self.wf_styles, list):
-                wf_styles = self.wf_styles[i]
-            if wf_styles is None:
-                wf_styles = itertools.repeat(None)
+        # draw lines
+        for i, lines in enumerate(self.lines.values()):
+            if isinstance(self.styles, list):
+                styles = self.styles[i]
+            if styles is None:
+                styles = cycler(plt.rcparams)
             
-            for wf, sty in zip(wf_set, wf_styles):
-                if sty is None:
-                    wf_line, = self.ax.plot(*wf, '-')
-                else:
-                    wf_line, = self.ax.plot(*wf, **sty)
-                leg_handles.append(wf_line)
+            for line, sty in zip(lines, styles):
+                if sty is not None: line.update(sty)
+                if line.get_figure() is not None: line.remove()
+                line.set_transform(self.ax.transData)
+                self.ax.add_line(line)
+                
+                leg_handles.append(line)
 
-        # draw legend
-        for legend_data, legend_format in zip(self.legend_data, self.legend_format):
-            for legend_vals in legend_data:
-                leg_labels.append(legend_format.format(*legend_vals))
+        # Get legend entries
+        try:
+            leg_cycle = cycler(**self.legend_vals)
+        except Exception:
+            for form in self.legend_format:
+                for i in range(self.n_stored):
+                    leg_labels.append(form)
+        else:
+            for form in self.legend_format:
+                for leg_dat in leg_cycle:
+                    leg_labels.append(form.format(**leg_dat))
 
-        # draw hlines and vlines
-        for lines in self.line_data:
-            for val in lines:
-                if isinstance(val, units.unit):
-                    self.ax.axvline(units.convert(1, val, self.x_unit))
-                else:
-                    self.ax.axhline(val)
-        
-        self.ax.set_xlabel(self.x_unit.label)
+        # Draw legend
+        self.ax.set_xlabel(self.x_unit)
         self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
@@ -342,57 +438,59 @@ class WaveformBrowser:
                     leg_handles = old_leg.get_lines() + leg_handles
                     leg_labels = [t.get_text() for t in old_leg.get_texts()] + leg_labels
             self.ax.legend(leg_handles, leg_labels, **self.legend_kwargs)
-        
+
+    def _update_auto_limit(self, x, y):
+        # Helper to update the automatic limits
+        y_where = {}
+        if isinstance(y, np.ndarray) and self.y_lim is not None:
+            y_where['where'] = ((y>=self.y_lim[0]) & (y<=self.y_lim[1]))
+        x_where = {}
+        if isinstance(x, np.ndarray) and self.x_lim is not None:
+            x_where['where'] = ((x>=self.x_lim[0]) & (x<=self.x_lim[1]))
+        if x is not None:
+            self.auto_x_lim[0] = np.amin(x, **y_where, initial=self.auto_x_lim[0]) 
+            self.auto_x_lim[1] = np.amax(x, **y_where, initial=self.auto_x_lim[1])
+        if y is not None:
+            self.auto_y_lim[0] = np.amin(y, **y_where, initial=self.auto_y_lim[0])
+            self.auto_y_lim[1] = np.amax(y, **y_where, initial=self.auto_y_lim[1])
                 
-    def draw_entry(self, entry, append=False, clear=True):
-        """Draw specified entries from file. Entry_list can be either a single value or list of values representing the index of an event within all files. If append is True, previously drawn entries will be drawn along with this one. If clear is False, the axis will not be cleared before drawing. Return the axis object"""
+    def draw_entry(self, entry, append=False, clear=True, safe=False):
+        """
+        Draw specified entry in the current figure/axes
+        
+        Parameters
+        ----------
+        entry : int or [ints]
+            entry or list of entries to draw
+        append : bool (default False)
+            if True, do not clear previously drawn entries before drawing more
+        clear : bool (default True)
+            if True, clear previously drawn objects in the axes before drawing
+        safe : bool (default False)
+            if False, throw an exception for out of range entries
+        """
         self.find_entry(entry, append)
         self.draw_current(clear)
 
     def find_next(self, n_wfs = None, append = False):
-        """Find the next n_wfs (default to self.n_drawn) waveforms indicated by self.selection and place them in self.wf_data, self.line_data and self.legend_data. If append is True, do not clear these buffers first."""
+        """Find the next n_wfs waveforms (default self.n_drawn). See find_entry"""
         if not n_wfs: n_wfs = self.n_drawn
-
-        wf_indices = [ i_wf for _, i_wf in zip(range(n_wfs), self.index_it) ]
-        if len(wf_indices) < n_wfs: self.eof=True
-        self.find_entry(wf_indices, append)
-
-        return wf_indices
+        entries = (self.next_entry, self.next_entry+n_wfs)
+        self.find_entry(range(*entries), append, safe=True)
+        return entries
         
     def draw_next(self, n_wfs = None, append = False, clear = True):
-        """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return a list of waveform indices drawn and the axis object:
-           n_wfs: number of waveforms to draw (default is self.n_wfs)
-           append: set to True to prevent clearing of axis before drawing
-           clear: set False to draw on an already defined axis
-        """
-        wf_indices = self.find_next(n_wfs, append)
+        """Draw the next n_wfs waveforms (default self.n_drawn). See draw_next"""
+        entries = self.find_next(append)
         self.draw_current(clear)
-        
-        return wf_indices
+        return entries
             
     def reset(self):
         """ Reset to the start of the file for draw_next """
-        self.eof = False
-        try:
-            if self.selection is None:
-                self.index_it = iter(range(0, self.file_map[-1]))
-            elif isinstance(self.selection, list) or isinstance(self.selection, tuple): # index list
-                self.index_it = iter(self.selection)
-            elif isinstance(self.selection, np.ndarray): # numpy boolean mask
-                self.index_it = iter(np.nonzero(self.selection)[0] )
-            elif isinstance(self.selection, pd.Series): # pandas series mask
-                self.index_it = iter(np.nonzero(self.selection.values)[0] )
-            else:
-                raise Exception
-        except:
-            print("Not sure what to do with selection", self.selection, "("+str(self.selection.__class__)+")")
+        self.clear_data()
+        self.next_entry = 0
         
     def __iter__(self):
-        self.reset()
-        return self
-    
-    def __next__(self):
-        """ Call draw_next... """
-        if self.eof:
-            raise StopIteration
-        return self.draw_next()
+        while self.next_entry < len(self.lh5_it):
+            yield self.draw_next()
+            

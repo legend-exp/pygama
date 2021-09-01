@@ -116,7 +116,10 @@ class WaveformTable(Table):
     @values_units.setter
     def values_units(self, units):
         self.values.attrs['units'] = f'{units}'
-
+    @property
+    def wf_len(self):
+        return self.values.nda.shape[1]
+    
     @property
     def t0(self):
         return self['t0']
