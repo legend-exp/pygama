@@ -189,6 +189,14 @@ class ProcChainVar:
     def buffer(self):
         return self.get_buffer()
 
+    @property
+    def period(self):
+        return self.grid.period if self.grid else None
+
+    @property
+    def offset(self):
+        return self.grid.offset if self.grid else None
+
     def description(self):
         return "{}({}, {}, coords: {}, unit: {}{})".format(self.name, \
             str(self.shape), str(self.dtype), str(self.grid), \
@@ -196,8 +204,15 @@ class ProcChainVar:
 
     # Update any variables set to auto; leave the others alone. Emit a messsage
     # only if anything was updated
-    def update_auto(self, shape=auto, dtype=auto, grid=auto, unit=auto, is_coord=auto):
+    def update_auto(self, shape=auto, dtype=auto, grid=auto, unit=auto, is_coord=auto, period=None, offset=0):
         updated = False
+        
+        # Construct coordinate grid from period/offset if given
+        if grid is auto and period is not None:
+            if isinstance(offset, str):
+                offset = get_variable(offset)
+            grid = CoordinateGrid(period, offset)
+        
         if self.shape is auto and shape is not auto:
             self.shape = shape
             updated = True
@@ -268,7 +283,7 @@ class ProcessingChain:
         self._verbosity = verbosity
 
 
-    def add_variable(self, name, dtype=auto, shape=auto, grid=auto, unit=auto, is_coord=auto):
+    def add_variable(self, name, dtype=auto, shape=auto, grid=auto, unit=auto, is_coord=auto, period=None, offset=0):
         """Add a named variable containing a block of values or arrays
         Parameters
         ----------
@@ -277,13 +292,22 @@ class ProcessingChain:
             will be deduced later, if possible
         shape : length or shape tuple of element. Default is None, meaning
             length will be deduced later, if possible
-        period : unit with period of waveform associated with object
-        offset : unit with offset of waveform associated with object
+        grid : CoordinateGrid for variable, containing period and offset
+        period : unit with period of waveform associated with object. Do
+            not use if grid is provided
+        offset : unit with offset of waveform associated with object. Require
+            a period to be provided
         is_coord : if True, transform value based on period and offset
         """
         self._validate_name(name, raise_exception=True)
         if name in self._vars_dict:
             raise ProcessingChainError(name+' is already in variable list')
+
+        # Construct coordinate grid from period/offset if given
+        if grid is auto and period is not None:
+            if isinstance(offset, str):
+                offset = get_variable(offset)
+            grid = CoordinateGrid(period, offset)
         
         var = ProcChainVar(self, name, shape=shape, dtype=dtype, grid=grid,
                            unit=unit, is_coord=is_coord)
@@ -527,7 +551,7 @@ class ProcessingChain:
                 if ret is None:
                     return ret
                 if isinstance(ret, Quantity):
-                    ret = float(ret/val.grid.period)
+                    ret = float(ret/val.period)
                 if isinstance(ret, float):
                     round_ret = int(round(ret))
                     if abs(ret - round_ret) > 0.0001:
@@ -556,12 +580,12 @@ class ProcessingChain:
                 if val.grid is None:
                     out_grid = None
                 else:
-                    pd = val.grid.period
+                    pd = val.period
                     if sl.step is not None: pd *= sl.step
 
-                    off = val.grid.offset
+                    off = val.offset
                     if sl.start is not None:
-                        start = sl.start*val.grid.period
+                        start = sl.start*val.period
                         if isinstance(off, ProcChainVar):
                             new_off = ProcChainVar(self,
                                                    name="({}+{})".format(str(off), str(start)),
@@ -590,9 +614,7 @@ class ProcessingChain:
         elif isinstance(node, ast.Attribute):
             val = self._parse_expr(node.value, expr, dry_run, var_name_list)
             if val is None: return None
-            # get shape with buffer_len dimension removed
-            if node.attr=='shape' and isinstance(val, np.ndarray):
-                return val.shape[1:]
+            return getattr(val, node.attr)
 
         # for func(args, kwargs)
         elif isinstance(node, ast.Call):
@@ -684,8 +706,6 @@ class ProcessingChain:
     # Map from function names when using ast interpretter to ProcessorChain functions that can be called
     func_list = {'len':_length,
                  'round':round, }
-    #'period':get_period,
-    #'offset':get_offset }
 
 
 ########################################################################### 
