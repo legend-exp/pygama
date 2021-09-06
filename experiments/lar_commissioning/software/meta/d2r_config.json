@@ -1,0 +1,11 @@
+{
+    "ch_groups" : {
+        "FlashCamEventDecoder" : {
+            "spms" : {
+                "ch_list" : [ [18,21] ],
+                "system" : "spms"
+            }
+        }
+    },
+    "output_template" : "L200C_r0028_{timestamp}_lac_spms_raw.lh5"
+}
