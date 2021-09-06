@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.5, 3.6, 3.7, 3.8]
+        python-version: [3.7, 3.8]
 
     steps:
     - uses: actions/checkout@v2
@@ -29,7 +29,7 @@ jobs:
     - name: Run unit tests
       run: |
         .github/workflows/get-dependencies.sh
-        pip install .
+        python -m pip install .
     # - name: Test
     #   run: |
     #     pytest
@@ -43,3 +43,26 @@ jobs:
     - uses: actions/checkout@v2
     - name: Run unit tests
       run: pip install .
+
+  deploy-docs:
+    name: Deploy documentation on legend-exp.github.io/pygama
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Build with Sphinx
+        run: |
+          .github/workflows/get-dependencies.sh
+          pip install .
+          pip install sphinx sphinx-rtd-theme
+          cd docs
+          make clean
+          make html
+      - name: Deploy to GitHub pages
+        uses: JamesIves/github-pages-deploy-action@4.1.0
+        with:
+          branch: gh-pages
+          folder: docs/build/html
