@@ -75,6 +75,8 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
         bins = int((range[1] - range[0]) / dx)
 
     # bins includes left edge of first bin and right edge of all other bins
+    # allow scalar weights
+    if np.shape(wts) == (): wts = np.full_like(data, wts)
     hist, bins = np.histogram(data, bins=bins, range=range, weights=wts)
 
     if wts is None: 
