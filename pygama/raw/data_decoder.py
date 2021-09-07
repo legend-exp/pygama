@@ -45,7 +45,11 @@ class DataDecoder(ABC):
                                      lgdo.Array(shape=garbage_length, dtype='uint32'))
 
 
-    def get_keys_list(self): pass
+    def get_keys_list(self): 
+        """ overload with list of keys for this decoder.
+        e.g. `return range(n_channels)`
+        """
+        pass
 
 
     def get_decoded_values(self, key=None):

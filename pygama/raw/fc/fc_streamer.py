@@ -77,9 +77,14 @@ class FCStreamer(DataStreamer):
         """
         Returns
         -------
-        chunk : list of lgdos
-            the returned list of lgdos (tables, etc) is ready for writing to
-            file or further processing
+        chunk_list, n_bytes : list of RawBuffers, int
+            chunk_list is the list of RawBuffers with data ready for writing to
+                file or further processing. The list contains all buffers with
+                data or just all full buffers depending on the flag full_only.
+                Note chunk_list is not a RawBufferList since the RawBuffers
+                inside may not all have the same structure
+            n_bytes is the number of bytes read from the file during this
+                iteration.
         """
         rc = 1
         n_bytes = 0
@@ -88,9 +93,10 @@ class FCStreamer(DataStreamer):
 
             # Skip non-interesting records
             # FIXME: push to a buffer of skipped packets?
+            # FIXME: need to at least update n_bytes?
             if rc == 0 or rc == 1 or rc == 2 or rc == 5: continue
 
-            packet_id += 1
+            self.packet_id += 1
 
             # Status record
             if rc == 4:
