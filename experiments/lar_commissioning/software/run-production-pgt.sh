@@ -2,7 +2,7 @@
 
 root_dir="/data1/shared/lar-commissioning"
 prod_base="$root_dir/data"
-run_name="com/sipmtest_aug"
+run_name="pgt/run0028-mid-june-sipm-test"
 meta_path="$root_dir/software/meta/$run_name"
 fcio_files="$root_dir/data/daq/$run_name/.*\.fcio"
 local_sw="$root_dir/software/pygama-v01"

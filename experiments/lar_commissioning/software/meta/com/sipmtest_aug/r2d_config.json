@@ -1,0 +1,52 @@
+{
+    "dsp_config": {
+        "outputs": [
+            "timestamp", "channel", "bl_mean", "bl_std", "trapEmax", "t0"
+        ],
+        "processors":{
+            "wf_blsub":{
+                "function": "bl_subtract",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", "baseline", "wf_blsub"],
+                "prereqs": ["waveform", "baseline"],
+                "unit": "ADC"
+            },
+            "bl_mean , bl_std, bl_slope, bl_intercept": {
+                "function": "linear_slope_fit",
+                "module": "pygama.dsp.processors",
+                "args" : ["wf_blsub[0:4000]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
+                "prereqs": ["wf_blsub"],
+                "unit": ["ADC", "ADC", "ADC", "ADC"]
+            },
+            "wf_pz": {
+                "function": "pole_zero",
+                "module": "pygama.dsp.processors",
+                "args": ["wf_blsub", "3*us", "wf_pz"],
+                "prereqs": ["wf_blsub"],
+                "unit": "ADC"
+            },
+            "t0": {
+                "function": "time_point_thresh",
+                "module": "pygama.dsp.processors",
+                "args": ["wf_pz", "2*bl_std", 0, 1, "t0"],
+                "prereqs": ["wf_pz"],
+                "unit": "16*ns"
+            },
+            "wf_trap": {
+                "function": "trap_norm",
+                "module": "pygama.dsp.processors",
+                "args": ["wf_pz", "3.2*us", "1.6*us", "wf_trap"],
+                "prereqs": ["wf_pz"],
+                "unit": "ADC"
+            },
+            "trapEmax": {
+                "function": "amax",
+                "module": "numpy",
+                "args": ["wf_trap", 1, "trapEmax"],
+                "kwargs": {"signature": "(n),()->()", "types": ["fi->f"]},
+                "unit": "ADC",
+                "prereqs": ["wf_trap"]
+            }
+        }
+    }
+}
