@@ -88,13 +88,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
         lh5_in, n_rows_read = raw_store.read_object(tb, f_raw, start_row=0, n_rows=buffer_len)
-        pc, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
+        pc, mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
 
         print(f'Processing table: {tb} ...')
         for start_row in range(0, tot_n_rows, buffer_len):
             if verbose > 0:
                 update_progress(start_row/tot_n_rows)
-            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, obj_buf=lh5_in)
+            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, field_mask = mask, obj_buf=lh5_in)
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
                 pc.execute(0, n_rows)
@@ -157,7 +157,7 @@ json config file and raw_to_dsp.""")
         help="Add outpar to list of parameters written to file. By default use the list defined in outputs list in config json file.")
     arg('-d', '--dbfile', default=None, type=str,
         help="JSON file to read DB parameters from. Should be nested dict with channel at the top level, and parameters below that.")
-    arg('-r', '--recreate', action='store_const', const=0, dest='writemode',
+    arg('-r', '--recreate', action='store_const', const=0, dest='writemode', default=0,
         help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
     arg('-u', '--update', action='store_const', const=1, dest='writemode',
         help="Update existing file with new values. Useful with the --outpar option. Mutually exclusive with --recreate and --append THIS IS NOT IMPLEMENTED YET!")
@@ -169,4 +169,4 @@ json config file and raw_to_dsp.""")
     if out is None:
         out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
 
-    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=args.writemode==0, buffer_len=args.chunk, block_width=args.block)
+    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, overwrite=(args.writemode==0), buffer_len=args.chunk, block_width=args.block)

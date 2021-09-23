@@ -145,7 +145,8 @@ setup(
         'pyFFTW',
         'h5py>=3.2.0',
         'pandas',
-        'matplotlib'
+        'matplotlib',
+        'iminuit'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
