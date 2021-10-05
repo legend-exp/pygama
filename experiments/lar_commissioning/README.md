@@ -54,13 +54,15 @@ lar-commissioning
     └── run-production.sh
 ```
 
-Configure files in `software/meta` and eventually edit `run-production.sh`, then:
+Configure files in `software/meta` and eventually edit `software/run-production.sh`, then:
 ```console
-$ ./software/run-production.sh
+$ cd software
+$ pygama-v01/legend-env.sh ./run-production.sh
 ```
-To run the analysis pipeline.
+To run the analysis pipeline inside the container.
 
-For interactive analysis, start first a container instance:
+For interactive analysis, you can work on a shell from within the container.
+Just invoke `legend-env.sh` without any command line argument:
 ```console
-$ software/legend-env.sh
+$ software/pygama-v01/legend-env.sh
 ```

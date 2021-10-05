@@ -1,3 +1,8 @@
+#!/bin/bash
+#
+# With `env` distributions that implement the -S flag, it is possible to
+# directly run the script inside the container with the following shebang:
+#
 #!/usr/bin/env -S singularity exec /data1/shared/lar-commissioning/software/containers/legend-container.sif bash
 
 root_dir="/data1/shared/lar-commissioning"
