@@ -54,13 +54,47 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def tqdm_range(start, stop, step=1, verbose=0, text="Processing", bar_format=None):
+def tqdm_range(start, stop, step=1, verbose=0, text="Processing", bar_length=20):
+    """
+    Uses tqdm.trange which wraps around the python range and also has the option
+    to display a progress
+
+    Example:
+
+        for start_row in range(0, tot_n_rows, buffer_len):
+            ...
+
+            Can be converted to the following
+
+        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
+            ...
+
+    Parameters
+    ----------
+    start : int
+        starting iteration value
+    stop : int
+        ending iteration value
+    step : int
+        step size inbetween each iteration
+    verbose : int
+        verbose = 0 hides progress bar verbose > 0 displays progress bar
+    text : str
+        text to display in front of the progress bar
+    bar_length : str
+        horizontal length of the bar in cursor spaces
+
+    Returns
+    -------
+    iterable : tqdm.trange
+        object that can be iterated over in a for loop
+    """
+
     hide_bar = True
     if verbose > 0:
         hide_bar = False
     
-    if bar_format is None:
-        bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
+    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
 
     return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
 
