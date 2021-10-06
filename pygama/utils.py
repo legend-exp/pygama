@@ -54,7 +54,7 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def tqdm_range(start, stop, step=1, verbose=0, text="Processing", bar_length=20):
+def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
     """
     Uses tqdm.trange which wraps around the python range and also has the option
     to display a progress
@@ -93,6 +93,9 @@ def tqdm_range(start, stop, step=1, verbose=0, text="Processing", bar_length=20)
     hide_bar = True
     if verbose > 0:
         hide_bar = False
+
+    if text is None:
+        text = "Processing"
     
     bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
 
