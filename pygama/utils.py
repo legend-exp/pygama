@@ -2,6 +2,7 @@
 pygama convenience functions.
 """
 import sys
+import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -53,35 +54,15 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def update_progress(progress, run=None):
-    """
-    adapted from from https://stackoverflow.com/a/15860757
-    """
-    barLength = 20  # length of the progress bar
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "error: progress var must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    block = int(round(barLength * progress))
+def tqdm_range(start, stop, step=1, verbose=0, text="Processing", bar_format=None):
+    hide_bar = True
+    if verbose > 0:
+        hide_bar = False
+    
+    if bar_format is None:
+        bar_format = "{l_bar}{bar:20}{r_bar}{bar:-20b}"
 
-    if run is None:
-        text = "\rProgress : [{}] {:0.1f}% {}".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status)
-    else:
-        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status,
-            run)
-
-    sys.stdout.write(text)
-    sys.stdout.flush()
+    return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
 
 
 def sizeof_fmt(num, suffix='B'):
