@@ -1,0 +1,32 @@
+{
+        "outputs": [
+            "timestamp", "channel", "bl_mean", "bl_std", "trapEmax", "Ecum", "t0"
+        ],
+        "processors":{
+            "wf_blsub":{
+                "function": "bl_subtract",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", "baseline", "wf_blsub"],
+                "unit": "ADC"
+            },
+            "bl_mean , bl_std, bl_slope, bl_intercept": {
+                "function": "linear_slope_fit",
+                "module": "pygama.dsp.processors",
+                "args" : ["wf_blsub[0:4000]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
+                "unit": ["ADC", "ADC", "ADC", "ADC"]
+            },
+            "t0": {
+                "function": "time_point_thresh",
+                "module": "pygama.dsp.processors",
+                "args": ["wf_blsub", "3*bl_std", 0, 1, "t0"],
+                "unit": "16*ns"
+            },
+            "wf_gaus": {
+                "function": "gaussian_filter1d",
+                "module": "scipy.ndimage",
+                "args": ["wf_blsub", "0.1*us", -1, 0, "wf_gaus"],
+                "kwargs": {"signature": "(n),(),(),()->(n)", "types": ["ffii->f"]},
+                "unit": "ADC"
+            }
+        }
+}
