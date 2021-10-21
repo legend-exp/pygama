@@ -18,7 +18,7 @@ class WaveformBrowser:
     """
 
     def __init__(self, files_in, lh5_group, dsp_config = None, database = None,
-                 n_drawn = 1, x_unit = 'ns', x_lim=None,
+                 n_drawn = 1, x_unit = 'ns', x_lim=None, y_lim=None,
                  waveforms = 'waveform', wf_styles = None, lines = None,
                  legend = None, legend_opts = None, norm = None, align=None,
                  selection = None,
@@ -26,7 +26,7 @@ class WaveformBrowser:
         """Constructor for WaveformBrowser:
         - file_in: name of file or list of names to browse. Can use wildcards
         - lh5_group: name of LH5 group in file to browse
-        - dsp_config (optional): name of DSP config json file containing transforms available to draw
+        - dsp_config (optional): name of DSP config json file or dict containing transforms available to draw
         - database (optional): dict with database of processing parameters
         - n_drawn (default 1): number of events to draw simultaneously when calling DrawNext
         - x_unit (default ns): unit for x-axis
@@ -52,7 +52,7 @@ class WaveformBrowser:
         # data i/o initialization
         self.lh5_st = lh5.Store(keep_open=True)
         if isinstance(files_in, str): files_in = [files_in]
-        
+
         # Expand wildcards and map out the files
         self.lh5_files = [f for f_wc in files_in for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
         self.lh5_group = lh5_group
@@ -102,13 +102,13 @@ class WaveformBrowser:
                 self.wf_styles = itertools.repeat(None)
             else:
                 self.wf_styles = cycler(**wf_styles)
-        
+
         if lines is None: self.line_names = []
         elif isinstance(lines, list): self.line_names = lines
         elif isinstance(lines, tuple):  self.line_names = list(lines)
         else: self.line_names = [lines]
         self.line_data = [ [] for _ in self.line_names ]
-        
+
         if legend is None: legend = []
         elif not isinstance(legend, list): legend = [legend]
 
@@ -150,25 +150,26 @@ class WaveformBrowser:
 
         self.legend_data = [ [] for _ in self.legend_input ]
         self.legend_kwargs = legend_opts if legend_opts else {}
-        
+
         self.norm_par = norm
         self.align_par = align
 
         self.x_unit = units.unit_parser.parse_unit(x_unit)
         self.x_lim = x_lim
+        self.y_lim = y_lim
 
         # make processing chain and output buffer
         outputs = self.wf_names + \
                   [name for name in self.line_names if isinstance(name, str)] + \
                   [name for name in self.legend_input  if isinstance(name, str)]
         if isinstance(self.norm_par, str): outputs += [self.norm_par]
-        if isinstance(self.align_par, str): outputs += [self.align_par] 
-        
+        if isinstance(self.align_par, str): outputs += [self.align_par]
+
         self.proc_chain, self.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
-        
+
         self.fig = None
-        self.ax = None        
-    
+        self.ax = None
+
     def new_figure(self):
         """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
@@ -199,7 +200,7 @@ class WaveformBrowser:
         for wf_set in self.wf_data: wf_set.clear()
         for line_set in self.line_data: line_set.clear()
         for leg_data in self.legend_data: leg_data.clear()
-        
+
     def find_entry(self, entry, append=True):
         """
         Find the requested data associated with entry in input files and
@@ -211,7 +212,7 @@ class WaveformBrowser:
         if isinstance(entry, list) or isinstance(entry, tuple):
             for idx in entry: self.find_entry(idx)
             return
-        
+
         # figure out which file we are reading from and the chunk/index within the file, using the file map
         file_no = np.searchsorted(self.file_map, entry, 'left')
         if file_no>len(self.lh5_files):
@@ -219,7 +220,7 @@ class WaveformBrowser:
         # get chunk and index within this chunk
         file_beg = self.file_map[file_no-1] if file_no>0 else 0
         chunk, index = divmod(entry - file_beg, self.buffer_len)
-        
+
         # Update the chunk as needed
         if file_no != self.current_file or chunk != self.current_chunk:
             self.current_chunk = chunk
@@ -231,7 +232,7 @@ class WaveformBrowser:
                                                           field_mask = self.field_mask,
                                                           obj_buf=self.lh5_in)
             self.proc_chain.execute(0, n_read)
-            
+
 
         # get scaling factor/time shift if used
         if self.norm_par is None:
@@ -249,7 +250,7 @@ class WaveformBrowser:
             ref_time = self.lh5_out[self.align_par].nda[index]*dt
         else:
             ref_time = self.align_par[entry]
-            
+
         leg_handle = None
 
         #waveforms
@@ -265,14 +266,14 @@ class WaveformBrowser:
                 f_nyq = units.convert(1, 0.5/self.proc_chain._clk, self.x_unit)
                 x = np.linspace(0, f_nyq, len(y), 'f')
             wf_data.append((x, y))
-                    
+
         # lines
         for line_name, line_data in zip(self.line_names, self.line_data):
             try: # if unit is time, do vline
                 unit = units.unit_parser.parse_unit(self.lh5_out[line_name].attrs['units'])
                 val = self.lh5_out[line_name].nda[index]*unit
                 val -= ref_time*self.x_unit
-                
+
             except: # else do hline
                 val = self.lh5_out[line_name].nda[index]/norm
 
@@ -287,7 +288,7 @@ class WaveformBrowser:
                 else:
                     leg_vals.append(val[entry])
             legend_data.append(leg_vals)
-    
+
     def draw_current(self, clear=True):
         """
         Draw the waveforms and data currently held internally by this class.
@@ -295,7 +296,7 @@ class WaveformBrowser:
         # Make figure/axis if needed
         if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
             self.new_figure()
-        
+
         if clear:
             self.ax.clear()
 
@@ -303,14 +304,14 @@ class WaveformBrowser:
         leg_labels = []
         if not isinstance(self.wf_styles, list):
             wf_styles = self.wf_styles
-            
+
         # draw waveforms
         for i, wf_set in enumerate(self.wf_data):
             if isinstance(self.wf_styles, list):
                 wf_styles = self.wf_styles[i]
             if wf_styles is None:
                 wf_styles = itertools.repeat(None)
-            
+
             for wf, sty in zip(wf_set, wf_styles):
                 if sty is None:
                     wf_line, = self.ax.plot(*wf, '-')
@@ -330,11 +331,13 @@ class WaveformBrowser:
                     self.ax.axvline(units.convert(1, val, self.x_unit))
                 else:
                     self.ax.axhline(val)
-        
+
         self.ax.set_xlabel(self.x_unit.label)
         self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
+        if self.y_lim:
+            self.ax.set_ylim(*self.y_lim)
         if len(leg_labels)>0:
             if not clear:
                 old_leg = self.ax.get_legend()
@@ -342,8 +345,8 @@ class WaveformBrowser:
                     leg_handles = old_leg.get_lines() + leg_handles
                     leg_labels = [t.get_text() for t in old_leg.get_texts()] + leg_labels
             self.ax.legend(leg_handles, leg_labels, **self.legend_kwargs)
-        
-                
+
+
     def draw_entry(self, entry, append=False, clear=True):
         """Draw specified entries from file. Entry_list can be either a single value or list of values representing the index of an event within all files. If append is True, previously drawn entries will be drawn along with this one. If clear is False, the axis will not be cleared before drawing. Return the axis object"""
         self.find_entry(entry, append)
@@ -358,7 +361,7 @@ class WaveformBrowser:
         self.find_entry(wf_indices, append)
 
         return wf_indices
-        
+
     def draw_next(self, n_wfs = None, append = False, clear = True):
         """Draw the next n_wfs waveforms on the same axis. If a selection was set, only draw waveforms from that selection. Return a list of waveform indices drawn and the axis object:
            n_wfs: number of waveforms to draw (default is self.n_wfs)
@@ -367,9 +370,9 @@ class WaveformBrowser:
         """
         wf_indices = self.find_next(n_wfs, append)
         self.draw_current(clear)
-        
+
         return wf_indices
-            
+
     def reset(self):
         """ Reset to the start of the file for draw_next """
         self.eof = False
@@ -386,11 +389,11 @@ class WaveformBrowser:
                 raise Exception
         except:
             print("Not sure what to do with selection", self.selection, "("+str(self.selection.__class__)+")")
-        
+
     def __iter__(self):
         self.reset()
         return self
-    
+
     def __next__(self):
         """ Call draw_next... """
         if self.eof:
