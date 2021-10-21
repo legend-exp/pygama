@@ -1,3 +1,5 @@
+#!/bin/bash
+
 BASEDIR="/data1/shared/lar-commissioning"
 
 if [[ $# -eq 0 ]]; then

@@ -1,4 +1,5 @@
 {
+    "dsp_config": {
         "outputs": [
             "timestamp", "channel", "bl_mean", "bl_std", "trapEmax", "Ecum", "t0"
         ],
@@ -29,4 +30,5 @@
                 "unit": "ADC"
             }
         }
+    }
 }
