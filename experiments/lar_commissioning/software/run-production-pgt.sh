@@ -1,10 +1,15 @@
+#!/bin/bash
+#
+# With `env` distributions that implement the -S flag, it is possible to
+# directly run the script inside the container with the following shebang:
+#
 #!/usr/bin/env -S singularity exec /data1/shared/lar-commissioning/software/containers/legend-container.sif bash
 
 root_dir="/data1/shared/lar-commissioning"
-prod_base="$root_dir/data"
-run_name="pgt/run0028-mid-june-sipm-test"
-meta_path="$root_dir/software/meta/$run_name"
-fcio_files="$root_dir/data/daq/$run_name/.*\.fcio"
+prod_base="$root_dir/data/pgt"
+run_name="run0028-mid-june-sipm-test"
+meta_path="$root_dir/software/meta/pgt/$run_name"
+fcio_files="$prod_base/daq/$run_name/.*\.fcio"
 local_sw="$root_dir/software/pygama-v01"
 
 export PYTHONUSERBASE="$root_dir/software/pygama-v01/local"
