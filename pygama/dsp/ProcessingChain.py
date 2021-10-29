@@ -461,7 +461,7 @@ class ProcessingChain:
                 if isinstance(var, np.ndarray) and len(var.shape)==2:
                     return var.shape[1]
                 else:
-                    raise ProcessingChainError("len(): " + node.args[0].id + "has wrong number of dims")
+                    raise ProcessingChainError("len(): " + node.args[0].id + " has wrong number of dims")
             elif func=="round" and len(node.args)==1:
                 var = self.__parse_expr(node.args[0], allocate_memory, var_name_list)
                 if var is None: return None
