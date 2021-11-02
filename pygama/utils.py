@@ -2,7 +2,6 @@
 pygama convenience functions.
 """
 import sys
-import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -54,52 +53,35 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
+def update_progress(progress, run=None):
     """
-    Uses tqdm.trange which wraps around the python range and also has the option
-    to display a progress
-
-    Example:
-
-        for start_row in range(0, tot_n_rows, buffer_len):
-            ...
-
-            Can be converted to the following
-
-        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
-            ...
-
-    Parameters
-    ----------
-    start : int
-        starting iteration value
-    stop : int
-        ending iteration value
-    step : int
-        step size inbetween each iteration
-    verbose : int
-        verbose = 0 hides progress bar verbose > 0 displays progress bar
-    text : str
-        text to display in front of the progress bar
-    bar_length : str
-        horizontal length of the bar in cursor spaces
-
-    Returns
-    -------
-    iterable : tqdm.trange
-        object that can be iterated over in a for loop
+    adapted from from https://stackoverflow.com/a/15860757
     """
+    barLength = 20  # length of the progress bar
+    status = ""
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+        status = "error: progress var must be float\r\n"
+    if progress < 0:
+        progress = 0
+        status = "Halt...\r\n"
+    if progress >= 1:
+        progress = 1
+        status = "Done...\r\n"
+    block = int(round(barLength * progress))
 
-    hide_bar = True
-    if verbose > 0:
-        hide_bar = False
+    if run is None:
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
+            "#" * block + "-" * (barLength - block), progress * 100, status)
+    else:
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
+            "#" * block + "-" * (barLength - block), progress * 100, status,
+            run)
 
-    if text is None:
-        text = "Processing"
-    
-    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
-
-    return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 
 def sizeof_fmt(num, suffix='B'):

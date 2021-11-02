@@ -14,7 +14,7 @@ from pygama import __version__ as pygama_version
 from pygama.dsp.ProcessingChain import ProcessingChain
 from pygama.dsp.units import *
 from pygama import lh5
-from pygama.utils import tqdm_range
+from pygama.utils import update_progress
 import pygama.git as git
 from pygama.dsp.build_processing_chain import *
 from pygama.dsp.errors import DSPFatal
@@ -91,8 +91,9 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         pc, mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
 
         print(f'Processing table: {tb} ...')
-        
-        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
+        for start_row in range(0, tot_n_rows, buffer_len):
+            if verbose > 0:
+                update_progress(start_row/tot_n_rows)
             lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, field_mask = mask, obj_buf=lh5_in)
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
@@ -104,6 +105,8 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
             
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
 
+        if verbose > 0:
+            update_progress(1)
         print(f'Done.  Writing to file {f_dsp}')
 
     # write processing metadata
