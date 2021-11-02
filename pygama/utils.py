@@ -23,7 +23,7 @@ def get_dataset_from_cmdline(args, run_db, cal_db):
         arg("-r", "--run", nargs=1, help="load a single run")
     """
     from pygama import DataSet
-    
+
     if args["ds"]:
         ds_lo = int(args["ds"][0])
         try:
@@ -31,9 +31,9 @@ def get_dataset_from_cmdline(args, run_db, cal_db):
         except:
             ds_hi = None
         ds = DataSet(ds_lo, ds_hi, md=run_db, cal=cal_db, v=args["verbose"])
-    
+
     if args["run"]:
-        ds = DataSet(run=int(args["run"][0]), md=run_db, cal=cal_db, 
+        ds = DataSet(run=int(args["run"][0]), md=run_db, cal=cal_db,
                      v=args["verbose"])
     return ds
 
@@ -52,6 +52,37 @@ def sh(cmd, sh=False):
                 print(e)
                 pass
     return decoders
+
+
+def update_progress(progress, run=None):
+    """
+    adapted from from https://stackoverflow.com/a/15860757
+    """
+    barLength = 20  # length of the progress bar
+    status = ""
+    if isinstance(progress, int):
+        progress = float(progress)
+    if not isinstance(progress, float):
+        progress = 0
+        status = "error: progress var must be float\r\n"
+    if progress < 0:
+        progress = 0
+        status = "Halt...\r\n"
+    if progress >= 1:
+        progress = 1
+        status = "Done...\r\n"
+    block = int(round(barLength * progress))
+
+    if run is None:
+        text = "\rProgress : [{}] {:0.1f}% {}".format(
+            "#" * block + "-" * (barLength - block), progress * 100, status)
+    else:
+        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
+            "#" * block + "-" * (barLength - block), progress * 100, status,
+            run)
+
+    sys.stdout.write(text)
+    sys.stdout.flush()
 
 
 def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
@@ -96,7 +127,7 @@ def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
 
     if text is None:
         text = "Processing"
-    
+
     bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
 
     return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
@@ -288,7 +319,7 @@ def linear_fit_by_sums(x, y, var=1):
     """
     y = y/var
     x = x/var
-    sum_wts = len(y)/var if np.isscalar(var) else np.sum(1/var) 
+    sum_wts = len(y)/var if np.isscalar(var) else np.sum(1/var)
     sum_x = np.sum(x)
     sum_xx = np.sum(x*x)
     sum_y = np.sum(y)
