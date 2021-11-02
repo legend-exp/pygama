@@ -2,7 +2,7 @@
     "ch_groups" : {
         "FlashCamEventDecoder" : {
             "spms" : {
-                "ch_list" : [ [0, 11] ],
+                "ch_list" : [ [0, 15] ],
                 "system" : "spms"
             }
         }
