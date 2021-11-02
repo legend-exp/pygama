@@ -7,7 +7,7 @@ $ cd /tmp
 $ git clone https://github.com/legend-exp/pyfcutils
 $ git clone https://github.com/legend-exp/pygama
 $ cd pyfcutils && python -m pip install . && cd ..
-$ cd pygama && python -m pip install . && cd ..
+$ cd pygama && git checkout exp-lar-commissioning && python -m pip install . && cd ..
 ```
 
 Place (a symlink to) fcio files somewhere below `data/`, e.g.
