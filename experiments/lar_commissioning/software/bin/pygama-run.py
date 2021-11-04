@@ -50,7 +50,11 @@ def main():
             match = re.search(re_input, entry.name)
             if match is not None:
                 f_input.append(os.path.join(dir_input, match.string))
-                if 'output_template' in f_config:
+
+                with open(f_config) as f:
+                    j_config = json.load(f)
+
+                if 'output_template' in j_config:
                     match = re.search(r'.*(\d{8})-(\d{6}).*\.fcio', entry.name)
                     if match is not None:
                         f_datetimes.append(match.groups()[0] + 'T' + match.groups()[1] + 'Z')
@@ -74,12 +78,12 @@ def main():
     if args.step == 'daq_to_raw':
 
         with open(f_config) as f:
-            f_config = json.load(f)
+            j_config = json.load(f)
 
-        ch_groups = f_config['ch_groups']
+        ch_groups = j_config['ch_groups']
 
-        if 'output_template' in f_config:
-            template = f_config['output_template']
+        if 'output_template' in j_config:
+            template = j_config['output_template']
             f_output = [os.path.join(args.output_dir, template.replace('{timestamp}', s)) for s in f_datetimes]
         else:
             f_output = [os.path.join(args.output_dir, os.path.basename(f.replace('.fcio', '_raw.lh5'))) for f in f_input]
