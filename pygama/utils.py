@@ -54,35 +54,8 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def update_progress(progress, run=None):
-    """
-    adapted from from https://stackoverflow.com/a/15860757
-    """
-    barLength = 20  # length of the progress bar
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "error: progress var must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    block = int(round(barLength * progress))
-
-    if run is None:
-        text = "\rProgress : [{}] {:0.1f}% {}".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status)
-    else:
-        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status,
-            run)
-
-    sys.stdout.write(text)
-    sys.stdout.flush()
+def update_progress(tqdm_bar, progress):
+    tqdm_bar.update(progress)
 
 
 def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
