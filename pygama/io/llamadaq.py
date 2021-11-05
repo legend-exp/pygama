@@ -5,7 +5,7 @@ from pprint import pprint
 
 from .io_base import DataTaker
 #from .waveform import Waveform
-from .utils import tqdm_range, update_progress
+from ..utils import tqdm_range, update_progress
 
 class llama_3316:
     """
@@ -527,11 +527,13 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
 
 
     n_entries = 0
+    unit = "B"
     if n_max < np.inf and n_max > 0:
         n_entries = n_max
+        unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose)
+    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
     file_position = 0
 
 
@@ -572,9 +574,6 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
     # final write to file
     for d in decoders:
         d.save_to_lh5(raw_filename)
-
-    if verbose:
-        update_progress(1)
 
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")

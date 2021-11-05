@@ -58,7 +58,7 @@ def update_progress(tqdm_bar, progress):
     tqdm_bar.update(progress)
 
 
-def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
+def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, unit=None):
     """
     Uses tqdm.trange which wraps around the python range and also has the option
     to display a progress
@@ -95,15 +95,24 @@ def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
     """
 
     hide_bar = True
-    if verbose > 0:
-        hide_bar = False
+    if isinstance(verbose, int):
+        if verbose > 0:
+            hide_bar = False
+    elif isinstance(verbose, bool):
+        if verbose is True:
+            hide_bar = False
 
     if text is None:
         text = "Processing"
 
+    if unit is None:
+        unit = "it"
+
     bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
 
-    return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
+    return tqdm.trange(start, stop, step,
+                       disable=hide_bar, desc=text,
+                       bar_format=bar_format, unit=unit, unit_scale=True)
 
 
 def sizeof_fmt(num, suffix='B'):

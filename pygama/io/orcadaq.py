@@ -347,11 +347,13 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     f_in.seek(reclen * 4)
 
     n_entries = 0
+    unit = "B"
     if n_max < np.inf and n_max > 0:
         n_entries = n_max
+        unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose)
+    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
     file_position = 0
 
     # start scanning
@@ -415,9 +417,6 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
             print('last write')
             tbl.clear()
-
-    if verbose:
-        update_progress(1)
 
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")

@@ -443,12 +443,15 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     bytes_per_loop = 0
     file_size = os.path.getsize(daq_file)
     max_numtraces = 0
+
+    unit = "B"
     n_entries = 0
     if n_max < np.inf and n_max > 0:
         n_entries = n_max
+        unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose)
+    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
     while rc and packet_id < n_max:
         rc = fcio.get_record()
 
@@ -521,7 +524,6 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             print('Not saving file since no data were found:', out_file)
 
     if verbose:
-        update_progress(1)
         print(packet_id, 'packets decoded')
 
     if len(event_decoder.skipped_channels) > 0:
