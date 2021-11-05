@@ -1,6 +1,12 @@
 # lar-commissioning
 
-Install pygama and pyfcutils in the container:
+Clone pygama and make sure you're sitting in the right branch:
+```console
+$ git clone https://github.com/legend-exp/pygama
+$ cd pygama && git checkout exp-lar-commissioning
+```
+
+Install pygama and pyfcutils in the container, for example:
 ```console
 $ ./software/bin/legend-env.sh
 $ cd /tmp
@@ -13,10 +19,10 @@ $ cd pygama && git checkout exp-lar-commissioning && python -m pip install . && 
 Place (a symlink to) fcio files somewhere below `data/`, e.g.
 ```console
 $ mkdir -p data/com && cd data/com
-$ ln -s /path/to/raw .
+$ ln -s </path/to/raw> .
 ```
 
-This is how the directory tree should look at the end:
+This is how the directory tree should look at the end (e.g. at MPIK):
 ```
 lar_commissioning
 ├── data
