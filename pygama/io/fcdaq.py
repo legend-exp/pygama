@@ -458,14 +458,6 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
         packet_id += 1
 
-        if verbose:
-            update_len = 0
-            if n_max < np.inf and n_max > 0:
-                update_len = 1
-            else:
-                update_len = bytes_per_loop
-            update_progress(progress_bar, update_len)
-
         # Status record
         if rc == 4:
             bytes_per_loop = status_decoder.decode_packet(fcio, status_tbl, packet_id)
@@ -495,6 +487,14 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             # Looks okay: just decode
             bytes_per_loop = event_decoder.decode_packet(fcio, event_tables, packet_id)
             bytes_processed += bytes_per_loop
+
+            if verbose:
+              update_len = 0
+              if n_max < np.inf and n_max > 0:
+                  update_len = 1
+              else:
+                  update_len = bytes_per_loop
+              update_progress(progress_bar, update_len)
 
             # i_debug += 1
             # if i_debug == 10:
