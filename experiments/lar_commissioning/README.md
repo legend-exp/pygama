@@ -1,5 +1,14 @@
 # lar-commissioning
 
+## Tutorials & documentation
+
+First of all, read this:
+* https://github.com/mmatteo/legend-analysis-tutorials
+* https://github.com/legend-exp/pygama/blob/dev/tutorials/WaveformBrowserTutorial.ipynb
+* https://github.com/legend-exp/pygama/blob/dev/tutorials/IntroToDSP.ipynb
+
+## Setting up the environment
+
 Clone pygama and make sure you're sitting in the right branch:
 ```console
 $ git clone https://github.com/legend-exp/pygama
