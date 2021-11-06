@@ -14,52 +14,67 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
     
-    Returns (proc_chain, lh5_out):
-    - proc_chain: ProcessingChain object that is bound to lh5_in and lh5_out;
-      all you need to do is handle file i/o for lh5_in/out and run execute
-    - lh5_out: output LH5 table
-    
-    Required arguments:
-    - lh5_in: input LH5 table
-    - config: dict or name of json file containing a recipe for
-      constructing the ProcessingChain object produced by this function.
-      config is formated as a json dict with different processors. Config
-      should have a dictionary called processors, containing dictionaries
-      of the following format:
-        Key: parameter name: name of parameter produced by the processor.
-             can optionally provide multiple, separated by spaces
-        Values:
-          processor (req): name of gufunc
-          module (req): name of module in which to find processor
-          prereqs (req): name of parameters from other processors and from 
-            input that are required to exist to run this
-          args (req): list of arguments for processor, with variables passed
-            by name or value. Names should either be inputs from lh5_in, or
-            parameter names for other processors. Names of the format db.name
-            will look up the parameter in the metadata. 
-          kwargs (opt): kwargs used when adding processors to proc_chain
-          init_args (opt): args used when initializing a processor that has
-            static data (for factory functions)
-          default (opt): default value for db parameters if not found
-          unit (opt): unit to be used for attr in lh5 file.
-      There may also be a list called 'outputs', containing a list of parameters
-      to put into lh5_out.
-    
-    Optional keyword arguments:
-    - outputs: list of parameters to put in the output lh5 table. If None,
-      use the parameters in the 'outputs' list from config
-    - db_dict: a nested dict pointing to values for db args.
-      e.g. if a processor uses arg db.trap.risetime, it will look up
+    Parameters
+    ----------
+    lh5_in : lgdo.Table
+        HDF5 table from which raw data is read. At least one row of entries
+        should be read in prior to calling this!
+    dsp_config: dict or str
+        A dict or json filename containing the recipes for computing DSP
+        parameter from raw parameters. The format is as follows:
+        {
+            "outputs" : [ "parnames", ... ] -> list of output parameters
+                 to compute by default; see outputs parameter.
+            "processors" : {
+                 "name1, ..." : { -> names of parameters computed
+                      "function" : str -> name of function to call. Function
+                           should implement the gufunc interface, a factory
+                           function returning a gufunc, or an arbitrary
+                           function that can be mapped onto a gufunc
+                      "module" : str -> name of module containing function
+                      "args" : [ str or numeric, ... ] -> list of names of
+                           computed and input parameters or constant values
+                           used as inputs to function. Note that outputs
+                           should be fed by reference as args! Arguments read
+                           from the database are prepended with db.
+                      "kwargs" : dict -> keyword arguments for
+                           ProcesssingChain.add_processor.
+                      "init_args" : [ str or numeric, ... ] -> list of names
+                           of computed and input parameters or constant values
+                           used to initialize a gufunc via a factory function
+                      "unit" : str or [ strs, ... ] -> units for parameters
+                      "defaults" : dict -> default value to be used for
+                           arguments read from the database
+                      "prereqs" : DEPRECATED [ strs, ...] -> list of parameters
+                           that must be computed before these can
+                 }
+    outputs: [str, ...] (optional)
+        List of parameters to put in the output lh5 table. If None,
+        use the parameters in the 'outputs' list from config
+    db_dict: dict (optional)
+        A nested dict pointing to values for db args. e.g. if a processor
+        uses arg db.trap.risetime, it will look up
           db_dict['trap']['risetime']
-      and use the found value. If no value is found, use the default defined
-      in the config file.
-    - verbosity: verbosity level:
-            0: Print nothing (except errors...)
-            1: Print basic warnings (default)
-            2: Print basic debug info
-            3: Print friggin' everything!    
-    - block_width: number of entries to process at once.
+        and use the found value. If no value is found, use the default
+        defined in the config file.
+    verbosity : int (optional)
+        0: Print nothing (except errors...)
+        1: Print basic warnings (default)
+        2: Print basic debug info
+        3: Print friggin' everything!    
+    block_width : int (optional)
+        number of entries to process at once. To optimize performance,
+        a multiple of 16 is preferred, but if performance is not an issue
+        any value can be used.
+    
+    Returns
+    -------
+    (proc_chain, field_mask, lh5_out) : tuple
+        proc_chain : ProcessingChain object that is executed
+        field_mask : List of input fields that are used
+        lh5_out : output lh5 table containing processed values
     """
+    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
@@ -75,12 +90,29 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     processors = dsp_config['processors']
     
-    # for processors with multiple outputs, add separate entries to the processor list
-    for key in list(processors):
+    # prepare the processor list
+    multi_out_procs = {}
+    for key, node in processors.items():
+        # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
         if len(keys)>1:
             for k in keys:
-                processors[k] = key
+                multi_out_procs[k] = key
+
+        # parse the arguments list for prereqs, if not included explicitly
+        if not 'prereqs' in node:
+            prereqs = []
+            for arg in node['args']:
+                if not isinstance(arg, str): continue
+                for prereq in proc_chain.get_variable(arg, True):
+                    if prereq not in prereqs and prereq not in keys and prereq != 'db':
+                        prereqs.append(prereq)
+            node['prereqs'] = prereqs
+
+        if verbosity>=2:
+            print("Prereqs for", key, "are", node['prereqs'])
+
+    processors.update(multi_out_procs)
     
     # Recursive function to crawl through the parameters/processors and get
     # a sequence of unique parameters such that parameters always appear after
@@ -91,7 +123,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         if par in resolved:
             return
         elif par in unresolved:
-            raise Exception('Circular references detected: %s -> %s' % (par, edge))
+            raise ProcessingChainError('Circular references detected: %s -> %s' % (par, edge))
 
         # if we don't find a node, this is a leaf
         node = processors.get(par)
@@ -128,8 +160,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         print('Required input parameters:', str(input_par_list))
         print('Copied output parameters:', str(copy_par_list))
         print('Processed output parameters:', str(out_par_list))
-        
-    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
     
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:
@@ -164,13 +194,13 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     args[i] = node
                     if(verbosity>0):
                         print("Database lookup: found", node, "for", arg)
-                except:
+                except (KeyError, TypeError):
                     try:
                         args[i] = recipe['defaults'][arg]
                         if(verbosity>0):
                             print("Database lookup: using default value of", args[i], "for", arg)
-                    except:
-                        raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                    except (KeyError, TypeError):
+                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
             
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
         # if init_args are defined, parse any strings and then call func
@@ -187,26 +217,23 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                         init_args[i] = node
                         if(verbosity>0):
                             print("Database lookup: found", node, "for", arg)
-                    except:
+                    except (KeyError, TypeError):
                         try:
                             init_args[i] = recipe['defaults'][arg]
                             if(verbosity>0):
                                 print("Database lookup: using default value of", init_args[i], "for", arg)
-                        except:
-                            raise Exception('Did not find', arg, 'in database, and could not find default value.')
+                        except (KeyError, TypeError):
+                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
                     arg = init_args[i]
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
-                    try:
-                        init_args[i] = proc_chain.get_variable(arg)
-                    except:
-                        pass
+                    init_args[i] = proc_chain.get_variable(arg)
                     
             if(verbosity>1):
                 print("Building function", func.__name__, "from init_args", init_args)
             func = func(*init_args)
-        except:
+        except KeyError:
             pass
         proc_chain.add_processor(func, *args, **kwargs)
 
@@ -249,4 +276,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         
         buf_out = proc_chain.get_output_buffer(out_par, unit=scale)
         lh5_out.add_field(out_par, lh5.Array(buf_out, attrs={"units":unit}) )
-    return (proc_chain, lh5_out)
+
+    field_mask = input_par_list + copy_par_list
+    return (proc_chain, field_mask, lh5_out)

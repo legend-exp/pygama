@@ -109,14 +109,15 @@ class Store:
             will be sliced to obey those constraints, where n_rows is
             interpreted as the (max) number of -selected- values (in idx) to be
             read out.
-        field_mask : dict or defaultdict { str : bool } (optional)
+        field_mask : dict or defaultdict { str : bool } or list/tuple (optional)
             For tables and structs, determines which fields get written out.
             Only applies to immediate fields of the requested objects. If a dict
             is used, a defaultdict will be made with the default set to the
             opposite of the first element in the dict. This way if one specifies
             a few fields at "false", all but those fields will be read out,
             while if one specifies just a few fields as "true", only those
-            fields will be read out.
+            fields will be read out. If a list is provided, the listed fields
+            will be set to "true", while the rest will default to "false".
         obj_buf : lh5 object (optional)
             Read directly into memory provided in obj_buf. Note: the buffer will
             be expanded to accommodate the data requested. To maintain the
@@ -141,7 +142,8 @@ class Store:
         #          proc.execute()
 
         # Handle list-of-files recursively
-        if isinstance(lh5_file, list):
+        if not isinstance(lh5_file, (str, h5py._hl.files.File)):
+            lh5_file = list(lh5_file)
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
                 if isinstance(idx, list) and len(idx) > 0 and not np.isscalar(idx[0]):
@@ -226,6 +228,8 @@ class Store:
                 if len(field_mask) > 0:
                     default = not field_mask[field_mask.keys[0]]
                 field_mask = defaultdict(lambda : default, field_mask)
+            elif isinstance(field_mask, (list, tuple)):
+                field_mask = defaultdict(lambda : False, { field : True for field in field_mask} )
             elif not isinstance(field_mask, defaultdict):
                 print('bad field_mask of type', type(field_mask).__name__)
                 return None, 0
@@ -273,6 +277,8 @@ class Store:
                 if len(field_mask) > 0:
                     default = not (field_mask[list(field_mask.keys())[0]])
                 field_mask = defaultdict(lambda : default, field_mask)
+            elif isinstance(field_mask, (list, tuple)):
+                field_mask = defaultdict(lambda : False, { field : True for field in field_mask} )
             elif not isinstance(field_mask, defaultdict):
                 print('bad field_mask of type', type(field_mask).__name__)
                 return None, 0

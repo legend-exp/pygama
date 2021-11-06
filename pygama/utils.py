@@ -2,6 +2,7 @@
 pygama convenience functions.
 """
 import sys
+import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -53,35 +54,52 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def update_progress(progress, run=None):
+def tqdm_range(start, stop, step=1, verbose=0, text=None, bar_length=20):
     """
-    adapted from from https://stackoverflow.com/a/15860757
+    Uses tqdm.trange which wraps around the python range and also has the option
+    to display a progress
+
+    Example:
+
+        for start_row in range(0, tot_n_rows, buffer_len):
+            ...
+
+            Can be converted to the following
+
+        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
+            ...
+
+    Parameters
+    ----------
+    start : int
+        starting iteration value
+    stop : int
+        ending iteration value
+    step : int
+        step size inbetween each iteration
+    verbose : int
+        verbose = 0 hides progress bar verbose > 0 displays progress bar
+    text : str
+        text to display in front of the progress bar
+    bar_length : str
+        horizontal length of the bar in cursor spaces
+
+    Returns
+    -------
+    iterable : tqdm.trange
+        object that can be iterated over in a for loop
     """
-    barLength = 20  # length of the progress bar
-    status = ""
-    if isinstance(progress, int):
-        progress = float(progress)
-    if not isinstance(progress, float):
-        progress = 0
-        status = "error: progress var must be float\r\n"
-    if progress < 0:
-        progress = 0
-        status = "Halt...\r\n"
-    if progress >= 1:
-        progress = 1
-        status = "Done...\r\n"
-    block = int(round(barLength * progress))
 
-    if run is None:
-        text = "\rProgress : [{}] {:0.1f}% {}".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status)
-    else:
-        text = "\rProgress : [{}] {:0.1f}% {} (Run {})".format(
-            "#" * block + "-" * (barLength - block), progress * 100, status,
-            run)
+    hide_bar = True
+    if verbose > 0:
+        hide_bar = False
 
-    sys.stdout.write(text)
-    sys.stdout.flush()
+    if text is None:
+        text = "Processing"
+    
+    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
+
+    return tqdm.trange(start, stop, step, disable=hide_bar, desc=text, bar_format=bar_format)
 
 
 def sizeof_fmt(num, suffix='B'):
@@ -279,4 +297,30 @@ def linear_fit_by_sums(x, y, var=1):
     b = (sum_y - m * sum_x) / sum_wts
     return m, b
 
+
+def fit_simple_scaling(x, y, var=1):
+    """
+    Fast computation of weighted linear least squares fit to a simple scaling
+
+    I.e. y = scale * x. Returns the best fit scale parameter and its variance.
+
+    Parameters
+    ----------
+    x : array like
+        x values for the fit
+    y : array like
+        y values for the fit
+    var : array like (optional)
+        The variances for each y-value
+
+    Returns
+    -------
+    scale, scale_var: tuple (float, float)
+        The scale parameter and its variance
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+    scale_var = 1/np.sum(x*x/var)
+    scale = np.sum(y*x/var) * scale_var
+    return scale, scale_var
 

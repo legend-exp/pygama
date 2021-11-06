@@ -12,7 +12,7 @@ class ORCAStruck3302(OrcaDecoder):
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.orca_class_name = 'ORSIS3302Model'
 
-        self.decoded_values = {
+        self.decoded_values_template = {
             'packet_id': {
                'dtype': 'uint32',
              },
@@ -50,14 +50,23 @@ class ORCAStruck3302(OrcaDecoder):
         }
 
         super().__init__(*args, **kwargs) # also initializes the garbage df
-        # self.enabled_cccs = []
-        self.skipped_channels = {}
+
+        self.decoded_values = {}
         self.ievt = 0
+        self.skipped_channels = {}
+        # self.enabled_cccs = []
 
 
     def get_decoded_values(self, channel=None):
-        # TODO: return channel-specific decoded_values
-        return self.decoded_values
+        if channel is None: 
+            dec_vals_list = self.decoded_values.items()
+            if len(dec_vals_list) == 0:
+                print("ORSIS3302Model: Error: decoded_values not built yet!")
+                return None
+            return list(dec_vals_list)[0][1] # Get first thing we find
+        if channel in self.decoded_values: return self.decoded_values[channel]
+        print("ORSIS3302Model: Error: No decoded values for channel", channel)
+        return None
 
 
     def set_object_info(self, object_info):
@@ -71,27 +80,26 @@ class ORCAStruck3302(OrcaDecoder):
             int_enabled_mask = card_dict['internalTriggerEnabledMask']
             ext_enabled_mask = card_dict['externalTriggerEnabledMask']
             enabled_mask = int_enabled_mask | ext_enabled_mask
-            trace_length = 0
             for channel in range(8):
                 # only care about enabled channels
-                if (enabled_mask >> channel) & 0x1:
-                    # save list of enabled channels
-                    #self.enabled_cccs.append(get_ccc(crate, card, channel))
+                if not ((enabled_mask >> channel) & 0x1): continue
 
-                    # get trace length(s). Should all be the same until
-                    # multi-buffer mode is implemented AND each channel has its
-                    # own buffer
-                    this_length = card_dict['sampleLengths'][int(channel/2)]
-                    if trace_length == 0: trace_length = this_length
-                    elif this_length != trace_length:
-                        print('SIS3316ORCADecoder Error: multiple trace lengths not supported')
-                        sys.exit()
+                ccc = get_ccc(crate, card, channel)
+                # save list of enabled channels
+                #self.enabled_cccs.append(ccc)
 
-            # check trace length and update decoded_values
-            if trace_length <= 0 or trace_length > 2**16:
-                print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
-                sys.exit()
-            self.decoded_values['waveform']['length'] = trace_length
+                self.decoded_values[ccc] = {}
+                self.decoded_values[ccc].update(self.decoded_values_template)
+                sd = self.decoded_values[ccc] # alias
+
+                # get trace length(s). Should all be the same until
+                # multi-buffer mode is implemented AND each channel has its
+                # own buffer
+                trace_length = card_dict['sampleLengths'][int(channel/2)]
+                if trace_length <= 0 or trace_length > 2**16:
+                    print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
+                    sys.exit()
+                self.decoded_values[ccc]['waveform']['length'] = trace_length
 
 
     def max_n_rows_per_packet(self):
@@ -275,7 +283,7 @@ class ORCAGretina4M(OrcaDecoder):
             if len(dec_vals_list) == 0:
                 print("ORGretina4MModel: Error: decoded_values not built yet!")
                 return None
-            return dec_vals_list[0]
+            return list(dec_vals_list)[0][1] # Get first thing we find
         if channel in self.decoded_values: return self.decoded_values[channel]
         print("ORGretina4MModel: Error: No decoded values for channel", channel)
         return None
