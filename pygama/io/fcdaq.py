@@ -451,7 +451,7 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
         unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
+    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
     while rc and packet_id < n_max:
         rc = fcio.get_record()
 

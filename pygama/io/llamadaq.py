@@ -533,7 +533,7 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
         unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
+    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
     file_position = 0
 
 
@@ -587,3 +587,6 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
     with pd.HDFStore(raw_filename,'r') as store:
         print(store.keys())
     #    # print(store.info())
+
+
+

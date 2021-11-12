@@ -91,8 +91,8 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         pc, mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
 
         print(f'Processing table: {tb} ...')
-
-        for start_row in tqdm_range(0, int(tot_n_rows), buffer_len, verbose):
+        
+        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
             lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, field_mask = mask, obj_buf=lh5_in)
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
@@ -101,7 +101,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 # Update the wf_range to reflect the file position
                 e.wf_range = "{}-{}".format(e.wf_range[0]+start_row, e.wf_range[1]+start_row)
                 raise e
-
+            
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
 
         print(f'Done.  Writing to file {f_dsp}')
