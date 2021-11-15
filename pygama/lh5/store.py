@@ -716,4 +716,4 @@ def load_dfs(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
         Contains columns for each parameter in par_list, and rows containing all
         data for the associated parameters concatenated over all files in f_list
     """
-    return pd.DataFrame( load_nda(f_list, par_list, lh5_group, verbose) )
+    return pd.DataFrame( load_nda(f_list, par_list, lh5_group=lh5_group, idx_list=idx_list, verbose=verbose) )
