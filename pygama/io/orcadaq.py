@@ -353,7 +353,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
+    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
     file_position = 0
 
     # start scanning
