@@ -12,7 +12,6 @@
   "lh5_user" : "$CAGE_LH5_USER",
   "lh5_60_kev" : "$CAGE_LH5_USER/60",
 
-
   "nersc_dir":"/global/project/projectdirs/m2676/data/cage",
 
   "tier_dirs" : ["raw","dsp","hit"],
