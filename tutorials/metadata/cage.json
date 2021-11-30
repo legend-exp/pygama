@@ -1,16 +1,14 @@
 {
   "experiment" : "cage",
 
-  "runDB" : "$CAGE_SW/processing/runDB.json",
-  "fileDB" : "$CAGE_SW/processing/fileDB.h5",
-  "runSelectionDB" : "$CAGE_SW/processing/metadata/run_selection.json",
+  "runDB" : "/global/project/projectdirs/legend/software/CAGE/processing/runDB.json",
+  "fileDB" : "/global/project/projectdirs/legend/software/CAGE/processing/fileDB.h5",
+  "runSelectionDB" : "/global/project/projectdirs/legend/software/CAGE/processing/metadata/run_selection.json",
 
   "daq" : "ORCA",
-  "daq_dir" : "$CAGE_DAQ",
+  "daq_dir" : "/global/cfs/cdirs/m2676/data/cage/Data",
   "daq_ignore" : [".log",".DS_Store", "openFiles"],
-  "lh5_dir" : "$CAGE_LH5",
-  "lh5_user" : "$CAGE_LH5_USER",
-  "lh5_60_kev" : "$CAGE_LH5_USER/60",
+  "lh5_dir" : "/global/cfs/cdirs/m2676/data/cage/LH5",
 
   "nersc_dir":"/global/project/projectdirs/m2676/data/cage",
 
@@ -23,5 +21,5 @@
   "daq_template" : "{YYYY}-{mm}-{dd}-CAGERun{cycle}",
   "lh5_template" : "cage_run{run}_cyc{cycle}_{tier}.lh5",
 
-  "ecal_default" : "$CAGE_SW/processing/metadata/config_ecal.json"
+  "ecal_default" : "/global/project/projectdirs/legend/software/CAGE/processing/metadata/config_ecal.json"
 }
