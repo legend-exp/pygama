@@ -440,8 +440,18 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
     packet_id = 0
     rc = 1
     bytes_processed = 0
+    bytes_per_loop = 0
     file_size = os.path.getsize(daq_file)
     max_numtraces = 0
+
+    unit = "B"
+    n_entries = 0
+    if n_max < np.inf and n_max > 0:
+        n_entries = n_max
+        unit = "id"
+    else:
+        n_entries = file_size
+    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
     while rc and packet_id < n_max:
         rc = fcio.get_record()
 
@@ -451,15 +461,10 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
 
         packet_id += 1
 
-        if verbose and packet_id % 1000 == 0:
-            # FIXME: is cast to float necessary?
-            pct_done = bytes_processed / file_size
-            if n_max < np.inf and n_max > 0: pct_done = packet_id / n_max
-            update_progress(pct_done)
-
         # Status record
         if rc == 4:
-            bytes_processed += status_decoder.decode_packet(fcio, status_tbl, packet_id)
+            bytes_per_loop = status_decoder.decode_packet(fcio, status_tbl, packet_id)
+            bytes_processed += bytes_per_loop
             if status_tbl.is_full():
                 lh5_store.write_object(status_tbl, 'fcio_status', status_filename, n_rows=status_tbl.size)
                 status_tbl.clear()
@@ -483,7 +488,16 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
                     tbl.clear()
 
             # Looks okay: just decode
-            bytes_processed += event_decoder.decode_packet(fcio, event_tables, packet_id)
+            bytes_per_loop = event_decoder.decode_packet(fcio, event_tables, packet_id)
+            bytes_processed += bytes_per_loop
+
+            if verbose:
+              update_len = 0
+              if n_max < np.inf and n_max > 0:
+                  update_len = 1
+              else:
+                  update_len = bytes_per_loop
+              update_progress(progress_bar, update_len)
 
             # i_debug += 1
             # if i_debug == 10:
@@ -510,7 +524,6 @@ def process_flashcam(daq_file, raw_files, n_max, ch_groups_dict=None, verbose=Fa
             print('Not saving file since no data were found:', out_file)
 
     if verbose:
-        update_progress(1)
         print(packet_id, 'packets decoded')
 
     if len(event_decoder.skipped_channels) > 0:

@@ -1,5 +1,7 @@
 # pygama
-Python based package for data processing and analysis
+Python based package for data processing and analysis.
+
+Online documentation (in development) can be found at: <https://legend-exp.github.io/pygama/>
 
 ## installation
 Install on local systems with:
