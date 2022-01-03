@@ -1,7 +1,7 @@
 Installing pygama
 =================
 
-Install on local systems with: ::
+Install on local systems with [#f1]_: ::
 
     > git clone https://github.com/legend-exp/pygama
     > pip install -e pygama
@@ -18,3 +18,5 @@ To uninstall pygama run: ::
 
 To run pygama at NERSC (and set up JupyterHub), we have additional instructions
 `at this link <https://github.com/legend-exp/legend/wiki/Computing-Resources-at-NERSC#configuring-jupyter--nersc>`_.
+
+.. [#f1] Compatible with python 3.7 and python 3.8
