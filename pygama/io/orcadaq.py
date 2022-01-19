@@ -421,7 +421,10 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
-            print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            try:
+                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            except KeyError:
+                print("  {}: Unknown".format(data_id))
         print("hopefully they weren't important!\n")
 
     print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
