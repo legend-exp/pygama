@@ -1,16 +1,8 @@
-from scimath.units.unit import unit
-from scimath.units.api import unit_parser
-from scimath.units.time import *
-from scimath.units.frequency import *
-from scimath.units.convert import convert, convert_str, InvalidConversion
-import sys
+from pint import UnitRegistry, Unit, Quantity, Measurement, set_application_registry
 
-ghz = 1000000000*hz
-ghz.label = 'gHz'
-gigahertz = ghz
+unit_registry = UnitRegistry(auto_reduce_dimensions=True)
+set_application_registry(unit_registry)
 
-mhz = 1000000*hz
-mhz.label = 'MHz'
-megahertz = mhz
-
-unit_parser.parser.extend(sys.modules['pygama.dsp.units'])
+# Define constants useful for LEGEND below
+unit_registry.define('m_76 = 75.921402729 * amu') # 10.1103/PhysRevC.81.032501
+unit_registry.define('Q_bb = 2039.061 * keV') # 10.1103/PhysRevC.81.032501

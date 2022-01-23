@@ -183,7 +183,9 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
 
 def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     """
-    Gives the value of a trapezoid, normalized by the "rise" (integration) time, at a specific time equal to pickoff_time. Use when the rest of the trapezoid output is extraneous.
+    Gives the value of a trapezoid, normalized by the "rise" (integration)
+    time, at a specific time equal to pickoff_time. Use when the rest of
+    the trapezoid output is extraneous.
     
     Parameters:
     ----------
@@ -197,7 +199,7 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     t_pickoff : float
             Time to take sample
     a_out : float
-            Output waveform after trap filter applied
+            Output amplitude after trap filter applied
     
     Processing Chain Example
     ------------------------
@@ -216,12 +218,6 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     if (np.isnan(w_in).any()):
         return
 
-    if (not  0 <= t_pickoff <= len(w_in)) :
-        return
-
-    if (not np.floor(t_pickoff)==t_pickoff):
-        raise DSPFatal('Pickoff time is not an integer')
-
     if (not  0 <= rise):
         raise DSPFatal('Rise must be >= 0')
     
@@ -237,6 +233,9 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     rise_int = int(rise)
     flat_int = int(flat)
     start_time = int(t_pickoff + 1) # the +1 makes slicing prettier
+
+    if not len(w_in) >= start_time >= 2*rise_int + flat_int:
+        return
     
     for i in range(start_time-rise_int, start_time):
         I_1 += w_in[i]
