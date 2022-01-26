@@ -6,7 +6,6 @@ on:
       - master
       - dev
       - 'releases/**'
-    tags: '*'
   pull_request:
   release:
 
@@ -57,13 +56,13 @@ jobs:
         run: |
           .github/workflows/get-dependencies.sh
           pip install .
-          pip install sphinx sphinx-rtd-theme
+          pip install sphinx sphinx-rtd-theme sphinx-multiversion
           cd docs
           make clean
-          make html
-      - if: github.event_name != 'pull_request'
+          make
+      - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
-        uses: JamesIves/github-pages-deploy-action@4.1.0
+        uses: JamesIves/github-pages-deploy-action@v4.2.2
         with:
           branch: gh-pages
           folder: docs/build/html
