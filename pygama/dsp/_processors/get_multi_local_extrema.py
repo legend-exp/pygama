@@ -6,8 +6,8 @@ from pygama.dsp.errors import DSPFatal
 
 @guvectorize(["void(float32[:], float32, float32[:], float32[:], float32[:], float32[:], float32[:], float32[:])",
               "void(float64[:], float64, float64[:], float64[:], float64[:],float64[:], float64[:], float64[:])"],
-             "(n),(),(m) -> (m),(m),(),(),()", nopython=True, cache=True)
-def get_multi_local_extrema(w_in, a_delta_in, t_arbitrary_in, vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out):
+             "(n),(),(m),(m),(),(),()", nopython=True, cache=True)
+def get_multi_local_extrema(w_in, a_delta_in, vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out):
     """
     Get lists of indices of the local maxima and minima of data
     The "local" extrema are those maxima / minima that have heights / depths of
@@ -20,8 +20,6 @@ def get_multi_local_extrema(w_in, a_delta_in, t_arbitrary_in, vt_max_out, vt_min
     a_delta_in : scalar
         The absolute level by which data must vary (in one direction) about an
         extremum in order for it to be tagged
-    t_arbitrary_in : array-like
-        An array of fixed length that tells numba to expect to return a list of amplitudes of the same length
     Returns
     -------
     vt_max_out, vt_min_out : array-like, array-like
@@ -54,14 +52,11 @@ def get_multi_local_extrema(w_in, a_delta_in, t_arbitrary_in, vt_max_out, vt_min
     if (np.isnan(w_in).any() or np.isnan(a_delta_in)):
         return
 
-    if (not len(t_arbitrary_in)<len(w_in)):
+    if (not len(vt_max_out)<len(w_in) or not len(vt_min_out)<len(w_in)):
         raise DSPFatal('The length of your return array must be smaller than the length of your waveform')
     if (not a_delta_in >= 0): 
         raise DSPFatal('a_delta_in must be positive')
-    if (not len(t_arbitrary_in)==len(vt_max_out) or not len(t_arbitrary_in)==len(vt_min_out)):
-        raise DSPFatal('Output arrays must be the same length as the arbitary input array')
-            
-
+        
     # now loop over data
     
     imax, imin = 0, 0
