@@ -13,6 +13,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../..'))
+import git
 
 
 # -- Project information -----------------------------------------------------
@@ -98,11 +99,15 @@ todo_include_todos = True
 
 # -- Options for sphinx-multiversion -----------------------------------------
 
+repo = git.Repo(os.path.dirname(os.path.realpath(__file__)),
+                search_parent_directories=True)
+branch = repo.active_branch.name
+
 # Whitelist pattern for tags (set to None to ignore all tags)
 smv_tag_whitelist = None
 
 # Whitelist pattern for branches (set to None to ignore all branches)
-smv_branch_whitelist = r'^(master|dev|refactor)$'
+smv_branch_whitelist = r'^(' + branch + '|master|dev|refactor)$'
 
 # Whitelist pattern for remotes (set to None to use local branches only)
 smv_remote_whitelist = None
