@@ -98,17 +98,24 @@ todo_include_todos = True
 
 # -- Options for sphinx-multiversion -----------------------------------------
 
+# For now, we include only (certain) branches when building docs.
+# To add a specific release to the list of versions for which docs should be build,
+# one must create a new branch named `releases/...`
+
+# Whitelist pattern for branches
+smv_branch_whitelist = r'^(master|dev|refactor|releases/.*)$'
+
 # Whitelist pattern for tags
 smv_tag_whitelist = '^$'
 
-# Whitelist pattern for branches
-smv_branch_whitelist = r'^(master|dev|refactor|release/.*)$'
+# Pattern for released versions
+smv_released_pattern = '^$'
+
+# The right way to find all docs versions is to look for matching branches on
+# the default remote
 
 # Whitelist pattern for remotes
 smv_remote_whitelist = r'^origin$'
-
-# Pattern for released versions
-smv_released_pattern = '^$'
 
 # Format for versioned output directories inside the build directory
 smv_outputdir_format = '{ref.name}'
