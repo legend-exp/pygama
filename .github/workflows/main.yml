@@ -54,11 +54,13 @@ jobs:
           python-version: 3.8
       - name: Build with Sphinx
         run: |
+          git fetch --no-tags --prune --no-recurse-submodules --depth=1 origin
           .github/workflows/get-dependencies.sh
           pip install .
           pip install sphinx sphinx-rtd-theme sphinx-multiversion
           cd docs
           make clean
+          make info
           make
       - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
