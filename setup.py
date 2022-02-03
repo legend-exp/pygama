@@ -138,7 +138,7 @@ setup(
     install_requires=[
         'numpy',
         'scimath',
-        'numba>=0.55.0',
+        'numba !=0.53, !=0.54',
         'parse',
         'GitPython',
         'tinydb',
