@@ -80,7 +80,7 @@ class ORCAStruck3302(OrcaDecoder):
             int_enabled_mask = card_dict['internalTriggerEnabledMask']
             ext_enabled_mask = card_dict['externalTriggerEnabledMask']
             enabled_mask = int_enabled_mask | ext_enabled_mask
-            for channel in range(8):
+            for channel in range(10):
                 # only care about enabled channels
                 if not ((enabled_mask >> channel) & 0x1): continue
 
@@ -286,6 +286,7 @@ class ORCAGretina4M(OrcaDecoder):
             return list(dec_vals_list)[0][1] # Get first thing we find
         if channel in self.decoded_values: return self.decoded_values[channel]
         print("ORGretina4MModel: Error: No decoded values for channel", channel)
+        print(self.decoded_values.keys())
         return None
 
 
@@ -307,7 +308,7 @@ class ORCAGretina4M(OrcaDecoder):
             mrpsrt = card_dict['Mrpsrt'] # index for channel's presum rate
             dividers = [1, 2, 4, 8 ] # dividers for presummed data
             mrpsdv = card_dict['Mrpsdv'] # index for channel's divider
-            for channel in range(8):
+            for channel in range(10):
                 # only care about enabled channels
                 if not is_enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
