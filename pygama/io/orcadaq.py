@@ -173,7 +173,54 @@ def get_object_info(header_dict, orca_class_name):
                 object_info_list.append(card)
 
     if len(object_info_list) == 0:
-        print('OrcaDecoder::get_object_info(): Warning: no object info')
+        print('OrcaDecoder::get_object_info(): Warning: no object info '
+              'for class name', orca_class_name)
+    return object_info_list
+
+
+def get_readout_info(header_dict, orca_class_name, unique_id=-1):
+    """
+    retunrs a list with all the readout list info from the header with name
+    orca_class_name.  optionally, if unique_id >= 0 only return the list for
+    that Orca unique id number.
+    """
+    object_info_list = []
+    try:
+        readouts = header_dict["ReadoutDescription"]
+        for readout in readouts:
+            try:
+                if readout["name"] == orca_class_name:
+                    if unique_id >= 0:
+                        if obj["uniqueID"] != unique_id: continue
+                    object_info_list.append(readout)
+            except KeyError: continue
+    except KeyError: pass
+    if len(object_info_list) == 0:
+        print('OrcaDecoder::get_readout_info(): warning: no readout info '
+              'for class name', orca_class_name)
+    return object_info_list
+
+
+def get_auxhw_info(header_dict, orca_class_name, unique_id=-1):
+    """
+    returns a list with all the info from the AuxHw table of the header
+    with name orca_class_name.  optionally, if unique_id >= 0 only return
+    the object for that Orca unique id number.
+    """
+    object_info_list = []
+    try:
+        objs = header_dict["ObjectInfo"]["AuxHw"]
+        for obj in objs:
+            try:
+                if obj["Class Name"] == orca_class_name:
+                    if unique_id >= 0:
+                        if obj["uniqueID"] != unique_id: continue
+                    object_info_list.append(obj)
+            except KeyError: continue
+    except KeyError: pass
+    if len(object_info_list) == 0:
+        print('OrcaDecoder::get_auxhw_info(): warning: no object info '
+              'for class name', orca_class_name)
     return object_info_list
 
 
@@ -239,7 +286,7 @@ def get_channel(ccc):
 
 # Import orca_digitizers so that the list of OrcaDecoder.__subclasses__ gets populated
 # Do it here so that orca_digitizers can import the functions above here
-from . import orca_digitizers
+from . import orca_digitizers, orca_flashcam
 
 def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """
@@ -353,7 +400,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         unit = "id"
     else:
         n_entries = file_size
-    progress_bar = tqdm_range(0, n_entries, text="Processing", verbose=verbose, unit=unit)
+    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
     file_position = 0
 
     # start scanning

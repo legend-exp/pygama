@@ -130,15 +130,24 @@ class ParGrid():
     def set_dsp_pars(self, dsp_config, indices):
         for i_dim, i_par in enumerate(indices):
             name, i_arg, value_str, companions = self.get_data(i_dim, i_par)
-            if np.isscalar(i_arg):
-                dsp_config['processors'][name]['args'][i_arg] = value_str
+            if dsp_config['processors'][name].get('init_args') is not None:
+                if np.isscalar(i_arg):
+                    dsp_config['processors'][name]['init_args'][i_arg] = value_str
+                else:
+                    for i in range(len(i_arg)):
+                        dsp_config['processors'][name]['init_args'][i_arg[i]] = value_str[i]
+                if companions is None: continue
+                for ( c_name, c_i_arg, c_value_str ) in companions:
+                    dsp_config['processors'][c_name]['init_args'][c_i_arg] = c_value_str[i_par]
             else:
-                for i in range(len(i_arg)):
-                    dsp_config['processors'][name]['args'][i_arg[i]] = value_str[i]
-            if companions is None: continue
-            for ( c_name, c_i_arg, c_value_str ) in companions:
-                dsp_config['processors'][c_name]['args'][c_i_arg] = c_value_str[i_par]
-
+                if np.isscalar(i_arg):
+                    dsp_config['processors'][name]['args'][i_arg] = value_str
+                else:
+                    for i in range(len(i_arg)):
+                        dsp_config['processors'][name]['args'][i_arg[i]] = value_str[i]
+                if companions is None: continue
+                for ( c_name, c_i_arg, c_value_str ) in companions:
+                    dsp_config['processors'][c_name]['args'][c_i_arg] = c_value_str[i_par]
 
 def run_grid(tb_data, dsp_config, grid, fom_function, dtype=np.float64, db_dict=None, verbosity=0):
     """Extract a table of optimization values for a grid of DSP parameters 

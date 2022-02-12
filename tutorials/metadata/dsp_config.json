@@ -25,7 +25,7 @@
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
+      "args": ["wf_pz", "round(10*us)", "round(5*us)", "wf_trap"],
       "unit": "ADC"
     },
     "wf_triangle": {
@@ -37,7 +37,7 @@
     "wf_atrap": {
       "function": "asym_trap_filter",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "0.05*us", "2*us", "3*us", "wf_atrap"],
+      "args": ["wf_pz", "round(0.05*us)", "round(2*us)", "round(3*us)", "wf_atrap"],
       "unit": "ADC"
     },
     "tp_min, tp_max, wf_min, wf_max":{
