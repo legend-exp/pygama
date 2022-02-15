@@ -4,8 +4,8 @@ from pygama.dsp.errors import DSPFatal
 
 
 
-@guvectorize(["void(float32[:], float32, float32[:], float32[:], float32[:], float32[:], float32[:], float32[:])",
-              "void(float64[:], float64, float64[:], float64[:], float64[:],float64[:], float64[:], float64[:])"],
+@guvectorize(["void(float32[:], float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
+              "void(float64[:], float64, float64[:], float64[:],float64[:], float64[:], float64[:])"],
              "(n),(),(m),(m),(),(),()", nopython=True, cache=True)
 def get_multi_local_extrema(w_in, a_delta_in, vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out):
     """

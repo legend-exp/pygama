@@ -5,7 +5,7 @@ from pygama.dsp._processors.time_point_thresh import time_point_thresh
     
 @guvectorize(["void(float32[:],float32[:],float32[:])",
               "void(float64[:],float64[:],float64[:])"],
-             "(m),(m) -> (m)", nopython=True, cache=True)
+             "(n),(n) -> (n)", nopython=True, cache=True)
 def remove_duplicates(t_in, vt_min_in, t_out):
     """ 
     time_point_thresh has issues with afterpulsing in waveforms that causes  
@@ -53,7 +53,7 @@ def remove_duplicates(t_in, vt_min_in, t_out):
 
 @guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
               "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
-             "(n),(),(m),(m)->(m)", forceobj=True, cache=True)
+             "(n),(),(m),(m),(m)", forceobj=True, cache=True)
 def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
     """
     Gets list of indices of the start of leading edges of multiple peaks within a waveform.
@@ -95,7 +95,7 @@ def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
     intermediate_t_out = np.full_like(t_out, np.nan, dtype=np.float32)
     
     # Go through the list of maxima, calling time_point_thresh (the refactored version ignores the nan padding)
-    time_point_thresh(w_in, a_threshold_in, t_maxs, 0, intermediate_t_out)
+    time_point_thresh(w_in, a_threshold_in, vt_max_in, 0, intermediate_t_out)
 
     # Remove duplicates from the t_out list
-    remove_duplicates(intermediate_t_out, t_mins, t_out)
+    remove_duplicates(intermediate_t_out, vt_min_in, t_out)

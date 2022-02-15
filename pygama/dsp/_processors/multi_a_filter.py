@@ -5,7 +5,7 @@ from pygama.dsp._processors.fixed_time_pickoff import fixed_time_pickoff
 
 @guvectorize(["void(float32[:], float32[:], float32[:])",
               "void(float64[:], float64[:], float64[:])"],
-             "(n),(m)->(m)", forceobj=True, cache=True)
+             "(n),(m),(m)", forceobj=True, cache=True)
 def multi_a_filter(w_in, vt_maxs_in, va_max_out): 
     """
     Finds the maximums in a waveform and returns the amplitude of the wave at those points
