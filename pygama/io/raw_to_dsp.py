@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-
+#!/usr/bin/env python3
 import os
 import sys
 import json
@@ -21,19 +20,12 @@ from pygama.dsp.errors import DSPFatal
 
 def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200,
-               block_width=16, verbose=1):
+               block_width=16, verbose=1, chan_config=None):
     """
     Uses the ProcessingChain class.
     The list of processors is specifed via a JSON file.
     """
     t_start = time.time()
-
-    if isinstance(dsp_config, str):
-        with open(dsp_config, 'r') as config_file:
-            dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
-
-    if not isinstance(dsp_config, dict):
-        raise Exception('Error, dsp_config must be an dict')
 
     raw_store = lh5.Store()
     lh5_file = raw_store.gimme_file(f_raw, 'r')
@@ -63,6 +55,11 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         print("Empty lh5_tables, exiting...")
         sys.exit(1)
 
+    # load DSP config (default: one config file for all tables)
+    if isinstance(dsp_config, str):
+        with open(dsp_config, 'r') as config_file:
+            dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
+
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
@@ -80,10 +77,33 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 print('Overwriting existing file:', f_dsp)
             os.remove(f_dsp)
 
+    # write processing metadata
+    dsp_info = lh5.Struct()
+    dsp_info.add_field('timestamp', lh5.Scalar(np.uint64(time.time())))
+    dsp_info.add_field('python_version', lh5.Scalar(sys.version))
+    dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
+    dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
+    dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
+    dsp_info.add_field('pygama_version', lh5.Scalar(pygama_version))
+    dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
+    dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
+    dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
+
+    # loop over tables to run DSP on
     for tb in lh5_tables:
         # load primary table and build processing chain and output table
         tot_n_rows = raw_store.read_n_rows(tb, f_raw)
         if n_max and n_max<tot_n_rows: tot_n_rows=n_max
+
+        # if we have separate DSP files for each table, read them in here
+        if chan_config is not None:
+            f_config = chan_config[tb]
+            with open(f_config, 'r') as config_file:
+                dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
+            print('Processing table:', tb, 'with DSP config file:\n  ', f_config)
+
+        if not isinstance(dsp_config, dict):
+            raise Exception('Error, dsp_config must be an dict')
 
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
@@ -104,20 +124,15 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
             raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
 
-        print(f'Done.  Writing to file {f_dsp}')
+        if chan_config is not None:
+            info_dsp = f'dsp_config/{tb}'
+        else:
+            info_dsp = 'dsp_config'
+        dsp_info.add_field(info_dsp, lh5.Scalar(json.dumps(dsp_config, indent=2)))
 
-    # write processing metadata
-    dsp_info = lh5.Struct()
-    dsp_info.add_field('timestamp', lh5.Scalar(np.uint64(time.time())))
-    dsp_info.add_field('python_version', lh5.Scalar(sys.version))
-    dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
-    dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
-    dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama_version))
-    dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
-    dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
-    dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
-    dsp_info.add_field('dsp_config', lh5.Scalar(json.dumps(dsp_config, indent=2)))
+        print(f'Done.  Writing to file: {f_dsp}')
+
+    # write metadata to file
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
 
     t_elap = (time.time() - t_start) / 60

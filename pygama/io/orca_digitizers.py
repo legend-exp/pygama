@@ -2,6 +2,7 @@ import sys
 import numpy as np
 
 from .orcadaq import OrcaDecoder, get_ccc
+from pygama.lh5 import Table
 
 class ORCAStruck3302(OrcaDecoder):
     """
@@ -307,7 +308,7 @@ class ORCAGretina4M(OrcaDecoder):
             mrpsrt = card_dict['Mrpsrt'] # index for channel's presum rate
             dividers = [1, 2, 4, 8 ] # dividers for presummed data
             mrpsdv = card_dict['Mrpsdv'] # index for channel's divider
-            for channel in range(8):
+            for channel in range(10):
                 # only care about enabled channels
                 if not is_enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
@@ -355,7 +356,7 @@ class ORCAGretina4M(OrcaDecoder):
 
         # aliases for brevity
         tb = lh5_tables
-        if isinstance(tb, dict):
+        if not isinstance(tb, Table):
             if ccc not in lh5_tables:
                 if ccc not in self.skipped_channels:
                     self.skipped_channels[ccc] = 0
