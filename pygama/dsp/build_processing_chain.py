@@ -185,45 +185,64 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         func = getattr(module, recipe['function'])
         args = recipe['args']
         for i, arg in enumerate(args):
-            if isinstance(arg, str) and arg[0:3]=='db.':
-                lookup_path = arg[3:].split('.')
-                try:
-                    node = db_dict
-                    for key in lookup_path:
-                        node = node[key]
-                    args[i] = node
-                    if(verbosity>0):
-                        print("Database lookup: found", node, "for", arg)
-                except (KeyError, TypeError):
+            if isinstance(arg, str) and 'db.' in arg:
+                res = [i.start() for i in re.finditer('db.', arg)]
+                for rs in res:
+                    first = args[i].find('db.')
+                    out = re.findall("[\dA-Za-z_.]*", args[i][first+3:])[0]
+                    lookup_path = out.split(".")
+                    database_str = f"db.{out}"
                     try:
-                        args[i] = recipe['defaults'][arg]
+                        node = db_dict
+                        for key in lookup_path:
+                            node = node[key]
+                        if not isinstance(node, str):
+                            node =str(node)
+                        args[i] = args[i].replace(database_str, node)
                         if(verbosity>0):
-                            print("Database lookup: using default value of", args[i], "for", arg)
-                    except (KeyError, TypeError):
-                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
-            
+                            print("Database lookup: found", node, "for", database_str)
+                    except:
+                        try:
+                            default_val = recipe['defaults'][database_str]
+                            if not isinstance(default_val, str):
+                                default_val =str(default_val)
+                            args[i] = args[i].replace(database_str, default_val)
+                            if(verbosity>0):
+                                print("Database lookup: using default value of", default_val, "for", database_str)
+                        except:
+                            raise Exception('Did not find', database_str, 'in database, and could not find default value.')            
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
         # if init_args are defined, parse any strings and then call func
         # as a factory/constructor function
         try:
             init_args = recipe['init_args']
             for i, arg in enumerate(init_args):
-                if isinstance(arg, str) and arg[0:3]=='db.':
-                    lookup_path = arg[3:].split('.')
-                    try:
-                        node = db_dict
-                        for key in lookup_path:
-                            node = node[key]
-                        init_args[i] = node
-                        if(verbosity>0):
-                            print("Database lookup: found", node, "for", arg)
-                    except (KeyError, TypeError):
+                if isinstance(arg, str) and 'db.' in arg:
+                    res = [i.start() for i in re.finditer('db.', arg)]
+                    for rs in res:
+                        first = init_args[i].find('db.')
+                        out = re.findall("[\dA-Za-z_.]*", init_args[i][first+3:])[0]
+                        lookup_path = out.split(".")
+                        database_str = f"db.{out}"
                         try:
-                            init_args[i] = recipe['defaults'][arg]
+                            node = db_dict
+                            for key in lookup_path:
+                                node = node[key]
+                            if not isinstance(node, str):
+                                node =str(node)
+                            init_args[i] = init_args[i].replace(database_str, node)
                             if(verbosity>0):
-                                print("Database lookup: using default value of", init_args[i], "for", arg)
-                        except (KeyError, TypeError):
-                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
+                                print("Database lookup: found", node, "for", database_str)
+                        except:
+                            try:
+                                default_val = recipe['defaults'][database_str]
+                                if not isinstance(default_val, str):
+                                    default_val =str(default_val)
+                                init_args[i] = init_args[i].replace(database_str, default_val)
+                                if(verbosity>0):
+                                    print("Database lookup: using default value of", default_val, "for", database_str)
+                            except:
+                                raise Exception('Did not find', database_str, 'in database, and could not find default value.') 
                     arg = init_args[i]
 
                 # see if string can be parsed by proc_chain
