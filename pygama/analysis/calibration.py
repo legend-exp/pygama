@@ -192,7 +192,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
     func : function
         The function to be fit to the peak in the (windowed) hist
     """
-    if func == pgf.gauss_step_pdf or func == pgf.gauss_step_cdf:
+    if  func == pgf.gauss_step_cdf:
         # get mu and hieght from a gauss fit, also sigma as fallback
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
@@ -230,7 +230,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         hstep = step /(bg + np.mean(hist[:10]))
         return [n_sig, mu, sigma/2,n_bkg, hstep]
 
-    if func == pgf.radford_pdf or func == pgf.radford_cdf:
+    if  func == pgf.radford_cdf:
 
         #guess mu, height
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
@@ -290,7 +290,7 @@ def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
         print(f'non-zero pars_guess must be passed to get_hpge_E_peak_bounds')
         return None
 
-    if func == pgf.gauss_step_pdf or func == pgf.gauss_step_cdf:
+    if  func == pgf.gauss_step_cdf:
         # pars are: n_sig, mu, sigma, n_bkg, hstep
         n_sig, mu, sigma, n_bkg, hstep = pars_guess
 
@@ -302,7 +302,7 @@ def get_hpge_E_peak_bounds(hist, bins, var, func, pars_guess):
 
         return [n_sigLims, muLims, sigmaLims, n_bkgLims, hstepLims]
 
-    if func == pgf.radford_pdf or func == pgf.radford_cdf:
+    if  func == pgf.radford_cdf:
         #pars are n_sig, mu, sigma, htail, tau, n_bkg, hstep
         n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars_guess
 
@@ -377,7 +377,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         bounds = get_hpge_E_peak_bounds(hist, bins, var, func_i, par_guesses)
 
         try:
-            pars_i,errs_i, cov_i = pgf.fit_binned(pgf.radford_cdf, hist,  bins, var=var, 
+            pars_i,errs_i, cov_i = pgf.fit_binned(func_i, hist,  bins, var=var, 
                                     guess=par_guesses, cost_func='LL', Extended=True, simplex=simplex, bounds = bounds)
             n_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
             if sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or np.isnan(sum([sum(c) if c is not None else 0 for c in cov_i])) :
