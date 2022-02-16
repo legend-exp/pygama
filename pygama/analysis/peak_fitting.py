@@ -588,9 +588,9 @@ def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False
     """
 
     if components ==False:
-        return n_sig+n_bkg , gauss_step_pdf(x,  n_sig, n_bkg, mu, sigma, hstep)
+        return n_sig+n_bkg , gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep)
     else:
-        sig, bkg = gauss_step_pdf(x,  n_sig, n_bkg, mu, sigma, hstep, components=True)
+        sig, bkg = gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=True)
         return n_sig+n_bkg, sig, bkg
 
 def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep):
@@ -659,7 +659,7 @@ def gauss_tail_norm(x,mu,sigma,tau):
     """
 
     tail = gauss_tail(x,mu,sigma,tau)
-    integral = gauss_tail_integral(np.array([norm_range[0], norm_range[1]]), mu, sigma, tau)
+    integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
     norm = integral[1]-integral[0]
     return tail/norm
 
@@ -734,9 +734,9 @@ def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, componen
     """
 
     if components ==False:
-        return n_sig + n_bkg, radford_pdf(x, n_sig, n_bkg, mu, sigma, hstep, htail, tau)
+        return n_sig + n_bkg, radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep)
     else:
-        peak, tail, bkg = radford_pdf(x, n_sig, n_bkg, mu, sigma, hstep, htail, tau,components=components)
+        peak, tail, bkg = radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,components=components)
         return n_sig + n_bkg, peak, tail, bkg
 
 def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep):
@@ -762,7 +762,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     """
     # optimize this to find max value
     def neg_radford_peak_bgfree(E, sigma, htail, tau):
-        return -gauss_with_tail_pdf(np.array([E,-5*sigma, 5*sigma]), 0, sigma, htail, tau)[0]
+        return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
     
     res = minimize_scalar( neg_radford_peak_bgfree,
                            args=(sigma, htail, tau),
@@ -772,7 +772,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
 
     # root find this to find the half-max energies
     def radford_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
-        return gauss_with_tail_pdf(np.array([E,-5*sigma, 5*sigma]), 0, sigma, htail, tau)[0] - half_max
+        return gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0] - half_max
     
     try:
         lower_hm = brentq( radford_peak_bgfree_halfmax,
