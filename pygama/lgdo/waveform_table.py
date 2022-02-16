@@ -24,7 +24,7 @@ class WaveformTable(Table):
     compression routine is used.
     """
 
-    def __init__(self, size=None, t0=0, t0_units=None, dt=1, dt_units=None, 
+    def __init__(self, size=None, t0=0, t0_units=None, dt=1, dt_units=None,
                  values=None, values_units=None, wf_len=None, dtype=None, attrs={}):
         """
         Parameters
@@ -77,7 +77,7 @@ class WaveformTable(Table):
             if nda.shape != shape: nda.resize(shape)
             t0 = Array(nda=nda)
         if t0_units is not None: t0.attrs['units'] = f'{t0_units}'
-            
+
         if not isinstance(dt, Array):
             shape = (size,)
             dt_dtype = dt.dtype if hasattr(dt, 'dtype') else np.float32
@@ -106,3 +106,37 @@ class WaveformTable(Table):
         col_dict['dt'] = dt
         col_dict['values'] = values
         super().__init__(size=size, col_dict=col_dict, attrs=attrs)
+
+    @property
+    def values(self):
+        return self['values']
+    @property
+    def values_units(self):
+        return self.values.attrs.get('units', None)
+    @values_units.setter
+    def values_units(self, units):
+        self.values.attrs['units'] = f'{units}'
+    @property
+    def wf_len(self):
+        return self.values.nda.shape[1]
+    
+    @property
+    def t0(self):
+        return self['t0']
+    @property
+    def t0_units(self):
+        return self.t0.attrs.get('units', None)
+    @t0_units.setter
+    def t0_units(self, units):
+        self.t0.attrs['units'] = f'{units}'
+
+    @property
+    def dt(self):
+        return self['dt']
+
+    @property
+    def dt_units(self):
+        return self.dt.attrs.get('units', None)
+    @dt_units.setter
+    def dt_units(self, units):
+        self.dt.attrs['units'] = f'{units}'
