@@ -400,10 +400,18 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         return 0, 0
 
 
-def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, **kwargs):
+def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, fill=False, fillcolor='r', fillalpha=0.2, **kwargs):
     """
     plot a step histogram, with optional error bars
     """
+    if fill: 
+        # the concat calls get the steps to draw correctly at the range boundaries
+        # where="post" tells plt to draw the step y[i] between x[i] and x[i+1]
+        save_color = None
+        if 'color' in kwargs: save_color = kwargs.pop('color')
+        elif 'c' in kwargs: save_color = kwargs.pop('c')
+        plt.fill_between(np.concatenate(([bins[0]], bins)), np.concatenate(([0], hist, [0])), step="post", color=fillcolor, alpha=fillalpha, **kwargs)
+        if save_color is not None: kwargs['color'] = save_color
     if var is None:
         # the concat calls get the steps to draw correctly at the range boundaries
         # where="post" tells plt to draw the step y[i] between x[i] and x[i+1]
