@@ -11,8 +11,7 @@
       "module": "numpy",
       "args": ["waveform", 1, "max_index"],
       "kwargs": {"signature":"(n),()->()", "types":["fi->i"]},
-      "unit": "ADC",
-      "prereqs":["waveform"]
+      "unit": "ADC"
     },
 
 
@@ -20,7 +19,6 @@
       "function": "linear_slope_fit",
       "module": "pygama.dsp.processors",
       "args" : ["waveform[:1650]", "bl","bl_sig", "slope","intercept"],
-      "prereqs": ["waveform"],
       "unit": ["ADC","ADC","ADC","ADC"]
     },
 
@@ -28,7 +26,6 @@
        "function": "subtract",
        "module": "numpy",
        "args": ["waveform", "bl", "wf_blsub"],
-       "prereqs": ["waveform", "bl"],
        "unit": "ADC"
     },
 
@@ -37,7 +34,6 @@
           "function": "log_check",
           "module": "pygama.dsp.processors",
           "args": ["wf_blsub[2100:]", "wf_logged"],
-          "prereqs": ["wf_blsub"],
           "unit": "ADC"
        },
 
@@ -45,7 +41,6 @@
          "function": "linear_slope_fit",
          "module": "pygama.dsp.processors",
          "args" : ["wf_logged", "tail_mean","tail_std", "tail_slope","tail_intercept"],
-         "prereqs": ["wf_logged"],
          "unit": ["ADC","ADC","ADC","ADC"]
       },
 
@@ -53,7 +48,6 @@
         "function": "pole_zero",
         "module": "pygama.dsp.processors",
         "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
-        "prereqs": ["wf_blsub"],
         "unit": "ADC",
         "defaults": { "db.pz.tau":"44.56*us" }
       },
@@ -62,14 +56,12 @@
         "function": "linear_slope_fit",
         "module": "pygama.dsp.processors",
         "args" : ["wf_pz[2100:]", "pz_mean","pz_std", "pz_slope","pz_intercept"],
-        "prereqs": ["wf_pz"],
         "unit": ["ADC","ADC","ADC","ADC"]
       },
       "wf_trap": {
         "function": "trap_norm",
         "module": "pygama.dsp.processors",
         "args": ["wf_pz", "8*us", "2*us", "wf_trap"],
-        "prereqs": ["wf_pz"],
         "unit": "ADC"
       },
       "trapEmax": {
@@ -77,8 +69,7 @@
         "module": "numpy",
         "args": ["wf_trap", 1, "trapEmax"],
         "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
-        "unit": "ADC",
-        "prereqs": ["wf_trap"]
+        "unit": "ADC"
     }
 
 
