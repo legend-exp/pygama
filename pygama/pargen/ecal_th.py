@@ -117,12 +117,12 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
             new_labels = get_peak_labels(locs, pars)
             plt.xticks(ticks = locs[1:-1], labels = new_labels)
 
-            csqr = chisquare(counts, fit_vals, 7)[0]/7
+            csqr = pgf.goodness_of_fit(counts, bins, None, pgf.radford_pdf, pk_pars[i] , method='Pearson')
     
             plt.plot([bin_cs[10]],[0],label=get_peak_label(fitted_peaks[i]), linestyle='None' )
             plt.plot([bin_cs[10]],[0],label = f'{fitted_peaks[i]:.1f} keV', linestyle='None')
             plt.plot([bin_cs[10]],[0],label = f'FWHM:{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV', linestyle='None')
-            plt.plot([bin_cs[10]],[0],label = f'chi^2 : {csqr:.0f}', linestyle='None')
+            plt.plot([bin_cs[10]],[0],label = f'chi^2/n : {csqr[0]/csqr[1]:.0f}', linestyle='None')
     
             plt.xlabel('Energy (keV)')
             plt.ylabel('Counts')
