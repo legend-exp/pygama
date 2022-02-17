@@ -209,24 +209,33 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     if method == 'Neyman' and np.any(hist==0):
         print("goodness_of_fit: hist cannot contain zeros for Neyman method")
         return 0, 0
-
-    # compute chi2 numerator and denominator
+    
+    
+    # compute expected values
     yy = func(pgh.get_bin_centers(bins), *pars)
-    numerator = (hist - yy)**2
-    if method == 'var':
-        denominator = var
-    elif method == 'Pearson':
-        denominator = yy
-    elif method == 'Neyman':
-        denominator = hist
+    
+    if method == 'LR':
+        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log(hist/yy), yy-hist))
+        dof = len(hist) - len(pars)
+        return log_lr, dof   
+        
     else:
-        print(f"goodness_of_fit: unknown method {method}")
-        return 0, 0
+        # compute chi2 numerator and denominator
+        numerator = (hist - yy)**2
+        if method == 'var':
+            denominator = var
+        elif method == 'Pearson':
+            denominator = yy
+        elif method == 'Neyman':
+            denominator = hist
+        else:
+            print(f"goodness_of_fit: unknown method {method}")
+            return 0, 0
 
-    # compute chi2 and dof 
-    chisq = np.sum(numerator/denominator)
-    dof = len(hist) - len(pars)
-    return chisq, dof
+        # compute chi2 and dof 
+        chisq = np.sum(numerator/denominator)
+        dof = len(hist) - len(pars)
+        return chisq, dof
 
 def get_bin_estimates(pars, func, hist, bins, integral=None, **kwargs):
     """
