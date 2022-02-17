@@ -302,6 +302,7 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
     for i in range(len(grid)):
         grid_values.append(np.ndarray(shape = shapes[i], dtype='O'))
     grid_list = get_grid_points(grid)
+    pool = mp.Pool(processes=processes)
     results = [pool.apply_async(run_grid_point, args=(tb_data,dsp_config, grid, fom_function, np.asarray(gl),
                     db_dict, verbosity, fom_kwargs)) for gl in grid_list]
 
