@@ -9,4 +9,4 @@ else
     sudo ln -s /usr/bin/llvm-config-8 /usr/bin/llvm-config
 fi
 
-python -m pip install --upgrade pip wheel setuptools numpy GitPython
+python -m pip install --upgrade pip wheel setuptools numpy GitPython pytest
