@@ -212,10 +212,10 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     
     
     # compute expected values
-    yy = func(pgh.get_bin_centers(bins), *pars)
+    yy = func(pgh.get_bin_centers(bins), *pars) * pgh.get_bin_widths(bins)
     
     if method == 'LR':
-        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log(hist/yy), yy-hist))
+        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (mu+1.e-99)), yy-hist))
         dof = len(hist) - len(pars)
         return log_lr, dof   
         
@@ -504,7 +504,7 @@ def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
         return n_sig * gauss_norm(x,mu,sigma), 1/(np.nanmax(x)-np.nanmin(x)) * n_bkg
 
 
-def gauss_lin(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
+def gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
     
     """
     gaussian signal + linear background function
@@ -543,7 +543,7 @@ def unnorm_step_pdf(x,  mu, sigma, hstep):
     return step_f
 
 @nb.njit(**kwd)
-def step(x,  mu, sigma, hstep):
+def step(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
 
     """
     Normalised step function w/args mu, sigma, hstep
@@ -551,25 +551,32 @@ def step(x,  mu, sigma, hstep):
     """
 
     step_f = unnorm_step_pdf(x,  mu, sigma, hstep)
-    integral = step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
+    if lower_range ==np.inf and upper_range ==np.inf:
+        integral = step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
+    else:
+        integral = step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
+    
     norm = integral[1]-integral[0]
     return step_f/norm
 
 @nb.njit(**kwd)
-def step_cdf(x,mu,sigma, hstep):
+def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
 
     """
     CDF for step function w/args mu, sigma, hstep
     """
 
     cdf = step_int(x,mu,sigma,hstep)
-    integral = step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
+    if lower_range ==np.inf and upper_range ==np.inf:
+        integral = step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
+    else:
+        integral = step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
     norm = integral[1]-integral[0]
     cdf =  (1/norm) * cdf
     c = 1-cdf[-1]
     return cdf+c
 
-def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False):
+def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
 
     """
     Pdf for Gaussian on step background 
@@ -577,7 +584,7 @@ def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False):
     """
 
     try:
-        bkg= step(x, mu, sigma, hstep)
+        bkg= step(x, mu, sigma, hstep, lower_range, upper_range)
     except ZeroDivisionError:
         bkg = np.zeros_like(x, dtype=np.float64)
     if np.any(bkg<0):
@@ -589,7 +596,7 @@ def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False):
     else:
         return n_sig*gauss_norm(x,mu,sigma), n_bkg*bkg
 
-def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False):
+def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
 
     """
     Pdf for Gaussian on step background for Compton spectrum, returns also the total number of events for extended unbinned fits
@@ -597,29 +604,32 @@ def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=False
     """
 
     if components ==False:
-        return n_sig+n_bkg , gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep)
+        return n_sig+n_bkg , gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range)
     else:
-        sig, bkg = gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, components=True)
+        sig, bkg = gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep,lower_range, upper_range, components=True)
         return n_sig+n_bkg, sig, bkg
 
-def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep):
+def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
     
     """
     Cdf for Gaussian on step background 
     args: n_sig mu, sigma for the signal and n_bkg,hstep for the backgorund
     """
     try:
-        bkg = step_cdf(x, mu, sigma, hstep)
+        bkg = step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
     except ZeroDivisionError:
         bkg = np.zeros_like(x, dtype=np.float64)
     if np.any(bkg<0):
         bkg= np.zeros_like(x, dtype=np.float64)
-    cdf = (1/(n_sig+n_bkg))*(n_sig*gauss_cdf(x, mu, sigma) +\
+    if components ==False:
+        cdf = (1/(n_sig+n_bkg))*(n_sig*gauss_cdf(x, mu, sigma) +\
           n_bkg*bkg)
-    return cdf
+        return cdf
+    else:
+        return (1/(n_sig+n_bkg))*n_sig*gauss_cdf(x, mu, sigma), (1/(n_sig+n_bkg))*(n_bkg*bkg)
 
 @nb.njit(**kwd)
-def gauss_tail_pdf(x, mu, sigma, tau):
+def gauss_tail(x, mu, sigma, tau):
     
     """
     A gaussian tail function template
@@ -634,7 +644,7 @@ def gauss_tail_pdf(x, mu, sigma, tau):
     return tail_f
 
 @nb.njit(**kwd)
-def gauss_tail_exact_pdf(x, mu, sigma, tau):
+def gauss_tail_exact(x, mu, sigma, tau):
     tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
     abstau = np.absolute(tau)
     tmp = np.where(tmp < limit, tmp, limit)
@@ -643,7 +653,7 @@ def gauss_tail_exact_pdf(x, mu, sigma, tau):
     return tail_f
 
 @nb.njit(**kwd)
-def gauss_tail_approx_pdf(x, mu, sigma, tau):
+def gauss_tail_approx(x, mu, sigma, tau):
     den = 1/(sigma + tau*(x-mu)/sigma)
     tail_f = sigma * gauss_norm(x, mu, sigma) * den * (1.-tau*tau*den*den)
     return tail_f
@@ -657,30 +667,36 @@ def gauss_tail_integral(x,mu,sigma,tau):
 
     abstau = np.abs(tau)
     part1 = (tau/(2*abstau)) * nb_erf((tau*(x-mu) )/(np.sqrt(2)*sigma*abstau))
-    part2 =    tau * gauss_tail_pdf(x,mu,sigma,tau)
+    part2 =    tau * gauss_tail(x,mu,sigma,tau)
     return part1+part2
 
 @nb.njit(**kwd)
-def gauss_tail_norm(x,mu,sigma,tau):
+def gauss_tail_norm(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
 
     """
     Normalised gauss tail. Note: this is only needed when the fitting range does not include the whole tail
     """
 
     tail = gauss_tail(x,mu,sigma,tau)
-    integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
+    if lower_range ==np.inf and upper_range ==np.inf:
+        integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
+    else:
+        integral = gauss_tail_integral(np.array([lower_range, upper_range]), mu, sigma, tau)
     norm = integral[1]-integral[0]
     return tail/norm
 
 @nb.njit(**kwd)
-def gauss_tail_cdf(x,mu,sigma,tau):
+def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
 
     """
     CDF for gaussian tail 
     """
 
     cdf = gauss_tail_integral(x,mu,sigma,tau)
-    integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
+    if lower_range ==np.inf and upper_range ==np.inf:
+        integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
+    else:
+        integral = gauss_tail_integral(np.array([lower_range, upper_range]), mu, sigma, tau)
     norm = integral[1]-integral[0]
     cdf =  (1/norm) * cdf
     c = 1-cdf[-1]
@@ -694,7 +710,7 @@ def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
 
     peak = gauss_norm(x,mu,sigma)
     try: 
-        tail = gauss_tail_pdf(x, mu, sigma, tau)
+        tail = gauss_tail(x, mu, sigma, tau)
     except ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
     if components ==False:
@@ -702,7 +718,7 @@ def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
     else: 
         return (1-htail)*peak, htail*tail
 
-def gauss_with_tail_cdf(x, mu, sigma, htail,  tau):
+def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
 
     """
     Cdf for gaussian with tail 
@@ -713,16 +729,20 @@ def gauss_with_tail_cdf(x, mu, sigma, htail,  tau):
         tail = gauss_tail_cdf(x, mu, sigma, tau)
     except  ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
-    return (1-htail)*peak + htail*tail
+    if components==False:
+        return (1-htail)*peak + htail*tail
+    else:
+        return (1-htail)*peak, htail*tail
 
-def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,  components=False):
+def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, 
+                lower_range=np.inf , upper_range=np.inf,  components=False):
 
     """
     David Radford's HPGe peak shape PDF consists of a gaussian with tail signal on a step background 
     """
 
     try:
-        bkg= step(x, mu, sigma, hstep)
+        bkg= step(x, mu, sigma, hstep, lower_range, upper_range)
     except ZeroDivisionError:
         bkg = np.zeros_like(x, dtype=np.float64)
     if np.any(bkg<0):
@@ -736,33 +756,39 @@ def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,  components=False
         peak, tail = gauss_with_tail_pdf(x, mu, sigma, htail,  tau, components=components)
         return n_sig *peak, n_sig*tail, n_bkg * bkg 
 
-def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, components=False):
+def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, 
+                         lower_range=np.inf , upper_range=np.inf, components=False):
 
     """
     Pdf for gaussian with tail signal and step background, also returns number of events
     """
 
     if components ==False:
-        return n_sig + n_bkg, radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep)
+        return n_sig + n_bkg, radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
     else:
-        peak, tail, bkg = radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,components=components)
+        peak, tail, bkg = radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, 
+                                      lower_range, upper_range,components=components)
         return n_sig + n_bkg, peak, tail, bkg
 
-def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep):
+def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
 
     """
     Cdf for gaussian with tail signal and step background 
     """
     try:
-        bkg = step_cdf(x, mu, sigma, hstep)
+        bkg = step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
     except ZeroDivisionError:
         bkg = np.zeros_like(x, dtype=np.float64)
     if np.any(bkg<0):
         bkg= np.zeros_like(x, dtype=np.float64)
-    sig = gauss_with_tail_cdf(x, mu, sigma, htail,  tau)
-    pdf = (1/(n_sig+n_bkg))*(n_sig*gauss_with_tail_cdf(x, mu, sigma, htail,tau) +\
-          n_bkg*bkg)
-    return pdf
+    if components ==False:
+        sig = gauss_with_tail_cdf(x, mu, sigma, htail)
+        pdf = (1/(n_sig+n_bkg))*(n_sig*gauss_with_tail_cdf(x, mu, sigma, htail,tau) +\
+            n_bkg*bkg)
+        return pdf
+    else:
+        peak, tail = gauss_with_tail_cdf(x, mu, sigma, htail, components= True)
+        return (n_sig/(n_sig+n_bkg))*peak, (n_sig/(n_sig+n_bkg))*tail, (n_bkg/(n_sig+n_bkg))*bkg
 
 def radford_fwhm(sigma, htail, tau,  cov = None):
     """
@@ -827,7 +853,7 @@ def radford_peakshape_derivative(E, pars, step_norm):
     gaus = gauss_norm(E, mu, sigma)
     y = (E-mu)/sigma
     ret = -(1-htail)*(y/sigma)*gaus
-    ret -= htail/tau*(-gauss_tail_pdf(np.array([E,E-1]), mu, sigma, tau)[0]+gaus)
+    ret -= htail/tau*(-gauss_tail(np.array([E,E-1]), mu, sigma, tau)[0]+gaus)
 
     return n_sig*ret - n_bkg*hstep*gaus/step_norm #need norm factor for bkg
 
@@ -835,7 +861,7 @@ def radford_parameter_gradient(E, pars, step_norm):
     n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars 
 
     gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0] 
-    tailL = gauss_tail_pdf(np.array([E, E-1]), mu, sigma, tau)[0] 
+    tailL = gauss_tail(np.array([E, E-1]), mu, sigma, tau)[0] 
     if n_bkg ==0:
         step_f = 0
     else:
@@ -869,8 +895,11 @@ def radford_parameter_gradient(E, pars, step_norm):
 
 def get_mu_func(func, pars, cov = None, errors=None):
 
-    if func == gauss_step_pdf:
-        n_sig, mu, sigma, n_bkg, hstep = pars
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+        if len(pars) ==5:
+            n_sig, mu, sigma, n_bkg, hstep = pars
+        elif len(pars) ==7:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
         if errors is not None:
             return mu, errors[1]
         elif cov is not None:
@@ -878,8 +907,11 @@ def get_mu_func(func, pars, cov = None, errors=None):
         else:
             return mu
 
-    elif func == radford_pdf or func == radford_cdf:
-        n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+        if len(pars) ==7:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+        elif len(pars) ==9:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
         if errors is not None:
             return mu, errors[1]
         elif cov is not None:
@@ -893,15 +925,21 @@ def get_mu_func(func, pars, cov = None, errors=None):
 
 def get_fwhm_func(func, pars, cov = None):
 
-    if func == gauss_step_pdf or func == gauss_step_cdf:
-        n_sig, mu, sigma, n_bkg, hstep = pars
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+        if len(pars) ==5:
+            n_sig, mu, sigma, n_bkg, hstep = pars
+        elif len(pars) ==7:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
         if cov is None:
             return sigma*2*np.sqrt(2*np.log(2))
         else:
             return sigma*2*np.sqrt(2*np.log(2)), np.sqrt(cov[2][2])*2*np.sqrt(2*np.log(2))
 
-    elif func == radford_pdf or func == radford_cdf:
-        n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+        if len(pars) ==7:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+        elif len(pars) ==9:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
 
         return radford_fwhm(sigma, htail, tau, cov)
     else:
@@ -910,8 +948,11 @@ def get_fwhm_func(func, pars, cov = None):
 
 def get_total_events_func(func, pars, cov = None, errors=None):
 
-    if func == gauss_step_pdf or func == gauss_step_cdf:
-        n_sig, mu, sigma, n_bkg, hstep = pars
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+        if len(pars) ==5:
+            n_sig, mu, sigma, n_bkg, hstep = pars
+        elif len(pars) ==7:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
         if errors is not None:
             return n_sig+n_bkg, np.sqrt(errors[0]**2 + errors[3]**2)
         elif cov is not None:
@@ -919,8 +960,11 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
 
-    elif func == radford_pdf or func == radford_cdf:
-        n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+        if len(pars) ==7:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+        elif len(pars) ==9:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
         if errors is not None:
             return n_sig+n_bkg, np.sqrt(errors[0]**2 + errors[5]**2)
         elif cov is not None:
@@ -928,11 +972,11 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
     else:
-        print(f'get_fwhm_func not implemented for {func.__name__}')
+        print(f'get_total_events_func not implemented for {func.__name__}')
         return None
 
-@nb.njit(**kwd)
-def Am_double(x,  n_sig1, n_bkg1, mu1, sigma1, hstep1, n_sig2,n_bkg2, mu2,sigma2,hstep2, n_sig3, mu3,sigma3):
+def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, n_bkg1, hstep1, n_bkg2, hstep2,
+             lower_range=np.inf , upper_range=np.inf, components=False):
     """
     A Fit function exclusevly for a 241Am 99keV and 103keV lines situation
     Consists of
@@ -940,27 +984,68 @@ def Am_double(x,  n_sig1, n_bkg1, mu1, sigma1, hstep1, n_sig2,n_bkg2, mu2,sigma2
      - two steps (for the two lines)
      - two tails (for the two lines)
     """
-    bkg = n_bkg1*step_pdf(x, mu1, sigma1, hstep1) + n_bkg2*step_pdf(x, mu2, sigma2, hstep2)
-    if np.any(bkg<0):
+    bkg1 = n_bkg1*step_pdf(x, mu1, sigma1, hstep1, lower_range, upper_range ) 
+    bkg2 = n_bkg2*step_pdf(x, mu2, sigma2, hstep2, lower_range, upper_range)
+    if np.any(bkg1<0) or np.any(bkg2<0):
         return 0, np.zeros_like(x)
-    sig = n_sig1*gauss_norm(x,mu1,sigma1)+ n_sig2* gauss_norm(x,mu2,sigma2)+n_sig3* gauss_norm(x,mu3,sigma3)
-    pdf = sig+bkg
-    return n_sig1+n_sig2+n_sig3+n_bkg1+n_bkg2, pdf
+    sig1 = n_sig1*gauss_norm(x,mu1,sigma1)
+    sig2 = n_sig2* gauss_norm(x,mu2,sigma2)
+    sig3 = n_sig3* gauss_norm(x,mu3,sigma3)
+    if components ==False:
+        return sig1+sig2+sig3+bkg1+bkg2
+    else:
+        return sig1,sig2,sig3,bkg1,bkg2
+    
+def extended_Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
+                       n_bkg1, hstep1, n_bkg2, hstep2,
+                     lower_range=np.inf , upper_range=np.inf, components=False):
+    if components ==False:
+        return n_sig1+n_sig2+n_sig3 + n_bkg1+n_bkg2, Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, 
+                                                               n_sig3, mu3,sigma3, 
+                                                               n_bkg1, hstep1, n_bkg2, hstep2,
+                                                                 lower_range, upper_range)
+    else:
+        sig1,sig2,sig3,bkg1,bkg2 = Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
+                                             n_bkg1, hstep1, n_bkg2, hstep2,
+                                             lower_range , upper_range,components=components)
+        return n_sig1+n_sig2+n_sig3 + n_bkg1+n_bkg2, sig1,sig2,sig3,bkg1,bkg2
 
-@nb.njit(**kwd)
-def double_gauss_pdf(x,  n_sig1, n_bkg, mu1, sigma1, hstep1, n_sig2, mu2,sigma2):
+
+def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+                     lower_range=np.inf, upper_range=np.inf, components=False):
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation
     Consists of
      - two gaussian peaks (two lines)
      - one step
      """
-    bkg = step_pdf(x, mu1, sigma1, hstep1)
+    bkg = n_bkg*step_pdf(x, mu1, sigma1, hstep, lower_range, upper_range)
     if np.any(bkg<0):
         return 0, np.zeros_like(x)
-    pdf = n_sig1*gauss_norm(x,mu1,sigma1)+ n_sig2* gauss_norm(x,mu2,sigma2)+\
-          n_bkg*bkg
-    return n_sig1+n_sig2+n_bkg, pdf
+    sig1 = n_sig1*gauss_norm(x,mu1,sigma1)
+    sig2 = n_sig2* gauss_norm(x,mu2,sigma2)
+    if components == False:
+        return sig1 + sig2 + bkg 
+    else:
+        return sig1, sig2, bkg
+
+def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+                     lower_range=np.inf , upper_range=np.inf, components=False):
+    """
+    A Fit function exclusevly for a 133Ba 81keV peak situation
+    Consists of
+     - two gaussian peaks (two lines)
+     - one step
+     """
+    
+    if components == False:
+        pdf = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+                     lower_range, upper_range)
+        return n_sig1+n_sig2+n_bkg, pdf
+    else:
+        sig1, sig2, bkg = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+                     lower_range, upper_range,components=components)
+        return n_sig1+n_sig2+n_bkg, sig1, sig2, bkg
 
 def xtalball(x, mu, sigma, A, beta, m):
     """
