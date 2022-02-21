@@ -8,7 +8,7 @@ from scipy.optimize import curve_fit
 import pygama.analysis.histograms as pgh
 import pygama.analysis.calibration as cal
 import pygama.analysis.peak_fitting as pgf
-from scipy.stats import chisquare
+import scipy.stats
 import math
 
 def fwhm_slope(x, m0, m1):
@@ -25,38 +25,41 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
     ####################
     # Start the analysis
     ####################
-    print('Load ...',end=' ')
-    uncal_pass = lh5.load_nda_with_cuts(files,'raw',energy_params)
+    print('Load and apply quality cuts...',end=' ')
+    uncal_pass, uncal_cut = cut.load_nda_with_cuts(files,'raw',energy_params,  cut_parameters= cut_parameters, verbose=False)
     print("Done")
 
     Npass = len(uncal_pass[energy_params[0]])
-    print(f'{Npass} events')
+    Ncut  = len(uncal_cut[energy_params[0]])
+    Ratio = 100.*float(Ncut)/float(Npass+Ncut)
+    print(f'{Npass} events pass')
+    print(f'{Ncut} events cut')
     
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
-    range_keV = [(25,25),(30,30), (30,30),(35,25),(25,40),(40,40),(70,70)] # side bands width
-    funcs = [pgf.radford_cdf,pgf.radford_cdf,pgf.radford_cdf,pgf.radford_cdf,
-         pgf.radford_cdf,pgf.radford_cdf,pgf.radford_cdf]
+    range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(70,70)] # side bands width
+    funcs = [pgf.extended_gauss_step_pdf,pgf.extended_gauss_step_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
+         pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf]
+    gof_funcs = [pgf.gauss_step_pdf,pgf.gauss_step_pdf,pgf.radford_pdf,pgf.radford_pdf,
+            pgf.radford_pdf,pgf.radford_pdf,pgf.radford_pdf]
     output_dict = {}
     for energy_param in energy_params:
         kev_ranges = range_keV.copy()
-        guess     = (2620/np.nanpercentile(uncal_pass[energy_param],99))
+        guess_keV  = (2620/np.nanpercentile(uncal_pass[energy_param],99))
         print(f'Find peaks and compute calibration curve for {energy_param}', end = ' ')
         pars, cov, results = cal.hpge_E_calibration(uncal_pass[energy_param],
                                                     glines,
-                                                    guess,
+                                                    guess_keV,
                                                     deg=1,
-                                                    range_keV = kev_ranges,
+                                                    range_keV = range_keV,
                                                     funcs = funcs,
+                                                    gof_funcs = gof_funcs,
+                                                    simplex=True,
                                                     verbose=False
                                                     )
         pk_pars      = results['pk_pars']
         found_peaks = results['got_peaks_locs']
         fitted_peaks = results['fitted_keV']
-        mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(funcs, pk_pars)]
-
-        #if (np.abs(mus-found_peaks)>20).all():
-        #        range_keV[i] = (range_keV[i][0]-5,  range_keV[i][1]-5)
-        #    for i,peak in enumerate(glines):
+        
         for i, peak in enumerate(glines):
             if peak not in fitted_peaks: 
                 kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
@@ -66,19 +69,28 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
         for i, peak in enumerate(fitted_peaks):
             if results['pk_fwhms'][:,1][i]/results['pk_fwhms'][:,0][i] >0.05:
                 index = np.where(glines == peak)[0][0]
-                print(index)
                 kev_ranges[i] = (kev_ranges[index][0]-5,  kev_ranges[index][1]-5)
 
         pars, cov, results = cal.hpge_E_calibration(uncal_pass[energy_param],
                                                     glines,
-                                                    guess,
+                                                    guess_keV,
                                                     deg=1,
                                                     range_keV = kev_ranges,
                                                     funcs = funcs,
+                                                    gof_funcs = gof_funcs,
+                                                    simplex=True,
                                                     verbose=False
                                                     )
         print("done")
         print(" ")
+        fitted_peaks = results['fitted_keV']
+        fitted_funcs = []
+        fitted_gof_funcs = []
+        for i, peak in enumerate(glines):
+            if peak in fitted_peaks: 
+                fitted_funcs.append(funcs[i])
+                fitted_gof_funcs.append(gof_funcs[i])
+                
         ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
         xpb = 1
         xlo = 0
@@ -92,9 +104,11 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
         datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
         plot_title = f'{detector}-{measurement}-{run}'
         peaks_kev = results['got_peaks_keV']
-        fitted_peaks = results['fitted_keV']
+        
+
         pk_ranges = results['pk_ranges']
-        mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(funcs, pk_pars)]
+        p_vals = results['pk_pvals']
+        mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
 
         fwhms        = results['pk_fwhms'][:,0]
         dfwhms       = results['pk_fwhms'][:,1]
@@ -109,21 +123,22 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
             plt.subplot(math.ceil((len(mus))/2),2,i+1)
             binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
             bin_cs = (binning[1:]+binning[:-1])/2
-            fit_vals = pgf.radford_pdf(bin_cs, *pk_pars[i])
-            counts, bs, bars = plt.hist(uncal_pass[energy_param], bins=binning, histtype='step')
+            energies = uncal_pass['cuspEmax_ctc'][(uncal_pass['cuspEmax_ctc']> pk_ranges[i][0])&
+                                          (uncal_pass['cuspEmax_ctc']< pk_ranges[i][1])][:15000]
+
+            counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
+            fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
             plt.plot(bin_cs, fit_vals)
-            plt.plot(bin_cs, (fit_vals-counts)) 
+            plt.plot(bin_cs, (fit_vals-counts)/counts) 
             locs,labels = plt.xticks()
             new_labels = get_peak_labels(locs, pars)
             plt.xticks(ticks = locs[1:-1], labels = new_labels)
 
-            csqr = pgf.goodness_of_fit(counts, bins, None, pgf.radford_pdf, pk_pars[i] , method='Pearson')
-    
             plt.plot([bin_cs[10]],[0],label=get_peak_label(fitted_peaks[i]), linestyle='None' )
             plt.plot([bin_cs[10]],[0],label = f'{fitted_peaks[i]:.1f} keV', linestyle='None')
-            plt.plot([bin_cs[10]],[0],label = f'FWHM:{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV', linestyle='None')
-            plt.plot([bin_cs[10]],[0],label = f'chi^2/n : {csqr[0]/csqr[1]:.0f}', linestyle='None')
-    
+            plt.plot([bin_cs[10]],[0],label = f'{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV', linestyle='None')
+            plt.plot([bin_cs[10]],[0],label = f'p-value : {p_vals[i]:.2f}', linestyle='None')
+
             plt.xlabel('Energy (keV)')
             plt.ylabel('Counts')
             plt.legend(loc = 'upper left', frameon=False)
@@ -144,11 +159,12 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
                 print(f"Tl SEP found at index {i}")
                 indexes.append(i)
                 continue
-            if(peak==1592.53): 
+            elif(peak==1592.53): 
                 print(f"Tl DEP found at index {i}")
                 indexes.append(i)
                 continue
-            fwhm_peaks = np.append(fwhm_peaks,peak)
+            else:
+                fwhm_peaks = np.append(fwhm_peaks,peak)
         fwhms  = np.delete(fwhms,[indexes])
         dfwhms = np.delete(dfwhms,[indexes])
         mus = np.delete(mus,[indexes])
@@ -173,7 +189,7 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
         qbb_line_vx = [np.amin(fwhm_peaks),2039.0]
         qbb_line_vy = [fit_qbb,fit_qbb]
         fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
-        ax1.errorbar(fwhm_peaks,fwhms,yerr=dfwhms, marker='o',lw=0, c='b')
+        ax1.errorbar(fwhm_peaks,fwhms,yerr=dfwhms, marker='x',lw=0, c='b')
         ax1.plot(fwhm_peaks,fit_vals,ls=' ')
         fwhm_slope_bins = np.arange(np.amin(fwhm_peaks),np.amax(fwhm_peaks),10)
         ax1.plot(fwhm_slope_bins ,fwhm_slope(fwhm_slope_bins,*fit_pars),lw=1, c='g')
@@ -187,7 +203,7 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
         fig.suptitle(plot_title)
         plot_save_path = os.path.join(save_path, 'plots', detector, f'{energy_param}.png')
         pathlib.Path(os.path.dirname(plot_save_path)).mkdir(parents=True, exist_ok=True)
-        fig.savefig(plot_save_path, bbox_inches='tight', transparent=True)
+        fig.savefig(plot_save_path, bbox_inches='tight')
         plt.close()
 
         
