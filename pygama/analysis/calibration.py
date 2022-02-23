@@ -394,22 +394,22 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
                 sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or 
                 np.isnan(sum([sum(c) if c is not None else 0 for c in cov_i]))) :
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
-                pars_i, errs_i, cov_i = None, None, None
+                pars_i, errs_i, cov_i, p_val = None, None, None, None
             
             elif (np.abs(errs_i/pars_i) < 1e-7).any():
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low')
-                pars_i, errs_i, cov_i = None, None, None
+                pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif np.abs(n_events[0] -np.sum(hist))/np.sum(hist)>0.1:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, n_events is outside limit')
-                pars_i, errs_i, cov_i = None, None, None
+                pars_i, errs_i, cov_i, p_val = None, None, None, None
                 
             elif p_val<0.1:
                 print(f'p-value too low: {p_val}')
-                pars_i, errs_i, cov_i = None, None, None
+                pars_i, errs_i, cov_i, p_val = None, None, None, None
 
-        except: pars_i, errs_i, cov_i = None, None, None
-
+        except: pars_i, errs_i, cov_i, p_val = None, None, None, None
+        
         #get binning
         binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
 

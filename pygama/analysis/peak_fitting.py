@@ -215,7 +215,7 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     yy = func(pgh.get_bin_centers(bins), *pars) * pgh.get_bin_widths(bins)
     
     if method == 'LR':
-        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (mu+1.e-99)), yy-hist))
+        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (yy+1.e-99)), yy-hist))
         dof = len(hist) - len(pars)
         return log_lr, dof   
         
