@@ -18,7 +18,12 @@ def fwhm_slope(x, m0, m1):
     return np.sqrt(m0 + m1*x)
 
 
-def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,'bl_std':4, 'pz_std':4}):
+def energy_cal_th(files, energy_params, save_path):
+
+
+    """
+    This is an example script for calibrating Th data.
+    """
     
     if isinstance(energy_params, str): energy_params = [energy_params]
 
@@ -26,14 +31,11 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
     # Start the analysis
     ####################
     print('Load and apply quality cuts...',end=' ')
-    uncal_pass, uncal_cut = cut.load_nda_with_cuts(files,'raw',energy_params,  cut_parameters= cut_parameters, verbose=False)
+    uncal_pass = lh5.load_nda(files,'raw',energy_params)
     print("Done")
 
-    Npass = len(uncal_pass[energy_params[0]])
-    Ncut  = len(uncal_cut[energy_params[0]])
-    Ratio = 100.*float(Ncut)/float(Npass+Ncut)
-    print(f'{Npass} events pass')
-    print(f'{Ncut} events cut')
+    Nevents = len(uncal_pass[energy_params[0]])
+    print(f'{Nevents} events pass')
     
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
     range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(70,70)] # side bands width
@@ -123,8 +125,8 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
             plt.subplot(math.ceil((len(mus))/2),2,i+1)
             binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
             bin_cs = (binning[1:]+binning[:-1])/2
-            energies = uncal_pass['cuspEmax_ctc'][(uncal_pass['cuspEmax_ctc']> pk_ranges[i][0])&
-                                          (uncal_pass['cuspEmax_ctc']< pk_ranges[i][1])][:15000]
+            energies = uncal_pass[energy_param][(uncal_pass[energy_param]> pk_ranges[i][0])&
+                                          (uncal_pass[energy_param]< pk_ranges[i][1])][:15000]
 
             counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
             fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
