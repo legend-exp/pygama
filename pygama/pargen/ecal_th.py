@@ -129,7 +129,7 @@ def energy_cal_th(files, energy_params, save_path, cut_parameters= {'bl_mean':4,
             counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
             fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
             plt.plot(bin_cs, fit_vals)
-            plt.plot(bin_cs, (fit_vals-counts)/counts) 
+            plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] ) 
             locs,labels = plt.xticks()
             new_labels = get_peak_labels(locs, pars)
             plt.xticks(ticks = locs[1:-1], labels = new_labels)
