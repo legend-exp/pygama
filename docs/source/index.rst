@@ -17,6 +17,7 @@ Package index
    :maxdepth: 4
 
    install
+   contributing
    Package API reference <pygama>
 
 
