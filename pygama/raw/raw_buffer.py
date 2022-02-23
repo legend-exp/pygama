@@ -6,13 +6,17 @@ one-to-many mapping of input sreams to output streams.
 
 Primary Classes
 ---------------
-RawBuffer: a single lgdo buffer
+RawBuffer: an lgdo (e.g. a table) along with buffer metadata, such as the
+current write location, the list of keys (e.g. channels) that write to it, the
+output stream it is associated with (if any), etc. Each data_decoder is
+associated with a RawBuffer of a particular format.
 
 RawBufferList: a collection of RawBuffers with lgdo's that all have the same
-structure
+structure (same type, same fields, etc). A data_decoder will write its output to
+a RawBufferList.
 
 RawBufferLibrary: a collection (dict) of RawBufferLists, e.g. one for each
-data-generating DAQ object
+data_decoder. Keyed by the decoder name.
 
 RawBuffers support a json short-hand notation, see
 RawBufferLibrary.set_from_json_dict() for full specification.
@@ -22,7 +26,8 @@ user would call RawBufferLibrary.set_from_json_dict(json_dict, kw_dict) with
 kw_dict containing an entry for 'file_key'. The other keywords {key} and {name}
 are understood by and filled in during set_from_json_dict() unless overloaded in
 kw_dict. Note the use of the wildcard "*": this will match all other decoder
-names / keys
+names / keys.
+
 {
   "FlashCamEventDecoder" : {
     "g{key:0>3d}" : {
@@ -31,7 +36,7 @@ names / keys
     },
     "spms" : {
       "key_list" : [ [6,23] ],
-      "out_stream" : "$DATADIR/{file_key}_spms.lh5"
+      "out_stream" : "$DATADIR/{file_key}_spms.lh5/sipms"
     },
     "puls" : {
       "key_list" : [ 0 ],
@@ -61,18 +66,19 @@ class RawBuffer:
     '''
     A RawBuffer is in essence a an lgdo object (typically a Table) to which
     decoded data will be written, along with some meta-data distinguishing
-    what data goes into it, and where the lgdo gets written out
+    what data goes into it, and where the lgdo gets written out. Also holds on
+    to the current location in the buffer for writing.
 
     Attributes
     ----------
     lgdo : lgdo 
         the lgdo used as the actual buffer. Typically a table. Set to None upon
-        creation so that the user can initialize it later.
+        creation so that the user or a decoder can initialize it later.
     key_list : list
         a list of keys (e.g. channel numbers) identifying data to be written
         into this buffer. The key scheme is specific to the decoder with which
-        the raw_group is associated. This is called "key_list" instead of "keys"
-        to avoid confusion with the dict function "keys()", i.e. raw_group.keys()
+        the RawBuffer is associated. This is called "key_list" instead of "keys"
+        to avoid confusion with the dict function "keys()", i.e. raw_buffer.lgdo.keys()
     out_stream : str (optional)
         the output stream to which the raw_buffer's lgdo should be sent or
         written. A colon can be used to separate the stream name/address from an
@@ -97,35 +103,11 @@ class RawBuffer:
         return len(lgdo)
 
 
-    def make_lgdo(self, maker, size=None):
-        ''' Make this buffer's lgdo
-
-        Uses the first key in key_list for initialization
-
-        Parameters
-        ----------
-        maker : obj
-            an object with an make_lgdo(key, size) function that can be
-            used to initialize the lgdo (e.g. set up the columns of the Table)
-        '''
-        key = None if len(self.key_list) == 0 else self.key_list[0]
-        self.lgdo = maker.make_lgdo(key=key, size=size)
-
-
-
 class RawBufferList(list):
     '''
     A RawBufferDict holds a collection of RawBuffers of identical structure
-    (same format lgdo's). 
+    (same format lgdo's with the same fields). 
     '''
-
-
-    def make_lgdos(self, maker, size=None):
-        ''' Make the lgdos in this raw buffer list 
-
-        See RawBuffer.make_lgdo for parameter info
-        '''
-        for rb in self: rb.make_lgdo(maker, size=size)
 
 
     def get_keyed_dict(self, default=None):
