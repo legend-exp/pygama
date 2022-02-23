@@ -204,7 +204,7 @@ def run_grid_point(tb_data, dsp_config, grids, fom_function, iii, db_dict=None, 
 
     if verbosity > 1: pprint(dsp_config)
     if verbosity > 0: 
-        [grid.print_data(iii) for grid in grids]
+        [grid.print_data(iii[i]) for i,grid in enumerate(grids)]
         print(' ')
     tb_out = run_one_dsp(tb_data,
                         dsp_config,
@@ -213,7 +213,7 @@ def run_grid_point(tb_data, dsp_config, grids, fom_function, iii, db_dict=None, 
     res = np.ndarray(shape=len(grids), dtype='O')
     if fom_function:
         for i in range(len(grids)):
-            if fom_kwargs:
+            if fom_kwargs[i] is not None:
                 if len(fom_function)>1:
                     res[i] = fom_function[i](tb_out, verbosity, fom_kwargs[i])
                 else:
@@ -295,12 +295,15 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
     if not isinstance(fom_function, list) and fom_function is not None:
         fom_function = [fom_function]
     if not isinstance(fom_kwargs, list):
-        fom_kwargs = [fom_kwargs]
+        fom_kwargs = [fom_kwargs for gri in grid]
     grid_values = []
     shapes = [gri.get_shape() for gri in grid]
-    grid_values = []
-    for i in range(len(grid)):
-        grid_values.append(np.ndarray(shape = shapes[i], dtype='O'))
+    if fom_function is not None:
+        for i in range(len(grid)):
+            grid_values.append(np.ndarray(shape = shapes[i], dtype='O'))
+    else:
+        grid_lengths = np.array([gri.get_n_grid_points() for gri in grid])
+        grid_values.append(np.ndarray(shape = shapes[np.argmax(grid_lengths)], dtype='O'))
     grid_list = get_grid_points(grid)
     pool = mp.Pool(processes=processes)
     results = [pool.apply_async(run_grid_point, args=(tb_data,dsp_config, grid, fom_function, np.asarray(gl),
@@ -309,10 +312,14 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
     for result in results:
         res = result.get()
         indexes = res['indexes']
-        for i in range(len(grid)):
-            index = indexes[i]
-            if grid_values[i][index] is None:
-                grid_values[i][index] = res['results'][i]
+        if fom_function is not None:
+            for i in range(len(grid)):
+                index = indexes[i]
+                if grid_values[i][index] is None:
+                    grid_values[i][index] = res['results'][i]
+        else:
+            grid_values[0][indexes[0]] = {f'{indexes[0]}':res['results']}
+
         
     pool.close()
     pool.join()
