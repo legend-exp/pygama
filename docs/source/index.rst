@@ -18,8 +18,8 @@ Package index
 
    install
    contributing
+   tutorials
    Package API reference <pygama>
-
 
 Indices and tables
 ==================

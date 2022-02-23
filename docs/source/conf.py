@@ -34,7 +34,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
-    'sphinx_multiversion',
+    'sphinx_multiversion'
 ]
 
 # The suffix(es) of source filenames.
