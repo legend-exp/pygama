@@ -103,7 +103,7 @@ todo_include_todos = True
 # one must create a new branch named `releases/...`
 
 # Whitelist pattern for branches
-smv_branch_whitelist = r'^(master|dev|refactor|releases/.*)$'
+smv_branch_whitelist = r'^(main|refactor|releases/.*)$'
 
 # Whitelist pattern for tags
 smv_tag_whitelist = '^$'
