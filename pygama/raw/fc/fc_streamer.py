@@ -31,7 +31,7 @@ class FCStreamer(DataStreamer):
 
 
 
-    def initialize(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
+    def open_stream(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
         """ Initialize the FC data stream
 
         Parameters
