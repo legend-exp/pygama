@@ -3,10 +3,11 @@ name: pygama
 on:
   push:
     branches:
+      - main
       - master
       - dev
+      - refactor
       - 'releases/**'
-    tags: '*'
   pull_request:
   release:
 
@@ -55,17 +56,25 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Build with Sphinx
+      - name: Setup build environment
         run: |
+          git fetch --no-tags --prune --no-recurse-submodules --depth=1 origin
           .github/workflows/get-dependencies.sh
-          pip install .
-          pip install sphinx sphinx-rtd-theme
+          pip install sphinx sphinx-rtd-theme sphinx-multiversion
+      - name: Build docs for current ref
+        run: |
           cd docs
           make clean
-          make html
-      - if: github.event_name != 'pull_request'
+          make this
+      - name: Build docs for selected versions (GitHub pages)
+        run: |
+          cd docs
+          make clean
+          make info
+          make
+      - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
-        uses: JamesIves/github-pages-deploy-action@4.1.0
+        uses: JamesIves/github-pages-deploy-action@v4.2.2
         with:
           branch: gh-pages
-          folder: docs/build/html
+          folder: docs/build/allver/html

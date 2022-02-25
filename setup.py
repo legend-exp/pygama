@@ -127,9 +127,16 @@ class PygamaDev(develop):
         clean_jupyter_notebooks()
         develop.run(self)
 
+# avoid having to manually specify the version in multiple places
+def get_version():
+    g = {}
+    with open(os.path.join("pygama", "version.py")) as f:
+        exec(f.read(), g)
+    return g["__version__"]
+
 setup(
     name='pygama',
-    version='0.5',
+    version=get_version(),
     author='LEGEND',
     author_email='wisecg@uw.edu',
     description='Python package for decoding and processing digitizer data',
