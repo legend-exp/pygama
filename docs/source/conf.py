@@ -19,11 +19,6 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 project = 'pygama'
 copyright = '2020, LEGEND Collaboration'
-author = 'C. Wiseman'
-
-# The full version, including alpha/beta/rc tags
-release = 'v0.6'
-
 
 # -- General configuration ---------------------------------------------------
 
@@ -39,6 +34,7 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
     'sphinx_rtd_theme',
+    'sphinx_multiversion'
 ]
 
 # The suffix(es) of source filenames.
@@ -99,3 +95,30 @@ napoleon_use_rtype = True
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+# -- Options for sphinx-multiversion -----------------------------------------
+
+# For now, we include only (certain) branches when building docs.
+# To add a specific release to the list of versions for which docs should be build,
+# one must create a new branch named `releases/...`
+
+# Whitelist pattern for branches
+smv_branch_whitelist = r'^(main|refactor|releases/.*)$'
+
+# Whitelist pattern for tags
+smv_tag_whitelist = '^$'
+
+# Pattern for released versions
+smv_released_pattern = '^$'
+
+# The right way to find all docs versions is to look for matching branches on
+# the default remote
+
+# Whitelist pattern for remotes
+smv_remote_whitelist = r'^origin$'
+
+# Format for versioned output directories inside the build directory
+smv_outputdir_format = '{ref.name}'
+
+# Determines whether remote or local git branches/tags are preferred if their output dirs conflict
+smv_prefer_remote_refs = False

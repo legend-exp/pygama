@@ -36,6 +36,14 @@ pygama.dsp.dsp\_optimize module
    :undoc-members:
    :show-inheritance:
 
+pygama.dsp.errors module
+------------------------
+
+.. automodule:: pygama.dsp.errors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pygama.dsp.processors module
 ----------------------------
 
