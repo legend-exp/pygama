@@ -18,7 +18,7 @@ def fwhm_slope(x, m0, m1):
     return np.sqrt(m0 + m1*x)
 
 
-def energy_cal_th(files, energy_params, save_path):
+def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=15000):
 
 
     """
@@ -31,14 +31,14 @@ def energy_cal_th(files, energy_params, save_path):
     # Start the analysis
     ####################
     print('Load and apply quality cuts...',end=' ')
-    uncal_pass = lh5.load_nda(files,'raw',energy_params)
+    uncal_pass = lh5.load_nda(files,energy_params,lh5_path)
     print("Done")
 
     Nevents = len(uncal_pass[energy_params[0]])
     print(f'{Nevents} events pass')
     
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
-    range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(70,70)] # side bands width
+    range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(60,60)] # side bands width
     funcs = [pgf.extended_gauss_step_pdf,pgf.extended_gauss_step_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
          pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf]
     gof_funcs = [pgf.gauss_step_pdf,pgf.gauss_step_pdf,pgf.radford_pdf,pgf.radford_pdf,
@@ -55,6 +55,7 @@ def energy_cal_th(files, energy_params, save_path):
                                                     range_keV = range_keV,
                                                     funcs = funcs,
                                                     gof_funcs = gof_funcs,
+                                                    n_events=n_events,
                                                     simplex=True,
                                                     verbose=False
                                                     )
@@ -69,9 +70,12 @@ def energy_cal_th(files, energy_params, save_path):
             if peak not in fitted_peaks: 
                 kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
         for i, peak in enumerate(fitted_peaks):
-            if results['pk_fwhms'][:,1][i]/results['pk_fwhms'][:,0][i] >0.05:
-                index = np.where(glines == peak)[0][0]
-                kev_ranges[i] = (kev_ranges[index][0]-5,  kev_ranges[index][1]-5)
+            try:
+                if results['pk_fwhms'][:,1][i]/results['pk_fwhms'][:,0][i] >0.05:
+                    index = np.where(glines == peak)[0][0]
+                    kev_ranges[i] = (kev_ranges[index][0]-5,  kev_ranges[index][1]-5)
+            except:
+                pass
 
         pars, cov, results = cal.hpge_E_calibration(uncal_pass[energy_param],
                                                     glines,
@@ -80,11 +84,15 @@ def energy_cal_th(files, energy_params, save_path):
                                                     range_keV = kev_ranges,
                                                     funcs = funcs,
                                                     gof_funcs = gof_funcs,
+                                                    n_events=n_events,
                                                     simplex=True,
                                                     verbose=False
                                                     )
         print("done")
         print(" ")
+        if pars is None:
+            print("Calibration failed")
+            continue
         fitted_peaks = results['fitted_keV']
         fitted_funcs = []
         fitted_gof_funcs = []
@@ -126,16 +134,12 @@ def energy_cal_th(files, energy_params, save_path):
             binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
             bin_cs = (binning[1:]+binning[:-1])/2
             energies = uncal_pass[energy_param][(uncal_pass[energy_param]> pk_ranges[i][0])&
-                                          (uncal_pass[energy_param]< pk_ranges[i][1])][:15000]
+                                          (uncal_pass[energy_param]< pk_ranges[i][1])][:n_events]
 
             counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
             fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
             plt.plot(bin_cs, fit_vals)
             plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] ) 
-            locs,labels = plt.xticks()
-            new_labels = get_peak_labels(locs, pars)
-            plt.xticks(ticks = locs[1:-1], labels = new_labels)
-
             plt.plot([bin_cs[10]],[0],label=get_peak_label(fitted_peaks[i]), linestyle='None' )
             plt.plot([bin_cs[10]],[0],label = f'{fitted_peaks[i]:.1f} keV', linestyle='None')
             plt.plot([bin_cs[10]],[0],label = f'{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV', linestyle='None')
@@ -145,6 +149,9 @@ def energy_cal_th(files, energy_params, save_path):
             plt.ylabel('Counts')
             plt.legend(loc = 'upper left', frameon=False)
             plt.xlim([peak-range_adu, peak+range_adu])
+            locs,labels = plt.xticks()
+            new_locs, new_labels = get_peak_labels(locs, pars)
+            plt.xticks(ticks = new_locs, labels = new_labels)
 
         plt.tight_layout()
         fits_save_path = os.path.join(save_path, 'plots', detector, f'{energy_param}_fits.pdf')
@@ -214,22 +221,23 @@ def energy_cal_th(files, energy_params, save_path):
                                     '2.6_fwhm': round(fwhms[-1],2), '2.6_fwhm_err': round(dfwhms[-1],2), 
                                     "m0":fit_pars[0], "m1":fit_pars[1], 
                                     "Calibration_pars":pars.tolist(),
-                                    "Number_passed": Npass,'Number_cut': Ncut,"Cut Percentage": Ratio 
+                                    "Number_events": Nevents}
 
-                                    }
+    
     dict_save_path = os.path.join(save_path, f'{detector}.json')
     with open(dict_save_path,'w') as fp:
         json.dump(output_dict,fp, indent=4)
 
-
 def get_peak_labels(labels, pars):
-    out = np.array([])
+    out = []
+    out_labels = []
     for i,label in enumerate(labels):
-        if i == 0 or i == len(labels)-1:
-            pass
+        if i%2 == 1:
+            continue
         else:
-            out = np.append(out, f'{pgf.poly(label, pars):.1f}')
-    return out
+            out.append( f'{pgf.poly(label, pars):.1f}')
+            out_labels.append(label)
+    return out_labels, out
 
 def get_peak_label(peak):
     if peak == 583.191: 
