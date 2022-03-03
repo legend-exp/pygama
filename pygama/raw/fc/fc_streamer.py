@@ -31,12 +31,12 @@ class FCStreamer(DataStreamer):
 
 
 
-    def open_stream(self, fcio_file, rb_lib, buffer_size=8192, verbosity=0):
+    def open_stream(self, fcio_filename, rb_lib=None, buffer_size=8192, verbosity=0):
         """ Initialize the FC data stream
 
         Parameters
         ----------
-        fcio_file : str
+        fcio_filename : str
             the FCIO filename 
         rb_lib : RawBufferLibrary
             library of buffers for this stream
@@ -47,20 +47,20 @@ class FCStreamer(DataStreamer):
  
         Returns
         -------
-        header_data, n_bytes : list(RawBuffer), int
-            header_data is a list of length 1 containing the raw buffer holding
-                the fc_config table
-            n_bytes is the number of bytes read from the file to extract the
-                header data
+        header_data : list(RawBuffer)
+            a list of length 1 containing the raw buffer holding the fc_config table
         """
-        self.fcio = fcutils.fcio(fcio_file)
+        self.fcio = fcutils.fcio(fcio_filename)
+        self.n_bytes_read = 0
 
         # read in file header (config) info
         fc_config = self.config_decoder.decode_config(fcio) # returns an lgdo.Struct
         self.event_decoder.set_file_config(fc_config)
+        self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
 
         # initialize the buffers in rb_lib
-        super().initialize(fcio_file, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+        super().initialize(fcio_filename, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+        if rb_lib = None: rb_lib = self.rb_lib
 
         # set up data loop variables
         self.packet_id = 0
@@ -69,62 +69,69 @@ class FCStreamer(DataStreamer):
         if 'FCConfigDecoder' in rb_lib: rb = rb_lib['FCConfigDecoder']
         else: rb = RawBuffer(lgdo=fc_config)
         rb.loc = 1 # we have filled this buffer
-        return [rb], 11*4 # there are 11 ints in the fcio_config struct
+        return [rb]
 
 
 
-    def read_chunk(self, full_only=True, verbosity=0):
+    def read_packet(self, verbosity=0):
+        """ Read a packet of data.
+
+        Data written to self.rb_lib.
+        Updates self.n_bytes_read
         """
-        Returns
-        -------
-        chunk_list, n_bytes : list of RawBuffers, int
-            chunk_list is the list of RawBuffers with data ready for writing to
-                file or further processing. The list contains all buffers with
-                data or just all full buffers depending on the flag full_only.
-                Note chunk_list is not a RawBufferList since the RawBuffers
-                inside may not all have the same structure
-            n_bytes is the number of bytes read from the file during this
-                iteration.
-        """
-        rc = 1
-        n_bytes = 0
-        while rc:
-            rc = self.fcio.get_record()
 
-            # Skip non-interesting records
-            # FIXME: push to a buffer of skipped packets?
-            # FIXME: need to at least update n_bytes?
-            if rc == 0 or rc == 1 or rc == 2 or rc == 5: continue
+        rc = self.fcio.get_record()
+        if rc == 0: return False # no more data
 
-            self.packet_id += 1
+        self.packet_id += 1
 
-            # Status record
-            if rc == 4:
-                n_bytes += self.status_decoder.decode_packet(self.fcio, self.status_tbl, self.packet_id)
-                if self.status_tbl.is_full(): return [ self.status_tbl ], n_bytes
+        elif rc == 1: # config (header) data
+            print(f'warning: got a header after start of run?')
+            print(f'         n_bytes_read = {self.n_bytes_read}')
+            self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
+            return True
 
-            # Event or SparseEvent record
-            if rc == 3 or rc == 6:
+        elif rc == 2: # calib record -- no longer supported
+            print(f'warning: got a calib record?')
+            print(f'         n_bytes_read = {self.n_bytes_read}')
+            return True
 
-                # check that tables are large enough to read in this packet. If
-                # not, exit and return the ones that might overflow
-                full_tables = []
-                for group_info in self.raw_groups.values():
-                    tbl = group_info['table']
-                    # Check that the tables are large enough
-                    # TODO: don't need to check this every event, only if sum(numtraces) >= buffer_size
-                    if tbl.size < self.fcio.numtraces and self.fcio.numtraces > self.max_numtraces:
-                        print('warning: tbl.size =', tbl.size,
-                              'but fcio.numtraces =', self.fcio.numtraces)
-                        print('may overflow. suggest increasing tbl.size')
-                        self.max_numtraces = fcio.numtraces
-                    # Return if tables are too full.
-                    if tbl.size - tbl.loc < fcio.numtraces: full_tables.append(tbl)
-                if len(full_tables) > 0: return full_tables, n_bytes
+        # FIXME: push to a buffer of skipped packets?
+        # FIXME: need to at least update n_bytes?
+        elif rc == 5: # recevent
+            print(f'warning: got a RecEvent packet -- skipping?')
+            print(f'         n_bytes_read = {self.n_bytes_read}')
+            self.n_bytes_read += 6*4 + 3*10*4 + 1*2304*4 + 3*4000*4 # there are 11 ints in the fcio_config struct
+            return True
 
-                # Looks okay: just decode
-                n_bytes += self.event_decoder.decode_packet(self.fcio, self.event_tables, self.packet_id)
+        # Status record
+        if rc == 4:
+            n_bytes += self.status_decoder.decode_packet(self.fcio, self.status_tbl, self.packet_id)
+            if self.status_tbl.is_full(): return [ self.status_tbl ], n_bytes
 
+        # Event or SparseEvent record
+        if rc == 3 or rc == 6:
+
+            # check that tables are large enough to read in this packet. If
+            # not, exit and return the ones that might overflow
+            full_tables = []
+            for group_info in self.raw_groups.values():
+                tbl = group_info['table']
+                # Check that the tables are large enough
+                # TODO: don't need to check this every event, only if sum(numtraces) >= buffer_size
+                if tbl.size < self.fcio.numtraces and self.fcio.numtraces > self.max_numtraces:
+                    print('warning: tbl.size =', tbl.size,
+                          'but fcio.numtraces =', self.fcio.numtraces)
+                    print('may overflow. suggest increasing tbl.size')
+                    self.max_numtraces = fcio.numtraces
+                # Return if tables are too full.
+                if tbl.size - tbl.loc < fcio.numtraces: full_tables.append(tbl)
+            if len(full_tables) > 0: return full_tables, n_bytes
+
+            # Looks okay: just decode
+            n_bytes += self.event_decoder.decode_packet(self.fcio, self.event_tables, self.packet_id)
+
+'''
     # finished with loop. return any tables with data
     tables = []
     for group_info in self.raw_groups.values():
@@ -289,3 +296,5 @@ def process_flashcam(daq_file, raw_files, n_max, raw_groups_dict=None, verbose=F
                 print("  ch", ch, ":", n, "hits")
 
     return bytes_processed
+'''
+

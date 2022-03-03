@@ -23,6 +23,7 @@ class DataStreamer(ABC):
         self.rb_lib = None
         self.chunk_mode = None
         self.n_bytes_read = 0
+        self.any_full = False
 
 
     def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
@@ -66,6 +67,9 @@ class DataStreamer(ABC):
         # call super().initialize([args]) to run this default code
         # after loading header info, then follow it with the return call.
 
+        # store chunk mode
+        self.chunk_mode = chunk_mode
+
         # prepare rb_lib -- its lgdo's should still be uninitialized
         if rb_lib is None: rb_lib = self.build_default_rb_lib(out_stream=out_stream)
         self.rb_lib = rb_lib
@@ -105,8 +109,15 @@ class DataStreamer(ABC):
 
         Needs to be overloaded. Gets called by read_chunk()
 
-        Must return true if any buffers got too full for another read during
-        this packet read. Also needs to update self.n_bytes_read
+        Needs to update self.any_full if any buffers would possibly over-fill on
+        the next read
+
+        Needs to update self.n_bytes_read too
+
+        Returns
+        -------
+        still_has_data : bool
+            Returns true while there is still data to read
         """
         return true
 
@@ -160,9 +171,11 @@ class DataStreamer(ABC):
 
         n_packets = 0
         while True:
-            got_full = self.read_packet()
+            still_has_data = self.read_packet()
+            if (not still_has_data) break
             n_packets += 1
-            if got_full or read_one_packet or n_packets > rp_max: break
+            if read_one_packet or n_packets > rp_max: break
+            if self.any_full break
 
         list_of_rbs = []
         for rb_list in self.rb_lib.items():

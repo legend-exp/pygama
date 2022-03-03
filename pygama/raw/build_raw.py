@@ -109,7 +109,7 @@ def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
         return
 
     # initialize the stream and read header. Also initializes rb_lib
-    header_data = streamer.open_stream(in_stream, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size, verbosity=verbosity)
     if verbosity > 0: update_progress(float(streamer.n_bytes_read)/in_stream_size)
 
     # rb_lib should now be fully initialized. Check if files need to be
