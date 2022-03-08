@@ -10,6 +10,8 @@ import pygama.analysis.calibration as cal
 import pygama.analysis.peak_fitting as pgf
 import scipy.stats
 import math
+import matplotlib as mpl
+from matplotlib.backends.backend_pdf import PdfPages
 
 def fwhm_slope(x, m0, m1):
     """
@@ -38,13 +40,17 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
     print(f'{Nevents} events pass')
     
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
-    range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(60,60)] # side bands width
-    funcs = [pgf.extended_gauss_step_pdf,pgf.extended_gauss_step_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
+    range_keV = [(20,20),(30,30), (40,40),(40,25),(25,40),(40,40),(60,60)] # side bands width
+    funcs = [pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
          pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf]
     gof_funcs = [pgf.gauss_step_pdf,pgf.gauss_step_pdf,pgf.radford_pdf,pgf.radford_pdf,
             pgf.radford_pdf,pgf.radford_pdf,pgf.radford_pdf]
     output_dict = {}
     for energy_param in energy_params:
+        datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
+        plot_save_path = os.path.join(save_path, 'plots', detector, f'{energy_param}.pdf')
+        pathlib.Path(os.path.dirname(plot_save_path)).mkdir(parents=True, exist_ok=True)
+
         kev_ranges = range_keV.copy()
         guess_keV  = (2620/np.nanpercentile(uncal_pass[energy_param],99))
         print(f'Find peaks and compute calibration curve for {energy_param}', end = ' ')
@@ -111,11 +117,10 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
         fitted_peaks = results['fitted_keV']
         pk_pars      = results['pk_pars']
         pk_covs      = results['pk_covs']
-        datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
+    
         plot_title = f'{detector}-{measurement}-{run}'
         peaks_kev = results['got_peaks_keV']
         
-
         pk_ranges = results['pk_ranges']
         p_vals = results['pk_pvals']
         mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
@@ -154,9 +159,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             plt.xticks(ticks = new_locs, labels = new_labels)
 
         plt.tight_layout()
-        fits_save_path = os.path.join(save_path, 'plots', detector, f'{energy_param}_fits.pdf')
-        pathlib.Path(os.path.dirname(fits_save_path)).mkdir(parents=True, exist_ok=True)
-        plt.savefig(fits_save_path)
+        pdf.savefig()
         plt.close()
 
         #####
@@ -186,8 +189,13 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
         param_bounds = (0, [10., 1.])
         fit_pars, fit_covs = curve_fit(fwhm_slope, fwhm_peaks, fwhms, sigma=dfwhms, 
                                p0=param_guess, bounds=param_bounds, absolute_sigma=True)
-        sderrs = np.sqrt(np.diag(fit_covs))
-        qbb_err = fwhm_slope(2039.0,*(fit_pars+sderrs))-fwhm_slope(2039.0,*fit_pars)
+        
+        rng = np.random.default_rng(1)
+        pars_b = rng.multivariate_normal(fit_pars, fit_covs, size=1000)
+        fits = np.array([fwhm_slope(fwhm_peaks, *pars) for pars in pars_b])
+        qbb_vals = np.array([fwhm_slope(2039.0, *pars) for pars in pars_b])
+        qbb_err = np.nanstd(qbb_vals)
+
         print(f'FWHM curve fit: {fit_pars}')
         fit_vals = fwhm_slope(fwhm_peaks,*fit_pars)
         print(f'FWHM fit values: {fit_vals}')
@@ -210,9 +218,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
         ax2.set_xlabel("Energy (keV)",    ha='right', x=1)
         ax2.set_ylabel("Residuals (keV)", ha='right', y=1)
         fig.suptitle(plot_title)
-        plot_save_path = os.path.join(save_path, 'plots', detector, f'{energy_param}.png')
-        pathlib.Path(os.path.dirname(plot_save_path)).mkdir(parents=True, exist_ok=True)
-        fig.savefig(plot_save_path, bbox_inches='tight')
+        pdf.savefig()
         plt.close()
 
         
