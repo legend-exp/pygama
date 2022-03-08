@@ -315,7 +315,8 @@ def get_hpge_E_bounds(func):
         return []
 
 def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf, 
-                     method = 'unbinned', gof_funcs=None, n_events=15000, uncal_is_int=False, simplex=False):
+                     method = 'unbinned', gof_funcs=None, n_events=15000, allowed_p_val= 0.05,
+                     uncal_is_int=False, simplex=False):
     """ Fit the Energy peaks specified using the function given
     Parameters
     ----------
@@ -338,6 +339,8 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
     simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
+    n_events : int number of events to use for unbinned fit
+    allowed_p_val: lower limit on p_val of fit 
     Returns
     -------
     pars : list of array
@@ -415,7 +418,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
                 
-            elif p_val<0.1:
+            elif p_val<allowed_p_val:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
@@ -508,7 +511,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
 
 def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None, 
                         funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
-                        n_events=15000, simplex=False, verbose=True):
+                        n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
     """ Calibrate HPGe data to a set of known peaks
     Parameters
     ----------
@@ -533,6 +536,8 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     range_keV : float, tuple, array of floats, or array of tuples of floats
         ranges around which the peak fitting is performed
         if tuple(s) are supplied, they provide the left and right ranges
+    n_events : int number of events to use for unbinned fit
+    allowed_p_val: lower limit on p_val of fit 
     Returns
     -------
     pars, cov : array, 2D array
@@ -658,7 +663,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     pk_pars,pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals = hpge_fit_E_peaks(E_uncal, got_peaks_locs, range_uncal, 
                                     n_bins=n_bins,
                                     funcs=funcs, method=method, gof_funcs = gof_funcs, n_events=n_events,
-                                    uncal_is_int=False, simplex=simplex)
+                                    uncal_is_int=False, simplex=simplex, allowed_p_val=allowed_p_val)
     results['pk_pars'] = pk_pars
     results['pk_errors'] = pk_errors
     results['pk_covs'] = pk_covs
