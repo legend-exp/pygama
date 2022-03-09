@@ -105,7 +105,7 @@ class RawBuffer:
 
 class RawBufferList(list):
     '''
-    A RawBufferDict holds a collection of RawBuffers of identical structure
+    A RawBufferList holds a collection of RawBuffers of identical structure
     (same format lgdo's with the same fields). 
     '''
 

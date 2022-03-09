@@ -6,9 +6,8 @@ class DataStreamer(ABC):
 
     Provides a uniform interface for streaming, e.g.
 
-    > header, n_bytes = ds.open_stream(stream_name)
-    > for chunk_buffers, n_bytes in ds:
-    >     do_something(chunk_buffers)
+    > header = ds.open_stream(stream_name)
+    > for chunk in ds: do_something(chunk)
 
     Also provides default management of the RawBufferLibrary used for data reading:
     - allocation (if needed)
