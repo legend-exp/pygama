@@ -161,7 +161,7 @@ setup(
         'pandas',
         'matplotlib',
         'pytest',
-        'pint'
+        'pint',
         'iminuit',
         'tqdm'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
