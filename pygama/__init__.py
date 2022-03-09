@@ -27,5 +27,6 @@ should ever by "blank" as specified by option 1: you should at least include a
 docstring explaining what the package does. This will help users poking around
 in ipython, etc.
 """
-__version__ = "0.1.0"
+
+from pygama.version import __version__
 

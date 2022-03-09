@@ -76,6 +76,14 @@ pygama.io.orca\_digitizers module
    :undoc-members:
    :show-inheritance:
 
+pygama.io.orca\_flashcam module
+-------------------------------
+
+.. automodule:: pygama.io.orca_flashcam
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pygama.io.orcadaq module
 ------------------------
 

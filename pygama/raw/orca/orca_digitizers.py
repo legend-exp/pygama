@@ -2,6 +2,7 @@ import sys
 import numpy as np
 
 from .orcadaq import OrcaDecoder, get_ccc
+from pygama.lh5 import Table
 
 class ORCAStruck3302(OrcaDecoder):
     """
@@ -12,7 +13,7 @@ class ORCAStruck3302(OrcaDecoder):
         self.decoder_name = 'ORSIS3302DecoderForEnergy'
         self.orca_class_name = 'ORSIS3302Model'
 
-        self.decoded_values = {
+        self.decoded_values_template = {
             'packet_id': {
                'dtype': 'uint32',
              },
@@ -50,14 +51,23 @@ class ORCAStruck3302(OrcaDecoder):
         }
 
         super().__init__(*args, **kwargs) # also initializes the garbage df
-        # self.enabled_cccs = []
-        self.skipped_channels = {}
+
+        self.decoded_values = {}
         self.ievt = 0
+        self.skipped_channels = {}
+        # self.enabled_cccs = []
 
 
     def get_decoded_values(self, channel=None):
-        # TODO: return channel-specific decoded_values
-        return self.decoded_values
+        if channel is None:
+            dec_vals_list = self.decoded_values.items()
+            if len(dec_vals_list) == 0:
+                print("ORSIS3302Model: Error: decoded_values not built yet!")
+                return None
+            return list(dec_vals_list)[0][1] # Get first thing we find
+        if channel in self.decoded_values: return self.decoded_values[channel]
+        print("ORSIS3302Model: Error: No decoded values for channel", channel)
+        return None
 
 
     def set_object_info(self, object_info):
@@ -71,27 +81,26 @@ class ORCAStruck3302(OrcaDecoder):
             int_enabled_mask = card_dict['internalTriggerEnabledMask']
             ext_enabled_mask = card_dict['externalTriggerEnabledMask']
             enabled_mask = int_enabled_mask | ext_enabled_mask
-            trace_length = 0
-            for channel in range(8):
+            for channel in range(10):
                 # only care about enabled channels
-                if (enabled_mask >> channel) & 0x1:
-                    # save list of enabled channels
-                    #self.enabled_cccs.append(get_ccc(crate, card, channel))
+                if not ((enabled_mask >> channel) & 0x1): continue
 
-                    # get trace length(s). Should all be the same until
-                    # multi-buffer mode is implemented AND each channel has its
-                    # own buffer
-                    this_length = card_dict['sampleLengths'][int(channel/2)]
-                    if trace_length == 0: trace_length = this_length
-                    elif this_length != trace_length:
-                        print('SIS3316ORCADecoder Error: multiple trace lengths not supported')
-                        sys.exit()
+                ccc = get_ccc(crate, card, channel)
+                # save list of enabled channels
+                #self.enabled_cccs.append(ccc)
 
-            # check trace length and update decoded_values
-            if trace_length <= 0 or trace_length > 2**16:
-                print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
-                sys.exit()
-            self.decoded_values['waveform']['length'] = trace_length
+                self.decoded_values[ccc] = {}
+                self.decoded_values[ccc].update(self.decoded_values_template)
+                sd = self.decoded_values[ccc] # alias
+
+                # get trace length(s). Should all be the same until
+                # multi-buffer mode is implemented AND each channel has its
+                # own buffer
+                trace_length = card_dict['sampleLengths'][int(channel/2)]
+                if trace_length <= 0 or trace_length > 2**16:
+                    print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
+                    sys.exit()
+                self.decoded_values[ccc]['waveform']['length'] = trace_length
 
 
     def max_n_rows_per_packet(self):
@@ -106,20 +115,20 @@ class ORCAStruck3302(OrcaDecoder):
         # does not copy data. p32 and p16 are read-only
         p32 = np.frombuffer(packet, dtype=np.uint32)
         p16 = np.frombuffer(packet, dtype=np.uint16)
-        
+
         # read the crate/card/channel first
         crate = (p32[0] >> 21) & 0xF
         card = (p32[0] >> 16) & 0x1F
         channel = (p32[0] >> 8) & 0xFF
         ccc = get_ccc(crate, card, channel)
-        
+
         # aliases for brevity
         tb = lh5_tables
-        # if the first key is an int, then there are different tables for 
+        # if the first key is an int, then there are different tables for
         # each channel.
         if isinstance(list(tb.keys())[0], int):
             if ccc not in lh5_tables:
-                if ccc not in self.skipped_channels: 
+                if ccc not in self.skipped_channels:
                     self.skipped_channels[ccc] = 0
                 self.skipped_channels[ccc] += 1
                 return
@@ -270,7 +279,7 @@ class ORCAGretina4M(OrcaDecoder):
 
 
     def get_decoded_values(self, channel=None):
-        if channel is None: 
+        if channel is None:
             dec_vals_list = self.decoded_values.items()
             if len(dec_vals_list) == 0:
                 print("ORGretina4MModel: Error: decoded_values not built yet!")
@@ -278,6 +287,7 @@ class ORCAGretina4M(OrcaDecoder):
             return list(dec_vals_list)[0][1] # Get first thing we find
         if channel in self.decoded_values: return self.decoded_values[channel]
         print("ORGretina4MModel: Error: No decoded values for channel", channel)
+        print(self.decoded_values.keys())
         return None
 
 
@@ -299,7 +309,7 @@ class ORCAGretina4M(OrcaDecoder):
             mrpsrt = card_dict['Mrpsrt'] # index for channel's presum rate
             dividers = [1, 2, 4, 8 ] # dividers for presummed data
             mrpsdv = card_dict['Mrpsdv'] # index for channel's divider
-            for channel in range(8):
+            for channel in range(10):
                 # only care about enabled channels
                 if not is_enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
@@ -347,9 +357,9 @@ class ORCAGretina4M(OrcaDecoder):
 
         # aliases for brevity
         tb = lh5_tables
-        if isinstance(tb, dict): 
+        if not isinstance(tb, Table):
             if ccc not in lh5_tables:
-                if ccc not in self.skipped_channels: 
+                if ccc not in self.skipped_channels:
                     self.skipped_channels[ccc] = 0
                 self.skipped_channels[ccc] += 1
                 return
@@ -433,10 +443,10 @@ class ORCAGretina4M(OrcaDecoder):
         self.ievt += 1
 
 
-'''
-class SIS3316ORCADecoder(DataTaker):
+class SIS3316ORCADecoder(OrcaDecoder):
     """
-    handle ORCA Struck 3316 digitizer
+    Decode ORCA Struck 3316 digitizer data.
+    Thanks to J. Browning of COHERENT for getting this updated!
 
     TODO:
     handle per-channel data (gain, ...)
@@ -445,62 +455,165 @@ class SIS3316ORCADecoder(DataTaker):
     def __init__(self, *args, **kwargs):
 
         self.decoder_name = 'ORSIS3316WaveformDecoder'
-        self.class_name = 'ORSIS3316Model'
+        self.orca_class_name = 'ORSIS3316Model'
 
         # store an entry for every event
         self.decoded_values = {
-            "packet_id": [],
-            "ievt": [],
-            "energy_first": [],
-            "energy": [],
-            "timestamp": [],
-            "channel": [],
-            "waveform": [],
+            'packet_id': {
+               'dtype': 'uint32',
+             },
+            'ievt': {
+              'dtype': 'uint32',
+            },
+            'energy': {
+              'dtype': 'uint32',
+              'units': 'adc',
+            },
+            'energy_first': {
+              'dtype': 'uint32',
+            },
+            'timestamp': {
+              'dtype': 'uint64',
+              'units': 'clock_ticks',
+            },
+            'crate': {
+              'dtype': 'uint8',
+            },
+            'card': {
+              'dtype': 'uint8',
+            },
+            'channel': {
+              'dtype': 'uint8',
+            },
+            'waveform': {
+              'dtype': 'uint16',
+              'datatype': 'waveform',
+              'length': 65532, # max value. override this before initalizing buffers to save RAM
+              'sample_period': 8, # override if a different clock rate is used
+              'sample_period_units': 'ns',
+              'units': 'adc',
+            },
         }
         super().__init__(*args, **kwargs) # also initializes the garbage df (whatever that means...)
 
         # self.event_header_length = 1 #?
-        self.sample_period = 10  # ns, I will set this later, according to header info
-        self.gain = 0
-        self.h5_format = "table"
-        self.ievt = 0       #event number
-        self.ievt_gbg = 0      #garbage event number
-        self.window = False
+        self.skipped_channels = {}
+        self.ievt = 0
 
 
-    def decode_event(self, event_data_bytes, packet_id, header_dict, verbose=False):
+    def get_decoded_values(self, channel=None):
+        # TODO: return channel-specific decoded_values
+        return self.decoded_values
+
+
+    def set_object_info(self, object_info):
+        self.object_info = object_info
+        trace_length = 65000
+
+        # parse object_info for important info
+        for card_dict in self.object_info:
+            crate = card_dict['Crate']
+            card = card_dict['Card']
+
+            try:
+                int_enabled_mask = card_dict['internalTriggerEnabledMask']
+                ext_enabled_mask = card_dict['externalTriggerEnabledMask']
+                enabled_mask = int_enabled_mask | ext_enabled_mask
+                trace_length = 0
+                for channel in range(8):
+                    # only care about enabled channels
+                    if (enabled_mask >> channel) & 0x1:
+                    # save list of enabled channels
+                    #self.enabled_cccs.append(get_ccc(crate, card, channel))
+
+                    # get trace length(s). Should all be the same until
+                    # multi-buffer mode is implemented AND each channel has its
+                    # own buffer
+                        this_length = card_dict['sampleLengths'][int(channel/2)]
+                        if trace_length == 0: trace_length = this_length
+                        elif this_length != trace_length:
+                            print('SIS3316ORCADecoder Error: multiple trace lengths not supported')
+                            sys.exit()
+            except:
+                print('I dont know what this is for')
+
+            # check trace length and update decoded_values
+            if trace_length <= 0 or trace_length > 2**16:
+                print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
+                sys.exit()
+            self.decoded_values['waveform']['length'] = trace_length
+
+
+    def max_n_rows_per_packet(self):
+        return 1
+
+
+    def decode_packet(self, packet, lh5_tables, packet_id, header_dict, verbose=False):
 
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
-        evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
-        evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
+        evt_data_32 = np.fromstring(packet, dtype=np.uint32)
+        evt_data_16 = np.fromstring(packet, dtype=np.uint16)
 
-        #TODO Figure out the header, particularly card/crate/channel/timestamp
+        tb = lh5_tables
+
+        crate = evt_data_32[3]
+        card = evt_data_32[4]
+        try:
+            channel = (evt_data_32[9] & 0xFFF0) >> 4
+        except:
+            print('Something went wrong')
+            channel = 33
+        ccc = get_ccc(crate, card, channel)
+
+        if isinstance(list(tb.keys())[0], int):
+            if ccc not in lh5_tables:
+                if ccc not in self.skipped_channels:
+                    self.skipped_channels[ccc] = 0
+                self.skipped_channels[ccc] += 1
+                return
+            tb = lh5_tables[ccc]
+        ii = tb.loc
+
+        tb['packet_id'].nda[ii] = packet_id
+
+        # TODO: Figure out the header, particularly card/crate/channel/timestamp
         n_lost_msb = 0
         n_lost_lsb = 0
         n_lost_records = 0
-        crate = evt_data_32[3]
-        card = evt_data_32[4]
-        channel = evt_data_32[4]
+        tb['crate'].nda[ii] = evt_data_32[3]
+        tb['card'].nda[ii] = evt_data_32[4]
+        try:
+            tb['channel'].nda[ii] = (evt_data_32[9] & 0xFFF0) >> 4
+        except:
+            print('Something went wrong')
+            tb['channel'].nda[ii] = 33
         buffer_wrap = 0
         crate_card_chan = crate + card + channel
         wf_length_32 = 0
         ene_wf_length = evt_data_32[4]
         evt_header_id = 0
-        timestamp = 0
+        try:
+            tb['timestamp'].nda[ii] = evt_data_32[10] + ((evt_data_32[9] & 0xffff0000) << 16)
+        except:
+            print('something went wrong here too')
+            tb['timestamp'].nda[ii] = 0
 
         # compute expected and actual array dimensions
-        wf_length16 = 1024
+        wf_length16 = 65000
         orca_helper_length16 = 52
         header_length16 = orca_helper_length16
         ene_wf_length16 = 2 * ene_wf_length
         footer_length16 = 0
 
-        expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)/2
+        expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)
 
-        if wf_length16 != expected_wf_length:
-            print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
-            #exit()
+        # if wf_length16 != expected_wf_length:
+        #    print(len(evt_data_16), orca_helper_length16, header_length16,
+        #          footer_length16)
+        #    print("ERROR: Waveform size %d doesn't match expected size %d." %
+        #          (wf_length16, expected_wf_length))
+        #    print("       The Last Word (should be 0xdeadbeef):",)
+        #    exit()
 
         # indexes of stuff (all referring to the 16 bit array)
         i_wf_start = header_length16
@@ -508,25 +621,25 @@ class SIS3316ORCADecoder(DataTaker):
         i_ene_start = i_wf_stop + 1
         i_ene_stop = i_ene_start + ene_wf_length16
 
-
+        tbwf = tb['waveform']['values'].nda[ii]
+        #print(len(tb['waveform']['values'].nda[ii]))
         # handle the waveform(s)
         if wf_length16 > 0:
-            wf_data = evt_data_16[i_wf_start:i_wf_stop]
+            try:
+                tb['waveform']['values'].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
+            except:
+                print(len(evt_data_16[i_wf_start:i_wf_stop]))
+                print(len(tb['waveform']['values'].nda[ii]))
 
-
-        #TODO check if number of events matches expected
-        #if len(wf_data) != expected_wf_length:
+        # TODO check if number of events matches expected
+        # if len(wf_data) != expected_wf_length:
         #    print("ERROR: We expected %d WF samples and only got %d" %
         #          (expected_wf_length, len(wf_data)))
         #    exit()
 
         # final raw wf array
-        waveform = wf_data
 
         # set the event number (searchable HDF5 column)
-        ievt = self.ievt
+        tb['ievt'].nda[ii] = self.ievt
         self.ievt += 1
-
-        # send any variable with a name in "decoded_values" to the pandas output
-        self.format_data(locals())
-'''
+        tb.push_row()

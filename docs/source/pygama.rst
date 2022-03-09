@@ -11,22 +11,23 @@ Subpackages
    pygama.dsp
    pygama.io
    pygama.lh5
+   pygama.sandbox
 
 Submodules
 ----------
-
-pygama.git module
------------------
-
-.. automodule:: pygama.git
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 pygama.utils module
 -------------------
 
 .. automodule:: pygama.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pygama.version module
+---------------------
+
+.. automodule:: pygama.version
    :members:
    :undoc-members:
    :show-inheritance:

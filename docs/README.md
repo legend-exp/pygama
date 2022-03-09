@@ -1,10 +1,10 @@
-### regenerating sphinx documentation
+### Documentation
 ```
+$ git fetch origin
 $ make clean
-$ make html
+$ make
 $ open build/html/pygama.html
 ```
-regenerate the .rst files:
+regenerate the `.rst` files:
 ```
 $ sphinx-apidoc -f -o ./source ../pygama/
-```
