@@ -11,8 +11,8 @@ from fc.fc_streamer import FCStreamer
 #from stream_fc import *
 
 
-def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192, 
-                    n_max=np.inf, overwrite=True, verbosity=0)
+def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192, 
+              n_max=np.inf, overwrite=True, verbosity=0)
     """ Convert data into LEGEND hdf5 `raw` format.  
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
