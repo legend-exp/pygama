@@ -45,7 +45,11 @@ class DataDecoder(ABC):
                                      lgdo.Array(shape=garbage_length, dtype='uint32'))
 
 
-    def get_keys_list(self): pass
+    def get_keys_list(self): 
+        """ overload with list of keys for this decoder.
+        e.g. `return range(n_channels)`
+        """
+        pass
 
 
     def get_decoded_values(self, key=None):
@@ -62,6 +66,17 @@ class DataDecoder(ABC):
         name = type(self).__name__
         print("You need to implement key-specific get_decoded_values for", name)
         return None
+
+
+    def setup_raw_buffers(self, rb_list, size=None):
+        """ Setup raw buffers for this decoder
+
+        Uses the first key in a RawBuffer's key_list for initialization
+        """
+        for rb in rb_list:
+            if rb.lgdo is not None: print("warning: replacing non-None lgdo")
+            key = None if len(rb.key_list) == 0 else rb.key_list[0]
+            rb.lgdo = self.make_lgdo(key=key, size=size)
 
 
     def make_lgdo(self, key=None, size=None):

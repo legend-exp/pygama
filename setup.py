@@ -127,9 +127,16 @@ class PygamaDev(develop):
         clean_jupyter_notebooks()
         develop.run(self)
 
+# avoid having to manually specify the version in multiple places
+def get_version():
+    g = {}
+    with open(os.path.join("pygama", "version.py")) as f:
+        exec(f.read(), g)
+    return g["__version__"]
+
 setup(
     name='pygama',
-    version='0.5',
+    version=get_version(),
     author='LEGEND',
     author_email='wisecg@uw.edu',
     description='Python package for decoding and processing digitizer data',
@@ -144,7 +151,8 @@ setup(
     },
     install_requires=[
         'numpy',
-        'numba',
+        'scimath',
+        'numba !=0.53, !=0.54',
         'parse',
         'GitPython',
         'tinydb',
@@ -153,8 +161,9 @@ setup(
         'pandas',
         'matplotlib',
         'pytest',
-        'pint'
-
+        'pint',
+        'iminuit',
+        'tqdm'
         # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),

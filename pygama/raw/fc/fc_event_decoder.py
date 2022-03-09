@@ -160,7 +160,7 @@ class FCEventDecoder(DataDecoder):
             The interface to the fcio data. Enters this function after a call to
             fcio.get_record() so that data for packet_id ready to be read out
         lgdo_tables : lgdo.Table or dict
-            A single table for readign out all data, or a dict of tables keyed
+            A single table for reading out all data, or a dict of tables keyed
             by channel number (i.e. as returned by raw_groups.build_tables())
         packet_id : int
             The index of the packet in the fcio stream. Incremented by

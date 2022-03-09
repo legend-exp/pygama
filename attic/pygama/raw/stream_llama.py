@@ -1,13 +1,14 @@
 import sys
-import numpy as np  
+import numpy as np
 import pandas as pd
 from pprint import pprint
 
 from .io_base import DataTaker
 #from .waveform import Waveform
+from ..utils import tqdm_range, update_progress
 
 class llama_3316:
-    """ 
+    """
     A parser file for the sis3316 able to decode header and events.
     The inputs are files produced by the llamaDAQ sis3316 readout program
     magic bytes: "LArU"
@@ -17,7 +18,7 @@ class llama_3316:
         self.verbose = verbosity
         flag = self.parse_fileheader()
         # chConf = self.parse_channelConfigs()
-        
+
         #idx, nrx = self.__read_chunk_header()
         #print("head1: ID: {}, nr: {}".format(idx, nrx))
         #flag = True
@@ -25,7 +26,7 @@ class llama_3316:
         #    fi, ci, da = self.read_next_event(chConf)
         #    if da is None:
         #        flag = False
-        
+
     def parse_fileheader(self):
         """
         parses the fileheader of a SIS3316 file.
@@ -40,7 +41,7 @@ class llama_3316:
         header = self.f_in.read(16)
         evt_data_32 = np.fromstring(header, dtype=np.uint32)
         evt_data_16 = np.fromstring(header, dtype=np.uint16)
-        
+
         #line0: magic bytes
         magic = evt_data_32[0]
         #print(hex(magic))
@@ -50,64 +51,64 @@ class llama_3316:
         else:
             print ("ERROR: Magic bytes not matching for SIS3316 file!")
             return False
-        
+
         self.version_major = evt_data_16[4]
         self.version_minor = evt_data_16[3]
         self.version_patch = evt_data_16[2]
         self.length_econf = evt_data_16[5]
         self.number_chOpen = evt_data_32[3]
-        
+
         if self.verbose > 0:
             print ("File version: {}.{}.{}".format(self.version_major, self.version_minor, self.version_patch))
             print ("{} channels open, each config {} bytes long".format(self.number_chOpen, self.length_econf))
-            
+
         return True
-       
-        
+
+
     def parse_channelConfigs(self):
         """
         Reads the metadata from the beginning of the file (the "channel configuration" part, directly after the file header).
         Creates a dictionary of the metadata for each FADC/channel combination, which is returned
-        
+
         structure of channelConfigs:
         FADCindex      channelIndex
         A ------------- x ----------- metadata for FADC A channel x
                       | y ----------- metadata for FADC A channel y
                       | z ----------- metadata for FADC A channel z
-                      
+
         B ------------- k ----------- metadata for FADC B channel k
                       | l ----------- metadata for FADC B channel l
         ...
-                      
+
         """
         self.f_in.seek(16)    #should be after file header anyhow, but re-set if not
-        
+
         channelConfigs = {}
-        
+
         for i in range(0, self.number_chOpen):
             if self.verbose > 1:
                 print("reading in channel config {}".format(i))
-                
+
             channel = self.f_in.read(68)
             ch_dpf = channel[16:32]
             evt_data_32 = np.fromstring(channel, dtype=np.uint32)
             evt_data_dpf = np.fromstring(ch_dpf, dtype=np.float64)
-            
+
             fadcIndex = evt_data_32[0]
             channelIndex = evt_data_32[1]
-            
+
             if fadcIndex in channelConfigs:
                 #print("pre-existing fadc")
                 pass
             else:
                 #print("new fadc #{}".format(fadcIndex))
                 channelConfigs[fadcIndex] = {}
-    
+
             if channelIndex in channelConfigs[fadcIndex]:
                 print("ERROR: Duplicate channel configuration in file: FADCID: {}, ChannelID: {}".format(fadcIndex, channelIndex))
             else:
                 channelConfigs[fadcIndex][channelIndex] = {}
-                
+
             channelConfigs[fadcIndex][channelIndex]["14BitFlag"] = evt_data_32[2] & 0x00000001
             if evt_data_32[2] & 0x00000002 == 0:
                 print("WARNING: Channel in configuration marked as non-open!")
@@ -123,20 +124,20 @@ class llama_3316:
             channelConfigs[fadcIndex][channelIndex]["Accum2Offset"] = evt_data_32[14]
             channelConfigs[fadcIndex][channelIndex]["MAW3Offset"] = evt_data_32[15]
             channelConfigs[fadcIndex][channelIndex]["SampleOffset"] = evt_data_32[16]
-            
-            
-        
+
+
+
         if self.verbose > 0:
             pprint(channelConfigs)
-            
+
         #self.chConfigs = channelConfigs
-        
+
         self.currentEventIndex=-1   #points to header of next chunk, not to event
         self.currentChunkIndex=0    #points to first chunk of file
-            
+
         return channelConfigs
-        
-        
+
+
     def __read_chunk_header(self):
         """
         reads the header of the chunk
@@ -147,58 +148,58 @@ class llama_3316:
         header = self.f_in.read(8)
         if len(header) < 8:
             raise BinaryReadException(8, len(header))
-        
+
         header_data_32 = np.fromstring(header, dtype=np.uint32)
-        
+
         self.currentEventIndex=0   #points to first event of chunk
- 
+
         if header_data_32[1] == 0:
             if self.verbose > 1:
                 print("Warning: having a chunk with 0 events")
-        
+
         return header_data_32[0], header_data_32[1]
-    
-    
+
+
     def __read_next_event(self, fadcID, channelConfigs, nrEventsPerChunk):
         """
         reads a chunk of data containing event data (event header and samples)
         file pointer has to be on beginning of event, NOT on chunk header
         Returns the channelID of the Event, as well as the chunk of data
         """
-        
+
         if self.currentEventIndex == -1:
             print("ERROR: pointing at chunk header!")
             return None
-            
+
         if self.verbose > 1:
             print("Reading chunk #{} event #{}".format(self.currentChunkIndex, self.currentEventIndex))
-        
+
         position = self.f_in.tell()     #save position of the event header's 1st byte
         data1 = self.f_in.read(4)       #read the first (32 bit) word of the event's header: channelID & format bits
         if len(data1) < 4:
             raise BinaryReadException(4, len(data1))
         self.f_in.seek(position)        #go back to 1st position of event header
-        
+
         header_data_32 = np.fromstring(data1, dtype=np.uint32)
         channelID = (header_data_32[0] >> 4) & 0x00000fff
         if self.verbose > 1:
             print("Event is from FADC #{}, channel #{}".format(fadcID, channelID))
         eventLength8 = channelConfigs[fadcID][channelID]["EventLength"]
         eventLength8 *= 4 #EventLength is in 32 bit
-        
+
         data = self.f_in.read(eventLength8)
         if len(data) < eventLength8:
             raise BinaryReadException(eventLength8, len(data))
-    
+
         self.currentEventIndex += 1     #move to next event
         if(self.currentEventIndex == nrEventsPerChunk): #if this event was the last of the chunk
             self.currentEventIndex = -1     #points to header of next chunk, not to event
             self.currentChunkIndex += 1     #points to next chunk of file
-    
-    
+
+
         return channelID, data
-    
-    
+
+
     def read_next_event(self, channelConfigs):
         """
         This should be the main method to call when parsing the file for events.
@@ -208,9 +209,9 @@ class llama_3316:
         when appropriate.
         returns FADCindex, channelIndex, binaryEventData
         """
-        
+
         # have to extract channel index from binary, since we need the length of the event, which can change between channels
-        
+
         if self.currentEventIndex == -1:     #points to header of next chunk, not to event
             self.currentChunkSize = 0
             try:
@@ -219,32 +220,32 @@ class llama_3316:
             except BinaryReadException as e:
                 #print("  No more data...\n")
                 return -1,-1,None
-                
+
         try:
             channelID, binary_data = self.__read_next_event(self.currentFADC, channelConfigs, self.currentChunkSize)
         except BinaryReadException as e:
             #print("  No more data...\n")
             return -1,-1,None
-            
+
         return self.currentFADC, channelID, binary_data
-        
-    
-    
+
+
+
 class BinaryReadException(Exception):
 
     def __init__(self, requestedNrOfBytes, gotNrOfBytes):
         self.reqNOB = requestedNrOfBytes
         self.gotNOB = gotNrOfBytes
-    
+
     def printMessage(self):
         print("Exception: tried to read {} bytes, got {} bytes".format(self.reqNOB, self.gotNOB))
-    
+
 
 
 class LLAMAStruck3316(DataTaker):
-    """ 
+    """
     decode Struck 3316 digitizer data
-    
+
     TODO:
     handle per-channel data (gain, ...)
     most metadata of Struck header (energy, ...)
@@ -281,7 +282,7 @@ class LLAMAStruck3316(DataTaker):
 
         self.config_names = []  #TODO at some point we want the metainfo here
         self.file_config = {}
-        if metadata is not None: 
+        if metadata is not None:
             self.file_config = self.readMetadata(metadata)
             print("We have {} adcs and {} samples per WF.".format(self.file_config["nadcs"],self.file_config["nsamples"]))
 
@@ -289,7 +290,7 @@ class LLAMAStruck3316(DataTaker):
 
         # self.event_header_length = 1 #?
         self.sample_period = 0  # ns, I will set this later, according to header info
-        self.gain = 0           
+        self.gain = 0
         self.h5_format = "table"	#was table
         #self.n_blsamp = 2000
         self.ievt = 0       #event number
@@ -322,7 +323,7 @@ class LLAMAStruck3316(DataTaker):
         configs["nadcs"] = totChan
         configs["nsamples"] = nsamples
         return configs
-        
+
     def initialize(self, sample_period, gain):
         """
         sets certain global values from a run, like:
@@ -332,22 +333,22 @@ class LLAMAStruck3316(DataTaker):
         """
         self.sample_period = sample_period
         self.gain = gain
-        
-        
-    def decode_event(self, event_data_bytes, packet_id, header_dict, fadcIndex, 
+
+
+    def decode_event(self, event_data_bytes, packet_id, header_dict, fadcIndex,
                      channelIndex, verbose=False):
         """
         see the llamaDAQ documentation for data word diagrams
         """
-        
+
         if self.sample_period == 0:
             print("ERROR: Sample period not set; use initialize() before using decode_event() on SIS3316Decoder")
             raise Exception ("Sample period not set")
-        
+
         # parse the raw event data into numpy arrays of 16 and 32 bit ints
         evt_data_32 = np.fromstring(event_data_bytes, dtype=np.uint32)
         evt_data_16 = np.fromstring(event_data_bytes, dtype=np.uint16)
-        
+
         # e sti gran binaries non ce li metti
         timestamp = ((evt_data_32[0] & 0xffff0000) << 16) + evt_data_32[1]
         format_bits = (evt_data_32[0]) & 0x0000000f
@@ -365,7 +366,7 @@ class LLAMAStruck3316(DataTaker):
             offset += 7
         else:
             peakhigh_value = 0
-            peakhigh_index = 0  
+            peakhigh_index = 0
             information = 0
             accumulator1 = accumulator2 = accumulator3 = accumulator4 = accumulator5 = accumulator6 = 0
             pass
@@ -395,8 +396,8 @@ class LLAMAStruck3316(DataTaker):
         offset += 1 #now the offset points to the wf data
         fadcID = fadcIndex
         channel = channelIndex
-        
-        
+
+
         # compute expected and actual array dimensions
         wf_length16 = 2 * wf_length_32
         header_length16 = offset * 2
@@ -525,12 +526,20 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
         digitizer.save_to_pytables(filename_mod, verbose)
 
 
+    n_entries = 0
+    unit = "B"
+    if n_max < np.inf and n_max > 0:
+        n_entries = n_max
+        unit = "id"
+    else:
+        n_entries = file_size
+    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
+    file_position = 0
+
+
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
         packet_id += 1
-
-        if verbose and packet_id % 1000 == 0:
-            update_progress(float(f_in.tell()) / file_size)
 
         # write periodically to the output file instead of writing all at once
         if packet_id % ROW_LIMIT == 0:
@@ -550,15 +559,21 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
         # sends data to the pandas dataframe
         decoder.decode_event(event_data, packet_id, header_dict, fadcID, channelID)
 
+        if verbose:
+            update_len = 0
+            if n_max < np.inf and n_max > 0:
+                update_len = 1
+            else:
+                update_len = f_in.tell() - file_position
+                file_position = f_in.tell()
+            update_progress(progress_bar, update_len)
+
     print("done.  last packet ID:", packet_id)
     f_in.close()
 
     # final write to file
     for d in decoders:
         d.save_to_lh5(raw_filename)
-
-    if verbose:
-        update_progress(1)
 
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
@@ -572,6 +587,3 @@ def process_llama_3316(daq_filename, raw_filename, run, n_max, config, verbose):
     with pd.HDFStore(raw_filename,'r') as store:
         print(store.keys())
     #    # print(store.info())
-
-
-

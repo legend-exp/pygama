@@ -11,8 +11,8 @@ from fc.fc_streamer import FCStreamer
 #from stream_fc import *
 
 
-def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192, 
-                    n_max=np.inf, overwrite=True, verbosity=0)
+def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192, 
+              n_max=np.inf, overwrite=True, verbosity=0)
     """ Convert data into LEGEND hdf5 `raw` format.  
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
@@ -109,10 +109,8 @@ def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
         return
 
     # initialize the stream and read header. Also initializes rb_lib
-    header_data, n_bytes = streamer.initialize(in_stream, in_stream_type, rb_lib, 
-                                               buffer_size=buffer_size, verbosity=verbosity)
-    bytes_processed += n_bytes
-    if verbosity > 0: update_progress(float(n_bytes)/in_stream_size)
+    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+    if verbosity > 0: update_progress(float(streamer.n_bytes_read)/in_stream_size)
 
     # rb_lib should now be fully initialized. Check if files need to be
     # overwritten or if we need to stop to avoid overwriting
@@ -134,9 +132,8 @@ def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
 
     # Now loop through the data
     while True:
-        chunk_list, n_bytes = streamer.read_chunk(full_only=True, verbosity=verbosity)
-        bytes_processed += n_bytes
-        if verbosity > 0: update_progress(float(n_bytes)/in_stream_size)
+        chunk_list = streamer.read_chunk(full_only=True, verbosity=verbosity)
+        if verbosity > 0: update_progress(float(streamer.n_bytes_read)/in_stream_size)
         for rb in chunk_list:
             if rb.loc > n_max: rb.loc = n_max
             n_max -= rb.loc
@@ -144,7 +141,7 @@ def build_raw_files(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
         if len(chunk_list) == 0 or n_max == 0: break
     if verbosity > 0: update_progress(1)
 
-    # Write out all buffers with any data
+    # Write out any buffers with data still in them
     all_rbs = []
     for rb_list in rb_lib.values(): all_rbs += rb_list
     write_to_lh5_and_clear(chunk_list, lh5_store)

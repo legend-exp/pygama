@@ -1,7 +1,9 @@
 import sys, gzip
 import numpy as np
 import plistlib
-from ..utils import update_progress
+
+from tqdm.std import tqdm
+from ..utils import tqdm_range, update_progress
 from .io_base import DataDecoder
 from pygama import lh5
 from .ch_group import *
@@ -34,7 +36,7 @@ class OrcaDecoder(DataDecoder):
 
 
 def open_orca(orca_filename):
-    if orca_filename.endswith('.gz'): 
+    if orca_filename.endswith('.gz'):
         return gzip.open(orca_filename.encode('utf-8'), 'rb')
     else: return open(orca_filename.encode('utf-8'), 'rb')
 
@@ -171,7 +173,54 @@ def get_object_info(header_dict, orca_class_name):
                 object_info_list.append(card)
 
     if len(object_info_list) == 0:
-        print('OrcaDecoder::get_object_info(): Warning: no object info')
+        print('OrcaDecoder::get_object_info(): Warning: no object info '
+              'for class name', orca_class_name)
+    return object_info_list
+
+
+def get_readout_info(header_dict, orca_class_name, unique_id=-1):
+    """
+    retunrs a list with all the readout list info from the header with name
+    orca_class_name.  optionally, if unique_id >= 0 only return the list for
+    that Orca unique id number.
+    """
+    object_info_list = []
+    try:
+        readouts = header_dict["ReadoutDescription"]
+        for readout in readouts:
+            try:
+                if readout["name"] == orca_class_name:
+                    if unique_id >= 0:
+                        if obj["uniqueID"] != unique_id: continue
+                    object_info_list.append(readout)
+            except KeyError: continue
+    except KeyError: pass
+    if len(object_info_list) == 0:
+        print('OrcaDecoder::get_readout_info(): warning: no readout info '
+              'for class name', orca_class_name)
+    return object_info_list
+
+
+def get_auxhw_info(header_dict, orca_class_name, unique_id=-1):
+    """
+    returns a list with all the info from the AuxHw table of the header
+    with name orca_class_name.  optionally, if unique_id >= 0 only return
+    the object for that Orca unique id number.
+    """
+    object_info_list = []
+    try:
+        objs = header_dict["ObjectInfo"]["AuxHw"]
+        for obj in objs:
+            try:
+                if obj["Class Name"] == orca_class_name:
+                    if unique_id >= 0:
+                        if obj["uniqueID"] != unique_id: continue
+                    object_info_list.append(obj)
+            except KeyError: continue
+    except KeyError: pass
+    if len(object_info_list) == 0:
+        print('OrcaDecoder::get_auxhw_info(): warning: no object info '
+              'for class name', orca_class_name)
     return object_info_list
 
 
@@ -237,7 +286,7 @@ def get_channel(ccc):
 
 # Import orca_digitizers so that the list of OrcaDecoder.__subclasses__ gets populated
 # Do it here so that orca_digitizers can import the functions above here
-from . import orca_digitizers
+from . import orca_digitizers, orca_flashcam
 
 def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """
@@ -282,10 +331,10 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
 
     # By default we decode all data for which we have decoders. If the user
     # provides a ch_group_dict, we will only decode data from decoders keyed in
-    # the dict. 
+    # the dict.
     decode_all_data = True
     decoders_to_run = dn2id_dict.keys()
-    if ch_groups_dict is not None: 
+    if ch_groups_dict is not None:
         decode_all_data = False
         decoders_to_run = ch_groups_dict.keys()
 
@@ -312,7 +361,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             print("warning: no decoder exists for", decoder_name, "... will skip its data.")
         else: new_dtr.append(decoder_name)
     decoders_to_run = new_dtr
-    
+
     # prepare ch groups
     if ch_groups_dict is None:
         ch_groups_dict = {}
@@ -333,7 +382,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         ch_groups = ch_groups_dict[decoder_name]
         ch_tables_dict[data_id] = build_tables(ch_groups, buffer_size, dec)
     max_tbl_size = 0
-    
+
     # -- scan over raw data --
     print("Beginning daq-to-raw processing ...")
 
@@ -344,12 +393,19 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     # reclen is in number of longs, and we want to skip a number of bytes
     f_in.seek(reclen * 4)
 
+    n_entries = 0
+    unit = "B"
+    if n_max < np.inf and n_max > 0:
+        n_entries = n_max
+        unit = "id"
+    else:
+        n_entries = file_size
+    progress_bar = tqdm_range(0, int(n_entries), text="Processing", verbose=verbose, unit=unit)
+    file_position = 0
+
     # start scanning
     while (packet_id < n_max and f_in.tell() < file_size):
         packet_id += 1
-
-        if verbose and packet_id % 1000 == 0:
-            update_progress(float(f_in.tell()) / file_size)
 
         try:
             packet, data_id = get_next_packet(f_in)
@@ -366,7 +422,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
 
         if data_id not in decoders: continue
         decoder = decoders[data_id]
-        
+
         # Clear the tables if the next read could overflow them.
         # Only have to check this when the max table size is within
         # max_n_rows_per_packet of being full.
@@ -375,7 +431,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             max_tbl_size = 0
             for group_info in ch_groups.values():
                 tbl = group_info['table']
-                if tbl.is_full(): 
+                if tbl.is_full():
                     group_path = group_info['group_path']
                     out_file = group_info['out_file']
                     lh5_store.write_object(tbl, group_path, out_file, n_rows=tbl.loc)
@@ -385,6 +441,14 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
 
         tables = ch_tables_dict[data_id]
         decoder.decode_packet(packet, tables, packet_id, header_dict)
+
+        if verbose:
+            if n_max < np.inf and n_max > 0:
+                update_len = 1
+            else:
+                update_len = f_in.tell() - file_position
+                file_position = f_in.tell()
+            update_progress(progress_bar, update_len)
 
 
     print("Done. Last packet ID:", packet_id)
@@ -401,13 +465,13 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
             print('last write')
             tbl.clear()
 
-    if verbose:
-        update_progress(1)
-
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
-            print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            try:
+                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            except KeyError:
+                print("  {}: Unknown".format(data_id))
         print("hopefully they weren't important!\n")
 
     print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))

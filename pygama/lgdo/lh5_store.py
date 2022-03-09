@@ -484,7 +484,7 @@ class LH5Store:
                 if n_rows == 0: 
                     tmp_shape = (0,) + h5f[name].shape[1:]
                     nda = np.empty(tmp_shape, h5f[name].dtype)
-                else: nda = h5f[name][:][source_sel]
+                else: nda = h5f[name][source_sel]
 
             # special handling for bools 
             # (c and Julia store as uint8 so cast to bool)
@@ -713,7 +713,7 @@ def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
         A list of parameters to read from each file
     lh5_group : str (optional)
         Optional group path within which to find the specified parameters
-    idx_list : list of index arrays
+    idx_list : list of index arrays, or a list of such lists
         For fancy-indexed reads. Must be one idx array for each file in f_list
     verbose : bool
         Print info on loaded data
@@ -725,7 +725,14 @@ def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
         Each entry contains the data for the specified parameter concatenated
         over all files in f_list
     """
-    if isinstance(f_list, str): f_list = [f_list]
+    if isinstance(f_list, str): 
+        f_list = [f_list]
+        if idx_list is not None: 
+            idx_list = [idx_list]
+    if idx_list is not None and len(f_list) != len(idx_list):
+        print(f"load_nda: f_list len ({len(f_list)}) != idx_list len ({len(idx_list)})!")
+        return None
+
     # Expand wildcards
     f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
     if verbose:
@@ -733,9 +740,14 @@ def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
 
     sto = LH5Store()
     par_data = {par : [] for par in par_list}
-    for f in f_list:
+    for ii, f in enumerate(f_list):
+        f = sto.gimme_file(f, 'r')
         for par in par_list:
-            data, _ = sto.read_object(f'{lh5_group}/{par}', f)
+            if f'{lh5_group}/{par}' not in f:
+                print(f'{lh5_group}/{par} not in file {f_list[ii]}')
+                return None
+            if idx_list is None: data, _ = sto.read_object(f'{lh5_group}/{par}', f)
+            else: data, _ = sto.read_object(f'{lh5_group}/{par}', f, idx=idx_list[ii])
             if not data: continue
             par_data[par].append(data.nda)
     par_data = {par : np.concatenate(par_data[par]) for par in par_list}
@@ -759,7 +771,7 @@ def load_dfs(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
         Contains columns for each parameter in par_list, and rows containing all
         data for the associated parameters concatenated over all files in f_list
     """
-    return pd.DataFrame( load_nda(f_list, par_list, lh5_group, verbose) )
+    return pd.DataFrame( load_nda(f_list, par_list, lh5_group=lh5_group, idx_list=idx_list, verbose=verbose) )
 
 
 class LH5Iterator:
