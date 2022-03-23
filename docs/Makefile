@@ -1,3 +1,4 @@
+SPHINXAPIDOC  ?= sphinx-apidoc
 SPHINXBUILD   ?= sphinx-build
 SPHINXMULTI   ?= sphinx-multiversion
 SOURCEDIR     = source
@@ -13,6 +14,9 @@ this:
 
 info:
 	@$(SPHINXMULTI) --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
+
+regenerate-rst:
+	@$(SPHINXAPIDOC) -f -o $(SOURCEDIR) ../pygama
 
 clean:
 	rm -rf "$(BUILDDIR)"
