@@ -28,6 +28,31 @@ templates_path = ['_templates']
 pygments_style = 'sphinx'
 html_theme = 'sphinx_rtd_theme'
 
+# list here pygama dependencies that are not required for building docs and
+# could be unmet at build time
+autodoc_mock_imports = [
+    'pandas',
+    'numpy',
+    'matplotlib',
+    'mplhep',
+    'scimath',
+    'numba',
+    'pytest',
+    'pyhf',
+    'awkward',
+    'iminuit',
+    'boost-histogram',
+    'hepunits',
+    'hepstats',
+    'uproot',
+    'h5py',
+    'pint',
+    'pyfftw',
+    'tqdm',
+    'tinydb',
+    'parse'
+]
+
 # sphinx-napoleon
 # enforce consistent usage of NumPy-style docstrings
 napoleon_numpy_docstring = True
