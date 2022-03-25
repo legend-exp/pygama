@@ -58,20 +58,21 @@ jobs:
           python-version: 3.8
       - name: Setup build environment
         run: |
-          git fetch --no-tags --prune --no-recurse-submodules --depth=1 origin
+          git fetch --prune --no-recurse-submodules --depth=1 origin
           .github/workflows/get-dependencies.sh
-          pip install sphinx sphinx-rtd-theme sphinx-multiversion
+          pip install sphinx sphinx-rtd-theme myst-parser
+          pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
       - name: Build docs for current ref
         run: |
           cd docs
           make clean
-          make this
+          make
       - name: Build docs for selected versions (GitHub pages)
         run: |
           cd docs
           make clean
-          make info
-          make
+          make allver-info
+          make allver
       - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
         uses: JamesIves/github-pages-deploy-action@v4.2.2
