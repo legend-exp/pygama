@@ -1,18 +1,28 @@
-SPHINXBUILD   ?= sphinx-build
-SPHINXMULTI   ?= sphinx-multiversion
-SOURCEDIR     = source
-BUILDDIRALL   = build/allver/html
-BUILDDIR      = build
+SOURCEDIR = source
+BUILDDIR = build
 
-all: this
-	@$(SPHINXMULTI) "$(SOURCEDIR)" "$(BUILDDIRALL)"
+# docs for all project versions will be placed here
+BUILDDIRALL = $(BUILDDIR)/allver/html
+
+# list in source/.py_api_exclude files or directories that should be excluded
+# from the API auto-generated documentation. No regex allowed
+PY_SOURCE_EXCLUDE = $(shell cat source/.py_api_exclude)
+
+all: apidoc
+	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)"
+
+allver:
+	sphinx-multiversion "$(SOURCEDIR)" "$(BUILDDIRALL)"
 	cp source/_assets/redirect.html "$(BUILDDIRALL)/index.html"
 
-this:
-	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+allver-info:
+	sphinx-multiversion --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
 
-info:
-	@$(SPHINXMULTI) --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
+apidoc: clean-apidoc
+	sphinx-apidoc --module-first --force --output-dir "$(SOURCEDIR)/generated" ../pygama $(PY_SOURCE_EXCLUDE)
 
-clean:
+clean-apidoc:
+	rm -rf "$(SOURCEDIR)/generated"
+
+clean: clean-apidoc
 	rm -rf "$(BUILDDIR)"
