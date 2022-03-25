@@ -48,16 +48,13 @@ smv_released_pattern = '^$'
 smv_outputdir_format = '{ref.name}'
 smv_prefer_remote_refs = False
 
-with open(os.path.dirname(__file__) + '/.py_api_exclude') as f:
-    py_exc = f.read().replace('\n', ' ')
-
 # HACK: we need to regenerate the API documentation before the actual build,
 # but it's not possible with the current sphinx-multiversion. Changes have been
 # proposed in this PR: https://github.com/Holzhaus/sphinx-multiversion/pull/62
 # but there's no timeline for merging yet. For the following option to be considered,
 # one needs to install sphinx-multiversion from a fork with the following:
 # $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
-smv_prebuild_command = 'sphinx-apidoc -M -f -o source/generated ../pygama ' + py_exc
+smv_prebuild_command = 'make -ik apidoc'
 
 # The right way to find all docs versions is to look for matching branches on
 # the default remote

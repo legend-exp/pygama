@@ -18,9 +18,11 @@ allver:
 allver-info:
 	sphinx-multiversion --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
 
-apidoc:
+apidoc: clean-apidoc
 	sphinx-apidoc --module-first --force --output-dir "$(SOURCEDIR)/generated" ../pygama $(PY_SOURCE_EXCLUDE)
 
-clean:
-	rm -rf "$(BUILDDIR)"
+clean-apidoc:
 	rm -rf "$(SOURCEDIR)/generated"
+
+clean: clean-apidoc
+	rm -rf "$(BUILDDIR)"
