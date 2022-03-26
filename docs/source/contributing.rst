@@ -33,6 +33,9 @@ Testing
 Versioning
 ----------
 
+Collaborators with push access that wish to release a new pygama version must
+do so by following these steps:
+
 * `Semantic versioning <https://semver.org>`_ is adopted. The version string
   uses the ``MAJOR.MINOR.PATCH`` format.
 * The version string is manually specified in ``pygama/version.py``. If needed
@@ -43,7 +46,8 @@ Versioning
   * The *pygama* version is updated in ``pygama/version.py``
   * A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
     the code at the intended stage is created
-  * The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0 -m 'short descriptive message here'`` (note the ``v``)
+  * The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
+    -m 'short descriptive message here'`` (note the ``v``)
   * Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
 
 * To release a new patch version, the following procedure should be followed:
@@ -57,9 +61,59 @@ Versioning
 Documentation
 -------------
 
+We adopt best practices in writing and maintaining pygama's documentation. When
+contributing to the project, make sure to implement the following:
+
 * Documentation should be exclusively available on the package website
   https://legend-exp.github.io/pygama. No READMEs, GitHub/LEGEND wiki pages
   should be written.
-* Jupyter notebooks should be added to the Git repository below ``tutorials/``.
 * Pull request authors are required to provide sufficient documentation (mainly
   as *docstrings*) for every proposed change or addition.
+* Documentation for functions, classes, modules and packages should be provided
+  as `Docstrings <https://peps.python.org/pep-0257>`_ along with the respective
+  source code. Docstrings are automatically converted to HTML as part of the
+  :ref:`pygama API documentation <pygama package>`.
+* General guides, comprehensive tutorials or other high-level documentation
+  (e.g. referring to how separate parts of the code interact between each
+  other) must be provided as separate pages in ``docs/source/`` and linked in
+  the table of contents.
+* Jupyter notebooks should be added to the pygama Git repository below
+  ``tutorials/``.
+* Before submitting a pull request, contributors are required to build the
+  documentation locally and resolve and warnings or errors.
+
+Writing documentation
+^^^^^^^^^^^^^^^^^^^^^
+
+*In progress...*
+
+Building the documentation
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Scripts and tools to build documentation are located below ``docs/``. To build
+documentation, the ``sphinx``, ``sphinx-rtd-theme`` and ``sphinx-multiversion``
+Python packages are required. At the moment, pygama is using a ``sphinx-multiversion``
+functionality only available through a fork of the project
+(``samtygier-stfc/sphinx-multiversion``, at the ``prebuild_command`` branch). With pip,
+it can be installed with the following command: ::
+
+    > pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+
+This will probably change in the future. To build documentation for the current
+Git ref, run the following commands: :: 
+
+    > cd docs
+    > make clean
+    > make
+
+Documentation can be then displayed by opening ``build/html/index.html`` with a
+web browser.  To build documentation for all main pygama versions (development
+branch and stable releases), run ::
+
+    > git fetch --prune origin
+    > cd docs
+    > make clean
+    > make allver
+
+and display the documentation by opening ``build/allver/html/index.html``. This
+documentation is also deployed to the pygama website.
