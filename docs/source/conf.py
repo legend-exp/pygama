@@ -13,6 +13,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
     'sphinx_rtd_theme',
     'sphinx_multiversion',
     'myst_parser'
@@ -57,6 +58,17 @@ autodoc_mock_imports = [
 # enforce consistent usage of NumPy-style docstrings
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
+
+# intersphinx
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'numba': ('https://numba.readthedocs.io/en/stable', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'pandas': ('https://pandas.pydata.org/docs', None),
+    'matplotlib': ('http://matplotlib.org/stable', None),
+    'iminuit': ('https://iminuit.readthedocs.io/en/stable', None)
+}
 
 # sphinx-autodoc
 # Include __init__() docstring in class docstring
