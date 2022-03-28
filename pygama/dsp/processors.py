@@ -28,7 +28,7 @@ advantages:
    Loops are slow in python since it is an interpreted language; vectorized
    commands remove the loop and only call the Python interpreter once.
 
-   Furthermore, :class:`ufuncs` are capable of `broadcasting
+   Furthermore, :class:`ufunc`\ s are capable of `broadcasting
    <https://docs.scipy.org/doc/numpy/reference/ufuncs.html#broadcasting>`_
    their dimensions. This involves a safety check to ensure the dimensions of
    ``a`` and ``b`` are compatible sizes. It also will automatically replicate a
@@ -36,26 +36,26 @@ advantages:
    a vector quantity. This is useful, as it allows us to process multiple
    waveforms at once.
 
-   One of the biggest advantages of vectorized :class:`ufuncs` is that many of
+   One of the biggest advantages of vectorized :class:`ufunc`\ s is that many of
    them will take advantage of SIMD (same input-multiple data) vectorization on
    a vector-CPU. Modern CPUs typically have 256- or 512-bit wide processing
    units, which can accommodate multiple 32- or 64-bit numbers. Programming
    with these, however, is quite difficult and requires specialized commands to
-   be called.  Luckily for us, many NumPy :class`ufunc` will automatically use
+   be called.  Luckily for us, many NumPy :class`ufunc`\ s will automatically use
    these for us, speeding up our code!
 
-3. :class:`ufunc` are capable of calculating their output in place, meaning
+3. :class:`ufunc`\ s are capable of calculating their output in place, meaning
    they can place calculated values in pre-allocated memory rather than
    allocating and returning new values. This is important because memory
    allocation is one of the slowest processes computers can perform, and should
-   be avoided. With :class:`ufunc`, this can be done using the out keyword in
+   be avoided. With :class:`ufunc`\ s, this can be done using the out keyword in
    arguments (ex ``numpy.add(a, b, out=c)``, or more succinctly, ``numpy.add(a,
    b, c)``).  While this may seem counterintuitive at first, the alternative
    (``c = np.add(a,b)`` or ``c = a+b``) causes an entirely new array to be
    allocated, with c pointing at that. These array allocations can add up very
    quickly: ``e = a*b + c*d``, for example, would allocate 3 different arrays:
    one for ``a*b``, one for ``c*d``, and one for the sum of those two. As we
-   write :class:`ufunc`, it is important that we try to use functions that
+   write :class:`ufunc`\ s, it is important that we try to use functions that
    operate in place as much as possible!
 """
 
