@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
-      - dev
       - refactor
       - 'releases/**'
   pull_request:
@@ -33,7 +31,8 @@ jobs:
         .github/workflows/get-dependencies.sh
         python -m pip install .
     - name: Run unit tests
-      run: pytest tests
+      run: |
+        pytest tests
 
   test-in-legend-container:
     name: Test pygama in LEGEND container
@@ -48,7 +47,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install and run unit tests
       run: |
-        pip install .
+        python -m pip install .
         pytest tests
 
   deploy-docs:
