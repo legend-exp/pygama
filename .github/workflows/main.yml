@@ -33,7 +33,7 @@ jobs:
         .github/workflows/get-dependencies.sh
         python -m pip install .
     - name: Run unit tests
-      run: pytest test
+      run: pytest tests
 
   test-in-legend-container:
     name: Test pygama in LEGEND container
@@ -45,7 +45,7 @@ jobs:
     - name: Install and run unit tests
       run: |
         pip install .
-        pytest test
+        pytest tests
 
   deploy-docs:
     name: Deploy documentation on legend-exp.github.io/pygama
