@@ -40,13 +40,3 @@ def test_rb_json_load():
     rb_keyed = rblib['FlashCamEventDecoder'].get_keyed_dict()
     name = rb_keyed[41].out_name
     assert name == 'g041'
-
-
-def test_rb_init():
-    rblist = prb.RawBufferList()
-    rblist.append(prb.RawBuffer())
-    rblist.append(prb.RawBuffer())
-    evt_dec = FCEventDecoder()
-    rblist.make_lgdos(evt_dec, size=888)
-    length = len(rblist[0].lgdo)
-    assert length == 888

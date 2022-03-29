@@ -14,8 +14,8 @@ def test_mostly_gauss_fwhm():
            [0, 0, 0, 0, 0, 0, 1e-16]] # damp2
     mu, sig, hstep, htail, tau, bg0, amp = pars
     fwhm, dfwhm = pgf.radford_fwhm(sig, htail, tau, cov)
-    assert fwhm == approx(2.3548)
-    assert dfwhm == approx(0.23548)
+    assert fwhm == approx(2.3548, rel=1E-5)
+    assert dfwhm == approx(2.3548E-8, rel=1E-5)
 
 
 def test_mostly_exp_fwhm():
@@ -29,5 +29,5 @@ def test_mostly_exp_fwhm():
            [0, 0, 0, 0, 0, 0, 1e-16]] # damp2
     mu, sig, hstep, htail, tau, bg0, amp = pars
     fwhm, dfwhm = pgf.radford_fwhm(sig, htail, tau, cov)
-    assert fwhm == approx(2)
-    assert dfwhm == approx(np.log(2)/10)
+    assert fwhm == approx(np.log(2), rel=1E-5)
+    assert dfwhm == approx(np.log(2)/10, rel=1E-5)
