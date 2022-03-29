@@ -38,7 +38,11 @@ jobs:
   test-in-legend-container:
     name: Test pygama in LEGEND container
     runs-on: ubuntu-latest
-    container: docker://legendexp/legend-base:latest
+    container: docker://legendexp/legend-base:${{ matrix.docker-tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        docker-tag: [latest, ubuntu]
 
     steps:
     - uses: actions/checkout@v2
