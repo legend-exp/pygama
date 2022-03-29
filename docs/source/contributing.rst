@@ -5,63 +5,48 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
-Coding style
-------------
+Code style
+----------
 
 *In progress...*
 
 Testing
 -------
 
-* The *pygama* test suite is available below ``test/``
-* Open source best practices are adopted. In particular:
+* The *pygama* test suite is available below ``tests/``. We use `pytest
+  <https://docs.pytest.org>`_ to run tests and analyze their output. As
+  a starting point to learn how to write good tests, reading of `the
+  Scikit-HEP Intro to testing <https://scikit-hep.org/developer/pytest>`_ is
+  recommended.
+* *pygama* tests belong to three categories:
 
-  * Tests are provided for each class/method separately (*micro-testing*) e.g.
-    (for each single DSP processor)
-  * High-level tests of realistic applications are provided (e.g. full
-    production of a real data sample)
+  :micro-tests: Should ensure the correct behaviour of each function
+      independently, possibly without relying on other *pygama* methods. The
+      existence of these microscopic tests makes it possible to promptly
+      identify and fix the source of a bug. An example of this are tests for
+      each single DSP processor
 
-* Unit tests are automatically run for every push event and pull request to
-  the remote Git repository on a build server (currently GitHub actions)
-* Every pull request must pass all tests before being approved for merging
-* Pull request authors are required to provide tests with sufficient coverage
-  for every proposed change or addition. If necessary, global tests (e.g. tests
-  of full production chain) should be updated.
+  :integration tests: Should ensure that independent parts of the code base
+      work well together and are integrated in a cohesive framework. An example
+      of this is testing whether :func:`moduleA.process_obj` is able to
+      correctly handle :class:`moduleB.DataObj`
 
-*In progress...*
+  :functional tests: High-level tests of realistic applications. An example is
+      testing whether the processing of a real or synthetic data sample yields
+      consistent output parameters
 
-Versioning
-----------
-
-Collaborators with push access to the GitHub repository that wish to release a
-new project version must implement the following procedures:
-
-* `Semantic versioning <https://semver.org>`_ is adopted. The version string
-  uses the ``MAJOR.MINOR.PATCH`` format.
-* The version string is manually specified in ``pygama/version.py``. If needed
-  elsewhere in the source code (e.g. in ``setup.py``), must be read in from here.
-* To release a new **minor** or **major version**, the following procedure
-  should be followed:
-
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
-     the code at the intended stage is created
-  3. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
-     -m 'short descriptive message here'`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
-
-* To release a new **patch version**, the following procedure should be followed:
-
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A commit with the patch is created on the relevant release branch
-     ``releases/vMAJOR.MINOR``
-  3. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+* Unit tests are automatically run for every push event and pull request to the
+  remote Git repository on a remote server (currently handled by GitHub
+  actions). Every pull request must pass all tests before being approved for
+  merging
+* Additionally, pull request authors are required to provide tests with
+  sufficient code coverage for every proposed change or addition. If necessary,
+  high-level functional tests should be updated.
 
 Documentation
 -------------
 
-We adopt best practices in writing and maintaining pygama's documentation. When
+We adopt best practices in writing and maintaining *pygama*'s documentation. When
 contributing to the project, make sure to implement the following:
 
 * Documentation should be exclusively available on the Project website
@@ -110,7 +95,7 @@ Building documentation
 
 Scripts and tools to build documentation are located below ``docs/``. To build
 documentation, the ``sphinx``, ``sphinx-rtd-theme`` and ``sphinx-multiversion``
-Python packages are required. At the moment, pygama is using a ``sphinx-multiversion``
+Python packages are required. At the moment, *pygama* is using a ``sphinx-multiversion``
 functionality only available through a fork of the project
 (``samtygier-stfc/sphinx-multiversion``, at the ``prebuild_command`` branch). With pip,
 it can be installed with the following command:
@@ -129,7 +114,7 @@ Git ref, run the following commands:
     $ make
 
 Documentation can be then displayed by opening ``build/html/index.html`` with a
-web browser.  To build documentation for all main pygama versions (development
+web browser.  To build documentation for all main *pygama* versions (development
 branch and stable releases), run
 
 .. code-block:: console
@@ -140,4 +125,32 @@ branch and stable releases), run
     $ make allver
 
 and display the documentation by opening ``build/allver/html/index.html``. This
-documentation is also deployed to the pygama website.
+documentation is also deployed to the *pygama* website.
+
+Versioning
+----------
+
+Collaborators with push access to the GitHub repository that wish to release a
+new project version must implement the following procedures:
+
+* `Semantic versioning <https://semver.org>`_ is adopted. The version string
+  uses the ``MAJOR.MINOR.PATCH`` format.
+* The version string is manually specified in ``pygama/version.py``. If needed
+  elsewhere in the source code (e.g. in ``setup.py``), must be read in from here.
+* To release a new **minor** or **major version**, the following procedure
+  should be followed:
+
+  1. The *pygama* version is updated in ``pygama/version.py``
+  2. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
+     the code at the intended stage is created
+  3. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
+     -m 'short descriptive message here'`` (note the ``v``)
+  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+
+* To release a new **patch version**, the following procedure should be followed:
+
+  1. The *pygama* version is updated in ``pygama/version.py``
+  2. A commit with the patch is created on the relevant release branch
+     ``releases/vMAJOR.MINOR``
+  3. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
+  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
