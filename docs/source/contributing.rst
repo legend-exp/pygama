@@ -1,5 +1,5 @@
-Contribution guidelines
-=======================
+Contribution guide
+==================
 
 The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests

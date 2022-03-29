@@ -2,11 +2,11 @@
 
 import pathlib
 import sys
-import os
+
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, LEGEND Collaboration'
+copyright = '2020, the LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
@@ -26,8 +26,12 @@ source_suffix = {
 }
 master_doc = 'index'
 language = 'python'
+# in _templates/ we have a custom layout.html to include the version menu
+# (adapted from sphinx-multiversion docs)
 templates_path = ['_templates']
 pygments_style = 'sphinx'
+
+# readthedocs.io Sphinx theme
 html_theme = 'sphinx_rtd_theme'
 
 # list here pygama dependencies that are not required for building docs and
