@@ -48,6 +48,7 @@ class DataDecoder(ABC):
     def get_keys_list(self): 
         """ overload with list of keys for this decoder.
         e.g. `return range(n_channels)`
+        or   `return [None]` for something with no keys
         """
         pass
 
