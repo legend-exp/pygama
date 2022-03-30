@@ -17,7 +17,9 @@ Testing
   <https://docs.pytest.org>`_ to run tests and analyze their output. As
   a starting point to learn how to write good tests, reading of `the
   Scikit-HEP Intro to testing <https://scikit-hep.org/developer/pytest>`_ is
-  recommended.
+  recommended. Refer to `pytest's how-to guides
+  <https://docs.pytest.org/en/stable/how-to/index.html>`_ for a complete
+  overview.
 * *pygama* tests belong to three categories:
 
   :micro-tests: Should ensure the correct behaviour of each function
