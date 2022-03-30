@@ -31,7 +31,8 @@ class FCStreamer(DataStreamer):
 
 
 
-    def open_stream(self, fcio_filename, rb_lib=None, buffer_size=8192, verbosity=0):
+    def open_stream(self, fcio_filename, rb_lib=None, buffer_size=8192,
+                    chunk_mode='any_full', out_stream='', verbosity=0):
         """ Initialize the FC data stream
 
         Parameters
@@ -58,13 +59,22 @@ class FCStreamer(DataStreamer):
         self.event_decoder.set_file_config(fc_config)
         self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
 
-        # initialize the buffers in rb_lib
-        super().initialize(fcio_filename, rb_lib, buffer_size=buffer_size, verbosity=verbosity)
+        # initialize the buffers in rb_lib. Store them for fast lookup
+        super().initialize(fcio_filename, rb_lib, buffer_size=buffer_size,
+                           chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
         if rb_lib = None: rb_lib = self.rb_lib
+        self.status_rb = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
+        if self.status_rb is not None:
+            if len(self.status_rb) != 1:
+                print(f'warning! status rb_list had length {len(self.status_rb)}, ignoring all but the first')
+            if len(self.status_rb) == 0:
+                self.status_rb = None
+            else: self.status_rb = self.status_rb[0]
+        self.event_rbkd = rb_lib['FCEventDecoder'].get_keyed_dict() if 'FCEventDecoder' in rb_lib else None
 
         # set up data loop variables
-        self.packet_id = 0
-        self.max_numtraces = 0
+        self.packet_id = 0 # for storing packet order in output tables
+        #self.max_numtraces = 0 # for checking that the tables are large enough
 
         if 'FCConfigDecoder' in rb_lib: rb = rb_lib['FCConfigDecoder']
         else: rb = RawBuffer(lgdo=fc_config)
@@ -101,17 +111,33 @@ class FCStreamer(DataStreamer):
         elif rc == 5: # recevent
             print(f'warning: got a RecEvent packet -- skipping?')
             print(f'         n_bytes_read = {self.n_bytes_read}')
-            self.n_bytes_read += 6*4 + 3*10*4 + 1*2304*4 + 3*4000*4 # there are 11 ints in the fcio_config struct
+            # sizeof(fcio_recevent): (6 + 3*10 + 1*2304 + 3*4000)*4 
+            self.n_bytes_read += 57360
             return True
 
         # Status record
         if rc == 4:
-            n_bytes += self.status_decoder.decode_packet(self.fcio, self.status_tbl, self.packet_id)
-            if self.status_tbl.is_full(): return [ self.status_tbl ], n_bytes
+            if self.status_rb is not None:
+                self.any_full |= self.status_decoder.decode_packet(self.fcio,
+                                                                   self.status_rb,
+                                                                   self.packet_id,
+                                                                   verbosity=verbosity)
+            # sizeof(fcio_status): (3 + 10 + 256*(10 + 9 + 16 + 4 + 256))*4
+            self.n_bytes_read += 302132
+            return True
 
         # Event or SparseEvent record
         if rc == 3 or rc == 6:
+            if self.event_rbkd is not None:
+                self.any_full |= self.event_decoder.decode_packet(self.fcio,
+                                                                  self.event_rbkd,
+                                                                  self.packet_id,
+                                                                  verbosity=verbosity)
+            # sizeof(fcio_event): (5 + 3*10 + 1)*4 + numtraces*(1 + nsamples+2)*2
+            self.n_bytes_read += 144 + numtraces*(eventsamples + 3)*2
+            return True
 
+'''
             # check that tables are large enough to read in this packet. If
             # not, exit and return the ones that might overflow
             full_tables = []
@@ -131,7 +157,6 @@ class FCStreamer(DataStreamer):
             # Looks okay: just decode
             n_bytes += self.event_decoder.decode_packet(self.fcio, self.event_tables, self.packet_id)
 
-'''
     # finished with loop. return any tables with data
     tables = []
     for group_info in self.raw_groups.values():

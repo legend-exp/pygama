@@ -64,13 +64,16 @@ class FCStatusDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
 
 
-    def decode_packet(self, fcio, lh5_table, packet_id, verbosity=0):
+    def get_keys_list(self): return [None]
+
+
+    def decode_packet(self, fcio, status_rb, packet_id, verbosity=0):
         """
         access FC status (temp., log, ...)
         """
         # aliases for brevity
-        tbl = lh5_table
-        ii = tbl.loc
+        tbl = status_rb.lgdo
+        ii = status_rb.loc
 
         # status -- 0: Errors occured, 1: no errors
         tbl['status'].nda[ii] = fcio.status
@@ -96,8 +99,7 @@ class FCStatusDecoder(DataDecoder):
         tbl['enverrors'].nda[ii] = fcio.enverrors
         tbl['othererrors'].nda[ii][:] = fcio.othererrors
 
-        tbl.push_row()
+        status_rb.loc += 1
 
-        # sizeof(fcio_status): (3 + 10 + 256*(10 + 9 + 16 + 4 + 256))*4
-        return 302132
+        return len(tbl) - status_rb.loc > 1
 
