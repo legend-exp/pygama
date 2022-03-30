@@ -96,11 +96,16 @@ class RawBuffer:
         self.out_stream = out_stream
         self.out_name = out_name
         self.loc = 0
+        self.fill_safety = 1
 
 
     def __len__(self):
-        if lgdo is None or not hasattr(lgdo, __len__): return 0
+        if lgdo is None: return 0
+        if not hasattr(lgdo, __len__): return 1
         return len(lgdo)
+
+    def is_full(self):
+        return (len(self) - self.loc) < self.fill_safety
 
 
 class RawBufferList(list):
