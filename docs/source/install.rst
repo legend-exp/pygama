@@ -1,22 +1,24 @@
-Installing pygama
-=================
+Installation
+============
 
-Install on local systems with [#f1]_: ::
+Install on local systems with:
 
-    > git clone https://github.com/legend-exp/pygama
-    > pip install -e pygama
+.. code-block:: console
+
+    $ git clone https://github.com/legend-exp/pygama
+    $ pip install -e pygama
 
 You can omit the ``-e`` flag (editable mode) if you do not plan to develop
-pygama. If you do not have admin rights (e.g. at NERSC) you can install pygama
-as a normal user: ::
+pygama. If you do not have admin rights you can install pygama as a normal
+user:
 
-    > pip install -e pygama --user
+.. code-block:: console
 
-To uninstall pygama run: ::
+    $ pip install -e pygama --user
 
-    > pip uninstall pygama
+and make sure that your ``PYTHONPATH`` environment variable is aware of the
+install location. To uninstall pygama run:
 
-To run pygama at NERSC (and set up JupyterHub), we have additional instructions
-`at this link <https://github.com/legend-exp/legend/wiki/Computing-Resources-at-NERSC#configuring-jupyter--nersc>`_.
+.. code-block:: console
 
-.. [#f1] Compatible with python 3.7 and python 3.8
+    $ pip uninstall pygama

@@ -2,17 +2,19 @@
 
 import pathlib
 import sys
-import os
+
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, LEGEND Collaboration'
+copyright = '2020, the LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autosectionlabel',
     'sphinx_rtd_theme',
     'sphinx_multiversion',
     'myst_parser'
@@ -24,8 +26,12 @@ source_suffix = {
 }
 master_doc = 'index'
 language = 'python'
+# in _templates/ we have a custom layout.html to include the version menu
+# (adapted from sphinx-multiversion docs)
 templates_path = ['_templates']
 pygments_style = 'sphinx'
+
+# readthedocs.io Sphinx theme
 html_theme = 'sphinx_rtd_theme'
 
 # list here pygama dependencies that are not required for building docs and
@@ -57,6 +63,17 @@ autodoc_mock_imports = [
 # enforce consistent usage of NumPy-style docstrings
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
+
+# intersphinx
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'numba': ('https://numba.readthedocs.io/en/stable', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'pandas': ('https://pandas.pydata.org/docs', None),
+    'matplotlib': ('http://matplotlib.org/stable', None),
+    'iminuit': ('https://iminuit.readthedocs.io/en/stable', None)
+}
 
 # sphinx-autodoc
 # Include __init__() docstring in class docstring
