@@ -169,6 +169,7 @@ class DataStreamer(ABC):
         only_full = (chunk_mode == 'only_full')
 
         n_packets = 0
+        still_has_data = True
         while True:
             still_has_data = self.read_packet()
             if (not still_has_data) break
@@ -176,16 +177,15 @@ class DataStreamer(ABC):
             if read_one_packet or n_packets > rp_max: break
             if self.any_full break
 
+        # send back all rb's with data if we finished reading
+        if not still_has_data: only_full = False
+
         list_of_rbs = []
         for rb_list in self.rb_lib.items():
             for rb in rb_list:
-                if not only_full and rb.loc > 0: list_of_rbs.append(rb)
-                else:
-                    if not hasattr(rb.lgod, __len__):
-                        if rb.loc > 0: list_of_rbs.append(rb)
-                    else:
-                        if rb.loc == len(rb.lgdo): list_of_rbs.append(rb)
-
+                if not only_full: # any_full or read_one_packet
+                    if rb.loc > 0: list_of_rbs.append(rb)
+                elif rb.is_full(): list_of_rbs.append(rb)
         return list_of_rbs
 
         
