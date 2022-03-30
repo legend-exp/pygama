@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from pygama import lgdo
-from ..raw_groups import *
+from ..raw_buffer import *
 from ..data_streamer import DataStreamer
 from .fc_config_decoder import FCConfigDecoder
 from .fc_event_decoder import FCEventDecoder
@@ -14,7 +14,7 @@ class FCStreamer(DataStreamer):
     and the FlashCam DataDecoders to save the results and write to output.
     """
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
         self.fcio = None
         self.config_decoder = FCConfigDecoder()
         self.status_decoder = FCStatusDecoder()
@@ -62,7 +62,7 @@ class FCStreamer(DataStreamer):
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().initialize(fcio_filename, rb_lib, buffer_size=buffer_size,
                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
-        if rb_lib = None: rb_lib = self.rb_lib
+        if rb_lib is None: rb_lib = self.rb_lib
         self.status_rb = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
         if self.status_rb is not None:
             if len(self.status_rb) != 1:
@@ -95,7 +95,7 @@ class FCStreamer(DataStreamer):
 
         self.packet_id += 1
 
-        elif rc == 1: # config (header) data
+        if rc == 1: # config (header) data
             print(f'warning: got a header after start of run?')
             print(f'         n_bytes_read = {self.n_bytes_read}')
             self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
@@ -116,7 +116,7 @@ class FCStreamer(DataStreamer):
             return True
 
         # Status record
-        if rc == 4:
+        elif rc == 4:
             if self.status_rb is not None:
                 self.any_full |= self.status_decoder.decode_packet(self.fcio,
                                                                    self.status_rb,
@@ -127,7 +127,7 @@ class FCStreamer(DataStreamer):
             return True
 
         # Event or SparseEvent record
-        if rc == 3 or rc == 6:
+        elif rc == 3 or rc == 6:
             if self.event_rbkd is not None:
                 self.any_full |= self.event_decoder.decode_packet(self.fcio,
                                                                   self.event_rbkd,

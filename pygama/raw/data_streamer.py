@@ -1,5 +1,5 @@
 from abc import ABC
-from raw_buffer import RawBufferLibrary
+from .raw_buffer import RawBufferLibrary
 
 class DataStreamer(ABC):
     """ Base clase for data streams 
@@ -80,12 +80,12 @@ class DataStreamer(ABC):
             dec_name = type(decoder).__name__
 
             # set up wildcard buffers
-            if dec_name not in rb_lib 
+            if dec_name not in rb_lib:
                 if '*' not in rb_lib: continue # user didn't want this decoder
                 dec_key = dec_name
                 if dec_key.endswith('Decoder'): dec_key.removesuffix('Decoder')
-                out_name = rb_lib['*'][0].out_name.format('name'=dec_key)
-                out_stream = rb_lib['*'][0].out_stream.format('name'=dec_key)
+                out_name = rb_lib['*'][0].out_name.format(name=dec_key)
+                out_stream = rb_lib['*'][0].out_stream.format(name=dec_key)
                 rb = RawBuffer(out_stream=out_stream, out_name=decoder)
                 rb_lib[dec_name] = RawBufferList()
                 rb_lib[dec_name].append(rb)
@@ -172,10 +172,10 @@ class DataStreamer(ABC):
         still_has_data = True
         while True:
             still_has_data = self.read_packet()
-            if (not still_has_data) break
+            if not still_has_data: break
             n_packets += 1
             if read_one_packet or n_packets > rp_max: break
-            if self.any_full break
+            if self.any_full: break
 
         # send back all rb's with data if we finished reading
         if not still_has_data: only_full = False
