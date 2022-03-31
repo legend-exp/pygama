@@ -5,27 +5,15 @@ Digital signal processing routines for waveform blocks.  Generally we have `Calc
 Pygama to-do list:
 https://docs.google.com/document/d/1ecOSJbIfC8p4OtYX3IngcsMnGxi7kOgaPVxwUFVHxGE/edit?usp=sharing
 
-## raw_to_dsp
+## build_dsp
 
-DSP is performed by extracting a table of raw data including waveforms and passing it to the [ProcessingChain](pygama/dsp/ProcessingChain.py). The primary function for DSP is [`raw_to_dsp`](../master/pygama/io/raw_to_dsp.py).
+DSP is performed by extracting a table of raw data including waveforms and passing it to the [ProcessingChain](pygama/dsp/ProcessingChain.py). The primary function for DSP is [`build_dsp`](../master/pygama/dsp/build_dsp.py).
 
 DSP is controlled via a [json](https://www.json.org)-formatted file that sets up which routines can be run, and which parameters are selected for output. See an example [dsp.json file here](experiments/lpgta/LPGTA_dsp.json). The DSP can refer to a dictionary of "database" values (see analysis parameters database below).
 
 Available processors include all numpy ufuncs as well as [this list of custom processors](pygama/dsp/_processors).
 
 (link to tutorial on dsp)
-
-#### raw_to_dsp to-do's
-
-* SiPM DSP
-* Resting baseline and PZ correction in trap filters
-* Improved vectorization
-* Additional filters
-* Unit tests
-  * process a standard input file and check the output
-  * one unit test for each processor
-* Optimization
-
 
 ## analysis parameters database
 

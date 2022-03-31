@@ -6,33 +6,18 @@ import h5py
 import time
 import numpy as np
 import argparse
-from importlib.resources import read_text
+from importlib.resources import path
 
-<<<<<<< HEAD:pygama/dsp/build_dsp.py
 import pygama
 from pygama import git
 from pygama.dsp.processing_chain import build_processing_chain
-=======
-from pygama import __version__ as pygama_version
-from pygama.dsp.ProcessingChain import ProcessingChain
-from pygama.dsp.units import *
-from pygama import lh5
-from pygama.utils import tqdm_range
-import pygama.git as git
-from pygama.dsp.build_processing_chain import *
->>>>>>> main:pygama/io/raw_to_dsp.py
 from pygama.dsp.errors import DSPFatal
 import pygama.lgdo.lh5_store as lh5
-from pygama.math.utils import update_progress
+from pygama.math.utils import tqdm_range
 
-def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
-<<<<<<< HEAD:pygama/dsp/build_dsp.py
+def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, write_mode='r', buffer_len=3200,
-               block_width=16, verbose=1):
-=======
-               outputs=None, n_max=np.inf, overwrite=True, buffer_len=3200,
                block_width=16, verbose=1, chan_config=None):
->>>>>>> main:pygama/io/raw_to_dsp.py
     """
     Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence of
     processors via the ProcessingChain.
@@ -69,7 +54,6 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     """
     t_start = time.time()
 
-<<<<<<< HEAD:pygama/dsp/build_dsp.py
     if isinstance(dsp_config, str):
         with open(dsp_config, 'r') as config_file:
             dsp_config = json.load(config_file)
@@ -78,24 +62,21 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         raise Exception('Error, dsp_config must be an dict')
 
     raw_store = lh5.LH5Store()
-=======
-    raw_store = lh5.Store()
->>>>>>> main:pygama/io/raw_to_dsp.py
     lh5_file = raw_store.gimme_file(f_raw, 'r')
     if lh5_file is None:
-        print(f'raw_to_dsp: input file not found: {f_raw}')
+        print(f'build_dsp: input file not found: {f_raw}')
         return
     else: print(f'Opened file {f_raw}')
 
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = []
-        lh5_keys = raw_store.ls(f_raw)
+        lh5_keys = lh5.ls(f_raw)
 
         # sometimes 'raw' is nested, e.g g024/raw
         for tb in lh5_keys:
             if "raw" not in tb:
-                tbname = raw_store.ls(lh5_file[tb])[0]
+                tbname = lh5.ls(lh5_file[tb])[0]
                 if "raw" in tbname:
                     tb = tb +'/'+ tbname # g024 + /raw
             lh5_tables.append(tb)
@@ -137,7 +118,7 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
     dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
     dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama_version))
+    dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
     dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
     dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
     dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
@@ -164,25 +145,19 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
         write_offset = 0
         raw_store.gimme_file(f_dsp, 'a')
-        if write_mode=='a' and raw_store.ls(f_dsp, tb_name):
+        if write_mode=='a' and lh5.ls(f_dsp, tb_name):
             write_offset = raw_store.read_n_rows(tb_name, f_dsp)
 
+        # Main processing loop
         print(f'Processing table: {tb} ...')
-<<<<<<< HEAD:pygama/dsp/build_dsp.py
         lh5_it = lh5.LH5Iterator(f_raw, tb, buffer_len = buffer_len)
         proc_chain = None
-        tb_out = None
         for lh5_in, start_row, n_rows in lh5_it:
+            # Initialize
             if proc_chain is None:
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
+                tqdm_it = iter(tqdm_range(0, tot_n_rows, buffer_len, verbose))
             
-            if verbose > 0:
-                update_progress(start_row/tot_n_rows)
-=======
-
-        for start_row in tqdm_range(0, int(tot_n_rows), buffer_len, verbose):
-            lh5_in, n_rows = raw_store.read_object(tb, f_raw, start_row=start_row, n_rows=buffer_len, field_mask = mask, obj_buf=lh5_in)
->>>>>>> main:pygama/io/raw_to_dsp.py
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
                 proc_chain.execute(0, n_rows)
@@ -190,7 +165,6 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 # Update the wf_range to reflect the file position
                 e.wf_range = "{}-{}".format(e.wf_range[0]+start_row, e.wf_range[1]+start_row)
                 raise e
-<<<<<<< HEAD:pygama/dsp/build_dsp.py
             
             raw_store.write_object(obj=tb_out,
                                    name=tb_name,
@@ -199,40 +173,13 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                                    wo_mode= 'o' if write_mode=='u' else 'a',
                                    write_start=write_offset+start_row,
             )
-
+            next(tqdm_it)
+            
             if start_row+n_rows > tot_n_rows:
                 break
             
-        if verbose > 0:
-            update_progress(1)
         print(f'Done.  Writing to file {f_dsp}')
 
-    # write processing metadata
-    dsp_info = lh5.Struct()
-    dsp_info.add_field('timestamp', lh5.Scalar(np.uint64(time.time())))
-    dsp_info.add_field('python_version', lh5.Scalar(sys.version))
-    dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
-    dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
-    dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
-    dsp_info.add_field('pygama_branch', lh5.Scalar(pygama.git.branch))
-    dsp_info.add_field('pygama_revision', lh5.Scalar(pygama.git.revision))
-    dsp_info.add_field('pygama_date', lh5.Scalar(pygama.git.commit_date))
-    dsp_info.add_field('dsp_config', lh5.Scalar(json.dumps(dsp_config, indent=2)))
-=======
-
-            raw_store.write_object(tb_out, tb.replace('/raw', '/dsp'), f_dsp, n_rows=n_rows)
-
-        if chan_config is not None:
-            info_dsp = f'dsp_config/{tb}'
-        else:
-            info_dsp = 'dsp_config'
-        dsp_info.add_field(info_dsp, lh5.Scalar(json.dumps(dsp_config, indent=2)))
-
-        print(f'Done.  Writing to file: {f_dsp}')
-
-    # write metadata to file
->>>>>>> main:pygama/io/raw_to_dsp.py
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
 
     t_elap = (time.time() - t_start) / 60
@@ -243,15 +190,15 @@ def raw_to_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description=
 """Process a single tier 1 LH5 file and produce a tier 2 LH5 file using a
-json config file and raw_to_dsp.""")
+json config file and build_dsp.""")
 
     arg = parser.add_argument
     arg('file', help="Input raw LH5 file.")
     arg('-g', '--group', default=None, action='append', type=str,
         help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
-    defaultconfig = json.loads(read_text(pygama, 'processor_list.json'))
-    arg('-j', '--jsonconfig', default=defaultconfig, type=str,
-        help="Name of json file used by raw_to_dsp to construct the processing routines used. By default use dsp_config in pygama/apps.")
+    with path('pygama.metadata', 'dsp_config.json') as default_config:
+        arg('-j', '--jsonconfig', default=str(default_config), type=str,
+            help="Name of json file used by build_dsp to construct the processing routines used. By default use the installed dsp_config.json.")
     arg('-d', '--dbfile', default=None, type=str,
         help="JSON file to read DB parameters from. Should be nested dict with channel at the top level, and parameters below that.")
     arg('-o', '--output',
@@ -284,4 +231,4 @@ json config file and raw_to_dsp.""")
     if out is None:
         out = 't2_'+args.file[args.file.rfind('/')+1:].replace('t1_', '')
 
-    raw_to_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, write_mode=args.writemode, buffer_len=args.chunk, block_width=args.block)
+    build_dsp(args.file, out, args.jsonconfig, lh5_tables=args.group, database=args.dbfile, verbose=args.verbose, outputs=args.outpar, n_max=args.nevents, write_mode=args.writemode, buffer_len=args.chunk, block_width=args.block)

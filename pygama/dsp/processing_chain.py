@@ -11,9 +11,6 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from typing import Union
 from copy import deepcopy, copy
-from scimath.units import convert
-from scimath.units.api import unit_parser
-from scimath.units.unit import unit
 
 from numba import vectorize
 
@@ -623,7 +620,7 @@ class ProcessingChain:
                      for arg in node.args ]
             kwargs = { kwarg.arg:self._parse_expr(kwarg.value, expr, dry_run, var_name_list) for kwarg in node.keywords }
             if func is not None:
-                return func(self, *args, **kwargs)
+                return func(*args, **kwargs)
             elif self._validate_name(node.func.id):
                 var_name = node.func.id
                 var_name_list.append(var_name)
@@ -641,16 +638,6 @@ class ProcessingChain:
                 raise ProcessingChainError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
 
         raise ProcessingChainError("Cannot parse AST nodes of type " + str(node.__dict__))
-
-    # Get length of ProcChainVar
-    def _length(self, var):
-        if var is None:
-            return None
-        if not isinstance(var, ProcChainVar):
-            raise ProcessingChainError("Cannot call len() on " + str(var))
-        if not len(var.buffer.shape)==2:
-            raise ProcessingChainError(str(var)+" has wrong number of dims")
-        return var.buffer.shape[1]
 
     def _validate_name(self, name, raise_exception=False):
         """Check that name is alphanumeric, and not an already used keyword"""
@@ -703,9 +690,29 @@ class ProcessingChain:
         + '\nOutput variables:\n  ' \
         + '\n  '.join([str(out_man) for out_man in self._output_managers])
 
-    # Map from function names when using ast interpretter to ProcessorChain functions that can be called
+    # Define functions that can be parsed by get_variable
+    # Get length of ProcChainVar
+    def _length(var):
+        if var is None:
+            return None
+        if not isinstance(var, ProcChainVar):
+            raise ProcessingChainError("Cannot call len() on " + str(var))
+        if not len(var.buffer.shape)==2:
+            raise ProcessingChainError(str(var)+" has wrong number of dims")
+        return var.buffer.shape[1]
+
+    # round value
+    def _round(var):
+        if var is None:
+            return None
+        if not isinstance(var, ProcChainVar):
+            return round(float(var))
+        else:
+            raise ProcessingChainError("round() is not implemented for variables, only constants.")
+
+    # dict of functions that can be parsed by get_variable
     func_list = {'len':_length,
-                 'round':round, }
+                 'round':_round, }
 
 
 ########################################################################### 
@@ -1153,6 +1160,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     # prepare the processor list
     multi_out_procs = {}
+    db_parser = re.compile("db.[\w_.]+")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
@@ -1160,11 +1168,33 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             for k in keys:
                 multi_out_procs[k] = key
 
+        # find DB lookups in args and replace the values
+        args = node['args']
+        for i, arg in enumerate(args):
+            if not isinstance(arg, str): continue
+            for db_var in db_parser.findall(arg):
+                try:
+                    db_node = db_dict
+                    for key in db_var[3:].split('.'):
+                        db_node = db_node[key]
+                    if(verbosity>0):
+                        print("Database lookup: found", db_node, "for", db_var)
+                except (KeyError, TypeError):
+                    try:
+                        db_node = node['defaults'][db_var]
+                        if(verbosity>0):
+                            print("Database lookup: using default value of", db_node, "for", db_var)
+                    except (KeyError, TypeError):
+                        raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                if arg==db_var: arg = db_node
+                else: arg = arg.replace(db_var, str(db_node))
+            args[i] = arg
+        
         # parse the arguments list for prereqs, if not included explicitly
         if not 'prereqs' in node:
             prereqs = []
             for arg in node['args']:
-                if not isinstance(arg, str) or arg[:3]== 'db.': continue
+                if not isinstance(arg, str): continue
                 for prereq in proc_chain.get_variable(arg, True):
                     if prereq not in prereqs and prereq not in keys:
                         prereqs.append(prereq)
@@ -1244,25 +1274,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                 if isinstance(unit, list): unit = unit[i]
                 
                 proc_chain.add_variable(name, unit=unit)
-            
-        # Parse the list of args
-        for i, arg in enumerate(args):
-            if isinstance(arg, str) and arg[0:3]=='db.':
-                lookup_path = arg[3:].split('.')
-                try:
-                    node = db_dict
-                    for key in lookup_path:
-                        node = node[key]
-                    args[i] = node
-                    if(verbosity>0):
-                        print("Database lookup: found", node, "for", arg)
-                except (KeyError, TypeError):
-                    try:
-                        args[i] = recipe['defaults'][arg]
-                        if(verbosity>0):
-                            print("Database lookup: using default value of", args[i], "for", arg)
-                    except (KeyError, TypeError):
-                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
 
         # get this list of kwargs
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
@@ -1272,23 +1283,23 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         try:
             init_args = recipe['init_args']
             for i, arg in enumerate(init_args):
-                if isinstance(arg, str) and arg[0:3]=='db.':
-                    lookup_path = arg[3:].split('.')
+                for db_var in db_parser.findall(arg):
                     try:
-                        node = db_dict
-                        for key in lookup_path:
-                            node = node[key]
-                        init_args[i] = node
+                        db_node = db_dict
+                        for key in db_val[3:].split('.'):
+                            db_node = db_node[key]
                         if(verbosity>0):
-                            print("Database lookup: found", node, "for", arg)
+                            print("Database lookup: found", db_node, "for", db_var)
                     except (KeyError, TypeError):
                         try:
-                            init_args[i] = recipe['defaults'][arg]
+                            db_node = recipe['defaults'][db_var]
                             if(verbosity>0):
-                                print("Database lookup: using default value of", init_args[i], "for", arg)
+                                print("Database lookup: using default value of", db_node, "for", db_var)
                         except (KeyError, TypeError):
-                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
-                    arg = init_args[i]
+                            raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                
+                    if arg==db_var: arg = db_node
+                    else: arg = arg.replace(db_var, str(db_node))
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
@@ -1299,6 +1310,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             func = func(*init_args)
         except KeyError:
             pass
+        
         proc_chain.add_processor(func, *args, **kwargs)
 
 
