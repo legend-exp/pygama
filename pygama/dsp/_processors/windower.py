@@ -28,9 +28,6 @@ def windower(w_in, t0_in, w_out):
     if np.isnan(w_in).any() or np.isnan(t0_in):
         return
 
-    if np.floor(t0_in) != t0_in:
-        raise DSPFatal('The starting index must be an integer')
-
     if len(w_out) >= len(w_in):
         raise DSPFatal('The windowed waveform must be smaller than the input waveform')
     
