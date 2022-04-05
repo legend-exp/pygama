@@ -84,10 +84,11 @@ class DataStreamer(ABC):
                 if '*' not in rb_lib: continue # user didn't want this decoder
                 rb_lib[dec_name] = RawBufferList()
                 dec_key = dec_name
-                if dec_key.endswith('Decoder'): dec_key.removesuffix('Decoder')
+                if dec_key.endswith('Decoder'): dec_key = dec_key.removesuffix('Decoder')
                 out_name = rb_lib['*'][0].out_name.format(name=dec_key)
                 out_stream = rb_lib['*'][0].out_stream.format(name=dec_key)
-                rb = RawBuffer(out_stream=out_stream, out_name=decoder)
+                key_list = decoder.get_key_list()
+                rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=out_name)
                 rb_lib[dec_name].append(rb)
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
@@ -99,6 +100,7 @@ class DataStreamer(ABC):
 
         # make sure there were no entries in rb_lib that weren't among the
         # decoders. If so, just emit a warning and continue.
+        if '*' in rb_lib: rb_lib.pop('*')
         for dec_name in rb_lib.keys():
             if dec_name not in dec_names:
                 print(f"Warning: no decoder named {dec_name} requested by rb_lib")
@@ -160,21 +162,19 @@ class DataStreamer(ABC):
 
         Returns
         -------
-        chunk_list, n_bytes : list of RawBuffers, int
+        chunk_list : list of RawBuffers, int
             chunk_list is the list of RawBuffers with data ready for writing to
-                file or further processing. The list contains all buffers with
-                data or just all full buffers depending on the flag full_only.
-                Note chunk_list is not a RawBufferList since the RawBuffers
-                inside may not all have the same structure
-            n_bytes is the number of bytes read from the file during this
-                iteration.
+            file or further processing. The list contains all buffers with data
+            or just all full buffers depending on the flag full_only.  Note
+            chunk_list is not a RawBufferList since the RawBuffers inside may
+            not all have the same structure
         """
 
         if clear_full_buffers: self.rb_lib.clear_full()
         self.any_full = False
 
         chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override 
-        if verbosity>0: print(f'reading chunk with chunk_mode {chunk_mode}')
+        if verbosity>1: print(f'reading chunk with chunk_mode {chunk_mode}')
 
         read_one_packet = (chunk_mode == 'single_packet')
         only_full = (chunk_mode == 'only_full')
@@ -182,7 +182,7 @@ class DataStreamer(ABC):
         n_packets = 0
         still_has_data = True
         while True:
-            still_has_data = self.read_packet(verbosity=verbosity)
+            still_has_data = self.read_packet(verbosity=verbosity-1)
             if not still_has_data: break
             n_packets += 1
             if read_one_packet or n_packets > rp_max: break
@@ -223,8 +223,10 @@ class DataStreamer(ABC):
             return rb_lib
         for decoder in decoders:
             dec_name = type(decoder).__name__
+            dec_key = dec_name
+            if dec_key.endswith('Decoder'): dec_key = dec_key.removesuffix('Decoder')
             key_list = decoder.get_key_list()
-            rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=dec_name)
+            rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=dec_key)
             rb_lib[dec_name] = RawBufferList()
             rb_lib[dec_name].append(rb)
         return rb_lib

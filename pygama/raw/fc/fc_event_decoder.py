@@ -185,7 +185,7 @@ class FCEventDecoder(DataDecoder):
         for iwf in fcio.tracelist:
             if iwf not in evt_rbkd:
                 if iwf not in self.skipped_channels:
-                    if verbosity>0: print(f'skipping packets from channel {iwf}...')
+                    if verbosity>-2: print(f'skipping packets from channel {iwf}...')
                     self.skipped_channels[iwf] = 0
                 self.skipped_channels[iwf] += 1
                 continue
@@ -195,7 +195,7 @@ class FCEventDecoder(DataDecoder):
                       fcio.nsamples, 'when',
                       self.decoded_values['waveform']['wf_len'], 'were expected')
             ii = evt_rbkd[iwf].loc
-            if verbosity>1: print(f'packet_id {packet_id}: writing wf {iwf} at loc {ii}')
+            if verbosity>0: print(f'packet_id {packet_id}: writing wf {iwf} at loc {ii}')
 
             # fill the table
             tbl['channel'].nda[ii] = iwf

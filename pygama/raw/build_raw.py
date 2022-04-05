@@ -1,9 +1,11 @@
 import os, time, sys, glob
 import numpy as np
+import tqdm
 
-from pygama.math.utils import update_progress
-from raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary, write_to_lh5_and_clear
-from fc.fc_streamer import FCStreamer
+from pygama import lgdo
+from pygama.math.utils import sizeof_fmt
+from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary, write_to_lh5_and_clear
+from .fc.fc_streamer import FCStreamer
 
 #from orca.stream_orca import *
 #from stream_llama import *
@@ -11,8 +13,8 @@ from fc.fc_streamer import FCStreamer
 #from stream_fc import *
 
 
-def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192, 
-              n_max=np.inf, overwrite=True, verbosity=0)
+def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192, 
+              n_max=np.inf, overwrite=True, verbosity=0):
     """ Convert data into LEGEND hdf5 `raw` format.  
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
@@ -58,14 +60,28 @@ def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
         return
     in_stream_size = os.stat(in_stream).st_size 
 
-    # set up RawBufferLibrary
+    # try to guess the input stream type if it's not provided
+    if in_stream_type is None:
+        i_ext = in_stream.rfind('.')
+        if i_ext == -1:
+            print('unknown file type. Specify in_stream_type')
+            return
+        ext = in_stream[i_ext+1:]
+        if ext == 'fcio': in_stream_type = 'FlashCam'
+        else:
+            print(f'unknown file extension {ext}. Specify in_stream_type')
+            return
+
+    # procss out_spec and setup rb_lib if specified
+    rb_lib = None
     if isinstance(out_spec, RawBufferLibrary): rb_lib = out_spec
     elif isinstance(out_spec, dict): rb_lib = RawBufferLibrary(json_dict=out_spec)
-    else: # dummy rb_lib sending all data to out_spec
-        if out_spec is None: out_spec = f'{in_stream}.hdf5'
-        rb_lib = RawBufferLibrary()
-        rb_lib['*'] = RawBufferList()
-        rb_lib['*'].append(RawBuffer(out_stream=out_spec, out_name='{name}'))
+    # dummy rb_lib sending all data to out_spec
+    elif out_spec is None: 
+        out_spec = in_stream
+        i_ext = out_spec.rfind('.')
+        if i_ext != -1: out_spec = out_spec[:i_ext]
+        out_spec += '.lh5'
 
     # modify buffer_size if necessary for n_max
     if buffer_size < 1:
@@ -75,18 +91,21 @@ def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
 
     # ouput start of processing info if verbosity > 0
     if verbosity > 0:
-        output = out_spec
-        if isinstance(out_spec, RawBufferLibrary): 
-            output = out_spec.get_list_of('out_stream')
         print( 'Starting build_raw processing.')
         print(f'  Input: {in_stream}')        
-        print(f'  Output: {pprint(output)}')
+        out_files = [out_spec]
+        if isinstance(out_spec, RawBufferLibrary): 
+            out_files = out_spec.get_list_of('out_stream')
+        if len(out_files) == 1: print(f'  Output: {out_files[0]}')
+        else: 
+            print(f'  Output:')
+            for out_file in out_files: print('- {out_file}')
         print(f'  Buffer size: {buffer_size}')  
         print(f'  Max num. events: {n_max}')    
+        if verbosity > 1: progress_bar = tqdm.tqdm(total=in_stream_size)
 
     # start a timer and a byte counter
     t_start = time.time()
-    bytes_processed = None
 
     # select the approprate streamer for in_stream
     streamer = None
@@ -109,8 +128,13 @@ def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
         return
 
     # initialize the stream and read header. Also initializes rb_lib
-    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size, verbosity=verbosity)
-    if verbosity > 0: update_progress(float(streamer.n_bytes_read)/in_stream_size)
+    if verbosity > 1: progress_bar.update(0)
+    out_stream = out_spec if isinstance(out_spec, str) else ''
+    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size, 
+                                       chunk_mode='full_only', out_stream=out_stream, 
+                                       verbosity=verbosity)
+    rb_lib = streamer.rb_lib
+    if verbosity > 1: progress_bar.update(streamer.n_bytes_read)
 
     # rb_lib should now be fully initialized. Check if files need to be
     # overwritten or if we need to stop to avoid overwriting
@@ -132,32 +156,30 @@ def build_raw(in_stream, in_stream_type, out_spec=None, buffer_size=8192,
 
     # Now loop through the data
     while True:
-        chunk_list = streamer.read_chunk(full_only=True, verbosity=verbosity)
-        if verbosity > 0: update_progress(float(streamer.n_bytes_read)/in_stream_size)
+        chunk_list = streamer.read_chunk(verbosity=verbosity-2)
+        if verbosity > 1: progress_bar.update(streamer.n_bytes_read)
+        if len(chunk_list) == 0: break
         for rb in chunk_list:
             if rb.loc > n_max: rb.loc = n_max
             n_max -= rb.loc
         write_to_lh5_and_clear(chunk_list, lh5_store)
-        if len(chunk_list) == 0 or n_max == 0: break
-    if verbosity > 0: update_progress(1)
-
-    # Write out any buffers with data still in them
-    all_rbs = []
-    for rb_list in rb_lib.values(): all_rbs += rb_list
-    write_to_lh5_and_clear(chunk_list, lh5_store)
-
+        if n_max <= 0: break
 
     # --------- summary ------------
 
-    elapsed = time.time() - t_start
-    print("Time elapsed: {:.2f} sec".format(elapsed))
-    if 'sysn' not in raw_file_pattern:
-        statinfo = os.stat(raw_file_pattern)
-        print('File size: {}'.format(sizeof_fmt(statinfo.st_size)))
-        print('Conversion speed: {}ps'.format(sizeof_fmt(statinfo.st_size/elapsed)))
-        print('  Output file:', raw_file_pattern)
-    else:
-        print('Total converted: {}'.format(sizeof_fmt(bytes_processed)))
-        print('Conversion speed: {}ps'.format(sizeof_fmt(bytes_processed/elapsed)))
+    if verbosity > 0:
+        elapsed = time.time() - t_start
+        print("Time elapsed: {:.2f} sec".format(elapsed))
+        out_files = rb_lib.get_list_of('out_stream')
+        if len(out_files) == 1: 
+            file_size = os.stat(out_files[0]).st_size
+            print(f'Output file: {out_files[0]} ({sizeof_fmt(file_size)})')
+        else: 
+            print("Output files:")
+            for out_file in out_files:
+                file_size = os.stat(out_file).st_size
+                print(f"  {out_file} ({sizeof_fmt(file_size)})")
+        print(f"Total converted: {sizeof_fmt(streamer.n_bytes_read)}")
+        print(f"Conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
 
-    print('Done.\n')
+        print('Done.\n')

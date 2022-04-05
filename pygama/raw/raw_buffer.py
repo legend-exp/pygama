@@ -238,7 +238,7 @@ class RawBufferLibrary(dict):
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
 
 
-    def get_list_of(self, attribute):
+    def get_list_of(self, attribute, unique=True):
         """
         Return a list of values of RawBuffer.attribute
 
@@ -259,6 +259,7 @@ class RawBufferLibrary(dict):
         values = []
         for rb_list in self.values(): 
             values += rb_list.get_list_of(attribute)
+        if unique: values = list(set(values))
         return values
 
     def clear_full(self):
@@ -333,13 +334,17 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0: continue # no data to write
-        ii = out_stream.find(':')
-        filename = out_stream[:ii]
-        group = out_stream[ii+1:]
-        if len(group) == 0: group = '/'
+        ii = rb.out_stream.find(':')
+        if ii == -1: 
+            filename = rb.out_stream
+            group = '/'
+        else: 
+            filename = rb.out_stream[:ii]
+            group = rb.out_stream[ii+1:]
+            if len(group) == 0: group = '/' # in case out_stream ends with :
         # write...
-        lh5_store.write_obj(rb.lgdo, rb.out_name, filename, group=group,
-                            n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+        lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
+                               n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0
 
