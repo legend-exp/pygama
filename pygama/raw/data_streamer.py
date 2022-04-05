@@ -1,5 +1,5 @@
 from abc import ABC
-from .raw_buffer import RawBufferLibrary
+from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary
 
 class DataStreamer(ABC):
     """ Base clase for data streams 
@@ -82,17 +82,20 @@ class DataStreamer(ABC):
             # set up wildcard buffers
             if dec_name not in rb_lib:
                 if '*' not in rb_lib: continue # user didn't want this decoder
+                rb_lib[dec_name] = RawBufferList()
                 dec_key = dec_name
                 if dec_key.endswith('Decoder'): dec_key.removesuffix('Decoder')
                 out_name = rb_lib['*'][0].out_name.format(name=dec_key)
                 out_stream = rb_lib['*'][0].out_stream.format(name=dec_key)
                 rb = RawBuffer(out_stream=out_stream, out_name=decoder)
-                rb_lib[dec_name] = RawBufferList()
                 rb_lib[dec_name].append(rb)
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
             dec_names.append(dec_name)
-            rb_lib[dec_name].make_lgdos(decoder, size=buffer_size)
+            for rb in rb_lib[dec_name]: 
+                # use the first available key
+                key = rb.key_list[0] if len(rb.key_list) > 0 else None
+                rb.lgdo = decoder.make_lgdo(key=key, size=buffer_size)
 
         # make sure there were no entries in rb_lib that weren't among the
         # decoders. If so, just emit a warning and continue.
@@ -215,4 +218,5 @@ class DataStreamer(ABC):
             rb = RawBuffer(out_stream=out_stream, out_name=dec_name)
             rb_lib[dec_name] = RawBufferList()
             rb_lib[dec_name].append(rb)
+        return rb_lib
 

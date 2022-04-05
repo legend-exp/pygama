@@ -148,7 +148,7 @@ class FCEventDecoder(DataDecoder):
         fc_config = FCConfigDecoder.decode_config(fcio)
         """
         self.fc_config = fc_config
-        self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples']
+        self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples'].value
 
 
     def decode_packet(self, fcio, evt_rbkd, packet_id, verbosity=0):

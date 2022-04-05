@@ -63,7 +63,7 @@ class DataDecoder(ABC):
         the constructor
         """
         if key is None:
-            return self.decoded_values if hasattr(self, decoded_values) else None
+            return self.decoded_values if hasattr(self, 'decoded_values') else None
         name = type(self).__name__
         print("You need to implement key-specific get_decoded_values for", name)
         return None

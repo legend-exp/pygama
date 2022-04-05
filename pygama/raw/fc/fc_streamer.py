@@ -28,6 +28,7 @@ class FCStreamer(DataStreamer):
         dec_list.append(self.config_decoder)
         dec_list.append(self.status_decoder)
         dec_list.append(self.event_decoder)
+        return dec_list
 
 
 
@@ -55,28 +56,33 @@ class FCStreamer(DataStreamer):
         self.n_bytes_read = 0
 
         # read in file header (config) info
-        fc_config = self.config_decoder.decode_config(fcio) # returns an lgdo.Struct
+        fc_config = self.config_decoder.decode_config(self.fcio) # returns an lgdo.Struct
         self.event_decoder.set_file_config(fc_config)
         self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
 
         # initialize the buffers in rb_lib. Store them for fast lookup
-        super().initialize(fcio_filename, rb_lib, buffer_size=buffer_size,
-                           chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
+        super().open_stream(fcio_filename, rb_lib, buffer_size=buffer_size,
+                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
         if rb_lib is None: rb_lib = self.rb_lib
-        self.status_rb = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
-        if self.status_rb is not None:
-            if len(self.status_rb) != 1:
-                print(f'warning! status rb_list had length {len(self.status_rb)}, ignoring all but the first')
-            if len(self.status_rb) == 0:
+        # get the status rb_list and pull out its first element
+        status_rb_list = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
+        if status_rb_list is not None:
+            if len(status_rb_list) != 1:
+                print(f'warning! status_rb_list had length {len(status_rb_list)}, ignoring all but the first')
+            if len(status_rb_list) == 0:
                 self.status_rb = None
-            else: self.status_rb = self.status_rb[0]
+            else: self.status_rb = status_rb_list[0]
         self.event_rbkd = rb_lib['FCEventDecoder'].get_keyed_dict() if 'FCEventDecoder' in rb_lib else None
 
         # set up data loop variables
         self.packet_id = 0 # for storing packet order in output tables
         #self.max_numtraces = 0 # for checking that the tables are large enough
 
-        if 'FCConfigDecoder' in rb_lib: rb = rb_lib['FCConfigDecoder']
+        if 'FCConfigDecoder' in rb_lib: 
+            config_rb_list = rb_lib['FCConfigDecoder']
+            if len(config_rb_list) != 1:
+                print(f'warning! config_rb_list had length {len(config_rb_list)}, ignoring all but the first')
+            rb = config_rb_list[0]
         else: rb = RawBuffer(lgdo=fc_config)
         rb.loc = 1 # we have filled this buffer
         return [rb]
