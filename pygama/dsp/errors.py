@@ -3,12 +3,17 @@ class DSPError(Exception):
     pass
 
 class DSPFatal(DSPError):
-    """Fatal error thrown by DSP processors that halts production
-        Attributes:
-        wf_range: range of wf indices. This will be set after the exception
-                  is caught, and appended to the error message
-        processor: string of processor and arguments. This will be set after
-                   the exception is caught, and appended to the error message
+    """
+    Fatal error thrown by DSP processors that halts production
+
+    Attributes
+    ----------
+    wf_range: range
+     range of wf indices. This will be set after the exception is caught, and
+     appended to the error message
+    processor: str
+        string of processor and arguments. This will be set after the exception
+        is caught, and appended to the error message
     """
     def __init__(self, *args):
         super(DSPFatal, self).__init__(*args)

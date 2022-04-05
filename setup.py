@@ -137,17 +137,13 @@ def get_version():
 setup(
     name='pygama',
     version=get_version(),
-    author='LEGEND',
-    author_email='wisecg@uw.edu',
+    url='https://legend-exp.github.io/pygama',
+    author='The LEGEND collaboration',
     description='Python package for decoding and processing digitizer data',
-    long_description='',
     packages=find_packages(),
-    scripts=[
-        'pygama/dsp/build_dsp.py'
-    ],
     include_package_data=True,
     package_data={
-        "":["*.json"]
+        "": ["*.json"]
     },
     install_requires=[
         'numpy',
@@ -164,7 +160,20 @@ setup(
         'pint',
         'iminuit',
         'tqdm'
-        # 'fcutils @ https://github.com/legend-exp/pyfcutils.git#egg=1.0.0'
+    ],
+    classifiers=[ # TODO: add license
+        'Intended Audience :: Developers',
+        'Intended Audience :: Information Technology',
+        'Intended Audience :: Science/Research',
+        'Operating System :: MacOS',
+        'Operating System :: POSIX',
+        'Operating System :: Unix',
+        'Programming Language :: Python :: 3',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Information Analysis',
+        'Topic :: Scientific/Engineering :: Mathematics',
+        'Topic :: Scientific/Engineering :: Physics',
+        'Topic :: Software Development'
     ],
     cmdclass=dict(build_ext=CMakeBuild, build_py=PygamaBuild, develop=PygamaDev),
     zip_safe=False,
