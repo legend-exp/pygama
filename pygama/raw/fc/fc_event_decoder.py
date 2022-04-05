@@ -16,7 +16,7 @@ class FCEventDecoder(DataDecoder):
                'dtype': 'uint32',
              },
             # index of event
-            'ievt': {
+            'eventnumber': {
               'dtype': 'int32',
             },
             # time since epoch
@@ -44,7 +44,7 @@ class FCEventDecoder(DataDecoder):
               'dtype': 'uint16',
             },
             # fpga energy
-            'onboard_E': {
+            'daqenergy': {
               'dtype': 'uint16',
             },
             # right now, index of the trigger (trace)
@@ -132,7 +132,7 @@ class FCEventDecoder(DataDecoder):
         self.max_numtraces = 1
 
 
-    def get_keys_list(self): return range(self.fc_config.nadcs)
+    def get_key_list(self): return range(self.fc_config['nadcs'].value)
 
 
     def get_decoded_values(self, channel=None):
@@ -174,7 +174,6 @@ class FCEventDecoder(DataDecoder):
         n_bytes : int
             (estimated) number of bytes in the packet that was just decoded.
         """
-
         if fcio.numtraces > self.max_numtraces: 
             self.max_numtraces = fcio.numtraces
             # The buffer might be storing all channels' data, so set the
@@ -186,26 +185,28 @@ class FCEventDecoder(DataDecoder):
         for iwf in fcio.tracelist:
             if iwf not in evt_rbkd:
                 if iwf not in self.skipped_channels:
+                    if verbosity>0: print(f'skipping packets from channel {iwf}...')
                     self.skipped_channels[iwf] = 0
                 self.skipped_channels[iwf] += 1
                 continue
             tbl = evt_rbkd[iwf].lgdo
-            if eventsamples != tbl['waveform']['values'].nda.shape[1]:
+            if fcio.nsamples != tbl['waveform']['values'].nda.shape[1]:
                 print('FCEventDecoder Warning: event wf length was',
-                      eventsamples, 'when',
+                      fcio.nsamples, 'when',
                       self.decoded_values['waveform']['wf_len'], 'were expected')
             ii = evt_rbkd[iwf].loc
+            if verbosity>1: print(f'packet_id {packet_id}: writing wf {iwf} at loc {ii}')
 
             # fill the table
             tbl['channel'].nda[ii] = iwf
             tbl['packet_id'].nda[ii] = packet_id
-            tbl['ievt'].nda[ii] = fcio.eventnumber # the eventnumber since the beginning of the file
+            tbl['eventnumber'].nda[ii] = fcio.eventnumber # the eventnumber since the beginning of the file
             tbl['timestamp'].nda[ii] = fcio.eventtime # the time since epoch in seconds
             tbl['runtime'].nda[ii] = fcio.runtime # the time since the beginning of the file in seconds
             tbl['numtraces'].nda[ii] = fcio.numtraces # number of triggered adcs
             tbl['tracelist'].set_vector(ii, fcio.tracelist) # list of triggered adcs
-            tbl['baseline'].nda[ii] = baselines[iwf] # the fpga baseline values for each channel in LSB
-            tbl['onboard_E'].nda[ii] = fcio.daqenergy[iwf] # the fpga energy values for each channel in LSB
+            tbl['baseline'].nda[ii] = fcio.baseline[iwf] # the fpga baseline values for each channel in LSB
+            tbl['daqenergy'].nda[ii] = fcio.daqenergy[iwf] # the fpga energy values for each channel in LSB
             tbl['ts_pps'].nda[ii] = fcio.timestamp_pps
             tbl['ts_ticks'].nda[ii] = fcio.timestamp_ticks
             tbl['ts_maxticks'].nda[ii] = fcio.timestamp_maxticks

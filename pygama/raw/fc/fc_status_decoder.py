@@ -64,8 +64,6 @@ class FCStatusDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
 
 
-    def get_keys_list(self): return [None]
-
 
     def decode_packet(self, fcio, status_rb, packet_id, verbosity=0):
         """

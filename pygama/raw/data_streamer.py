@@ -124,7 +124,7 @@ class DataStreamer(ABC):
         return true
 
 
-    def read_chunk(self, chunk_mode_override=None, rp_max=1000000, verbosity=0):
+    def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True, verbosity=0):
         """
         Reads a chunk of data into raw buffers
 
@@ -151,6 +151,10 @@ class DataStreamer(ABC):
         rp_max : int
             maximum number of packets to read before returning anyway, even if
             one of the other conditions is not met
+        clear_full_buffers : bool
+            automatically clear any buffers that report themselves as being full
+            prior to reading the chunk. Set to False if clearing manually for a
+            minor speed-up
         verbosity : int
             verbosity level for the initialize function
 
@@ -166,7 +170,11 @@ class DataStreamer(ABC):
                 iteration.
         """
 
+        if clear_full_buffers: self.rb_lib.clear_full()
+        self.any_full = False
+
         chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override 
+        if verbosity>0: print(f'reading chunk with chunk_mode {chunk_mode}')
 
         read_one_packet = (chunk_mode == 'single_packet')
         only_full = (chunk_mode == 'only_full')
@@ -174,7 +182,7 @@ class DataStreamer(ABC):
         n_packets = 0
         still_has_data = True
         while True:
-            still_has_data = self.read_packet()
+            still_has_data = self.read_packet(verbosity=verbosity)
             if not still_has_data: break
             n_packets += 1
             if read_one_packet or n_packets > rp_max: break
@@ -184,7 +192,7 @@ class DataStreamer(ABC):
         if not still_has_data: only_full = False
 
         list_of_rbs = []
-        for rb_list in self.rb_lib.items():
+        for rb_list in self.rb_lib.values():
             for rb in rb_list:
                 if not only_full: # any_full or read_one_packet
                     if rb.loc > 0: list_of_rbs.append(rb)
@@ -215,7 +223,8 @@ class DataStreamer(ABC):
             return rb_lib
         for decoder in decoders:
             dec_name = type(decoder).__name__
-            rb = RawBuffer(out_stream=out_stream, out_name=dec_name)
+            key_list = decoder.get_key_list()
+            rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=dec_name)
             rb_lib[dec_name] = RawBufferList()
             rb_lib[dec_name].append(rb)
         return rb_lib

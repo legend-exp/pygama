@@ -101,6 +101,8 @@ class FCStreamer(DataStreamer):
 
         self.packet_id += 1
 
+        if verbosity>1: print(f'packet {self.packet_id}: rc = {rc}')
+
         if rc == 1: # config (header) data
             print(f'warning: got a header after start of run?')
             print(f'         n_bytes_read = {self.n_bytes_read}')

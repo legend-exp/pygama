@@ -100,9 +100,9 @@ class RawBuffer:
 
 
     def __len__(self):
-        if lgdo is None: return 0
-        if not hasattr(lgdo, __len__): return 1
-        return len(lgdo)
+        if self.lgdo is None: return 0
+        if not hasattr(self.lgdo, '__len__'): return 1
+        return len(self.lgdo)
 
     def is_full(self):
         return (len(self) - self.loc) < self.fill_safety
@@ -172,6 +172,9 @@ class RawBufferList(list):
             if val not in values: values.append(val)
         return values
 
+    def clear_full(self):
+        for rb in self: 
+            if rb.is_full(): rb.loc = 0
 
 
 class RawBufferLibrary(dict):
@@ -257,6 +260,9 @@ class RawBufferLibrary(dict):
         for rb_list in self.values(): 
             values += rb_list.get_list_of(attribute)
         return values
+
+    def clear_full(self):
+        for rb_list in self.values(): rb_list.clear_full()
 
 
 
