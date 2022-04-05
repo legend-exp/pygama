@@ -183,7 +183,7 @@ class FCEventDecoder(DataDecoder):
         any_full = False
 
         # a list of channels is read out simultaneously for each event
-        for iwf in tracelist:
+        for iwf in fcio.tracelist:
             if iwf not in evt_rbkd:
                 if iwf not in self.skipped_channels:
                     self.skipped_channels[iwf] = 0

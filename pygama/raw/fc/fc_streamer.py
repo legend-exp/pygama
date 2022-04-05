@@ -140,7 +140,7 @@ class FCStreamer(DataStreamer):
                                                                   self.packet_id,
                                                                   verbosity=verbosity)
             # sizeof(fcio_event): (5 + 3*10 + 1)*4 + numtraces*(1 + nsamples+2)*2
-            self.n_bytes_read += 144 + numtraces*(eventsamples + 3)*2
+            self.n_bytes_read += 144 + self.fcio.numtraces*(self.fcio.nsamples + 3)*2
             return True
 
 '''
