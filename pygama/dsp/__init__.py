@@ -10,6 +10,6 @@ main contents of this submodule are:
   processors for inclusion in the analysis.
 * :class:`ProcessingChain`: A class that manages and efficiently
   runs a list of DSP processors
-* :function:`build_processing_chain`: A function that builds a ProcessingChain using lh5 formatted input and output files, and a json configuration file
-* :function: `build_dsp`: A function that runs build_processing_chain to build a ProcessingChain from a json config file and then processes an input file and writes into an output file, using the lh5 file format
+* :func:`build_processing_chain`: A function that builds a ProcessingChain using lh5 formatted input and output files, and a json configuration file
+* :func:`build_dsp`: A function that runs build_processing_chain to build a ProcessingChain from a json config file and then processes an input file and writes into an output file, using the lh5 file format
 """
