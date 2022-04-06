@@ -6,7 +6,6 @@ import h5py
 import time
 import numpy as np
 import argparse
-from importlib.resources import path
 
 import pygama
 from pygama import git
@@ -196,9 +195,8 @@ json config file and build_dsp.""")
     arg('file', help="Input raw LH5 file.")
     arg('-g', '--group', default=None, action='append', type=str,
         help="Name of group in LH5 file. By default process all base groups. Supports wildcards.")
-    with path('pygama.metadata', 'dsp_config.json') as default_config:
-        arg('-j', '--jsonconfig', default=str(default_config), type=str,
-            help="Name of json file used by build_dsp to construct the processing routines used. By default use the installed dsp_config.json.")
+    arg('-j', '--jsonconfig', default=str(default_config), type=str,
+        help="Name of json file used by build_dsp to construct the processing routines used. By default use the installed dsp_config.json.")
     arg('-d', '--dbfile', default=None, type=str,
         help="JSON file to read DB parameters from. Should be nested dict with channel at the top level, and parameters below that.")
     arg('-o', '--output',
