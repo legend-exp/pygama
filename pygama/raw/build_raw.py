@@ -1,7 +1,5 @@
-import os, time, sys, glob
-
+import os, time, sys, glob, json, tqdm
 import numpy as np
-import tqdm
 
 from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
@@ -15,7 +13,7 @@ from .fc.fc_streamer import FCStreamer
 
 
 def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192, 
-              n_max=np.inf, overwrite=True, verbosity=2):
+              n_max=np.inf, overwrite=True, verbosity=2, **kwargs):
     """ Convert data into LEGEND hdf5 `raw` format.  
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
@@ -32,16 +30,15 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         Options are 'ORCA', 'FlashCams', 'LlamaDaq', 'Compass', 'MGDO'
     out_spec : str or json dict or RawBufferLibrary or None
         Specification for the output stream. 
-        - If a str, interpretted as a filename for
-          an output hdf5 file, in which each stream decoder writes its own
-          stream to an hdf5 group named for the decoder. Can use environment
-          variables.
-        - If None, uses '{in_stream}.hdf5' as the output filename.  
-        - If a RawBufferLibrary, the mapping of data to output file / group is
-          taken from that.
+        - If None, uses '{in_stream}.hdf5' as the output filename.
+        - If a str not ending in '.json', interpretted as the output filename.
+        - If a str ending in '.json', interpretted as a filename containing
+          json-shorthand for the output sepcification (see raw_buffer.py)
         - If a json dict, should be a dict loaded from the json shorthand
           notation for RawBufferLibraries (see raw_buffer.py), which is then
           used to build a RawBufferLibrary
+        - If a RawBufferLibrary, the mapping of data to output file / group is
+          taken from that.
     buffer_size : int
         Default size to use for data buffering
     n_max : int
@@ -50,6 +47,8 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         Sets whether to overwrite the output file(s) if it (they) already exist
     verbosity : int
         Sets the verbosity level. 0 gives the minimum output level.
+    kwargs : kwargs
+        Sent to RawBufferLibrary generation as kw_dict
     """
 
     # convert any environment variables in in_stream so that we can check for readability
@@ -75,14 +74,21 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
 
     # procss out_spec and setup rb_lib if specified
     rb_lib = None
+    if isinstance(out_spec, str) and out_spec.endswith('.json'):
+        with open(out_spec) as json_file: out_spec = json.load(json_file)
+    if isinstance(out_spec, dict): 
+        out_spec = RawBufferLibrary(json_dict=out_spec, kw_dict=kwargs)
     if isinstance(out_spec, RawBufferLibrary): rb_lib = out_spec
-    elif isinstance(out_spec, dict): rb_lib = RawBufferLibrary(json_dict=out_spec)
-    # dummy rb_lib sending all data to out_spec
-    elif out_spec is None: 
+    # if no rb_lib, write all data to file
+    if out_spec is None: 
         out_spec = in_stream
         i_ext = out_spec.rfind('.')
         if i_ext != -1: out_spec = out_spec[:i_ext]
         out_spec += '.lh5'
+    # by now, out_spec should be a str or a RawBufferLibrary
+    if not isinstance(out_spec, str) and not isinstance(out_spec, RawBufferLibrary):
+        print(f'Error: unknown out_spec type {type(out_spec).__name__}')
+        return
 
     # modify buffer_size if necessary for n_max
     if buffer_size < 1:
@@ -100,7 +106,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         if len(out_files) == 1: print(f'  Output: {out_files[0]}')
         else: 
             print(f'  Output:')
-            for out_file in out_files: print('- {out_file}')
+            for out_file in out_files: print(f'- {out_file}')
         print(f'  Buffer size: {buffer_size}')  
         print(f'  Max num. events: {n_max}')    
         if verbosity > 1: 
@@ -181,13 +187,22 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         print("Time elapsed: {:.2f} sec".format(elapsed))
         out_files = rb_lib.get_list_of('out_stream')
         if len(out_files) == 1: 
-            file_size = os.stat(out_files[0]).st_size
-            print(f'Output file: {out_files[0]} ({sizeof_fmt(file_size)})')
+            out_file = out_files[0]
+            colpos = out_file.find(':')
+            if colpos != -1: out_file = out_file[:colpos]
+            if os.path.exists(out_file):
+                file_size = os.stat(out_file).st_size
+                print(f"Output file: {out_file} ({sizeof_fmt(file_size)})")
+            else: print("Output file: {out_file} (not written)")
         else: 
             print("Output files:")
             for out_file in out_files:
-                file_size = os.stat(out_file).st_size
-                print(f"  {out_file} ({sizeof_fmt(file_size)})")
+                colpos = out_file.find(':')
+                if colpos != -1: out_file = out_file[:colpos]
+                if os.path.exists(out_file):
+                    file_size = os.stat(out_file).st_size
+                    print(f"  {out_file} ({sizeof_fmt(file_size)})")
+                else: print(f"  {out_file} (not written)")
         print(f"Total converted: {sizeof_fmt(streamer.n_bytes_read)}")
         print(f"Conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
 
