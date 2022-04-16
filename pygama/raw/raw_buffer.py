@@ -29,14 +29,14 @@ kw_dict. Note the use of the wildcard "*": this will match all other decoder
 names / keys.
 
 {
-  "FlashCamEventDecoder" : {
+  "FCEventDecoder" : {
     "g{key:0>3d}" : {
       "key_list" : [ [24,64] ],
       "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
     },
     "spms" : {
       "key_list" : [ [6,23] ],
-      "out_stream" : "$DATADIR/{file_key}_spms.lh5/sipms"
+      "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
     },
     "puls" : {
       "key_list" : [ 0 ],
@@ -104,8 +104,17 @@ class RawBuffer:
         if not hasattr(self.lgdo, '__len__'): return 1
         return len(self.lgdo)
 
+
     def is_full(self):
         return (len(self) - self.loc) < self.fill_safety
+
+
+    def __str__(self):
+        return f'RawBuffer {"{"} lgdo={self.lgdo}, key_list={self.key_list}, out_stream={self.out_stream}, out_name={self.out_name}, loc={self.loc}, fill_safety={self.fill_safety} {"}"}'
+
+
+    def __repr__(self): return str(self)
+
 
 
 class RawBufferList(list):
