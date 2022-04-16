@@ -1,4 +1,5 @@
 import os, time, sys, glob
+
 import numpy as np
 import tqdm
 
@@ -14,7 +15,7 @@ from .fc.fc_streamer import FCStreamer
 
 
 def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192, 
-              n_max=np.inf, overwrite=True, verbosity=0):
+              n_max=np.inf, overwrite=True, verbosity=2):
     """ Convert data into LEGEND hdf5 `raw` format.  
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
@@ -102,7 +103,9 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
             for out_file in out_files: print('- {out_file}')
         print(f'  Buffer size: {buffer_size}')  
         print(f'  Max num. events: {n_max}')    
-        if verbosity > 1: progress_bar = tqdm.tqdm(total=in_stream_size)
+        if verbosity > 1: 
+            if n_max < np.inf: progress_bar = tqdm.tqdm(total=n_max, unit='rows')
+            else: progress_bar = tqdm.tqdm(total=in_stream_size, unit='B', unit_scale=True)
 
     # start a timer and a byte counter
     t_start = time.time()
@@ -134,7 +137,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
                                        chunk_mode='full_only', out_stream=out_stream, 
                                        verbosity=verbosity)
     rb_lib = streamer.rb_lib
-    if verbosity > 1: progress_bar.update(streamer.n_bytes_read)
+    if verbosity > 1 and n_max == np.inf: progress_bar.update(streamer.n_bytes_read)
 
     # rb_lib should now be fully initialized. Check if files need to be
     # overwritten or if we need to stop to avoid overwriting
@@ -155,13 +158,19 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     write_to_lh5_and_clear(header_data, lh5_store)
 
     # Now loop through the data
+    n_bytes_last = streamer.n_bytes_read
     while True:
         chunk_list = streamer.read_chunk(verbosity=verbosity-2)
-        if verbosity > 1: progress_bar.update(streamer.n_bytes_read)
+        if verbosity > 1 and n_max == np.inf: 
+            progress_bar.update(streamer.n_bytes_read-n_bytes_last)
+            n_bytes_last = streamer.n_bytes_read
         if len(chunk_list) == 0: break
+        n_read = 0
         for rb in chunk_list:
             if rb.loc > n_max: rb.loc = n_max
             n_max -= rb.loc
+            n_read += rb.loc
+        if verbosity > 1 and n_max < np.inf: progress_bar.update(n_read)
         write_to_lh5_and_clear(chunk_list, lh5_store)
         if n_max <= 0: break
 
@@ -183,3 +192,4 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         print(f"Conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
 
         print('Done.\n')
+
