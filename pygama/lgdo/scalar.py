@@ -41,3 +41,13 @@ class Scalar:
     def form_datatype(self):
         """Return this lgdo's datatype attribute string"""
         return self.datatype_name()
+
+    def __str__(self):
+        """Convert to string (e.g. for printing)"""
+        string = str(self.value)
+        tmp_attrs = self.attrs.copy()
+        tmp_attrs.pop('datatype')
+        if len(tmp_attrs) > 0: string += ' ' + str(tmp_attrs)
+        return string
+
+    def __repr__(self): return str(self)

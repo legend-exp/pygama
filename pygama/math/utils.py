@@ -46,9 +46,6 @@ def sh(cmd, sh=False):
     return decoders
 
 
-def update_progress(tqdm_bar, progress):
-    tqdm_bar.update(progress)
-
 
 def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, unit=None):
     """
@@ -112,9 +109,9 @@ def sizeof_fmt(num, suffix='B'):
     given a file size in bytes, output a human-readable form.
     """
     for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
-        if abs(num) < 1000.0:
+        if abs(num) < 1024.0:
             return "{:.3f} {}{}".format(num, unit, suffix)
-        num /= 1000.0
+        num /= 1024.0
     return "{:.1f} {} {}".format(num, 'Y', suffix)
 
 

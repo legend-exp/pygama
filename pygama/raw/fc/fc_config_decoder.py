@@ -1,4 +1,4 @@
-from ..data_decoder.py import *
+from ..data_decoder import *
 from pygama import lgdo
 
 class FCConfigDecoder(DataDecoder):
@@ -18,7 +18,7 @@ class FCConfigDecoder(DataDecoder):
         super().__init__(*args, **kwargs)
         self.config = lgdo.Struct()
 
-    def decode_config(fcio):
+    def decode_config(self, fcio):
         config_names = [
             'nsamples', # samples per channel
             'nadcs', # number of adc channels

@@ -51,7 +51,7 @@ class LH5Store:
             if group in base_group: group = base_group[group]
             else: 
                 group = base_group.create_group(group)
-                group.attrs.update(grp_attrs)
+                if grp_attrs is not None: group.attrs.update(grp_attrs)
                 return group
         if grp_attrs is not None:
             if not overwrite and grp_attrs != group.attrs:
@@ -583,7 +583,7 @@ class LH5Store:
             # if appending we need to add an appropriate offset to the
             # cumulative lengths as appropriate for the in-file object
             offset = 0 # declare here because we have to subtract it off at the end
-            if wo_mode == 'a' or wo_mode == 'o' and 'cumulative_length' in group:
+            if (wo_mode == 'a' or wo_mode == 'o') and 'cumulative_length' in group:
                 len_cl = len(group['cumulative_length']) 
                 if wo_mode == 'a': write_start = len_cl
                 if len_cl > 0: offset = group['cumulative_length'][write_start-1]
