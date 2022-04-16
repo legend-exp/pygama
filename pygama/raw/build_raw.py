@@ -149,6 +149,8 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     # overwritten or if we need to stop to avoid overwriting
     out_files = rb_lib.get_list_of('out_stream')
     for out_file in out_files:
+        colpos = out_file.find(':')
+        if colpos != -1: out_file = out_file[:colpos]
         out_file_glob = glob.glob(out_file)
         if len(out_file_glob) == 0: continue
         if len(out_file_glob) > 1:
