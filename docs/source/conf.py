@@ -2,11 +2,11 @@
 
 import pathlib
 import sys
-
+import os
 sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, the LEGEND Collaboration'
+copyright = '2020, LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
