@@ -29,14 +29,14 @@ kw_dict. Note the use of the wildcard "*": this will match all other decoder
 names / keys.
 
 {
-  "FlashCamEventDecoder" : {
+  "FCEventDecoder" : {
     "g{key:0>3d}" : {
       "key_list" : [ [24,64] ],
       "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
     },
     "spms" : {
       "key_list" : [ [6,23] ],
-      "out_stream" : "$DATADIR/{file_key}_spms.lh5/sipms"
+      "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
     },
     "puls" : {
       "key_list" : [ 0 ],
@@ -96,11 +96,25 @@ class RawBuffer:
         self.out_stream = out_stream
         self.out_name = out_name
         self.loc = 0
+        self.fill_safety = 1
 
 
     def __len__(self):
-        if lgdo is None or not hasattr(lgdo, __len__): return 0
-        return len(lgdo)
+        if self.lgdo is None: return 0
+        if not hasattr(self.lgdo, '__len__'): return 1
+        return len(self.lgdo)
+
+
+    def is_full(self):
+        return (len(self) - self.loc) < self.fill_safety
+
+
+    def __str__(self):
+        return f'RawBuffer {"{"} lgdo={self.lgdo}, key_list={self.key_list}, out_stream={self.out_stream}, out_name={self.out_name}, loc={self.loc}, fill_safety={self.fill_safety} {"}"}'
+
+
+    def __repr__(self): return str(self)
+
 
 
 class RawBufferList(list):
@@ -167,6 +181,9 @@ class RawBufferList(list):
             if val not in values: values.append(val)
         return values
 
+    def clear_full(self):
+        for rb in self: 
+            if rb.is_full(): rb.loc = 0
 
 
 class RawBufferLibrary(dict):
@@ -230,7 +247,7 @@ class RawBufferLibrary(dict):
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
 
 
-    def get_list_of(self, attribute):
+    def get_list_of(self, attribute, unique=True):
         """
         Return a list of values of RawBuffer.attribute
 
@@ -251,7 +268,11 @@ class RawBufferLibrary(dict):
         values = []
         for rb_list in self.values(): 
             values += rb_list.get_list_of(attribute)
+        if unique: values = list(set(values))
         return values
+
+    def clear_full(self):
+        for rb_list in self.values(): rb_list.clear_full()
 
 
 
@@ -322,13 +343,17 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0: continue # no data to write
-        ii = out_stream.find(':')
-        filename = out_stream[:ii]
-        group = out_stream[ii+1:]
-        if len(group) == 0: group = '/'
+        ii = rb.out_stream.find(':')
+        if ii == -1: 
+            filename = rb.out_stream
+            group = '/'
+        else: 
+            filename = rb.out_stream[:ii]
+            group = rb.out_stream[ii+1:]
+            if len(group) == 0: group = '/' # in case out_stream ends with :
         # write...
-        lh5_store.write_obj(rb.lgdo, rb.out_name, filename, group=group,
-                            n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+        lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
+                               n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0
 

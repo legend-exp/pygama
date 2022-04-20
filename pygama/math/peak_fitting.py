@@ -639,8 +639,8 @@ def gauss_tail(x, mu, sigma, tau):
     x = np.asarray(x)
     tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
     tail_f = np.where(tmp < limit, 
-                      gauss_tail_exact_pdf(x, mu, sigma, tau), 
-                      gauss_tail_approx_pdf(x, mu, sigma, tau))
+                      gauss_tail_exact(x, mu, sigma, tau), 
+                      gauss_tail_approx(x, mu, sigma, tau))
     return tail_f
 
 @nb.njit(**kwd)
