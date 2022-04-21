@@ -18,10 +18,3 @@ Table of Contents
    tutorials
    Package API reference <generated/pygama>
    contributing
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
