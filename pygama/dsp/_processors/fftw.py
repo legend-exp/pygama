@@ -11,7 +11,7 @@ def dft(buf_in, buf_out):
     fixed memory buffers, so you must tell it what memory to use ahead of time.
     When using this with ProcessingChain, to ensure the correct buffers are used,
     call ProcessingChain.get_variable('var_name') to give it the internal memory
-    buffer directly---with raw_to_dsp, you can just give it the name, and it will
+    buffer directly---with build_dsp, you can just give it the name, and it will
     automatically happen.  The possible dtypes for the input/outputs are:
     - float32/float          (size n) -> complex64              (size n/2+1)
     - float64/double         (size n) -> complex128             (size n/2+1)
@@ -49,7 +49,7 @@ def inv_dft(buf_in, buf_out):
     fixed memory buffers, so you must tell it what memory to use ahead of time.
     When using this with ProcessingChain, to ensure the correct buffers are used,
     call ProcessingChain.get_variable('var_name') to give it the internal memory
-    buffer directly---with raw_to_dsp, you can just give it the name, and it will
+    buffer directly---with build_dsp, you can just give it the name, and it will
     automatically happen.  The possible dtypes for the input/outputs are:
     - complex64              (size n/2+1) -> float32/float          (size n)
     - complex128             (size n/2+1) -> float64/double         (size n)
@@ -87,7 +87,7 @@ def psd(buf_in, buf_out):
     that performs the FFT.  FFTW works on fixed memory buffers, so you must
     tell it what memory to use ahead of time.  When using this with ProcessingChain,
     to ensure the correct buffers are used, call ProcessingChain.get_variable('var_name')
-    to give it the internal memory buffer directly---with raw_to_dsp, you can just
+    to give it the internal memory buffer directly---with build_dsp, you can just
     give it the name, and it will automatically happen.  The possible dtypes for the
     input/outputs are:
     - complex64              (size n) -> float32/float       (size n    )

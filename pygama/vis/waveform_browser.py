@@ -19,7 +19,7 @@ class WaveformBrowser:
     """
     The Waveform Browser is a tool meant for interacting with waveforms from
     LH5 files. This defines an interface for drawing waveforms from a file,
-    drawing transformed waveforms defined using raw_to_dsp style json files,
+    drawing transformed waveforms defined using build_dsp style json files,
     drawing horizontal and verticle lines at the values of calculated
     parameters, and filling a legend with calculated parameters.
     
