@@ -41,7 +41,7 @@ def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=
         If fom_function is None, returns the output lh5 table for the DSP iteration
     """
     
-    pc, tb_out = build_processing_chain(tb_data, dsp_config, db_dict=db_dict, verbosity=verbosity)
+    pc, lh5_col_names, tb_out = build_processing_chain(tb_data, dsp_config, db_dict=db_dict, verbosity=verbosity)
     pc.execute()
     if fom_function is not None: 
         if fom_kwargs is not None:
