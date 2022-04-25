@@ -12,9 +12,9 @@ def inject_sig_pulse(wf_in,t0,rt,A,decay, wf_out):
     """
 
 
-    w_out[:] = np.nan
+    wf_out[:] = np.nan
 
-    if np.isnan(w_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
+    if np.isnan(wf_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
         return
 
     rise = 4*log(99)/rt
@@ -32,14 +32,14 @@ def inject_exp_pulse(wf_in,t0,rt,A,decay, wf_out):
     Inject exponential pulse into existing waveform to simulate pileup
     """
 
-    w_out[:] = np.nan
+    wf_out[:] = np.nan
 
-    if np.isnan(w_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
+    if np.isnan(wf_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
         return
 
     wf_out[:] = wf_in[:]
     for T in range(len(wf_out)):
         if (t0<= T)& (T<= t0+rt):
-            wf_out[T] += ((A*exp((T-t0-rt)/(rise))*exp(-(1/decay)*(T-t0))))
+            wf_out[T] += ((A*exp((T-t0-rt)/(rt))*exp(-(1/decay)*(T-t0))))
         elif (T>t0+rt):
             wf_out[T] += (A*exp(-(1/decay)*(T-t0)))
