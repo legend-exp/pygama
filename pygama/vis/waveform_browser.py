@@ -493,4 +493,3 @@ class WaveformBrowser:
     def __iter__(self):
         while self.next_entry < len(self.lh5_it):
             yield self.draw_next()
-
