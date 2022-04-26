@@ -62,7 +62,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     if Etol_keV is None:
         #estimate Etol_keV
         pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
-        if sum(sum([sum(c) if c is not None else 0 for c in pt_covs])) == np.inf or sum(sum([sum(c) if c is not None else 0 for c in pt_covs])) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
+        if sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
@@ -390,9 +390,9 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             cov_i = np.array(cov_i)[mask,:][:,mask]
             
             n_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
-            if (sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or 
-                sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or 
-                np.isnan(sum([sum(c) if c is not None else 0 for c in cov_i]))) :
+            if (sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf or 
+                sum(sum(c) if c is not None else 0 for c in cov_i) == 0 or 
+                np.isnan(sum(sum(c) if c is not None else 0 for c in cov_i))) :
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
             
@@ -583,7 +583,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
             print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
-    Euc_min, Euc_max = [(np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1)]
+    Euc_min, Euc_max = ((np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1))
     Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
     Euc_max = Euc_max[np.logical_and(Euc_max >= Euc_min, Euc_max <= max(E_uncal))][0]
     dEuc = 0.2/roughpars[-2]
@@ -993,10 +993,10 @@ def match_peaks(data_pks, cal_pks):
     print(i, best_err)
     print("cal:",cal)
     print("data:",data)
-    plt.scatter(data, cal, label='min.err:{:.2e}'.format(err))
+    plt.scatter(data, cal, label=f'min.err:{err:.2e}')
     xs = np.linspace(data[0], data[-1], 10)
     plt.plot(xs, best_m * xs + best_b , c="r",
-             label="y = {:.2f} x + {:.2f}".format(best_m,best_b) )
+             label=f"y = {best_m:.2f} x + {best_b:.2f}" )
     plt.xlabel("Energy (uncal)", ha='right', x=1)
     plt.ylabel("Energy (keV)", ha='right', y=1)
     plt.legend()

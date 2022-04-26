@@ -186,7 +186,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
 
     if verbosity > 0:
         elapsed = time.time() - t_start
-        print("Time elapsed: {:.2f} sec".format(elapsed))
+        print(f"Time elapsed: {elapsed:.2f} sec")
         out_files = rb_lib.get_list_of('out_stream')
         if len(out_files) == 1: 
             out_file = out_files[0]

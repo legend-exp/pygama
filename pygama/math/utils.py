@@ -110,7 +110,7 @@ def sizeof_fmt(num, suffix='B'):
     """
     for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
         if abs(num) < 1024.0:
-            return "{:.3f} {}{}".format(num, unit, suffix)
+            return f"{num:.3f} {unit}{suffix}"
         num /= 1024.0
     return "{:.1f} {} {}".format(num, 'Y', suffix)
 
@@ -200,7 +200,7 @@ def tree_draw(tree, vars, tcut):
 
         for j, var in enumerate(tmp_list):
             # print(i, j, var, "getting V", j+1, "writing to np_arrs", i + j)
-            tmp = getattr(tree, "GetV{}".format(j + 1))()
+            tmp = getattr(tree, f"GetV{j + 1}")()
             np_arrs[i + j] = np.array([tmp[k] for k in range(n)])
 
     return tuple(np_arrs)

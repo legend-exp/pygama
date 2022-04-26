@@ -252,8 +252,8 @@ def get_next_packet(f_in):
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
-    record_length = int((head[0] & 0x3FFFF))
-    data_id = int((head[0] >> 18))
+    record_length = int(head[0] & 0x3FFFF)
+    data_id = int(head[0] >> 18)
     # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
@@ -310,7 +310,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     file_size = float(f_in.tell())
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
-    print("Total file size: {:.3f} MB".format(file_size_MB))
+    print(f"Total file size: {file_size_MB:.3f} MB")
     print("Run number:", get_run_number(header_dict))
 
 
@@ -469,10 +469,10 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
             try:
-                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+                print(f"  {data_id}: {id2dn_dict[data_id]}")
             except KeyError:
-                print("  {}: Unknown".format(data_id))
+                print(f"  {data_id}: Unknown")
         print("hopefully they weren't important!\n")
 
-    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
+    print(f"Wrote RAW File:\n    {raw_file_pattern}\nFILE INFO:")
 

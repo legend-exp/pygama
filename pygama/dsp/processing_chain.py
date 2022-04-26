@@ -36,8 +36,8 @@ class CoordinateGrid:
     and offset. Period is a unitted Quantity, offset is a scalar in units of
     period, a Unit or a ProcChainVar. In the last case, a ProcessingChain
     variable is used to store a different offset for each event"""
-    period: Union[Quantity, Unit, str]
-    offset: Union[Quantity, ProcChainVar, float, int]
+    period: Quantity | Unit | str
+    offset: Quantity | ProcChainVar | float | int
 
     def __post_init__(self):
         if isinstance(self.period, str):
@@ -75,7 +75,7 @@ class CoordinateGrid:
     def __str__(self):
         offset = self.offset.name if isinstance(self.offset, ProcChainVar) \
             else str(self.offset)
-        return "({},{})".format(str(self.period), offset)
+        return f"({str(self.period)},{offset})"
 
 class ProcChainVar:
     """Helper data class with buffer and information for internal variables in
@@ -95,7 +95,7 @@ class ProcChainVar:
         
         # ndarray containing data buffer of size block_width x shape
         # list of ndarrays in different coordinate systems if is_coord is true
-        self._buffer: Union[list, np.ndarray] = None
+        self._buffer: list | np.ndarray = None
         
         self.shape = shape
         self.dtype = dtype
@@ -136,7 +136,7 @@ class ProcChainVar:
                 elif isinstance(self._buffer, np.ndarray):
                     self._buffer = [(self._buffer, CoordinateGrid(self.unit, 0))]
 
-        super(ProcChainVar, self).__setattr__(name, value)
+        super().__setattr__(name, value)
         
     def get_buffer(self, unit=None):
         # If buffer needs to be created, do so now
@@ -578,7 +578,7 @@ class ProcessingChain:
             if isinstance(node.slice, ast.Index):
                 index = get_index(node.slice.value)
                 out_buf = val[..., index]
-                out_name='{}[{}]'.format(str(val), index),
+                out_name=f'{str(val)}[{index}]',
                 out_grid = None
             
             elif isinstance(node.slice, ast.Slice):
@@ -603,7 +603,7 @@ class ProcessingChain:
                         start = sl.start*val.period
                         if isinstance(off, ProcChainVar):
                             new_off = ProcChainVar(self,
-                                                   name="({}+{})".format(str(off), str(start)),
+                                                   name=f"({str(off)}+{str(start)})",
                                                    is_coord=True)
                             self._proc_managers.append(ProcessorManager(self, np.add, [off, start, new_off]))
                             off = new_off
@@ -659,7 +659,7 @@ class ProcessingChain:
 
     def _validate_name(self, name, raise_exception=False):
         """Check that name is alphanumeric, and not an already used keyword"""
-        isgood = re.match("\A\w+$", name) and name not in self.func_list \
+        isgood = re.match(r"\A\w+$", name) and name not in self.func_list \
             and not name in ureg
         if raise_exception and not isgood:
             raise ProcessingChainError(name+" is not a valid variable name")
@@ -777,7 +777,7 @@ class ProcessorManager:
         
         # Make sure arrays obey the broadcasting rules, and make a dictionary
         # of the correct dimensions and unit system
-        dims_list = re.findall("\((.*?)\)", self.signature)
+        dims_list = re.findall(r"\((.*?)\)", self.signature)
 
         if not len(dims_list)==len(params)+len(kw_params):
             raise ProcessingChainError("Expected {} arguments from signature {}; found {}: ({})".format(len(dims_list), self.signature, len(params), ', '.join([str(par) for par in params])))
@@ -837,7 +837,7 @@ class ProcessorManager:
                         outerdims.insert(len(fun_dims)-i, self.DimInfo(ad, arr_grid))
                         fun_dims.insert(len(fun_dims)-i, ad)
                     else:
-                        raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions. Require: "+str(tuple([dim.length for dim in outerdims+fun_dims]))+"; found "+str(tuple(arr_dims)) + " for "+str(param))
+                        raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions. Require: "+str(tuple(dim.length for dim in outerdims+fun_dims))+"; found "+str(tuple(arr_dims)) + " for "+str(param))
                 elif not fd.grid:
                     outerdims[len(fun_dims)-i].grid = arr_grid
                 
@@ -871,7 +871,7 @@ class ProcessorManager:
                 if not d in dims_dict:
                     raise ProcessingChainError("Could not deduce dimension " + d + " for " + str(param))
                 dim_list.append(dims_dict[d])
-            shape = tuple([d.length for d in dim_list])
+            shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
             
             if isinstance(param, ProcChainVar):
@@ -921,7 +921,7 @@ class ProcessorManager:
 
     def __str__(self):
         return self.processor.__name__ + '(' \
-            + ", ".join([str(par) for par in self.params] + ["{}={}".format(k, str(v)) for k, v in self.kw_params.items()]) + ')'
+            + ", ".join([str(par) for par in self.params] + [f"{k}={str(v)}" for k, v in self.kw_params.items()]) + ')'
         
 
 
@@ -981,7 +981,7 @@ class NumpyIOManager(IOManager):
                         shape = io_buf.shape[1:])
         
         if var.shape != io_buf.shape[1:] or var.dtype != io_buf.dtype:
-            raise ProcessingChainError("numpy.array<{}>\{{}\}@{}) is not compatible with variable {}".format(self.io_buf.shape, self.io_buf.dtype, self.io_buf.data, str(self.var)))
+            raise ProcessingChainError(r"numpy.array<{}>\{{}\}@{}) is not compatible with variable {}".format(self.io_buf.shape, self.io_buf.dtype, self.io_buf.data, str(self.var)))
 
         self.io_buf = io_buf
         self.var = var
@@ -996,7 +996,7 @@ class NumpyIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self):
-        return '{} linked to numpy.array({}, {})@{})'.format(str(self.var), self.io_buf.shape, self.io_buf.dtype, self.io_buf.data)
+        return f'{str(self.var)} linked to numpy.array({self.io_buf.shape}, {self.io_buf.dtype})@{self.io_buf.data})'
 
 
 class LGDOArrayIOManager(IOManager):
@@ -1010,7 +1010,7 @@ class LGDOArrayIOManager(IOManager):
                         unit = unit )
         
         if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError('LGDO object {}@{} is incompatible with {}'.format(self.io_buf.form_datatype(), self.raw_buf.data, str(self.var)))
+            raise ProcessingChainError(f'LGDO object {self.io_buf.form_datatype()}@{self.raw_buf.data} is incompatible with {str(self.var)}')
 
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
@@ -1018,7 +1018,7 @@ class LGDOArrayIOManager(IOManager):
             elif ureg.is_compatible_with(var.unit.period, unit):
                 unit = ureg.Quantity(unit).u
             else:
-                raise ProcessingChainError("LGDO array and variable {} have incompatible units ({} and {})".format(str(var), str(var.unit.period.u), str(unit)))
+                raise ProcessingChainError(f"LGDO array and variable {str(var)} have incompatible units ({str(var.unit.period.u)} and {str(unit)})")
         
         if unit is None and not var.unit is None:
             io_array.attrs['units'] = str(var.unit)
@@ -1038,7 +1038,7 @@ class LGDOArrayIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self):
-        return '{} linked to {}'.format(str(self.var), str(self.io_array))
+        return f'{str(self.var)} linked to {str(self.io_array)}'
 
 
 # Waveforms
@@ -1095,7 +1095,7 @@ class LGDOWaveformIOManager(IOManager):
         
 
     def __str__(self):
-        return  '{} linked to <pygama.lgdo.WaveformTable: values: {}, dt: {}, t0: {}>'.format(str(self.var), str(self.wf_table.values), str(self.wf_table.dt), str(self.wf_table.t0))
+        return  f'{str(self.var)} linked to <pygama.lgdo.WaveformTable: values: {str(self.wf_table.values)}, dt: {str(self.wf_table.dt)}, t0: {str(self.wf_table.t0)}>'
     
 
 
@@ -1183,7 +1183,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     # prepare the processor list
     multi_out_procs = {}
-    db_parser = re.compile("db.[\w_.]+")
+    db_parser = re.compile(r"db.[\w_.]+")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
@@ -1237,7 +1237,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         if par in resolved:
             return
         elif par in unresolved:
-            raise ProcessingChainError('Circular references detected: %s -> %s' % (par, edge))
+            raise ProcessingChainError('Circular references detected: {} -> {}'.format(par, edge))
 
         # if we don't find a node, this is a leaf
         node = processors.get(par)
@@ -1335,7 +1335,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     init_args.append(arg)
 
             if(verbosity>1):
-                print("Building function from init_args: {}({})".format(func.__name__, ", ".join(["{}".format(a) for a in init_args] + ["{}={}".format(k, v) for k, v in init_kwargs.items()])))
+                print("Building function from init_args: {}({})".format(func.__name__, ", ".join([f"{a}" for a in init_args] + [f"{k}={v}" for k, v in init_kwargs.items()])))
             func = func(*init_args)
         except KeyError:
             pass

@@ -54,7 +54,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     t_start = time.time()
 
     if isinstance(dsp_config, str):
-        with open(dsp_config, 'r') as config_file:
+        with open(dsp_config) as config_file:
             dsp_config = json.load(config_file)
 
     if not isinstance(dsp_config, dict):
@@ -90,13 +90,13 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
     # load DSP config (default: one config file for all tables)
     if isinstance(dsp_config, str):
-        with open(dsp_config, 'r') as config_file:
+        with open(dsp_config) as config_file:
             dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
 
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
-        with open(database, 'r') as db_file:
+        with open(database) as db_file:
             database = json.load(db_file)
 
     if database and not isinstance(database, dict):
@@ -131,7 +131,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         # if we have separate DSP files for each table, read them in here
         if chan_config is not None:
             f_config = chan_config[tb]
-            with open(f_config, 'r') as config_file:
+            with open(f_config) as config_file:
                 dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
             print('Processing table:', tb, 'with DSP config file:\n  ', f_config)
 
@@ -162,7 +162,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 proc_chain.execute(0, n_rows)
             except DSPFatal as e:
                 # Update the wf_range to reflect the file position
-                e.wf_range = "{}-{}".format(e.wf_range[0]+start_row, e.wf_range[1]+start_row)
+                e.wf_range = f"{e.wf_range[0]+start_row}-{e.wf_range[1]+start_row}"
                 raise e
             
             raw_store.write_object(obj=tb_out,

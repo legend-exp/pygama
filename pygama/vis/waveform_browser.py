@@ -180,7 +180,7 @@ class WaveformBrowser:
                 if form is None or form=='':
                     form = '~0.3P'
                 cv = '' if cv is None or cv=='' else "!"+cv
-                legend_format += "{}{{{}:{}{}}}".format(st, name, form, cv)
+                legend_format += f"{st}{{{name}:{form}{cv}}}"
             self.legend_format.append(legend_format)
 
         self.legend_kwargs = legend_opts if isinstance(legend_opts, dict) else {}
