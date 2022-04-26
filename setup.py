@@ -90,7 +90,7 @@ def make_git_file():
         print(ex)
         print('continuing...')
 
-#Add a git hook to clean jupyter notebooks before commiting
+#Add a git hook to clean jupyter notebooks before committing
 def clean_jupyter_notebooks():
     import git
     repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))

@@ -1,7 +1,7 @@
 """
 data_decoder.py
 
-base classe for decoding data into raw lgdo tables / files
+base classes for decoding data into raw lgdo tables / files
 """
 
 from abc import ABC

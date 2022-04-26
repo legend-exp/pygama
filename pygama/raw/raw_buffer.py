@@ -86,7 +86,7 @@ class RawBuffer:
         File example: '/path/filename.lh5:/group'
         Socket example: '198.0.0.100:8000'
     out_name : str (optional)
-        the name / identifier of the object in the ouput stream 
+        the name / identifier of the object in the output stream 
     '''
 
 
@@ -210,11 +210,11 @@ class RawBufferLibrary(dict):
         }
 
         By default "name" is used for the RawBuffer's "out_name" attribute, but
-        this can be overrided if desired by providing an explicit "out_name"
+        this can be overridden if desired by providing an explicit "out_name"
 
-        Allowed shorthands, in order of exapansion:
+        Allowed shorthands, in order of expansion:
         * key_list may have entries that are 2-integer lists corresponding to
-          the first and last integer keys in a continguous range (e.g. of
+          the first and last integer keys in a contiguous range (e.g. of
           channels) that get stored to the same buffer. These simply get
           replaced with the explicit list of integers in the range. We use lists
           not tuples for json compliance.
@@ -318,7 +318,7 @@ def expand_rblist_json_dict(json_dict, kw_dict):
                 json_dict[expanded_name]['key_list'] = [key];
             json_dict.pop(name)
 
-    # now re-iterate and exand out_paths
+    # now re-iterate and expand out_paths
     for name, info in json_dict.items():
         if len(info['key_list']) == 1 and info['key_list'][0] != "*": 
             kw_dict['key'] = info['key_list'][0]

@@ -10,7 +10,7 @@ class FCStatusDecoder(DataDecoder):
         """
         """
         self.decoded_values = {
-            'status': { # 0: Errors occured, 1: no errors
+            'status': { # 0: Errors occurred, 1: no errors
               'dtype': 'int32',
             },
             'statustime': { # fc250 seconds, microseconds, dummy, startsec startusec
@@ -73,7 +73,7 @@ class FCStatusDecoder(DataDecoder):
         tbl = status_rb.lgdo
         ii = status_rb.loc
 
-        # status -- 0: Errors occured, 1: no errors
+        # status -- 0: Errors occurred, 1: no errors
         tbl['status'].nda[ii] = fcio.status
 
         # times

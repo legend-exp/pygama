@@ -51,32 +51,32 @@ def parse_header(orca_filename):
     """
     with open_orca(orca_filename) as xmlfile_handle:
         #read the first word:
-        ba = bytearray(xmlfile_handle.read(8))
+        barr = bytearray(xmlfile_handle.read(8))
 
         #Replacing this to be python2 friendly
         # #first 4 bytes: header length in long words
-        # i = int.from_bytes(ba[:4], byteorder=sys.byteorder)
+        # i = int.from_bytes(barr[:4], byteorder=sys.byteorder)
         # #second 4 bytes: header length in bytes
-        # j = int.from_bytes(ba[4:], byteorder=sys.byteorder)
+        # j = int.from_bytes(barr[4:], byteorder=sys.byteorder)
 
         big_endian = False if sys.byteorder == "little" else True
-        i = from_bytes(ba[:4], big_endian=big_endian)
-        j = from_bytes(ba[4:], big_endian=big_endian)
+        i = from_bytes(barr[:4], big_endian=big_endian)
+        j = from_bytes(barr[4:], big_endian=big_endian)
         if (np.ceil(j/4) != i-2) and (np.ceil(j/4) != i-3):
             print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
             return i, j, {}
 
         #read in the next that-many bytes that occupy the plist header
         as_bytes = xmlfile_handle.read(j)
-        ba = bytearray(as_bytes)
+        barr = bytearray(as_bytes)
 
         #convert to string
         #the readPlistFromBytes method doesn't exist in 2.7
         if sys.version_info[0] < 3:
-            header_string = ba.decode("utf-8")
+            header_string = barr.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
         elif sys.version_info[1] < 9:
-            header_dict = plistlib.readPlistFromBytes(ba)
+            header_dict = plistlib.readPlistFromBytes(barr)
         else:
             header_dict = plistlib.loads(as_bytes, fmt=plistlib.FMT_XML)
         return i, j, header_dict
@@ -180,7 +180,7 @@ def get_object_info(header_dict, orca_class_name):
 
 def get_readout_info(header_dict, orca_class_name, unique_id=-1):
     """
-    retunrs a list with all the readout list info from the header with name
+    returns a list with all the readout list info from the header with name
     orca_class_name.  optionally, if unique_id >= 0 only return the list for
     that Orca unique id number.
     """

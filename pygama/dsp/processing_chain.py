@@ -22,7 +22,7 @@ from pygama.math.units import Unit, Quantity
 # Filler value for variables to be automatically deduced later
 auto = 'auto'
 
-# Map from ast interpretter operations to functions to call and format string
+# Map from ast interpreter operations to functions to call and format string
 ast_ops_dict = {ast.Add: (np.add, '{}+{}'),
                 ast.Sub: (np.subtract, '{}-{}'),
                 ast.Mult: (np.multiply, '{}*{}'),
@@ -199,7 +199,7 @@ class ProcChainVar:
             str(self.shape), str(self.dtype), str(self.grid), \
             str(self.unit), " (coord)" if self.is_coord is True else '' )
 
-    # Update any variables set to auto; leave the others alone. Emit a messsage
+    # Update any variables set to auto; leave the others alone. Emit a message
     # only if anything was updated
     def update_auto(self, shape=auto, dtype=auto, grid=auto, unit=auto, is_coord=auto, period=None, offset=0):
         updated = False

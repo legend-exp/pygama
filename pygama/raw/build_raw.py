@@ -31,9 +31,9 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     out_spec : str or json dict or RawBufferLibrary or None
         Specification for the output stream. 
         - If None, uses '{in_stream}.hdf5' as the output filename.
-        - If a str not ending in '.json', interpretted as the output filename.
-        - If a str ending in '.json', interpretted as a filename containing
-          json-shorthand for the output sepcification (see raw_buffer.py)
+        - If a str not ending in '.json', interpreted as the output filename.
+        - If a str ending in '.json', interpreted as a filename containing
+          json-shorthand for the output specification (see raw_buffer.py)
         - If a json dict, should be a dict loaded from the json shorthand
           notation for RawBufferLibraries (see raw_buffer.py), which is then
           used to build a RawBufferLibrary
@@ -96,7 +96,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         return
     if buffer_size > n_max: buffer_size = n_max
 
-    # ouput start of processing info if verbosity > 0
+    # output start of processing info if verbosity > 0
     if verbosity > 0:
         print( 'Starting build_raw processing.')
         print(f'  Input: {in_stream}')        
@@ -116,7 +116,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     # start a timer and a byte counter
     t_start = time.time()
 
-    # select the approprate streamer for in_stream
+    # select the appropriate streamer for in_stream
     streamer = None
     if in_stream_type == 'ORCA':
         print(f'Error: ORCA streaming not yet implemented')

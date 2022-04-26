@@ -10,7 +10,7 @@ class Table(Struct):
     table I/O using functions like push_row(), is_full(), and clear()
 
     Note: if you write to a table and don't fill it up to its total size, be
-    sure to resize it before passing to data processing fucntions, as they will
+    sure to resize it before passing to data processing functions, as they will
     call len(table) to access valid data, which returns table.size.
     """
     # TODO: overload getattr to allow access to fields as object attributes?

@@ -85,7 +85,7 @@ class LH5Store:
             Name of the lh5 object to be read (including its group path)
         lh5_file : str or h5py File object, or a list of either
             The file(s) containing the object to be read oad out. If a list of
-            files, array-like object data will be contatenated into the output
+            files, array-like object data will be concatenated into the output
             object
         start_row : int (optional)
             Starting entry for the object read (for array-like objects). For a
@@ -385,7 +385,7 @@ class LH5Store:
             # operations on the view change the original array because they are
             # numpy arrays, not lists.
             #
-            # First we need to substract off the in-file offset for the start of
+            # First we need to subtract off the in-file offset for the start of
             # read for flattened_data
             this_cumulen_nda -= da_start
 
@@ -806,7 +806,7 @@ class LH5Iterator:
         lh5_obj, n_rows = lh5_it.read(entry)
     to read the block of entries starting at entry. In case of multiple files
     or the use of an event selection, entry refers to a global event index
-    accros files and does not count events that are excluded by the selection.
+    across files and does not count events that are excluded by the selection.
     
     This can also be used as an iterator:
         for lh5_obj, entry, n_rows in LH5Iterator(...):

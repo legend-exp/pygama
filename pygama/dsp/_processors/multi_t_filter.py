@@ -12,7 +12,7 @@ def remove_duplicates(t_in, vt_min_in, t_out):
     an aferpulse peak's tp0 to be sent to 0 or the same index as the tp0 for the first pulse.
     This only happens when the relative minimum between the first pulse and 
     the afterpulse is greater than the threshold. So, we sweep through the array again 
-    to ensure there are no duplicate indices. If there are duplicate indicies caused by a
+    to ensure there are no duplicate indices. If there are duplicate indices caused by a
     misidentified tp0 of an afterpulse, we replace its index by that of the corresponding minimum
     found using the get_multi_local_extrema function. It also checks to make sure that the maximum of a waveform
     isn't right at index 0.
@@ -20,7 +20,7 @@ def remove_duplicates(t_in, vt_min_in, t_out):
     t_in : array-like
         The array of indices that we want to remove duplicates from 
     vt_min_in : array-like
-        List of indicies of minima that we want to replace duplicates in t_out with
+        List of indices of minima that we want to replace duplicates in t_out with
     t_out: array-like
         The array we want to return that will have no duplicate indices in it
     """

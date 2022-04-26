@@ -202,7 +202,7 @@ def cluster_events(tb_list:list, ts_unit:float=1e-8, ch_col:str='channel',
     #     copy_cols.extend(data_cols)
     # copy_cols = sorted(list(set(copy_cols))) # drop duplicates
 
-    # create a new dataframe where we SORT ALL ROWS by a striclty ascending timestamp
+    # create a new dataframe where we SORT ALL ROWS by a strictly ascending timestamp
     dfs = tb_list
     tcm = pd.concat(dfs).sort_values('tcm_sec')
     tcm.reset_index(inplace=True, drop=True)

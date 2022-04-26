@@ -193,7 +193,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         The function to be fit to the peak in the (windowed) hist
     """
     if  func == pgf.gauss_step_cdf or func == pgf.gauss_step_pdf or func == pgf.extended_gauss_step_pdf:
-        # get mu and hieght from a gauss fit, also sigma as fallback
+        # get mu and height from a gauss fit, also sigma as fallback
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
@@ -1083,8 +1083,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
         # plt.figure()
         # plt.plot(bin_centers,peak_hist,  color="k", ls="steps")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         try:
             guess_e, guess_sigma, guess_area = get_gaussian_guess(
@@ -1107,8 +1107,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
             gauss(bin_centers, guess_e, guess_sigma, guess_area),
             color="b")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         bounds = ([0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, 0], [
             1.1 * guess_e, 2 * guess_sigma, 0.1, 0.75, window_width_in_adc, 10,
@@ -1123,8 +1123,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
         plt.plot(bin_centers, radford_peak(bin_centers, *params), color="r")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         fit_result_map[energy] = params
         centers[i] = params[0]

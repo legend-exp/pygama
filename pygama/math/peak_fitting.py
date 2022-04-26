@@ -19,7 +19,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
     DEPRECATED USE FIT_BINNED
 
     do a binned fit to a histogram (nonlinear least squares).
-    can either do a poisson log-likelihood fit (jason's fave) or
+    can either do a poisson log-likelihood fit (jason's favourite) or
     use curve_fit w/ an arbitrary function.
     - hist, bins, var : as in return value of pygama.histograms.get_hist()
     - guess : initial parameter guesses. Should be optional -- we can auto-guess
@@ -274,7 +274,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     The advantage of using a gaussian over a polynomial directly is that the
     gaussian parameters are the ones we care about most for a peak, whereas for
     a poly we would have to extract them after the fit, accounting for
-    covariances. The guassian also better approximates most peaks farther down
+    covariances. The gaussian also better approximates most peaks farther down
     the peak. However, the gauss fit is nonlinear and thus less stable.
     Parameters
     ----------
@@ -305,7 +305,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
         pars : 3-tuple containing the parameters (mode, sigma, maximum) of the
                gaussian fit
             mode : the estimated x-position of the maximum
-            sigma : the estimated width of the peak. Equivalent to a guassian
+            sigma : the estimated width of the peak. Equivalent to a gaussian
                 width (sigma), but based only on the curvature within n_bins of
                 the peak.  Note that the Taylor-approxiamted curvature of the
                 underlying function in the vicinity of the max is given by max /
@@ -495,7 +495,7 @@ def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
     
     """
     define a gaussian signal on a uniform background, 
-    args: n_sig mu, sigma for the signal and n_bkg for the backgorund
+    args: n_sig mu, sigma for the signal and n_bkg for the background
     """
 
     if components==False:
@@ -508,7 +508,7 @@ def gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
     
     """
     gaussian signal + linear background function
-    args: n_sig mu, sigma for the signal and n_bkg,b,m for the backgorund
+    args: n_sig mu, sigma for the signal and n_bkg,b,m for the background
     """
     
 
@@ -580,7 +580,7 @@ def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , uppe
 
     """
     Pdf for Gaussian on step background 
-    args: n_sig mu, sigma for the signal and n_bkg,hstep for the backgorund
+    args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
     """
 
     try:
@@ -600,7 +600,7 @@ def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.i
 
     """
     Pdf for Gaussian on step background for Compton spectrum, returns also the total number of events for extended unbinned fits
-    args: n_sig mu, sigma for the signal and n_bkg, hstep for the backgorund
+    args: n_sig mu, sigma for the signal and n_bkg, hstep for the background
     """
 
     if components ==False:
@@ -613,7 +613,7 @@ def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper
     
     """
     Cdf for Gaussian on step background 
-    args: n_sig mu, sigma for the signal and n_bkg,hstep for the backgorund
+    args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
     """
     try:
         bkg = step_cdf(x, mu, sigma, hstep, lower_range, upper_range)

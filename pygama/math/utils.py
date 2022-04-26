@@ -69,7 +69,7 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
     stop : int
         ending iteration value
     step : int
-        step size inbetween each iteration
+        step size in between each iteration
     verbose : int
         verbose = 0 hides progress bar verbose > 0 displays progress bar
     text : str

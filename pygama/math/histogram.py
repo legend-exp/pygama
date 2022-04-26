@@ -225,7 +225,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     Typically used by sending slices around a peak. Searches about argmax(hist)
     for the peak to fall by [fraction] from mx to bl
 
-    Paramaters
+    Parameters
     ----------
     fraction : float
         The fractional amplitude at which to evaluate the full width
@@ -245,7 +245,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     dbl : float (optional)
         The uncertainty in the bl
     method : string
-        'bins_over_f' : the simplest method: just take the diffence in the bin
+        'bins_over_f' : the simplest method: just take the difference in the bin
             centers that are over [fraction] of max. Only works for high stats and 
             FWFM/bin_width >> 1
         'interpolate' : interpolate between the bins that cross the [fration]
@@ -285,7 +285,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
             dmx = np.sqrt(var[np.argmax(hist)])
     idxs_over_f = hist > (bl + fraction * (mx-bl))
 
-    # argmax will return the index of the first occurence of a maximum
+    # argmax will return the index of the first occurrence of a maximum
     # so we can use it to find the first and last time idxs_over_f is "True"
     bin_lo = np.argmax(idxs_over_f)
     bin_hi = len(idxs_over_f) - np.argmax(idxs_over_f[::-1])
@@ -295,7 +295,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     dheight2 = (fraction*dmx)**2 + ((1-fraction)*dbl)**2
 
     if method == 'bins_over_f':
-        # the simplest method: just take the diffence in the bin centers
+        # the simplest method: just take the difference in the bin centers
         fwfm = bin_centers[bin_hi] - bin_centers[bin_lo]
 
         # compute rough uncertainty as [bin width] (+) [dheight / slope]
