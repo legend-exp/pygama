@@ -65,7 +65,8 @@ jobs:
       - name: Generate Report
         run: |
           .github/workflows/get-dependencies.sh
-          pip install coverage
+          python -m pip install .
+          python -m pip install coverage
           coverage run -m pytest
       - name: Upload Coverage to codecov.io
         uses: codecov/codecov-action@v2
