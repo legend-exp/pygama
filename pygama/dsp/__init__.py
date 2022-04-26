@@ -11,16 +11,6 @@ main contents of this submodule are:
   numpy ufuncs as well.
 * :class:`pygama.dsp.ProcessingChain`: A class that manages and efficiently
   runs a list of DSP processors
-
-Generally we have *calculators*, which take a block and return a column
-(single-valued), and *transforms*, which take a block and return another block.
-
-DSP is performed by extracting a table of raw data including waveforms and
-passing it to the :class:`pygama.dsp.processing_chain.ProcessingChain`. The primary
-function for DSP is :func:`pygama.dsp.build_dsp.raw_to_dsp`.
-
-The DSP and other routines can make use of an analysis parameters database,
-which is a `JSON <https://www.json.org>`_-formatted file read in as a python
-dictionary. It can be sent to the DSP routines to load optimal parameters for a
-given channel.
+* :func:`build_processing_chain`: A function that builds a ProcessingChain using lh5 formatted input and output files, and a json configuration file
+* :func:`build_dsp`: A function that runs build_processing_chain to build a ProcessingChain from a json config file and then processes an input file and writes into an output file, using the lh5 file format
 """
