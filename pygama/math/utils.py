@@ -2,10 +2,10 @@
 pygama convenience functions.
 """
 import sys
-import tqdm
-import numpy as np
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import tqdm
 
 
 def get_dataset_from_cmdline(args, run_db, cal_db):

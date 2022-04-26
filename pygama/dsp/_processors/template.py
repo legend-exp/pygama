@@ -2,7 +2,9 @@
 #
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 # 2) Provide instructions to Numba
 #

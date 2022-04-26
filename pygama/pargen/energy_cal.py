@@ -6,14 +6,17 @@ routines for automatic calibration.
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
 import sys
-import numpy as np
-import pygama.math.utils as pgu
-import pygama.math.peak_fitting as pgf
-import pygama.math.histogram as pgh
-import matplotlib.pyplot as plt
+
 import matplotlib.gridspec as gs
-from scipy.signal import medfilt, find_peaks_cwt
+import matplotlib.pyplot as plt
+import numpy as np
 import scipy.stats
+from scipy.signal import find_peaks_cwt, medfilt
+
+import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
+import pygama.math.utils as pgu
+
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
@@ -968,6 +971,7 @@ def match_peaks(data_pks, cal_pks):
     Match uncalibrated peaks with literature energy values.
     """
     from itertools import combinations
+
     from scipy.stats import linregress
 
     n_pks = len(cal_pks) if len(cal_pks) < len(data_pks) else len(data_pks)

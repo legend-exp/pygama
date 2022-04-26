@@ -37,6 +37,7 @@
 import numpy
 from numba import guvectorize
 
+
 def gaussian_filter1d(sigma, truncate):
     """1-D Gaussian filter.
     Parameters

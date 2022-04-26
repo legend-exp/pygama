@@ -14,10 +14,11 @@ they will help you if you need to do something trickier than is provided (e.g.
 2D hists).
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
-import pygama.math.utils as pgu
+import numpy as np
 from pylab import rcParams
+
+import pygama.math.utils as pgu
 
 
 def get_hist(data, bins=None, range=None, dx=None, wts=None):

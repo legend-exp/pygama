@@ -1,5 +1,6 @@
 import numpy as np
-from numba import guvectorize, types, from_dtype
+from numba import from_dtype, guvectorize, types
+
 
 def param_lookup(param_dict, default_val, dtype):
     """

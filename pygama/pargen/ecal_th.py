@@ -1,15 +1,19 @@
-import pygama.lh5 as lh5
+import json
+import math
+import os
+import pathlib
+
 import matplotlib.pyplot as plt
 import numpy as np
-import os,json
-import pathlib
+import scipy.stats
 from scipy.optimize import curve_fit
+
+import pygama.analysis.calibration as cal
 #import pygama.genpar_tmp.cuts as cut
 import pygama.analysis.histograms as pgh
-import pygama.analysis.calibration as cal
 import pygama.analysis.peak_fitting as pgf
-import scipy.stats
-import math
+import pygama.lh5 as lh5
+
 
 def fwhm_slope(x, m0, m1):
     """

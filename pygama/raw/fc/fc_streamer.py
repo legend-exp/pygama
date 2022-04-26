@@ -1,12 +1,16 @@
 import os
+
+import fcutils
 import numpy as np
+
 from pygama import lgdo
-from ..raw_buffer import *
+
 from ..data_streamer import DataStreamer
+from ..raw_buffer import *
 from .fc_config_decoder import FCConfigDecoder
 from .fc_event_decoder import FCEventDecoder
 from .fc_status_decoder import FCStatusDecoder
-import fcutils
+
 
 class FCStreamer(DataStreamer):
     """

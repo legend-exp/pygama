@@ -1,5 +1,6 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp._processors.time_point_thresh import time_point_thresh
 
 

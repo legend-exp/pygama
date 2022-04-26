@@ -1,10 +1,18 @@
-import os, time, sys, glob, json, tqdm
+import glob
+import json
+import os
+import sys
+import time
+
 import numpy as np
+import tqdm
 
 from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
-from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary, write_to_lh5_and_clear
+
 from .fc.fc_streamer import FCStreamer
+from .raw_buffer import (RawBuffer, RawBufferLibrary, RawBufferList,
+                         write_to_lh5_and_clear)
 
 #from orca.stream_orca import *
 #from stream_llama import *

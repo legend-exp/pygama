@@ -1,7 +1,8 @@
 import numpy as np
 
-from .orcadaq import OrcaDecoder, get_ccc, get_readout_info, get_auxhw_info
 from .fcdaq import FlashCamEventDecoder
+from .orcadaq import OrcaDecoder, get_auxhw_info, get_ccc, get_readout_info
+
 
 class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
     '''

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
+import argparse
+import json
 import os
 import sys
-import json
-import h5py
 import time
+
+import h5py
 import numpy as np
-import argparse
 
 import pygama
-from pygama import git
-from pygama.dsp.processing_chain import build_processing_chain
-from pygama.dsp.errors import DSPFatal
 import pygama.lgdo.lh5_store as lh5
+from pygama import git
+from pygama.dsp.errors import DSPFatal
+from pygama.dsp.processing_chain import build_processing_chain
 from pygama.math.utils import tqdm_range
+
 
 def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, write_mode='r', buffer_len=3200,

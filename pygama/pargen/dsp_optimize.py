@@ -1,9 +1,11 @@
-import numpy as np
-from .build_processing_chain import build_processing_chain
-from collections import namedtuple
-from pprint import pprint
 import multiprocessing as mp
+from collections import namedtuple
 from multiprocessing import get_context
+from pprint import pprint
+
+import numpy as np
+
+from .build_processing_chain import build_processing_chain
 
 
 def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0, fom_kwargs=None):

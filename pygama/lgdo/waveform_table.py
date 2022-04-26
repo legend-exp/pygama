@@ -1,7 +1,8 @@
 import numpy as np
-from .table import Table
+
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .table import Table
 from .vectorofvectors import VectorOfVectors
 
 

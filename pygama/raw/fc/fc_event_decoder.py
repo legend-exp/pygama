@@ -1,5 +1,5 @@
-from pygama.raw.data_decoder import *
 from pygama import lgdo
+from pygama.raw.data_decoder import *
 
 
 class FCEventDecoder(DataDecoder):

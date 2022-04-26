@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def get_element_type(obj):
     """Get the lgdo element type of a scalar or array
 

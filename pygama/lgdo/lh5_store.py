@@ -1,20 +1,21 @@
-import sys, os
-import numpy as np
-import h5py
 import fnmatch
-from collections import defaultdict
-from bisect import bisect_left
-
-import pandas as pd
 import glob
+import os
+import sys
+from bisect import bisect_left
+from collections import defaultdict
 
+import h5py
+import numpy as np
+import pandas as pd
+
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .fixedsizearray import FixedSizeArray
 from .lgdo_utils import *
 from .scalar import Scalar
 from .struct import Struct
 from .table import Table
-from .array import Array
-from .fixedsizearray import FixedSizeArray
-from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .vectorofvectors import VectorOfVectors
 from .waveform_table import WaveformTable
 

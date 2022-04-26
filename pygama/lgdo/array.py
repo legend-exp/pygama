@@ -1,5 +1,7 @@
 import numpy as np
+
 from .lgdo_utils import *
+
 
 class Array:
     """

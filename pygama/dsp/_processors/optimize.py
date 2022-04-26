@@ -1,8 +1,11 @@
 import numpy as np
-from numba import guvectorize
-from pygama.dsp.errors import DSPFatal
-from .pole_zero import pole_zero, double_pole_zero
 from iminuit import Minuit
+from numba import guvectorize
+
+from pygama.dsp.errors import DSPFatal
+
+from .pole_zero import double_pole_zero, pole_zero
+
 
 class Model:
     """

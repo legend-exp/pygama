@@ -1,5 +1,7 @@
-from ..data_decoder import *
 from pygama import lgdo
+
+from ..data_decoder import *
+
 
 class FCConfigDecoder(DataDecoder):
     """

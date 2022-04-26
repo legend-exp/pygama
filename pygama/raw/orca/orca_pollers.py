@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
 import sys
 
+import numpy as np
+import pandas as pd
+
 from .io_base import DataTaker
+
 
 class MJDPreampDecoder(DataTaker):
     """

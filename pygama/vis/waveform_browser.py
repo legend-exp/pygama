@@ -1,19 +1,20 @@
-import sys
-import os
 import glob
 import itertools
-import string
 import math
-import numpy as np
-import pandas as pd
-
-from pygama.dsp.processing_chain import build_processing_chain
-import pygama.lgdo.lh5_store as lh5
-from pygama.math.units import unit_registry as ureg
+import os
+import string
+import sys
 
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+import numpy as np
+import pandas as pd
 from cycler import cycler
+from matplotlib.lines import Line2D
+
+import pygama.lgdo.lh5_store as lh5
+from pygama.dsp.processing_chain import build_processing_chain
+from pygama.math.units import unit_registry as ureg
+
 
 class WaveformBrowser:
     """

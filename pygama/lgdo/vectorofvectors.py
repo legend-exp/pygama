@@ -1,6 +1,8 @@
 import numpy as np
-from .lgdo_utils import *
+
 from .array import Array
+from .lgdo_utils import *
+
 
 class VectorOfVectors:
     """

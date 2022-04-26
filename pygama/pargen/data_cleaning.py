@@ -5,10 +5,11 @@ mainly pulser tagging
 - find_pulser_properties (find pulser by looking for which peak has a constant time between events)
 - tag_pulsers
 """
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy import stats
+
 from .peak_fitting import *
 
 
@@ -105,7 +106,6 @@ def find_pulser_properties(df, energy="trap_max"):
 
     # print (df[energy])
     # exit()
-
     #find pulser by looking for which peak has a constant time between events
     #df should already be grouped by channel
 

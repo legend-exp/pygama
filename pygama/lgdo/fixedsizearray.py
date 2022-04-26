@@ -1,5 +1,6 @@
 from .array import Array
 
+
 class FixedSizeArray(Array):
     """
     An array of fixed-size arrays

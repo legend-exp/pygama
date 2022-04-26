@@ -60,7 +60,9 @@ e.g. to have object-specific buffer sizes
 """
 
 import os
+
 from pygama import lgdo
+
 
 class RawBuffer:
     '''

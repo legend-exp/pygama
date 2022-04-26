@@ -1,12 +1,15 @@
-import sys, gzip
-import numpy as np
+import gzip
 import plistlib
+import sys
 
+import numpy as np
 from tqdm.std import tqdm
-from ..utils import tqdm_range, update_progress
-from .io_base import DataDecoder
+
 from pygama import lh5
+
+from ..utils import tqdm_range, update_progress
 from .ch_group import *
+from .io_base import DataDecoder
 
 
 class OrcaDecoder(DataDecoder):
@@ -287,6 +290,7 @@ def get_channel(ccc):
 # Import orca_digitizers so that the list of OrcaDecoder.__subclasses__ gets populated
 # Do it here so that orca_digitizers can import the functions above here
 from . import orca_digitizers, orca_flashcam
+
 
 def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """

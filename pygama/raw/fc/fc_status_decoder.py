@@ -1,6 +1,9 @@
 import os
+
 import numpy as np
+
 from ..data_decoder import *
+
 
 class FCStatusDecoder(DataDecoder):
     """

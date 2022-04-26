@@ -1,12 +1,13 @@
+import math
+import sys
+
+import numba as nb
 import numpy as np
-from scipy.optimize import minimize, curve_fit, minimize_scalar, brentq
+from iminuit import Minuit, cost, util
+from scipy.integrate import simps
+from scipy.optimize import brentq, curve_fit, minimize, minimize_scalar
 from scipy.special import erf, erfc, gammaln
 from scipy.stats import crystalball
-from scipy.integrate import simps
-import sys
-import numba as nb
-import math
-from iminuit import Minuit, cost, util
 
 import pygama.math.histogram as pgh
 

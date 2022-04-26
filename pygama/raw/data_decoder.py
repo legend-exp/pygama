@@ -5,7 +5,9 @@ base classes for decoding data into raw lgdo tables / files
 """
 
 from abc import ABC
+
 import numpy as np
+
 from pygama import lgdo
 
 

@@ -1,5 +1,7 @@
 from abc import ABC
-from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary
+
+from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
+
 
 class DataStreamer(ABC):
     """ Base clase for data streams

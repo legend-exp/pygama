@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 import os
+import platform
 import re
+import subprocess
 import sys
 import sysconfig
-import platform
-import subprocess
-
 from distutils.version import LooseVersion
-from setuptools import setup, Extension, find_packages
-from setuptools.command.egg_info import egg_info
+from shutil import copyfile, copymode
+
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.build_py import build_py
 from setuptools.command.develop import develop
+from setuptools.command.egg_info import egg_info
 from setuptools.command.test import test as TestCommand
-from shutil import copyfile, copymode
+
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):

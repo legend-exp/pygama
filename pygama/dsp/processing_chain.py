@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-import numpy as np
+import ast
+import importlib
+import itertools as it
 import json
 import re
-import ast
-import itertools as it
-import importlib
 from abc import ABCMeta, abstractmethod
-
+from copy import copy, deepcopy
 from dataclasses import dataclass, field
 from typing import Union
-from copy import deepcopy, copy
 
+import numpy as np
 from numba import vectorize
 
-from .errors import ProcessingChainError, DSPFatal
 import pygama.lgdo.lh5_store as lh5
+from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
-from pygama.math.units import Unit, Quantity
+
+from .errors import DSPFatal, ProcessingChainError
 
 # Filler value for variables to be automatically deduced later
 auto = 'auto'

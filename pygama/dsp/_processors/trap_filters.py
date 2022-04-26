@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
               "void(float64[:], int32, int32, float64[:])"],

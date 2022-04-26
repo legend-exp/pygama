@@ -2,6 +2,7 @@ import numpy as np
 from numba import guvectorize
 from pyfftw import FFTW
 
+
 def dft(buf_in, buf_out):
     """
     Perform discrete Fourier transforms using the FFTW library.  FFTW optimizes

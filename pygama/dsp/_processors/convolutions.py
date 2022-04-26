@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 def cusp_filter(length, sigma, flat, decay):
     """

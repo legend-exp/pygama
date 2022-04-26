@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import time
-import argparse
+from pprint import pprint
+
 import h5py
 import numpy as np
 import pandas as pd
-from pprint import pprint
 
 import pygama.lh5 as lh5
+
 
 def hit_to_evt(f_hit:str, f_evt:str=None, lh5_tables:list=None, copy_cols:list=None,
                overwrite:bool=True, evt_tb_name:str=None, builder_config:dict=None):
