@@ -631,7 +631,7 @@ def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper
 
 @nb.njit(**kwd)
 def gauss_tail_pdf(x, mu, sigma, tau):
-    
+
     """
     A gaussian tail function template
     Can be used as a component of other fit functions w/args mu,sigma,tau
@@ -716,7 +716,7 @@ def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
             return np.full_like(x, np.nan, dtype='float64'), np.full_like(x, np.nan, dtype='float64')
 
     peak = gauss_norm(x,mu,sigma)
-    try: 
+    try:
         tail = gauss_tail_pdf(x, mu, sigma, tau)
     except ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
@@ -815,7 +815,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     if htail<0 or htail>1:
         print("htail outside allowed limits of 0 and 1")
         raise ValueError
-    
+
     res = minimize_scalar( neg_radford_peak_bgfree,
                            args=(sigma, htail, tau),
                            bounds=(-sigma-htail, sigma+htail) )
@@ -877,8 +877,8 @@ def radford_peakshape_derivative(E, pars, step_norm):
 def radford_parameter_gradient(E, pars, step_norm):
     n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
 
-    gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0] 
-    tailL = gauss_tail_pdf(np.array([E, E-1]), mu, sigma, tau)[0] 
+    gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0]
+    tailL = gauss_tail_pdf(np.array([E, E-1]), mu, sigma, tau)[0]
     if n_bkg ==0:
         step_f = 0
     else:

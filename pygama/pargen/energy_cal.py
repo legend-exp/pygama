@@ -308,16 +308,16 @@ def get_hpge_E_bounds(func):
     if  func == pgf.radford_cdf or func == pgf.radford_pdf or func == pgf.extended_radford_pdf:
         return [(0,None), (None,None), (None,None), (0,1),(None,None),(0,None), (None,None)
                 ,(None,None),(None,None),(None,None)]
-    
+
     elif  func ==  pgf.gauss_step_cdf or func ==  pgf.gauss_step_pdf or func == pgf.extended_gauss_step_pdf :
         return [(0,None), (None,None), (None,None),(0,None), (None,None),(None,None)
                 ,(None,None),(None,None)]
-    
+
     else:
         print(f'get_hpge_E_bounds not implemented for {func.__name__}')
         return []
 
-def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf, 
+def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf,
                      method = 'unbinned', gof_funcs=None, n_events=15000, allowed_p_val= 0.05,
                      uncal_is_int=False, simplex=False):
     """ Fit the Energy peaks specified using the function given
@@ -343,7 +343,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         E_uncal
     simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit 
+    allowed_p_val: lower limit on p_val of fit
     Returns
     -------
     pars : list of array
@@ -405,11 +405,11 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             pars_i = np.array(pars_i)[mask]
             errs_i = np.array(errs_i)[mask]
             cov_i = np.array(cov_i)[mask,:][:,mask]
-            
+
             total_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
-            if (sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or 
-                sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or 
-                np.isnan(sum([sum(c) if c is not None else 0 for c in cov_i]))) :
+            if (sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf or
+                sum(sum(c) if c is not None else 0 for c in cov_i) == 0 or
+                np.isnan(sum(sum(c) if c is not None else 0 for c in cov_i))) :
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
@@ -420,7 +420,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             elif np.abs(total_events[0] -np.sum(hist))/np.sum(hist)>0.1:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
-                
+
             elif p_val<allowed_p_val:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
@@ -540,7 +540,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         ranges around which the peak fitting is performed
         if tuple(s) are supplied, they provide the left and right ranges
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit 
+    allowed_p_val: lower limit on p_val of fit
     Returns
     -------
     pars, cov : array, 2D array

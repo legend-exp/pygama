@@ -72,5 +72,5 @@ from ._processors.moving_windows import (avg_current, moving_window_left,
                                          moving_window_multi,
                                          moving_window_right)
 from ._processors.multi_a_filter import multi_a_filter
+from ._processors.pulse_injector import inject_exp_pulse, inject_sig_pulse
 from ._processors.Wiener_filter import Wiener_filter
-from ._processors.pulse_injector import inject_sig_pulse,inject_exp_pulse
