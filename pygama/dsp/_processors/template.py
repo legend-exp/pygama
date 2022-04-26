@@ -5,7 +5,7 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 # 2) Provide instructions to Numba
-# 
+#
 # Documentation about Numba guvectorize decorator:
 # https://numba.pydata.org/numba-doc/latest/user/vectorize.html#the-guvectorize-decorator
 #
@@ -65,7 +65,7 @@ def the_processor_template(w_in, t_in, a_in, w_out, t_out):
         raise DSPFatal('The error message goes here')
 
     # 7) Algorithm
-    # 
+    #
     # Loop over waveforms by using a "for i in range(.., .., ..)" instruction.
     # Avoid loops based on a while condition which might lead to segfault.  Avoid
     # also enumerate/ndenumerate to keep code as similar as possible among all

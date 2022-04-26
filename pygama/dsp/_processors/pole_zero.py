@@ -29,7 +29,7 @@ def pole_zero(w_in, t_tau, w_out):
         "prereqs": ["wf_bl"]
     }
     """
-    w_out[:] = np.nan 
+    w_out[:] = np.nan
 
     if np.isnan(w_in).any() or np.isnan(t_tau):
         return
@@ -70,7 +70,7 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
         "prereqs": ["wf_bl"]
     }
     """
-    w_out[:] = np.nan 
+    w_out[:] = np.nan
 
     if np.isnan(w_in).any() or np.isnan(t_tau1) or np.isnan(t_tau2) or np.isnan(frac):
         return

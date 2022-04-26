@@ -10,7 +10,7 @@ def saturation(w_in, bit_depth_in, n_lo_out, n_hi_out):
     Count the number of samples in the waveform that are
     saturated at the minimum and maximum possible values based
     on the bit depth.
-    
+
     Parameters
     ----------
     w_in        : array-like
@@ -21,7 +21,7 @@ def saturation(w_in, bit_depth_in, n_lo_out, n_hi_out):
                   The output number of samples at the minimum
     n_hi_out    : int
                   The output number of samples at the maximum
-    
+
     Processing Chain Example
     ------------------------
     "sat_lo, sat_hi": {

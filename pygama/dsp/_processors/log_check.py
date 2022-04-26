@@ -28,11 +28,11 @@ def log_check(w_in, w_log):
     }
     """
     w_log[:] = np.nan
-    
+
     if np.isnan(w_in).any():
         return
 
     if np.any(w_in <= 0):
         return
-        
+
     w_log[:] = np.log(w_in[:])

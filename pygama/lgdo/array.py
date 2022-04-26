@@ -26,7 +26,7 @@ class Array:
         nda : ndarray (optional)
             An ndarray to be used for this object's internal array. Note: the
             array is used directly, not copied. If not supplied, internal memory
-            is newly allocated based on the shape and dtype arguments. 
+            is newly allocated based on the shape and dtype arguments.
         shape : tuple of ints (optional)
             A numpy-format shape specification for shape of the internal
             ndarray. Required if nda is None, otherwise unused.
@@ -44,7 +44,7 @@ class Array:
             if fill_val is None: nda = np.empty(shape, dtype=dtype)
             elif fill_val == 0: nda = np.zeros(shape, dtype=dtype)
             else: nda = np.full(shape, fill_val, dtype=dtype)
-        self.nda = nda 
+        self.nda = nda
         self.dtype = self.nda.dtype
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
@@ -78,4 +78,3 @@ class Array:
         """Resize the array to new_size (int)"""
         new_shape = (new_size,) + self.nda.shape[1:]
         self.nda.resize(new_shape)
-

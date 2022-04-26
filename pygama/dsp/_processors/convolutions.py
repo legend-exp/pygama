@@ -61,7 +61,7 @@ def cusp_filter(length, sigma, flat, decay):
 
     den   = [1, -np.exp(-1 / decay)]
     cuspd = np.convolve(cusp, den, 'same')
-    
+
     @guvectorize(["void(float32[:], float32[:])",
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)

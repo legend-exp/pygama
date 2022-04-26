@@ -100,4 +100,3 @@ class FCStatusDecoder(DataDecoder):
         status_rb.loc += 1
 
         return len(tbl) - status_rb.loc > 1
-

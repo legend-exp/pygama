@@ -12,7 +12,7 @@ def param_lookup(param_dict, default_val, dtype):
     # convert types to avoid any necessity of casting
     param_dict  = {types.uint32(k): out_type(v) for k, v in param_dict.items()}
     default_val = out_type(default_val)
-    
+
     @guvectorize(["void(uint32, " + out_type.name + "[:])"],
                  "()->()", forceobj=True)
     def lookup(channel, val):

@@ -45,4 +45,3 @@ ytick.minor.visible  : True
 font.family : STIXGeneral
 font.serif : STIX
 mathtext.fontset : stix
-

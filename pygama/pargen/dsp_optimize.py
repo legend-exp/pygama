@@ -8,7 +8,7 @@ from multiprocessing import get_context
 
 def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0, fom_kwargs=None):
     """
-    run one iteration of DSP on tb_data 
+    run one iteration of DSP on tb_data
 
     Optionally returns a value for optimization
 
@@ -40,13 +40,13 @@ def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=
     tb_out : lh5 Table
         If fom_function is None, returns the output lh5 table for the DSP iteration
     """
-    
+
     pc, tb_out = build_processing_chain(tb_data, dsp_config, db_dict=db_dict, verbosity=verbosity)
     pc.execute()
-    if fom_function is not None: 
+    if fom_function is not None:
         if fom_kwargs is not None:
             return fom_function(tb_out, verbosity, fom_kwargs)
-        else: 
+        else:
             return fom_function(tb_out, verbosity)
     else: return tb_out
 
@@ -56,7 +56,7 @@ ParGridDimension = namedtuple('ParGridDimension', 'name parameter value_strs')
 class ParGrid():
     """ Parameter Grid class
     Each ParGrid entry corresponds to a dsp parameter to be varied.
-    The ntuples must follow the pattern: 
+    The ntuples must follow the pattern:
     ( name parameter value_strs) : ( str, str, list of str)
     where name and parameter are the same as 'db.name.parameter' in the processing chain,
     value_strs is the array of strings to set the argument to.
@@ -87,7 +87,7 @@ class ParGrid():
         Always uses Matrix indexing (natural for par grid) so that
         mg[i1][i2][...] corresponds to index order in self.dims
         Note copy is False by default as opposed to numpy default of True
-        """     
+        """
         axes = []
         for i in range(self.get_n_dimensions()):
             axes.append(self.dims[i].values_strs)
@@ -127,20 +127,20 @@ class ParGrid():
             name, parameter, value_str = self.get_data(i_dim, i_par)
             print(f"{name}.{parameter} = {value_str}")
 
-    def set_dsp_pars(self, db_dict, indices):        
+    def set_dsp_pars(self, db_dict, indices):
         if db_dict is None:
-            db_dict = {}          
+            db_dict = {}
         for i_dim, i_par in enumerate(indices):
             name, parameter, value_str= self.get_data(i_dim, i_par)
             if name not in db_dict.keys():
                 db_dict[name] = {parameter:value_str}
             else:
-                db_dict[name][parameter] = value_str        
+                db_dict[name][parameter] = value_str
         return db_dict
 
 
 def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1, **fom_kwargs):
-    """Extract a table of optimization values for a grid of DSP parameters 
+    """Extract a table of optimization values for a grid of DSP parameters
     The grid argument defines a list of parameters and values over which to run
     the DSP defined in dsp_config on tb_data. At each point, a scalar
     figure-of-merit is extracted
@@ -157,7 +157,7 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1,
         list of output variables to appear in the output table for each grid point
     grid : ParGrid
         See ParGrid class for format
-    fom_function : function 
+    fom_function : function
         When given the output lh5 table of this DSP iteration, the fom_function
         must return a scalar figure-of-merit. Should accept verbosity as a
         second keyword argument
@@ -166,7 +166,7 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1,
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
 
-    **fom_kwargs : 
+    **fom_kwargs :
         Any keyword arguments for fom_function
 
 
@@ -203,7 +203,7 @@ def run_grid_point(tb_data, dsp_config, grids, fom_function, iii, db_dict=None, 
         db_dict = grid.set_dsp_pars(db_dict, index)
 
     if verbosity > 1: pprint(dsp_config)
-    if verbosity > 0: 
+    if verbosity > 0:
         [grid.print_data(iii[i]) for i,grid in enumerate(grids)]
         print(' ')
     tb_out = run_one_dsp(tb_data,
@@ -226,7 +226,7 @@ def run_grid_point(tb_data, dsp_config, grids, fom_function, iii, db_dict=None, 
         print("value:",res)
         out = {'indexes': [tuple(ii) for ii in iii], 'results': res}
 
-    else: 
+    else:
         out = {'indexes': [tuple(ii) for ii in iii], 'results': tb_out}
     return out
 
@@ -239,7 +239,7 @@ def get_grid_points(grid):
     complete =np.full(len(grid), False)
     while True:
         out.append([tuple(ii) for ii in iii])
-        
+
         for i, gri in enumerate(zip(iii,grid)):
             if not gri[1].iterate_indices(gri[0]):
                 print(f"{i} grid end")
@@ -248,7 +248,7 @@ def get_grid_points(grid):
         if all(complete): break
     return out
 
-def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1, 
+def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1,
                           processes=5, fom_kwargs=None):
 
     """
@@ -273,13 +273,13 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
     fom_function : function or None (optional)
         When given the output lh5 table of this DSP iteration, the
         fom_function must return a scalar figure-of-merit value upon which the
-        optimization will be based. Should accept verbosity as a second argument. 
-        If multiple grids provided can either pass one fom to have it run for each grid 
+        optimization will be based. Should accept verbosity as a second argument.
+        If multiple grids provided can either pass one fom to have it run for each grid
         or a list of fom to run different fom on each grid.
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-    fom_kwargs: 
-        any keyword arguments to pass to the fom, 
+    fom_kwargs:
+        any keyword arguments to pass to the fom,
         if multiple grids given will need to be a list of the fom_kwargs for each grid
 
     Returns:
@@ -320,7 +320,7 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
         else:
             grid_values[0][indexes[0]] = {f'{indexes[0]}':res['results']}
 
-        
+
     pool.close()
     pool.join()
     return grid_values

@@ -25,40 +25,40 @@ def get_multi_local_extrema(w_in, a_delta_in, vt_max_out, vt_min_out, n_max_out,
     vt_max_out, vt_min_out : array-like, array-like
         Arrays of fixed length (padded with nans) that hold the indices of
         the identified local maxima and minima
-    n_max_out, n_min_out: scalar, scalar 
+    n_max_out, n_min_out: scalar, scalar
         The number of maxima and minima found in a waveform
     flag_out: scalar
-        Returns 1 if there is only one maximum and it is a simple waveform, 
+        Returns 1 if there is only one maximum and it is a simple waveform,
         Returns 0 if there are no peaks, or multiple peaks in a waveform
-        
+
     """
 
-    # prepare output 
-    
+    # prepare output
+
     vt_max_out[:]= np.nan
-    vt_min_out[:] = np.nan    
+    vt_min_out[:] = np.nan
     n_max_out[0] = np.nan
     n_min_out[0] = np.nan
     flag_out[0] = np.nan
-    
+
     # initialize internal counters
-    
-    n_max_counter = 0 
-    n_min_counter = 0 
-    
-    
-    # Checks 
-    
+
+    n_max_counter = 0
+    n_min_counter = 0
+
+
+    # Checks
+
     if (np.isnan(w_in).any() or np.isnan(a_delta_in)):
         return
 
     if (not len(vt_max_out)<len(w_in) or not len(vt_min_out)<len(w_in)):
         raise DSPFatal('The length of your return array must be smaller than the length of your waveform')
-    if (not a_delta_in >= 0): 
+    if (not a_delta_in >= 0):
         raise DSPFatal('a_delta_in must be positive')
-        
+
     # now loop over data
-    
+
     imax, imin = 0, 0
     find_max = True
     for i in range(len(w_in)):
@@ -82,11 +82,11 @@ def get_multi_local_extrema(w_in, a_delta_in, vt_max_out, vt_min_out, n_max_out,
                 n_min_counter += 1
                 imax = i
                 find_max = True
-                
+
     # set output
     n_max_out[0] = n_max_counter
     n_min_out[0] = n_min_counter
-    
+
     if n_max_out[0] == 1:
         flag_out[0] = 1
     else:

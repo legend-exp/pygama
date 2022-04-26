@@ -313,4 +313,3 @@ def fit_simple_scaling(x, y, var=1):
     scale_var = 1/np.sum(x*x/var)
     scale = np.sum(y*x/var) * scale_var
     return scale, scale_var
-

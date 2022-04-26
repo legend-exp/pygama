@@ -30,7 +30,7 @@ def optimize_1pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, val0_out):
     """
     Find the optimal, single pole-zero cancellation's parameter
     by minimizing the slope in the waveform's specified time range.
-    
+
     Parameters
     ----------
     w_in         : array-like
@@ -47,7 +47,7 @@ def optimize_1pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, val0_out):
                    The initial guess of the optimal time constant
     val0_out     : float
                    The output value of the best-fit time constant
-              
+
     Processing Chain Example
     ------------------------
     "tau0": {
@@ -78,7 +78,7 @@ def optimize_1pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, val0_out):
     m.errordef = Minuit.LEAST_SQUARES
     m.migrad()
     val0_out[0] = m.values[0]
-    
+
 @guvectorize(["void(float32[:], float32, float32, float32, float32, float32, float32, float32[:], float32[:], float32[:])",
               "void(float64[:], float64, float64, float64, float64, float64, float64, float64[:], float64[:], float64[:])"],
              "(n),(),(),(),(),(),()->(),(),()", forceobj=True)
@@ -86,7 +86,7 @@ def optimize_2pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, p1_in, p2_in, v
     """
     Find the optimal, double pole-zero cancellation's parameters
     by minimizing the slope in the waveform's specified time range.
-    
+
     Parameters
     ----------
     w_in         : array-like
@@ -111,7 +111,7 @@ def optimize_2pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, p1_in, p2_in, v
                    The output value of the best-fit, shorter time constant
     val2_out     : float
                    The output value of the best-fit fraction
-              
+
     Processing Chain Example
     ------------------------
     "tau1, tau2, frac": {

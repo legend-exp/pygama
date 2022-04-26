@@ -24,7 +24,7 @@ def energy_cal_th(files, energy_params, save_path):
     """
     This is an example script for calibrating Th data.
     """
-    
+
     if isinstance(energy_params, str): energy_params = [energy_params]
 
     ####################
@@ -36,7 +36,7 @@ def energy_cal_th(files, energy_params, save_path):
 
     Nevents = len(uncal_pass[energy_params[0]])
     print(f'{Nevents} events pass')
-    
+
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
     range_keV = [(15,15),(20,20), (30,30),(35,25),(25,40),(40,40),(70,70)] # side bands width
     funcs = [pgf.extended_gauss_step_pdf,pgf.extended_gauss_step_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
@@ -61,12 +61,12 @@ def energy_cal_th(files, energy_params, save_path):
         pk_pars      = results['pk_pars']
         found_peaks = results['got_peaks_locs']
         fitted_peaks = results['fitted_keV']
-        
+
         for i, peak in enumerate(glines):
-            if peak not in fitted_peaks: 
+            if peak not in fitted_peaks:
                 kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
         for i, peak in enumerate(glines):
-            if peak not in fitted_peaks: 
+            if peak not in fitted_peaks:
                 kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
         for i, peak in enumerate(fitted_peaks):
             if results['pk_fwhms'][:,1][i]/results['pk_fwhms'][:,0][i] >0.05:
@@ -89,10 +89,10 @@ def energy_cal_th(files, energy_params, save_path):
         fitted_funcs = []
         fitted_gof_funcs = []
         for i, peak in enumerate(glines):
-            if peak in fitted_peaks: 
+            if peak in fitted_peaks:
                 fitted_funcs.append(funcs[i])
                 fitted_gof_funcs.append(gof_funcs[i])
-                
+
         ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
         xpb = 1
         xlo = 0
@@ -106,7 +106,7 @@ def energy_cal_th(files, energy_params, save_path):
         datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
         plot_title = f'{detector}-{measurement}-{run}'
         peaks_kev = results['got_peaks_keV']
-        
+
 
         pk_ranges = results['pk_ranges']
         p_vals = results['pk_pvals']
@@ -131,7 +131,7 @@ def energy_cal_th(files, energy_params, save_path):
             counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
             fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
             plt.plot(bin_cs, fit_vals)
-            plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] ) 
+            plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] )
             locs,labels = plt.xticks()
             new_labels = get_peak_labels(locs, pars)
             plt.xticks(ticks = locs[1:-1], labels = new_labels)
@@ -157,11 +157,11 @@ def energy_cal_th(files, energy_params, save_path):
         fwhm_peaks   = np.array([], dtype=np.float32)
         indexes=[]
         for i,peak in enumerate(fitted_peaks):
-            if(peak==2103.53): 
+            if(peak==2103.53):
                 print(f"Tl SEP found at index {i}")
                 indexes.append(i)
                 continue
-            elif(peak==1592.53): 
+            elif(peak==1592.53):
                 print(f"Tl DEP found at index {i}")
                 indexes.append(i)
                 continue
@@ -177,7 +177,7 @@ def energy_cal_th(files, energy_params, save_path):
             print(f'FWHM of {peak} keV peak is: {fwhms[i]:1.2f} +- {dfwhms[i]:1.2f} keV')
         param_guess  = [0.2,0.001]
         param_bounds = (0, [10., 1.])
-        fit_pars, fit_covs = curve_fit(fwhm_slope, fwhm_peaks, fwhms, sigma=dfwhms, 
+        fit_pars, fit_covs = curve_fit(fwhm_slope, fwhm_peaks, fwhms, sigma=dfwhms,
                                p0=param_guess, bounds=param_bounds, absolute_sigma=True)
         sderrs = np.sqrt(np.diag(fit_covs))
         qbb_err = fwhm_slope(2039.0,*(fit_pars+sderrs))-fwhm_slope(2039.0,*fit_pars)
@@ -208,13 +208,13 @@ def energy_cal_th(files, energy_params, save_path):
         fig.savefig(plot_save_path, bbox_inches='tight')
         plt.close()
 
-        
+
 
         output_dict[energy_param] = {'Qbb_fwhm': round(fit_qbb,2), 'Qbb_fwhm_err': round(qbb_err,2),
-                                    '2.6_fwhm': round(fwhms[-1],2), '2.6_fwhm_err': round(dfwhms[-1],2), 
-                                    "m0":fit_pars[0], "m1":fit_pars[1], 
+                                    '2.6_fwhm': round(fwhms[-1],2), '2.6_fwhm_err': round(dfwhms[-1],2),
+                                    "m0":fit_pars[0], "m1":fit_pars[1],
                                     "Calibration_pars":pars.tolist(),
-                                    "Number_passed": Npass,'Number_cut': Ncut,"Cut Percentage": Ratio 
+                                    "Number_passed": Npass,'Number_cut': Ncut,"Cut Percentage": Ratio
 
                                     }
     dict_save_path = os.path.join(save_path, f'{detector}.json')
@@ -232,7 +232,7 @@ def get_peak_labels(labels, pars):
     return out
 
 def get_peak_label(peak):
-    if peak == 583.191: 
+    if peak == 583.191:
         return 'Tl 583'
     elif peak == 727.33:
         return 'Bi 727'

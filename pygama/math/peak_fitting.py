@@ -44,7 +44,7 @@ def fit_hist(func, hist, bins, var=None, guess=None,
 def fit_binned(func, hist, bins, var=None, guess=None,
              cost_func='LL', Extended=True,  simplex=False, bounds=None, fixed = None):
     """
-    Do a binned fit to a histogram. 
+    Do a binned fit to a histogram.
     Default is Extended Log Likelihood fit, with option for either Least Squares or other cost function.
 
     Inputs
@@ -56,7 +56,7 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
     guess : initial guess parameters
 
-    cost_func: cost function to use 
+    cost_func: cost function to use
 
     Extended: run extended or non extended fit
 
@@ -64,20 +64,20 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
     bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
 
-    fixed: list of parameter indices to fix 
+    fixed: list of parameter indices to fix
 
     Returns
     ------
     coeff, error cov_matrix : tuple(array, array, matrix)
     """
-        
-    
+
+
     if guess is None:
         print("auto-guessing not yet implemented, you must supply a guess.")
         return None, None
 
-    if cost_func == 'LL': 
-        
+    if cost_func == 'LL':
+
         if var is not None:
             t_arr = np.zeros((len(hist),2))
             t_arr[:,0] = hist
@@ -86,7 +86,7 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
         if Extended ==True:
             cost_func = cost.ExtendedBinnedNLL(hist,bins,  func)
-            
+
         else:
             cost_func = cost.BinnedNLL( hist,bins, func)
 
@@ -94,11 +94,11 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
         if var is None:
             var = hist # assume Poisson stats if variances are not provided
-        
+
         if len(bins) == len(hist)+1:
             bin_centres = pgh.get_bin_centers(bins)
 
-        # skip "okay" bins with content 0 +/- 0 
+        # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
         zeros = (hist == 0)
         zero_errors = (var == 0)
@@ -107,7 +107,7 @@ def fit_binned(func, hist, bins, var=None, guess=None,
         var = np.sqrt(var[mask])
         xvals = bin_centres[mask]
         cost_func = cost.LeastSquares(xvals, hist,var, func)
-            
+
     m = Minuit(cost_func, *guess)
     if bounds is not None:
         m.limits = bounds
@@ -122,11 +122,11 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     return m.values, m.errors, m.covariance
 
 def fit_unbinned(func, data, guess=None,
-             Extended=True, cost_func = 'LL',simplex=False, 
+             Extended=True, cost_func = 'LL',simplex=False,
              bounds=None, fixed=None):
     """
 
-    Do a unbinned fit to data. 
+    Do a unbinned fit to data.
     Default is Extended Log Likelihood fit, with option for other cost functions.
 
     Inputs
@@ -134,13 +134,13 @@ def fit_unbinned(func, data, guess=None,
 
     func : the function to fit
 
-    data: 
+    data:
 
     guess : initial guess parameters
 
     Extended: run extended or non extended fit
 
-    cost_func: cost function to use 
+    cost_func: cost function to use
 
     simplex: whether to include a round of simpson minimisation before main minimisation
 
@@ -159,10 +159,10 @@ def fit_unbinned(func, data, guess=None,
     if cost_func =='LL':
         if Extended ==True:
             cost_func = cost.ExtendedUnbinnedNLL(data, func)
-            
+
         else:
             cost_func = cost.UnbinnedNLL(data, func)
-            
+
     m = Minuit(cost_func, *guess)
     if bounds is not None:
         m.limits = bounds
@@ -209,16 +209,16 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     if method == 'Neyman' and np.any(hist==0):
         print("goodness_of_fit: hist cannot contain zeros for Neyman method")
         return 0, 0
-    
-    
+
+
     # compute expected values
     yy = func(pgh.get_bin_centers(bins), *pars) * pgh.get_bin_widths(bins)
-    
+
     if method == 'LR':
         log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (yy+1.e-99)), yy-hist))
         dof = len(hist) - len(pars)
-        return log_lr, dof   
-        
+        return log_lr, dof
+
     else:
         # compute chi2 numerator and denominator
         numerator = (hist - yy)**2
@@ -232,7 +232,7 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
             print(f"goodness_of_fit: unknown method {method}")
             return 0, 0
 
-        # compute chi2 and dof 
+        # compute chi2 and dof
         chisq = np.sum(numerator/denominator)
         dof = len(hist) - len(pars)
         return chisq, dof
@@ -261,7 +261,7 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 
-def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5, 
+def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
                          cost_func='Least Squares', inflate_errors=False, gof_method='var'):
     """
     Get the max, mode, and width of a peak based on gauss fit near the max
@@ -422,7 +422,7 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
 def nb_erf(x):
 
     """
-    Numba version of error function 
+    Numba version of error function
     """
 
     y = np.empty_like(x)
@@ -434,7 +434,7 @@ def nb_erf(x):
 def nb_erfc(x):
 
     """
-    Numba version of complementary error function 
+    Numba version of complementary error function
     """
 
     y = np.empty_like(x)
@@ -464,7 +464,7 @@ def gauss_norm(x, mu, sigma):
     if sigma ==0: invs=np.nan
     else: invs = 1.0 / sigma
     z = (x - mu) * invs
-    invnorm = invs/ np.sqrt(2 * np.pi) 
+    invnorm = invs/ np.sqrt(2 * np.pi)
     return np.exp(-0.5 * z ** 2) * invnorm
 
 @nb.njit(**kwd)
@@ -483,7 +483,7 @@ def gauss_amp(x, mu, sigma, a):
 
 @nb.njit(**kwd)
 def gauss_pdf(x, mu, sigma, n_sig):
-    
+
     """
     Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
     """
@@ -492,9 +492,9 @@ def gauss_pdf(x, mu, sigma, n_sig):
 
 
 def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
-    
+
     """
-    define a gaussian signal on a uniform background, 
+    define a gaussian signal on a uniform background,
     args: n_sig mu, sigma for the signal and n_bkg for the background
     """
 
@@ -505,12 +505,12 @@ def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
 
 
 def gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
-    
+
     """
     gaussian signal + linear background function
     args: n_sig mu, sigma for the signal and n_bkg,b,m for the background
     """
-    
+
 
     norm = (m/2 *np.nanmax(x)**2 + b*np.nanmax(x)) - (m/2 *np.nanmin(x)**2 + b*np.nanmin(x))
 
@@ -532,7 +532,7 @@ def step_int(x,mu,sigma, hstep):
 
 @nb.njit(**kwd)
 def unnorm_step_pdf(x,  mu, sigma, hstep):
-    
+
     """
     Unnormalised step function for use in pdfs
     """
@@ -555,7 +555,7 @@ def step(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
         integral = step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
     else:
         integral = step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
-    
+
     norm = integral[1]-integral[0]
     return step_f/norm
 
@@ -579,7 +579,7 @@ def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
 def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
 
     """
-    Pdf for Gaussian on step background 
+    Pdf for Gaussian on step background
     args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
     """
 
@@ -610,9 +610,9 @@ def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.i
         return n_sig+n_bkg, sig, bkg
 
 def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
-    
+
     """
-    Cdf for Gaussian on step background 
+    Cdf for Gaussian on step background
     args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
     """
     try:
@@ -630,7 +630,7 @@ def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper
 
 @nb.njit(**kwd)
 def gauss_tail(x, mu, sigma, tau):
-    
+
     """
     A gaussian tail function template
     Can be used as a component of other fit functions w/args mu,sigma,tau
@@ -638,8 +638,8 @@ def gauss_tail(x, mu, sigma, tau):
 
     x = np.asarray(x)
     tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
-    tail_f = np.where(tmp < limit, 
-                      gauss_tail_exact(x, mu, sigma, tau), 
+    tail_f = np.where(tmp < limit,
+                      gauss_tail_exact(x, mu, sigma, tau),
                       gauss_tail_approx(x, mu, sigma, tau))
     return tail_f
 
@@ -662,7 +662,7 @@ def gauss_tail_approx(x, mu, sigma, tau):
 def gauss_tail_integral(x,mu,sigma,tau):
 
     """
-    Integral for gaussian tail 
+    Integral for gaussian tail
     """
 
     abstau = np.abs(tau)
@@ -689,7 +689,7 @@ def gauss_tail_norm(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
 def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
 
     """
-    CDF for gaussian tail 
+    CDF for gaussian tail
     """
 
     cdf = gauss_tail_integral(x,mu,sigma,tau)
@@ -702,30 +702,30 @@ def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
     c = 1-cdf[-1]
     return cdf+c
 
-def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False): 
+def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
 
     """
-    Pdf for gaussian with tail 
+    Pdf for gaussian with tail
     """
 
     peak = gauss_norm(x,mu,sigma)
-    try: 
+    try:
         tail = gauss_tail(x, mu, sigma, tau)
     except ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
     if components ==False:
         return (1-htail)*peak + htail*tail
-    else: 
+    else:
         return (1-htail)*peak, htail*tail
 
 def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
 
     """
-    Cdf for gaussian with tail 
+    Cdf for gaussian with tail
     """
 
     peak = gauss_cdf(x,mu,sigma)
-    try: 
+    try:
         tail = gauss_tail_cdf(x, mu, sigma, tau)
     except  ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
@@ -734,11 +734,11 @@ def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
     else:
         return (1-htail)*peak, htail*tail
 
-def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, 
+def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                 lower_range=np.inf , upper_range=np.inf,  components=False):
 
     """
-    David Radford's HPGe peak shape PDF consists of a gaussian with tail signal on a step background 
+    David Radford's HPGe peak shape PDF consists of a gaussian with tail signal on a step background
     """
 
     try:
@@ -754,9 +754,9 @@ def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
         return pdf
     else:
         peak, tail = gauss_with_tail_pdf(x, mu, sigma, htail,  tau, components=components)
-        return n_sig *peak, n_sig*tail, n_bkg * bkg 
+        return n_sig *peak, n_sig*tail, n_bkg * bkg
 
-def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, 
+def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                          lower_range=np.inf , upper_range=np.inf, components=False):
 
     """
@@ -766,14 +766,14 @@ def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
     if components ==False:
         return n_sig + n_bkg, radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
     else:
-        peak, tail, bkg = radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, 
+        peak, tail, bkg = radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep,
                                       lower_range, upper_range,components=components)
         return n_sig + n_bkg, peak, tail, bkg
 
 def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
 
     """
-    Cdf for gaussian with tail signal and step background 
+    Cdf for gaussian with tail signal and step background
     """
     try:
         bkg = step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -798,7 +798,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     # optimize this to find max value
     def neg_radford_peak_bgfree(E, sigma, htail, tau):
         return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
-    
+
     res = minimize_scalar( neg_radford_peak_bgfree,
                            args=(sigma, htail, tau),
                            bounds=(-sigma-htail, sigma+htail) )
@@ -808,7 +808,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     # root find this to find the half-max energies
     def radford_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
         return gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0] - half_max
-    
+
     try:
         lower_hm = brentq( radford_peak_bgfree_halfmax,
                        -(2.5*sigma/2 + htail*tau), Emax,
@@ -825,9 +825,9 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
         upper_hm = brentq( radford_peak_bgfree_halfmax,
                    Emax, 5*sigma,
                    args = (sigma, htail, tau, half_max) )
-    
+
     if cov is None: return upper_hm - lower_hm
-    
+
     #calculate uncertainty
     #amp set to 1, mu to 0, hstep+bg set to 0
     pars = [1,0, sigma, htail, tau,0,0]
@@ -858,10 +858,10 @@ def radford_peakshape_derivative(E, pars, step_norm):
     return n_sig*ret - n_bkg*hstep*gaus/step_norm #need norm factor for bkg
 
 def radford_parameter_gradient(E, pars, step_norm):
-    n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars 
+    n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
 
-    gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0] 
-    tailL = gauss_tail(np.array([E, E-1]), mu, sigma, tau)[0] 
+    gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0]
+    tailL = gauss_tail(np.array([E, E-1]), mu, sigma, tau)[0]
     if n_bkg ==0:
         step_f = 0
     else:
@@ -871,11 +871,11 @@ def radford_parameter_gradient(E, pars, step_norm):
     y = (E-mu)/sigma
     sigtauL = sigma/tau
 
-    g_n_sig = 0.5*(htail*tailL + (1-htail)*gaus) 
+    g_n_sig = 0.5*(htail*tailL + (1-htail)*gaus)
     g_n_bkg = step_f
-    
+
     g_hs = n_bkg*math.erfc(y/np.sqrt(2))/step_norm
-    
+
     g_ht = (n_sig/2)*(tailL-gaus)
 
     #gradient of gaussian part
@@ -984,7 +984,7 @@ def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
      - two steps (for the two lines)
      - two tails (for the two lines)
     """
-    bkg1 = n_bkg1*step_pdf(x, mu1, sigma1, hstep1, lower_range, upper_range ) 
+    bkg1 = n_bkg1*step_pdf(x, mu1, sigma1, hstep1, lower_range, upper_range )
     bkg2 = n_bkg2*step_pdf(x, mu2, sigma2, hstep2, lower_range, upper_range)
     if np.any(bkg1<0) or np.any(bkg2<0):
         return 0, np.zeros_like(x)
@@ -995,23 +995,23 @@ def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
         return sig1+sig2+sig3+bkg1+bkg2
     else:
         return sig1,sig2,sig3,bkg1,bkg2
-    
-def extended_Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
+
+def extended_Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3,
                        n_bkg1, hstep1, n_bkg2, hstep2,
                      lower_range=np.inf , upper_range=np.inf, components=False):
     if components ==False:
-        return n_sig1+n_sig2+n_sig3 + n_bkg1+n_bkg2, Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, 
-                                                               n_sig3, mu3,sigma3, 
+        return n_sig1+n_sig2+n_sig3 + n_bkg1+n_bkg2, Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2,
+                                                               n_sig3, mu3,sigma3,
                                                                n_bkg1, hstep1, n_bkg2, hstep2,
                                                                  lower_range, upper_range)
     else:
-        sig1,sig2,sig3,bkg1,bkg2 = Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
+        sig1,sig2,sig3,bkg1,bkg2 = Am_double(n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3,
                                              n_bkg1, hstep1, n_bkg2, hstep2,
                                              lower_range , upper_range,components=components)
         return n_sig1+n_sig2+n_sig3 + n_bkg1+n_bkg2, sig1,sig2,sig3,bkg1,bkg2
 
 
-def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
                      lower_range=np.inf, upper_range=np.inf, components=False):
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation
@@ -1025,11 +1025,11 @@ def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
     sig1 = n_sig1*gauss_norm(x,mu1,sigma1)
     sig2 = n_sig2* gauss_norm(x,mu2,sigma2)
     if components == False:
-        return sig1 + sig2 + bkg 
+        return sig1 + sig2 + bkg
     else:
         return sig1, sig2, bkg
 
-def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
                      lower_range=np.inf , upper_range=np.inf, components=False):
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation
@@ -1037,13 +1037,13 @@ def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg
      - two gaussian peaks (two lines)
      - one step
      """
-    
+
     if components == False:
-        pdf = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+        pdf = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
                      lower_range, upper_range)
         return n_sig1+n_sig2+n_bkg, pdf
     else:
-        sig1, sig2, bkg = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep, 
+        sig1, sig2, bkg = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
                      lower_range, upper_range,components=components)
         return n_sig1+n_sig2+n_bkg, sig1, sig2, bkg
 

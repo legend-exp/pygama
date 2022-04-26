@@ -119,7 +119,7 @@ class WaveformTable(Table):
     @property
     def wf_len(self):
         return self.values.nda.shape[1]
-    
+
     @property
     def t0(self):
         return self['t0']

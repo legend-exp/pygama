@@ -49,6 +49,6 @@ class Struct(dict):
         self.update_datatype()
 
 
-    def __len__(self): 
+    def __len__(self):
         """Structs are considered length=1 """
         return 1

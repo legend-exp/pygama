@@ -20,7 +20,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     """
     Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence of
     processors via the ProcessingChain.
-    
+
     Parameters
     ----------
     f_raw : str
@@ -156,7 +156,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
             if proc_chain is None:
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
                 tqdm_it = iter(tqdm_range(0, tot_n_rows, buffer_len, verbose))
-            
+
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
                 proc_chain.execute(0, n_rows)
@@ -164,7 +164,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                 # Update the wf_range to reflect the file position
                 e.wf_range = f"{e.wf_range[0]+start_row}-{e.wf_range[1]+start_row}"
                 raise e
-            
+
             raw_store.write_object(obj=tb_out,
                                    name=tb_name,
                                    lh5_file=f_dsp,
@@ -173,10 +173,10 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                                    write_start=write_offset+start_row,
             )
             next(tqdm_it)
-            
+
             if start_row+n_rows > tot_n_rows:
                 break
-            
+
         print(f'Done.  Writing to file {f_dsp}')
 
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
@@ -187,9 +187,9 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser(description=
-"""Process a single tier 1 LH5 file and produce a tier 2 LH5 file using a
-json config file and build_dsp.""")
+    parser = argparse.ArgumentParser(description="""Process a single tier 1 LH5
+    file and produce a tier 2 LH5 file using a json config file and
+    build_dsp.""")
 
     arg = parser.add_argument
     arg('file', help="Input raw LH5 file.")
@@ -206,17 +206,17 @@ json config file and build_dsp.""")
 
     arg('-n', '--nevents', default=None, type=int,
         help="Number of waveforms to process. By default do the whole file")
-    
+
     arg('-v', '--verbose', action='store_const', const=2, default=1,
         help="Verbose output, useful for debugging")
     arg('-q', '--quiet', action='store_const', const=0, dest='verbose',
         help="Silent output, print only exceptions thrown")
-    
+
     arg('-b', '--block', default=16, type=int,
         help="Number of waveforms to process simultaneously. Default is 8")
     arg('-c', '--chunk', default=3200, type=int,
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
-    
+
     arg('-r', '--recreate', action='store_const', const='r', dest='writemode', default='r',
         help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
     arg('-u', '--update', action='store_const', const='u', dest='writemode',

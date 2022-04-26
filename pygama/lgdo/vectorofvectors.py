@@ -8,8 +8,8 @@ class VectorOfVectors:
 
     For now only a 1D vector of 1D vectors is supported. Internal representation
     is as two ndarrays, one to store the flattened data contiguosly and one to
-    store the cumulative sum of lengths of each vector. 
-    """ 
+    store the cumulative sum of lengths of each vector.
+    """
 
 
     def __init__(self, flattened_data=None, cumulative_length=None, shape_guess=None, dtype=None, attrs={}):
@@ -82,7 +82,7 @@ class VectorOfVectors:
         """
         if i_vec<0 or i_vec>len(self.cumulative_length.nda)-1:
             print('VectorOfVectors: Error: bad i_vec', i_vec)
-            return 
+            return
         if len(nda.shape) != 1:
             print('VectorOfVectors: Error: nda had bad shape', nda.shape)
             return

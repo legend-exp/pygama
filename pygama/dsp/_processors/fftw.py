@@ -30,10 +30,10 @@ def dft(buf_in, buf_out):
     - complex64 (size n) -> complex64 (size n)
     - complex128 (size n) -> complex128 (size n)
     - complex256/clongdouble (size n) -> complex256/clongdouble (size n)""")
-    
+
     typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
     sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
-    
+
     @guvectorize([typesig], sizesig, forceobj=True)
     def dft(wf_in, dft_out):
         dft_fun(wf_in, dft_out)
@@ -62,16 +62,16 @@ def inv_dft(buf_in, buf_out):
         idft_fun = FFTW(buf_in, buf_out, axes=(-1,), direction='FFTW_BACKWARD')
     except ValueError:
         raise ValueError("""Incompatible array types/shapes.  Allowed:
-        - complex64 (size n/2+1) -> float32/float (size n) 
+        - complex64 (size n/2+1) -> float32/float (size n)
         - complex128 (size n/2+1) -> float64/double (size n)
         - complex256/clongdouble (size n/2+1) -> float128/longdouble (size n)
         - complex64 (size n) -> complex64 (size n)
         - complex128 (size n) -> complex128 (size n)
         - complex256/clongdouble (size n) -> complex256/clongdouble (size n)""")
-    
+
     typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
     sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
-    
+
     @guvectorize([typesig], sizesig, forceobj=True)
     def inv_dft(wf_in, dft_out):
         idft_fun(wf_in, dft_out)
@@ -104,19 +104,19 @@ def psd(buf_in, buf_out):
         dft_fun = FFTW(buf_in, buf_dft, axes=(-1,), direction='FFTW_FORWARD')
     except ValueError:
         raise ValueError("""Incompatible array types/shapes.  Allowed:
-        - complex64 (size n) -> float32/float (size n) 
+        - complex64 (size n) -> float32/float (size n)
         - complex128 (size n) -> float64/double (size n)
         - complex256/clongdouble (size n) -> float128/longdouble (size n)
         - float32/float (size n) -> float32/float (size n/2+1)
         - float64/double (size n) -> float64/double (size n/2+1)
         - float128/longdouble (size n) -> float128/longdouble (size n/2+1)""")
-    
+
     typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
     sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
-    
+
     @guvectorize([typesig], sizesig, forceobj=True)
     def psd(wf_in, psd_out):
         dft_fun(wf_in, buf_dft)
         np.abs(buf_dft, psd_out)
-    
+
     return psd

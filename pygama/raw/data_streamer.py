@@ -2,7 +2,7 @@ from abc import ABC
 from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary
 
 class DataStreamer(ABC):
-    """ Base clase for data streams 
+    """ Base clase for data streams
 
     Provides a uniform interface for streaming, e.g.
 
@@ -93,7 +93,7 @@ class DataStreamer(ABC):
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
             dec_names.append(dec_name)
-            for rb in rb_lib[dec_name]: 
+            for rb in rb_lib[dec_name]:
                 # use the first available key
                 key = rb.key_list[0] if len(rb.key_list) > 0 else None
                 rb.lgdo = decoder.make_lgdo(key=key, size=buffer_size)
@@ -173,7 +173,7 @@ class DataStreamer(ABC):
         if clear_full_buffers: self.rb_lib.clear_full()
         self.any_full = False
 
-        chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override 
+        chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override
         if verbosity>1: print(f'reading chunk with chunk_mode {chunk_mode}')
 
         read_one_packet = (chunk_mode == 'single_packet')
@@ -199,7 +199,7 @@ class DataStreamer(ABC):
                 elif rb.is_full(): list_of_rbs.append(rb)
         return list_of_rbs
 
-        
+
 
 
     def get_decoder_list(self):
@@ -230,4 +230,3 @@ class DataStreamer(ABC):
             rb_lib[dec_name] = RawBufferList()
             rb_lib[dec_name].append(rb)
         return rb_lib
-

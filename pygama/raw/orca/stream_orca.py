@@ -475,4 +475,3 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         print("hopefully they weren't important!\n")
 
     print(f"Wrote RAW File:\n    {raw_file_pattern}\nFILE INFO:")
-

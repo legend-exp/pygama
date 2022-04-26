@@ -174,7 +174,7 @@ class FCEventDecoder(DataDecoder):
         n_bytes : int
             (estimated) number of bytes in the packet that was just decoded.
         """
-        if fcio.numtraces > self.max_numtraces: 
+        if fcio.numtraces > self.max_numtraces:
             self.max_numtraces = fcio.numtraces
             # The buffer might be storing all channels' data, so set the
             # fill_safety to the max number of traces we've seen so far.
