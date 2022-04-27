@@ -23,6 +23,7 @@ class DataStreamer(ABC):
         self.chunk_mode = None
         self.n_bytes_read = 0
         self.any_full = False
+        self.packet_id = 0
 
 
     def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
