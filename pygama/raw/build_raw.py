@@ -5,6 +5,7 @@ from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
 from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary, write_to_lh5_and_clear
 from .fc.fc_streamer import FCStreamer
+from .orca.orca_streamer import OrcaStreamer
 
 #from orca.stream_orca import *
 #from stream_llama import *
@@ -119,8 +120,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     # select the approprate streamer for in_stream
     streamer = None
     if in_stream_type == 'ORCA':
-        print(f'Error: ORCA streaming not yet implemented')
-        return
+        streamer = OrcaStreamer()
     elif in_stream_type == 'FlashCam':
         streamer = FCStreamer()
     elif in_stream_type == 'LlamaDaq':
