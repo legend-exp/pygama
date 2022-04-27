@@ -65,13 +65,17 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     if in_stream_type is None:
         i_ext = in_stream.rfind('.')
         if i_ext == -1:
-            print('unknown file type. Specify in_stream_type')
-            return
-        ext = in_stream[i_ext+1:]
-        if ext == 'fcio': in_stream_type = 'FlashCam'
+            if OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
+            else:
+                print('unknown file type. Specify in_stream_type')
+                return
         else:
-            print(f'unknown file extension {ext}. Specify in_stream_type')
-            return
+            ext = in_stream[i_ext+1:]
+            if ext == 'fcio': in_stream_type = 'FlashCam'
+            if ext == 'gz' and OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
+            else:
+                print(f'unknown file extension {ext}. Specify in_stream_type')
+                return
 
     # procss out_spec and setup rb_lib if specified
     rb_lib = None
