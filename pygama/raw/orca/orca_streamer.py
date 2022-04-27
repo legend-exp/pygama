@@ -1,7 +1,9 @@
+import gzip
+import numpy as np
+
 from ..data_streamer import DataStreamer
 from . import orca_packet
 from .orca_header_decoder import OrcaHeaderDecoder
-import numpy as np
 
 class OrcaStreamer(DataStreamer):
     """ Data streamer for ORCA data
@@ -55,12 +57,36 @@ class OrcaStreamer(DataStreamer):
 
     def set_in_stream(self, stream_name):
         if self.in_stream is not None: self.close_in_stream()
-        self.in_stream = open(stream_name, 'rb')
+        if stream_name.endswith('.gz'):
+            self.in_stream = gzip.open(stream_name.encode('utf-8'), 'rb')
+        else: self.in_stream = open(stream_name.encode('utf-8'), 'rb')
         self.n_bytes_read = 0
+
 
     def close_in_stream(self):
         self.in_stream.close()
         self.in_stream = None
+
+
+    def is_orca_stream(stream_name): # static function
+        orca = OrcaStreamer()
+        orca.set_in_stream(stream_name)
+        first_bytes = orca.in_stream.read(12)
+        uints = np.frombuffer(first_bytes, dtype='uint32')
+
+        # first 14 bits should be zero
+        if (uints[0] & 0xfffc0000) != 0: return False
+
+        # xml header length should fit within header packet length
+        pad = uints[0] * 4 - 2 - uints[1]
+        if pad < 0 or pad > 3: return False
+
+        # last 4 chars should be '<?xm'
+        if first_bytes[8:].decode() != '<?xm': return False
+
+        # it must be an orca stream
+        return True
+
 
     def hex_dump(self, stream_name, n_packets=np.inf, 
                  skip_header=False, shift_data_id=True, print_n_words=False, 
@@ -77,7 +103,7 @@ class OrcaStreamer(DataStreamer):
             if print_n_words: print(f'data ID = {data_id}: {n_words} words')
             else:
                 print(f'data ID = {data_id}:')
-                n_to_print = np.minimum(n_words, max_words)
+                n_to_print = int(np.minimum(n_words, max_words))
                 pad = int(np.ceil(np.log10(n_to_print)))
                 for i in range(n_to_print):
                     line = f'{str(i).zfill(pad)}'
@@ -142,7 +168,7 @@ class OrcaStreamer(DataStreamer):
                 continue
             # instantiate other decoders by name
             if name not in globals():
-                print(f'Warning: requested decoder {name} not in globals()')
+                print(f'Warning: No implementation of {name}, corresponding packets will be skipped')
                 continue
             decoder = globals()[name]
             decoder.data_id = self.header_decoder.get_data_id(name)
