@@ -8,7 +8,6 @@ import numpy as np
 import argparse
 
 import pygama
-from pygama import git
 from pygama.dsp.processing_chain import build_processing_chain
 from pygama.dsp.errors import DSPFatal
 import pygama.lgdo.lh5_store as lh5
@@ -118,9 +117,6 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
     dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
     dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
-    dsp_info.add_field('pygama_branch', lh5.Scalar(git.branch))
-    dsp_info.add_field('pygama_revision', lh5.Scalar(git.revision))
-    dsp_info.add_field('pygama_date', lh5.Scalar(git.commit_date))
 
     # loop over tables to run DSP on
     for tb in lh5_tables:

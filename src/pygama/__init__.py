@@ -3,4 +3,4 @@ Pygama: decoding and processing digitizer data.
 Check out the `online documentation <https://legend-exp.github.io/pygama>`_
 """
 
-from pygama.version import __version__
+from pygama._version import version as __version__
