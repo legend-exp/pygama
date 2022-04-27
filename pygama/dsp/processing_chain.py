@@ -11,9 +11,6 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from typing import Union
 from copy import deepcopy, copy
-from scimath.units import convert
-from scimath.units.api import unit_parser
-from scimath.units.unit import unit
 
 from numba import vectorize
 
@@ -210,7 +207,7 @@ class ProcChainVar:
         # Construct coordinate grid from period/offset if given
         if grid is auto and period is not None:
             if isinstance(offset, str):
-                offset = get_variable(offset)
+                offset = get_variable(offset, expr_only=True)
             grid = CoordinateGrid(period, offset)
         
         if self.shape is auto and shape is not auto:
@@ -306,7 +303,7 @@ class ProcessingChain:
         # Construct coordinate grid from period/offset if given
         if grid is auto and period is not None:
             if isinstance(offset, str):
-                offset = get_variable(offset)
+                offset = get_variable(offset, expr_only=True)
             grid = CoordinateGrid(period, offset)
         
         var = ProcChainVar(self, name, shape=shape, dtype=dtype, grid=grid,
@@ -328,7 +325,7 @@ class ProcessingChain:
         Return : buff or newly allocated input buffer
         """
         self._validate_name(varname, raise_exception=True)
-        var = self.get_variable(varname)
+        var = self.get_variable(varname, expr_only=True)
         if var is None:
             var = self.add_variable(varname)
         
@@ -377,7 +374,7 @@ class ProcessingChain:
         Return : buff or newly allocated output buffer
         """
         self._validate_name(varname, raise_exception=True)
-        var = self.get_variable(varname)
+        var = self.get_variable(varname, expr_only=True)
         if var is None:
             var = self.add_variable(varname)
         
@@ -416,14 +413,16 @@ class ProcessingChain:
         # make a list of parameters from *args. Replace any strings in the list
         # with numpy objects from vars_dict, where able
         params = []
+        kw_params = {}
         for i, param in enumerate(args):
             if(isinstance(param, str)):
-                param_val = self.get_variable(param)
-                if param_val is not None:
-                    param=param_val
-            params.append(param)
+                param = self.get_variable(param)
+            if(isinstance(param, dict)):
+                kw_params.update(param)
+            else:
+                params.append(param)
 
-        proc_man = ProcessorManager(self, func, params, signature, types)
+        proc_man = ProcessorManager(self, func, params, kw_params, signature, types)
         self._proc_managers.append(proc_man)
 
     def execute(self, start=0, stop=None):
@@ -434,7 +433,7 @@ class ProcessingChain:
         
 
 
-    def get_variable(self, expr, get_names_only=False):
+    def get_variable(self, expr, get_names_only=False, expr_only=False):
         """Parse string expr into a numpy array or value, using the following
         syntax:
           - numeric values are parsed into ints or floats
@@ -455,19 +454,31 @@ class ProcessingChain:
               to store the output
           - varname[slice]: return the variable with a slice applied. Slice
               values can be floats, and will have round applied to them
+          - keyword = expr: return a dict with a single element pointing from
+              keyword to the parsed expr. This is used for kwargs. If expr_only
+              is True, raise an exception if we see this
         If get_names_only is set to True, do not fetch or allocate new arrays,
           instead return a list of variable names found in the expression
         """
         names = []
         try:
-            var = self._parse_expr(ast.parse(expr, mode='eval').body, \
-                                    expr, get_names_only, names)
+            stmt = ast.parse(expr).body[0]
+            var = self._parse_expr(stmt.value, expr, get_names_only, names)
         except Exception as e:
             raise ProcessingChainError("Could not parse expression:\n  " + expr) from e
-        
+
+        # Check if this is an arg (i.e. expr) or kwarg (i.e. assign)
         if not get_names_only:
-            return var
-        else: return names
+            if isinstance(stmt, ast.Expr):
+                return var
+            elif isinstance(stmt, ast.Assign) and len(stmt.targets)==1:
+                if expr_only:
+                    raise ProcessingChainError("kwarg assignment is not allowed in this context\n  " + expr)
+                return {stmt.targets[0].id : var}
+            else:
+                raise ProcessingChainError("Could not parse expression:\n  " + expr)
+        else:
+            return names
 
 
     def _parse_expr(self, node, expr, dry_run, var_name_list):
@@ -488,7 +499,7 @@ class ProcessingChain:
             return node.s
         
         elif isinstance(node, ast.Constant):
-            return node.val
+            return node.value
 
         # look for name in variable dictionary
         elif isinstance(node, ast.Name):
@@ -498,7 +509,11 @@ class ProcessingChain:
 
             #check if it is a variable
             var_name_list.append(node.id)
+            if dry_run: return None
+            
             val = self._vars_dict.get(node.id, None)
+            if val is None:
+                val = self.add_variable(node.id)
             return val
 
         # define binary operators (+,-,*,/)
@@ -623,7 +638,7 @@ class ProcessingChain:
                      for arg in node.args ]
             kwargs = { kwarg.arg:self._parse_expr(kwarg.value, expr, dry_run, var_name_list) for kwarg in node.keywords }
             if func is not None:
-                return func(self, *args, **kwargs)
+                return func(*args, **kwargs)
             elif self._validate_name(node.func.id):
                 var_name = node.func.id
                 var_name_list.append(var_name)
@@ -641,16 +656,6 @@ class ProcessingChain:
                 raise ProcessingChainError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
 
         raise ProcessingChainError("Cannot parse AST nodes of type " + str(node.__dict__))
-
-    # Get length of ProcChainVar
-    def _length(self, var):
-        if var is None:
-            return None
-        if not isinstance(var, ProcChainVar):
-            raise ProcessingChainError("Cannot call len() on " + str(var))
-        if not len(var.buffer.shape)==2:
-            raise ProcessingChainError(str(var)+" has wrong number of dims")
-        return var.buffer.shape[1]
 
     def _validate_name(self, name, raise_exception=False):
         """Check that name is alphanumeric, and not an already used keyword"""
@@ -703,9 +708,29 @@ class ProcessingChain:
         + '\nOutput variables:\n  ' \
         + '\n  '.join([str(out_man) for out_man in self._output_managers])
 
-    # Map from function names when using ast interpretter to ProcessorChain functions that can be called
+    # Define functions that can be parsed by get_variable
+    # Get length of ProcChainVar
+    def _length(var):
+        if var is None:
+            return None
+        if not isinstance(var, ProcChainVar):
+            raise ProcessingChainError("Cannot call len() on " + str(var))
+        if not len(var.buffer.shape)==2:
+            raise ProcessingChainError(str(var)+" has wrong number of dims")
+        return var.buffer.shape[1]
+
+    # round value
+    def _round(var):
+        if var is None:
+            return None
+        if not isinstance(var, ProcChainVar):
+            return round(float(var))
+        else:
+            raise ProcessingChainError("round() is not implemented for variables, only constants.")
+
+    # dict of functions that can be parsed by get_variable
     func_list = {'len':_length,
-                 'round':round, }
+                 'round':_round, }
 
 
 ########################################################################### 
@@ -718,7 +743,7 @@ class ProcessorManager:
         length : int # length of arrays in this dimension
         grid : CoordinateGrid # period and offset of arrays in this dimension
     
-    def __init__(self, proc_chain, func, params, signature=None, types=None):
+    def __init__(self, proc_chain, func, params, kw_params={}, signature=None, types=None):
         assert isinstance(proc_chain, ProcessingChain) and callable(func) \
             and isinstance(params, list)
 
@@ -728,8 +753,12 @@ class ProcessorManager:
         self.processor = func
         # list of parameters prior to converting to internal representation
         self.params = params
+        # dict of keyword parameters prior to converting to internal rep
+        self.kw_params = kw_params
         # list of raw values and buffers from params; we will fill this soon
-        self.raw_params = []
+        self.args = []
+        # dict of kws -> raw values and buffers from params; we will fill this soon
+        self.kwargs = {}
         
         # Get the signature and list of valid types for the function
         self.signature = func.signature if signature is None else signature
@@ -750,15 +779,14 @@ class ProcessorManager:
         # of the correct dimensions and unit system
         dims_list = re.findall("\((.*?)\)", self.signature)
 
-        if not len(dims_list)==len(params):
+        if not len(dims_list)==len(params)+len(kw_params):
             raise ProcessingChainError("Expected {} arguments from signature {}; found {}: ({})".format(len(dims_list), self.signature, len(params), ', '.join([str(par) for par in params])))
         
         dims_dict = {} # map from dim name -> DimInfo
         outerdims = [] # list of DimInfo
         grid = None # period/offset to use for unit and coordinate conversions
 
-        for ipar, dims in enumerate(dims_list):
-            param = self.params[ipar]
+        for ipar, (dims, param) in enumerate(zip(dims_list, it.chain(self.params, self.kw_params.values()))):
             if not isinstance(param, ProcChainVar):
                 continue
 
@@ -822,7 +850,7 @@ class ProcessorManager:
         # Get the type signature we are using
         if(not found_types):
             error_str = "Could not find a type signature matching the types of the variables given for " + str(self) + " (types: " + str(types) + ")"
-            for param in self.params:
+            for param in it.chain(self.params, self.kw_params.values()):
                 if not isinstance(param, ProcChainVar): continue
                 error_str += '\n\t' + str(param) + ': ' + str(param.dtype)
             raise ProcessingChainError(error_str)
@@ -830,10 +858,13 @@ class ProcessorManager:
         self.types = [np.dtype(t) for t in found_types[0]]
 
         # Finish setting up of input parameters for function
+        #   Iterate through args and then kwargs
         #   Reshape variable arrays to add broadcast dimensions
         #   Allocate new arrays as needed
         #   Convert coords to right system of units as needed
-        for i, (param, dims, dtype) in enumerate(zip(self.params, dims_list, self.types)):
+        for i, ((arg_name, param), dims, dtype) in enumerate(zip(
+            it.chain(zip(it.repeat(None), self.params), self.kw_params.items()),
+            dims_list, self.types)):
             dim_list = outerdims.copy()
             for d in dims.split(','):
                 if not d: continue
@@ -843,13 +874,7 @@ class ProcessorManager:
             shape = tuple([d.length for d in dim_list])
             this_grid = dim_list[-1].grid if dim_list else None
             
-            if isinstance(param, str):
-                # Create a new variable with the right dimensions and such
-                param = self.proc_chain.add_variable(param, dtype=np.dtype(dtype), shape=shape, grid=this_grid, unit=None, is_coord=False)
-                self.params[i] = param
-                self.raw_params.append(param.buffer)
-                
-            elif isinstance(param, ProcChainVar):
+            if isinstance(param, ProcChainVar):
                 # Deduce any automated descriptions of parameter
                 unit = None
                 is_coord = False
@@ -866,34 +891,37 @@ class ProcessorManager:
 
                 if param.is_coord and not grid:
                     grid = param._buffer[0][1]
-                raw_param = param.get_buffer(grid)
+                param = param.get_buffer(grid)
                 
                 # reshape just in case there are some missing dimensions
-                arshape = list(raw_param.shape)
+                arshape = list(param.shape)
                 for idim in range(-1, -1-len(shape), -1):
                     if arshape[idim]!=shape[idim]:
                         arshape.insert(len(arshape)+idim+1, 1)
-                self.raw_params.append(raw_param.reshape(tuple(arshape)))
+                param = param.reshape(tuple(arshape))
                 
-            else:
+            elif param is not None:
                 # Convert scalar to right type, including units
                 if isinstance(param, (Quantity, Unit)):
                     if not isinstance(grid, CoordinateGrid) or not ureg.is_compatible_with(grid.period, param):
                         raise ProcessingChainError("Could not find valid conversion for " + str(param) + "; CoordinateGrid is "+str(grid))
                     param = float(param/grid.period)
                 if np.issubdtype(dtype, np.integer):
-                    self.raw_params.append(dtype.type(round(param)))
+                    param = dtype.type(round(param))
                 else:
-                    self.raw_params.append(dtype.type(param))
-        
+                    param = dtype.type(param)
+            
+            if arg_name is None: self.args.append(param)
+            else: self.kwargs[arg_name] = param
+            
         self.proc_chain._print(2, 'Added processor:', str(self))
 
     def execute(self):
-        self.processor(*self.raw_params)
+        self.processor(*self.args, **self.kwargs)
 
     def __str__(self):
         return self.processor.__name__ + '(' \
-            + ", ".join([str(par) for par in self.params]) + ')'
+            + ", ".join([str(par) for par in self.params] + ["{}={}".format(k, str(v)) for k, v in self.kw_params.items()]) + ')'
         
 
 
@@ -910,12 +938,14 @@ class UnitConversionManager(ProcessorManager):
         self.processor = UnitConversionManager.convert
         # list of parameters prior to converting to internal representation
         self.params = [var, unit]
+        self.kw_params = {}
 
         from_buffer, from_grid = var._buffer[0]
         period_ratio = from_grid.get_period(unit.period)
         self.out_buffer = np.zeros_like(from_buffer)
-        self.raw_params = [from_buffer, from_grid.get_offset(),
+        self.args = [from_buffer, from_grid.get_offset(),
                            unit.get_offset(), period_ratio, self.out_buffer]
+        self.kwargs = {}
         
         self.proc_chain._print(2, 'Added conversion:', str(self))
         
@@ -1153,6 +1183,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     # prepare the processor list
     multi_out_procs = {}
+    db_parser = re.compile("db.[\w_.]+")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k!='']
@@ -1160,11 +1191,33 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             for k in keys:
                 multi_out_procs[k] = key
 
+        # find DB lookups in args and replace the values
+        args = node['args']
+        for i, arg in enumerate(args):
+            if not isinstance(arg, str): continue
+            for db_var in db_parser.findall(arg):
+                try:
+                    db_node = db_dict
+                    for key in db_var[3:].split('.'):
+                        db_node = db_node[key]
+                    if(verbosity>0):
+                        print("Database lookup: found", db_node, "for", db_var)
+                except (KeyError, TypeError):
+                    try:
+                        db_node = node['defaults'][db_var]
+                        if(verbosity>0):
+                            print("Database lookup: using default value of", db_node, "for", db_var)
+                    except (KeyError, TypeError):
+                        raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                if arg==db_var: arg = db_node
+                else: arg = arg.replace(db_var, str(db_node))
+            args[i] = arg
+        
         # parse the arguments list for prereqs, if not included explicitly
         if not 'prereqs' in node:
             prereqs = []
             for arg in node['args']:
-                if not isinstance(arg, str) or arg[:3]== 'db.': continue
+                if not isinstance(arg, str): continue
                 for prereq in proc_chain.get_variable(arg, True):
                     if prereq not in prereqs and prereq not in keys:
                         prereqs.append(prereq)
@@ -1244,25 +1297,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                 if isinstance(unit, list): unit = unit[i]
                 
                 proc_chain.add_variable(name, unit=unit)
-            
-        # Parse the list of args
-        for i, arg in enumerate(args):
-            if isinstance(arg, str) and arg[0:3]=='db.':
-                lookup_path = arg[3:].split('.')
-                try:
-                    node = db_dict
-                    for key in lookup_path:
-                        node = node[key]
-                    args[i] = node
-                    if(verbosity>0):
-                        print("Database lookup: found", node, "for", arg)
-                except (KeyError, TypeError):
-                    try:
-                        args[i] = recipe['defaults'][arg]
-                        if(verbosity>0):
-                            print("Database lookup: using default value of", args[i], "for", arg)
-                    except (KeyError, TypeError):
-                        raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
 
         # get this list of kwargs
         kwargs = recipe.get('kwargs', {}) # might also need db lookup here
@@ -1270,35 +1304,42 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         # if init_args are defined, parse any strings and then call func
         # as a factory/constructor function
         try:
-            init_args = recipe['init_args']
-            for i, arg in enumerate(init_args):
-                if isinstance(arg, str) and arg[0:3]=='db.':
-                    lookup_path = arg[3:].split('.')
+            init_args_in = recipe['init_args']
+            init_args = []
+            init_kwargs = {}
+            for i, arg in enumerate(init_args_in):
+                for db_var in db_parser.findall(arg):
                     try:
-                        node = db_dict
-                        for key in lookup_path:
-                            node = node[key]
-                        init_args[i] = node
+                        db_node = db_dict
+                        for key in db_val[3:].split('.'):
+                            db_node = db_node[key]
                         if(verbosity>0):
-                            print("Database lookup: found", node, "for", arg)
+                            print("Database lookup: found", db_node, "for", db_var)
                     except (KeyError, TypeError):
                         try:
-                            init_args[i] = recipe['defaults'][arg]
+                            db_node = recipe['defaults'][db_var]
                             if(verbosity>0):
-                                print("Database lookup: using default value of", init_args[i], "for", arg)
+                                print("Database lookup: using default value of", db_node, "for", db_var)
                         except (KeyError, TypeError):
-                            raise ProcessingChainError('Did not find', arg, 'in database, and could not find default value.')
-                    arg = init_args[i]
+                            raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                
+                    if arg==db_var: arg = db_node
+                    else: arg = arg.replace(db_var, str(db_node))
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
-                    init_args[i] = proc_chain.get_variable(arg)
+                    arg = proc_chain.get_variable(arg)
+                if isinstance(arg, dict):
+                    init_kwargs.update(arg)
+                else:
+                    init_args.append(arg)
 
             if(verbosity>1):
-                print("Building function", func.__name__, "from init_args", init_args)
+                print("Building function from init_args: {}({})".format(func.__name__, ", ".join(["{}".format(a) for a in init_args] + ["{}={}".format(k, v) for k, v in init_kwargs.items()])))
             func = func(*init_args)
         except KeyError:
             pass
+        
         proc_chain.add_processor(func, *args, **kwargs)
 
 

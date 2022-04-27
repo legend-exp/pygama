@@ -63,29 +63,6 @@ class LH5Store:
                 group.attrs.update(grp_attrs)
         return group
 
-
-    def ls(self, lh5_file, lh5_group=''):
-        """Print a list of the group names in the lh5 file in the style of a
-        Unix ls command. Supports wildcards."""
-        # To use recursively, make lh5_file a h5group instead of a string
-        if isinstance(lh5_file, str):
-            lh5_file = self.gimme_file(lh5_file, 'r')
-            
-        if lh5_group=='':
-            lh5_group='*'
-            
-        splitpath = lh5_group.split('/', 1)
-        matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
-        ret = []
-        
-        if len(splitpath)==1:
-            return matchingkeys
-        else:
-            ret = []
-            for key in matchingkeys:
-                ret.extend([key + '/' + path for path in self.ls(lh5_file[key], splitpath[1])])
-            return ret
-
             
     def get_buffer(self, name, lh5_file, size=None):
         """
@@ -697,6 +674,51 @@ class LH5Store:
 
         print('LH5Store: don\'t know how to read datatype', datatype)
         return None
+
+def ls(lh5_file, lh5_group=''):
+    """Return a list of lh5 groups in the input file and group, similar
+    to ls or h5ls. Supports wildcards in group names.
+    
+    Parameters
+    ----------
+    lh5_file : str
+        name of file
+    lh5_group : str
+        group to search
+    lh5_st : LH5Store
+        lh5_st object to use for searching
+    
+    Returns
+    -------
+    groups : list of strs
+        List of names of groups found
+    """
+
+    lh5_st = LH5Store()
+    
+    # To use recursively, make lh5_file a h5group instead of a string
+    if isinstance(lh5_file, str):
+        lh5_file = lh5_st.gimme_file(lh5_file, 'r')
+    
+    if lh5_group=='':
+        lh5_group='*'
+    
+    splitpath = lh5_group.split('/', 1)
+    matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
+    
+    # if we gave a group name, go one deeper
+    if len(matchingkeys)==1 and matchingkeys[0] == splitpath[0] \
+       and isinstance(lh5_file[matchingkeys[0]], h5py.Group):
+        splitpath.append('')
+    ret = []
+    
+    if len(splitpath)==1:
+        return matchingkeys
+    else:
+        ret = []
+        for key in matchingkeys:
+            ret.extend([key + '/' + path for path in ls(lh5_file[key], splitpath[1])])
+        return ret
 
 
 def load_nda(f_list, par_list, lh5_group='', idx_list=None, verbose=True):

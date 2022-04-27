@@ -2,8 +2,8 @@ import numpy as np
 from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
-@guvectorize(["void(float32[:], float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64[:])"],
+@guvectorize(["void(float32[:], int32, int32, float32[:])",
+              "void(float64[:], int32, int32, float64[:])"],
              "(n),(),()->(n)", nopython=True, cache=True)
 def trap_filter(w_in, rise, flat, w_out):
     """
@@ -35,12 +35,6 @@ def trap_filter(w_in, rise, flat, w_out):
     if np.isnan(w_in).any() or np.isnan(rise) or np.isnan(flat):
         return
 
-    if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise section must be an integer')
-
-    if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat section must be an integer')
-
     if int(rise) < 0:
         raise DSPFatal('The number of samples in the rise section must be positive')
     
@@ -50,20 +44,18 @@ def trap_filter(w_in, rise, flat, w_out):
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
     
-    rise_int = int(rise)
-    flat_int = int(flat)
     w_out[0] = w_in[0]
-    for i in range(1, rise_int, 1):
+    for i in range(1, rise, 1):
         w_out[i] = w_out[i-1] + w_in[i]
-    for i in range(rise_int, rise_int + flat_int, 1):
-        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise_int]
-    for i in range(rise_int + flat_int, 2 * rise_int + flat_int, 1):
-        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise_int] - w_in[i-rise_int-flat_int]
-    for i in range(2 * rise_int + flat_int, len(w_in), 1):
-        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise_int] - w_in[i-rise_int-flat_int] + w_in[i-2*rise_int-flat_int]
+    for i in range(rise, rise + flat, 1):
+        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise]
+    for i in range(rise + flat, 2 * rise + flat, 1):
+        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise] - w_in[i-rise-flat]
+    for i in range(2 * rise + flat, len(w_in), 1):
+        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise] - w_in[i-rise-flat] + w_in[i-2*rise-flat]
 
-@guvectorize(["void(float32[:], float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64[:])"],
+@guvectorize(["void(float32[:], int32, int32, float32[:])",
+              "void(float64[:], int32, int32, float64[:])"],
              "(n),(),()->(n)", nopython=True, cache=True)
 def trap_norm(w_in, rise, flat, w_out):
     """
@@ -96,12 +88,6 @@ def trap_norm(w_in, rise, flat, w_out):
     if np.isnan(w_in).any() or np.isnan(rise) or np.isnan(flat):
         return
 
-    if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise section must be an integer')
-
-    if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat section must be an integer')
-
     if int(rise) < 0:
         raise DSPFatal('The number of samples in the rise section must be positive')
 
@@ -111,20 +97,18 @@ def trap_norm(w_in, rise, flat, w_out):
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
     
-    rise_int = int(rise)
-    flat_int = int(flat)
     w_out[0] = w_in[0] / rise
-    for i in range(1, rise_int, 1):
+    for i in range(1, rise, 1):
         w_out[i] = w_out[i-1] + w_in[i] / rise
-    for i in range(rise_int, rise_int + flat_int, 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int]) / rise
-    for i in range(rise_int + flat_int, 2 * rise_int + flat_int, 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int] - w_in[i-rise_int-flat_int]) / rise
-    for i in range(2 * rise_int + flat_int, len(w_in), 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int] - w_in[i-rise_int-flat_int] + w_in[i-2*rise_int-flat_int]) / rise
+    for i in range(rise, rise + flat, 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise]) / rise
+    for i in range(rise + flat, 2 * rise + flat, 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise] - w_in[i-rise-flat]) / rise
+    for i in range(2 * rise + flat, len(w_in), 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise] - w_in[i-rise-flat] + w_in[i-2*rise-flat]) / rise
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64, float64[:])"],
+@guvectorize(["void(float32[:], int32, int32, int32, float32[:])",
+              "void(float64[:], int32, int32, int32, float64[:])"],
              "(n),(),(),()->(n)", nopython=True, cache=True)
 def asym_trap_filter(w_in, rise, flat, fall, w_out):
     """
@@ -159,15 +143,6 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
     if np.isnan(w_in).any() or np.isnan(rise) or np.isnan(flat) or np.isnan(fall):
         return
 
-    if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise section must be an integer')
-
-    if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat section must be an integer')
-
-    if np.floor(fall) != fall:
-        raise DSPFatal('The number of samples in the fall section must be an integer')
-
     if int(rise) < 0:
         raise DSPFatal('The number of samples in the rise section must be positive')
 
@@ -180,21 +155,18 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
     if int(rise) + int(flat) + int(fall) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
 
-    rise_int = int(rise)
-    flat_int = int(flat)
-    fall_int = int(fall)
     w_out[0] = w_in[0] / rise
-    for i in range(1, rise_int, 1):
+    for i in range(1, rise, 1):
         w_out[i] = w_out[i-1] + w_in[i] / rise
-    for i in range(rise_int, rise_int + flat_int, 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int]) / rise
-    for i in range(rise_int + flat_int, rise_int + flat_int + fall_int, 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int]) / rise - w_in[i-rise_int-flat_int] / fall
-    for i in range(rise_int + flat_int + fall_int, len(w_in), 1):
-        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise_int]) / rise - (w_in[i-rise_int-flat_int] - w_in[i-rise_int-flat_int-fall_int]) / fall
+    for i in range(rise, rise + flat, 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise]) / rise
+    for i in range(rise + flat, rise + flat + fall, 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise]) / rise - w_in[i-rise-flat] / fall
+    for i in range(rise + flat + fall, len(w_in), 1):
+        w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise]) / rise - (w_in[i-rise-flat] - w_in[i-rise-flat-fall]) / fall
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64, float64[:])"],
+@guvectorize(["void(float32[:], int32, int32, float32, float32[:])",
+              "void(float64[:], int32, int32, float64, float64[:])"],
              "(n),(),(),()->()", nopython=True, cache=True)
 def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     """
@@ -210,7 +182,7 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
                The number of samples averaged in the rise and fall sections
     flat     : int
                The delay between the rise and fall sections
-    t_pickoff: int
+    t_pickoff: float
                The waveform index to pick off
     a_out    : float
                The output pick-off value of the filtered waveform
@@ -230,12 +202,6 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     if np.isnan(w_in).any() or np.isnan(rise) or np.isnan(flat) or np.isnan(t_pickoff):
         return
 
-    if np.floor(rise) != rise:
-        raise DSPFatal('The number of samples in the rise section must be an integer')
-
-    if np.floor(flat) != flat:
-        raise DSPFatal('The number of samples in the flat section must be an integer')
-
     if np.floor(t_pickoff) != t_pickoff:
         raise DSPFatal('The pick-off index must be an integer')
 
@@ -250,15 +216,13 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
 
     I_1 = 0.
     I_2 = 0.
-    rise_int   = int(rise)
-    flat_int   = int(flat)
     start_time = int(t_pickoff + 1)
 
-    if not len(w_in) >= start_time >= 2*rise_int + flat_int:
+    if not len(w_in) >= start_time >= 2*rise + flat:
         return
     
-    for i in range(start_time - rise_int, start_time, 1):
+    for i in range(start_time - rise, start_time, 1):
         I_1 += w_in[i]
-    for i in range(start_time - 2 * rise_int - flat_int, start_time - rise_int - flat_int, 1):
+    for i in range(start_time - 2 * rise - flat, start_time - rise - flat, 1):
         I_2 += w_in[i]
     a_out[0] = (I_1 - I_2) / rise
