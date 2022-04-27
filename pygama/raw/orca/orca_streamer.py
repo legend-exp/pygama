@@ -72,9 +72,12 @@ class OrcaStreamer(DataStreamer):
         orca = OrcaStreamer()
         orca.set_in_stream(stream_name)
         first_bytes = orca.in_stream.read(12)
-        uints = np.frombuffer(first_bytes, dtype='uint32')
+
+        # that read should have succeeded
+        if len(first_bytes) != 12: return False
 
         # first 14 bits should be zero
+        uints = np.frombuffer(first_bytes, dtype='uint32')
         if (uints[0] & 0xfffc0000) != 0: return False
 
         # xml header length should fit within header packet length
