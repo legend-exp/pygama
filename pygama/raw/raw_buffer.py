@@ -351,9 +351,10 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
             filename = rb.out_stream[:ii]
             group = rb.out_stream[ii+1:]
             if len(group) == 0: group = '/' # in case out_stream ends with :
-        # write...
-        lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
-                               n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+        # write if requested...
+        if filename != '':
+            lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
+                                   n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0
 
