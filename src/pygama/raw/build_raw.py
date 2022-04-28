@@ -11,8 +11,12 @@ from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
 
 from .fc.fc_streamer import FCStreamer
-from .raw_buffer import (RawBuffer, RawBufferLibrary, RawBufferList,
-                         write_to_lh5_and_clear)
+from .raw_buffer import (
+    RawBuffer,
+    RawBufferLibrary,
+    RawBufferList,
+    write_to_lh5_and_clear,
+)
 
 #from orca.stream_orca import *
 #from stream_llama import *
