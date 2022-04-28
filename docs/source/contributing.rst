@@ -127,24 +127,14 @@ Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
 
 Scripts and tools to build documentation are located below ``docs/``. To build
-documentation, ``sphinx``, ``sphinx-rtd-theme`` and ``sphinx-multiversion``
+documentation, ``sphinx``, ``sphinx-rtd-theme`` and a couple of additional
 Python packages are required. You can get all the needed dependencies by running:
 
 .. code-block:: console
 
    $ pip install .[docs]
 
-At the moment, *pygama* is using a ``sphinx-multiversion`` functionality only
-available through a fork of the project
-(``samtygier-stfc/sphinx-multiversion``, at the ``prebuild_command`` branch).
-With pip, it can be installed with the following command:
-
-.. code-block:: console
-
-   $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
-
-This will probably change in the future. To build documentation for the current
-Git ref, run the following commands:
+To build documentation for the current Git ref, run the following commands:
 
 .. code-block:: console
 
