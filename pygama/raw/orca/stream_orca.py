@@ -1,12 +1,15 @@
-import sys, gzip
-import numpy as np
+import gzip
 import plistlib
+import sys
 
+import numpy as np
 from tqdm.std import tqdm
-from ..utils import tqdm_range, update_progress
-from .io_base import DataDecoder
+
 from pygama import lh5
+
+from ..utils import tqdm_range, update_progress
 from .ch_group import *
+from .io_base import DataDecoder
 
 
 class OrcaDecoder(DataDecoder):
@@ -51,32 +54,32 @@ def parse_header(orca_filename):
     """
     with open_orca(orca_filename) as xmlfile_handle:
         #read the first word:
-        ba = bytearray(xmlfile_handle.read(8))
+        barr = bytearray(xmlfile_handle.read(8))
 
         #Replacing this to be python2 friendly
         # #first 4 bytes: header length in long words
-        # i = int.from_bytes(ba[:4], byteorder=sys.byteorder)
+        # i = int.from_bytes(barr[:4], byteorder=sys.byteorder)
         # #second 4 bytes: header length in bytes
-        # j = int.from_bytes(ba[4:], byteorder=sys.byteorder)
+        # j = int.from_bytes(barr[4:], byteorder=sys.byteorder)
 
         big_endian = False if sys.byteorder == "little" else True
-        i = from_bytes(ba[:4], big_endian=big_endian)
-        j = from_bytes(ba[4:], big_endian=big_endian)
+        i = from_bytes(barr[:4], big_endian=big_endian)
+        j = from_bytes(barr[4:], big_endian=big_endian)
         if (np.ceil(j/4) != i-2) and (np.ceil(j/4) != i-3):
             print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
             return i, j, {}
 
         #read in the next that-many bytes that occupy the plist header
         as_bytes = xmlfile_handle.read(j)
-        ba = bytearray(as_bytes)
+        barr = bytearray(as_bytes)
 
         #convert to string
         #the readPlistFromBytes method doesn't exist in 2.7
         if sys.version_info[0] < 3:
-            header_string = ba.decode("utf-8")
+            header_string = barr.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
         elif sys.version_info[1] < 9:
-            header_dict = plistlib.readPlistFromBytes(ba)
+            header_dict = plistlib.readPlistFromBytes(barr)
         else:
             header_dict = plistlib.loads(as_bytes, fmt=plistlib.FMT_XML)
         return i, j, header_dict
@@ -180,7 +183,7 @@ def get_object_info(header_dict, orca_class_name):
 
 def get_readout_info(header_dict, orca_class_name, unique_id=-1):
     """
-    retunrs a list with all the readout list info from the header with name
+    returns a list with all the readout list info from the header with name
     orca_class_name.  optionally, if unique_id >= 0 only return the list for
     that Orca unique id number.
     """
@@ -252,8 +255,8 @@ def get_next_packet(f_in):
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
-    record_length = int((head[0] & 0x3FFFF))
-    data_id = int((head[0] >> 18))
+    record_length = int(head[0] & 0x3FFFF)
+    data_id = int(head[0] >> 18)
     # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
@@ -288,6 +291,7 @@ def get_channel(ccc):
 # Do it here so that orca_digitizers can import the functions above here
 from . import orca_digitizers, orca_flashcam
 
+
 def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """
     convert ORCA DAQ data to "raw" lh5
@@ -310,7 +314,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     file_size = float(f_in.tell())
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
-    print("Total file size: {:.3f} MB".format(file_size_MB))
+    print(f"Total file size: {file_size_MB:.3f} MB")
     print("Run number:", get_run_number(header_dict))
 
 
@@ -469,10 +473,9 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
             try:
-                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+                print(f"  {data_id}: {id2dn_dict[data_id]}")
             except KeyError:
-                print("  {}: Unknown".format(data_id))
+                print(f"  {data_id}: Unknown")
         print("hopefully they weren't important!\n")
 
-    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
-
+    print(f"Wrote RAW File:\n    {raw_file_pattern}\nFILE INFO:")

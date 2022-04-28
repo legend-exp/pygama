@@ -1,8 +1,11 @@
 import sys
+
 import numpy as np
 
-from .orcadaq import OrcaDecoder, get_ccc
 from pygama.lh5 import Table
+
+from .orcadaq import OrcaDecoder, get_ccc
+
 
 class ORCAStruck3302(OrcaDecoder):
     """
@@ -43,7 +46,7 @@ class ORCAStruck3302(OrcaDecoder):
             'waveform': {
               'dtype': 'uint16',
               'datatype': 'waveform',
-              'length': 65532, # max value. override this before initalizing buffers to save RAM
+              'length': 65532, # max value. override this before initializing buffers to save RAM
               'sample_period': 10, # override if a different clock rate is used
               'sample_period_units': 'ns',
               'units': 'adc',
@@ -488,7 +491,7 @@ class SIS3316ORCADecoder(OrcaDecoder):
             'waveform': {
               'dtype': 'uint16',
               'datatype': 'waveform',
-              'length': 65532, # max value. override this before initalizing buffers to save RAM
+              'length': 65532, # max value. override this before initializing buffers to save RAM
               'sample_period': 8, # override if a different clock rate is used
               'sample_period_units': 'ns',
               'units': 'adc',

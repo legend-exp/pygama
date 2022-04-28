@@ -1,29 +1,30 @@
-import sys
-import os
 import glob
 import itertools
-import string
 import math
-import numpy as np
-import pandas as pd
-
-from pygama.dsp.processing_chain import build_processing_chain
-import pygama.lgdo.lh5_store as lh5
-from pygama.math.units import unit_registry as ureg
+import os
+import string
+import sys
 
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+import numpy as np
+import pandas as pd
 from cycler import cycler
+from matplotlib.lines import Line2D
+
+import pygama.lgdo.lh5_store as lh5
+from pygama.dsp.processing_chain import build_processing_chain
+from pygama.math.units import unit_registry as ureg
+
 
 class WaveformBrowser:
     """
     The Waveform Browser is a tool meant for interacting with waveforms from
     LH5 files. This defines an interface for drawing waveforms from a file,
     drawing transformed waveforms defined using build_dsp style json files,
-    drawing horizontal and verticle lines at the values of calculated
+    drawing horizontal and vertical lines at the values of calculated
     parameters, and filling a legend with calculated parameters.
-    
-    
+
+
     """
 
     def __init__(self, files_in, lh5_group, base_path = '',
@@ -102,12 +103,12 @@ class WaveformBrowser:
         block_width (default 16): block width for processing chain
         """
         self.verbosity = verbosity
-        
+
         self.norm_par = norm
         self.align_par = align
         self.n_drawn = n_drawn
         self.next_entry = 0
-        
+
         # data i/o initialization
         self.lh5_it = lh5.LH5Iterator(files_in,
                                       lh5_group,
@@ -115,7 +116,7 @@ class WaveformBrowser:
                                       entry_list=entry_list,
                                       entry_mask=entry_mask,
                                       buffer_len=buffer_len )
-        
+
 
         # Get the input buffer and read the first chunk
         self.lh5_in, _ = self.lh5_it.read(0)
@@ -128,12 +129,12 @@ class WaveformBrowser:
                 entry_offset = self.lh5_it.file_map[i-1] if i>0 else 0
                 entries += [ entry_offset + entry for entry in f_entries ]
             self.aux_vals = self.aux_vals.iloc[entries].reset_index()
-        
+
         # initialize objects to draw: dict from name to list of 2DLines
         if isinstance(lines, str): self.lines = { lines:[] }
         elif lines is None: self.lines = {}
         else: self.lines = { l:[] for l in lines }
-        
+
         # styles
         if isinstance(styles, (list, tuple)):
             self.styles = [ None for _ in self.lines ]
@@ -161,10 +162,10 @@ class WaveformBrowser:
 
         self.legend_format = [] # list of formatter strings
         self.legend_vals = {}  # Set up dict from names to lists of values
-        
+
         if legend is None: legend = []
         elif isinstance(legend, str): legend = [legend]
-        
+
         for entry in legend:
             legend_format = ""
             for st, name, form, cv in string.Formatter().parse(entry):
@@ -172,7 +173,7 @@ class WaveformBrowser:
                     # If name is none, this is the last batch of characters
                     legend_format += st
                     break
-                
+
                 if name=='':
                     raise KeyError("Cannot use empty formatter in "+entry)
                 self.legend_vals[name] = []
@@ -180,35 +181,35 @@ class WaveformBrowser:
                 if form is None or form=='':
                     form = '~0.3P'
                 cv = '' if cv is None or cv=='' else "!"+cv
-                legend_format += "{}{{{}:{}{}}}".format(st, name, form, cv)
+                legend_format += f"{st}{{{name}:{form}{cv}}}"
             self.legend_format.append(legend_format)
 
         self.legend_kwargs = legend_opts if isinstance(legend_opts, dict) else {}
-        
+
         # make processing chain and output buffer
         outputs = list(self.lines) + list(self.legend_vals)
         if isinstance(self.norm_par, str): outputs += [self.norm_par]
         if isinstance(self.align_par, str): outputs += [self.align_par]
 
-            
+
         # Remove any values not found in aux_vals
         if self.aux_vals is not None:
             outputs = [ o for o in outputs if o not in self.aux_vals ]
-        
+
         self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
         self.proc_chain.execute()
-        
+
         # Check if all of our outputs can be found
         for name in outputs:
             if not name in self.lh5_out:
                 raise KeyError("Could not find "+name+" in input lh5 file, DSP config file, or aux values")
-        
+
         self.x_unit = ureg[x_unit] if x_unit else None
         self.x_lim = x_lim
         self.y_lim = y_lim
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
-        
+
         # Set limit and convert to x-unit if needed; also set x_unit if needed
         if self.x_lim is not None:
             self.x_lim = list(self.x_lim)
@@ -221,16 +222,16 @@ class WaveformBrowser:
                     else:
                         self.x_unit = self.x_lim[i].u
                         self.x_lim[i] = self.x_lim[i].m
-        
+
         # If we still have no x_unit get it from the first waveform we can find
         if self.x_unit is None:
             for wf in self.lh5_out.values():
                 if not isinstance(wf, lh5.WaveformTable): continue
                 self.x_unit = ureg[wf.dt_units]
-        
+
         self.fig = None
-        self.ax = None        
-    
+        self.ax = None
+
     def new_figure(self):
         """Create a new figure and draw in it"""
         self.fig, self.ax = plt.subplots(1)
@@ -265,12 +266,12 @@ class WaveformBrowser:
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
         self.n_stored = 0
-        
+
     def find_entry(self, entry, append=True, safe=False):
         """
         Find the requested data associated with entry in input files and
         place store it internally without drawing it.
-        
+
         Parameters
         ----------
         entry : int or [ints]
@@ -295,7 +296,7 @@ class WaveformBrowser:
             self.lh5_it.read(entry)
             self.proc_chain.execute()
             i_tb = 0
-        
+
         # get scaling factor/time shift if used
         if self.norm_par is None:
             norm = 1.
@@ -317,7 +318,7 @@ class WaveformBrowser:
                 ref_time = self.aux_vals[self.align_par][entry]
             else:
                 raise
-            
+
         leg_handle = None
 
         # lines
@@ -332,20 +333,20 @@ class WaveformBrowser:
                 x = np.linspace(t0, t0+dt*(data.wf_len-1), data.wf_len)
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
-                
+
             elif isinstance(data, lh5.Array):
                 val = data.nda[i_tb]
                 unit = data.attrs.get('units', None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
                     # Vertical line
-                    val = val*float(ureg[unit]/self.x_unit) - ref_time 
+                    val = val*float(ureg[unit]/self.x_unit) - ref_time
                     lines.append(Line2D([val]*2, [-lim, lim]))
                     self._update_auto_limit(val, None)
                 else:
                     # Horizontal line
                     lines.append(Line2D([-lim, lim], [val/norm]*2))
                     self._update_auto_limit(None, val)
-                    
+
             elif data is None:
                 # Check for data in auxiliary table. It's unitless so I guess just do an hline...
                 val = self.aux_vals[name][entry]/norm
@@ -369,12 +370,12 @@ class WaveformBrowser:
                     data = ureg.Quantity(data.nda[i_tb])
             else:
                 raise TypeError("WaveformBrowser does not adding legend entries for data of type " + data.__class__)
-            
+
             vals.append(data)
 
         self.n_stored += 1
         self.next_entry = entry + 1
-    
+
     def draw_current(self, clear=True):
         """
         Draw the waveforms and data currently held internally by this class.
@@ -382,7 +383,7 @@ class WaveformBrowser:
         # Make figure/axis if needed
         if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
             self.new_figure()
-        
+
         if clear:
             self.ax.clear()
 
@@ -398,20 +399,20 @@ class WaveformBrowser:
         leg_labels = []
         if not isinstance(self.styles, list):
             styles = self.styles
-            
+
         # draw lines
         for i, lines in enumerate(self.lines.values()):
             if isinstance(self.styles, list):
                 styles = self.styles[i]
             if styles is None:
                 styles = cycler(plt.rcparams)
-            
+
             for line, sty in zip(lines, styles):
                 if sty is not None: line.update(sty)
                 if line.get_figure() is not None: line.remove()
                 line.set_transform(self.ax.transData)
                 self.ax.add_line(line)
-                
+
                 leg_handles.append(line)
 
         # Get legend entries
@@ -448,16 +449,16 @@ class WaveformBrowser:
         if isinstance(x, np.ndarray) and self.x_lim is not None:
             x_where['where'] = ((x>=self.x_lim[0]) & (x<=self.x_lim[1]))
         if x is not None:
-            self.auto_x_lim[0] = np.amin(x, **y_where, initial=self.auto_x_lim[0]) 
+            self.auto_x_lim[0] = np.amin(x, **y_where, initial=self.auto_x_lim[0])
             self.auto_x_lim[1] = np.amax(x, **y_where, initial=self.auto_x_lim[1])
         if y is not None:
             self.auto_y_lim[0] = np.amin(y, **y_where, initial=self.auto_y_lim[0])
             self.auto_y_lim[1] = np.amax(y, **y_where, initial=self.auto_y_lim[1])
-                
+
     def draw_entry(self, entry, append=False, clear=True, safe=False):
         """
         Draw specified entry in the current figure/axes
-        
+
         Parameters
         ----------
         entry : int or [ints]
@@ -478,19 +479,18 @@ class WaveformBrowser:
         entries = (self.next_entry, self.next_entry+n_wfs)
         self.find_entry(range(*entries), append, safe=True)
         return entries
-        
+
     def draw_next(self, n_wfs = None, append = False, clear = True):
         """Draw the next n_wfs waveforms (default self.n_drawn). See draw_next"""
         entries = self.find_next(append)
         self.draw_current(clear)
         return entries
-            
+
     def reset(self):
         """ Reset to the start of the file for draw_next """
         self.clear_data()
         self.next_entry = 0
-        
+
     def __iter__(self):
         while self.next_entry < len(self.lh5_it):
             yield self.draw_next()
-            

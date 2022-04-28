@@ -1,8 +1,10 @@
-import numpy as np
-import pandas as pd
 import sys
 
+import numpy as np
+import pandas as pd
+
 from .io_base import DataTaker
+
 
 class MJDPreampDecoder(DataTaker):
     """
@@ -128,8 +130,8 @@ class ISegHVDecoder(DataTaker):
 
     def decode_event(self, event_data_bytes, event_number, header_dict,
                      verbose=False):
-        """ 
-        see README for the 32-bit data word diagram 
+        """
+        see README for the 32-bit data word diagram
         """
         event_data_int = np.fromstring(event_data_bytes, dtype=np.uint32)
         event_data_float = np.fromstring(event_data_bytes, dtype=np.float32)

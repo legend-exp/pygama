@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
               "void(float64[:], float64, float64, float64, float64[:])"],
@@ -37,7 +39,7 @@ def time_point_thresh(w_in, a_threshold, t_start, walk_forward, t_out):
 
     if np.isnan(w_in).any() or np.isnan(a_threshold) or np.isnan(t_start) or np.isnan(walk_forward):
         return
-    
+
     if np.floor(t_start) != t_start:
         raise DSPFatal('The starting index must be an integer')
 

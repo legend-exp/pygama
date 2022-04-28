@@ -1,5 +1,6 @@
-from pytest import approx
 import numpy as np
+from pytest import approx
+
 import pygama.math.peak_fitting as pgf
 
 

@@ -1,6 +1,8 @@
+from math import exp, log
+
 import numpy as np
 from numba import guvectorize
-from math import log,exp
+
 
 @guvectorize(["void(float32[:], float32, float32, float32, float32, float32[:])",
               "void(float64[:], float64, float64,float64,float64,float64[:])"],
@@ -40,6 +42,6 @@ def inject_exp_pulse(wf_in,t0,rt,A,decay, wf_out):
     wf_out[:] = wf_in[:]
     for T in range(len(wf_out)):
         if (t0<= T)& (T<= t0+rt):
-            wf_out[T] += ((A*exp((T-t0-rt)/(rise))*exp(-(1/decay)*(T-t0))))
+            wf_out[T] += (A*exp((T-t0-rt)/(rise))*exp(-(1/decay)*(T-t0)))
         elif (T>t0+rt):
             wf_out[T] += (A*exp(-(1/decay)*(T-t0)))

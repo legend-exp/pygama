@@ -1,11 +1,13 @@
 """
 data_decoder.py
 
-base classe for decoding data into raw lgdo tables / files
+base classes for decoding data into raw lgdo tables / files
 """
 
 from abc import ABC
+
 import numpy as np
+
 from pygama import lgdo
 
 
@@ -45,7 +47,7 @@ class DataDecoder(ABC):
                                      lgdo.Array(shape=garbage_length, dtype='uint32'))
 
 
-    def get_key_list(self): 
+    def get_key_list(self):
         """ overload with list of keys for this decoder.
         e.g. `return range(n_channels)`
         The default version works for decoders with single / no keys

@@ -1,10 +1,18 @@
-import os, time, sys, glob, json, tqdm
+import glob
+import json
+import os
+import sys
+import time
+
 import numpy as np
+import tqdm
 
 from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
-from .raw_buffer import RawBuffer, RawBufferList, RawBufferLibrary, write_to_lh5_and_clear
+
 from .fc.fc_streamer import FCStreamer
+from .raw_buffer import (RawBuffer, RawBufferLibrary, RawBufferList,
+                         write_to_lh5_and_clear)
 
 #from orca.stream_orca import *
 #from stream_llama import *
@@ -12,9 +20,9 @@ from .fc.fc_streamer import FCStreamer
 #from stream_fc import *
 
 
-def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192, 
+def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
               n_max=np.inf, overwrite=True, verbosity=2, **kwargs):
-    """ Convert data into LEGEND hdf5 `raw` format.  
+    """ Convert data into LEGEND hdf5 `raw` format.
 
     Takes an input stream (in_stream) of a given type (in_stream_type) and
     writes to output file(s) according to the user's a specification (out_spec).
@@ -29,11 +37,11 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         Type of stream used to write the input file.
         Options are 'ORCA', 'FlashCams', 'LlamaDaq', 'Compass', 'MGDO'
     out_spec : str or json dict or RawBufferLibrary or None
-        Specification for the output stream. 
+        Specification for the output stream.
         - If None, uses '{in_stream}.hdf5' as the output filename.
-        - If a str not ending in '.json', interpretted as the output filename.
-        - If a str ending in '.json', interpretted as a filename containing
-          json-shorthand for the output sepcification (see raw_buffer.py)
+        - If a str not ending in '.json', interpreted as the output filename.
+        - If a str ending in '.json', interpreted as a filename containing
+          json-shorthand for the output specification (see raw_buffer.py)
         - If a json dict, should be a dict loaded from the json shorthand
           notation for RawBufferLibraries (see raw_buffer.py), which is then
           used to build a RawBufferLibrary
@@ -53,12 +61,12 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
 
     # convert any environment variables in in_stream so that we can check for readability
     in_stream = os.path.expandvars(in_stream)
-    # later: fix if in_stream is not a file 
+    # later: fix if in_stream is not a file
     # (e.g. a socket, which exists if open and has size = np.inf)
     if not os.path.exists(in_stream):
         print(f'Error: file {in_stream} not found')
         return
-    in_stream_size = os.stat(in_stream).st_size 
+    in_stream_size = os.stat(in_stream).st_size
 
     # try to guess the input stream type if it's not provided
     if in_stream_type is None:
@@ -76,11 +84,11 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     rb_lib = None
     if isinstance(out_spec, str) and out_spec.endswith('.json'):
         with open(out_spec) as json_file: out_spec = json.load(json_file)
-    if isinstance(out_spec, dict): 
+    if isinstance(out_spec, dict):
         out_spec = RawBufferLibrary(json_dict=out_spec, kw_dict=kwargs)
     if isinstance(out_spec, RawBufferLibrary): rb_lib = out_spec
     # if no rb_lib, write all data to file
-    if out_spec is None: 
+    if out_spec is None:
         out_spec = in_stream
         i_ext = out_spec.rfind('.')
         if i_ext != -1: out_spec = out_spec[:i_ext]
@@ -96,27 +104,27 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         return
     if buffer_size > n_max: buffer_size = n_max
 
-    # ouput start of processing info if verbosity > 0
+    # output start of processing info if verbosity > 0
     if verbosity > 0:
         print( 'Starting build_raw processing.')
-        print(f'  Input: {in_stream}')        
+        print(f'  Input: {in_stream}')
         out_files = [out_spec]
-        if isinstance(out_spec, RawBufferLibrary): 
+        if isinstance(out_spec, RawBufferLibrary):
             out_files = out_spec.get_list_of('out_stream')
         if len(out_files) == 1: print(f'  Output: {out_files[0]}')
-        else: 
+        else:
             print(f'  Output:')
             for out_file in out_files: print(f'- {out_file}')
-        print(f'  Buffer size: {buffer_size}')  
-        print(f'  Max num. events: {n_max}')    
-        if verbosity > 1: 
+        print(f'  Buffer size: {buffer_size}')
+        print(f'  Max num. events: {n_max}')
+        if verbosity > 1:
             if n_max < np.inf: progress_bar = tqdm.tqdm(total=n_max, unit='rows')
             else: progress_bar = tqdm.tqdm(total=in_stream_size, unit='B', unit_scale=True)
 
     # start a timer and a byte counter
     t_start = time.time()
 
-    # select the approprate streamer for in_stream
+    # select the appropriate streamer for in_stream
     streamer = None
     if in_stream_type == 'ORCA':
         print(f'Error: ORCA streaming not yet implemented')
@@ -139,8 +147,8 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     # initialize the stream and read header. Also initializes rb_lib
     if verbosity > 1: progress_bar.update(0)
     out_stream = out_spec if isinstance(out_spec, str) else ''
-    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size, 
-                                       chunk_mode='full_only', out_stream=out_stream, 
+    header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size,
+                                       chunk_mode='full_only', out_stream=out_stream,
                                        verbosity=verbosity)
     rb_lib = streamer.rb_lib
     if verbosity > 1 and n_max == np.inf: progress_bar.update(streamer.n_bytes_read)
@@ -169,7 +177,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     n_bytes_last = streamer.n_bytes_read
     while True:
         chunk_list = streamer.read_chunk(verbosity=verbosity-2)
-        if verbosity > 1 and n_max == np.inf: 
+        if verbosity > 1 and n_max == np.inf:
             progress_bar.update(streamer.n_bytes_read-n_bytes_last)
             n_bytes_last = streamer.n_bytes_read
         if len(chunk_list) == 0: break
@@ -186,9 +194,9 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
 
     if verbosity > 0:
         elapsed = time.time() - t_start
-        print("Time elapsed: {:.2f} sec".format(elapsed))
+        print(f"Time elapsed: {elapsed:.2f} sec")
         out_files = rb_lib.get_list_of('out_stream')
-        if len(out_files) == 1: 
+        if len(out_files) == 1:
             out_file = out_files[0]
             colpos = out_file.find(':')
             if colpos != -1: out_file = out_file[:colpos]
@@ -196,7 +204,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
                 file_size = os.stat(out_file).st_size
                 print(f"Output file: {out_file} ({sizeof_fmt(file_size)})")
             else: print("Output file: {out_file} (not written)")
-        else: 
+        else:
             print("Output files:")
             for out_file in out_files:
                 colpos = out_file.find(':')
@@ -209,4 +217,3 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         print(f"Conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
 
         print('Done.\n')
-

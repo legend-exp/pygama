@@ -1,16 +1,18 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
               "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
              "(n)->(),(),(),()", nopython=True, cache=True)
-def linear_slope_fit(w_in, mean, stdev, slope, intercept):   
+def linear_slope_fit(w_in, mean, stdev, slope, intercept):
     """
     Calculate the mean and standard deviation of the waveform using
     Welford's method as well as the slope an intercept of the waveform
     using linear regression.
-    
+
     Parameters
     ----------
     w_in     : array-like

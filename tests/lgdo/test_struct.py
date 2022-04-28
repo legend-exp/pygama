@@ -1,6 +1,7 @@
 import pytest
-import pygama.lgdo as lgdo
 from numpy.testing import assert_
+
+import pygama.lgdo as lgdo
 
 
 @pytest.fixture()

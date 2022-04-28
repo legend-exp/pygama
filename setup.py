@@ -1,19 +1,20 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 import os
+import platform
 import re
+import subprocess
 import sys
 import sysconfig
-import platform
-import subprocess
-
 from distutils.version import LooseVersion
-from setuptools import setup, Extension, find_packages
-from setuptools.command.egg_info import egg_info
+from shutil import copyfile, copymode
+
+from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools.command.build_py import build_py
 from setuptools.command.develop import develop
+from setuptools.command.egg_info import egg_info
 from setuptools.command.test import test as TestCommand
-from shutil import copyfile, copymode
+
 
 class CMakeExtension(Extension):
     def __init__(self, name, sourcedir=''):
@@ -90,7 +91,7 @@ def make_git_file():
         print(ex)
         print('continuing...')
 
-#Add a git hook to clean jupyter notebooks before commiting
+#Add a git hook to clean jupyter notebooks before committing
 def clean_jupyter_notebooks():
     import git
     repo = git.Repo(os.path.dirname(os.path.realpath(__file__)))

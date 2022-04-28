@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
               "void(float64[:], int32, int32, float64[:])"],
@@ -37,13 +39,13 @@ def trap_filter(w_in, rise, flat, w_out):
 
     if int(rise) < 0:
         raise DSPFatal('The number of samples in the rise section must be positive')
-    
+
     if int(flat) < 0:
         raise DSPFatal('The number of samples in the flat section must be positive')
-    
+
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
-    
+
     w_out[0] = w_in[0]
     for i in range(1, rise, 1):
         w_out[i] = w_out[i-1] + w_in[i]
@@ -96,7 +98,7 @@ def trap_norm(w_in, rise, flat, w_out):
 
     if 2 * int(rise) + int(flat) > len(w_in):
         raise DSPFatal('The trapezoid width is wider than the waveform')
-    
+
     w_out[0] = w_in[0] / rise
     for i in range(1, rise, 1):
         w_out[i] = w_out[i-1] + w_in[i] / rise
@@ -173,7 +175,7 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
     Pick off the value at the provided index of a symmetric trapezoidal
     filter to the input waveform, normalized by the number of samples averaged
     in the rise and fall sections.
-    
+
     Parameters
     ----------
     w_in     : array-like
@@ -186,7 +188,7 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
                The waveform index to pick off
     a_out    : float
                The output pick-off value of the filtered waveform
-    
+
     Processing Chain Example
     ------------------------
     "ct_corr": {
@@ -220,7 +222,7 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
 
     if not len(w_in) >= start_time >= 2*rise + flat:
         return
-    
+
     for i in range(start_time - rise, start_time, 1):
         I_1 += w_in[i]
     for i in range(start_time - 2 * rise - flat, start_time - rise - flat, 1):

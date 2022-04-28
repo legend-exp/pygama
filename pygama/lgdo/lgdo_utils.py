@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def get_element_type(obj):
     """Get the lgdo element type of a scalar or array
 
@@ -63,10 +64,8 @@ def parse_datatype(datatype):
     # for other datatypes, need to parse the datatype string
     from parse import parse
     datatype, element_description = parse('{}{{{}}}', datatype)
-    if datatype.endswith('>'): 
+    if datatype.endswith('>'):
         datatype, dims = parse('{}<{}>', datatype)
         dims = [int(i) for i in dims.split(',')]
         return datatype, tuple(dims), element_description
     else: return datatype, None, element_description.split(',')
-
-

@@ -29,13 +29,13 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 `h5py <https://www.h5py.org>`_.
 """
 
-from .lgdo_utils import *
-from .scalar import Scalar
 from .array import Array
-from .fixedsizearray import FixedSizeArray
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from .vectorofvectors import VectorOfVectors
+from .fixedsizearray import FixedSizeArray
+from .lgdo_utils import *
+from .lh5_store import LH5Store, load_dfs, load_nda
+from .scalar import Scalar
 from .struct import Struct
 from .table import Table
+from .vectorofvectors import VectorOfVectors
 from .waveform_table import WaveformTable
-from .lh5_store import LH5Store, load_nda, load_dfs

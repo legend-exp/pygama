@@ -5,10 +5,11 @@ mainly pulser tagging
 - find_pulser_properties (find pulser by looking for which peak has a constant time between events)
 - tag_pulsers
 """
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy import stats
+
 from .peak_fitting import *
 
 
@@ -47,7 +48,7 @@ def gaussian_cut(data, cut_sigma=3, plotAxis=None):
         plotAxis.plot(bin_centers, fit, label="gaussian fit")
         plotAxis.axvline(result[0], color="g", label="fit mean")
         plotAxis.axvline(
-            cut_lo, color="r", label="+/- {} sigma".format(cut_sigma))
+            cut_lo, color="r", label=f"+/- {cut_sigma} sigma")
         plotAxis.axvline(cut_hi, color="r")
         plotAxis.legend()
         # plt.xlabel(params[i])
@@ -92,7 +93,7 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
         fit = xtalball(bin_centers, *result)
         plt.plot(bin_centers, fit, label="xtalball fit")
         plt.axvline(result[0], color="g", label="fit mean")
-        plt.axvline(cut_lo, color="r", label="+/- {} sigma".format(cut_sigma))
+        plt.axvline(cut_lo, color="r", label=f"+/- {cut_sigma} sigma")
         plt.axvline(cut_hi, color="r")
         plt.legend()
         # plt.xlabel(params[i])
@@ -105,7 +106,6 @@ def find_pulser_properties(df, energy="trap_max"):
 
     # print (df[energy])
     # exit()
-
     #find pulser by looking for which peak has a constant time between events
     #df should already be grouped by channel
 

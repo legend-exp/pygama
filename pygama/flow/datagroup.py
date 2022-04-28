@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-import os, json
-import pandas as pd
 import itertools
+import json
+import os
 from collections import OrderedDict
-from string import Formatter
 from pathlib import Path
-from parse import parse
 from pprint import pprint
+from string import Formatter
+
+import pandas as pd
+from parse import parse
 
 import pygama.utils as pu
 
