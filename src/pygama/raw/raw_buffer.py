@@ -60,7 +60,9 @@ e.g. to have object-specific buffer sizes
 """
 
 import os
+
 from pygama import lgdo
+
 
 class RawBuffer:
     '''
@@ -71,7 +73,7 @@ class RawBuffer:
 
     Attributes
     ----------
-    lgdo : lgdo 
+    lgdo : lgdo
         the lgdo used as the actual buffer. Typically a table. Set to None upon
         creation so that the user or a decoder can initialize it later.
     key_list : list
@@ -86,7 +88,7 @@ class RawBuffer:
         File example: '/path/filename.lh5:/group'
         Socket example: '198.0.0.100:8000'
     out_name : str (optional)
-        the name / identifier of the object in the ouput stream 
+        the name / identifier of the object in the output stream
     '''
 
 
@@ -120,7 +122,7 @@ class RawBuffer:
 class RawBufferList(list):
     '''
     A RawBufferList holds a collection of RawBuffers of identical structure
-    (same format lgdo's with the same fields). 
+    (same format lgdo's with the same fields).
     '''
 
 
@@ -146,11 +148,11 @@ class RawBufferList(list):
         expand_rblist_json_dict(json_dict, kw_dict)
         for name in json_dict:
             rb = RawBuffer()
-            if 'key_list' in json_dict[name]: 
+            if 'key_list' in json_dict[name]:
                 rb.key_list = json_dict[name]['key_list']
-            if 'out_stream' in json_dict[name]: 
+            if 'out_stream' in json_dict[name]:
                 rb.out_stream = json_dict[name]['out_stream']
-            if 'out_name' in json_dict[name]: 
+            if 'out_name' in json_dict[name]:
                 rb.out_name = json_dict[name]['out_name']
             else: rb.out_name = name
             self.append(rb);
@@ -182,7 +184,7 @@ class RawBufferList(list):
         return values
 
     def clear_full(self):
-        for rb in self: 
+        for rb in self:
             if rb.is_full(): rb.loc = 0
 
 
@@ -192,7 +194,7 @@ class RawBufferLibrary(dict):
     names of decoders that can write to them
     '''
     def __init__(self, json_dict=None, kw_dict={}):
-        if json_dict is not None: 
+        if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
 
@@ -210,11 +212,11 @@ class RawBufferLibrary(dict):
         }
 
         By default "name" is used for the RawBuffer's "out_name" attribute, but
-        this can be overrided if desired by providing an explicit "out_name"
+        this can be overridden if desired by providing an explicit "out_name"
 
-        Allowed shorthands, in order of exapansion:
+        Allowed shorthands, in order of expansion:
         * key_list may have entries that are 2-integer lists corresponding to
-          the first and last integer keys in a continguous range (e.g. of
+          the first and last integer keys in a contiguous range (e.g. of
           channels) that get stored to the same buffer. These simply get
           replaced with the explicit list of integers in the range. We use lists
           not tuples for json compliance.
@@ -241,7 +243,7 @@ class RawBufferLibrary(dict):
         kw_dict : dict
             dict of keyword-value pairs for substitutions into the out_stream
             and out_name fields
-        '''                
+        '''
         for list_name in json_dict:
             if list_name not in self: self[list_name] = RawBufferList()
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
@@ -266,7 +268,7 @@ class RawBufferLibrary(dict):
         output_file_list = rbl.get_list_of('out_stream')
         """
         values = []
-        for rb_list in self.values(): 
+        for rb_list in self.values():
             values += rb_list.get_list_of(attribute)
         if unique: values = list(set(values))
         return values
@@ -294,7 +296,7 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             return
         info = json_dict[name] # changes to info will change json_dict[name]
         # make sure we have a key list
-        if 'key_list' not in info: 
+        if 'key_list' not in info:
             print(f'expand_json_dict: {name} is missing key_list')
             continue
 
@@ -309,18 +311,18 @@ def expand_rblist_json_dict(json_dict, kw_dict):
                 info['key_list'][i:i+1] = range(key_range[0], key_range[1]+1)
                 i += key_range[1]-key_range[0]
             i += 1
-        
+
         # Expand list_names if name contains a key-based formatter
-        if '{key' in name: 
+        if '{key' in name:
             for key in info['key_list']:
                 expanded_name = name.format(key=key)
                 json_dict[expanded_name] = info.copy()
                 json_dict[expanded_name]['key_list'] = [key];
             json_dict.pop(name)
 
-    # now re-iterate and exand out_paths
+    # now re-iterate and expand out_paths
     for name, info in json_dict.items():
-        if len(info['key_list']) == 1 and info['key_list'][0] != "*": 
+        if len(info['key_list']) == 1 and info['key_list'][0] != "*":
             kw_dict['key'] = info['key_list'][0]
         if 'out_stream' in info:
             if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
@@ -344,10 +346,10 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0: continue # no data to write
         ii = rb.out_stream.find(':')
-        if ii == -1: 
+        if ii == -1:
             filename = rb.out_stream
             group = '/'
-        else: 
+        else:
             filename = rb.out_stream[:ii]
             group = rb.out_stream[ii+1:]
             if len(group) == 0: group = '/' # in case out_stream ends with :
@@ -356,5 +358,3 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
                                n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0
-
-

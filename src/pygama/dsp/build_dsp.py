@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
+import argparse
+import json
 import os
 import sys
-import json
-import h5py
 import time
+
+import h5py
 import numpy as np
-import argparse
 
 import pygama
-from pygama.dsp.processing_chain import build_processing_chain
-from pygama.dsp.errors import DSPFatal
 import pygama.lgdo.lh5_store as lh5
+from pygama.dsp.errors import DSPFatal
+from pygama.dsp.processing_chain import build_processing_chain
 from pygama.math.utils import tqdm_range
+
 
 def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                outputs=None, n_max=np.inf, write_mode='r', buffer_len=3200,
@@ -19,7 +21,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     """
     Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence of
     processors via the ProcessingChain.
-    
+
     Parameters
     ----------
     f_raw : str
@@ -53,7 +55,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     t_start = time.time()
 
     if isinstance(dsp_config, str):
-        with open(dsp_config, 'r') as config_file:
+        with open(dsp_config) as config_file:
             dsp_config = json.load(config_file)
 
     if not isinstance(dsp_config, dict):
@@ -89,13 +91,13 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
     # load DSP config (default: one config file for all tables)
     if isinstance(dsp_config, str):
-        with open(dsp_config, 'r') as config_file:
+        with open(dsp_config) as config_file:
             dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
 
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
-        with open(database, 'r') as db_file:
+        with open(database) as db_file:
             database = json.load(db_file)
 
     if database and not isinstance(database, dict):
@@ -127,7 +129,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         # if we have separate DSP files for each table, read them in here
         if chan_config is not None:
             f_config = chan_config[tb]
-            with open(f_config, 'r') as config_file:
+            with open(f_config) as config_file:
                 dsp_config = json.load(config_file, object_pairs_hook=OrderedDict)
             print('Processing table:', tb, 'with DSP config file:\n  ', f_config)
 
@@ -152,15 +154,15 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
             if proc_chain is None:
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
                 tqdm_it = iter(tqdm_range(0, tot_n_rows, buffer_len, verbose))
-            
+
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
                 proc_chain.execute(0, n_rows)
             except DSPFatal as e:
                 # Update the wf_range to reflect the file position
-                e.wf_range = "{}-{}".format(e.wf_range[0]+start_row, e.wf_range[1]+start_row)
+                e.wf_range = f"{e.wf_range[0]+start_row}-{e.wf_range[1]+start_row}"
                 raise e
-            
+
             raw_store.write_object(obj=tb_out,
                                    name=tb_name,
                                    lh5_file=f_dsp,
@@ -169,10 +171,10 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                                    write_start=write_offset+start_row,
             )
             next(tqdm_it)
-            
+
             if start_row+n_rows > tot_n_rows:
                 break
-            
+
         print(f'Done.  Writing to file {f_dsp}')
 
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
@@ -183,9 +185,9 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
 
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser(description=
-"""Process a single tier 1 LH5 file and produce a tier 2 LH5 file using a
-json config file and build_dsp.""")
+    parser = argparse.ArgumentParser(description="""Process a single tier 1 LH5
+    file and produce a tier 2 LH5 file using a json config file and
+    build_dsp.""")
 
     arg = parser.add_argument
     arg('file', help="Input raw LH5 file.")
@@ -202,17 +204,17 @@ json config file and build_dsp.""")
 
     arg('-n', '--nevents', default=None, type=int,
         help="Number of waveforms to process. By default do the whole file")
-    
+
     arg('-v', '--verbose', action='store_const', const=2, default=1,
         help="Verbose output, useful for debugging")
     arg('-q', '--quiet', action='store_const', const=0, dest='verbose',
         help="Silent output, print only exceptions thrown")
-    
+
     arg('-b', '--block', default=16, type=int,
         help="Number of waveforms to process simultaneously. Default is 8")
     arg('-c', '--chunk', default=3200, type=int,
         help="Number of waveforms to read from disk at a time. Default is 256. THIS IS NOT IMPLEMENTED YET!")
-    
+
     arg('-r', '--recreate', action='store_const', const='r', dest='writemode', default='r',
         help="Overwrite file if it already exists. Default option. Multually exclusive with --update and --append")
     arg('-u', '--update', action='store_const', const='u', dest='writemode',

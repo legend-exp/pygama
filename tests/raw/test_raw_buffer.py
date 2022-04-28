@@ -1,5 +1,7 @@
-import pytest
 import json
+
+import pytest
+
 import pygama.raw.raw_buffer as prb
 from pygama.raw.fc.fc_event_decoder import FCEventDecoder
 

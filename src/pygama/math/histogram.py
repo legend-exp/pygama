@@ -14,10 +14,11 @@ they will help you if you need to do something trickier than is provided (e.g.
 2D hists).
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
-import pygama.math.utils as pgu
+import numpy as np
 from pylab import rcParams
+
+import pygama.math.utils as pgu
 
 
 def get_hist(data, bins=None, range=None, dx=None, wts=None):
@@ -44,7 +45,7 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
         The array of data to be histogrammed
     bins: int, array, or str (optional)
         int: the number of bins to be used in the histogram
-        array: an array of bin edges to use 
+        array: an array of bin edges to use
         str: the name of the np.histogram automatic binning algorithm to use
         If not provided, np.histogram's default auto-binning routine is used
     range : tuple (float, float) (optional)
@@ -79,7 +80,7 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
     if wts is not None and np.shape(wts) == (): wts = np.full_like(data, wts)
     hist, bins = np.histogram(data, bins=bins, range=range, weights=wts)
 
-    if wts is None: 
+    if wts is None:
         # no weights: var = hist, but return a copy so that mods to var don't
         # modify hist.
         # Note: If you don't want a var copy, just call np.histogram()
@@ -225,7 +226,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     Typically used by sending slices around a peak. Searches about argmax(hist)
     for the peak to fall by [fraction] from mx to bl
 
-    Paramaters
+    Parameters
     ----------
     fraction : float
         The fractional amplitude at which to evaluate the full width
@@ -237,16 +238,16 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         An array of histogram variances. Used with the 'fit_slopes' method
     mx : float or tuple(float, float) (optional)
         The value to use for the max of the peak. If None, np.amax(hist) is
-        used. 
+        used.
     dmx : float (optional)
         The uncertainty in mx
     bl : float or tuple (float, float) (optional)
-        Used to specify an offset from which to estimate the FWFM. 
+        Used to specify an offset from which to estimate the FWFM.
     dbl : float (optional)
         The uncertainty in the bl
     method : string
-        'bins_over_f' : the simplest method: just take the diffence in the bin
-            centers that are over [fraction] of max. Only works for high stats and 
+        'bins_over_f' : the simplest method: just take the difference in the bin
+            centers that are over [fraction] of max. Only works for high stats and
             FWFM/bin_width >> 1
         'interpolate' : interpolate between the bins that cross the [fration]
             line.  Works well for high stats and a reasonable number of bins.
@@ -279,13 +280,13 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     """
 
     # find bins over [fraction]
-    if mx is None: 
+    if mx is None:
         mx = np.amax(hist)
-        if var is not None and dmx == 0: 
+        if var is not None and dmx == 0:
             dmx = np.sqrt(var[np.argmax(hist)])
     idxs_over_f = hist > (bl + fraction * (mx-bl))
 
-    # argmax will return the index of the first occurence of a maximum
+    # argmax will return the index of the first occurrence of a maximum
     # so we can use it to find the first and last time idxs_over_f is "True"
     bin_lo = np.argmax(idxs_over_f)
     bin_hi = len(idxs_over_f) - np.argmax(idxs_over_f[::-1])
@@ -295,7 +296,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     dheight2 = (fraction*dmx)**2 + ((1-fraction)*dbl)**2
 
     if method == 'bins_over_f':
-        # the simplest method: just take the diffence in the bin centers
+        # the simplest method: just take the difference in the bin centers
         fwfm = bin_centers[bin_hi] - bin_centers[bin_lo]
 
         # compute rough uncertainty as [bin width] (+) [dheight / slope]
@@ -311,7 +312,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
 
     elif method == 'interpolate':
         # interpolate between the two bins that cross the [fraction] line
-        # works well for high stats 
+        # works well for high stats
         if bin_lo < 1 or bin_hi >= len(hist)-1:
             print(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
             return 0, 0
@@ -325,7 +326,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         x_lo = bin_centers[bin_lo-1] + dx * dhf/dh
         # uncertainty
         dx2_lo = 0
-        if var is not None: 
+        if var is not None:
             dx2_lo = (dhf/dh)**2 * var[bin_lo] + ((dh-dhf)/dh)**2 * var[bin_lo-1]
             dx2_lo *= (dx/dh)**2
         dDdh = -dx/dh
@@ -336,12 +337,12 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         dh = hist[bin_hi] - hist[bin_hi+1]
         if dh == 0:
             raise ValueError(f"get_fwhm: interpolation failed, dh == 0")
-        x_hi = bin_centers[bin_hi] + dx * dhf/dh 
+        x_hi = bin_centers[bin_hi] + dx * dhf/dh
         if x_hi < x_lo:
             raise ValueError(f"get_fwfm: interpolation produced negative fwfm")
         # uncertainty
         dx2_hi = 0
-        if var is not None: 
+        if var is not None:
             dx2_hi = (dhf/dh)**2 * var[bin_hi+1] + ((dh-dhf)/dh)**2 * var[bin_hi]
             dx2_hi *= (dx/dh)**2
         dDdh += dx/dh
@@ -406,7 +407,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
     """
     plot a step histogram, with optional error bars
     """
-    if fill: 
+    if fill:
         # the concat calls get the steps to draw correctly at the range boundaries
         # where="post" tells plt to draw the step y[i] between x[i] and x[i+1]
         save_color = None
@@ -434,7 +435,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
         dmean = stddev/np.sqrt(N)
 
         mean, dmean = pgu.get_formatted_stats(mean, dmean, 2)
-        stats = r'$\mu=%s \pm %s$\n$\sigma=%#.3g$' % (mean, dmean, stddev)
+        stats = fr'$\mu={mean} \pm {dmean}$\n$\sigma={stddev:#.3g}$'
         stats_fontsize = rcParams['legend.fontsize']
         plt.text(stats_hloc, stats_vloc, stats, transform=plt.gca().transAxes, fontsize = stats_fontsize)
 

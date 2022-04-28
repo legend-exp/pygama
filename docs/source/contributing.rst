@@ -8,7 +8,23 @@ that do not comply to the following directives will be rejected.
 Code style
 ----------
 
-*In progress...*
+A set of `pre-commit <https://pre-commit.com>`_ hooks is configured to make
+sure that *pygama* coherently follows standard coding style conventions. The
+pre-commit tool is able to identify common style problems and automatically fix
+them, wherever possible. Configured hooks are listed in the
+``.pre-commit-config.yaml`` file at the project root folder. They are run
+remotely on the GitHub repository through the `pre-commit bot
+<https://pre-commit.ci>`_, but can also be run locally before submitting a
+pull request (recommended):
+
+.. code-block:: console
+
+   $ pip install pre-commit      # required
+   $ pre-commit run --all-files  # analyse the source code and fix it wherever possible
+   $ pre-commit install          # install a Git pre-commit hook (optional)
+
+For a more comprehensive guide, check out the `Scikit-HEP documentation about
+code style <https://scikit-hep.org/developer/style>`_.
 
 Testing
 -------
@@ -22,11 +38,11 @@ Testing
   overview.
 * *pygama* tests belong to three categories:
 
-  :micro-tests: Should ensure the correct behaviour of each function
+  :unit tests: Should ensure the correct behaviour of each function
       independently, possibly without relying on other *pygama* methods. The
-      existence of these microscopic tests makes it possible to promptly
-      identify and fix the source of a bug. An example of this are tests for
-      each single DSP processor
+      existence of these micro-tests makes it possible to promptly identify and
+      fix the source of a bug. An example of this are tests for each single DSP
+      processor
 
   :integration tests: Should ensure that independent parts of the code base
       work well together and are integrated in a cohesive framework. An example
@@ -40,10 +56,19 @@ Testing
 * Unit tests are automatically run for every push event and pull request to the
   remote Git repository on a remote server (currently handled by GitHub
   actions). Every pull request must pass all tests before being approved for
-  merging
+  merging.
 * Additionally, pull request authors are required to provide tests with
   sufficient code coverage for every proposed change or addition. If necessary,
-  high-level functional tests should be updated.
+  high-level functional tests should be updated. We currently rely on
+  `codecov.io <https://app.codecov.io/gh/legend-exp/pygama>`_ to keep track of
+  the test coverage. To generate a local coverage report (recommended before
+  submitting pull requests), the ``coverage`` Python package is needed:
+
+  .. code-block:: console
+
+    $ pip install coverage
+    $ coverage run -m pytest
+    $ coverage report
 
 Documentation
 -------------

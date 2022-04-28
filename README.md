@@ -1,9 +1,9 @@
 # pygama
 
 ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/legend-exp/pygama?logo=git)
-![Documentation (main)](https://img.shields.io/badge/documentation-online-purple?logo=readthedocs&link=https%3A%2F%2Flegend-exp.github.io%2Fpygama)
-![GitHub Workflow Status (main)](https://img.shields.io/github/workflow/status/legend-exp/pygama/pygama/main?label=main%20branch&logo=github)
-![GitHub Workflow Status (dev)](https://img.shields.io/github/workflow/status/legend-exp/pygama/pygama/dev?label=dev%20branch&logo=github)
+![Documentation](https://img.shields.io/badge/documentation-online-purple?logo=readthedocs&link=https%3A%2F%2Flegend-exp.github.io%2Fpygama)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/legend-exp/pygama/pygama/main?label=main%20branch&logo=github)
+![Codecov](https://img.shields.io/codecov/c/github/legend-exp/pygama?logo=codecov)
 ![GitHub issues](https://img.shields.io/github/issues/legend-exp/pygama?logo=github)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/legend-exp/pygama?logo=github)
 ![License](https://img.shields.io/github/license/legend-exp/pygama)
@@ -15,3 +15,4 @@
 * optimizing DSP routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
+Check out the [online documentation](https://legend-exp.github.io/pygama).

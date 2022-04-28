@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
@@ -13,7 +15,7 @@ def windower(w_in, t0_in, w_out):
     parameter.  If the the length of "w_out" plus "t0_in" extends
     past the end of "w_in" or if "t0_in" is negative, remaining
     values are padded with NaN.
-    
+
     Parameters
     ----------
     w_in : array-like
@@ -30,7 +32,7 @@ def windower(w_in, t0_in, w_out):
 
     if len(w_out) >= len(w_in):
         raise DSPFatal('The windowed waveform must be smaller than the input waveform')
-    
+
     beg = min(int(t0_in), len(w_in))
     end = max(beg + len(w_out), 0)
     if beg < 0:

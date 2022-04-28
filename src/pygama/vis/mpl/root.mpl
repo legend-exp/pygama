@@ -33,4 +33,3 @@ ytick.minor.visible  : True
 # font.family : Helvetica Neue Light
 # font.style : light
 #font.family : Optima
-

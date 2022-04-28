@@ -1,17 +1,20 @@
-import pygama.lh5 as lh5
+import json
+import math
+import os
+import pathlib
+
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import os,json
-import pathlib
+import scipy.stats
+from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
+
+import pygama.analysis.calibration as cal
 #import pygama.genpar_tmp.cuts as cut
 import pygama.analysis.histograms as pgh
-import pygama.analysis.calibration as cal
 import pygama.analysis.peak_fitting as pgf
-import scipy.stats
-import math
-import matplotlib as mpl
-from matplotlib.backends.backend_pdf import PdfPages
+
 
 def fwhm_slope(x, m0, m1):
     """
@@ -26,7 +29,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
     """
     This is an example script for calibrating Th data.
     """
-    
+
     if isinstance(energy_params, str): energy_params = [energy_params]
 
     mpl.use('pdf')
@@ -42,7 +45,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
 
     Nevents = len(uncal_pass[energy_params[0]])
     print(f'{Nevents} events pass')
-    
+
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
     range_keV = [(20,20),(30,30), (40,40),(40,25),(25,40),(40,40),(60,60)] # side bands width
     funcs = [pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
@@ -74,12 +77,12 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             pk_pars      = results['pk_pars']
             found_peaks = results['got_peaks_locs']
             fitted_peaks = results['fitted_keV']
-            
+
             for i, peak in enumerate(glines):
-                if peak not in fitted_peaks: 
+                if peak not in fitted_peaks:
                     kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
             for i, peak in enumerate(glines):
-                if peak not in fitted_peaks: 
+                if peak not in fitted_peaks:
                     kev_ranges[i] = (kev_ranges[i][0]-5,  kev_ranges[i][1]-5)
             for i, peak in enumerate(fitted_peaks):
                 try:
@@ -109,10 +112,10 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             fitted_funcs = []
             fitted_gof_funcs = []
             for i, peak in enumerate(glines):
-                if peak in fitted_peaks: 
+                if peak in fitted_peaks:
                     fitted_funcs.append(funcs[i])
                     fitted_gof_funcs.append(gof_funcs[i])
-                    
+
             ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
             xpb = 1
             xlo = 0
@@ -123,10 +126,10 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             fitted_peaks = results['fitted_keV']
             pk_pars      = results['pk_pars']
             pk_covs      = results['pk_covs']
-        
+
             plot_title = f'{detector}-{measurement}-{run}'
             peaks_kev = results['got_peaks_keV']
-            
+
             pk_ranges = results['pk_ranges']
             p_vals = results['pk_pvals']
             mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
@@ -146,7 +149,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
                 counts, bs, bars = plt.hist(energies, bins=binning, histtype='step')
                 fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i])*np.diff(bs)
                 plt.plot(bin_cs, fit_vals)
-                plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] ) 
+                plt.step(bin_cs, [(fval-count)/count if count != 0 else  (fval-count) for count, fval in zip(counts, fit_vals)] )
                 plt.plot([bin_cs[10]],[0],label=get_peak_label(fitted_peaks[i]), linestyle='None' )
                 plt.plot([bin_cs[10]],[0],label = f'{fitted_peaks[i]:.1f} keV', linestyle='None')
                 plt.plot([bin_cs[10]],[0],label = f'{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV', linestyle='None')
@@ -169,11 +172,11 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             fwhm_peaks   = np.array([], dtype=np.float32)
             indexes=[]
             for i,peak in enumerate(fitted_peaks):
-                if(peak==2103.53): 
+                if(peak==2103.53):
                     print(f"Tl SEP found at index {i}")
                     indexes.append(i)
                     continue
-                elif(peak==1592.53): 
+                elif(peak==1592.53):
                     print(f"Tl DEP found at index {i}")
                     indexes.append(i)
                     continue
@@ -189,9 +192,9 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
                 print(f'FWHM of {peak} keV peak is: {fwhms[i]:1.2f} +- {dfwhms[i]:1.2f} keV')
             param_guess  = [0.2,0.001]
             param_bounds = (0, [10., 1.])
-            fit_pars, fit_covs = curve_fit(fwhm_slope, fwhm_peaks, fwhms, sigma=dfwhms, 
+            fit_pars, fit_covs = curve_fit(fwhm_slope, fwhm_peaks, fwhms, sigma=dfwhms,
                                 p0=param_guess, bounds=param_bounds, absolute_sigma=True)
-            
+
             rng = np.random.default_rng(1)
             pars_b = rng.multivariate_normal(fit_pars, fit_covs, size=1000)
             fits = np.array([fwhm_slope(fwhm_peaks, *pars) for pars in pars_b])
@@ -223,15 +226,15 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             pdf.savefig()
             plt.close()
 
-        
+
 
         output_dict[energy_param] = {'Qbb_fwhm': round(fit_qbb,2), 'Qbb_fwhm_err': round(qbb_err,2),
-                                    '2.6_fwhm': round(fwhms[-1],2), '2.6_fwhm_err': round(dfwhms[-1],2), 
-                                    "m0":fit_pars[0], "m1":fit_pars[1], 
+                                    '2.6_fwhm': round(fwhms[-1],2), '2.6_fwhm_err': round(dfwhms[-1],2),
+                                    "m0":fit_pars[0], "m1":fit_pars[1],
                                     "Calibration_pars":pars.tolist(),
                                     "Number_events": Nevents}
 
-    
+
     dict_save_path = os.path.join(save_path, f'{detector}.json')
     with open(dict_save_path,'w') as fp:
         json.dump(output_dict,fp, indent=4)
@@ -248,7 +251,7 @@ def get_peak_labels(labels, pars):
     return out_labels, out
 
 def get_peak_label(peak):
-    if peak == 583.191: 
+    if peak == 583.191:
         return 'Tl 583'
     elif peak == 727.33:
         return 'Bi 727'

@@ -2,10 +2,10 @@
 pygama convenience functions.
 """
 import sys
-import tqdm
-import numpy as np
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import tqdm
 
 
 def get_dataset_from_cmdline(args, run_db, cal_db):
@@ -69,7 +69,7 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
     stop : int
         ending iteration value
     step : int
-        step size inbetween each iteration
+        step size in between each iteration
     verbose : int
         verbose = 0 hides progress bar verbose > 0 displays progress bar
     text : str
@@ -110,7 +110,7 @@ def sizeof_fmt(num, suffix='B'):
     """
     for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
         if abs(num) < 1024.0:
-            return "{:.3f} {}{}".format(num, unit, suffix)
+            return f"{num:.3f} {unit}{suffix}"
         num /= 1024.0
     return "{:.1f} {} {}".format(num, 'Y', suffix)
 
@@ -200,7 +200,7 @@ def tree_draw(tree, vars, tcut):
 
         for j, var in enumerate(tmp_list):
             # print(i, j, var, "getting V", j+1, "writing to np_arrs", i + j)
-            tmp = getattr(tree, "GetV{}".format(j + 1))()
+            tmp = getattr(tree, f"GetV{j + 1}")()
             np_arrs[i + j] = np.array([tmp[k] for k in range(n)])
 
     return tuple(np_arrs)
@@ -313,4 +313,3 @@ def fit_simple_scaling(x, y, var=1):
     scale_var = 1/np.sum(x*x/var)
     scale = np.sum(y*x/var) * scale_var
     return scale, scale_var
-

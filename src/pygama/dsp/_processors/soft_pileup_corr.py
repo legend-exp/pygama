@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32, float32, float32[:])",
               "void(float64[:], float64, float64, float64[:])"],
@@ -10,7 +12,7 @@ def soft_pileup_corr(w_in, n_in, tau_in, w_out):
     Fit the baseline to an exponential with the provided time
     constant and then subtract the best-fit function from the
     entire waveform.
-    
+
     Parameters
     ----------
     w_in  : array-like
@@ -22,7 +24,7 @@ def soft_pileup_corr(w_in, n_in, tau_in, w_out):
             The fixed, exponential time constant
     w_out : array-like
             The output waveform with the exponential subtracted
-    
+
     Processing Chain Example
     ------------------------
     "wf_bl": {
@@ -71,7 +73,7 @@ def soft_pileup_corr_bl(w_in, n_in, tau_in, B_in, w_out):
     Fit the baseline to an exponential with the provided time
     constant and then subtract the best-fit function from the
     entire waveform.
-    
+
     Parameters
     ----------
     w_in  : array-like
@@ -85,7 +87,7 @@ def soft_pileup_corr_bl(w_in, n_in, tau_in, B_in, w_out):
             The fixed, exponential constant
     w_out : array-like
             The output waveform with the exponential subtracted
-    
+
     Processing Chain Example
     ------------------------
     "wf_bl": {

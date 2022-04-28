@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
@@ -39,5 +41,5 @@ def fixed_time_pickoff(w_in, t_in, a_out):
 
     if int(t_in) < 0 or int(t_in) >= len(w_in):
         return
-  
+
     a_out[0] = w_in[int(t_in)]

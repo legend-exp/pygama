@@ -6,14 +6,17 @@ routines for automatic calibration.
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
 import sys
-import numpy as np
-import pygama.math.utils as pgu
-import pygama.math.peak_fitting as pgf
-import pygama.math.histogram as pgh
-import matplotlib.pyplot as plt
+
 import matplotlib.gridspec as gs
-from scipy.signal import medfilt, find_peaks_cwt
+import matplotlib.pyplot as plt
+import numpy as np
 import scipy.stats
+from scipy.signal import find_peaks_cwt, medfilt
+
+import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
+import pygama.math.utils as pgu
+
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
     """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
@@ -62,7 +65,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     if Etol_keV is None:
         #estimate Etol_keV
         pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
-        if sum(sum([sum(c) if c is not None else 0 for c in pt_covs])) == np.inf or sum(sum([sum(c) if c is not None else 0 for c in pt_covs])) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
+        if sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
@@ -193,7 +196,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         The function to be fit to the peak in the (windowed) hist
     """
     if  func == pgf.gauss_step_cdf or func == pgf.gauss_step_pdf or func == pgf.extended_gauss_step_pdf:
-        # get mu and hieght from a gauss fit, also sigma as fallback
+        # get mu and height from a gauss fit, also sigma as fallback
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
@@ -224,9 +227,9 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
                     return []
 
         # now compute amp and return
-        n_sig = np.sum(hist[(bin_centres>mu-3*sigma)&(bin_centres<mu+3*sigma)]) 
+        n_sig = np.sum(hist[(bin_centres>mu-3*sigma)&(bin_centres<mu+3*sigma)])
         n_bkg = np.sum(hist)-n_sig
-        
+
         hstep = step /(bg + np.mean(hist[:10]))
         return [n_sig, mu, sigma/2,n_bkg, hstep,bins[0], bins[-1],0]
 
@@ -249,7 +252,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
 
         # get bg and step from edges of hist
         bg0 = np.mean(hist[-10:])
-        step = bg0 -np.mean(hist[:10]) 
+        step = bg0 -np.mean(hist[:10])
 
         # get sigma from fwfm with f = 1/sqrt(e)
         try:
@@ -257,7 +260,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
             if sigma == 0: raise ValueError
         except:
             sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='fit_slopes')[0]
-            if sigma == 0: 
+            if sigma == 0:
                 print("get_hpge_E_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None:
                     sigma = sigma_guess
@@ -268,10 +271,10 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         # for now hard-coded
         htail = 1./5
         tau = 0.5*sigma
-        
+
         hstep = step /(bg0 + np.mean(hist[:10]))
-        
-        n_sig = np.sum(hist[(bin_centres>mu-3*sigma)&(bin_centres<mu+3*sigma)]) 
+
+        n_sig = np.sum(hist[(bin_centres>mu-3*sigma)&(bin_centres<mu+3*sigma)])
         n_bkg = np.sum(hist)-n_sig
 
         parguess = [n_sig,  mu, sigma, htail, tau, n_bkg,hstep,bins[0], bins[-1],0]
@@ -281,7 +284,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
     else:
         print(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
         return []
-        
+
 
 def get_hpge_E_fixed( func):
     """
@@ -305,16 +308,16 @@ def get_hpge_E_bounds(func):
     if  func == pgf.radford_cdf or func == pgf.radford_pdf or func == pgf.extended_radford_pdf:
         return [(0,None), (None,None), (None,None), (0,1),(None,None),(0,None), (None,None)
                 ,(None,None),(None,None),(None,None)]
-    
+
     elif  func ==  pgf.gauss_step_cdf or func ==  pgf.gauss_step_pdf or func == pgf.extended_gauss_step_pdf :
         return [(0,None), (None,None), (None,None),(0,None), (None,None),(None,None)
                 ,(None,None),(None,None)]
-    
+
     else:
         print(f'get_hpge_E_bounds not implemented for {func.__name__}')
         return []
 
-def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf, 
+def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf,
                      method = 'unbinned', gof_funcs=None, n_events=15000, allowed_p_val= 0.05,
                      uncal_is_int=False, simplex=False):
     """ Fit the Energy peaks specified using the function given
@@ -331,7 +334,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         array of number of bins to use for the fit window histogramming
     funcs : function or array of functions
         funcs to be used to fit each region
-    method: str 
+    method: str
             default is unbinned fit can specify to use binned fit method instead
     gof_funcs : function or array of functions
             functions to use for calculation goodness of fit if unspecified will use same func as fit
@@ -340,7 +343,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         E_uncal
     simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit 
+    allowed_p_val: lower limit on p_val of fit
     Returns
     -------
     pars : list of array
@@ -370,13 +373,13 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             gof_func_i = gof_funcs[i_peak] if hasattr(gof_funcs, '__len__') else gof_funcs
         else:
             gof_func_i = func_i
-        
+
         try:
             # bin a histogram
             Euc_min = mode_guesses[i_peak] - wleft_i
             Euc_max = mode_guesses[i_peak] + wright_i
             Euc_min, Euc_max, n_bins_i = pgh.better_int_binning(x_lo=Euc_min, x_hi=Euc_max, n_bins=n_bins_i)
-            
+
             if method =='unbinned':
                 energies = E_uncal[(E_uncal>Euc_min)&(E_uncal<Euc_max)][:n_events]
                 hist, bins, var = pgh.get_hist(energies, bins=n_bins_i, range=(Euc_min,Euc_max))
@@ -391,25 +394,25 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
                 par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
                 bounds = get_hpge_E_bounds(func_i)
                 fixed, mask = get_hpge_E_fixed(func_i)
-                pars_i,errs_i, cov_i = pgf.fit_binned(func_i, hist,  bins, var=var, 
-                                        guess=par_guesses, cost_func=method, Extended=True, 
+                pars_i,errs_i, cov_i = pgf.fit_binned(func_i, hist,  bins, var=var,
+                                        guess=par_guesses, cost_func=method, Extended=True,
                                                     fixed=fixed, simplex=simplex, bounds = bounds)
-            
+
             csqr = pgf.goodness_of_fit(hist, bins, None, gof_func_i, pars_i , method='LR')
             p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
 
-            
+
             pars_i = np.array(pars_i)[mask]
             errs_i = np.array(errs_i)[mask]
             cov_i = np.array(cov_i)[mask,:][:,mask]
-            
+
             total_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
-            if (sum([sum(c) if c is not None else 0 for c in cov_i]) == np.inf or 
-                sum([sum(c) if c is not None else 0 for c in cov_i]) == 0 or 
-                np.isnan(sum([sum(c) if c is not None else 0 for c in cov_i]))) :
+            if (sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf or
+                sum(sum(c) if c is not None else 0 for c in cov_i) == 0 or
+                np.isnan(sum(sum(c) if c is not None else 0 for c in cov_i))) :
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
-            
+
             elif (np.abs(errs_i/pars_i) < 1e-7).any():
                 print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
@@ -417,13 +420,13 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             elif np.abs(total_events[0] -np.sum(hist))/np.sum(hist)>0.1:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
-                
+
             elif p_val<allowed_p_val:
                 print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
         except: pars_i, errs_i, cov_i, p_val = None, None, None, None
-        
+
         #get binning
         binw_1 = (bins[-1]-bins[0])/(len(bins)-1)
 
@@ -434,7 +437,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         ranges.append([Euc_min, Euc_max])
         p_vals.append(p_val)
 
-    return (np.array(pars, dtype = object), np.array(errors, dtype = object), 
+    return (np.array(pars, dtype = object), np.array(errors, dtype = object),
         np.array(covs, dtype = object), np.array(binws), np.array(ranges), np.array(p_vals))
 
 
@@ -509,7 +512,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     return pars, cov
 
 
-def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None, 
+def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None,
                         funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
                         n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
     """ Calibrate HPGe data to a set of known peaks
@@ -526,7 +529,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         degree of the polynomial for the E_cal function E_keV = poly(E_uncal).
         deg = 0 corresponds to a simple scaling E_keV = scale * E_uncal.
         Otherwise follows the convention in np.polyfit
-    method: str 
+    method: str
             default is unbinned fit can specify to use binned fit method instead
     gof_funcs : function or array of functions
             functions to use for calculation goodness of fit if unspecified will use same func as fit
@@ -537,7 +540,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         ranges around which the peak fitting is performed
         if tuple(s) are supplied, they provide the left and right ranges
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit 
+    allowed_p_val: lower limit on p_val of fit
     Returns
     -------
     pars, cov : array, 2D array
@@ -599,7 +602,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
             print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
-    Euc_min, Euc_max = [(np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1)]
+    Euc_min, Euc_max = ((np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1))
     Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
     Euc_max = Euc_max[np.logical_and(Euc_max >= Euc_min, Euc_max <= max(E_uncal))][0]
     dEuc = 0.2/roughpars[-2]
@@ -660,7 +663,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         range_uncal = [(r[0]/d, r[1]/d) if isinstance(r, tuple) else r/d for r, d in zip(range_keV, der)]
         n_bins = [sum(r)/0.5/d if isinstance(r, tuple) else r/0.2/d for r, d in zip(range_keV, der)]
 
-    pk_pars,pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals = hpge_fit_E_peaks(E_uncal, got_peaks_locs, range_uncal, 
+    pk_pars,pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals = hpge_fit_E_peaks(E_uncal, got_peaks_locs, range_uncal,
                                     n_bins=n_bins,
                                     funcs=funcs, method=method, gof_funcs = gof_funcs, n_events=n_events,
                                     uncal_is_int=False, simplex=simplex, allowed_p_val=allowed_p_val)
@@ -720,7 +723,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     derco = np.polyder(np.poly1d(pars)).coefficients
     der = [pgf.poly(Ei, derco) for Ei in fitted_peaks_keV]
 
-    cal_fwhms = uncal_fwhms * der 
+    cal_fwhms = uncal_fwhms * der
     cal_fwhms_errs = uncal_fwhm_errs*der
     results['pk_fwhms'] = np.asarray([(u*d, e*d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)])
 
@@ -730,7 +733,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         for i, (Ei, fwhm, fwhme) in enumerate(zip(fitted_peaks_keV, cal_fwhms, cal_fwhms_errs)):
             print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {fwhm:.2f}+-{fwhme:.2f} keV'.ljust(5))
 
-    return   pars, cov, results  
+    return   pars, cov, results
 
 
 
@@ -988,6 +991,7 @@ def match_peaks(data_pks, cal_pks):
     Match uncalibrated peaks with literature energy values.
     """
     from itertools import combinations
+
     from scipy.stats import linregress
 
     n_pks = len(cal_pks) if len(cal_pks) < len(data_pks) else len(data_pks)
@@ -1013,10 +1017,10 @@ def match_peaks(data_pks, cal_pks):
     print(i, best_err)
     print("cal:",cal)
     print("data:",data)
-    plt.scatter(data, cal, label='min.err:{:.2e}'.format(err))
+    plt.scatter(data, cal, label=f'min.err:{err:.2e}')
     xs = np.linspace(data[0], data[-1], 10)
     plt.plot(xs, best_m * xs + best_b , c="r",
-             label="y = {:.2f} x + {:.2f}".format(best_m,best_b) )
+             label=f"y = {best_m:.2f} x + {best_b:.2f}" )
     plt.xlabel("Energy (uncal)", ha='right', x=1)
     plt.ylabel("Energy (keV)", ha='right', y=1)
     plt.legend()
@@ -1103,8 +1107,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
         # plt.figure()
         # plt.plot(bin_centers,peak_hist,  color="k", ls="steps")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         try:
             guess_e, guess_sigma, guess_area = get_gaussian_guess(
@@ -1127,8 +1131,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
             gauss(bin_centers, guess_e, guess_sigma, guess_area),
             color="b")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         bounds = ([0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, 0], [
             1.1 * guess_e, 2 * guess_sigma, 0.1, 0.75, window_width_in_adc, 10,
@@ -1143,8 +1147,8 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
 
         plt.plot(bin_centers, radford_peak(bin_centers, *params), color="r")
 
-        # inpu = input("q to quit...")
-        # if inpu == "q": exit()
+        # inp = input("q to quit...")
+        # if inp == "q": exit()
 
         fit_result_map[energy] = params
         centers[i] = params[0]

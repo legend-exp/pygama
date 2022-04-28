@@ -1,6 +1,8 @@
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(["void(float32[:], float32[:])",
               "void(float64[:], float64[:])"],
@@ -28,11 +30,11 @@ def log_check(w_in, w_log):
     }
     """
     w_log[:] = np.nan
-    
+
     if np.isnan(w_in).any():
         return
 
     if np.any(w_in <= 0):
         return
-        
+
     w_log[:] = np.log(w_in[:])

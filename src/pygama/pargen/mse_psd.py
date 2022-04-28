@@ -3,9 +3,9 @@
 - get_ae_cut (does A/E)
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.gridspec as gs
+import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import LogNorm
 
 from pygama.analysis.peak_fitting import *

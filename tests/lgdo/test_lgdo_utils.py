@@ -1,5 +1,6 @@
-import pygama.lgdo.lgdo_utils as lgdo_utils
 import numpy as np
+
+import pygama.lgdo.lgdo_utils as lgdo_utils
 
 
 def test_get_element_type():

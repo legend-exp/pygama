@@ -189,6 +189,6 @@
       "init_args": ["wf_blsub", "power_spect(len(wf_blsub)//2+1, 'f')"],
       "unit": "MHz"
     }
-    
+
   }
 }

@@ -16,7 +16,7 @@ class DSPFatal(DSPError):
         is caught, and appended to the error message
     """
     def __init__(self, *args):
-        super(DSPFatal, self).__init__(*args)
+        super().__init__(*args)
         self.wf_range = None
         self.processor = None
 
@@ -26,7 +26,7 @@ class DSPFatal(DSPError):
             suffix += '\nThrown while processing entries ' + str(self.wf_range)
         if self.processor:
             suffix += '\nThrown by ' + self.processor
-        return super(DSPFatal, self).__str__() + suffix
+        return super().__str__() + suffix
 
 class ProcessingChainError(DSPError):
     """Error thrown when there is a problem setting up a processing chain"""

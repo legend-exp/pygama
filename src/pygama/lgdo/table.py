@@ -1,4 +1,5 @@
 import pandas as pd
+
 from .struct import Struct
 
 
@@ -10,7 +11,7 @@ class Table(Struct):
     table I/O using functions like push_row(), is_full(), and clear()
 
     Note: if you write to a table and don't fill it up to its total size, be
-    sure to resize it before passing to data processing fucntions, as they will
+    sure to resize it before passing to data processing functions, as they will
     call len(table) to access valid data, which returns table.size.
     """
     # TODO: overload getattr to allow access to fields as object attributes?
@@ -44,7 +45,7 @@ class Table(Struct):
         # if col_dict is not empty, set size according to it
         # if size is also supplied, resize all fields to match it
         # otherwise, warn if the supplied fields have varying size
-        if len(col_dict) > 0: 
+        if len(col_dict) > 0:
             do_warn = True if size is None else False
             self.resize(new_size=size, do_warn=do_warn)
 
@@ -55,7 +56,7 @@ class Table(Struct):
         self.loc = 0
 
 
-    def datatype_name(self): 
+    def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
         return 'table'
 
@@ -71,7 +72,7 @@ class Table(Struct):
             if new_size is None: new_size = len(obj)
             elif len(obj) != new_size:
                 if do_warn:
-                    print('warning: resizing field', field, 
+                    print('warning: resizing field', field,
                           'with size', len(obj), '!=', new_size)
                 if isinstance(obj, Table): obj.resize(new_size, do_warn)
                 else: obj.resize(new_size)
@@ -169,7 +170,7 @@ class Table(Struct):
         """
         df = pd.DataFrame(copy=copy)
         if cols is None: cols = self.keys()
-        for col in cols: 
+        for col in cols:
             if not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')
             else: df[col] = self[col].nda

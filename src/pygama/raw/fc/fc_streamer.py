@@ -1,12 +1,16 @@
 import os
+
+import fcutils
 import numpy as np
+
 from pygama import lgdo
-from ..raw_buffer import *
+
 from ..data_streamer import DataStreamer
+from ..raw_buffer import *
 from .fc_config_decoder import FCConfigDecoder
 from .fc_event_decoder import FCEventDecoder
 from .fc_status_decoder import FCStatusDecoder
-import fcutils
+
 
 class FCStreamer(DataStreamer):
     """
@@ -39,14 +43,14 @@ class FCStreamer(DataStreamer):
         Parameters
         ----------
         fcio_filename : str
-            the FCIO filename 
+            the FCIO filename
         rb_lib : RawBufferLibrary
             library of buffers for this stream
         buffer_size : int
             length of tables to be read out in read_chunk
         verbosity : int
             verbosity level for the initialize function
- 
+
         Returns
         -------
         header_data : list(RawBuffer)
@@ -78,7 +82,7 @@ class FCStreamer(DataStreamer):
         self.packet_id = 0 # for storing packet order in output tables
         #self.max_numtraces = 0 # for checking that the tables are large enough
 
-        if 'FCConfigDecoder' in rb_lib: 
+        if 'FCConfigDecoder' in rb_lib:
             config_rb_list = rb_lib['FCConfigDecoder']
             if len(config_rb_list) != 1:
                 print(f'warning! config_rb_list had length {len(config_rb_list)}, ignoring all but the first')
@@ -119,7 +123,7 @@ class FCStreamer(DataStreamer):
         elif rc == 5: # recevent
             print(f'warning: got a RecEvent packet -- skipping?')
             print(f'         n_bytes_read = {self.n_bytes_read}')
-            # sizeof(fcio_recevent): (6 + 3*10 + 1*2304 + 3*4000)*4 
+            # sizeof(fcio_recevent): (6 + 3*10 + 1*2304 + 3*4000)*4
             self.n_bytes_read += 57360
             return True
 
@@ -144,4 +148,3 @@ class FCStreamer(DataStreamer):
             # sizeof(fcio_event): (5 + 3*10 + 1)*4 + numtraces*(1 + nsamples+2)*2
             self.n_bytes_read += 144 + self.fcio.numtraces*(self.fcio.nsamples + 3)*2
             return True
-

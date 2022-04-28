@@ -1,17 +1,18 @@
 import numpy as np
 
-from .orcadaq import OrcaDecoder, get_ccc, get_readout_info, get_auxhw_info
 from .fcdaq import FlashCamEventDecoder
+from .orcadaq import OrcaDecoder, get_auxhw_info, get_ccc, get_readout_info
+
 
 class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
     '''
     Decoder for FlashCam listener config written by ORCA
     '''
     def __init__(self, *args, **kwargs):
-        
+
         self.decoder_name    = 'ORFlashCamListenerConfigDecoder'
         self.orca_class_name = 'ORFlashCamListenerModel'
-        
+
         # up through ch_inputnum, these are in order of the fcio data format
         # for similicity.  append any additional values after this.
         self.decoded_values = {
@@ -37,7 +38,7 @@ class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
                               'array_of_equalsized_arrays<1,1>{real}',
                               'length': 2400, },
             }
-        
+
         super().__init__(args, kwargs)
 
 
@@ -48,17 +49,17 @@ class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
     def max_n_rows_per_packet(self):
         return 1
 
-    
+
     def decode_packet(self, packet, lh5_tables,
                       packet_id, header_dict, verbose=False):
-        
+
         data = np.frombuffer(packet, dtype=np.int32)
         tbl  = lh5_tables
         ii   = tbl.loc
 
         tbl['readout_id'].nda[ii]  = (data[0] & 0xffff0000) >> 16
         tbl['listener_id'].nda[ii] =  data[0] & 0x0000ffff
-        
+
         for i,k in enumerate(self.decoded_values):
             if i < 2: continue
             tbl[k].nda[ii] = data[i-1]
@@ -72,7 +73,7 @@ class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
 
         tbl.push_row()
 
-        
+
 class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     '''
     Decoder for FlashCam status packets written by ORCA
@@ -141,7 +142,7 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
             'card_link_errors': {
                 'dtype':        'uint32',
                 'datatype':     'array<1>{array<1>{real}}',
-                'length_guess':  self.nCards, },        
+                'length_guess':  self.nCards, },
             'card_other_errors': {
                 'dtype':        'uint32',
                 'datatype':     'array<1>{array<1>{real}}',
@@ -184,7 +185,7 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
         # arrays to temporarily store card-level decoded data
         self.cdata = {}
         self.resize_card_data(ncards=self.nCards)
-            
+
         super().__init__(args, kwargs)
 
 
@@ -222,18 +223,18 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
         # set nCards to allow for not calling this function during decoding
         self.nCards = ncards
 
-        
+
     def get_decoded_values(self, channel=None):
         return self.decoded_values
 
-    
+
     def max_n_rows_per_packet(self):
         return 1
 
-    
+
     def decode_packet(self, packet, lh5_tables,
                       packet_id, header_dict, verbose=False):
-        
+
         data = np.frombuffer(packet, dtype=np.uint32)
         tbl  = lh5_tables
         ii   = tbl.loc
@@ -287,16 +288,16 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
         # populate the card level data with the flattened local data, then push
         for key in self.cdata:
             tbl[key].set_vector(ii, self.cdata[key].flatten())
-            
+
         tbl.push_row()
-        
+
 
 class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
     """
     Decoder for FlashCam ADC data written by ORCA
     """
     def __init__(self, *args, **kwargs):
-        
+
         self.decoder_name    = 'ORFlashCamADCWaveformDecoder'
         self.orca_class_name = 'ORFlashCamADCModel'
 
@@ -308,7 +309,7 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
             'fcio_id':  { 'dtype': 'uint16', }  }
         fc = FlashCamEventDecoder()
         self.decoded_values_template.update(fc.decoded_values)
-        
+
         super().__init__(*args, **kwargs)
         self.decoded_values = {}
         self.skipped_channels = {}
@@ -332,13 +333,13 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
 
     def set_object_info(self, object_info):
         self.object_info = object_info
-        
+
         # get the readout list for looking up the waveform length.
         # catch AttributeError for when the header_dict is not yet set.
         roi = []
         try: roi=get_readout_info(self.header_dict, 'ORFlashCamListenerModel')
         except AttributeError: pass
-        
+
         for card_dict in self.object_info:
             crate   = card_dict['Crate']
             card    = card_dict['Card']
@@ -369,7 +370,7 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
                 if samples > 0:
                     self.decoded_values[ccc]['waveform']['length'] = samples
 
-                    
+
     def decode_packet(self, packet, lh5_tables,
                       packet_id, header_dict, verbose=False):
 
