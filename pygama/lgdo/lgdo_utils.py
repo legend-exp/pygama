@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def get_element_type(obj):
     """Get the lgdo element type of a scalar or array
 
@@ -25,7 +24,7 @@ def get_element_type(obj):
     # the rest use dtypes
     dt = obj.dtype if hasattr(obj, 'dtype') else np.dtype(type(obj))
     kind = dt.kind
-
+    
     if kind == 'b': return 'bool'
     if kind == 'V': return 'blob'
     if kind in ['i', 'u', 'f']: return 'real'
@@ -64,8 +63,10 @@ def parse_datatype(datatype):
     # for other datatypes, need to parse the datatype string
     from parse import parse
     datatype, element_description = parse('{}{{{}}}', datatype)
-    if datatype.endswith('>'):
+    if datatype.endswith('>'): 
         datatype, dims = parse('{}<{}>', datatype)
         dims = [int(i) for i in dims.split(',')]
         return datatype, tuple(dims), element_description
     else: return datatype, None, element_description.split(',')
+
+

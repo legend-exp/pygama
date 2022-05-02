@@ -1,8 +1,7 @@
 import numpy as np
-
+from .table import Table
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from .table import Table
 from .vectorofvectors import VectorOfVectors
 
 
@@ -88,18 +87,30 @@ class WaveformTable(Table):
         if dt_units is not None: dt.attrs['units'] = f'{dt_units}'
 
         if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(values, VectorOfVectors):
-            if isinstance(values, np.ndarray): wf_len = values.shape[1]
-            if wf_len is None: # VectorOfVectors
-                shape_guess = (size, 100)
-                if dtype is None: dtype = np.float64
-                values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
-            else: # ArrayOfEqualSizedArrays
-                shape = (size, wf_len)
-                if dtype is None:
-                    dtype = values.dtype if hasattr(values, 'dtype') else np.float64
-                nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
-                if nda.shape != shape: nda.resize(shape)
-                values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
+            if isinstance(values, np.ndarray): 
+                try:
+                    wf_len = values.shape[1]
+                except:
+                    wf_len = None
+                if wf_len is None: # VectorOfVectors
+                    shape_guess = (size, 100)
+                    if dtype is None: dtype = np.dtype(np.float64)
+                    if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
+                    else: 
+                        flattened_data = values.flatten()
+                        length = 0
+                        cumulative_length = []
+                        for i in range(size):
+                            length += len(values[i])
+                            cumulative_length.append(length)
+                        values = VectorOfVectors(flattened_data=flattened_data, cumulative_length=cumulative_length, dtype=dtype)
+                else: # ArrayOfEqualSizedArrays
+                    shape = (size, wf_len)
+                    if dtype is None:
+                        dtype = values.dtype if hasattr(values, 'dtype') else np.dtype(np.float64)
+                    nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
+                    if nda.shape != shape: nda.resize(shape)
+                    values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
         if values_units is not None: values.attrs['units'] = f'{values_units}'
 
         col_dict = {}
@@ -120,7 +131,7 @@ class WaveformTable(Table):
     @property
     def wf_len(self):
         return self.values.nda.shape[1]
-
+    
     @property
     def t0(self):
         return self['t0']
