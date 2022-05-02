@@ -1,7 +1,8 @@
 import numpy as np
-from .table import Table
+
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .table import Table
 from .vectorofvectors import VectorOfVectors
 
 
@@ -87,7 +88,7 @@ class WaveformTable(Table):
         if dt_units is not None: dt.attrs['units'] = f'{dt_units}'
 
         if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(values, VectorOfVectors):
-            if isinstance(values, np.ndarray): 
+            if isinstance(values, np.ndarray):
                 try:
                     wf_len = values.shape[1]
                 except:
@@ -96,7 +97,7 @@ class WaveformTable(Table):
                     shape_guess = (size, 100)
                     if dtype is None: dtype = np.dtype(np.float64)
                     if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
-                    else: 
+                    else:
                         flattened_data = np.concatenate(values)
                         length = 0
                         cumulative_length = []
@@ -131,7 +132,7 @@ class WaveformTable(Table):
     @property
     def wf_len(self):
         return self.values.nda.shape[1]
-    
+
     @property
     def t0(self):
         return self['t0']

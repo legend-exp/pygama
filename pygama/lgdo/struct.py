@@ -49,7 +49,7 @@ class Struct(dict):
         self.update_datatype()
 
 
-    def __len__(self): 
+    def __len__(self):
         """Structs are considered length=1 """
         return 1
 
@@ -61,5 +61,5 @@ class Struct(dict):
         if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
         return string
 
-    def __repr__(self): 
+    def __repr__(self):
         return str(self)

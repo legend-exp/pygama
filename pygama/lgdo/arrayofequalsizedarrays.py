@@ -1,5 +1,6 @@
-from .lgdo_utils import *
 from .array import Array
+from .lgdo_utils import *
+
 
 class ArrayOfEqualSizedArrays(Array):
     """
@@ -14,14 +15,14 @@ class ArrayOfEqualSizedArrays(Array):
 
 
     def __init__(self, dims=None, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
-        """ 
+        """
         Parameters
         ----------
         dims : tuple of ints (optional)
             specifies the dimensions required for building the
             ArrayOfEqualSizedArrays' datatype attribute
 
-        See Array.__init__ for optional args 
+        See Array.__init__ for optional args
         """
         self.dims = dims
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
