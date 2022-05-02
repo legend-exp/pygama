@@ -154,7 +154,7 @@ class Table(Struct):
     def get_dataframe(self, cols=None, copy=False):
         """Get a pandas dataframe from the data in the table.
 
-        Note: the requested data must be array-like, with the nda attribute.
+        Note: the requested data must be array-like, with the nda attribute, or a VectorOfVectors.
 
         Parameters
         ----------
@@ -173,10 +173,6 @@ class Table(Struct):
         if cols is None: cols = self.keys()
         for col in cols: 
             if isinstance(self[col], VectorOfVectors):
-                df[col] = self[col].tolist()
-            elif isinstance(self[col], list):
-                df[col] = self[col]
-            elif isinstance(self[col], np.ndarray):
                 df[col] = self[col].tolist()
             elif not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')

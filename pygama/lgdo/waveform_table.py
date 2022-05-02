@@ -97,7 +97,7 @@ class WaveformTable(Table):
                     if dtype is None: dtype = np.dtype(np.float64)
                     if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
                     else: 
-                        flattened_data = values.flatten()
+                        flattened_data = np.concatenate(values)
                         length = 0
                         cumulative_length = []
                         for i in range(size):
