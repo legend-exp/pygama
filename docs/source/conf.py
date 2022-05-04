@@ -1,9 +1,9 @@
 # Configuration file for the Sphinx documentation builder.
 
-import pathlib
+from pathlib import Path
 import sys
 
-sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
+sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
 copyright = '2020, the LEGEND Collaboration'
