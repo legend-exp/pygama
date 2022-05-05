@@ -687,8 +687,6 @@ def ls(lh5_file, lh5_group=''):
         name of file
     lh5_group : str
         group to search
-    lh5_st : LH5Store
-        lh5_st object to use for searching
 
     Returns
     -------

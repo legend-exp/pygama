@@ -21,15 +21,17 @@ def pole_zero(w_in, t_tau, w_out):
     w_out: array-like
            The pole-zero cancelled waveform
 
-    Processing Chain Example
-    ------------------------
-    "wf_pz": {
-        "function": "pole_zero",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "400*us", "wf_pz"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_pz": {
+            "function": "pole_zero",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "400*us", "wf_pz"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"]
+        }
     """
     w_out[:] = np.nan
 
@@ -62,15 +64,17 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
     w_out : array-like
             The pole-zero cancelled waveform
 
-    Processing Chain Example
-    ------------------------
-    "wf_pz": {
-        "function": "double_pole_zero",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "400*us", "20*us", "0.02", "wf_pz"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_pz": {
+            "function": "double_pole_zero",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "400*us", "20*us", "0.02", "wf_pz"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"]
+        }
     """
     w_out[:] = np.nan
 

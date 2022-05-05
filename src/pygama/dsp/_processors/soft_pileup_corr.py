@@ -25,15 +25,17 @@ def soft_pileup_corr(w_in, n_in, tau_in, w_out):
     w_out : array-like
             The output waveform with the exponential subtracted
 
-    Processing Chain Example
-    ------------------------
-    "wf_bl": {
-        "function": "soft_pileup_corr",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "1000", "500*us", "wf_bl"],
-        "unit": "ADC",
-        "prereqs": ["waveform"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_bl": {
+            "function": "soft_pileup_corr",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "1000", "500*us", "wf_bl"],
+            "unit": "ADC",
+            "prereqs": ["waveform"]
+        }
     """
     w_out[:] = np.nan
 
@@ -88,15 +90,17 @@ def soft_pileup_corr_bl(w_in, n_in, tau_in, B_in, w_out):
     w_out : array-like
             The output waveform with the exponential subtracted
 
-    Processing Chain Example
-    ------------------------
-    "wf_bl": {
-        "function": "soft_pileup_corr_bl",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "1000", "500*us", "baseline", "wf_bl"],
-        "unit": "ADC",
-        "prereqs": ["waveform", "baseline"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_bl": {
+            "function": "soft_pileup_corr_bl",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "1000", "500*us", "baseline", "wf_bl"],
+            "unit": "ADC",
+            "prereqs": ["waveform", "baseline"]
+        }
     """
     w_out[:] = np.nan
 

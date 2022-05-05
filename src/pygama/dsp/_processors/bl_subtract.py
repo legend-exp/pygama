@@ -20,15 +20,17 @@ def bl_subtract(w_in, a_baseline, w_out):
     w_out: array-like
            The output waveform with the baseline subtracted
 
-    Processing Chain Example
-    ------------------------
-    "wf_bl": {
-        "function": "bl_subtract",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "baseline", "wf_bl"],
-        "unit": "ADC",
-        "prereqs": ["waveform", "baseline"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_bl": {
+            "function": "bl_subtract",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "baseline", "wf_bl"],
+            "unit": "ADC",
+            "prereqs": ["waveform", "baseline"]
+        }
     """
     w_out[:] = np.nan
 

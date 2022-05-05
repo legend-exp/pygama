@@ -21,15 +21,17 @@ def fixed_time_pickoff(w_in, t_in, a_out):
     a_out: float
            The output pick-off value
 
-    Processing Chain Example
-    ------------------------
-    "trapEftp": {
-        "function": "fixed_time_pickoff",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_trap", "tp_0+10*us", "trapEftp"],
-        "unit": "ADC",
-        "prereqs": ["wf_trap", "tp_0"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "trapEftp": {
+            "function": "fixed_time_pickoff",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_trap", "tp_0+10*us", "trapEftp"],
+            "unit": "ADC",
+            "prereqs": ["wf_trap", "tp_0"]
+        }
     """
     a_out[0] = np.nan
 

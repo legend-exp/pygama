@@ -24,15 +24,17 @@ def saturation(w_in, bit_depth_in, n_lo_out, n_hi_out):
     n_hi_out    : int
                   The output number of samples at the maximum
 
-    Processing Chain Example
-    ------------------------
-    "sat_lo, sat_hi": {
-        "function": "saturation",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "16", "sat_lo", "sat_hi"],
-        "unit": "ADC",
-        "prereqs": ["waveform"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "sat_lo, sat_hi": {
+            "function": "saturation",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "16", "sat_lo", "sat_hi"],
+            "unit": "ADC",
+            "prereqs": ["waveform"]
+        }
     """
     n_lo_out[0] = np.nan
     n_hi_out[0] = np.nan

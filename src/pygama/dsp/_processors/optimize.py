@@ -51,15 +51,17 @@ def optimize_1pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, val0_out):
     val0_out     : float
                    The output value of the best-fit time constant
 
-    Processing Chain Example
-    ------------------------
-    "tau0": {
-        "function": "optimize_1pz",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "baseline", "0", "20*us", "500*us", "tau0"],
-        "prereqs": ["waveform", "baseline"],
-        "unit": "us"
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "tau0": {
+            "function": "optimize_1pz",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "baseline", "0", "20*us", "500*us", "tau0"],
+            "prereqs": ["waveform", "baseline"],
+            "unit": "us"
+        }
     """
     val0_out[0] = np.nan
 
@@ -115,15 +117,17 @@ def optimize_2pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, p1_in, p2_in, v
     val2_out     : float
                    The output value of the best-fit fraction
 
-    Processing Chain Example
-    ------------------------
-    "tau1, tau2, frac": {
-        "function": "optimize_2pz",
-        "module": "pygama.dsp.processors",
-        "args": ["waveform", "baseline", "0", "20*us", "500*us", "20*us", "0.02", "tau1", "tau2", "frac"],
-        "prereqs": ["waveform", "baseline"],
-        "unit": "us"
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "tau1, tau2, frac": {
+            "function": "optimize_2pz",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "baseline", "0", "20*us", "500*us", "20*us", "0.02", "tau1", "tau2", "frac"],
+            "prereqs": ["waveform", "baseline"],
+            "unit": "us"
+        }
     """
     val0_out[0] = np.nan
     val1_out[0] = np.nan

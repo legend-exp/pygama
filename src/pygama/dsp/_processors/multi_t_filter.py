@@ -2,6 +2,7 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp._processors.time_point_thresh import time_point_thresh
+from pygama.dsp.errors import DSPFatal
 
 
 @guvectorize(["void(float32[:],float32[:],float32[:])",
@@ -77,13 +78,9 @@ def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
         The array of max positions for each wf
     vt_mins_in : array-like
         The array of min positions for each wf
-
-    Returns
-    -------
     t_out : array-like
-        Array of fixed length (padded with nans) that hold the indices of
+        Output array of fixed length (padded with nans) that hold the indices of
         the identified initial rise times of peaks in the signal
-
     """
 
     # initialize arrays, padded with the elements we want

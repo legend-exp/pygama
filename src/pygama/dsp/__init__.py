@@ -19,4 +19,4 @@ main contents of this submodule are:
 """
 
 from .build_dsp import build_dsp
-from .processing_chain import (ProcessingChain, build_processing_chain)
+from .processing_chain import ProcessingChain, build_processing_chain

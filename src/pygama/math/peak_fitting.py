@@ -60,8 +60,10 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     fixed: list of parameter indices to fix
 
     Returns
-    ------
-    coeff, error cov_matrix : tuple(array, array, matrix)
+    -------
+    coeff : array
+    error : array
+    cov_matrix : array
     """
 
 
@@ -283,8 +285,8 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     n_bins : int (optional)
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
-    poissonLL : bool (optional)
-        Flag passed to fit_hist()
+    cost_func : str (optional)
+        Passed to fit_binned()
     inflate_errors : bool (optional)
         If true, the parameter uncertainties are inflated by sqrt(chi2red)
         if it is greater than 1

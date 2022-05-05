@@ -21,16 +21,18 @@ def cusp_filter(length, sigma, flat, decay):
     decay : int
             The decay constant of the exponential to be convolved
 
-    Processing Chain Example
-    ------------------------
-    "wf_cusp": {
-        "function": "cusp_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "wf_cusp(101,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"],
-        "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_cusp": {
+            "function": "cusp_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "wf_cusp(101,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"],
+            "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"]
+        }
     """
     if length <= 0:
         raise DSPFatal('The length of the filter must be positive')
@@ -98,16 +100,18 @@ def zac_filter(length, sigma, flat, decay):
     decay : int
             The decay constant of the exponential to be convolved
 
-    Processing Chain Example
-    ------------------------
-    "wf_zac": {
-        "function": "zac_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "wf_zac(101,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"],
-        "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"],
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_zac": {
+            "function": "zac_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "wf_zac(101,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"],
+            "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"],
+        }
     """
     if length <= 0:
         raise DSPFatal('The length of the filter must be positive')
@@ -192,16 +196,18 @@ def t0_filter(rise, fall):
           The length of the fall section.  This is the simple averaging part
           of the filter.
 
-    Processing Chain Example
-    ------------------------
-    "wf_t0_filter": {
-        "function": "t0_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_pz", "wf_t0_filter(3748,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_pz"],
-        "init_args": ["128*ns", "2*us"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_t0_filter": {
+            "function": "t0_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", "wf_t0_filter(3748,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_pz"],
+            "init_args": ["128*ns", "2*us"]
+        }
     """
     if rise < 0:
         raise DSPFatal('The length of the rise section must be positive')

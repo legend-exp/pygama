@@ -6,25 +6,30 @@ from pygama.dsp.errors import DSPFatal
 
 
 def wiener_filter(file_name_array):
-    """
-    Apply a wiener filter to the waveform.  Note that this convolution is performed in the frequency domain
+    """Apply a wiener filter to the waveform.
+
+    Note that this convolution is performed in the frequency domain
 
     Parameters
     ----------
     file_name_array : string
-            Array with path to an lh5 file containing the time domain version of the superpulse in one column and noise waveform in another,
-            the superpulse group must be titled 'spms/processed/superpulse' and the noise waveform must be called 'spms/processed/noise_wf'
+            Array with path to an lh5 file containing the time domain version
+            of the superpulse in one column and noise waveform in another,
+            the superpulse group must be titled 'spms/processed/superpulse' and
+            the noise waveform must be called 'spms/processed/noise_wf'
 
-    Processing Chain Example
-    ------------------------
-    "wf_wiener": {
-        "function": "wiener_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl_fft", "wf_wiener(2000,f)"],
-        "unit": "dB",
-        "prereqs": ["wf_bl_fft"],
-        "init_args": ["/path/to/file/wiener.lh5"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_wiener": {
+            "function": "wiener_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl_fft", "wf_wiener(2000,f)"],
+            "unit": "dB",
+            "prereqs": ["wf_bl_fft"],
+            "init_args": ["/path/to/file/wiener.lh5"]
+        }
     """
 
     sto = lh5.LH5Store()

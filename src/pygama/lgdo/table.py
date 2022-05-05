@@ -36,8 +36,6 @@ class Table(Struct):
         attrs : dict (optional)
             A set of user attributes to be carried along with this lgdo
 
-        Initialization
-        --------------
         self.loc is initialized to 0
         """
         super().__init__(obj_dict=col_dict, attrs=attrs)

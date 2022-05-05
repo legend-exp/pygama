@@ -496,8 +496,8 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
         variances in the mus
     Es_keV : array
         energies to fit to, in keV
-    k
-        hpge_fit_E_scale)
+    E_scale_pars : array
+        ???
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit

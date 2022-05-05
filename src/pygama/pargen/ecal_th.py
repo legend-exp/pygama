@@ -10,10 +10,9 @@ import scipy.stats
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
-import pygama.pargen.energy_cal as cal
-
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
+import pygama.pargen.energy_cal as cal
 
 
 def fwhm_slope(x, m0, m1):

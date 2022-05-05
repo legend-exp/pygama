@@ -67,9 +67,9 @@ class WaveformBrowser:
             line colors and other style parameters to cycle through when
             drawing waveforms. Can be given as:
 
-            - dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
-            - name of predefined style; see matplotlib.style documentation
-            - None: use current matplotlib rcparams style
+              - dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
+              - name of predefined style; see matplotlib.style documentation
+              - None: use current matplotlib rcparams style
 
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
@@ -90,10 +90,10 @@ class WaveformBrowser:
         x_lim : tuple-pair of float, pint.Quantity or str (default auto)
             range of x-values and units passes as tuple.
 
-            - None: Get range from first waveform drawn
-            - pint.Quantity: set value and x-unit
-            - float: get unit from first waveform drawn
-            - str: convert to pint.Quanity (e.g. ('0*us', '10*us'))
+              - None: Get range from first waveform drawn
+              - pint.Quantity: set value and x-unit
+              - float: get unit from first waveform drawn
+              - str: convert to pint.Quanity (e.g. ('0*us', '10*us'))
 
         x_unit : pint.Unit or str (default auto)
             unit of x-axis
@@ -103,8 +103,10 @@ class WaveformBrowser:
         align : str (default None)
             name of parameter to use for x-offset; useful, e.g., for aligning
             multiple waveforms at a particular timepoint
-        buffer_len (default 16): number of waveforms to keep in memory at a time
-        block_width (default 16): block width for processing chain
+        buffer_len : int (default 16)
+            number of waveforms to keep in memory at a time
+        block_width : int (default 16)
+            block width for processing chain
         """
         self.verbosity = verbosity
 
