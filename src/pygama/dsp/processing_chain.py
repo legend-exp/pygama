@@ -269,13 +269,12 @@ class ProcessingChain:
         """
         Parameters
         ----------
-
-        block_width: int
+        block_width : int
             number of entries to simultaneously process.
-        buffer_len: int
+        buffer_len : int
             length of input and output buffers. Should be a multiple of
             block_width
-        verbosity: int
+        verbosity : int
             integer indicating the verbosity level. 0: Print nothing (except
             errors...); 1: Print basic warnings (default); 2: Print basic debug
             info
@@ -1140,7 +1139,8 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     lh5_in : lgdo.Table
         HDF5 table from which raw data is read. At least one row of entries
         should be read in prior to calling this!
-    dsp_config: dict or str
+
+    dsp_config : dict or str
         A dict or json filename containing the recipes for computing DSP
         parameter from raw parameters. The format is as follows: ::
 
@@ -1173,19 +1173,22 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                }
             }
 
-    outputs: [str, ...], optional
+    outputs : [str, ...], optional
         List of parameters to put in the output lh5 table. If None,
         use the parameters in the 'outputs' list from config
-    db_dict: dict, optional
+
+    db_dict : dict, optional
         A nested dict pointing to values for db args. e.g. if a processor
         uses arg db.trap.risetime, it will look up db_dict['trap']['risetime']
         and use the found value. If no value is found, use the default
         defined in the config file.
+
     verbosity : int, optional
         0: Print nothing (except errors...)
         1: Print basic warnings (default)
         2: Print basic debug info
         3: Print friggin' everything!
+
     block_width : int, optional
         number of entries to process at once. To optimize performance,
         a multiple of 16 is preferred, but if performance is not an issue

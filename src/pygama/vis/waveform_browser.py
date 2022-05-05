@@ -37,32 +37,41 @@ class WaveformBrowser:
         """
         Parameters
         ----------
-        file_in : str
+        files_in : str
             name of file or list of names to browse. Can use wildcards
+
         lh5_group : str
             name of LH5 group in file to browse
+
         base_path : str
             base path for file. See LH5Store
+
         entry_list : list-like or nested list-like (optional)
             List of event indices to draw. If it is a nested list, use local
             indices for each file, otherwise use global indices
+
         entry_mask : array-like or list of array-likes (optional)
             Boolean mask indicating which events to draw. If a nested list, use
             a mask for each file, else use a global mask. Cannot be used with
             entry_list...
+
         dsp_config : str (optional)
             name of DSP config json file containing a list of processors that
             can be applied to waveforms
+
         database : str or dict-like (optional)
             dict or JSON file with database of processing parameters
+
         aux_values : pandas dataframe (optional)
             table of auxiliary values that are one-to-one with the input
             waveforms that can be drawn or placed in the legend
+
         lines : str or [strs] (default 'waveform')
             name(s) of objects to draw 2D lines for. Waveforms will be drawn
             as a time-series. Scalar quantities will be drawn as horizontal
             or vertical lines, depending on units. Vectors will be drawn
             as multiple horizontal/vertical lines
+
         styles : (default None)
             line colors and other style parameters to cycle through when
             drawing waveforms. Can be given as:
@@ -73,6 +82,7 @@ class WaveformBrowser:
 
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
+
         legend : str or [strs] (default None)
             Formatting string and values to include in the legend. This can
             be a list of values (one for each drawn object). If just a name
@@ -83,12 +93,15 @@ class WaveformBrowser:
 
             Names will be searched in the input file, DSP processed parameters,
             or auxiliary data-table
+
         legend_opts : dict (default None)
             dict containing additional kwargs for matplotlib.legend
+
         n_drawn : int (default 1)
             number of events to draw simultaneously when calling DrawNext
-        x_lim : tuple-pair of float, pint.Quantity or str (default auto)
-            range of x-values and units passes as tuple.
+
+        x_lim, y_lim : tuple-pair of float, pint.Quantity or str (default auto)
+            range of x- or y-values and units passes as tuple.
 
               - None: Get range from first waveform drawn
               - pint.Quantity: set value and x-unit
@@ -97,16 +110,23 @@ class WaveformBrowser:
 
         x_unit : pint.Unit or str (default auto)
             unit of x-axis
+
         norm : str (default None)
             name of parameter (probably energy) to use to normalize WFs
             useful when drawing multiple WFs
+
         align : str (default None)
             name of parameter to use for x-offset; useful, e.g., for aligning
             multiple waveforms at a particular timepoint
+
         buffer_len : int (default 16)
             number of waveforms to keep in memory at a time
+
         block_width : int (default 16)
             block width for processing chain
+
+        verbosity : bool
+            print debug messages
         """
         self.verbosity = verbosity
 
@@ -244,7 +264,7 @@ class WaveformBrowser:
 
     def save_figure(self, f_out, *args, **kwargs):
         """ Write figure to file named f_out. See matplotlib.pyplot.savefig
-        for args and kwargs """
+        for args and kwargs"""
         self.fig.savefig(f_out)
 
     def set_figure(self, fig, ax=None):

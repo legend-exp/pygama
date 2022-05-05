@@ -15,22 +15,33 @@ kwd = {"parallel": False, "fastmath": True}
 def fit_hist(func, hist, bins, var=None, guess=None,
              poissonLL=False, integral=None, method=None, bounds=None):
     """
-    DEPRECATED USE FIT_BINNED
+    .. deprecated:: 0.8
+        Replaced by :func:`.fit_binned`. Will be removed in future releases.
 
     do a binned fit to a histogram (nonlinear least squares).
     can either do a poisson log-likelihood fit (jason's favourite) or
     use curve_fit w/ an arbitrary function.
 
-    - hist, bins, var : as in return value of pygama.histograms.get_hist()
-    - guess : initial parameter guesses. Should be optional -- we can
-      auto-guess for many common functions. But not yet implemented.
-    - poissonLL : use Poisson stats instead of the Gaussian approximation in
-      each bin. Requires integer stats. You must use parameter bounds to make
-      sure that func does not go negative over the x-range of the histogram.
-    - method, bounds : options to pass to scipy.optimize.minimize
+    Parameters
+    ----------
+    func
+        function to be fitted
+    hist, bins, var
+        as in return value of pygama.histograms.get_hist()
+    guess
+        initial parameter guesses. Should be optional -- we can auto-guess for
+        many common functions. But not yet implemented.
+    poissonLL
+        use Poisson stats instead of the Gaussian approximation in each bin.
+        Requires integer stats. You must use parameter bounds to make sure that
+        func does not go negative over the x-range of the histogram.
+    integral
+        DOCME
+    method, bounds
+        options to pass to :func:`scipy.optimize.minimize`
 
     Returns
-    ------
+    -------
     coeff, cov_matrix : tuple(array, matrix)
     """
 
@@ -53,11 +64,11 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     func : the function to fit, if using LL as method needs to be a cdf
     hist, bins, var : histogrammed data
     guess : initial guess parameters
-    cost_func: cost function to use
-    Extended: run extended or non extended fit
-    simplex: whether to include a round of simpson minimisation before main minimisation
+    cost_func : cost function to use
+    Extended : run extended or non extended fit
+    simplex : whether to include a round of simpson minimisation before main minimisation
     bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-    fixed: list of parameter indices to fix
+    fixed : list of parameter indices to fix
 
     Returns
     -------
@@ -132,9 +143,6 @@ def fit_unbinned(func, data, guess=None,
     simplex : whether to include a round of simpson minimisation before main minimisation
     bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
     fixed : list of parameter indices to fix
-
-    Returns
-    ------
     coeff, cov_matrix : tuple(array, matrix)
     """
     if guess is None:
@@ -305,7 +313,6 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
           underlying function in the vicinity of the max is given by max /
           sigma^2
         - maximum : the estimated maximum value of the peak
-
     cov : 3x3 matrix of floats
         The covariance matrix for the 3 parameters in pars
     """
@@ -336,9 +343,9 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
     """Alias for gauss_mode_width_max that just returns the max and mode
 
-    Parameters
+    See Also
     --------
-    See gauss_mode_width_max
+    gauss_mode_width_max
 
     Returns
     -------
@@ -383,6 +390,8 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     n_bins : int
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
+    poissonLL
+        DOCME
 
     Returns
     -------
@@ -1015,7 +1024,7 @@ def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
 
      - two gaussian peaks (two lines)
      - one step
-     """
+    """
     bkg = n_bkg*step_pdf(x, mu1, sigma1, hstep, lower_range, upper_range)
     if np.any(bkg<0):
         return 0, np.zeros_like(x)
@@ -1034,7 +1043,7 @@ def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg
 
      - two gaussian peaks (two lines)
      - one step
-     """
+    """
 
     if components == False:
         pdf = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,

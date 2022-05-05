@@ -15,15 +15,15 @@ def soft_pileup_corr(w_in, n_in, tau_in, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    n_in  : int
-            The number of samples at the beginning of the waveform
-            to fit to an exponential
-    tau_in: float
-            The fixed, exponential time constant
+    w_in : array-like
+        The input waveform
+    n_in : int
+        The number of samples at the beginning of the waveform
+        to fit to an exponential
+    tau_in : float
+        The fixed, exponential time constant
     w_out : array-like
-            The output waveform with the exponential subtracted
+        The output waveform with the exponential subtracted
 
     Examples
     --------
@@ -78,17 +78,17 @@ def soft_pileup_corr_bl(w_in, n_in, tau_in, B_in, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    n_in  : int
-            The number of samples at the beginning of the waveform
-            to fit to an exponential
-    tau_in: float
-            The fixed, exponential time constant
-    B_in  : float
-            The fixed, exponential constant
+    w_in : array-like
+        The input waveform
+    n_in : int
+        The number of samples at the beginning of the waveform
+        to fit to an exponential
+    tau_in : float
+        The fixed, exponential time constant
+    B_in : float
+        The fixed, exponential constant
     w_out : array-like
-            The output waveform with the exponential subtracted
+        The output waveform with the exponential subtracted
 
     Examples
     --------

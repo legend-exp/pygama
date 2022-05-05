@@ -13,10 +13,10 @@ def wiener_filter(file_name_array):
     Parameters
     ----------
     file_name_array : string
-            Array with path to an lh5 file containing the time domain version
-            of the superpulse in one column and noise waveform in another,
-            the superpulse group must be titled 'spms/processed/superpulse' and
-            the noise waveform must be called 'spms/processed/noise_wf'
+        Array with path to an lh5 file containing the time domain version
+        of the superpulse in one column and noise waveform in another,
+        the superpulse group must be titled 'spms/processed/superpulse' and
+        the noise waveform must be called 'spms/processed/noise_wf'
 
     Examples
     --------
@@ -102,9 +102,9 @@ def wiener_filter(file_name_array):
         Parameters
         ----------
         fft_w_in : array-like
-               The fourier transform input waveform
-        fft_w_out: array-like
-               The filtered waveform, in the frequency domain
+            The fourier transform input waveform
+        fft_w_out : array-like
+            The filtered waveform, in the frequency domain
         """
         fft_w_out[:] = np.nan
 

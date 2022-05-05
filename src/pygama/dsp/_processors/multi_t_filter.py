@@ -26,7 +26,7 @@ def remove_duplicates(t_in, vt_min_in, t_out):
         The array of indices that we want to remove duplicates from
     vt_min_in : array-like
         List of indices of minima that we want to replace duplicates in t_out with
-    t_out: array-like
+    t_out : array-like
         The array we want to return that will have no duplicate indices in it
     """
     # initialize arrays
@@ -72,11 +72,11 @@ def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
     ----------
     w_in : array-like
         The array of data within which the list of tp0s will be found
-    a_threshold_in: scalar
+    a_threshold_in : scalar
         Threshold to search for using time_point_thresh
-    vt_maxs_in : array-like
+    vt_max_in : array-like
         The array of max positions for each wf
-    vt_mins_in : array-like
+    vt_min_in : array-like
         The array of min positions for each wf
     t_out : array-like
         Output array of fixed length (padded with nans) that hold the indices of

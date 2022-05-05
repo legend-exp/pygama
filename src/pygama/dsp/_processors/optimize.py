@@ -36,20 +36,20 @@ def optimize_1pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, val0_out):
 
     Parameters
     ----------
-    w_in         : array-like
-                   The input waveform
-    a_baseline_in: float
-                   The resting baseline
-    t_beg_in     : int
-                   The lower bound's index for the time range over
-                   which to optimize the pole-zero cancellation
-    t_end_in     : int
-                   The upper bound's index for the time range over
-                   which to optimize the pole-zero cancellation
-    p0_in        : float
-                   The initial guess of the optimal time constant
-    val0_out     : float
-                   The output value of the best-fit time constant
+    w_in : array-like
+        The input waveform
+    a_baseline_in : float
+        The resting baseline
+    t_beg_in : int
+        The lower bound's index for the time range over
+        which to optimize the pole-zero cancellation
+    t_end_in : int
+        The upper bound's index for the time range over
+        which to optimize the pole-zero cancellation
+    p0_in : float
+        The initial guess of the optimal time constant
+    val0_out : float
+        The output value of the best-fit time constant
 
     Examples
     --------
@@ -94,28 +94,28 @@ def optimize_2pz(w_in, a_baseline_in, t_beg_in, t_end_in, p0_in, p1_in, p2_in, v
 
     Parameters
     ----------
-    w_in         : array-like
-                   The input waveform
-    a_baseline_in: float
-                   The resting baseline
-    t_beg_in     : int
-                   The lower bound's index for the time range over
-                   which to optimize the pole-zero cancellation
-    t_end_in     : int
-                   The upper bound's index for the time range over
-                   which to optimize the pole-zero cancellation
-    p0_in        : float
-                   The initial guess of the optimal, longer time constant
-    p1_in        : float
-                   The initial guess of the optimal, shorter time constant
-    p2_in        : float
-                   The initial guess of the optimal fraction
-    val0_out     : float
-                   The output value of the best-fit, longer time constant
-    val1_out     : float
-                   The output value of the best-fit, shorter time constant
-    val2_out     : float
-                   The output value of the best-fit fraction
+    w_in : array-like
+        The input waveform
+    a_baseline_in : float
+        The resting baseline
+    t_beg_in : int
+        The lower bound's index for the time range over
+        which to optimize the pole-zero cancellation
+    t_end_in : int
+        The upper bound's index for the time range over
+        which to optimize the pole-zero cancellation
+    p0_in : float
+        The initial guess of the optimal, longer time constant
+    p1_in : float
+        The initial guess of the optimal, shorter time constant
+    p2_in : float
+        The initial guess of the optimal fraction
+    val0_out : float
+        The output value of the best-fit, longer time constant
+    val1_out : float
+        The output value of the best-fit, shorter time constant
+    val2_out : float
+        The output value of the best-fit fraction
 
     Examples
     --------

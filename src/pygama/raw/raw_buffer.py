@@ -175,8 +175,8 @@ class RawBufferList(list):
         values : list
             The list of values of RawBuffer.attribute
 
-        Example
-        -------
+        Examples
+        --------
         >>> output_file_list = rbl.get_list_of('out_stream')
         """
         values = []
@@ -264,14 +264,16 @@ class RawBufferLibrary(dict):
         ----------
         attribute : str
             The RawBuffer attribute queried to make the list
+        unique : bool
+            Remove duplicates
 
         Returns
         -------
         values : list
             The list of values of RawBuffer.attribute
 
-        Example
-        -------
+        Examples
+        --------
         >>> output_file_list = rbl.get_list_of('out_stream')
         """
         values = []
@@ -348,6 +350,10 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     lh5_store : LH5Store or None
         Allows user to send in a store holding a collection of already open
         files (saves some time opening / closing files)
+    wo_mode : str
+        write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
+    verbosity : bool
+        print debug messages
     """
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:

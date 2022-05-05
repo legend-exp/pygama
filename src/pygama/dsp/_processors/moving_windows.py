@@ -13,12 +13,12 @@ def moving_window_left(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
     Examples
     --------
@@ -58,12 +58,12 @@ def moving_window_right(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
     Examples
     --------
@@ -104,14 +104,14 @@ def moving_window_multi(w_in, length, num_mw, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
-    num_mw: int
-            The number of moving windows
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
+    num_mw : int
+        The number of moving windows
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
     Examples
     --------
@@ -168,12 +168,12 @@ def avg_current(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The output derivative
+        The output derivative
 
     Examples
     --------

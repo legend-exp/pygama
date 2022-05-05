@@ -52,12 +52,14 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
     Uses tqdm.trange which wraps around the python range and also has the option
     to display a progress
 
-    Example:
+    For example:
+    .. code-block :: python
 
         for start_row in range(0, tot_n_rows, buffer_len):
             ...
 
-            Can be converted to the following
+    Can be converted to the following
+    .. code-block :: python
 
         for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
             ...
@@ -76,6 +78,8 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
         text to display in front of the progress bar
     bar_length : str
         horizontal length of the bar in cursor spaces
+    unit : str
+        physical units to be displayed
 
     Returns
     -------

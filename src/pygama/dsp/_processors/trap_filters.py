@@ -14,13 +14,13 @@ def trap_filter(w_in, rise, flat, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
+        The input waveform
     rise : int
-           The number of samples averaged in the rise and fall sections
+        The number of samples averaged in the rise and fall sections
     flat : int
-           The delay between the rise and fall sections
-    w_out: array-like
-           The filtered waveform
+        The delay between the rise and fall sections
+    w_out : array-like
+        The filtered waveform
 
     Examples
     --------
@@ -69,13 +69,13 @@ def trap_norm(w_in, rise, flat, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
+        The input waveform
     rise : int
-           The number of samples averaged in the rise and fall sections
+        The number of samples averaged in the rise and fall sections
     flat : int
-           The delay between the rise and fall sections
-    w_out: array-like
-           The normalized, filtered waveform
+        The delay between the rise and fall sections
+    w_out : array-like
+        The normalized, filtered waveform
 
     Examples
     --------
@@ -124,15 +124,15 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
+        The input waveform
     rise : int
-           The number of samples averaged in the rise section
+        The number of samples averaged in the rise section
     flat : int
-           The delay between the rise and fall sections
+        The delay between the rise and fall sections
     fall : int
-           The number of samples averaged in the fall section
-    w_out: array-like
-           The normalized, filtered waveform
+        The number of samples averaged in the fall section
+    w_out : array-like
+        The normalized, filtered waveform
 
     Examples
     --------
@@ -184,16 +184,16 @@ def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
 
     Parameters
     ----------
-    w_in     : array-like
-               The input waveform
-    rise     : int
-               The number of samples averaged in the rise and fall sections
-    flat     : int
-               The delay between the rise and fall sections
-    t_pickoff: float
-               The waveform index to pick off
-    a_out    : float
-               The output pick-off value of the filtered waveform
+    w_in : array-like
+        The input waveform
+    rise : int
+        The number of samples averaged in the rise and fall sections
+    flat : int
+        The delay between the rise and fall sections
+    t_pickoff : float
+        The waveform index to pick off
+    a_out : float
+        The output pick-off value of the filtered waveform
 
     Examples
     --------

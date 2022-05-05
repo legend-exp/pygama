@@ -35,7 +35,7 @@ class Array:
         dtype : numpy dtype (optional)
             Specifies the type of the data in the array. Required if nda is
             None, otherwise unused.
-        fill_val: scalar or None
+        fill_val : scalar or None
             If None, memory is allocated without initialization. Otherwise, the
             array is allocated with all elements set to the corresponding fill
             value. If nda is not None, this parameter is ignored

@@ -8,6 +8,7 @@ class FCEventDecoder(DataDecoder):
     """
     def __init__(self, *args, **kwargs):
         """
+        DOCME
         """
         # these are read for every event (decode_event)
         self.decoded_values = {
@@ -160,7 +161,7 @@ class FCEventDecoder(DataDecoder):
         fcio : fcio reader object
             The interface to the fcio data. Enters this function after a call to
             fcio.get_record() so that data for packet_id ready to be read out
-        lgdo_tables : lgdo.Table or dict
+        evt_rbkd : lgdo.Table or dict
             A single table for reading out all data, or a dict of tables keyed
             by channel number (i.e. as returned by raw_groups.build_tables())
         packet_id : int

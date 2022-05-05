@@ -15,14 +15,14 @@ def saturation(w_in, bit_depth_in, n_lo_out, n_hi_out):
 
     Parameters
     ----------
-    w_in        : array-like
-                  The input waveform
-    bit_depth_in: int
-                  The bit depth of the analog-to-digital converter
-    n_lo_out    : int
-                  The output number of samples at the minimum
-    n_hi_out    : int
-                  The output number of samples at the maximum
+    w_in : array-like
+        The input waveform
+    bit_depth_in : int
+        The bit depth of the analog-to-digital converter
+    n_lo_out : int
+        The output number of samples at the minimum
+    n_hi_out : int
+        The output number of samples at the maximum
 
     Examples
     --------

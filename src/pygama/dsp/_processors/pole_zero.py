@@ -15,11 +15,11 @@ def pole_zero(w_in, t_tau, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    t_tau: float
-           The time constant of the exponential to be deconvolved
-    w_out: array-like
-           The pole-zero cancelled waveform
+        The input waveform
+    t_tau : float
+        The time constant of the exponential to be deconvolved
+    w_out : array-like
+        The pole-zero cancelled waveform
 
     Examples
     --------
@@ -53,16 +53,16 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    t_tau1: float
-            The time constant of the first exponential to be deconvolved
-    t_tau2: float
-            The time constant of the second exponential to be deconvolved
-    frac  : float
-            The fraction which the second exponential contributes
+    w_in : array-like
+        The input waveform
+    t_tau1 : float
+        The time constant of the first exponential to be deconvolved
+    t_tau2 : float
+        The time constant of the second exponential to be deconvolved
+    frac : float
+        The fraction which the second exponential contributes
     w_out : array-like
-            The pole-zero cancelled waveform
+        The pole-zero cancelled waveform
 
     Examples
     --------

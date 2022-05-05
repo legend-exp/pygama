@@ -48,6 +48,10 @@ class FCStreamer(DataStreamer):
             library of buffers for this stream
         buffer_size : int
             length of tables to be read out in read_chunk
+        chunk_mode : str
+            DOCME
+        out_stream : str
+            DOCME
         verbosity : int
             verbosity level for the initialize function
 

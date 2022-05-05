@@ -16,15 +16,15 @@ def min_max(w_in, t_min, t_max, a_min, a_max):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    t_min: int
-           The index of the minimum value
-    t_max: int
-           The index of the maximum value
-    a_min: float
-           The minimum value
-    a_max: float
-           The maximum value
+        The input waveform
+    t_min : int
+        The index of the minimum value
+    t_max : int
+        The index of the maximum value
+    a_min : float
+        The minimum value
+    a_max : float
+        The maximum value
 
     Examples
     --------

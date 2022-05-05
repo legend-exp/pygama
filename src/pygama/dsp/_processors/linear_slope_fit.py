@@ -15,16 +15,16 @@ def linear_slope_fit(w_in, mean, stdev, slope, intercept):
 
     Parameters
     ----------
-    w_in     : array-like
-               The input waveform
-    a_mean   : float
-               The mean of the waveform
-    stdev    : float
-               The standard deviation of the waveform
-    slope    : float
-               The slope of the linear fit
-    intercept: float
-               The intercept of the linear fit
+    w_in : array-like
+        The input waveform
+    mean : float
+        The mean of the waveform
+    stdev : float
+        The standard deviation of the waveform
+    slope : float
+        The slope of the linear fit
+    intercept : float
+        The intercept of the linear fit
 
     Examples
     --------

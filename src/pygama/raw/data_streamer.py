@@ -143,8 +143,7 @@ class DataStreamer(ABC):
 
         Parameters
         ----------
-        chunk_mode_override: 'any_full', 'only_full', 'single_packet', or None
-
+        chunk_mode_override : 'any_full', 'only_full', 'single_packet', or None
             - None : do not override self.chunk_mode
             - 'any_full' : returns all raw buffers with data as soon as any one
               buffer gets full
@@ -153,7 +152,6 @@ class DataStreamer(ABC):
             - 'single_packet' : returns all raw buffers with data after a single
               read is performed. This is useful for streaming data out as soon
               as it is read in (e.g. for diagnostics or in-line analysis)
-
         rp_max : int
             maximum number of packets to read before returning anyway, even if
             one of the other conditions is not met

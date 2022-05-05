@@ -22,12 +22,18 @@ from .waveform_table import WaveformTable
 
 class LH5Store:
     def __init__(self, base_path='', keep_open=False):
+        """
+        DOCME
+        """
         self.base_path = base_path
         self.keep_open = keep_open
         self.files = {}
 
 
     def gimme_file(self, lh5_file, mode='r', verbosity=0):
+        """
+        DOCME
+        """
         if isinstance(lh5_file, h5py.File): return lh5_file
         if lh5_file in self.files.keys(): return self.files[lh5_file]
         if self.base_path != '': full_path = self.base_path + '/' + lh5_file
@@ -48,6 +54,9 @@ class LH5Store:
 
 
     def gimme_group(self, group, base_group, grp_attrs=None, overwrite=False, verbosity=0):
+        """
+        DOCME
+        """
         if not isinstance(group, h5py.Group):
             if group in base_group: group = base_group[group]
             else:
@@ -783,9 +792,7 @@ def load_dfs(f_list, par_list, lh5_group='', idx_list=None, verbose=True):
     optionally the group path, return a pandas DataFrame with all values for
     each parameter.
 
-    Parameters
-    ----------
-    See load_nda for parameter specification
+    See :func:`load_nda` for parameter specification
 
     Returns
     -------
@@ -813,7 +820,7 @@ class LH5Iterator:
     This can also be used as an iterator: ::
 
         for lh5_obj, entry, n_rows in LH5Iterator(...):
-            do the thing!
+            # do the thing!
 
     This is intended for if you are reading a large quantity of data but
     want to limit your memory usage (particularly when reading in waveforms!).
@@ -821,7 +828,8 @@ class LH5Iterator:
     reallocation of memory; this means that if you want to hold on to data
     between reads, you will have to copy it somewhere!
     """
-    def __init__(self, lh5_files, group, base_path='', entry_list=None, entry_mask=None, field_mask=None, buffer_len=3200):
+    def __init__(self, lh5_files, group, base_path='', entry_list=None,
+                 entry_mask=None, field_mask=None, buffer_len=3200):
         """
         Parameters
         ----------
@@ -829,7 +837,9 @@ class LH5Iterator:
             File or files to read from. May include wildcards and env vars
         group : str
             HDF5 group to read
-        selection_list : list-like or nested list-like of ints (optional)
+        base_path : str
+            HDF5 path to prepend
+        entry_list : list-like or nested list-like of ints (optional)
             List of entry numbers to read. If a nested list is provided,
             expect one top-level list for each file, containing a list of
             local entries. If a list of ints is provided, use global entries

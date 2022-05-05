@@ -27,10 +27,12 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
     f_raw : str
         Name of raw LH5 file to read from
     f_dsp : str
-        Name of dsp LH% file to write to
+        Name of dsp LH5 file to write to
     dsp_config : str
         Name of json file containing ProcessingChain config. See
         pygama.processing_chain.build_processing_chain for details
+    lh5_tables
+        DOC_ME
     database : str (optional)
         Name of json file containing a parameter database. See
         pygama.processing_chain.build_processing_chain for details
@@ -51,6 +53,8 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
         0: Silent except for exceptions thrown
         1: Minimal information printed (default)
         2: Verbose output for debugging purposes
+    chan_config
+        DOC_ME
     """
     t_start = time.time()
 

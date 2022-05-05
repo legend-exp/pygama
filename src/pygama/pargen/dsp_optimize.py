@@ -32,7 +32,7 @@ def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=
         optimization will be based. Should accept verbosity as a second argument
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-    fom_kwargs:
+    fom_kwargs
         any keyword arguments to pass to the fom
 
     Returns
@@ -269,7 +269,7 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
         Specifies the DSP to be performed for this iteration (see
         build_processing_chain()) and the list of output variables to appear in
         the output table
-    grid: pargrid, list of pargrids
+    grid : pargrid, list of pargrids
         Grids to run optimization on
     db_dict : dict (optional)
         DSP parameters database. See build_processing_chain for formatting info
@@ -281,7 +281,9 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
         or a list of fom to run different fom on each grid.
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-    fom_kwargs:
+    processes : int
+        DOCME
+    fom_kwargs
         any keyword arguments to pass to the fom,
         if multiple grids given will need to be a list of the fom_kwargs for each grid
 

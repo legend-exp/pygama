@@ -15,11 +15,11 @@ def fixed_time_pickoff(w_in, t_in, a_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
+        The input waveform
     t_in : int
-           The waveform index to pick off
-    a_out: float
-           The output pick-off value
+        The waveform index to pick off
+    a_out : float
+        The output pick-off value
 
     Examples
     --------

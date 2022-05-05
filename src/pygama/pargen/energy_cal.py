@@ -26,7 +26,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
 
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
         var cannot contain any zero entries.
     peaks_keV : array
@@ -41,6 +41,8 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
         number used to replace zeros of var to avoid divide-by-zero in
         hist/sqrt(var). Default value is 1. Usually when var = 0 its because
         hist = 0, and any value here is fine.
+    verbose : bool
+        print debug messages
 
     Returns
     -------
@@ -84,7 +86,7 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
 
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
         var cannot contain any zero entries.
     cal_pars : array
@@ -99,6 +101,8 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
         number used to replace zeros of var to avoid divide-by-zero in
         hist/sqrt(var). Default value is 1. Usually when var = 0 its because
         hist = 0, and any value here is fine.
+    verbose : bool
+        print debug messages
 
     Returns
     -------
@@ -154,13 +158,13 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
 
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
     peak_locs : array
         locations of peaks in hist. Must be accurate two within +/- 2*n_to_fit
     n_to_fit : int
         number of hist bins near the peak top to include in the gaussian fit
-    poissonLL : bool (optional)
+    cost_func : bool (optional)
         Flag passed to gauss_mode_width_max()
     inflate_errors : bool (optional)
         Flag passed to gauss_mode_width_max()
@@ -196,7 +200,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
 
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist(). Should be
         windowed around the peak.
     func : function
@@ -342,16 +346,16 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         array of number of bins to use for the fit window histogramming
     funcs : function or array of functions
         funcs to be used to fit each region
-    method: str
-            default is unbinned fit can specify to use binned fit method instead
+    method : str
+        default is unbinned fit can specify to use binned fit method instead
     gof_funcs : function or array of functions
-            functions to use for calculation goodness of fit if unspecified will use same func as fit
+        functions to use for calculation goodness of fit if unspecified will use same func as fit
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
     simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit
+    allowed_p_val : lower limit on p_val of fit
 
     Returns
     -------
@@ -526,8 +530,8 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
 
 
 def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None,
-                        funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
-                        n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
+                       funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
+                       n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
     """Calibrate HPGe data to a set of known peaks
 
     Parameters
@@ -543,18 +547,28 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         degree of the polynomial for the E_cal function E_keV = poly(E_uncal).
         deg = 0 corresponds to a simple scaling E_keV = scale * E_uncal.
         Otherwise follows the convention in np.polyfit
-    method: str
-            default is unbinned fit can specify to use binned fit method instead
-    gof_funcs : function or array of functions
-            functions to use for calculation goodness of fit if unspecified will use same func as fit
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
     range_keV : float, tuple, array of floats, or array of tuples of floats
         ranges around which the peak fitting is performed
         if tuple(s) are supplied, they provide the left and right ranges
-    n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit
+    funcs
+        DOCME
+    gof_funcs : function or array of functions
+        functions to use for calculation goodness of fit if unspecified will use same func as fit
+    method : str
+        default is unbinned fit can specify to use binned fit method instead
+    gof_func
+        DOCME
+    n_events : int
+        number of events to use for unbinned fit
+    simplex : bool
+        DOCME
+    allowed_p_val
+        lower limit on p_val of fit
+    verbose : bool
+        print debug statements
 
     Returns
     -------

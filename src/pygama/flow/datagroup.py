@@ -23,6 +23,7 @@ class DataGroup:
     """
     def __init__(self, config=None, nfiles=None, load=False):
         """
+        DOCME
         """
         # master table
         self.fileDB = None
@@ -41,6 +42,7 @@ class DataGroup:
 
     def set_config(self, config):
         """
+        DOCME
         """
         with open(config) as f:
             self.config = json.load(f)
@@ -273,6 +275,7 @@ class DataGroup:
 
     def load_df(self, fname=None):
         """
+        DOCME
         """
         if fname is None: fname = self.f_fileDB
         self.fileDB = pd.read_hdf(fname, key='file_keys')

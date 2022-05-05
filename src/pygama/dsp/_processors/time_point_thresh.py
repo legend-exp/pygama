@@ -14,16 +14,16 @@ def time_point_thresh(w_in, a_threshold, t_start, walk_forward, t_out):
 
     Parameters
     ----------
-    w_in        : array-like
-                  The input waveform
+    w_in : array-like
+        The input waveform
     a_threshold : float
-                  The threshold value
-    t_start     : int
-                  The starting index
-    walk_forward: int
-                  The backward (0) or forward (1) search direction
-    t_out       : float
-                  The index where the waveform value crosses the threshold
+        The threshold value
+    t_start : int
+        The starting index
+    walk_forward : int
+        The backward (0) or forward (1) search direction
+    t_out : float
+        The index where the waveform value crosses the threshold
 
     Examples
     --------

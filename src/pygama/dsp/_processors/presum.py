@@ -16,9 +16,9 @@ def presum(w_in, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    w_out: array-like
-           The output waveform
+        The input waveform
+    w_out : array-like
+        The output waveform
     """
     w_out[:] = np.nan
 

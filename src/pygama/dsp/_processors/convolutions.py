@@ -12,14 +12,14 @@ def cusp_filter(length, sigma, flat, decay):
 
     Parameters
     ----------
-    length: int
-            The length of the filter to be convolved
+    length : int
+        The length of the filter to be convolved
     sigma : float
-            The curvature of the rising and falling part of the kernel
-    flat  : int
-            The length of the flat section
+        The curvature of the rising and falling part of the kernel
+    flat : int
+        The length of the flat section
     decay : int
-            The decay constant of the exponential to be convolved
+        The decay constant of the exponential to be convolved
 
     Examples
     --------
@@ -67,9 +67,9 @@ def cusp_filter(length, sigma, flat, decay):
         Parameters
         ----------
         w_in : array-like
-               The input waveform
-        w_out: array-like
-               The filtered waveform
+            The input waveform
+        w_out : array-like
+            The filtered waveform
         """
         w_out[:] = np.nan
 
@@ -91,14 +91,14 @@ def zac_filter(length, sigma, flat, decay):
 
     Parameters
     ----------
-    length: int
-            The length of the filter to be convolved
+    length : int
+        The length of the filter to be convolved
     sigma : float
-            The curvature of the rising and falling part of the kernel
-    flat  : int
-            The length of the flat section
+        The curvature of the rising and falling part of the kernel
+    flat : int
+        The length of the flat section
     decay : int
-            The decay constant of the exponential to be convolved
+        The decay constant of the exponential to be convolved
 
     Examples
     --------
@@ -164,9 +164,9 @@ def zac_filter(length, sigma, flat, decay):
         Parameters
         ----------
         w_in : array-like
-               The input waveform
-        w_out: array-like
-               The filtered waveform
+            The input waveform
+        w_out : array-like
+            The filtered waveform
         """
         w_out[:] = np.nan
 
@@ -189,12 +189,12 @@ def t0_filter(rise, fall):
 
     Parameters
     ----------
-    rise: int
-          The length of the rise section.  This is the linearly increasing
-          section of the filter that performs a weighted average.
-    fall: int
-          The length of the fall section.  This is the simple averaging part
-          of the filter.
+    rise : int
+        The length of the rise section.  This is the linearly increasing
+        section of the filter that performs a weighted average.
+    fall : int
+        The length of the fall section.  This is the simple averaging part
+        of the filter.
 
     Examples
     --------
@@ -226,9 +226,9 @@ def t0_filter(rise, fall):
         Parameters
         ----------
         w_in : array-like
-               The input waveform
-        w_out: array-like
-               The filtered waveform
+            The input waveform
+        w_out : array-like
+            The filtered waveform
         """
         w_out[:] = np.nan
 

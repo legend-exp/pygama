@@ -15,9 +15,9 @@ def log_check(w_in, w_log):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    w_log: array-like
-           The output waveform with logged values
+        The input waveform
+    w_log : array-like
+        The output waveform with logged values
 
     Examples
     --------
