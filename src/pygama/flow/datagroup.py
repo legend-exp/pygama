@@ -4,13 +4,10 @@ import json
 import os
 from collections import OrderedDict
 from pathlib import Path
-from pprint import pprint
 from string import Formatter
 
 import pandas as pd
 from parse import parse
-
-import pygama.utils as pu
 
 
 class DataGroup:

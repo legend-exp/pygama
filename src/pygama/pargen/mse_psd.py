@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from pygama.analysis.peak_fitting import *
-from pygama.utils import get_bin_centers
+from pygama.math.peak_fitting import *
+from pygama.math.histogram import get_bin_centers
 
 
 def get_avse_cut(e_cal, current, plotFigure=None):

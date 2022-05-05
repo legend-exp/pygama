@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-import pygama.lh5 as lh5
+import pygama.lgdo.lh5_store as lh5
 
 
 def hit_to_evt(f_hit:str, f_evt:str=None, lh5_tables:list=None, copy_cols:list=None,
@@ -124,7 +124,7 @@ def hit_to_evt(f_hit:str, f_evt:str=None, lh5_tables:list=None, copy_cols:list=N
     if os.path.exists(f_evt):
         os.remove(f_evt)
 
-    sto = lh5.Store()
+    sto = lh5.LH5Store()
     col_dict = {col : lh5.Array(tcm[col].values, attrs={'units':''}) for col in tcm.columns}
     tb_tcm = lh5.Table(size=len(tcm), col_dict=col_dict)
     tb_name = 'events'

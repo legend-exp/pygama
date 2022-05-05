@@ -1,31 +1,24 @@
 import numpy as np
 from numba import guvectorize
 
-from pygama import lh5
+import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 
 
-def Wiener_filter(file_name_array):
+def wiener_filter(file_name_array):
     """
-    Apply a Wiener filter to the waveform.  Note that this convolution is performed in the frequency domain
+    Apply a wiener filter to the waveform.  Note that this convolution is performed in the frequency domain
 
-    Initialization Parameters
-    -------------------------
+    Parameters
+    ----------
     file_name_array : string
             Array with path to an lh5 file containing the time domain version of the superpulse in one column and noise waveform in another,
             the superpulse group must be titled 'spms/processed/superpulse' and the noise waveform must be called 'spms/processed/noise_wf'
 
-    Parameters
-    ----------
-    fft_w_in : array-like
-           The fourier transform input waveform
-    fft_w_out: array-like
-           The filtered waveform, in the frequency domain
-
     Processing Chain Example
     ------------------------
     "wf_wiener": {
-        "function": "Wiener_filter",
+        "function": "wiener_filter",
         "module": "pygama.dsp.processors",
         "args": ["wf_bl_fft", "wf_wiener(2000,f)"],
         "unit": "dB",
@@ -34,7 +27,7 @@ def Wiener_filter(file_name_array):
     }
     """
 
-    sto = lh5.Store()
+    sto = lh5.LH5Store()
 
     # Check that the file is valid and the data is in the correct format
 
@@ -71,7 +64,7 @@ def Wiener_filter(file_name_array):
     if np.argmax(superpulse) <= 0 or np.argmax(superpulse) > len(superpulse):
         raise DSPFatal('The index of the maximum of the superpulse must occur within the waveform')
 
-    # Transform these to the frequency domain to eventually create the Wiener filter
+    # Transform these to the frequency domain to eventually create the wiener filter
 
     fft_superpulse = np.fft.fft(superpulse)
     fft_noise_wf = np.fft.fft(noise_wf)
@@ -86,7 +79,7 @@ def Wiener_filter(file_name_array):
 
         return fft_superpulse/np.fft.fft(delta)
 
-    # Now create the Wiener filter in the frequency domain
+    # Now create the wiener filter in the frequency domain
 
     fft_PSF = PSF(superpulse, fft_superpulse)
     PSD_noise_wf = fft_noise_wf*np.conj(fft_noise_wf)
@@ -94,12 +87,20 @@ def Wiener_filter(file_name_array):
 
     w_filter = (np.conj(fft_PSF))/((fft_PSF*np.conj(fft_PSF))+(PSD_noise_wf/PSD_superpulse))
 
-    # Create a factory function that performs the convolution with the Wiener filter, the output is still in the frequency domain
+    # Create a factory function that performs the convolution with the wiener filter, the output is still in the frequency domain
 
     @guvectorize(["void(complex64[:], complex64[:])",
                   "void(complex128[:], complex128[:])"],
                  "(n)->(n)", forceobj=True)
-    def Wiener_out(fft_w_in, fft_w_out):
+    def wiener_out(fft_w_in, fft_w_out):
+        """
+        Parameters
+        ----------
+        fft_w_in : array-like
+               The fourier transform input waveform
+        fft_w_out: array-like
+               The filtered waveform, in the frequency domain
+        """
         fft_w_out[:] = np.nan
 
         if np.isnan(fft_w_in).any():
@@ -110,4 +111,4 @@ def Wiener_filter(file_name_array):
 
         fft_w_out[:] = fft_w_in * w_filter
 
-    return Wiener_out
+    return wiener_out

@@ -23,8 +23,6 @@ class WaveformBrowser:
     drawing transformed waveforms defined using build_dsp style json files,
     drawing horizontal and vertical lines at the values of calculated
     parameters, and filling a legend with calculated parameters.
-
-
     """
 
     def __init__(self, files_in, lh5_group, base_path = '',
@@ -68,17 +66,21 @@ class WaveformBrowser:
         styles : (default None)
             line colors and other style parameters to cycle through when
             drawing waveforms. Can be given as:
+
             - dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
             - name of predefined style; see matplotlib.style documentation
             - None: use current matplotlib rcparams style
+
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
         legend : str or [strs] (default None)
             Formatting string and values to include in the legend. This can
             be a list of values (one for each drawn object). If just a name
             is given, it will be auto-formatted to 3 digits. Otherwise,
-            formatting strings in brackets can be used:
+            formatting strings in brackets can be used: ::
+
               "{energy:0.1f} keV, {timestamp:d} ns"
+
             Names will be searched in the input file, DSP processed parameters,
             or auxiliary data-table
         legend_opts : dict (default None)
@@ -87,10 +89,12 @@ class WaveformBrowser:
             number of events to draw simultaneously when calling DrawNext
         x_lim : tuple-pair of float, pint.Quantity or str (default auto)
             range of x-values and units passes as tuple.
+
             - None: Get range from first waveform drawn
             - pint.Quantity: set value and x-unit
             - float: get unit from first waveform drawn
             - str: convert to pint.Quanity (e.g. ('0*us', '10*us'))
+
         x_unit : pint.Unit or str (default auto)
             unit of x-axis
         norm : str (default None)

@@ -9,14 +9,17 @@ from pygama.dsp._processors.time_point_thresh import time_point_thresh
              "(n),(n) -> (n)", nopython=True, cache=True)
 def remove_duplicates(t_in, vt_min_in, t_out):
     """
-    time_point_thresh has issues with afterpulsing in waveforms that causes
-    an aferpulse peak's tp0 to be sent to 0 or the same index as the tp0 for the first pulse.
-    This only happens when the relative minimum between the first pulse and
-    the afterpulse is greater than the threshold. So, we sweep through the array again
-    to ensure there are no duplicate indices. If there are duplicate indices caused by a
-    misidentified tp0 of an afterpulse, we replace its index by that of the corresponding minimum
-    found using the get_multi_local_extrema function. It also checks to make sure that the maximum of a waveform
-    isn't right at index 0.
+    time_point_thresh has issues with afterpulsing in waveforms that causes an
+    aferpulse peak's tp0 to be sent to 0 or the same index as the tp0 for the
+    first pulse.  This only happens when the relative minimum between the first
+    pulse and the afterpulse is greater than the threshold. So, we sweep
+    through the array again to ensure there are no duplicate indices. If there
+    are duplicate indices caused by a misidentified tp0 of an afterpulse, we
+    replace its index by that of the corresponding minimum found using the
+    get_multi_local_extrema function. It also checks to make sure that the
+    maximum of a waveform isn't right at index 0.
+
+    Parameters
     ----------
     t_in : array-like
         The array of indices that we want to remove duplicates from
@@ -63,6 +66,7 @@ def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
     "get_multi_local_extrema" which returns a list of the maxima and minima in a waveform,
     and then the list of maxima is fed into "time_point_thresh" which returns
     the final times that waveform is less than a specified threshold.
+
     Parameters
     ----------
     w_in : array-like
@@ -73,6 +77,7 @@ def multi_t_filter(w_in, a_threshold_in, vt_max_in, vt_min_in, t_out):
         The array of max positions for each wf
     vt_mins_in : array-like
         The array of min positions for each wf
+
     Returns
     -------
     t_out : array-like

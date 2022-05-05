@@ -10,8 +10,8 @@ def cusp_filter(length, sigma, flat, decay):
     factory function that is called using the init_args argument and that
     the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
+    Parameters
+    ----------
     length: int
             The length of the filter to be convolved
     sigma : float
@@ -20,13 +20,6 @@ def cusp_filter(length, sigma, flat, decay):
             The length of the flat section
     decay : int
             The decay constant of the exponential to be convolved
-
-    Parameters
-    ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
 
     Processing Chain Example
     ------------------------
@@ -68,6 +61,14 @@ def cusp_filter(length, sigma, flat, decay):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def cusp_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+               The input waveform
+        w_out: array-like
+               The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
@@ -86,8 +87,8 @@ def zac_filter(length, sigma, flat, decay):
     composed of a factory function that is called using the init_args
     argument and that the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
+    Parameters
+    ----------
     length: int
             The length of the filter to be convolved
     sigma : float
@@ -96,13 +97,6 @@ def zac_filter(length, sigma, flat, decay):
             The length of the flat section
     decay : int
             The decay constant of the exponential to be convolved
-
-    Parameters
-    ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
 
     Processing Chain Example
     ------------------------
@@ -162,6 +156,14 @@ def zac_filter(length, sigma, flat, decay):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def zac_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+               The input waveform
+        w_out: array-like
+               The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
@@ -181,21 +183,14 @@ def t0_filter(rise, fall):
     that it is composed of a factory function that is called using the init_args
     argument and that the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
+    Parameters
+    ----------
     rise: int
           The length of the rise section.  This is the linearly increasing
           section of the filter that performs a weighted average.
     fall: int
           The length of the fall section.  This is the simple averaging part
           of the filter.
-
-    Parameters
-    ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
 
     Processing Chain Example
     ------------------------
@@ -221,6 +216,14 @@ def t0_filter(rise, fall):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def t0_filter_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+               The input waveform
+        w_out: array-like
+               The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():

@@ -499,16 +499,17 @@ class LH5Store:
         starting from start_row in obj.
 
         wo_modes:
-            'write_safe' or 'w': only proceed with writing if the object does
-                not already exist in the file
-            'append' or 'a': append along axis 0 (the first dimension) of
-                array-like objects and array-like subfields of structs. Scalar
-                objects get overwritten
-            'overwrite' or 'o': replace data in the file if present, starting
-                from write_start. Note: overwriting with write_start = end of
-                array is the same as append
-            'overwrite_file' or 'of': delete file if present prior to writing to
-                it. write_start should be 0 (it's ignored)
+
+          - 'write_safe' or 'w': only proceed with writing if the object does
+            not already exist in the file
+          - 'append' or 'a': append along axis 0 (the first dimension) of
+            array-like objects and array-like subfields of structs. Scalar
+            objects get overwritten
+          - 'overwrite' or 'o': replace data in the file if present, starting
+            from write_start. Note: overwriting with write_start = end of
+            array is the same as append
+          - 'overwrite_file' or 'of': delete file if present prior to writing to
+            it. write_start should be 0 (it's ignored)
 
         """
         if wo_mode == 'write_safe':  wo_mode = 'w'
@@ -803,13 +804,16 @@ class LH5Iterator:
     at a time. This also accepts an entry list/mask to enable event selection,
     and a field mask.
 
-    This class can be used either for random access:
+    This class can be used either for random access: ::
+
         lh5_obj, n_rows = lh5_it.read(entry)
+
     to read the block of entries starting at entry. In case of multiple files
     or the use of an event selection, entry refers to a global event index
     across files and does not count events that are excluded by the selection.
 
-    This can also be used as an iterator:
+    This can also be used as an iterator: ::
+
         for lh5_obj, entry, n_rows in LH5Iterator(...):
             do the thing!
 

@@ -11,6 +11,7 @@ class WaveformTable(Table):
     An lgdo for storing blocks of (1D) time-series data.
 
     A WaveformTable is an lgdo Table with the 3 columns t0, dt, and values:
+
     * t0[i] is a time offset (relative to a user-defined global reference) for
       the sample in values[i][0]. Implemented as an lgdo Array with optional
       attribute "units"

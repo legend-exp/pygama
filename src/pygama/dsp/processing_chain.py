@@ -237,35 +237,48 @@ class ProcChainVar:
 
 class ProcessingChain:
     """
-    A ProcessingChain is used to efficiently perform a sequence of digital
-    signal processing (dsp) transforms. It contains a list of dsp functions and
-    a set of constant values and named variables contained in fixed memory
-    locations. When executing the ProcessingChain, processors will act on the
-    internal memory without allocating new memory in the process. Furthermore,
-    the memory is allocated in blocks, enabling vectorized processing of many
-    entries at once. To set up a ProcessingChain, use the following methods:
-    1) add_input_buffer: bind a named variable to an external numpy array to
-         read data from
-    2) add_processor: add a dsp function and bind its inputs to a set of named
-         variables and constant values
-    3) add_output_buffer: bind a named variable to an external numpy array to
-         write data into
-    When calling these methods, the ProcessingChain class will use available
-    information to allocate buffers to the correct sizes and data types. For
-    this reason, transforms will ideally implement the numpy ufunc class,
-    enabling broadcasting of array dimensions. If not enough information is
-    available to correctly allocate memory, it can be provided through the
-    named variable strings or by calling add_vector or add_scalar.
+    A :class:`ProcessingChain` is used to efficiently perform a sequence of
+    digital signal processing (DSP) transforms. It contains a list of DSP
+    functions and a set of constant values and named variables contained in
+    fixed memory locations. When executing the :class:`ProcessingChain`,
+    processors will act on the internal memory without allocating new memory in
+    the process. Furthermore, the memory is allocated in blocks, enabling
+    vectorized processing of many entries at once. To set up a
+    :class:`ProcessingChain`, use the following methods:
+
+    :meth:`.link_input_buffer`
+        bind a named variable to an external numpy array to read data from
+
+    :meth:`.add_processor`
+        add a dsp function and bind its inputs to a set of named variables and
+        constant values
+
+    :meth:`.link_output_buffer`
+        bind a named variable to an external numpy array to write data into
+
+    When calling these methods, the :class:`ProcessingChain` class will use
+    available information to allocate buffers to the correct sizes and data
+    types. For this reason, transforms will ideally implement the
+    :class:`numpy.ufunc` class, enabling broadcasting of array dimensions. If
+    not enough information is available to correctly allocate memory, it can be
+    provided through the named variable strings or by calling add_vector or
+    add_scalar.
     """
+
     def __init__(self, block_width=8, buffer_len=None, verbosity=1):
-        """Named arguments:
-        - block_width: number of entries to simultaneously process.
-        - buffer_len: length of input and output buffers. Should be a multiple
-            of block_width
-        - verbosity: integer indicating the verbosity level:
-            0: Print nothing (except errors...)
-            1: Print basic warnings (default)
-            2: Print basic debug info
+        """
+        Parameters
+        ----------
+
+        block_width: int
+            number of entries to simultaneously process.
+        buffer_len: int
+            length of input and output buffers. Should be a multiple of
+            block_width
+        verbosity: int
+            integer indicating the verbosity level. 0: Print nothing (except
+            errors...); 1: Print basic warnings (default); 2: Print basic debug
+            info
         """
         # Dictionary from name to scratch data buffers as ProcChainVar
         self._vars_dict = {}
@@ -314,15 +327,21 @@ class ProcessingChain:
 
     def link_input_buffer(self, varname, buff=None):
         """Link an input buffer to a variable
+
         Parameters
         ----------
-        varname : name of internal variable to copy into buffer at the end
+        varname
+            name of internal variable to copy into buffer at the end
             of processor execution. If variable does not yet exist, it will
             be created with a similar shape to the provided buffer
-        buff : numpy array or lgdo class to use as input buffer. If None,
-            create a new buffer with a similar shape to the variable
+        buff : numpy.array or lgdo class
+            object to use as input buffer. If None, create a new buffer with a
+            similar shape to the variable
 
-        Return : buff or newly allocated input buffer
+        Returns
+        -------
+        numpy.array or lgdo class
+            buff or newly allocated input buffer
         """
         self._validate_name(varname, raise_exception=True)
         var = self.get_variable(varname, expr_only=True)
@@ -363,15 +382,21 @@ class ProcessingChain:
 
     def link_output_buffer(self, varname, buff=None):
         """Link an output buffer to a variable
+
         Parameters
         ----------
-        varname : name of internal variable to copy into buffer at the end
+        varname
+            name of internal variable to copy into buffer at the end
             of processor execution. If variable does not yet exist, it will
             be created with a similar shape to the provided buffer
-        buff : numpy array or lgdo class to use as output buffer. If None,
-            create a new buffer with a similar shape to the variable
+        buff : numpy.array or lgdo class
+            object to use as output buffer. If None, create a new buffer with a
+            similar shape to the variable
 
-        Return : buff or newly allocated output buffer
+        Returns
+        -------
+        numpy.array or lgdo object
+            buff or newly allocated output buffer
         """
         self._validate_name(varname, raise_exception=True)
         var = self.get_variable(varname, expr_only=True)
@@ -434,31 +459,36 @@ class ProcessingChain:
 
 
     def get_variable(self, expr, get_names_only=False, expr_only=False):
-        """Parse string expr into a numpy array or value, using the following
+        """Parse string expr into a NumPy array or value, using the following
         syntax:
+
           - numeric values are parsed into ints or floats
-          - units found in the pint package
+          - units found in the :mod:`pint` package
           - other strings are parsed into variable names. If get_name_only is
             False, fetch the internal buffer (creating it as needed). Else,
             return a string of the name
           - if a string is followed by (...), try parsing into one of the
             following expressions:
-              len(expr): return the length of the array found with expr
-              round(expr): return the value found with expr to the nearest int
-              varname(shape, type): allocate a new buffer with the specified
+
+              - len(expr): return the length of the array found with expr
+              - round(expr): return the value found with expr to the nearest int
+              - varname(shape, type): allocate a new buffer with the specified
                 shape and type, using varname. This is used if the automatic
                 type and shape deduction for allocating variables fails
-          - Unary and binary operators +, -, *, /, // are available. If
-              a variable name is included in the expression, a processor
-              will be added to the ProcChain and a new buffer allocated
-              to store the output
+
+          - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
+            :obj:`//` are available. If a variable name is included in the
+            expression, a processor will be added to the
+            :class:`ProcessingChain` and a new buffer allocated to store the
+            output
           - varname[slice]: return the variable with a slice applied. Slice
-              values can be floats, and will have round applied to them
+            values can be floats, and will have round applied to them
           - keyword = expr: return a dict with a single element pointing from
-              keyword to the parsed expr. This is used for kwargs. If expr_only
-              is True, raise an exception if we see this
+            keyword to the parsed expr. This is used for kwargs. If expr_only
+            is True, raise an exception if we see this
+
         If get_names_only is set to True, do not fetch or allocate new arrays,
-          instead return a list of variable names found in the expression
+        instead return a list of variable names found in the expression
         """
         names = []
         try:
@@ -1112,48 +1142,51 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         should be read in prior to calling this!
     dsp_config: dict or str
         A dict or json filename containing the recipes for computing DSP
-        parameter from raw parameters. The format is as follows:
-        {
-            "outputs" : [ "parnames", ... ] -> list of output parameters
-                 to compute by default; see outputs parameter.
-            "processors" : {
-                 "name1, ..." : { -> names of parameters computed
-                      "function" : str -> name of function to call. Function
-                           should implement the gufunc interface, a factory
-                           function returning a gufunc, or an arbitrary
-                           function that can be mapped onto a gufunc
-                      "module" : str -> name of module containing function
-                      "args" : [ str or numeric, ... ] -> list of names of
-                           computed and input parameters or constant values
-                           used as inputs to function. Note that outputs
-                           should be fed by reference as args! Arguments read
-                           from the database are prepended with db.
-                      "kwargs" : dict -> keyword arguments for
-                           ProcesssingChain.add_processor.
-                      "init_args" : [ str or numeric, ... ] -> list of names
-                           of computed and input parameters or constant values
-                           used to initialize a gufunc via a factory function
-                      "unit" : str or [ strs, ... ] -> units for parameters
-                      "defaults" : dict -> default value to be used for
-                           arguments read from the database
-                      "prereqs" : DEPRECATED [ strs, ...] -> list of parameters
-                           that must be computed before these can
-                 }
-    outputs: [str, ...] (optional)
+        parameter from raw parameters. The format is as follows: ::
+
+            {
+               "outputs" : [ "parnames", ... ] -> list of output parameters
+                  to compute by default; see outputs parameter.
+               "processors" : {
+                  "name1, ..." : { -> names of parameters computed
+                    "function" : str -> name of function to call. Function
+                      should implement the gufunc interface, a factory
+                      function returning a gufunc, or an arbitrary
+                      function that can be mapped onto a gufunc
+                    "module" : str -> name of module containing function
+                    "args" : [ str or numeric, ... ] -> list of names of
+                      computed and input parameters or constant values
+                      used as inputs to function. Note that outputs
+                      should be fed by reference as args! Arguments read
+                      from the database are prepended with db.
+                    "kwargs" : dict -> keyword arguments for
+                      ProcesssingChain.add_processor.
+                    "init_args" : [ str or numeric, ... ] -> list of names
+                      of computed and input parameters or constant values
+                      used to initialize a gufunc via a factory function
+                    "unit" : str or [ strs, ... ] -> units for parameters
+                    "defaults" : dict -> default value to be used for
+                      arguments read from the database
+                    "prereqs" : DEPRECATED [ strs, ...] -> list of parameters
+                      that must be computed before these can
+                  }
+               }
+            }
+
+    outputs: [str, ...], optional
         List of parameters to put in the output lh5 table. If None,
         use the parameters in the 'outputs' list from config
-    db_dict: dict (optional)
+    db_dict: dict, optional
         A nested dict pointing to values for db args. e.g. if a processor
-        uses arg db.trap.risetime, it will look up
-          db_dict['trap']['risetime']
+        uses arg db.trap.risetime, it will look up db_dict['trap']['risetime']
         and use the found value. If no value is found, use the default
         defined in the config file.
-    verbosity : int (optional)
+    verbosity : int, optional
         0: Print nothing (except errors...)
         1: Print basic warnings (default)
         2: Print basic debug info
         3: Print friggin' everything!
-    block_width : int (optional)
+    block_width : int, optional
         number of entries to process at once. To optimize performance,
         a multiple of 16 is preferred, but if performance is not an issue
         any value can be used.

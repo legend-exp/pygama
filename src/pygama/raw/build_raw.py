@@ -42,6 +42,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         Options are 'ORCA', 'FlashCams', 'LlamaDaq', 'Compass', 'MGDO'
     out_spec : str or json dict or RawBufferLibrary or None
         Specification for the output stream.
+
         - If None, uses '{in_stream}.hdf5' as the output filename.
         - If a str not ending in '.json', interpreted as the output filename.
         - If a str ending in '.json', interpreted as a filename containing
@@ -51,6 +52,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
           used to build a RawBufferLibrary
         - If a RawBufferLibrary, the mapping of data to output file / group is
           taken from that.
+
     buffer_size : int
         Default size to use for data buffering
     n_max : int

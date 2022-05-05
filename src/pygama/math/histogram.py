@@ -16,13 +16,13 @@ they will help you if you need to do something trickier than is provided (e.g.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pylab import rcParams
+from matplotlib import rcParams
 
 import pygama.math.utils as pgu
 
 
 def get_hist(data, bins=None, range=None, dx=None, wts=None):
-    """ return hist, bins, var after binning data
+    """return hist, bins, var after binning data
 
     This is just a wrapper for numpy.histogram, with optional weights for each
     element and proper computing of variances.
@@ -62,12 +62,14 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
 
     Returns
     -------
-    hist, bins, var : tuple (array, array, array)
-        hist : the values in each bin of the histogram
-        bins : an array of bin edges: bins[i] is the lower edge of the ith bin.
-               Note: it includes the upper edge of the last bin and does not
-               include underflow or overflow bins. So len(bins) = len(hist) + 1
-        var : array of variances in each bin of the histogram
+    hist : array
+        the values in each bin of the histogram
+    bins : array
+        an array of bin edges: bins[i] is the lower edge of the ith bin.
+        Note: it includes the upper edge of the last bin and does not
+        include underflow or overflow bins. So len(bins) = len(hist) + 1
+    var : array
+        array of variances in each bin of the histogram
     """
     if bins is None:
         bins = 100 # override np.histogram default of just 10
