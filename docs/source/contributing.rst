@@ -5,6 +5,13 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
+All extra tools needed to develop *pygama* are listed as optional dependencies
+and can be installed via pip by running:
+
+.. code-block:: console
+
+    $ pip install .[all]
+
 Code style
 ----------
 
