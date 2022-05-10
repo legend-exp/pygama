@@ -14,11 +14,16 @@ class OrcaHeaderDecoder(DataDecoder):
 
     def buffer_is_full(self, rb): return rb.loc > 0
 
-    def decode_header(self, packet):
+    def decode_packet(self, packet, packet_id, rbl=None, verbosity=0):
+        if len(self.header.keys()) != 0:
+            print("Warning: got a second header...")
+        if packet_id != 0:
+            print(f"Warning: header was packet {packet_id}")
         n_bytes = packet[1] # word 1 is the header packet length in bytes
         as_bytes = packet[2:].tobytes()
         header_dict = plistlib.loads(as_bytes[:n_bytes], fmt=plistlib.FMT_XML)
         self.header.update(header_dict)
+        return True # header is "full" 
 
     def get_decoder_list(self):
         decoder_names = []
