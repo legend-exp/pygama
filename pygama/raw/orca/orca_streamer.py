@@ -15,9 +15,10 @@ class OrcaStreamer(DataStreamer):
         self.header_decoder = OrcaHeaderDecoder()
         self.decoder_id_dict = {} # dict of data_id to decoder object
         self.decoder_name_dict = {} # dict of name to decoder object
+        self.rbl_id_dict = {} # dict of RawBufferLists for each data_id
 
 
-    def load_packet(self):
+    def load_packet(self, skip_unknown_ids=False):
         """ Loads the next packet into the internal buffer
         Returns packet as a uint32 view of the buffer (a slice)
         Returns None at EOF or for an error
@@ -31,6 +32,7 @@ class OrcaStreamer(DataStreamer):
         # read packet header
         pkt_hdr = self.buffer[:1]
         n_bytes_read = self.in_stream.readinto(pkt_hdr) # buffer is at least 4 kB long
+        self.n_bytes_read += n_bytes_read
         if n_bytes_read == 0: return None
         if n_bytes_read != 4:
             print(f'Error: only got {n_bytes_read} bytes for packet header')
@@ -39,10 +41,17 @@ class OrcaStreamer(DataStreamer):
         # if it's a short packet, we are done
         if orca_packet.is_short(pkt_hdr): return pkt_hdr
 
-        # long packet: get length and load into buffer, resizing as necessary
+        # long packet: get length and check if we can skip it
         n_words = orca_packet.get_n_words(pkt_hdr)
+        if skip_unknown_ids and orca_packet.get_data_id(pkt_hdr) not in self.decoder_id_dict:
+            self.in_stream.seek((n_words-1)*4, 1)
+            self.n_bytes_read += (n_words-1)*4 # well, we didn't really read it... 
+            return pkt_hdr
+
+        # load into buffer, resizing as necessary
         if len(self.buffer) < n_words: self.buffer.resize(n_words, refcheck=False)
         n_bytes_read = self.in_stream.readinto(self.buffer[1:n_words])
+        self.n_bytes_read += n_bytes_read
         if n_bytes_read != (n_words-1)*4:
             print(f'Error: only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected.')
             return None
@@ -81,7 +90,7 @@ class OrcaStreamer(DataStreamer):
         if (uints[0] & 0xfffc0000) != 0: return False
 
         # xml header length should fit within header packet length
-        pad = uints[0] * 4 - 2 - uints[1]
+        pad = uints[0] * 4 - 8 - uints[1]
         if pad < 0 or pad > 3: return False
 
         # last 4 chars should be '<?xm'
@@ -148,8 +157,7 @@ class OrcaStreamer(DataStreamer):
             print(f'Error: got data id {orca_packet.get_data_id(packet)} for header')
             return []
         self.packet_id = 0
-        self.header_decoder.decode_header(packet)
-        self.n_bytes_read = len(packet)*4
+        self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id, verbosity=verbosity)
 
         # instantiate decoders listed in the header AND in the rb_lib (if specified)
         decoder_names = ['OrcaHeaderDecoder']
@@ -167,7 +175,7 @@ class OrcaStreamer(DataStreamer):
             # handle header decoder specially
             if name == 'OrcaHeaderDecoder':
                 self.decoder_id_dict[0] = self.header_decoder
-                self.decoder_name_dict['OrcaHeaderDecoder'] = self.header_decoder
+                self.decoder_name_dict['OrcaHeaderDecoder'] = 0
                 continue
             # instantiate other decoders by name
             if name not in globals():
@@ -176,12 +184,16 @@ class OrcaStreamer(DataStreamer):
             decoder = globals()[name]
             decoder.data_id = self.header_decoder.get_data_id(name)
             self.decoder_id_dict[decoder.data_id] = decoder
-            self.decoder_name_dict[name] = decoder
+            self.decoder_name_dict[name] = decoder.data_id
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(stream_name, rb_lib, buffer_size=buffer_size,
                             chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
         if rb_lib is None: rb_lib = self.rb_lib
+        for name in self.rb_lib.keys(): 
+            data_id = self.decoder_name_dict[name]
+            self.rbl_id_dict[data_id] = self.rb_lib[name]
+        print(self.rb_lib)
 
         # return header raw buffer
         if 'OrcaHeaderDecoder' in rb_lib: 
@@ -192,6 +204,30 @@ class OrcaStreamer(DataStreamer):
         else: rb = RawBuffer(lgdo=self.header_decoder.header)
         rb.loc = 1 # we have filled this buffer
         return [rb]
+
+
+    def read_packet(self, verbosity=0):
+        """ Read a packet of data.
+
+        Data written to self.rb_lib.
+        """
+        # read until we get a decodeable packet
+        while True:
+            packet = self.load_packet(skip_unknown_ids=True)
+            if packet is None: return False
+            self.packet_id += 1
+
+            # look up the data id, decoder, and rbl
+            data_id = orca_packet.get_data_id(packet)
+            if verbosity>0: print(f'packet {self.packet_id}: data_id = {data_id}')
+            if data_id in self.decoder_id_dict: break
+
+        # now decode
+        decoder = self.decoder_id_dict[data_id]
+        rbl = self.rbl_id_dict[data_id]
+        self.any_full |= decoder.decode_packet(packet, self.packet_id, rbl, verbosity=verbosity)
+        return True
+
 
 
 '''
