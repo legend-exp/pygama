@@ -5,10 +5,33 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
+All extra tools needed to develop *pygama* are listed as optional dependencies
+and can be installed via pip by running:
+
+.. code-block:: console
+
+    $ pip install .[all]
+
 Code style
 ----------
 
-*In progress...*
+A set of `pre-commit <https://pre-commit.com>`_ hooks is configured to make
+sure that *pygama* coherently follows standard coding style conventions. The
+pre-commit tool is able to identify common style problems and automatically fix
+them, wherever possible. Configured hooks are listed in the
+``.pre-commit-config.yaml`` file at the project root folder. They are run
+remotely on the GitHub repository through the `pre-commit bot
+<https://pre-commit.ci>`_, but can also be run locally before submitting a
+pull request (recommended):
+
+.. code-block:: console
+
+   $ pip install pre-commit      # required
+   $ pre-commit run --all-files  # analyse the source code and fix it wherever possible
+   $ pre-commit install          # install a Git pre-commit hook (optional)
+
+For a more comprehensive guide, check out the `Scikit-HEP documentation about
+code style <https://scikit-hep.org/developer/style>`_.
 
 Testing
 -------
@@ -22,11 +45,11 @@ Testing
   overview.
 * *pygama* tests belong to three categories:
 
-  :micro-tests: Should ensure the correct behaviour of each function
+  :unit tests: Should ensure the correct behaviour of each function
       independently, possibly without relying on other *pygama* methods. The
-      existence of these microscopic tests makes it possible to promptly
-      identify and fix the source of a bug. An example of this are tests for
-      each single DSP processor
+      existence of these micro-tests makes it possible to promptly identify and
+      fix the source of a bug. An example of this are tests for each single DSP
+      processor
 
   :integration tests: Should ensure that independent parts of the code base
       work well together and are integrated in a cohesive framework. An example
@@ -40,10 +63,25 @@ Testing
 * Unit tests are automatically run for every push event and pull request to the
   remote Git repository on a remote server (currently handled by GitHub
   actions). Every pull request must pass all tests before being approved for
-  merging
+  merging. Running the test suite is simple:
+
+  .. code-block:: console
+
+     $ pip install .[test]
+     $ pytest
+
 * Additionally, pull request authors are required to provide tests with
   sufficient code coverage for every proposed change or addition. If necessary,
-  high-level functional tests should be updated.
+  high-level functional tests should be updated. We currently rely on
+  `codecov.io <https://app.codecov.io/gh/legend-exp/pygama>`_ to keep track of
+  the test coverage. To generate a local coverage report (recommended before
+  submitting pull requests), run:
+
+  .. code-block:: console
+
+     $ pip install .[test]
+     $ coverage run -m pytest
+     $ coverage report
 
 Documentation
 -------------
@@ -96,24 +134,20 @@ Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
 
 Scripts and tools to build documentation are located below ``docs/``. To build
-documentation, the ``sphinx``, ``sphinx-rtd-theme`` and ``sphinx-multiversion``
-Python packages are required. At the moment, *pygama* is using a ``sphinx-multiversion``
-functionality only available through a fork of the project
-(``samtygier-stfc/sphinx-multiversion``, at the ``prebuild_command`` branch). With pip,
-it can be installed with the following command:
+documentation, ``sphinx``, ``sphinx-rtd-theme`` and a couple of additional
+Python packages are required. You can get all the needed dependencies by running:
 
 .. code-block:: console
 
-    $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+   $ pip install .[docs]
 
-This will probably change in the future. To build documentation for the current
-Git ref, run the following commands:
+To build documentation for the current Git ref, run the following commands:
 
 .. code-block:: console
 
-    $ cd docs
-    $ make clean
-    $ make
+   $ cd docs
+   $ make clean
+   $ make
 
 Documentation can be then displayed by opening ``build/html/index.html`` with a
 web browser.  To build documentation for all main *pygama* versions (development
@@ -137,22 +171,18 @@ new project version must implement the following procedures:
 
 * `Semantic versioning <https://semver.org>`_ is adopted. The version string
   uses the ``MAJOR.MINOR.PATCH`` format.
-* The version string is manually specified in ``pygama/version.py``. If needed
-  elsewhere in the source code (e.g. in ``setup.py``), must be read in from here.
 * To release a new **minor** or **major version**, the following procedure
   should be followed:
 
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
+  1. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
      the code at the intended stage is created
-  3. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
+  2. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
      -m 'short descriptive message here'`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
 
 * To release a new **patch version**, the following procedure should be followed:
 
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A commit with the patch is created on the relevant release branch
+  1. A commit with the patch is created on the relevant release branch
      ``releases/vMAJOR.MINOR``
-  3. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  2. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
+  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
