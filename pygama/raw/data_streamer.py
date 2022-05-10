@@ -124,7 +124,7 @@ class DataStreamer(ABC):
         still_has_data : bool
             Returns true while there is still data to read
         """
-        return true
+        return True
 
 
     def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True, verbosity=0):
