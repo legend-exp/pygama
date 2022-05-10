@@ -3,10 +3,8 @@ import sys
 
 import numba as nb
 import numpy as np
-from iminuit import Minuit, cost, util
-from scipy.integrate import simps
-from scipy.optimize import brentq, curve_fit, minimize, minimize_scalar
-from scipy.special import erf, erfc, gammaln
+from iminuit import Minuit, cost
+from scipy.optimize import brentq, minimize_scalar
 from scipy.stats import crystalball
 
 import pygama.math.histogram as pgh
@@ -17,21 +15,33 @@ kwd = {"parallel": False, "fastmath": True}
 def fit_hist(func, hist, bins, var=None, guess=None,
              poissonLL=False, integral=None, method=None, bounds=None):
     """
-    DEPRECATED USE FIT_BINNED
+    .. deprecated:: 0.8
+        Replaced by :func:`.fit_binned`. Will be removed in future releases.
 
     do a binned fit to a histogram (nonlinear least squares).
     can either do a poisson log-likelihood fit (jason's favourite) or
     use curve_fit w/ an arbitrary function.
-    - hist, bins, var : as in return value of pygama.histograms.get_hist()
-    - guess : initial parameter guesses. Should be optional -- we can auto-guess
-              for many common functions. But not yet implemented.
-    - poissonLL : use Poisson stats instead of the Gaussian approximation in
-                  each bin. Requires integer stats. You must use parameter
-                  bounds to make sure that func does not go negative over the
-                  x-range of the histogram.
-    - method, bounds : options to pass to scipy.optimize.minimize
+
+    Parameters
+    ----------
+    func
+        function to be fitted
+    hist, bins, var
+        as in return value of pygama.histograms.get_hist()
+    guess
+        initial parameter guesses. Should be optional -- we can auto-guess for
+        many common functions. But not yet implemented.
+    poissonLL
+        use Poisson stats instead of the Gaussian approximation in each bin.
+        Requires integer stats. You must use parameter bounds to make sure that
+        func does not go negative over the x-range of the histogram.
+    integral
+        DOCME
+    method, bounds
+        options to pass to :func:`scipy.optimize.minimize`
+
     Returns
-    ------
+    -------
     coeff, cov_matrix : tuple(array, matrix)
     """
 
@@ -44,32 +54,27 @@ def fit_hist(func, hist, bins, var=None, guess=None,
 
 def fit_binned(func, hist, bins, var=None, guess=None,
              cost_func='LL', Extended=True,  simplex=False, bounds=None, fixed = None):
-    """
-    Do a binned fit to a histogram.
-    Default is Extended Log Likelihood fit, with option for either Least Squares or other cost function.
+    """Do a binned fit to a histogram.
 
-    Inputs
-    ------
+    Default is Extended Log Likelihood fit, with option for either Least
+    Squares or other cost function.
 
+    Parameters
+    ----------
     func : the function to fit, if using LL as method needs to be a cdf
-
     hist, bins, var : histogrammed data
-
     guess : initial guess parameters
-
-    cost_func: cost function to use
-
-    Extended: run extended or non extended fit
-
-    simplex: whether to include a round of simpson minimisation before main minimisation
-
+    cost_func : cost function to use
+    Extended : run extended or non extended fit
+    simplex : whether to include a round of simpson minimisation before main minimisation
     bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-
-    fixed: list of parameter indices to fix
+    fixed : list of parameter indices to fix
 
     Returns
-    ------
-    coeff, error cov_matrix : tuple(array, array, matrix)
+    -------
+    coeff : array
+    error : array
+    cov_matrix : array
     """
 
 
@@ -125,32 +130,19 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 def fit_unbinned(func, data, guess=None,
              Extended=True, cost_func = 'LL',simplex=False,
              bounds=None, fixed=None):
-    """
-
-    Do a unbinned fit to data.
+    """Do a unbinned fit to data.
     Default is Extended Log Likelihood fit, with option for other cost functions.
 
-    Inputs
-    ------
-
+    Parameters
+    ----------
     func : the function to fit
-
-    data:
-
+    data : the data
     guess : initial guess parameters
-
-    Extended: run extended or non extended fit
-
-    cost_func: cost function to use
-
-    simplex: whether to include a round of simpson minimisation before main minimisation
-
+    Extended : run extended or non extended fit
+    cost_func : cost function to use
+    simplex : whether to include a round of simpson minimisation before main minimisation
     bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-
-    fixed: list of parameter indices to fix
-
-    Returns
-    ------
+    fixed : list of parameter indices to fix
     coeff, cov_matrix : tuple(array, matrix)
     """
     if guess is None:
@@ -178,7 +170,8 @@ def fit_unbinned(func, data, guess=None,
     return m.values, m.errors, m.covariance
 
 def goodness_of_fit(hist, bins, var, func, pars, method='var'):
-    """ Compute chisq and dof of fit
+    """Compute chisq and dof of fit
+
     Parameters
     ----------
     hist, bins, var : array, array, array or None
@@ -192,6 +185,7 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
         'var': user passes in the variances in var (must not have zeros)
         'Pearson': use func (hist must contain integer counts)
         'Neyman': use hist (hist must contain integer counts and no zeros)
+
     Returns
     -------
     chisq : float
@@ -264,19 +258,25 @@ def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
 
 def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
                          cost_func='Least Squares', inflate_errors=False, gof_method='var'):
-    """
+    r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
     maximum of the hist (or the max near mode_guess, if provided). This is
     equivalent to a Taylor expansion around the peak maximum because near its
     maximum a Gaussian can be approximated by a 2nd-order polynomial in x:
-    A exp[ -(x-mu)^2 / 2 sigma^2 ] ~= A [ 1 - (x-mu)^2 / 2 sigma^2 ]
-                                    = A - (1/2!) (A/sigma^2) (x-mu)^2
+
+    .. math::
+
+        A \exp[ -(x-\mu)^2 / 2 \sigma^2 ]
+        \simeq A [ 1 - (x-\mu)^2 / 2 \sigma^2 ]
+        = A - (1/2!) (A/\sigma^2) (x-\mu)^2
+
     The advantage of using a gaussian over a polynomial directly is that the
     gaussian parameters are the ones we care about most for a peak, whereas for
     a poly we would have to extract them after the fit, accounting for
     covariances. The gaussian also better approximates most peaks farther down
     the peak. However, the gauss fit is nonlinear and thus less stable.
+
     Parameters
     ----------
     hist : array-like
@@ -293,27 +293,28 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     n_bins : int (optional)
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
-    poissonLL : bool (optional)
-        Flag passed to fit_hist()
+    cost_func : str (optional)
+        Passed to fit_binned()
     inflate_errors : bool (optional)
         If true, the parameter uncertainties are inflated by sqrt(chi2red)
         if it is greater than 1
     gof_method : str (optional)
         method flag for goodness_of_fit
+
     Returns
     -------
-    (pars, cov) : tuple (array, matrix)
-        pars : 3-tuple containing the parameters (mode, sigma, maximum) of the
-               gaussian fit
-            mode : the estimated x-position of the maximum
-            sigma : the estimated width of the peak. Equivalent to a gaussian
-                width (sigma), but based only on the curvature within n_bins of
-                the peak.  Note that the Taylor-approxiamted curvature of the
-                underlying function in the vicinity of the max is given by max /
-                sigma^2
-            maximum : the estimated maximum value of the peak
-        cov : 3x3 matrix of floats
-            The covariance matrix for the 3 parameters in pars
+    pars : 3-tuple containing the parameters (mode, sigma, maximum) of the
+        gaussian fit
+
+        - mode : the estimated x-position of the maximum
+        - sigma : the estimated width of the peak. Equivalent to a gaussian
+          width (sigma), but based only on the curvature within n_bins of
+          the peak.  Note that the Taylor-approxiamted curvature of the
+          underlying function in the vicinity of the max is given by max /
+          sigma^2
+        - maximum : the estimated maximum value of the peak
+    cov : 3x3 matrix of floats
+        The covariance matrix for the 3 parameters in pars
     """
 
     bin_centers = pgh.get_bin_centers(bins)
@@ -340,18 +341,20 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 
 
 def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
-    """ Alias for gauss_mode_width_max that just returns the max and mode
-    Parameters
+    """Alias for gauss_mode_width_max that just returns the max and mode
+
+    See Also
     --------
-    See gauss_mode_width_max
+    gauss_mode_width_max
+
     Returns
     -------
-    (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (mode, maximum) of the gaussian fit
-            mode : the estimated x-position of the maximum
-            maximum : the estimated maximum value of the peak
-        cov : 2x2 matrix of floats
-            The covariance matrix for the 2 parameters in pars
+    pars : 2-tuple with the parameters (mode, maximum) of the gaussian fit
+        mode : the estimated x-position of the maximum
+        maximum : the estimated maximum value of the peak
+    cov : 2x2 matrix of floats
+        The covariance matrix for the 2 parameters in pars
+
     Examples
     --------
     >>> import pygama.analysis.histograms as pgh
@@ -367,9 +370,10 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
 
 
 def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
-    """ Get the max and mode of a peak based on Taylor exp near the max
+    """Get the max and mode of a peak based on Taylor exp near the max
     Returns the amplitude and position of a peak based on a poly fit over n_bins
     in the vicinity of the maximum of the hist (or the max near mode_guess, if provided)
+
     Parameters
     ----------
     hist : array-like
@@ -386,14 +390,17 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     n_bins : int
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
+    poissonLL
+        DOCME
+
     Returns
     -------
-    (pars, cov) : tuple (array, matrix)
-        pars : 2-tuple with the parameters (mode, max) of the fit
-            mode : the estimated x-position of the maximum
-            maximum : the estimated maximum value of the peak
-        cov : 2x2 matrix of floats
-            The covariance matrix for the 2 parameters in pars
+    pars : 2-tuple with the parameters (mode, max) of the fit
+        mode : the estimated x-position of the maximum
+        maximum : the estimated maximum value of the peak
+    cov : 2x2 matrix of floats
+        The covariance matrix for the 2 parameters in pars
+
     Examples
     --------
     >>> import pygama.analysis.histograms as pgh
@@ -421,7 +428,6 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
 
 @nb.njit(**kwd)
 def nb_erf(x):
-
     """
     Numba version of error function
     """
@@ -433,7 +439,6 @@ def nb_erf(x):
 
 @nb.njit(**kwd)
 def nb_erfc(x):
-
     """
     Numba version of complementary error function
     """
@@ -445,7 +450,6 @@ def nb_erfc(x):
 
 @nb.njit(**kwd)
 def gauss(x, mu, sigma):
-
     """
     Gaussian, unnormalised for use in building pdfs, w/ args: mu, sigma.
     """
@@ -457,7 +461,6 @@ def gauss(x, mu, sigma):
 
 @nb.njit(**kwd)
 def gauss_norm(x, mu, sigma):
-
     """
     Normalised Gaussian, w/ args: mu, sigma.
     """
@@ -484,7 +487,6 @@ def gauss_amp(x, mu, sigma, a):
 
 @nb.njit(**kwd)
 def gauss_pdf(x, mu, sigma, n_sig):
-
     """
     Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
     """
@@ -493,7 +495,6 @@ def gauss_pdf(x, mu, sigma, n_sig):
 
 
 def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
-
     """
     define a gaussian signal on a uniform background,
     args: n_sig mu, sigma for the signal and n_bkg for the background
@@ -506,7 +507,6 @@ def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
 
 
 def gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
-
     """
     gaussian signal + linear background function
     args: n_sig mu, sigma for the signal and n_bkg,b,m for the background
@@ -522,7 +522,6 @@ def gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
 
 @nb.njit(**kwd)
 def step_int(x,mu,sigma, hstep):
-
     """
     Integral of step function w/args mu, sigma, hstep
     """
@@ -533,7 +532,6 @@ def step_int(x,mu,sigma, hstep):
 
 @nb.njit(**kwd)
 def unnorm_step_pdf(x,  mu, sigma, hstep):
-
     """
     Unnormalised step function for use in pdfs
     """
@@ -545,7 +543,6 @@ def unnorm_step_pdf(x,  mu, sigma, hstep):
 
 @nb.njit(**kwd)
 def step_pdf(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
-
     """
     Normalised step function w/args mu, sigma, hstep
     Can be used as a component of other fit functions
@@ -562,7 +559,6 @@ def step_pdf(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
 
 @nb.njit(**kwd)
 def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
-
     """
     CDF for step function w/args mu, sigma, hstep
     """
@@ -578,7 +574,6 @@ def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
     return cdf+c
 
 def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
-
     """
     Pdf for Gaussian on step background
     args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
@@ -598,7 +593,6 @@ def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , uppe
         return n_sig*gauss_norm(x,mu,sigma), n_bkg*bkg
 
 def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
-
     """
     Pdf for Gaussian on step background for Compton spectrum, returns also the total number of events for extended unbinned fits
     args: n_sig mu, sigma for the signal and n_bkg, hstep for the background
@@ -611,7 +605,6 @@ def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.i
         return n_sig+n_bkg, sig, bkg
 
 def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
-
     """
     Cdf for Gaussian on step background
     args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
@@ -631,7 +624,6 @@ def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper
 
 @nb.njit(**kwd)
 def gauss_tail_pdf(x, mu, sigma, tau):
-
     """
     A gaussian tail function template
     Can be used as a component of other fit functions w/args mu,sigma,tau
@@ -661,7 +653,6 @@ def gauss_tail_approx(x, mu, sigma, tau):
 
 @nb.njit(**kwd)
 def gauss_tail_integral(x,mu,sigma,tau):
-
     """
     Integral for gaussian tail
     """
@@ -673,9 +664,9 @@ def gauss_tail_integral(x,mu,sigma,tau):
 
 @nb.njit(**kwd)
 def gauss_tail_norm(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
-
     """
-    Normalised gauss tail. Note: this is only needed when the fitting range does not include the whole tail
+    Normalised gauss tail. Note: this is only needed when the fitting range
+    does not include the whole tail
     """
 
     tail = gauss_tail_pdf(x,mu,sigma,tau)
@@ -688,7 +679,6 @@ def gauss_tail_norm(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
 
 @nb.njit(**kwd)
 def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
-
     """
     CDF for gaussian tail
     """
@@ -704,7 +694,6 @@ def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
     return cdf+c
 
 def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
-
     """
     Pdf for gaussian with tail
     """
@@ -726,7 +715,6 @@ def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
         return (1-htail)*peak, htail*tail
 
 def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
-
     """
     Cdf for gaussian with tail
     """
@@ -749,9 +737,9 @@ def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
 
 def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                 lower_range=np.inf , upper_range=np.inf,  components=False):
-
     """
-    David Radford's HPGe peak shape PDF consists of a gaussian with tail signal on a step background
+    David Radford's HPGe peak shape PDF consists of a gaussian with tail signal
+    on a step background
     """
 
     try:
@@ -771,7 +759,6 @@ def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
 
 def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                          lower_range=np.inf , upper_range=np.inf, components=False):
-
     """
     Pdf for gaussian with tail signal and step background, also returns number of events
     """
@@ -784,7 +771,6 @@ def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
         return n_sig + n_bkg, peak, tail, bkg
 
 def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
-
     """
     Cdf for gaussian with tail signal and step background
     """
@@ -805,8 +791,9 @@ def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.in
 
 def radford_fwhm(sigma, htail, tau,  cov = None):
     """
-    Return the FWHM of the radford_peak function, ignoring background and
-    step components. If calculating error also need the normalisation for the step function.
+    Return the FWHM of the radford_peak function, ignoring background and step
+    components. If calculating error also need the normalisation for the step
+    function.
     """
     # optimize this to find max value
     def neg_radford_peak_bgfree(E, sigma, htail, tau):
@@ -997,6 +984,7 @@ def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, 
     """
     A Fit function exclusevly for a 241Am 99keV and 103keV lines situation
     Consists of
+
      - three gaussian peaks (two lines + one bkg line in between)
      - two steps (for the two lines)
      - two tails (for the two lines)
@@ -1033,9 +1021,10 @@ def double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation
     Consists of
+
      - two gaussian peaks (two lines)
      - one step
-     """
+    """
     bkg = n_bkg*step_pdf(x, mu1, sigma1, hstep, lower_range, upper_range)
     if np.any(bkg<0):
         return 0, np.zeros_like(x)
@@ -1051,9 +1040,10 @@ def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg
     """
     A Fit function exclusevly for a 133Ba 81keV peak situation
     Consists of
+
      - two gaussian peaks (two lines)
      - one step
-     """
+    """
 
     if components == False:
         pdf = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,

@@ -62,8 +62,8 @@ class DataStreamer(ABC):
         -------
         header_data: list(RawBuffer), int
             header_data is a list of RawBuffer's containing any file header
-                data, ready for writing to file or further processing. It's not
-                a RawBufferList since the buffers may have a different format
+            data, ready for writing to file or further processing. It's not a
+            RawBufferList since the buffers may have a different format
         """
         # call super().initialize([args]) to run this default code
         # after loading header info, then follow it with the return call.
@@ -143,15 +143,15 @@ class DataStreamer(ABC):
 
         Parameters
         ----------
-        chunk_mode_override: 'any_full', 'only_full', 'single_packet', or None
-            None : do not override self.chunk_mode
-            'any_full' : returns all raw buffers with data as soon as any one
-                buffer gets full
-            'only_full' : returns only those raw buffers that became full (or
-                nearly full) during the read. This minimizes the number of write calls.
-            'single_packet' : returns all raw buffers with data after a single
-                read is performed. This is useful for streaming data out as soon
-                as it is read in (e.g. for diagnostics or in-line analysis)
+        chunk_mode_override : 'any_full', 'only_full', 'single_packet', or None
+            - None : do not override self.chunk_mode
+            - 'any_full' : returns all raw buffers with data as soon as any one
+              buffer gets full
+            - 'only_full' : returns only those raw buffers that became full (or
+              nearly full) during the read. This minimizes the number of write calls.
+            - 'single_packet' : returns all raw buffers with data after a single
+              read is performed. This is useful for streaming data out as soon
+              as it is read in (e.g. for diagnostics or in-line analysis)
         rp_max : int
             maximum number of packets to read before returning anyway, even if
             one of the other conditions is not met

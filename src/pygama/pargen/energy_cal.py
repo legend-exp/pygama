@@ -1,5 +1,5 @@
-"""
-routines for automatic calibration.
+"""routines for automatic calibration.
+
 - hpge_find_E_peaks (Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV)
 - hpge_get_E_peaks (Get uncalibrated E peaks at the energies of peaks_keV)
 - hpge_fit_E_peaks (fits the energy peals)
@@ -19,13 +19,14 @@ import pygama.math.utils as pgu
 
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
-    """ Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
+    """Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
     Note: the specialization here to units "keV" in peaks and Etol is
     unnecessary. However it is kept so that the default value for Etol_keV has
     an unambiguous interpretation.
+
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
         var cannot contain any zero entries.
     peaks_keV : array
@@ -40,6 +41,9 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
         number used to replace zeros of var to avoid divide-by-zero in
         hist/sqrt(var). Default value is 1. Usually when var = 0 its because
         hist = 0, and any value here is fine.
+    verbose : bool
+        print debug messages
+
     Returns
     -------
     detected_peak_locations : list
@@ -78,10 +82,11 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
 
 
 def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5, var_zero=1, verbose = False):
-    """ Get uncalibrated E peaks at the energies of peaks_keV
+    """Get uncalibrated E peaks at the energies of peaks_keV
+
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
         var cannot contain any zero entries.
     cal_pars : array
@@ -96,6 +101,9 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
         number used to replace zeros of var to avoid divide-by-zero in
         hist/sqrt(var). Default value is 1. Usually when var = 0 its because
         hist = 0, and any value here is fine.
+    verbose : bool
+        print debug messages
+
     Returns
     -------
     got_peak_locations : list
@@ -146,21 +154,23 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
 
 def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
                          cost_func = 'Least Squares', inflate_errors=False, gof_method='var'):
-    """ Fit gaussians to the tops of peaks
+    """Fit gaussians to the tops of peaks
+
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist()
     peak_locs : array
         locations of peaks in hist. Must be accurate two within +/- 2*n_to_fit
     n_to_fit : int
         number of hist bins near the peak top to include in the gaussian fit
-    poissonLL : bool (optional)
+    cost_func : bool (optional)
         Flag passed to gauss_mode_width_max()
     inflate_errors : bool (optional)
         Flag passed to gauss_mode_width_max()
     gof_method : str (optional)
         method flag passed to gauss_mode_width_max()
+
     Returns
     -------
     pars_list : list of array
@@ -186,10 +196,11 @@ def hpge_fit_E_peak_tops(hist, bins, var, peak_locs, n_to_fit=7,
 
 
 def get_hpge_E_peak_par_guess(hist, bins, var, func):
-    """ Get parameter guesses for func fit to peak in hist
+    """Get parameter guesses for func fit to peak in hist
+
     Parameters
     ----------
-    hist, bins, var: array, array, array
+    hist, bins, var : array, array, array
         Histogram of uncalibrated energies, see pgh.get_hist(). Should be
         windowed around the peak.
     func : function
@@ -320,7 +331,8 @@ def get_hpge_E_bounds(func):
 def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf,
                      method = 'unbinned', gof_funcs=None, n_events=15000, allowed_p_val= 0.05,
                      uncal_is_int=False, simplex=False):
-    """ Fit the Energy peaks specified using the function given
+    """Fit the Energy peaks specified using the function given
+
     Parameters
     ----------
     E_uncal : array
@@ -334,16 +346,17 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
         array of number of bins to use for the fit window histogramming
     funcs : function or array of functions
         funcs to be used to fit each region
-    method: str
-            default is unbinned fit can specify to use binned fit method instead
+    method : str
+        default is unbinned fit can specify to use binned fit method instead
     gof_funcs : function or array of functions
-            functions to use for calculation goodness of fit if unspecified will use same func as fit
+        functions to use for calculation goodness of fit if unspecified will use same func as fit
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
     simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
     n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit
+    allowed_p_val : lower limit on p_val of fit
+
     Returns
     -------
     pars : list of array
@@ -442,8 +455,9 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
 
 
 def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
-    """ Find best fit of poly(E) = mus +/- sqrt(mu_vars)
+    """Find best fit of poly(E) = mus +/- sqrt(mu_vars)
     Compare to hpge_fit_E_cal_func which fits for E = poly(mu)
+
     Parameters
     ----------
     mus : array
@@ -455,6 +469,7 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
+
     Returns
     -------
     pars : array
@@ -472,10 +487,11 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
 
 
 def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
-    """ Find best fit of E = poly(mus +/- sqrt(mu_vars))
+    """Find best fit of E = poly(mus +/- sqrt(mu_vars))
     This is an inversion of hpge_fit_E_scale.
     E uncertainties are computed from mu_vars / dmu/dE where mu = poly(E) is the
     E_scale function
+
     Parameters
     ----------
     mus : array
@@ -484,11 +500,12 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
         variances in the mus
     Es_keV : array
         energies to fit to, in keV
-    k
-        hpge_fit_E_scale)
+    E_scale_pars : array
+        ???
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
+
     Returns
     -------
     pars : array
@@ -513,9 +530,10 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
 
 
 def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None,
-                        funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
-                        n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
-    """ Calibrate HPGe data to a set of known peaks
+                       funcs=pgf.gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
+                       n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
+    """Calibrate HPGe data to a set of known peaks
+
     Parameters
     ----------
     E_uncal : array
@@ -529,18 +547,29 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         degree of the polynomial for the E_cal function E_keV = poly(E_uncal).
         deg = 0 corresponds to a simple scaling E_keV = scale * E_uncal.
         Otherwise follows the convention in np.polyfit
-    method: str
-            default is unbinned fit can specify to use binned fit method instead
-    gof_funcs : function or array of functions
-            functions to use for calculation goodness of fit if unspecified will use same func as fit
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         E_uncal
     range_keV : float, tuple, array of floats, or array of tuples of floats
         ranges around which the peak fitting is performed
         if tuple(s) are supplied, they provide the left and right ranges
-    n_events : int number of events to use for unbinned fit
-    allowed_p_val: lower limit on p_val of fit
+    funcs
+        DOCME
+    gof_funcs : function or array of functions
+        functions to use for calculation goodness of fit if unspecified will use same func as fit
+    method : str
+        default is unbinned fit can specify to use binned fit method instead
+    gof_func
+        DOCME
+    n_events : int
+        number of events to use for unbinned fit
+    simplex : bool
+        DOCME
+    allowed_p_val
+        lower limit on p_val of fit
+    verbose : bool
+        print debug statements
+
     Returns
     -------
     pars, cov : array, 2D array
@@ -738,13 +767,14 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
 
 
 def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
-    """
-    Find the polynomial function best matching pol(xx) = yy
+    """Find the polynomial function best matching pol(xx) = yy
+
     Finds the poly fit of xx to yy that obtains the most matches between pol(xx)
     and yy in the np.isclose() sense. If multiple fits give the same number of
     matches, the fit with the best gof is used, where gof is computed only among
     the matches.
     Assumes that the relationship between xx and yy is monotonic
+
     Parameters
     ----------
     xx : array-like
@@ -763,6 +793,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
     atol : float
         the absolute tolerance to be sent to np.isclose(). Has the same units
         as yy.
+
     Returns
     -------
     pars: None or array of floats
@@ -884,11 +915,12 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 
 
 def get_i_local_extrema(data, delta):
-    """
-    Get lists of indices of the local maxima and minima of data
+    """Get lists of indices of the local maxima and minima of data
+
     The "local" extrema are those maxima / minima that have heights / depths of
     at least delta.
     Converted from MATLAB script at: http://billauer.co.il/peakdet.html
+
     Parameters
     ----------
     data : array-like
@@ -896,6 +928,7 @@ def get_i_local_extrema(data, delta):
     delta : scalar
         the absolute level by which data must vary (in one direction) about an
         extremum in order for it to be tagged
+
     Returns
     -------
     imaxes, imins : 2-tuple ( array, array )
@@ -948,11 +981,11 @@ def get_i_local_minima(data, delta): return get_i_local_extrema(data, delta)[1]
 
 def get_most_prominent_peaks(energySeries, xlo, xhi, xpb,
                              max_num_peaks=np.inf, test=False):
-    """
-    find the most prominent peaks in a spectrum by looking for spikes in derivative of spectrum
-    energySeries: array of measured energies
-    max_num_peaks = maximum number of most prominent peaks to find
-    return a histogram around the most prominent peak in a spectrum of a given percentage of width
+    """find the most prominent peaks in a spectrum by looking for spikes in
+    derivative of spectrum energySeries: array of measured energies
+    max_num_peaks = maximum number of most prominent peaks to find return a
+    histogram around the most prominent peak in a spectrum of a given
+    percentage of width
     """
     nb = int((xhi-xlo)/xpb)
     hist, bin_edges = np.histogram(energySeries, range=(xlo, xhi), bins=nb)

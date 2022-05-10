@@ -14,7 +14,6 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.autosectionlabel',
     'sphinx_rtd_theme',
     'sphinx_multiversion',
     'myst_parser'

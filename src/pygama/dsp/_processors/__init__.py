@@ -1,2 +1,3 @@
 """
+Package documentation
 """

@@ -21,8 +21,26 @@ class ArrayOfEqualSizedArrays(Array):
         dims : tuple of ints (optional)
             specifies the dimensions required for building the
             ArrayOfEqualSizedArrays' datatype attribute
+        nda : ndarray (optional)
+            An ndarray to be used for this object's internal array. Note: the
+            array is used directly, not copied. If not supplied, internal memory
+            is newly allocated based on the shape and dtype arguments.
+        shape : tuple of ints (optional)
+            A numpy-format shape specification for shape of the internal
+            ndarray. Required if nda is None, otherwise unused.
+        dtype : numpy dtype (optional)
+            Specifies the type of the data in the array. Required if nda is
+            None, otherwise unused.
+        fill_val : scalar or None
+            If None, memory is allocated without initialization. Otherwise, the
+            array is allocated with all elements set to the corresponding fill
+            value. If nda is not None, this parameter is ignored
+        attrs : dict (optional)
+            A set of user attributes to be carried along with this lgdo
 
-        See Array.__init__ for optional args
+        See Also
+        --------
+        :class:`.Array`
         """
         self.dims = dims
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)

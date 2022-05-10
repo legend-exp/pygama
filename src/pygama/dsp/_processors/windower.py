@@ -19,11 +19,11 @@ def windower(w_in, t0_in, w_out):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    t0_in: int
-           The starting index of the window
-    w_out: array-like
-           The windowed waveform
+        The input waveform
+    t0_in : int
+        The starting index of the window
+    w_out : array-like
+        The windowed waveform
     """
     w_out[:] = np.nan
 

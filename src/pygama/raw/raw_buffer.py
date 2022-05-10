@@ -1,59 +1,62 @@
-"""
-raw_buffer.py: manages data buffering for raw data conversion
+r"""
+:mod:`.raw_buffer` manages data buffering for raw data conversion
 
 Manages LGDO buffers and their corresponding output streams. Allows for
 one-to-many mapping of input sreams to output streams.
 
 Primary Classes
 ---------------
-RawBuffer: an lgdo (e.g. a table) along with buffer metadata, such as the
+:class:`.RawBuffer`: an LGDO (e.g. a table) along with buffer metadata, such as the
 current write location, the list of keys (e.g. channels) that write to it, the
 output stream it is associated with (if any), etc. Each data_decoder is
-associated with a RawBuffer of a particular format.
+associated with a :class:`.RawBuffer` of a particular format.
 
-RawBufferList: a collection of RawBuffers with lgdo's that all have the same
-structure (same type, same fields, etc). A data_decoder will write its output to
-a RawBufferList.
+:class:`.RawBufferList`: a collection of :class:`RawBuffer` with LGDO's that
+all have the same structure (same type, same fields, etc). A data_decoder will
+write its output to a :class:`.RawBufferList`.
 
-RawBufferLibrary: a collection (dict) of RawBufferLists, e.g. one for each
-data_decoder. Keyed by the decoder name.
+:class:`.RawBufferLibrary`: a collection (dict) of :class:`RawBufferList`\ s,
+e.g. one for each data_decoder. Keyed by the decoder name.
 
-RawBuffers support a json short-hand notation, see
-RawBufferLibrary.set_from_json_dict() for full specification.
+:class:`.RawBuffer` supports a JSON short-hand notation, see
+:meth:`.RawBufferLibrary.set_from_json_dict` for full specification.
 
-Example json yielding a valid RawBufferLibrary is below. In the example, the
-user would call RawBufferLibrary.set_from_json_dict(json_dict, kw_dict) with
-kw_dict containing an entry for 'file_key'. The other keywords {key} and {name}
-are understood by and filled in during set_from_json_dict() unless overloaded in
-kw_dict. Note the use of the wildcard "*": this will match all other decoder
-names / keys.
+Example JSON yielding a valid :class:`.RawBufferLibrary` is below. In the
+example, the user would call ``RawBufferLibrary.set_from_json_dict(json_dict,
+kw_dict)`` with ``kw_dict`` containing an entry for ``'file_key'``. The other
+keywords ``{key}`` and ``{name}`` are understood by and filled in during
+:meth:`.RawBufferLibrary.set_from_json_dict` unless overloaded in ``kw_dict``.
+Note the use of the wildcard ``*``: this will match all other decoder names /
+keys.
 
-{
-  "FCEventDecoder" : {
-    "g{key:0>3d}" : {
-      "key_list" : [ [24,64] ],
-      "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
-    },
-    "spms" : {
-      "key_list" : [ [6,23] ],
-      "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
-    },
-    "puls" : {
-      "key_list" : [ 0 ],
-      "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
-    },
-    "muvt" : {
-      "key_list" : [ 1, 5 ],
-      "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
+.. code-block :: json
+
+    {
+      "FCEventDecoder" : {
+        "g{key:0>3d}" : {
+          "key_list" : [ [24,64] ],
+          "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
+        },
+        "spms" : {
+          "key_list" : [ [6,23] ],
+          "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
+        },
+        "puls" : {
+          "key_list" : [ 0 ],
+          "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
+        },
+        "muvt" : {
+          "key_list" : [ 1, 5 ],
+          "out_stream" : "$DATADIR/{file_key}_auxs.lh5:/auxs"
+        }
+      },
+      "*" : {
+        "{name}" : {
+          "key_list" : [ "*" ],
+          "out_stream" : "$DATADIR/{file_key}_{name}.lh5"
+        }
+      }
     }
-  },
-  "*" : {
-    "{name}" : {
-      "key_list" : [ "*" ],
-      "out_stream" : "$DATADIR/{file_key}_{name}.lh5"
-    }
-  }
-}
 
 later: could initially make field "lgdo" a dict of args for lgdo.__init__(),
 e.g. to have object-specific buffer sizes
@@ -65,7 +68,7 @@ from pygama import lgdo
 
 
 class RawBuffer:
-    '''
+    """
     A RawBuffer is in essence a an lgdo object (typically a Table) to which
     decoded data will be written, along with some meta-data distinguishing
     what data goes into it, and where the lgdo gets written out. Also holds on
@@ -89,7 +92,7 @@ class RawBuffer:
         Socket example: '198.0.0.100:8000'
     out_name : str (optional)
         the name / identifier of the object in the output stream
-    '''
+    """
 
 
     def __init__(self, lgdo=None, key_list=[], out_stream='', out_name=''):
@@ -120,18 +123,18 @@ class RawBuffer:
 
 
 class RawBufferList(list):
-    '''
+    """
     A RawBufferList holds a collection of RawBuffers of identical structure
     (same format lgdo's with the same fields).
-    '''
+    """
 
 
     def get_keyed_dict(self, default=None):
-        ''' returns a dict of RawBuffers built from the buffers' key_lists
+        """ returns a dict of RawBuffers built from the buffers' key_lists
 
         Different keys may point to the same buffer. Requires the buffers in the
         RawBufferList to have non-overlapping key lists.
-        '''
+        """
         keyed_dict = {}
         for rb in self:
             for key in rb.key_list: keyed_dict[key] = rb
@@ -139,12 +142,12 @@ class RawBufferList(list):
 
 
     def set_from_json_dict(self, json_dict, kw_dict={}):
-        ''' set up a RawBufferList from a dict written in json shorthand
+        """set up a RawBufferList from a dict written in json shorthand
 
         See RawBufferLibrary.set_from_json_dict() for details
 
-        Note: json_dict is changed by this function
-        '''
+        Note: ``json_dict`` is changed by this function
+        """
         expand_rblist_json_dict(json_dict, kw_dict)
         for name in json_dict:
             rb = RawBuffer()
@@ -172,9 +175,9 @@ class RawBufferList(list):
         values : list
             The list of values of RawBuffer.attribute
 
-        Example
-        -------
-        output_file_list = rbl.get_list_of('out_stream')
+        Examples
+        --------
+        >>> output_file_list = rbl.get_list_of('out_stream')
         """
         values = []
         for rb in self:
@@ -189,32 +192,36 @@ class RawBufferList(list):
 
 
 class RawBufferLibrary(dict):
-    '''
+    """
     A RawBufferLibrary is a collection of RawBufferLists associated with the
     names of decoders that can write to them
-    '''
+    """
     def __init__(self, json_dict=None, kw_dict={}):
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
 
     def set_from_json_dict(self, json_dict, kw_dict={}):
-        ''' set up a RawBufferLibrary from a dict written in json shorthand
+        """ set up a RawBufferLibrary from a dict written in json shorthand
 
         Basic structure:
-        {
-        "list_name" : {
-          "name" : {
-              "key_list" : [ key1, key2, ... ],
-              "out_stream" : "out_stream_str",
-              "out_name" : "out_name_str" (optional)
-          }
-        }
+
+        .. code-block :: js
+
+            {
+            "list_name" : {
+              "name" : {
+                  "key_list" : [ "key1", "key2", "..." ],
+                  "out_stream" : "out_stream_str",
+                  "out_name" : "out_name_str" // (optional)
+              }
+            }
 
         By default "name" is used for the RawBuffer's "out_name" attribute, but
         this can be overridden if desired by providing an explicit "out_name"
 
         Allowed shorthands, in order of expansion:
+
         * key_list may have entries that are 2-integer lists corresponding to
           the first and last integer keys in a contiguous range (e.g. of
           channels) that get stored to the same buffer. These simply get
@@ -243,7 +250,7 @@ class RawBufferLibrary(dict):
         kw_dict : dict
             dict of keyword-value pairs for substitutions into the out_stream
             and out_name fields
-        '''
+        """
         for list_name in json_dict:
             if list_name not in self: self[list_name] = RawBufferList()
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
@@ -257,15 +264,17 @@ class RawBufferLibrary(dict):
         ----------
         attribute : str
             The RawBuffer attribute queried to make the list
+        unique : bool
+            Remove duplicates
 
         Returns
         -------
         values : list
             The list of values of RawBuffer.attribute
 
-        Example
-        -------
-        output_file_list = rbl.get_list_of('out_stream')
+        Examples
+        --------
+        >>> output_file_list = rbl.get_list_of('out_stream')
         """
         values = []
         for rb_list in self.values():
@@ -279,7 +288,7 @@ class RawBufferLibrary(dict):
 
 
 def expand_rblist_json_dict(json_dict, kw_dict):
-    """ Expand shorthands in json_dict representing a RawBufferList
+    """Expand shorthands in json_dict representing a RawBufferList
 
     See RawBufferLibrary.set_from_json_dict() for details
 
@@ -331,7 +340,7 @@ def expand_rblist_json_dict(json_dict, kw_dict):
 
 
 def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbosity=0):
-    ''' Write a list of RawBuffers to lh5 files and then clears them
+    """Write a list of RawBuffers to lh5 files and then clears them
 
     Parameters
     ----------
@@ -341,7 +350,11 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
     lh5_store : LH5Store or None
         Allows user to send in a store holding a collection of already open
         files (saves some time opening / closing files)
-    '''
+    wo_mode : str
+        write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
+    verbosity : bool
+        print debug messages
+    """
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0: continue # no data to write

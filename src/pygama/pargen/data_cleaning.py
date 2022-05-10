@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from .peak_fitting import *
+from pygama.math.peak_fitting import *
 
 
 def gaussian_cut(data, cut_sigma=3, plotAxis=None):
