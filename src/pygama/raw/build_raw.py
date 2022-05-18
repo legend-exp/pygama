@@ -37,11 +37,14 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         The name of the input stream to be converted. Typically a filename,
         including path. Can use environment variables. Some streamers may be
         able to (eventually) accept e.g. streaming over a port as an input.
+
     in_stream_type : str
         Type of stream used to write the input file.
         Options are 'ORCA', 'FlashCams', 'LlamaDaq', 'Compass', 'MGDO'
+
     out_spec : str or json dict or RawBufferLibrary or None
         Specification for the output stream.
+
         - If None, uses '{in_stream}.hdf5' as the output filename.
         - If a str not ending in '.json', interpreted as the output filename.
         - If a str ending in '.json', interpreted as a filename containing
@@ -51,15 +54,20 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
           used to build a RawBufferLibrary
         - If a RawBufferLibrary, the mapping of data to output file / group is
           taken from that.
+
     buffer_size : int
         Default size to use for data buffering
+
     n_max : int
         Maximum number of "row" of data to process from the input file
+
     overwrite : bool
         Sets whether to overwrite the output file(s) if it (they) already exist
+
     verbosity : int
         Sets the verbosity level. 0 gives the minimum output level.
-    kwargs : kwargs
+
+    **kwargs : kwargs
         Sent to RawBufferLibrary generation as kw_dict
     """
 

@@ -15,19 +15,21 @@ def log_check(w_in, w_log):
     Parameters
     ----------
     w_in : array-like
-           The input waveform
-    w_log: array-like
-           The output waveform with logged values
+        The input waveform
+    w_log : array-like
+        The output waveform with logged values
 
-    Processing Chain Example
-    ------------------------
-    "wf_logged": {
-        "function": "log_check",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_blsub[2100:]", "wf_logged"],
-        "unit": "ADC",
-        "prereqs": ["wf_blsub"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_logged": {
+            "function": "log_check",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_blsub[2100:]", "wf_logged"],
+            "unit": "ADC",
+            "prereqs": ["wf_blsub"]
+        }
     """
     w_log[:] = np.nan
 

@@ -16,13 +16,13 @@ they will help you if you need to do something trickier than is provided (e.g.
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pylab import rcParams
+from matplotlib import rcParams
 
 import pygama.math.utils as pgu
 
 
 def get_hist(data, bins=None, range=None, dx=None, wts=None):
-    """ return hist, bins, var after binning data
+    """return hist, bins, var after binning data
 
     This is just a wrapper for numpy.histogram, with optional weights for each
     element and proper computing of variances.
@@ -43,7 +43,7 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
     ----------
     data : array like
         The array of data to be histogrammed
-    bins: int, array, or str (optional)
+    bins : int, array, or str (optional)
         int: the number of bins to be used in the histogram
         array: an array of bin edges to use
         str: the name of the np.histogram automatic binning algorithm to use
@@ -62,12 +62,14 @@ def get_hist(data, bins=None, range=None, dx=None, wts=None):
 
     Returns
     -------
-    hist, bins, var : tuple (array, array, array)
-        hist : the values in each bin of the histogram
-        bins : an array of bin edges: bins[i] is the lower edge of the ith bin.
-               Note: it includes the upper edge of the last bin and does not
-               include underflow or overflow bins. So len(bins) = len(hist) + 1
-        var : array of variances in each bin of the histogram
+    hist : array
+        the values in each bin of the histogram
+    bins : array
+        an array of bin edges: bins[i] is the lower edge of the ith bin.
+        Note: it includes the upper edge of the last bin and does not
+        include underflow or overflow bins. So len(bins) = len(hist) + 1
+    var : array
+        array of variances in each bin of the histogram
     """
     if bins is None:
         bins = 100 # override np.histogram default of just 10
@@ -206,12 +208,12 @@ def range_slice(x_min, x_max, hist, bins, var=None):
     return hist[i_min:i_max], bins[i_min:i_max+1], var
 
 
-
 def get_fwhm(hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method='bins_over_f', n_slope=3):
-    """
-    Estimate the FWHM of data in a histogram
+    """Estimate the FWHM of data in a histogram
 
-    See get_fwfm for parameters and return values
+    See Also
+    --------
+    get_fwfm : for parameters and return values
     """
     if len(bins) == len(hist):
         print("note: this function has been updated to require bins rather",
@@ -232,8 +234,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         The fractional amplitude at which to evaluate the full width
     hist : array-like
         The histogram data array containing the peak
-    bin_centers : array-like
-        An array of bin centers for the histogram
+    bins : array-like
+        An array of bin edges for the histogram
     var : array-like (optional)
         An array of histogram variances. Used with the 'fit_slopes' method
     mx : float or tuple(float, float) (optional)
@@ -257,6 +259,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
             when stats are moderate but requires enough bins that dx traversed
             by n_slope bins is approximately linear. Incorporates bin variances
             in fit and final uncertainties if provided.
+    n_slope : int
+        DOCME
 
     Returns
     -------

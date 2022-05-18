@@ -11,6 +11,7 @@ class FCStatusDecoder(DataDecoder):
     """
     def __init__(self, *args, **kwargs):
         """
+        DOCME
         """
         self.decoded_values = {
             'status': { # 0: Errors occurred, 1: no errors

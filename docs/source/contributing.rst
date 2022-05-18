@@ -97,7 +97,7 @@ contributing to the project, make sure to implement the following:
 * Documentation for functions, classes, modules and packages should be provided
   as `Docstrings <https://peps.python.org/pep-0257>`_ along with the respective
   source code. Docstrings are automatically converted to HTML as part of the
-  :ref:`pygama API documentation <pygama package>`.
+  :mod:`pygama` package API documentation.
 * General guides, comprehensive tutorials or other high-level documentation
   (e.g. referring to how separate parts of the code interact between each
   other) must be provided as separate pages in ``docs/source/`` and linked in

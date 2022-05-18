@@ -10,34 +10,29 @@ def cusp_filter(length, sigma, flat, decay):
     factory function that is called using the init_args argument and that
     the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
-    length: int
-            The length of the filter to be convolved
-    sigma : float
-            The curvature of the rising and falling part of the kernel
-    flat  : int
-            The length of the flat section
-    decay : int
-            The decay constant of the exponential to be convolved
-
     Parameters
     ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
+    length : int
+        The length of the filter to be convolved
+    sigma : float
+        The curvature of the rising and falling part of the kernel
+    flat : int
+        The length of the flat section
+    decay : int
+        The decay constant of the exponential to be convolved
 
-    Processing Chain Example
-    ------------------------
-    "wf_cusp": {
-        "function": "cusp_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "wf_cusp(101,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"],
-        "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_cusp": {
+            "function": "cusp_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "wf_cusp(101,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"],
+            "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"]
+        }
     """
     if length <= 0:
         raise DSPFatal('The length of the filter must be positive')
@@ -68,6 +63,14 @@ def cusp_filter(length, sigma, flat, decay):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def cusp_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+            The input waveform
+        w_out : array-like
+            The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
@@ -86,34 +89,29 @@ def zac_filter(length, sigma, flat, decay):
     composed of a factory function that is called using the init_args
     argument and that the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
-    length: int
-            The length of the filter to be convolved
-    sigma : float
-            The curvature of the rising and falling part of the kernel
-    flat  : int
-            The length of the flat section
-    decay : int
-            The decay constant of the exponential to be convolved
-
     Parameters
     ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
+    length : int
+        The length of the filter to be convolved
+    sigma : float
+        The curvature of the rising and falling part of the kernel
+    flat : int
+        The length of the flat section
+    decay : int
+        The decay constant of the exponential to be convolved
 
-    Processing Chain Example
-    ------------------------
-    "wf_zac": {
-        "function": "zac_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_bl", "wf_zac(101,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_bl"],
-        "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"],
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_zac": {
+            "function": "zac_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_bl", "wf_zac(101,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_bl"],
+            "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"],
+        }
     """
     if length <= 0:
         raise DSPFatal('The length of the filter must be positive')
@@ -162,6 +160,14 @@ def zac_filter(length, sigma, flat, decay):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def zac_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+            The input waveform
+        w_out : array-like
+            The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
@@ -181,32 +187,27 @@ def t0_filter(rise, fall):
     that it is composed of a factory function that is called using the init_args
     argument and that the function the waveforms are passed to using args.
 
-    Initialization Parameters
-    -------------------------
-    rise: int
-          The length of the rise section.  This is the linearly increasing
-          section of the filter that performs a weighted average.
-    fall: int
-          The length of the fall section.  This is the simple averaging part
-          of the filter.
-
     Parameters
     ----------
-    w_in : array-like
-           The input waveform
-    w_out: array-like
-           The filtered waveform
+    rise : int
+        The length of the rise section.  This is the linearly increasing
+        section of the filter that performs a weighted average.
+    fall : int
+        The length of the fall section.  This is the simple averaging part
+        of the filter.
 
-    Processing Chain Example
-    ------------------------
-    "wf_t0_filter": {
-        "function": "t0_filter",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_pz", "wf_t0_filter(3748,f)"],
-        "unit": "ADC",
-        "prereqs": ["wf_pz"],
-        "init_args": ["128*ns", "2*us"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_t0_filter": {
+            "function": "t0_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", "wf_t0_filter(3748,f)"],
+            "unit": "ADC",
+            "prereqs": ["wf_pz"],
+            "init_args": ["128*ns", "2*us"]
+        }
     """
     if rise < 0:
         raise DSPFatal('The length of the rise section must be positive')
@@ -221,6 +222,14 @@ def t0_filter(rise, fall):
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
     def t0_filter_out(w_in, w_out):
+        """
+        Parameters
+        ----------
+        w_in : array-like
+            The input waveform
+        w_out : array-like
+            The filtered waveform
+        """
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():

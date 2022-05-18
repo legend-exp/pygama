@@ -15,26 +15,28 @@ def linear_slope_fit(w_in, mean, stdev, slope, intercept):
 
     Parameters
     ----------
-    w_in     : array-like
-               The input waveform
-    a_mean   : float
-               The mean of the waveform
-    stdev    : float
-               The standard deviation of the waveform
-    slope    : float
-               The slope of the linear fit
-    intercept: float
-               The intercept of the linear fit
+    w_in : array-like
+        The input waveform
+    mean : float
+        The mean of the waveform
+    stdev : float
+        The standard deviation of the waveform
+    slope : float
+        The slope of the linear fit
+    intercept : float
+        The intercept of the linear fit
 
-    Processing Chain Example
-    ------------------------
-    "bl_mean, bl_std, bl_slope, bl_intercept": {
-        "function": "linear_slope_fit",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_blsub[0:1650]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
-        "unit": ["ADC", "ADC", "ADC", "ADC"],
-        "prereqs": ["wf_blsub"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "bl_mean, bl_std, bl_slope, bl_intercept": {
+            "function": "linear_slope_fit",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_blsub[0:1650]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
+            "unit": ["ADC", "ADC", "ADC", "ADC"],
+            "prereqs": ["wf_blsub"]
+        }
     """
     mean     [0] = np.nan
     stdev    [0] = np.nan

@@ -4,11 +4,11 @@ from .lgdo_utils import *
 
 
 class Array:
-    """
-    Holds an ndarray and attributes
+    """Holds an ndarray and attributes
 
     Array (and the other various array types) holds an "nda" instead of deriving
     from ndarray for the following reasons:
+
     - it keeps management of the nda totally under the control of the user. The
       user can point it to another object's buffer, grab the nda and toss the
       Array, etc.
@@ -17,6 +17,7 @@ class Array:
       standard, reusable, and (we expect) performant python
     - it allows the first axis of the nda to be treated as "special" for storage
       in Tables
+
     """
 
 
@@ -24,7 +25,6 @@ class Array:
         """
         Parameters
         ----------
-
         nda : ndarray (optional)
             An ndarray to be used for this object's internal array. Note: the
             array is used directly, not copied. If not supplied, internal memory
@@ -35,7 +35,7 @@ class Array:
         dtype : numpy dtype (optional)
             Specifies the type of the data in the array. Required if nda is
             None, otherwise unused.
-        fill_val: scalar or None
+        fill_val : scalar or None
             If None, memory is allocated without initialization. Otherwise, the
             array is allocated with all elements set to the corresponding fill
             value. If nda is not None, this parameter is ignored

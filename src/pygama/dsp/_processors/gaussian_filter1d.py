@@ -40,6 +40,7 @@ from numba import guvectorize
 
 def gaussian_filter1d(sigma, truncate):
     """1-D Gaussian filter.
+
     Parameters
     ----------
     %(input)s
@@ -48,6 +49,7 @@ def gaussian_filter1d(sigma, truncate):
     truncate : float, optional
         Truncate the filter at this many standard deviations.
         Default is 4.0.
+
     Returns
     -------
     gaussian_filter1d : ndarray
@@ -80,6 +82,7 @@ def gaussian_filter1d(sigma, truncate):
     """Calculate a 1-D correlation along the given axis.
     The lines of the array along the given axis are correlated with the
     given weights.
+
     Parameters
     ----------
     %(input)s

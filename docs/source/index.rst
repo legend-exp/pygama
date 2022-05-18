@@ -16,5 +16,5 @@ Table of Contents
 
    install
    tutorials
-   Package API reference <generated/pygama>
+   Package API reference <generated/modules>
    contributing

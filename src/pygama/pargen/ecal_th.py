@@ -10,11 +10,9 @@ import scipy.stats
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
-import pygama.analysis.calibration as cal
-
-#import pygama.genpar_tmp.cuts as cut
-import pygama.analysis.histograms as pgh
-import pygama.analysis.peak_fitting as pgf
+import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
+import pygama.pargen.energy_cal as cal
 
 
 def fwhm_slope(x, m0, m1):
@@ -25,8 +23,6 @@ def fwhm_slope(x, m0, m1):
 
 
 def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=15000):
-
-
     """
     This is an example script for calibrating Th data.
     """

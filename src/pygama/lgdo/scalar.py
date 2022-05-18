@@ -7,9 +7,8 @@ class Scalar:
     """
     Holds just a value and some attributes (datatype, units, ...)
 
-    #TODO: do scalars need proper numpy dtypes?
+    TODO: do scalars need proper numpy dtypes?
     """
-
 
     def __init__(self, value, attrs={}):
         """
@@ -33,12 +32,10 @@ class Scalar:
                 print('type(value): ', type(value).__name__)
         else: self.attrs['datatype'] = get_element_type(self.value)
 
-
     def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
         if hasattr(self.value, 'datatype_name'): return self.value.datatype_name
         else: return get_element_type(self.value)
-
 
     def form_datatype(self):
         """Return this lgdo's datatype attribute string"""

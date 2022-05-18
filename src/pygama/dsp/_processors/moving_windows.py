@@ -13,22 +13,24 @@ def moving_window_left(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
-    Processing Chain Example
-    ------------------------
-    "wf_mw": {
-        "function": "moving_window_left",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_pz", "96*ns", "wf_mw"],
-        "unit": "ADC",
-        "prereqs": ["wf_pz"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_mw": {
+            "function": "moving_window_left",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", "96*ns", "wf_mw"],
+            "unit": "ADC",
+            "prereqs": ["wf_pz"]
+        }
     """
     w_out[:] = np.nan
 
@@ -56,22 +58,24 @@ def moving_window_right(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
-    Processing Chain Example
-    ------------------------
-    "wf_mw": {
-        "function": "moving_window_right",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_pz", "96*ns", "wf_mw"],
-        "unit": "ADC",
-        "prereqs": ["wf_pz"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "wf_mw": {
+            "function": "moving_window_right",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", "96*ns", "wf_mw"],
+            "unit": "ADC",
+            "prereqs": ["wf_pz"]
+        }
     """
     w_out[:] = np.nan
 
@@ -100,24 +104,26 @@ def moving_window_multi(w_in, length, num_mw, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
-    num_mw: int
-            The number of moving windows
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
+    num_mw : int
+        The number of moving windows
     w_out : array-like
-            The windowed waveform
+        The windowed waveform
 
-    Processing Chain Example
-    ------------------------
-    "curr_av": {
-        "function": "moving_window_multi",
-        "module": "pygama.dsp.processors",
-        "args": ["curr", "96*ns", "3", "curr_av"],
-        "unit": "ADC/sample",
-        "prereqs": ["curr"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "curr_av": {
+            "function": "moving_window_multi",
+            "module": "pygama.dsp.processors",
+            "args": ["curr", "96*ns", "3", "curr_av"],
+            "unit": "ADC/sample",
+            "prereqs": ["curr"]
+        }
     """
     w_out[:] = np.nan
 
@@ -162,22 +168,24 @@ def avg_current(w_in, length, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    length: int
-            The length of the moving window
+    w_in : array-like
+        The input waveform
+    length : int
+        The length of the moving window
     w_out : array-like
-            The output derivative
+        The output derivative
 
-    Processing Chain Example
-    ------------------------
-    "curr": {
-        "function": "avg_current",
-        "module": "pygama.dsp.processors",
-        "args": ["wf_pz", 1, "curr(len(wf_pz)-1, f)"],
-        "unit": "ADC/sample",
-        "prereqs": ["wf_pz"]
-    }
+    Examples
+    --------
+    .. code-block :: json
+
+        "curr": {
+            "function": "avg_current",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", 1, "curr(len(wf_pz)-1, f)"],
+            "unit": "ADC/sample",
+            "prereqs": ["wf_pz"]
+        }
     """
     w_out[:] = np.nan
 

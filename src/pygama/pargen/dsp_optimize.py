@@ -5,7 +5,7 @@ from pprint import pprint
 
 import numpy as np
 
-from .build_processing_chain import build_processing_chain
+from pygama.dsp import build_processing_chain
 
 
 def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0, fom_kwargs=None):
@@ -14,8 +14,8 @@ def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=
 
     Optionally returns a value for optimization
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     tb_data : lh5 Table
         An input table of lh5 data. Typically a selection is made prior to
         sending tb_data to this function: optimization typically doesn't have to
@@ -32,11 +32,11 @@ def run_one_dsp(tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=
         optimization will be based. Should accept verbosity as a second argument
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-    fom_kwargs:
+    fom_kwargs
         any keyword arguments to pass to the fom
 
-    Returns:
-    --------
+    Returns
+    -------
     figure_of_merit : float
         If fom_function is not None, returns figure-of-merit value for the DSP iteration
     tb_out : lh5 Table
@@ -145,11 +145,13 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1,
     """Extract a table of optimization values for a grid of DSP parameters
     The grid argument defines a list of parameters and values over which to run
     the DSP defined in dsp_config on tb_data. At each point, a scalar
-    figure-of-merit is extracted
+    figure-of-merit is extracted.
+
     Returns a N-dimensional ndarray of figure-of-merit values, where the array
     axes are in the order they appear in grid.
-    Parameters:
-    -----------
+
+    Parameters
+    ----------
     tb_data : lh5 Table
         An input table of lh5 data. Typically a selection is made prior to
         sending tb_data to this function: optimization typically doesn't have to
@@ -167,13 +169,11 @@ def run_grid(tb_data, dsp_config, grid, fom_function, db_dict=None, verbosity=1,
         DSP parameters database. See build_processing_chain for formatting info
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-
-    **fom_kwargs :
+    **fom_kwargs
         Any keyword arguments for fom_function
 
-
-    Returns:
-    --------
+    Returns
+    -------
     grid_values : ndarray of floats
         An N-dimensional numpy ndarray whose Mth axis corresponds to the Mth row
         of the grid argument
@@ -254,12 +254,13 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
                           processes=5, fom_kwargs=None):
 
     """
-    run one iteration of DSP on tb_data with multiprocessing, can handle multiple grids if they are the same dimensions
+    run one iteration of DSP on tb_data with multiprocessing, can handle
+    multiple grids if they are the same dimensions
 
     Optionally returns a value for optimization
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     tb_data : lh5 Table
         An input table of lh5 data. Typically a selection is made prior to
         sending tb_data to this function: optimization typically doesn't have to
@@ -268,7 +269,7 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
         Specifies the DSP to be performed for this iteration (see
         build_processing_chain()) and the list of output variables to appear in
         the output table
-    grid: pargrid, list of pargrids
+    grid : pargrid, list of pargrids
         Grids to run optimization on
     db_dict : dict (optional)
         DSP parameters database. See build_processing_chain for formatting info
@@ -280,12 +281,14 @@ def run_grid_multiprocess_parallel(tb_data, dsp_config, grid, fom_function, db_d
         or a list of fom to run different fom on each grid.
     verbosity : int (optional)
         verbosity for the processing chain and fom_function calls
-    fom_kwargs:
+    processes : int
+        DOCME
+    fom_kwargs
         any keyword arguments to pass to the fom,
         if multiple grids given will need to be a list of the fom_kwargs for each grid
 
-    Returns:
-    --------
+    Returns
+    -------
     figure_of_merit : float
         If fom_function is not None, returns figure-of-merit value for the DSP iteration
     tb_out : lh5 Table

@@ -18,10 +18,8 @@ def multi_a_filter(w_in, vt_maxs_in, va_max_out):
         The array of data within which amplitudes of extrema will be found
     vt_maxs_in : array-like
         The array of max positions for each wf
-    Returns
-    -------
-    va_max_out: array-like
-        An array of the amplitudes of the maximums of the waveform
+    va_max_out : array-like
+        An array (in-place filled) of the amplitudes of the maximums of the waveform
     """
 
     # Initialize output parameters
