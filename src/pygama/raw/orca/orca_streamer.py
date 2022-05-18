@@ -1,9 +1,12 @@
-import gzip, json
+import gzip
+import json
+
 import numpy as np
 
 from ..data_streamer import DataStreamer
 from . import orca_packet
 from .orca_header_decoder import OrcaHeaderDecoder
+
 
 class OrcaStreamer(DataStreamer):
     """ Data streamer for ORCA data
@@ -46,7 +49,7 @@ class OrcaStreamer(DataStreamer):
         n_words = orca_packet.get_n_words(pkt_hdr)
         if skip_unknown_ids and orca_packet.get_data_id(pkt_hdr) not in self.decoder_id_dict:
             self.in_stream.seek((n_words-1)*4, 1)
-            self.n_bytes_read += (n_words-1)*4 # well, we didn't really read it... 
+            self.n_bytes_read += (n_words-1)*4 # well, we didn't really read it...
             return pkt_hdr
 
         # load into buffer, resizing as necessary
@@ -101,14 +104,14 @@ class OrcaStreamer(DataStreamer):
         return True
 
 
-    def hex_dump(self, stream_name, n_packets=np.inf, 
-                 skip_header=False, shift_data_id=True, print_n_words=False, 
+    def hex_dump(self, stream_name, n_packets=np.inf,
+                 skip_header=False, shift_data_id=True, print_n_words=False,
                  max_words=np.inf, as_int=False, as_short=False):
         self.set_in_stream(stream_name)
         if skip_header: self.load_packet()
         while n_packets > 0:
             packet = self.load_packet()
-            if packet is None: 
+            if packet is None:
                 self.close_in_stream()
                 return
             data_id = orca_packet.get_data_id(packet, shift=shift_data_id)
@@ -143,13 +146,13 @@ class OrcaStreamer(DataStreamer):
             length of tables to be read out in read_chunk
         verbosity : int
             verbosity level for the initialize function
- 
+
         Returns
         -------
         header_data : list(RawBuffer)
             a list of length 1 containing the raw buffer holding the ORCA header
         """
-        
+
         self.set_in_stream(stream_name)
 
         # read in the header
@@ -192,13 +195,13 @@ class OrcaStreamer(DataStreamer):
         super().open_stream(stream_name, rb_lib, buffer_size=buffer_size,
                             chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
         if rb_lib is None: rb_lib = self.rb_lib
-        for name in self.rb_lib.keys(): 
+        for name in self.rb_lib.keys():
             data_id = self.decoder_name_dict[name]
             self.rbl_id_dict[data_id] = self.rb_lib[name]
         print(self.rb_lib)
 
         # return header raw buffer
-        if 'OrcaHeaderDecoder' in rb_lib: 
+        if 'OrcaHeaderDecoder' in rb_lib:
             header_rb_list = rb_lib['OrcaHeaderDecoder']
             if len(header_rb_list) != 1:
                 print(f'warning! header_rb_list had length {len(header_rb_list)}, ignoring all but the first')

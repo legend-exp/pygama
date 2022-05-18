@@ -1,4 +1,6 @@
-import plistlib, json
+import json
+import plistlib
+
 
 class OrcaHeader(dict):
     """

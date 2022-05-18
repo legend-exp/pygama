@@ -1,5 +1,6 @@
 <<<<<<< HEAD:src/pygama/raw/orca/orca_base.py
 from ..data_decoder import *
+
 =======
 import gzip
 import plistlib
@@ -42,17 +43,18 @@ class OrcaDecoder(DataDecoder):
         self.object_info = object_info
 
 
-import sys, gzip
-import numpy as np
+import gzip
 import plistlib
+import sys
 
+import numpy as np
 from tqdm.std import tqdm
-from ..utils import tqdm_range, update_progress
-from .io_base import DataDecoder
+
 from pygama import lh5
+
+from ..utils import tqdm_range, update_progress
 from .ch_group import *
-
-
+from .io_base import DataDecoder
 
 
 def open_orca(orca_filename):

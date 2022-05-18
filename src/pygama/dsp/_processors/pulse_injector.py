@@ -42,6 +42,6 @@ def inject_exp_pulse(wf_in,t0,rt,A,decay, wf_out):
     wf_out[:] = wf_in[:]
     for T in range(len(wf_out)):
         if (t0<= T)& (T<= t0+rt):
-            wf_out[T] += ((A*exp((T-t0-rt)/(rt))*exp(-(1/decay)*(T-t0))))
+            wf_out[T] += (A*exp((T-t0-rt)/(rt))*exp(-(1/decay)*(T-t0)))
         elif (T>t0+rt):
             wf_out[T] += (A*exp(-(1/decay)*(T-t0)))

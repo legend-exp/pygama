@@ -1,7 +1,10 @@
+import plistlib
+
+from pygama import lgdo
+
 from ..data_decoder import *
 from . import orca_header
-from pygama import lgdo
-import plistlib
+
 
 class OrcaHeaderDecoder(DataDecoder):
     """
@@ -26,8 +29,7 @@ class OrcaHeaderDecoder(DataDecoder):
         if rbl is not None:
             if len(rbl) != 1 or not isinstance(rbl[0].lgdo, lgdo.Scalar):
                 print(f"Error: len(rbl) = {len(rbl)}, type = {type(rbl[0].lgdo)}")
-            else: 
+            else:
                 rbl[0].lgdo.value = json.dumps(self.header)
                 rbl[0].loc = 1
-        return True # header raw buffer is "full" 
-
+        return True # header raw buffer is "full"

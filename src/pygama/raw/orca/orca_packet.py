@@ -12,7 +12,7 @@ def get_n_words(packet):
     return packet[0] & 0x3FFFF
 
 def get_data_id(packet, shift=True):
-    if is_short(packet): 
+    if is_short(packet):
         if shift: return (packet[0] & 0xFC000000) >> 26
         else: return packet[0] & 0xFC000000
     if shift: return (packet[0] & 0xFFFC0000) >> 18
