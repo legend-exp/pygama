@@ -5,6 +5,13 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
+All extra tools needed to develop *pygama* are listed as optional dependencies
+and can be installed via pip by running:
+
+.. code-block:: console
+
+    $ pip install .[all]
+
 Code style
 ----------
 
@@ -56,19 +63,25 @@ Testing
 * Unit tests are automatically run for every push event and pull request to the
   remote Git repository on a remote server (currently handled by GitHub
   actions). Every pull request must pass all tests before being approved for
-  merging.
+  merging. Running the test suite is simple:
+
+  .. code-block:: console
+
+     $ pip install .[test]
+     $ pytest
+
 * Additionally, pull request authors are required to provide tests with
   sufficient code coverage for every proposed change or addition. If necessary,
   high-level functional tests should be updated. We currently rely on
   `codecov.io <https://app.codecov.io/gh/legend-exp/pygama>`_ to keep track of
   the test coverage. To generate a local coverage report (recommended before
-  submitting pull requests), the ``coverage`` Python package is needed:
+  submitting pull requests), run:
 
   .. code-block:: console
 
-    $ pip install coverage
-    $ coverage run -m pytest
-    $ coverage report
+     $ pip install .[test]
+     $ coverage run -m pytest
+     $ coverage report
 
 Documentation
 -------------
@@ -84,7 +97,7 @@ contributing to the project, make sure to implement the following:
 * Documentation for functions, classes, modules and packages should be provided
   as `Docstrings <https://peps.python.org/pep-0257>`_ along with the respective
   source code. Docstrings are automatically converted to HTML as part of the
-  :ref:`pygama API documentation <pygama package>`.
+  :mod:`pygama` package API documentation.
 * General guides, comprehensive tutorials or other high-level documentation
   (e.g. referring to how separate parts of the code interact between each
   other) must be provided as separate pages in ``docs/source/`` and linked in
@@ -121,24 +134,20 @@ Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
 
 Scripts and tools to build documentation are located below ``docs/``. To build
-documentation, the ``sphinx``, ``sphinx-rtd-theme`` and ``sphinx-multiversion``
-Python packages are required. At the moment, *pygama* is using a ``sphinx-multiversion``
-functionality only available through a fork of the project
-(``samtygier-stfc/sphinx-multiversion``, at the ``prebuild_command`` branch). With pip,
-it can be installed with the following command:
+documentation, ``sphinx``, ``sphinx-rtd-theme`` and a couple of additional
+Python packages are required. You can get all the needed dependencies by running:
 
 .. code-block:: console
 
-    $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+   $ pip install .[docs]
 
-This will probably change in the future. To build documentation for the current
-Git ref, run the following commands:
+To build documentation for the current Git ref, run the following commands:
 
 .. code-block:: console
 
-    $ cd docs
-    $ make clean
-    $ make
+   $ cd docs
+   $ make clean
+   $ make
 
 Documentation can be then displayed by opening ``build/html/index.html`` with a
 web browser.  To build documentation for all main *pygama* versions (development
@@ -162,22 +171,18 @@ new project version must implement the following procedures:
 
 * `Semantic versioning <https://semver.org>`_ is adopted. The version string
   uses the ``MAJOR.MINOR.PATCH`` format.
-* The version string is manually specified in ``pygama/version.py``. If needed
-  elsewhere in the source code (e.g. in ``setup.py``), must be read in from here.
 * To release a new **minor** or **major version**, the following procedure
   should be followed:
 
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
+  1. A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
      the code at the intended stage is created
-  3. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
+  2. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
      -m 'short descriptive message here'`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
 
 * To release a new **patch version**, the following procedure should be followed:
 
-  1. The *pygama* version is updated in ``pygama/version.py``
-  2. A commit with the patch is created on the relevant release branch
+  1. A commit with the patch is created on the relevant release branch
      ``releases/vMAJOR.MINOR``
-  3. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
-  4. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  2. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
+  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``

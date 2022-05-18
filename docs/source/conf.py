@@ -1,9 +1,9 @@
 # Configuration file for the Sphinx documentation builder.
 
-import pathlib
 import sys
+from pathlib import Path
 
-sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
+sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
 copyright = '2020, the LEGEND Collaboration'
@@ -14,7 +14,6 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.autosectionlabel',
     'sphinx_rtd_theme',
     'sphinx_multiversion',
     'myst_parser'
@@ -38,10 +37,10 @@ html_theme = 'sphinx_rtd_theme'
 # could be unmet at build time
 autodoc_mock_imports = [
     'pandas',
-    'numpy',
+    # 'numpy',
     'matplotlib',
     'mplhep',
-    'scimath',
+    'scipy',
     'numba',
     'pytest',
     'pyhf',
@@ -67,11 +66,11 @@ napoleon_google_docstring = False
 # intersphinx
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
-    'numpy': ('http://docs.scipy.org/doc/numpy', None),
+    'numpy': ('https://numpy.org/doc/stable', None),
     'numba': ('https://numba.readthedocs.io/en/stable', None),
-    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy', None),
     'pandas': ('https://pandas.pydata.org/docs', None),
-    'matplotlib': ('http://matplotlib.org/stable', None),
+    'matplotlib': ('https://matplotlib.org/stable', None),
     'iminuit': ('https://iminuit.readthedocs.io/en/stable', None)
 }
 

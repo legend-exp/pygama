@@ -28,27 +28,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Get dependencies and install the package
       run: |
-        .github/workflows/get-dependencies.sh
-        python -m pip install .
+        python -m pip install --upgrade pip wheel setuptools
+        python -m pip install --upgrade .[test]
     - name: Run unit tests
       run: |
         pytest
-
-  # test-in-legend-container:
-  #   name: Test pygama in LEGEND container
-  #   runs-on: ubuntu-latest
-  #   container: docker://legendexp/legend-base:${{ matrix.docker-tag }}
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       docker-tag: [latest, ubuntu]
-
-  #   steps:
-  #   - uses: actions/checkout@v2
-  #   - name: Install and run unit tests
-  #     run: |
-  #       python -m pip install .
-  #       pytest
 
   test-coverage:
     name: Calculate and upload test coverage
@@ -64,28 +48,27 @@ jobs:
 
       - name: Generate Report
         run: |
-          .github/workflows/get-dependencies.sh
-          python -m pip install .
-          python -m pip install coverage
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install --upgrade .[test]
           coverage run -m pytest
       - name: Upload Coverage to codecov.io
         uses: codecov/codecov-action@v2
 
   deploy-docs:
-    name: Deploy documentation on legend-exp.github.io/pygama
+    name: Build documentation
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.8
+          python-version: '3.8'
       - name: Setup build environment
         run: |
-          git fetch --prune --no-recurse-submodules --depth=1 origin
-          .github/workflows/get-dependencies.sh
-          pip install sphinx sphinx-rtd-theme myst-parser
-          pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install --upgrade .[docs]
       - name: Build docs for current ref
         run: |
           cd docs

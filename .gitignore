@@ -10,9 +10,7 @@
 *~
 *.csv
 
-pygama/git.py
-experiments/lpgta/cori_slurm/logs/
-experiments/oppi/logs
+/src/pygama/_version.py
 
 # -------------------- github-generated stuff -------------------
 # Byte-compiled / optimized / DLL files
