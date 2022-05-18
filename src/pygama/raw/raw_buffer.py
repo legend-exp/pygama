@@ -126,7 +126,7 @@ class RawBufferList(list):
     """
     A RawBufferList holds a collection of RawBuffers of identical structure
     (same format lgdo's with the same fields).
-    """    
+    """
     def __init__(self):
         self.keyed_dict = None
 
@@ -137,7 +137,7 @@ class RawBufferList(list):
         Different keys may point to the same buffer. Requires the buffers in the
         RawBufferList to have non-overlapping key lists.
         """
-        if self.keyed_dict is None: 
+        if self.keyed_dict is None:
             self.keyed_dict = {}
             for rb in self:
                 for key in rb.key_list: self.keyed_dict[key] = rb
