@@ -83,7 +83,7 @@ class DataDecoder(ABC):
 
 
     def make_lgdo(self, key=None, size=None):
-        """ Make an lgdo for this DataDecoder
+        """ Make an lgdo for this DataDecoder to fill
 
         This default version of this function allocates a Table using
         the decoded_values for key. If a different type of lgdo object is

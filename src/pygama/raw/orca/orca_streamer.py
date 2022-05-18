@@ -1,4 +1,4 @@
-import gzip
+import gzip, json
 import numpy as np
 
 from ..data_streamer import DataStreamer
@@ -11,7 +11,8 @@ class OrcaStreamer(DataStreamer):
     def __init__(self):
         super().__init__()
         self.in_stream = None
-        self.buffer = np.empty(1024, dtype='uint32') # start with a 4 kB buffer
+        self.buffer = np.empty(1024, dtype='uint32') # start with a 4 kB packet buffer
+        self.header = None
         self.header_decoder = OrcaHeaderDecoder()
         self.decoder_id_dict = {} # dict of data_id to decoder object
         self.decoder_name_dict = {} # dict of name to decoder object
@@ -158,10 +159,11 @@ class OrcaStreamer(DataStreamer):
             return []
         self.packet_id = 0
         self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id, verbosity=verbosity)
+        self.header = self.header_decoder.header
 
         # instantiate decoders listed in the header AND in the rb_lib (if specified)
         decoder_names = ['OrcaHeaderDecoder']
-        decoder_names += self.header_decoder.get_decoder_list()
+        decoder_names += self.header.get_decoder_list()
         if rb_lib is not None and '*' not in rb_lib:
             keep_decoders = []
             for name in decoder_names:
@@ -182,7 +184,7 @@ class OrcaStreamer(DataStreamer):
                 print(f'Warning: No implementation of {name}, corresponding packets will be skipped')
                 continue
             decoder = globals()[name]
-            decoder.data_id = self.header_decoder.get_data_id(name)
+            decoder.data_id = self.header.get_data_id(name)
             self.decoder_id_dict[decoder.data_id] = decoder
             self.decoder_name_dict[name] = decoder.data_id
 
@@ -201,7 +203,8 @@ class OrcaStreamer(DataStreamer):
             if len(header_rb_list) != 1:
                 print(f'warning! header_rb_list had length {len(header_rb_list)}, ignoring all but the first')
             rb = header_rb_list[0]
-        else: rb = RawBuffer(lgdo=self.header_decoder.header)
+        else: rb = RawBuffer(lgdo=self.header_decoder.make_lgdo())
+        rb.lgdo.value = json.dumps(self.header)
         rb.loc = 1 # we have filled this buffer
         return [rb]
 
