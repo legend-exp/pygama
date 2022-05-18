@@ -49,13 +49,13 @@ class VectorOfVectors:
                 print('VectorOfVectors: Warning: flattened_data and dtype cannot both be None!')
             else:
                 self.flattened_data = Array(shape=(length,), dtype=dtype)
-        else: 
+        else:
             self.flattened_data = flattened_data
             if dtype is None:
                 self.dtype = self.flattened_data.dtype
-            else: 
+            else:
                 self.dtype = dtype
-        
+
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
@@ -114,10 +114,10 @@ class VectorOfVectors:
                 end = self.cumulative_length[0]
             else:
                 start = self.cumulative_length[self.index-1]
-                end = self.cumulative_length[self.index] 
-            result = self.flattened_data[start:end] 
+                end = self.cumulative_length[self.index]
+            result = self.flattened_data[start:end]
         except IndexError:
-            raise StopIteration 
+            raise StopIteration
         self.index += 1
         return result
 
