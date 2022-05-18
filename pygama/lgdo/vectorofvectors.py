@@ -45,11 +45,17 @@ class VectorOfVectors:
         else: self.cumulative_length = cumulative_length
         if flattened_data is None:
             length = np.prod(shape_guess)
-            self.flattened_data = Array(shape=(length,), dtype=dtype)
-        else: self.flattened_data = flattened_data
-        if dtype is None:
-            self.dtype = self.flattened_data.dtype
-        else: self.dtype = dtype
+            if dtype is None:
+                print('VectorOfVectors: Warning: flattened_data and dtype cannot both be None!')
+            else:
+                self.flattened_data = Array(shape=(length,), dtype=dtype)
+        else: 
+            self.flattened_data = flattened_data
+            if dtype is None:
+                self.dtype = self.flattened_data.dtype
+            else: 
+                self.dtype = dtype
+        
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
@@ -97,15 +103,27 @@ class VectorOfVectors:
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
 
-    def tolist(self):
-        l = []
-        l.append(list(self.flattened_data[:self.cumulative_length[0]]))
-        l += [list(self.flattened_data[self.cumulative_length[i-1]:self.cumulative_length[i]]) for i in range(1, len(self.cumulative_length))]
-        return l
+    def __iter__(self):
+        self.index = 0
+        return self
+
+    def __next__(self):
+        try:
+            if self.index == 0:
+                start = 0
+                end = self.cumulative_length[0]
+            else:
+                start = self.cumulative_length[self.index-1]
+                end = self.cumulative_length[self.index] 
+            result = self.flattened_data[start:end] 
+        except IndexError:
+            raise StopIteration 
+        self.index += 1
+        return result
 
     def __str__(self):
         """Convert to string (e.g. for printing)"""
-        nda = self.tolist()
+        nda = list(self)
         string = str(nda)
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop('datatype')
