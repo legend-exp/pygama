@@ -13,7 +13,7 @@ class Table(Struct):
     table I/O using functions like push_row(), is_full(), and clear()
 
     Note: if you write to a table and don't fill it up to its total size, be
-    sure to resize it before passing to data processing fucntions, as they will
+    sure to resize it before passing to data processing functions, as they will
     call len(table) to access valid data, which returns table.size.
     """
     # TODO: overload getattr to allow access to fields as object attributes?
@@ -173,17 +173,8 @@ class Table(Struct):
         df = pd.DataFrame(copy=copy)
         if cols is None: cols = self.keys()
         for col in cols:
-            if isinstance(self[col], VectorOfVectors):
-                df[col] = self[col].tolist()
-            elif not hasattr(self[col],'nda'):
+            if not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')
             else: df[col] = list(self[col].nda)
 
         return df
-
-    def __str__(self):
-        string = str(self.get_dataframe())
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop('datatype')
-        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
-        return string
