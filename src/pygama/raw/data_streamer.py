@@ -25,6 +25,7 @@ class DataStreamer(ABC):
         self.chunk_mode = None
         self.n_bytes_read = 0
         self.any_full = False
+        self.packet_id = 0
 
 
     def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
@@ -125,7 +126,7 @@ class DataStreamer(ABC):
         still_has_data : bool
             Returns true while there is still data to read
         """
-        return true
+        return True
 
 
     def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True, verbosity=0):

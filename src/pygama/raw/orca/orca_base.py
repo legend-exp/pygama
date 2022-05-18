@@ -1,3 +1,6 @@
+<<<<<<< HEAD:src/pygama/raw/orca/orca_base.py
+from ..data_decoder import *
+=======
 import gzip
 import plistlib
 import sys
@@ -11,11 +14,12 @@ from ..utils import tqdm_range, update_progress
 from .ch_group import *
 from .io_base import DataDecoder
 
+>>>>>>> a70367724f70ef1bb7e5232291714af021dcf287:src/pygama/raw/orca/stream_orca.py
 
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
 
-    ORCA data packets have a dataID-to-decoder_name mapping so these decoders
+    ORCA data packets have a data_id-to-decoder_name mapping so these decoders
     need to have self.decoder_name defined in __init__
 
     ORCA also stores an object_info dictionary in the header by 'class name" so
@@ -24,9 +28,9 @@ class OrcaDecoder(DataDecoder):
     ORCA also uses a uniform packet structure so put some boiler plate here so
     that all ORCA decoders can make use of it.
     """
-    def __init__(self, dataID=None, object_info=[], *args, **kwargs):
+    def __init__(self, data_id=None, object_info=[], *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dataID = dataID
+        self.data_id = data_id
         self.set_object_info(object_info)
 
     def set_header_dict(self, header_dict):
@@ -36,6 +40,19 @@ class OrcaDecoder(DataDecoder):
     def set_object_info(self, object_info):
         """Overload to e.g. update decoded_values based on object_info."""
         self.object_info = object_info
+
+
+import sys, gzip
+import numpy as np
+import plistlib
+
+from tqdm.std import tqdm
+from ..utils import tqdm_range, update_progress
+from .io_base import DataDecoder
+from pygama import lh5
+from .ch_group import *
+
+
 
 
 def open_orca(orca_filename):
@@ -147,16 +164,16 @@ def flip_data_ids(header_dict):
 def get_id_to_decoder_name_dict(header_dict):
     """
     Returns a dictionary that goes:
-    `dict[dataID] = "decoderName"`
+    `dict[data_id] = "decoderName"`
     e.g: d[5] = 'ORSIS3302DecoderForEnergy'
     """
     id2dn_dict = {}
     dd = header_dict['dataDescription']
     for class_key in dd.keys():
         for super_key in dd[class_key].keys():
-            dataID = (dd[class_key][super_key]['dataId']) >> 18
+            data_id = (dd[class_key][super_key]['dataId']) >> 18
             decoder_name = dd[class_key][super_key]['decoder']
-            id2dn_dict[dataID] = decoder_name
+            id2dn_dict[data_id] = decoder_name
     return id2dn_dict
 
 
@@ -346,9 +363,9 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     for sub in OrcaDecoder.__subclasses__():
         decoder = sub() # instantiate the class
         if decoder.decoder_name in decoders_to_run:
-            decoder.dataID = dn2id_dict[decoder.decoder_name]
+            decoder.data_id = dn2id_dict[decoder.decoder_name]
             decoder.set_header_dict(header_dict)
-            decoders[decoder.dataID] = decoder
+            decoders[decoder.data_id] = decoder
     if len(decoders) == 0:
         print("No decoders. Exiting...")
         sys.exit(1)

@@ -72,6 +72,7 @@ class FCStreamer(DataStreamer):
         super().open_stream(fcio_filename, rb_lib, buffer_size=buffer_size,
                             chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
         if rb_lib is None: rb_lib = self.rb_lib
+
         # get the status rb_list and pull out its first element
         status_rb_list = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
         if status_rb_list is not None:
@@ -84,7 +85,6 @@ class FCStreamer(DataStreamer):
 
         # set up data loop variables
         self.packet_id = 0 # for storing packet order in output tables
-        #self.max_numtraces = 0 # for checking that the tables are large enough
 
         if 'FCConfigDecoder' in rb_lib:
             config_rb_list = rb_lib['FCConfigDecoder']
