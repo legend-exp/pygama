@@ -528,8 +528,7 @@ class SIS3316ORCADecoder(OrcaDecoder):
                 # get ccc and make an empty table for that ccc
                 # TODO: should try and only do this for enabled channels
                 ccc = get_ccc(crate, card, channel)
-                self.decoded_values[ccc] = {}
-                self.decoded_values[ccc].update(copy.deepcopy(self.decoded_values_template))
+                self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
 
                 if trace_length <= 0 or trace_length > 2**16:
                     print('SIS3316ORCADecoder Error: invalid trace_length', trace_length)
