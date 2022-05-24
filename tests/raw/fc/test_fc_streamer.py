@@ -1,5 +1,28 @@
+from pygama.raw.fc.fc_config_decoder import FCConfigDecoder
+from pygama.raw.fc.fc_status_decoder import FCStatusDecoder
+from pygama.raw.fc.fc_event_decoder import FCEventDecoder
 from pygama.raw.fc.fc_streamer import FCStreamer
 from pygama.raw.raw_buffer import RawBuffer
+
+
+def test_get_decoder_list():
+    streamer = FCStreamer()
+    assert isinstance(streamer.get_decoder_list()[0], FCConfigDecoder)
+    assert isinstance(streamer.get_decoder_list()[1], FCStatusDecoder)
+    assert isinstance(streamer.get_decoder_list()[2], FCEventDecoder)
+
+
+def test_default_rb_lib(lgnd_test_data):
+    streamer = FCStreamer()
+    streamer.open_stream(lgnd_test_data.get_path('fcio/L200-comm-20211130-phy-spms.fcio'), buffer_size=6)
+    rb_lib = streamer.build_default_rb_lib()
+    assert 'FCConfigDecoder' in rb_lib.keys()
+    assert 'FCStatusDecoder' in rb_lib.keys()
+    assert 'FCEventDecoder' in rb_lib.keys()
+    assert rb_lib['FCConfigDecoder'][0].out_name == 'FCConfig'
+    assert rb_lib['FCStatusDecoder'][0].out_name == 'FCStatus'
+    assert rb_lib['FCEventDecoder'][0].out_name == 'FCEvent'
+    assert rb_lib['FCEventDecoder'][0].key_list == range(0, 6)
 
 
 def test_open_stream(lgnd_test_data):
@@ -10,14 +33,6 @@ def test_open_stream(lgnd_test_data):
     assert streamer.packet_id == 0  # packet id is initialized
     assert streamer.n_bytes_read == 11*4  # fc header is read
     assert streamer.event_rbkd is not None  # dict containing event info is initialized
-
-    # relevant raw buffers are initialized
-    assert 'FCConfigDecoder' in streamer.rb_lib.keys()
-    assert 'FCStatusDecoder' in streamer.rb_lib.keys()
-    assert 'FCEventDecoder' in streamer.rb_lib.keys()
-    assert streamer.rb_lib['FCConfigDecoder'][0].out_name == 'FCConfig'
-    assert streamer.rb_lib['FCStatusDecoder'][0].out_name == 'FCStatus'
-    assert streamer.rb_lib['FCEventDecoder'][0].out_name == 'FCEvent'
 
 
 def test_read_packet(lgnd_test_data):
