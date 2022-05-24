@@ -179,7 +179,7 @@ class FCEventDecoder(DataDecoder):
             self.max_numtraces = fcio.numtraces
             # The buffer might be storing all channels' data, so set the
             # fill_safety to the max number of traces we've seen so far.
-            for rb in evt_rbkd.items(): rb.fill_safety = self.max_numtraces
+            for rb in evt_rbkd.values(): rb.fill_safety = self.max_numtraces
         any_full = False
 
         # a list of channels is read out simultaneously for each event
