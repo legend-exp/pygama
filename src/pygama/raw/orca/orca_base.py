@@ -1,21 +1,4 @@
-<<<<<<< HEAD:src/pygama/raw/orca/orca_base.py
 from ..data_decoder import *
-
-=======
-import gzip
-import plistlib
-import sys
-
-import numpy as np
-from tqdm.std import tqdm
-
-from pygama import lh5
-
-from ..utils import tqdm_range, update_progress
-from .ch_group import *
-from .io_base import DataDecoder
-
->>>>>>> a70367724f70ef1bb7e5232291714af021dcf287:src/pygama/raw/orca/stream_orca.py
 
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
