@@ -92,8 +92,7 @@ class ORCAStruck3302(OrcaDecoder):
                 # save list of enabled channels
                 #self.enabled_cccs.append(ccc)
 
-                self.decoded_values[ccc] = {}
-                self.decoded_values[ccc].update(self.decoded_values_template)
+                self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                 sd = self.decoded_values[ccc] # alias
 
                 # get trace length(s). Should all be the same until
@@ -316,8 +315,7 @@ class ORCAGretina4M(OrcaDecoder):
                 # only care about enabled channels
                 if not is_enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
-                self.decoded_values[ccc] = {}
-                self.decoded_values[ccc].update(self.decoded_values_template)
+                self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                 sd = self.decoded_values[ccc] # alias
 
                 # find MS parameters
