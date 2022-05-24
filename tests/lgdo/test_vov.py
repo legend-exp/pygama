@@ -1,6 +1,6 @@
+import numpy as np
 import pytest
 from numpy.testing import assert_
-import numpy as np
 
 import pygama.lgdo as lgdo
 
