@@ -35,9 +35,9 @@ class Test_VectorOfVectors:
         result = list(v)
 
         desired = [ np.array([1,2]),
-                    np.array([3,4,5]), 
+                    np.array([3,4,5]),
                     np.array([2]),
                     np.array([4,8,9,7]),
                     np.array([5, 3, 1]) ]
-                    
+
         assert_( (desired[i]==result[i]).all() for i in range(len(desired)) )
