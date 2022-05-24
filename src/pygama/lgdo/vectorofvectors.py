@@ -111,15 +111,18 @@ class VectorOfVectors:
         try:
             if self.index == 0:
                 start = 0
-                end = self.cumulative_length[0]
+                end = self.cumulative_length.nda[0]
             else:
-                start = self.cumulative_length[self.index-1]
-                end = self.cumulative_length[self.index] 
-            result = self.flattened_data[start:end] 
+                start = self.cumulative_length.nda[self.index-1]
+                end = self.cumulative_length.nda[self.index] 
+            result = self.flattened_data.nda[start:end] 
         except IndexError:
             raise StopIteration 
         self.index += 1
         return result
+
+    def __getitem__(self, index):
+        return list(self)[index] 
 
     def __str__(self):
         """Convert to string (e.g. for printing)"""
@@ -131,3 +134,4 @@ class VectorOfVectors:
         return string
 
     def __repr__(self): return str(self)
+
