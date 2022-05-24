@@ -510,7 +510,7 @@ class SIS3316ORCADecoder(OrcaDecoder):
                 print("ORSIS3302Model: Error: decoded_values not built yet!")
                 return None
             return list(dec_vals_list)[0][1] # Get first thing we find
-        if channel in self.decoded_values: 
+        if channel in self.decoded_values:
             return self.decoded_values[channel]
         print("ORSIS3316Model: Error: No decoded values for channel", channel)
         return None

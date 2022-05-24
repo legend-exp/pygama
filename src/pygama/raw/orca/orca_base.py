@@ -1,5 +1,6 @@
 from ..data_decoder import *
 
+
 class OrcaDecoder(DataDecoder):
     """ Base class for ORCA decoders.
 
