@@ -1,11 +1,12 @@
-import pytest
 import fcutils
+import pytest
+
 from pygama.raw.fc.fc_config_decoder import FCConfigDecoder
 
 
 @pytest.fixture(scope='module')
 def fcio_obj(lgnd_test_data):
-    return fcutils.fcio(lgnd_test_data.get_path('fcio/th228.fcio'))
+    return fcutils.fcio(lgnd_test_data.get_path('fcio/L200-comm-20211130-phy-spms.fcio'))
 
 
 @pytest.fixture(scope='module')

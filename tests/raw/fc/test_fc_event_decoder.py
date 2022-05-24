@@ -1,7 +1,9 @@
+import numpy as np
 import pytest
+
+from pygama import lgdo
 from pygama.raw.fc.fc_event_decoder import FCEventDecoder
 from pygama.raw.raw_buffer import RawBuffer
-from pygama import lgdo
 
 
 @pytest.fixture(scope="module")
@@ -9,8 +11,8 @@ def event_rbkd(fcio_obj, fcio_config):
     decoder = FCEventDecoder()
     decoder.set_file_config(fcio_config)
 
-    # get just one record because size=1 and check if it's an event
-    assert fcio_obj.get_record() == 3
+    # get just one record (because size=1, see below) and check if it's a (sparse)event
+    assert fcio_obj.get_record() == 3 or fcio_obj.get_record() == 6
 
     # build raw buffer for each channel in the FC trace list
     rbkd = {}
@@ -18,18 +20,18 @@ def event_rbkd(fcio_obj, fcio_config):
         rbkd[i] = RawBuffer(lgdo=decoder.make_lgdo(size=1))
 
     # decode packet into the lgdo's and check if the buffer is full
-    assert decoder.decode_packet(fcio=fcio_obj, evt_rbkd=rbkd, packet_id=123) is True
+    assert decoder.decode_packet(fcio=fcio_obj, evt_rbkd=rbkd, packet_id=69) is True
     return rbkd
 
 
-def test_fc_event_decoding(event_rbkd):
+def test_decoding(event_rbkd):
     assert event_rbkd != {}
 
 
 def test_data_types(event_rbkd):
 
     for k, v in event_rbkd.items():
-        # assert v.out_name == 'FCEvent' FIXME
+        # assert v.out_name == 'FCEvent' FIXME: is this a bug?
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
         assert isinstance(tbl['packet_id'], lgdo.Array)
@@ -66,17 +68,25 @@ def test_data_types(event_rbkd):
 def test_values(event_rbkd, fcio_obj):
 
     fc = fcio_obj
-    for ch in fcio_obj.tracelist:
+    for ch in fc.tracelist:
         loc = event_rbkd[ch].loc - 1
         tbl = event_rbkd[ch].lgdo
-        assert tbl['packet_id'].nda[loc] == 123
+
+        assert event_rbkd[ch].fill_safety == fc.numtraces
+
+        assert tbl['packet_id'].nda[loc] == 69
         assert tbl['eventnumber'].nda[loc] == fc.eventnumber
         assert tbl['timestamp'].nda[loc] == fc.eventtime
         assert tbl['runtime'].nda[loc] == fc.runtime
         assert tbl['numtraces'].nda[loc] == fc.numtraces
-        # assert tbl['tracelist'] == TODO
-        assert tbl['baseline'].nda[loc] == fc.baseline
-        assert tbl['daqenergy'].nda[loc] == fc.daqenergy
+
+        # custom logic for VectorOfVectors
+        start = 0 if loc == 0 else tbl['tracelist'].cumulative_length.nda[loc-1]
+        stop = start + len(fc.tracelist)
+        assert np.array_equal(tbl['tracelist'].flattened_data.nda[start:stop], fc.tracelist)
+
+        assert np.array_equal(tbl['baseline'].nda[loc], fc.baseline[ch])
+        assert np.array_equal(tbl['daqenergy'].nda[loc], fc.daqenergy[ch])
         assert tbl['channel'].nda[loc] == ch
         assert tbl['ts_pps'].nda[loc] == fc.timestamp_pps
         assert tbl['ts_ticks'].nda[loc] == fc.timestamp_ticks
@@ -96,4 +106,4 @@ def test_values(event_rbkd, fcio_obj):
         assert tbl['deadtime'].nda[loc] == fc.deadtime
         assert tbl['waveform']['t0'].nda[loc] == 0
         assert tbl['waveform']['dt'].nda[loc] == 16
-        # assert tbl['waveform']['values'].nda[loc] == fc.traces[ch] TODO
+        assert np.array_equal(tbl['waveform']['values'].nda[loc], fc.traces[ch])
