@@ -46,7 +46,7 @@ class Scalar:
         string = str(self.value)
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop('datatype')
-        if len(tmp_attrs) > 0: string += ' ' + str(tmp_attrs)
+        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
         return string
 
     def __repr__(self): return str(self)

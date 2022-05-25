@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 
 from .struct import Struct
+from .vectorofvectors import VectorOfVectors
 
 
 class Table(Struct):
@@ -174,4 +176,5 @@ class Table(Struct):
             if not hasattr(self[col],'nda'):
                 print(f'column {col} does not have an nda, skipping...')
             else: df[col] = self[col].nda
+
         return df

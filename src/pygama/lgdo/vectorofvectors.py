@@ -45,9 +45,17 @@ class VectorOfVectors:
         else: self.cumulative_length = cumulative_length
         if flattened_data is None:
             length = np.prod(shape_guess)
-            self.flattened_data = Array(shape=(length,), dtype=dtype)
-        else: self.flattened_data = flattened_data
-        self.dtype = self.flattened_data.dtype
+            if dtype is None:
+                print('VectorOfVectors: Warning: flattened_data and dtype cannot both be None!')
+            else:
+                self.flattened_data = Array(shape=(length,), dtype=dtype)
+        else:
+            self.flattened_data = flattened_data
+            if dtype is None:
+                self.dtype = self.flattened_data.dtype
+            else:
+                self.dtype = dtype
+
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
@@ -58,7 +66,7 @@ class VectorOfVectors:
 
 
     def datatype_name(self):
-        """The name for this lgod's datatype attribute"""
+        """The name for this lgdo's datatype attribute"""
         return 'array'
 
 
@@ -94,3 +102,35 @@ class VectorOfVectors:
             self.flattened_data.nda.resize(2*len(self.flattened_data.nda))
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
+
+    def __iter__(self):
+        self.index = 0
+        return self
+
+    def __next__(self):
+        try:
+            if self.index == 0:
+                start = 0
+                end = self.cumulative_length.nda[0]
+            else:
+                start = self.cumulative_length.nda[self.index-1]
+                end = self.cumulative_length.nda[self.index]
+            result = self.flattened_data.nda[start:end]
+        except IndexError:
+            raise StopIteration
+        self.index += 1
+        return result
+
+    def __getitem__(self, index):
+        return list(self)[index]
+
+    def __str__(self):
+        """Convert to string (e.g. for printing)"""
+        nda = list(self)
+        string = str(nda)
+        tmp_attrs = self.attrs.copy()
+        tmp_attrs.pop('datatype')
+        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
+        return string
+
+    def __repr__(self): return str(self)
