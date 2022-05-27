@@ -19,10 +19,8 @@ def array():
 
 
 class Test_VectorOfVectors:
-    def test_datatype_name(self, vov, array):
-        flat = array(nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1]))
-        length = array(nda=np.array([2, 5, 6, 10, 13]))
-        v = vov(flattened_data=flat, cumulative_length=length)
+    def test_datatype_name(self, vov):
+        v = vov(shape_guess=(12,64), dtype='uint8')
         result = v.datatype_name()
         desired = 'array'
         assert_(result == desired)
