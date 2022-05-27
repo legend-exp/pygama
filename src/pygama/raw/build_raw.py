@@ -11,6 +11,7 @@ from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
 
 from .fc.fc_streamer import FCStreamer
+from .orca.orca_streamer import OrcaStreamer
 from .raw_buffer import (
     RawBuffer,
     RawBufferLibrary,
@@ -18,7 +19,6 @@ from .raw_buffer import (
     write_to_lh5_and_clear,
 )
 
-#from orca.stream_orca import *
 #from stream_llama import *
 #from stream_compass import *
 #from stream_fc import *
@@ -84,13 +84,17 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     if in_stream_type is None:
         i_ext = in_stream.rfind('.')
         if i_ext == -1:
-            print('unknown file type. Specify in_stream_type')
-            return
-        ext = in_stream[i_ext+1:]
-        if ext == 'fcio': in_stream_type = 'FlashCam'
+            if OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
+            else:
+                print('unknown file type. Specify in_stream_type')
+                return
         else:
-            print(f'unknown file extension {ext}. Specify in_stream_type')
-            return
+            ext = in_stream[i_ext+1:]
+            if ext == 'fcio': in_stream_type = 'FlashCam'
+            if ext == 'gz' and OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
+            else:
+                print(f'unknown file extension {ext}. Specify in_stream_type')
+                return
 
     # procss out_spec and setup rb_lib if specified
     rb_lib = None
@@ -139,8 +143,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     # select the appropriate streamer for in_stream
     streamer = None
     if in_stream_type == 'ORCA':
-        print(f'Error: ORCA streaming not yet implemented')
-        return
+        streamer = OrcaStreamer()
     elif in_stream_type == 'FlashCam':
         streamer = FCStreamer()
     elif in_stream_type == 'LlamaDaq':

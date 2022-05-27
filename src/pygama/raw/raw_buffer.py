@@ -127,18 +127,21 @@ class RawBufferList(list):
     A RawBufferList holds a collection of RawBuffers of identical structure
     (same format lgdo's with the same fields).
     """
+    def __init__(self):
+        self.keyed_dict = None
 
 
-    def get_keyed_dict(self, default=None):
+    def get_keyed_dict(self):
         """ returns a dict of RawBuffers built from the buffers' key_lists
 
         Different keys may point to the same buffer. Requires the buffers in the
         RawBufferList to have non-overlapping key lists.
         """
-        keyed_dict = {}
-        for rb in self:
-            for key in rb.key_list: keyed_dict[key] = rb
-        return keyed_dict
+        if self.keyed_dict is None:
+            self.keyed_dict = {}
+            for rb in self:
+                for key in rb.key_list: self.keyed_dict[key] = rb
+        return self.keyed_dict
 
 
     def set_from_json_dict(self, json_dict, kw_dict={}):
@@ -366,8 +369,9 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
             filename = rb.out_stream[:ii]
             group = rb.out_stream[ii+1:]
             if len(group) == 0: group = '/' # in case out_stream ends with :
-        # write...
-        lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
-                               n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+        # write if requested...
+        if filename != '':
+            lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
+                                   n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
         # and clear
         rb.loc = 0

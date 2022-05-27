@@ -365,8 +365,7 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
             for channel in range(len(enabled)):
                 if not enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
-                self.decoded_values[ccc] = {}
-                self.decoded_values[ccc].update(self.decoded_values_template)
+                self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                 if samples > 0:
                     self.decoded_values[ccc]['waveform']['length'] = samples
 

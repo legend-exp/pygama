@@ -1,15 +1,251 @@
 import gzip
-import plistlib
-import sys
+import json
 
 import numpy as np
+
+from ..data_streamer import DataStreamer
+from . import orca_packet
+from .orca_header_decoder import OrcaHeaderDecoder
+
+
+class OrcaStreamer(DataStreamer):
+    """ Data streamer for ORCA data
+    """
+    def __init__(self):
+        super().__init__()
+        self.in_stream = None
+        self.buffer = np.empty(1024, dtype='uint32') # start with a 4 kB packet buffer
+        self.header = None
+        self.header_decoder = OrcaHeaderDecoder()
+        self.decoder_id_dict = {} # dict of data_id to decoder object
+        self.decoder_name_dict = {} # dict of name to decoder object
+        self.rbl_id_dict = {} # dict of RawBufferLists for each data_id
+
+
+    def load_packet(self, skip_unknown_ids=False):
+        """ Loads the next packet into the internal buffer
+        Returns packet as a uint32 view of the buffer (a slice)
+        Returns None at EOF or for an error
+
+        CHECK: need to correct for endianness?
+        """
+        if self.in_stream is None:
+            print('Error: in_stream is None')
+            return None
+
+        # read packet header
+        pkt_hdr = self.buffer[:1]
+        n_bytes_read = self.in_stream.readinto(pkt_hdr) # buffer is at least 4 kB long
+        self.n_bytes_read += n_bytes_read
+        if n_bytes_read == 0: return None
+        if n_bytes_read != 4:
+            print(f'Error: only got {n_bytes_read} bytes for packet header')
+            return None
+
+        # if it's a short packet, we are done
+        if orca_packet.is_short(pkt_hdr): return pkt_hdr
+
+        # long packet: get length and check if we can skip it
+        n_words = orca_packet.get_n_words(pkt_hdr)
+        if skip_unknown_ids and orca_packet.get_data_id(pkt_hdr) not in self.decoder_id_dict:
+            self.in_stream.seek((n_words-1)*4, 1)
+            self.n_bytes_read += (n_words-1)*4 # well, we didn't really read it...
+            return pkt_hdr
+
+        # load into buffer, resizing as necessary
+        if len(self.buffer) < n_words: self.buffer.resize(n_words, refcheck=False)
+        n_bytes_read = self.in_stream.readinto(self.buffer[1:n_words])
+        self.n_bytes_read += n_bytes_read
+        if n_bytes_read != (n_words-1)*4:
+            print(f'Error: only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected.')
+            return None
+
+        # return just the packet
+        return self.buffer[:n_words]
+
+
+    def get_decoder_list(self):
+        return list(self.decoder_id_dict.values())
+
+
+    def set_in_stream(self, stream_name):
+        if self.in_stream is not None: self.close_in_stream()
+        if stream_name.endswith('.gz'):
+            self.in_stream = gzip.open(stream_name.encode('utf-8'), 'rb')
+        else: self.in_stream = open(stream_name.encode('utf-8'), 'rb')
+        self.n_bytes_read = 0
+
+
+    def close_in_stream(self):
+        self.in_stream.close()
+        self.in_stream = None
+
+
+    def is_orca_stream(stream_name): # static function
+        orca = OrcaStreamer()
+        orca.set_in_stream(stream_name)
+        first_bytes = orca.in_stream.read(12)
+
+        # that read should have succeeded
+        if len(first_bytes) != 12: return False
+
+        # first 14 bits should be zero
+        uints = np.frombuffer(first_bytes, dtype='uint32')
+        if (uints[0] & 0xfffc0000) != 0: return False
+
+        # xml header length should fit within header packet length
+        pad = uints[0] * 4 - 8 - uints[1]
+        if pad < 0 or pad > 3: return False
+
+        # last 4 chars should be '<?xm'
+        if first_bytes[8:].decode() != '<?xm': return False
+
+        # it must be an orca stream
+        return True
+
+
+    def hex_dump(self, stream_name, n_packets=np.inf,
+                 skip_header=False, shift_data_id=True, print_n_words=False,
+                 max_words=np.inf, as_int=False, as_short=False):
+        self.set_in_stream(stream_name)
+        if skip_header: self.load_packet()
+        while n_packets > 0:
+            packet = self.load_packet()
+            if packet is None:
+                self.close_in_stream()
+                return
+            data_id = orca_packet.get_data_id(packet, shift=shift_data_id)
+            n_words = orca_packet.get_n_words(packet)
+            if print_n_words: print(f'data ID = {data_id}: {n_words} words')
+            else:
+                print(f'data ID = {data_id}:')
+                n_to_print = int(np.minimum(n_words, max_words))
+                pad = int(np.ceil(np.log10(n_to_print)))
+                for i in range(n_to_print):
+                    line = f'{str(i).zfill(pad)}'
+                    line += ' {0:#0{1}x}'.format(packet[i], 10)
+                    if data_id == 0 and i > 1: line += f' {packet[i:i+1].tobytes().decode()}'
+                    if as_int: line += f' {packet[i]}'
+                    if as_short: line += f" {np.frombuffer(packet[i:i+1].tobytes(), dtype='uint16')}"
+                    print(line)
+            n_packets -= 1
+
+
+    def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
+                    chunk_mode='any_full', out_stream='', verbosity=0):
+        """ Initialize the ORCA data stream
+
+        Parameters
+        ----------
+        stream_name : str
+            The ORCA filename.  Only file streams are currently supported.
+            Socket stream reading can be added later.
+        rb_lib : RawBufferLibrary
+            library of buffers for this stream
+        buffer_size : int
+            length of tables to be read out in read_chunk
+        verbosity : int
+            verbosity level for the initialize function
+
+        Returns
+        -------
+        header_data : list(RawBuffer)
+            a list of length 1 containing the raw buffer holding the ORCA header
+        """
+
+        self.set_in_stream(stream_name)
+
+        # read in the header
+        packet = self.load_packet()
+        if orca_packet.get_data_id(packet) != 0:
+            print(f'Error: got data id {orca_packet.get_data_id(packet)} for header')
+            return []
+        self.packet_id = 0
+        self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id, verbosity=verbosity)
+        self.header = self.header_decoder.header
+
+        # instantiate decoders listed in the header AND in the rb_lib (if specified)
+        decoder_names = ['OrcaHeaderDecoder']
+        decoder_names += self.header.get_decoder_list()
+        if rb_lib is not None and '*' not in rb_lib:
+            keep_decoders = []
+            for name in decoder_names:
+                if name in rb_lib: keep_decoders.append[name]
+            decoder_names = keep_decoders
+            # check that all requested decoders are present
+            for name in rb_lib.keys():
+                if name not in keep_decoders:
+                    print(f'Warning: decoder {name} (requested in rb_lib) not in data description in header')
+        for name in decoder_names:
+            # handle header decoder specially
+            if name == 'OrcaHeaderDecoder':
+                self.decoder_id_dict[0] = self.header_decoder
+                self.decoder_name_dict['OrcaHeaderDecoder'] = 0
+                continue
+            # instantiate other decoders by name
+            if name not in globals():
+                print(f'Warning: No implementation of {name}, corresponding packets will be skipped')
+                continue
+            decoder = globals()[name]
+            decoder.data_id = self.header.get_data_id(name)
+            self.decoder_id_dict[decoder.data_id] = decoder
+            self.decoder_name_dict[name] = decoder.data_id
+
+        # initialize the buffers in rb_lib. Store them for fast lookup
+        super().open_stream(stream_name, rb_lib, buffer_size=buffer_size,
+                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
+        if rb_lib is None: rb_lib = self.rb_lib
+        for name in self.rb_lib.keys():
+            data_id = self.decoder_name_dict[name]
+            self.rbl_id_dict[data_id] = self.rb_lib[name]
+        print(self.rb_lib)
+
+        # return header raw buffer
+        if 'OrcaHeaderDecoder' in rb_lib:
+            header_rb_list = rb_lib['OrcaHeaderDecoder']
+            if len(header_rb_list) != 1:
+                print(f'warning! header_rb_list had length {len(header_rb_list)}, ignoring all but the first')
+            rb = header_rb_list[0]
+        else: rb = RawBuffer(lgdo=self.header_decoder.make_lgdo())
+        rb.lgdo.value = json.dumps(self.header)
+        rb.loc = 1 # we have filled this buffer
+        return [rb]
+
+
+    def read_packet(self, verbosity=0):
+        """ Read a packet of data.
+
+        Data written to self.rb_lib.
+        """
+        # read until we get a decodeable packet
+        while True:
+            packet = self.load_packet(skip_unknown_ids=True)
+            if packet is None: return False
+            self.packet_id += 1
+
+            # look up the data id, decoder, and rbl
+            data_id = orca_packet.get_data_id(packet)
+            if verbosity>0: print(f'packet {self.packet_id}: data_id = {data_id}')
+            if data_id in self.decoder_id_dict: break
+
+        # now decode
+        decoder = self.decoder_id_dict[data_id]
+        rbl = self.rbl_id_dict[data_id]
+        self.any_full |= decoder.decode_packet(packet, self.packet_id, rbl, verbosity=verbosity)
+        return True
+
+
+
+'''
+import sys, gzip
+import numpy as np
+import plistlib
+
 from tqdm.std import tqdm
-
-from pygama import lh5
-
 from ..utils import tqdm_range, update_progress
-from .ch_group import *
 from .io_base import DataDecoder
+from pygama import lh5
+from .ch_group import *
 
 
 class OrcaDecoder(DataDecoder):
@@ -54,32 +290,32 @@ def parse_header(orca_filename):
     """
     with open_orca(orca_filename) as xmlfile_handle:
         #read the first word:
-        barr = bytearray(xmlfile_handle.read(8))
+        ba = bytearray(xmlfile_handle.read(8))
 
         #Replacing this to be python2 friendly
         # #first 4 bytes: header length in long words
-        # i = int.from_bytes(barr[:4], byteorder=sys.byteorder)
+        # i = int.from_bytes(ba[:4], byteorder=sys.byteorder)
         # #second 4 bytes: header length in bytes
-        # j = int.from_bytes(barr[4:], byteorder=sys.byteorder)
+        # j = int.from_bytes(ba[4:], byteorder=sys.byteorder)
 
         big_endian = False if sys.byteorder == "little" else True
-        i = from_bytes(barr[:4], big_endian=big_endian)
-        j = from_bytes(barr[4:], big_endian=big_endian)
+        i = from_bytes(ba[:4], big_endian=big_endian)
+        j = from_bytes(ba[4:], big_endian=big_endian)
         if (np.ceil(j/4) != i-2) and (np.ceil(j/4) != i-3):
             print('Error: header byte length = %d is the wrong size to fit into %d header packet words' % (j, i-2))
             return i, j, {}
 
         #read in the next that-many bytes that occupy the plist header
         as_bytes = xmlfile_handle.read(j)
-        barr = bytearray(as_bytes)
+        ba = bytearray(as_bytes)
 
         #convert to string
         #the readPlistFromBytes method doesn't exist in 2.7
         if sys.version_info[0] < 3:
-            header_string = barr.decode("utf-8")
+            header_string = ba.decode("utf-8")
             header_dict = plistlib.readPlistFromString(header_string)
         elif sys.version_info[1] < 9:
-            header_dict = plistlib.readPlistFromBytes(barr)
+            header_dict = plistlib.readPlistFromBytes(ba)
         else:
             header_dict = plistlib.loads(as_bytes, fmt=plistlib.FMT_XML)
         return i, j, header_dict
@@ -183,7 +419,7 @@ def get_object_info(header_dict, orca_class_name):
 
 def get_readout_info(header_dict, orca_class_name, unique_id=-1):
     """
-    returns a list with all the readout list info from the header with name
+    retunrs a list with all the readout list info from the header with name
     orca_class_name.  optionally, if unique_id >= 0 only return the list for
     that Orca unique id number.
     """
@@ -255,8 +491,8 @@ def get_next_packet(f_in):
     # reserved        = (head[4] + (head[5]<<8))
 
     # Using an array of uint32
-    record_length = int(head[0] & 0x3FFFF)
-    data_id = int(head[0] >> 18)
+    record_length = int((head[0] & 0x3FFFF))
+    data_id = int((head[0] >> 18))
     # reserved =int( (head[1] &0xFFFF))
 
     # /* ========== read in the rest of the event data ========== */
@@ -291,7 +527,6 @@ def get_channel(ccc):
 # Do it here so that orca_digitizers can import the functions above here
 from . import orca_digitizers, orca_flashcam
 
-
 def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=None, verbose=False, buffer_size=1024):
     """
     convert ORCA DAQ data to "raw" lh5
@@ -314,7 +549,7 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     file_size = float(f_in.tell())
     f_in.seek(0, 0)  # rewind
     file_size_MB = file_size / 1e6
-    print(f"Total file size: {file_size_MB:.3f} MB")
+    print("Total file size: {:.3f} MB".format(file_size_MB))
     print("Run number:", get_run_number(header_dict))
 
 
@@ -473,9 +708,10 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
             try:
-                print(f"  {data_id}: {id2dn_dict[data_id]}")
+                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
             except KeyError:
-                print(f"  {data_id}: Unknown")
+                print("  {}: Unknown".format(data_id))
         print("hopefully they weren't important!\n")
 
-    print(f"Wrote RAW File:\n    {raw_file_pattern}\nFILE INFO:")
+    print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
+'''

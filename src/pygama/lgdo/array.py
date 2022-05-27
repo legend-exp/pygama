@@ -80,3 +80,13 @@ class Array:
         """Resize the array to new_size (int)"""
         new_shape = (new_size,) + self.nda.shape[1:]
         self.nda.resize(new_shape)
+
+    def __str__(self):
+        """Convert to string (e.g. for printing)"""
+        string = str(self.nda)
+        tmp_attrs = self.attrs.copy()
+        tmp_attrs.pop('datatype')
+        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
+        return string
+
+    def __repr__(self): return str(self)

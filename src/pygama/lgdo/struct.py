@@ -52,3 +52,14 @@ class Struct(dict):
     def __len__(self):
         """Structs are considered length=1 """
         return 1
+
+    def __str__(self):
+        """Convert to string (e.g. for printing)"""
+        string = super().__repr__() #__repr__ instead of __str__ to avoid infinite loop
+        tmp_attrs = self.attrs.copy()
+        tmp_attrs.pop('datatype')
+        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
+        return string
+
+    def __repr__(self):
+        return str(self)
