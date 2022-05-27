@@ -49,12 +49,13 @@ class VectorOfVectors:
                 print('VectorOfVectors: Warning: flattened_data and dtype cannot both be None!')
             else:
                 self.flattened_data = Array(shape=(length,), dtype=dtype)
+                self.dtype = np.dtype(dtype)
         else:
             self.flattened_data = flattened_data
             if dtype is None:
                 self.dtype = self.flattened_data.dtype
             else:
-                self.dtype = dtype
+                self.dtype = np.dtype(dtype)
 
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
