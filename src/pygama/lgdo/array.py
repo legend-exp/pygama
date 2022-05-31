@@ -21,7 +21,7 @@ class Array:
     """
 
 
-    def __init__(self, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
+    def __init__(self, nda=None, shape=(), dtype=None, fill_val=None, attrs={}):
         """
         Parameters
         ----------
