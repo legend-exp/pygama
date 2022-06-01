@@ -19,6 +19,6 @@ class FixedSizeArray(Array):
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
 
 
-    def dataype_name(self):
+    def datatype_name(self):
         """The name for this object's lh5 datatype attribute"""
-        return 'fixedsize_array'
+        return 'fixed_size_array'
