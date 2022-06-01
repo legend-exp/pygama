@@ -1,11 +1,13 @@
-import gzip, json
+import gzip
+import json
+
 import numpy as np
 
 from ..data_streamer import DataStreamer
 from ..raw_buffer import RawBuffer
 from . import orca_packet
-from .orca_header_decoder import OrcaHeaderDecoder
 from .orca_flashcam import ORFlashCamADCWaveformDecoder
+from .orca_header_decoder import OrcaHeaderDecoder
 
 
 class OrcaStreamer(DataStreamer):

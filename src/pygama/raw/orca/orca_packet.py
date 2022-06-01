@@ -17,4 +17,3 @@ def get_data_id(packet, shift=True):
         else: return packet[0] & 0xFC000000
     if shift: return (packet[0] & 0xFFFC0000) >> 18
     return packet[0] & 0xFFFC0000
-

@@ -46,7 +46,7 @@ class OrcaHeader(dict):
         orca_class_name.
         """
         object_info_list = []
-    
+
         crates = self["ObjectInfo"]["Crates"]
         for crate in crates:
             cards = crate["Cards"]
@@ -54,7 +54,7 @@ class OrcaHeader(dict):
                 if card["Class Name"] == orca_class_name:
                     card["Crate"] = crate["CrateNumber"]
                     object_info_list.append(card)
-    
+
         if len(object_info_list) == 0:
             print('OrcaHeader::get_object_info(): Warning: no object info '
                   'for class name', orca_class_name)

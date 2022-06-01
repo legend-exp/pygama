@@ -1,8 +1,9 @@
 import plistlib
 
 from pygama import lgdo
-from .orca_base import OrcaDecoder
+
 from . import orca_header
+from .orca_base import OrcaDecoder
 
 
 class OrcaHeaderDecoder(OrcaDecoder):
