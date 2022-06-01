@@ -2,6 +2,7 @@ import numpy as np
 import pygama.lgdo as lgdo
 
 
+# TODO: add more tests
 def test_datatype_name():
     v = lgdo.VectorOfVectors(shape_guess=(12, 64), dtype='uint8')
     assert v.datatype_name() == 'array'

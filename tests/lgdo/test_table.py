@@ -1,6 +1,9 @@
 import numpy as np
-from pygama.lgdo.table import Table
+import pandas as pd
+import pytest
+
 import pygama.lgdo as lgdo
+from pygama.lgdo.table import Table
 
 
 def test_init():
@@ -54,6 +57,9 @@ def test_add_field():
     tbl.add_field('a', lgdo.Array(np.array([1, 2, 3])), use_obj_size=True)
     assert tbl.size == 3
 
+    with pytest.raises(TypeError):
+        tbl.add_field('s', lgdo.Scalar(value=69))
+
 
 def test_add_column():
     tbl = Table()
@@ -62,12 +68,25 @@ def test_add_column():
 
 
 def test_join():
-    tbl1 = Table()
-    tbl1.add_field('a', lgdo.Array(np.array([1, 2, 3])))
+    tbl1 = Table(size=3)
+    tbl1.add_field('a', lgdo.FixedSizeArray(np.array([1, 2, 3])))
+    tbl1.add_field('b', lgdo.Array(np.array([1, 2, 3])))
+    assert list(tbl1.keys()) == ['a', 'b']
 
-    tbl2 = Table()
-    tbl2.add_field('b', lgdo.Array(np.array([4, 5, 6, 7])))
-    tbl2.add_field('c', lgdo.Array(np.array([9, 9, 10, 11])))
+    tbl2 = Table(size=3)
+    tbl2.add_field('c', lgdo.Array(np.array([4, 5, 6])))
+    tbl2.add_field('d', lgdo.Array(np.array([9, 9, 10])))
 
     tbl1.join(tbl2)
-    assert list(tbl1.keys()) == ['a', 'b', 'c']
+    assert list(tbl1.keys()) == ['a', 'b', 'c', 'd']
+
+    tbl2.join(tbl1, cols=('a'))
+    assert list(tbl2.keys()) == ['c', 'd', 'a']
+
+
+def test_get_dataframe():
+    tbl = Table(3)
+    tbl.add_column('a', lgdo.Array(np.array([1, 2, 3])))
+    df = tbl.get_dataframe()
+    assert isinstance(df, pd.DataFrame)
+    assert df.keys().all() == 'a'

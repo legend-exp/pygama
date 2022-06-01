@@ -12,7 +12,9 @@ def test_form_datatype():
     assert aoesa.form_datatype() == 'array_of_equal_sized_arrays<2,3>{real}'
 
 
-def test_init_value():
-    aoesa = lgdo.ArrayOfEqualSizedArrays(dims=(2, 3), dtype=np.float32, fill_val=42)
+def test_init():
+    attrs = {'attr1': 1}
+    aoesa = lgdo.ArrayOfEqualSizedArrays(dims=(2, 3), dtype=np.float32, fill_val=42, attrs=attrs)
     assert aoesa.dims == (2, 3)
     assert (aoesa.nda == np.full((2, 3), 42, np.float32)).all()
+    assert aoesa.attrs == attrs | {'datatype': 'array_of_equal_sized_arrays<2,3>{real}'}

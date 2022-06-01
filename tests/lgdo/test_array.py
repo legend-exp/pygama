@@ -1,4 +1,5 @@
 import numpy as np
+
 import pygama.lgdo as lgdo
 
 
@@ -12,9 +13,11 @@ def test_form_datatype():
     assert array.form_datatype() == 'array<2>{real}'
 
 
-def test_init_value():
-    array = lgdo.Array(shape=(3,), fill_val=42, dtype=np.float32)
+def test_init():
+    attrs = {'attr1': 1}
+    array = lgdo.Array(shape=(3,), dtype=np.float32, fill_val=42, attrs=attrs)
     assert (array.nda == np.full((3,), 42, np.float32)).all()
+    assert array.attrs == attrs | {'datatype': 'array<1>{real}'}
 
 
 def test_resize():

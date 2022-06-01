@@ -11,6 +11,9 @@ def test_form_datatype():
     assert scalar.form_datatype() == 'real'
 
 
-def test_init_value():
-    scalar = lgdo.Scalar(value=42)
+# TODO: check for warning if mismatched datatype
+def test_init():
+    attrs = {'attr1': 1}
+    scalar = lgdo.Scalar(value=42, attrs=attrs)
     assert scalar.value == 42
+    assert scalar.attrs == attrs | {'datatype': 'real'}
