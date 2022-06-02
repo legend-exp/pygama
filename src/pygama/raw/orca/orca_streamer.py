@@ -146,6 +146,10 @@ class OrcaStreamer(DataStreamer):
             library of buffers for this stream
         buffer_size : int
             length of tables to be read out in read_chunk
+        chunk_mode : 'any_full', 'only_full', or 'single_packet'
+            sets the mode use for read_chunk
+        out_stream : str
+            optional name of output stream for default rb_lib generation
         verbosity : int
             verbosity level for the initialize function
 
