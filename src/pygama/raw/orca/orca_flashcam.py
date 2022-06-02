@@ -442,7 +442,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         tbl['ts_maxticks'].nda[ii]  = np.int32(packet[offset+3])
 
         # set the runtime and timestamp
-        tstamp = np.float64(packet[offset]+1);
+        tstamp = np.float64(packet[offset+1]);
         tstamp += np.float64(packet[offset+2]) / (np.int32(packet[offset+3])+1)
         tbl['runtime'].nda[ii]   = tstamp
         tbl['timestamp'].nda[ii] = tstamp + toff
