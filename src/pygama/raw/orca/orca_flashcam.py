@@ -1,9 +1,9 @@
 import copy
+
 import numpy as np
 
-from .orca_base import OrcaDecoder, get_ccc
 from ..fc.fc_event_decoder import fc_decoded_values
-
+from .orca_base import OrcaDecoder, get_ccc
 
 """
 from .fcdaq import FlashCamEventDecoder
@@ -313,7 +313,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             'crate' :   { 'dtype': 'uint8',  },
             'card' :    { 'dtype': 'uint8',  },
             'ch_orca' : { 'dtype': 'uint8',  },
-            'fcio_id' : { 'dtype': 'uint16', }  
+            'fcio_id' : { 'dtype': 'uint16', }
         } )
         self.decoded_values = {}
         super().__init__(*args, **kwargs)
@@ -359,7 +359,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
                     self.decoded_values[ccc]['waveform']['wf_len'] = samples
 
 
-    def get_key_list(self): 
+    def get_key_list(self):
         return list(self.decoded_values.keys())
 
 

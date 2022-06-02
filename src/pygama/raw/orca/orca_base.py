@@ -32,5 +32,3 @@ def get_card(ccc):
 
 def get_channel(ccc):
     return ccc & 0xf
-
-

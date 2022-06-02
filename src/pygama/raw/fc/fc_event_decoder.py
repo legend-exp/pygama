@@ -1,7 +1,7 @@
+import copy
+
 from pygama import lgdo
 from pygama.raw.data_decoder import *
-
-import copy
 
 # put decoded values here where they can be used also by the orca decoder
 fc_decoded_values = {
