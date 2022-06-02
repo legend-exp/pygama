@@ -9,6 +9,11 @@ def test_datatype_name():
     assert v.datatype_name() == 'array'
 
 
+def test_form_datatype():
+    v = lgdo.VectorOfVectors(shape_guess=(12, 64), dtype='uint8')
+    assert v.form_datatype() == 'array<1>{array<1>{real}}'
+
+
 def test_list():
     flat = lgdo.Array(nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1]))
     length = lgdo.Array(nda=np.array([2, 5, 6, 10, 13]))

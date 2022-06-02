@@ -89,7 +89,11 @@ class WaveformTable(Table):
         if dt_units is not None: dt.attrs['units'] = f'{dt_units}'
 
         if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(values, VectorOfVectors):
-            if isinstance(values, np.ndarray): wf_len = values.shape[1]
+            if isinstance(values, np.ndarray):
+                try:
+                    wf_len = values.shape[1]
+                except:
+                    wf_len = None
             if wf_len is None: # VectorOfVectors
                 shape_guess = (size, 100)
                 if dtype is None: dtype = np.dtype(np.float64)
