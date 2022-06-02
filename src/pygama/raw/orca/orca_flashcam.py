@@ -1,13 +1,9 @@
 import copy
-
 import numpy as np
 
 from ..fc.fc_event_decoder import fc_decoded_values
 from .orca_base import OrcaDecoder, get_ccc
 
-"""
-from .fcdaq import FlashCamEventDecoder
-from .orcadaq import OrcaDecoder, get_auxhw_info, get_ccc, get_readout_info
 
 class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
     '''
@@ -295,7 +291,6 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
             tbl[key].set_vector(ii, self.cdata[key].flatten())
 
         tbl.push_row()
-"""
 
 
 class ORFlashCamADCWaveformDecoder(OrcaDecoder):
