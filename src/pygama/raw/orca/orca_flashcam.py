@@ -1,4 +1,5 @@
 import copy
+
 import numpy as np
 
 from ..fc.fc_event_decoder import fc_decoded_values
