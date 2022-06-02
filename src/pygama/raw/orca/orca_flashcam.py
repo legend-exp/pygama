@@ -6,6 +6,7 @@ from .orca_base import OrcaDecoder, get_ccc
 
 
 class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
+    """
     '''
     Decoder for FlashCam listener config written by ORCA
     '''
@@ -291,7 +292,7 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
             tbl[key].set_vector(ii, self.cdata[key].flatten())
 
         tbl.push_row()
-
+    """
 
 class ORFlashCamADCWaveformDecoder(OrcaDecoder):
     """
