@@ -94,25 +94,25 @@ class WaveformTable(Table):
                     wf_len = values.shape[1]
                 except:
                     wf_len = None
-                if wf_len is None: # VectorOfVectors
-                    shape_guess = (size, 100)
-                    if dtype is None: dtype = np.dtype(np.float64)
-                    if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
-                    else:
-                        flattened_data = np.concatenate(values)
-                        length = 0
-                        cumulative_length = []
-                        for i in range(size):
-                            length += len(values[i])
-                            cumulative_length.append(length)
-                        values = VectorOfVectors(flattened_data=flattened_data, cumulative_length=cumulative_length, dtype=dtype)
-                else: # ArrayOfEqualSizedArrays
-                    shape = (size, wf_len)
-                    if dtype is None:
-                        dtype = values.dtype if hasattr(values, 'dtype') else np.dtype(np.float64)
-                    nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
-                    if nda.shape != shape: nda.resize(shape)
-                    values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
+            if wf_len is None: # VectorOfVectors
+                shape_guess = (size, 100)
+                if dtype is None: dtype = np.dtype(np.float64)
+                if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
+                else:
+                    flattened_data = np.concatenate(values)
+                    length = 0
+                    cumulative_length = []
+                    for i in range(size):
+                        length += len(values[i])
+                        cumulative_length.append(length)
+                    values = VectorOfVectors(flattened_data=flattened_data, cumulative_length=cumulative_length, dtype=dtype)
+            else: # ArrayOfEqualSizedArrays
+                shape = (size, wf_len)
+                if dtype is None:
+                    dtype = values.dtype if hasattr(values, 'dtype') else np.dtype(np.float64)
+                nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
+                if nda.shape != shape: nda.resize(shape)
+                values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
         if values_units is not None: values.attrs['units'] = f'{values_units}'
 
         col_dict = {}

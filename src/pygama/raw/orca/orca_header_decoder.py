@@ -2,16 +2,18 @@ import plistlib
 
 from pygama import lgdo
 
-from ..data_decoder import *
 from . import orca_header
+from .orca_base import OrcaDecoder
 
 
-class OrcaHeaderDecoder(DataDecoder):
+class OrcaHeaderDecoder(OrcaDecoder):
     """
     Decodes Orca headers
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.header is not None:
+            print("Warning: OrcaHeaderDecoder: unexpected non-None header in __init__")
         self.header = orca_header.OrcaHeader()
 
     def make_lgdo(self, key=None, size=None): return lgdo.Scalar(value='')
