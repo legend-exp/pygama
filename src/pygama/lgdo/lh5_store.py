@@ -2,7 +2,7 @@ import fnmatch
 import glob
 import os
 import sys
-from bisect import bisect_left
+from bisect import bisect_right, bisect_left
 from collections import defaultdict
 
 import h5py
@@ -21,9 +21,19 @@ from .waveform_table import WaveformTable
 
 
 class LH5Store:
+    """
+    DOCME
+    """
+
     def __init__(self, base_path='', keep_open=False):
         """
-        DOCME
+        Parameters
+        ----------
+        base_path : str
+            directory path to prepend to LH5 files
+        keep_open : bool
+            whether to keep files open by storing the h5py objects as class
+            attributes
         """
         self.base_path = base_path
         self.keep_open = keep_open
@@ -32,7 +42,20 @@ class LH5Store:
 
     def gimme_file(self, lh5_file, mode='r', verbosity=0):
         """
-        DOCME
+        Returns a h5py file object from the store or creates a new one
+
+        Parameters
+        ----------
+        lh5_file : str
+            LH5 file name
+        mode : str, default='r'
+            mode in which to open file. See :class:`h5py.File` documentation
+        verbosity : bool
+            verbosity
+
+        Returns
+        -------
+            file_obj : h5py.File
         """
         if isinstance(lh5_file, h5py.File): return lh5_file
         if lh5_file in self.files.keys(): return self.files[lh5_file]
@@ -44,8 +67,7 @@ class LH5Store:
                 if verbosity > 0: print(f'making path {directory}')
                 os.makedirs(directory)
         if mode == 'r' and not os.path.exists(full_path):
-            print('file not found:', full_path)
-            return None
+            raise FileNotFoundError(f'file {full_path} not found')
         if verbosity > 0 and mode != 'r' and os.path.exists(full_path):
             print(f'opening existing file {full_path} in mode {mode}...')
         h5f = h5py.File(full_path, mode)
@@ -55,7 +77,21 @@ class LH5Store:
 
     def gimme_group(self, group, base_group, grp_attrs=None, overwrite=False, verbosity=0):
         """
-        DOCME
+        Returns an existing h5py group from a base group or creates a new one.
+        Can also set (or replace) group attributes
+
+        Parameters
+        ----------
+        group : str
+            name of the HDF5 group
+        base_group : h5py.File or h5py.Group
+            HDF5 group to be used as a base
+        grp_attrs : dict, default None
+            HDF5 group attributes
+        overwrite : bool, default False
+            whether overwrite group attributes, ignored is grp_attrs is None
+        verbosity : bool
+            verbosity
         """
         if not isinstance(group, h5py.Group):
             if group in base_group: group = base_group[group]
@@ -87,7 +123,8 @@ class LH5Store:
 
     def read_object(self, name, lh5_file, start_row=0, n_rows=sys.maxsize, idx=None,
                     field_mask=None, obj_buf=None, obj_buf_start=0, verbosity=0):
-        """ Read LH5 object data from a file
+        """
+        Read LH5 object data from a file
 
         Parameters
         ----------
@@ -871,12 +908,12 @@ class LH5Iterator:
         self.entry_list = None
         if entry_list is not None:
             entry_list = list(entry_list)
-            if is_instance(x[0], int):
+            if isinstance(entry_list[0], int):
                 entry_list.sort()
                 i_start = 0
                 self.entry_list = []
                 for f_end in self.file_map:
-                    i_stop = bisect.bisect_right(entry_list, f_end, lo=i_start)
+                    i_stop = bisect_right(entry_list, f_end, lo=i_start)
                     self.entry_list.append(entry_list[i_start:i_stop])
                     i_start = i_stop
 
