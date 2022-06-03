@@ -36,6 +36,7 @@ html_theme = 'sphinx_rtd_theme'
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
 autodoc_mock_imports = [
+    'pygama._version',
     'pandas',
     # 'numpy',
     'matplotlib',
