@@ -79,7 +79,7 @@ class Array:
     def resize(self, new_size):
         """Resize the array to new_size (int)"""
         new_shape = (new_size,) + self.nda.shape[1:]
-        self.nda.resize(new_shape)
+        self.nda.resize(new_shape, refcheck=True)
 
     def __str__(self):
         """Convert to string (e.g. for printing)"""
