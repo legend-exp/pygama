@@ -1,11 +1,11 @@
 import h5py
-from pygama.lgdo.lh5_store import LH5Store, LH5Iterator
-import pygama.lgdo.lh5_store as lh5
-import pygama.lgdo as lgdo
-
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
+
+import pygama.lgdo as lgdo
+import pygama.lgdo.lh5_store as lh5
+from pygama.lgdo.lh5_store import LH5Iterator, LH5Store
 
 
 @pytest.fixture(scope='module')
