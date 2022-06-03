@@ -1,5 +1,4 @@
 import numpy as np
-
 import pytest
 
 import pygama.lgdo as lgdo

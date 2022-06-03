@@ -2,7 +2,7 @@ import fnmatch
 import glob
 import os
 import sys
-from bisect import bisect_right, bisect_left
+from bisect import bisect_left, bisect_right
 from collections import defaultdict
 
 import h5py
@@ -55,7 +55,7 @@ class LH5Store:
 
         Returns
         -------
-            file_obj : h5py.File
+        file_obj : h5py.File
         """
         if isinstance(lh5_file, h5py.File): return lh5_file
         if lh5_file in self.files.keys(): return self.files[lh5_file]
