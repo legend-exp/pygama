@@ -48,7 +48,7 @@ class ArrayOfEqualSizedArrays(Array):
 
     def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
-        return 'array_of_equal_sized_arrays'
+        return 'array_of_equalsized_arrays'
 
 
     def form_datatype(self):

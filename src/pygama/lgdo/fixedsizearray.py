@@ -21,4 +21,4 @@ class FixedSizeArray(Array):
 
     def datatype_name(self):
         """The name for this object's lh5 datatype attribute"""
-        return 'fixed_size_array'
+        return 'fixedsize_array'
