@@ -74,13 +74,8 @@ Testing
   sufficient code coverage for every proposed change or addition. If necessary,
   high-level functional tests should be updated. We currently rely on
   `codecov.io <https://app.codecov.io/gh/legend-exp/pygama>`_ to keep track of
-  the test coverage. To generate a local coverage report (recommended before
-  submitting pull requests), run:
-
-  .. code-block:: console
-
-     $ pip install .[test]
-     $ pytest --cov=pygama
+  test coverage. A local report, which must be inspected before submitting pull
+  requests, is automatically generated when running ``pytest``.
 
 Documentation
 -------------

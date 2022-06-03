@@ -71,7 +71,8 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy', None),
     'pandas': ('https://pandas.pydata.org/docs', None),
     'matplotlib': ('https://matplotlib.org/stable', None),
-    'iminuit': ('https://iminuit.readthedocs.io/en/stable', None)
+    'iminuit': ('https://iminuit.readthedocs.io/en/stable', None),
+    'h5py': ('https://docs.h5py.org/en/stable', None)
 }
 
 # sphinx-autodoc
@@ -93,8 +94,7 @@ smv_prefer_remote_refs = False
 # but it's not possible with the current sphinx-multiversion. Changes have been
 # proposed in this PR: https://github.com/Holzhaus/sphinx-multiversion/pull/62
 # but there's no timeline for merging yet. For the following option to be considered,
-# one needs to install sphinx-multiversion from a fork with the following:
-# $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+# one needs to install the sphinx-multiversion-pre-post-build fork from PyPI
 smv_prebuild_command = 'make -ik apidoc'
 
 # The right way to find all docs versions is to look for matching branches on
