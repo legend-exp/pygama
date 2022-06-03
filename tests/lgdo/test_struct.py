@@ -17,13 +17,12 @@ def test_update_datatype():
     assert struct.attrs['datatype'] == 'struct{}'
 
 
-# FIXME: error in dict.update
-# def test_init():
-#     obj_dict = {'scalar1', lgdo.Scalar(value=10)}
-#     attrs = {'attr1': 1}
-#     struct = lgdo.Struct(obj_dict=obj_dict, attrs=attrs)
-#     assert dict(struct) == obj_dict
-#     assert struct.attrs == attrs
+def test_init():
+    obj_dict = {'scalar1': lgdo.Scalar(value=10)}
+    attrs = {'attr1': 1}
+    struct = lgdo.Struct(obj_dict=obj_dict, attrs=attrs)
+    assert dict(struct) == obj_dict
+    assert struct.attrs == attrs | {'datatype': 'struct{scalar1}'}
 
 
 def test_add_field():
