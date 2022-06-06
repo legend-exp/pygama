@@ -326,6 +326,8 @@ def expand_rblist_json_dict(json_dict, kw_dict):
 
         # Expand list_names if name contains a key-based formatter
         if '{key' in name:
+            if len(info['key_list']) == 1 and info['key_list'][0] == '*':
+                continue # will be handled later, once the key_list is known
             for key in info['key_list']:
                 expanded_name = name.format(key=key)
                 json_dict[expanded_name] = info.copy()
