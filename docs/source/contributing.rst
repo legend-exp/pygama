@@ -26,7 +26,7 @@ pull request (recommended):
 
 .. code-block:: console
 
-   $ pip install pre-commit      # required
+   $ pip install .[test]
    $ pre-commit run --all-files  # analyse the source code and fix it wherever possible
    $ pre-commit install          # install a Git pre-commit hook (optional)
 
@@ -80,8 +80,7 @@ Testing
   .. code-block:: console
 
      $ pip install .[test]
-     $ coverage run -m pytest
-     $ coverage report
+     $ pytest --cov=pygama
 
 Documentation
 -------------

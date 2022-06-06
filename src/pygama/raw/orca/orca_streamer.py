@@ -229,6 +229,7 @@ class OrcaStreamer(DataStreamer):
         rbl = self.rbl_id_dict[data_id]
         self.any_full |= decoder.decode_packet(packet, self.packet_id, rbl, verbosity=verbosity)
         return True
+
         '''
 # Import orca_digitizers so that the list of OrcaDecoder.__subclasses__ gets populated
 # Do it here so that orca_digitizers can import the functions above here
