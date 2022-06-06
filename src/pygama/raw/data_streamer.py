@@ -6,7 +6,7 @@ from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
 class DataStreamer(ABC):
     """ Base clase for data streams
 
-    Provides a uniform interface for streaming, e.g.
+    Provides a uniform interface for streaming, e.g.:
 
     > header = ds.open_stream(stream_name)
     > for chunk in ds: do_something(chunk)
