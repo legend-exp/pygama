@@ -7,6 +7,7 @@ orca packets are ndarrays of type uint32
 
 import numpy as np
 
+
 def is_short(packet):
     return bool(packet[0] >> 31)
 
@@ -28,7 +29,7 @@ def hex_dump(packet, shift_data_id=True, print_n_words=False, max_words=np.inf,
              as_int=False, as_short=False, id_dict=None):
     data_id = get_data_id(packet, shift=shift_data_id)
     n_words = get_n_words(packet)
-    if id_dict is not None: 
+    if id_dict is not None:
         if data_id in id_dict:
             heading = f'{id_dict[data_id]} (data ID = {data_id})'
         else:

@@ -39,7 +39,7 @@ class OrcaHeader(dict):
         for class_key in dd.keys():
             for super_key in dd[class_key].keys():
                 data_id = dd[class_key][super_key]['dataId']
-                if shift_data_id: 
+                if shift_data_id:
                     if data_id < 0: # short record
                         data_id = (-data_id) >> 26
                     else: data_id = data_id >> 18

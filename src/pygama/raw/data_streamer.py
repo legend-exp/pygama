@@ -104,7 +104,7 @@ class DataStreamer(ABC):
             keyed_name_rbs = []
             ii = 0
             while ii < len(rb_lib[dec_name]):
-                if '{key' in rb_lib[dec_name][ii].out_name: 
+                if '{key' in rb_lib[dec_name][ii].out_name:
                     keyed_name_rbs.append(rb_lib[dec_name].pop(ii))
                 else: ii += 1
             for rb in keyed_name_rbs:
