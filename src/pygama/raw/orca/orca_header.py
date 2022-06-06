@@ -33,6 +33,18 @@ class OrcaHeader(dict):
                 if dd[class_key][super_key]['decoder'] == decoder_name:
                     return dd[class_key][super_key]['dataId']
 
+    def get_id_to_object_name_dict(self, shift_data_id=True):
+        id_dict = {}
+        dd = self['dataDescription']
+        for class_key in dd.keys():
+            for super_key in dd[class_key].keys():
+                data_id = dd[class_key][super_key]['dataId']
+                if shift_data_id: 
+                    if data_id < 0: # short record
+                        data_id = (-data_id) >> 26
+                    else: data_id = data_id >> 18
+                id_dict[data_id] = f'{class_key}:{super_key}'
+        return id_dict
 
     def get_run_number(self):
         for d in self["ObjectInfo"]["DataChain"]:
