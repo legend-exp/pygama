@@ -116,20 +116,10 @@ class OrcaStreamer(DataStreamer):
             if packet is None:
                 self.close_in_stream()
                 return
-            data_id = orca_packet.get_data_id(packet, shift=shift_data_id)
-            n_words = orca_packet.get_n_words(packet)
-            if print_n_words: print(f'data ID = {data_id}: {n_words} words')
-            else:
-                print(f'data ID = {data_id}:')
-                n_to_print = int(np.minimum(n_words, max_words))
-                pad = int(np.ceil(np.log10(n_to_print)))
-                for i in range(n_to_print):
-                    line = f'{str(i).zfill(pad)}'
-                    line += ' {0:#0{1}x}'.format(packet[i], 10)
-                    if data_id == 0 and i > 1: line += f' {packet[i:i+1].tobytes().decode()}'
-                    if as_int: line += f' {packet[i]}'
-                    if as_short: line += f" {np.frombuffer(packet[i:i+1].tobytes(), dtype='uint16')}"
-                    print(line)
+            orca_packet.hex_dump(packet, shift_data_id=shift_data_id,
+                                 print_n_words=print_n_words,
+                                 max_words=max_words, as_int=as_int,
+                                 as_short=as_short)
             n_packets -= 1
 
 

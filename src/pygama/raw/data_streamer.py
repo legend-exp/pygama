@@ -6,7 +6,7 @@ from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
 class DataStreamer(ABC):
     """ Base clase for data streams
 
-    Provides a uniform interface for streaming, e.g.
+    Provides a uniform interface for streaming, e.g.:
 
     > header = ds.open_stream(stream_name)
     > for chunk in ds: do_something(chunk)
@@ -82,7 +82,7 @@ class DataStreamer(ABC):
         for decoder in decoders:
             dec_name = type(decoder).__name__
 
-            # set up wildcard buffers
+            # set up wildcard decoder buffers
             if dec_name not in rb_lib:
                 if '*' not in rb_lib: continue # user didn't want this decoder
                 rb_lib[dec_name] = RawBufferList()
@@ -96,6 +96,23 @@ class DataStreamer(ABC):
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
             dec_names.append(dec_name)
+
+            # set up wildcard key buffers
+            for rb in rb_lib[dec_name]:
+                if len(rb.key_list) == 1 and rb.key_list[0] == "*":
+                    rb.key_list = decoder.get_key_list()
+            keyed_name_rbs = []
+            ii = 0
+            while ii < len(rb_lib[dec_name]):
+                if '{key' in rb_lib[dec_name][ii].out_name:
+                    keyed_name_rbs.append(rb_lib[dec_name].pop(ii))
+                else: ii += 1
+            for rb in keyed_name_rbs:
+                for key in rb.key_list:
+                    expanded_name = rb.out_name.format(key=key)
+                    new_rb = RawBuffer(key_list=[key], out_stream=rb.out_stream, out_name=expanded_name)
+                    rb_lib[dec_name].append(new_rb)
+
             for rb in rb_lib[dec_name]:
                 # use the first available key
                 key = rb.key_list[0] if len(rb.key_list) > 0 else None
