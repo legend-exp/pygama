@@ -15,19 +15,28 @@ def get_n_words(packet):
     return packet[0] & 0x3FFFF
 
 def get_data_id(packet, shift=True):
+    # in the header the data_id appears unshifted, but in pygama we use it
+    # shifted by default so that it has sensible values when printed / checked
     if is_short(packet):
         if shift: return (packet[0] & 0xFC000000) >> 26
         else: return packet[0] & 0xFC000000
     if shift: return (packet[0] & 0xFFFC0000) >> 18
     return packet[0] & 0xFFFC0000
 
+
 def hex_dump(packet, shift_data_id=True, print_n_words=False, max_words=np.inf,
-             as_int=False, as_short=False):
+             as_int=False, as_short=False, id_dict=None):
     data_id = get_data_id(packet, shift=shift_data_id)
     n_words = get_n_words(packet)
-    if print_n_words: print(f'data ID = {data_id}: {n_words} words')
+    if id_dict is not None: 
+        if data_id in id_dict:
+            heading = f'{id_dict[data_id]} (data ID = {data_id})'
+        else:
+            heading = f'[unknown] (data ID = {data_id})'
+    else: heading = f'data ID = {data_id}'
+    if print_n_words: print(f'{heading}: {n_words} words')
     else:
-        print(f'data ID = {data_id}:')
+        print(f'{heading}:')
         n_to_print = int(np.minimum(n_words, max_words))
         pad = int(np.ceil(np.log10(n_to_print)))
         for i in range(n_to_print):
