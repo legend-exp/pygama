@@ -56,16 +56,16 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
 
     Parameters
     ----------
-    w_in  : array-like
-            The input waveform
-    t_tau1: float
-            The time constant of the first exponential to be deconvolved
-    t_tau2: float
-            The time constant of the second exponential to be deconvolved
-    frac  : float
-            The fraction which the second exponential contributes
+    w_in : array-like
+        The input waveform
+    t_tau1 : float
+        The time constant of the first exponential to be deconvolved
+    t_tau2 : float
+        The time constant of the second exponential to be deconvolved
+    frac : float
+        The fraction which the second exponential contributes
     w_out : array-like
-            The pole-zero cancelled waveform
+        The pole-zero cancelled waveform
 
     Examples
     --------
@@ -79,7 +79,7 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
             "prereqs": ["wf_bl"]
         }
     """
-    w_out[:] = np.nan 
+    w_out[:] = np.nan
 
     if np.isnan(w_in).any() or np.isnan(t_tau1) or np.isnan(t_tau2) or np.isnan(frac):
         return 
