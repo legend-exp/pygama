@@ -51,7 +51,7 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
     Apply a double pole-zero cancellation using the provided time
     constant to the waveform. This algorithm is a IIR filter to deconvolve the function
     s(x) = A[frac*exp(-t/t_tau2) + (1-frac)*exp(-t/t_tau1)] into a single step function
-    of amplitude A. See the June 1st analysis and simulations call for more details. 
+    of amplitude A. See the June 1st analysis and simulations call for more details.
     https://indico.legend-exp.org/event/840/
 
     Parameters
@@ -82,7 +82,7 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
     w_out[:] = np.nan
 
     if np.isnan(w_in).any() or np.isnan(t_tau1) or np.isnan(t_tau2) or np.isnan(frac):
-        return 
+        return
     if (len(w_in)<=3):
         raise DSPFatal('The length of the waveform must be larger than 3 for the filter to work safely')
 
@@ -94,4 +94,3 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
 
     for i in range(2, len(w_in), 1):
         w_out[i] = -(frac*b-frac*a-b-1)*w_out[i-1] + (frac*b-frac*a-b)*w_out[i-2] + w_in[i] - (a+b)*w_in[i-1] + (a*b)*w_in[i-2]
-
