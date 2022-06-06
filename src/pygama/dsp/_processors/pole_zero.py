@@ -88,9 +88,15 @@ def double_pole_zero(w_in, t_tau1, t_tau2, frac, w_out):
 
     a = np.exp(-1 / t_tau1)
     b = np.exp(-1 / t_tau2)
+
+    transfer_denom_1 = -1*(frac*b-frac*a-b-1)
+    transfer_denom_2 = frac*b-frac*a-b
+    transfer_num_1 = -1*(a+b)
+    transfer_num_2 = a*b
+
     w_out[0] = w_in[0]
     w_out[1] = w_in[1]
     w_out[2] = w_in[2]
 
     for i in range(2, len(w_in), 1):
-        w_out[i] = -(frac*b-frac*a-b-1)*w_out[i-1] + (frac*b-frac*a-b)*w_out[i-2] + w_in[i] - (a+b)*w_in[i-1] + (a*b)*w_in[i-2]
+        w_out[i] = transfer_denom_1*w_out[i-1] + transfer_denom_2*w_out[i-2] + w_in[i] + transfer_num_1*w_in[i-1] + transfer_num_2*w_in[i-2]
