@@ -2,13 +2,18 @@
 pygama convenience functions for fitting binned data
 """
 import math
+
 import numpy as np
 from iminuit import Minuit, cost
 from scipy.optimize import brentq, minimize_scalar
 
-
 import pygama.math.histogram as pgh
-from pygama.math.distributions import gauss_with_tail_pdf, gauss_tail_pdf, unnorm_step_pdf, gauss_norm
+from pygama.math.distributions import (
+    gauss_norm,
+    gauss_tail_pdf,
+    gauss_with_tail_pdf,
+    unnorm_step_pdf,
+)
 from pygama.math.functions import gauss_amp
 
 

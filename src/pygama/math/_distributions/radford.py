@@ -3,8 +3,12 @@ Radford Ge peak shape distributions for pygama
 """
 import numpy as np
 
-
-from pygama.math.distributions import gauss_with_tail_pdf, gauss_with_tail_cdf, step_pdf, step_cdf 
+from pygama.math.distributions import (
+    gauss_with_tail_cdf,
+    gauss_with_tail_pdf,
+    step_cdf,
+    step_pdf,
+)
 
 
 def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,

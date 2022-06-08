@@ -6,9 +6,7 @@ import sys
 import numba as nb
 import numpy as np
 
-
-from pygama.math.distributions import gauss_norm, step_pdf, step_cdf, gauss_cdf
-
+from pygama.math.distributions import gauss_cdf, gauss_norm, step_cdf, step_pdf
 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}

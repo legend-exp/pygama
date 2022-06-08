@@ -6,8 +6,7 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math.functions import step_int, nb_erf
-
+from pygama.math.functions import nb_erf, step_int
 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}

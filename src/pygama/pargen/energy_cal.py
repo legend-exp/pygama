@@ -13,13 +13,13 @@ import numpy as np
 import scipy.stats
 from scipy.signal import find_peaks_cwt, medfilt
 
-import pygama.math.histogram as pgh
-import pygama.math.distributions as pgd
-import pygama.math.linear_fitting as pgl
-import pygama.math.functions as pgf
 import pygama.math.binned_fitting as pgb
-import pygama.math.unbinned_fitting as pgub
 import pygama.math.distribution_selector as pgds
+import pygama.math.distributions as pgd
+import pygama.math.functions as pgf
+import pygama.math.histogram as pgh
+import pygama.math.linear_fitting as pgl
+import pygama.math.unbinned_fitting as pgub
 
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):

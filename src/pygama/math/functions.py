@@ -8,7 +8,6 @@ import numba as nb
 import numpy as np
 from scipy.stats import crystalball
 
-
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}
 

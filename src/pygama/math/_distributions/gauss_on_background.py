@@ -3,7 +3,6 @@ Gaussian distributions on linear and uniform backgrounds for pygama
 """
 import numpy as np
 
-
 from pygama.math._distributions.gauss import gauss_norm
 
 

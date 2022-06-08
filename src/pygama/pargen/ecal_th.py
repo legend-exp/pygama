@@ -10,10 +10,10 @@ import scipy.stats
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
-import pygama.math.histogram as pgh
+import pygama.math.distribution_selector as pgds
 import pygama.math.distributions as pgd
 import pygama.math.functions as pgf
-import pygama.math.distribution_selector as pgds
+import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as cal
 
 

@@ -1,14 +1,21 @@
 """
-Convenience functions to select distributions 
+Convenience functions to select distributions
 """
 import numpy as np
 
-from pygama.math.distributions import gauss_step_cdf, gauss_step_pdf, extended_gauss_step_pdf, radford_cdf, radford_pdf, extended_radford_pdf
 from pygama.math.binned_fitting import radford_fwhm
+from pygama.math.distributions import (
+    extended_gauss_step_pdf,
+    extended_radford_pdf,
+    gauss_step_cdf,
+    gauss_step_pdf,
+    radford_cdf,
+    radford_pdf,
+)
 
 
 def get_mu_func(func, pars, cov = None, errors=None):
-    """ 
+    """
     Function to select which distribution to get the centroid from
     """
     if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
@@ -41,7 +48,7 @@ def get_mu_func(func, pars, cov = None, errors=None):
 
 
 def get_fwhm_func(func, pars, cov = None):
-    """ 
+    """
     Function to select which distribution to get the FWHM of
     """
     if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
@@ -67,7 +74,7 @@ def get_fwhm_func(func, pars, cov = None):
 
 
 def get_total_events_func(func, pars, cov = None, errors=None):
-    """ 
+    """
     Function to select which distribution to get the total number of events from
     """
     if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:

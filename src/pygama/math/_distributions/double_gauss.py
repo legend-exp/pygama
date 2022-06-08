@@ -2,10 +2,10 @@
 Double Gaussian distributions with different backgrounds for pygama
 """
 import math
+
 import numpy as np
 
-
-from pygama.math.distributions import gauss_norm, step_pdf 
+from pygama.math.distributions import gauss_norm, step_pdf
 
 
 def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, n_bkg1, hstep1, n_bkg2, hstep2,
@@ -91,4 +91,3 @@ def extended_double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg
         sig1, sig2, bkg = double_gauss_pdf(x,  n_sig1,  mu1, sigma1, n_sig2, mu2,sigma2,n_bkg,hstep,
                      lower_range, upper_range,components=components)
         return n_sig1+n_sig2+n_bkg, sig1, sig2, bkg
-

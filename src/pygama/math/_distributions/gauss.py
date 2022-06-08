@@ -5,9 +5,9 @@ import sys
 
 import numba as nb
 import numpy as np
+
 from pygama.math.functions import nb_erf
 
- 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}
 
