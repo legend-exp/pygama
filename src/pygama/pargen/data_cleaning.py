@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from pygama.math.peak_fitting import *
+from pygama.math.binned_fitting import *
+from pygama.math.functions import *
+from pygama.math.histogram import *
 
 
 def gaussian_cut(data, cut_sigma=3, plotAxis=None):

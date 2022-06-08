@@ -11,7 +11,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
+import pygama.math.distributions as pgd
+import pygama.math.functions as pgf
+import pygama.math.distribution_selector as pgds
 import pygama.pargen.energy_cal as cal
 
 
@@ -45,10 +47,10 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
 
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
     range_keV = [(20,20),(30,30), (40,40),(40,25),(25,40),(40,40),(60,60)] # side bands width
-    funcs = [pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf,
-         pgf.extended_radford_pdf,pgf.extended_radford_pdf,pgf.extended_radford_pdf]
-    gof_funcs = [pgf.gauss_step_pdf,pgf.gauss_step_pdf,pgf.radford_pdf,pgf.radford_pdf,
-            pgf.radford_pdf,pgf.radford_pdf,pgf.radford_pdf]
+    funcs = [pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf,
+         pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf]
+    gof_funcs = [pgd.gauss_step_pdf,pgd.gauss_step_pdf,pgd.radford_pdf,pgd.radford_pdf,
+            pgd.radford_pdf,pgd.radford_pdf,pgd.radford_pdf]
     output_dict = {}
     for energy_param in energy_params:
         datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
@@ -129,7 +131,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
 
             pk_ranges = results['pk_ranges']
             p_vals = results['pk_pvals']
-            mus = [pgf.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
+            mus = [pgds.get_mu_func(func_i, pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
 
             fwhms        = results['pk_fwhms'][:,0]
             dfwhms       = results['pk_fwhms'][:,1]

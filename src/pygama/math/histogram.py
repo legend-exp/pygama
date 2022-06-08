@@ -202,6 +202,13 @@ def find_bin(x, bins):
 
 
 def range_slice(x_min, x_max, hist, bins, var=None):
+    """
+    Get the histogram bins and values for a given slice of the range
+
+    See Also
+    --------
+    find_bin : for parameters and return values
+    """
     i_min = find_bin(x_min, bins)
     i_max = find_bin(x_max, bins)
     if var is not None: var = var[i_min:i_max]
@@ -282,7 +289,6 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
     >>> pgh.get_fwfm(0.5, hist, bins, var, method='fit_slopes')
     (2.3083363869003466, 0.10939486522749278) # may vary
     """
-
     # find bins over [fraction]
     if mx is None:
         mx = np.amax(hist)
@@ -461,3 +467,16 @@ def get_gaussian_guess(hist, bins):
     guess_area = guess_amp * guess_sigma * np.sqrt(2 * np.pi)
 
     return (guess_e, guess_sigma, guess_area)
+
+
+def get_bin_estimates(pars, func, hist, bins, integral=None, **kwargs):
+    """
+    Bin expected means are estimated by f(bin_center)*bin_width. Supply an
+    integrating function to compute the integral over the bin instead.
+    TODO: make default integrating function a numerical method that is off by
+    default.
+    """
+    if integral is None:
+        return func(get_bin_centers(bins), *pars, **kwargs) * get_bin_widths(bins)
+    else:
+        return integral(bins[1:], *pars, **kwargs) - integral(bins[:-1], *pars, **kwargs)
