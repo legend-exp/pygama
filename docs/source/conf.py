@@ -2,11 +2,13 @@
 
 import sys
 from pathlib import Path
+from pkg_resources import get_distribution
 
 sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
 copyright = '2020, the LEGEND Collaboration'
+version = get_distribution("pygama").version
 
 extensions = [
     'sphinx.ext.githubpages',
@@ -14,7 +16,6 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
-    'sphinx_rtd_theme',
     'sphinx_multiversion',
     'sphinx_copybutton',
     'myst_parser'
@@ -32,7 +33,15 @@ templates_path = ['_templates']
 pygments_style = 'sphinx'
 
 # readthedocs.io Sphinx theme
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'sphinx_book_theme'
+html_theme_options = {
+    'home_page_in_toc': True,
+    'repository_url': 'https://github.com/legend-exp/pygama',
+    'use_repository_button': True,
+    'use_issues_button': True,
+    'use_edit_page_button': True,
+}
+html_title = f"pygama {version}"
 
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
