@@ -2,9 +2,9 @@ import sys
 
 import numpy as np
 
-from pygama.lh5 import Table
+from pygama.lgdo import Table
 
-from .orcadaq import OrcaDecoder, get_ccc
+from .orca_base import OrcaDecoder, get_ccc
 
 
 class ORCAStruck3302(OrcaDecoder):
