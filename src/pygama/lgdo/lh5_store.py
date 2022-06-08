@@ -330,8 +330,8 @@ class LH5Store:
                                                                 obj_buf=fld_buf,
                                                                 obj_buf_start=obj_buf_start,
                                                                 verbosity=verbosity)
-                if obj_buf is not None and obj_buf_start+n_rows > len(obj_buf):
-                    obj_buf.resize(obj_buf_start+n_rows, do_warn=(verbosity>0))
+                if obj_buf is not None and obj_buf_start+n_rows_read > len(obj_buf):
+                    obj_buf.resize(obj_buf_start+n_rows_read, do_warn=(verbosity>0))
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
             n_rows_read = rows_read[0]
