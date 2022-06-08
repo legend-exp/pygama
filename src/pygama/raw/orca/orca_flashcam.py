@@ -1,4 +1,5 @@
-import copy, gc
+import copy
+import gc
 
 import numpy as np
 
@@ -421,14 +422,14 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         if wf_samples != rb_wf_len:
             if not hasattr(self, 'wf_len_errs'): self.wf_len_errs = {}
             # if dec_vals has been updated, orca miscalc'd and a warning has
-            # already been emitted.  Otherwise, emit a new warning. 
+            # already been emitted.  Otherwise, emit a new warning.
             if wf_samples != self.decoded_values[ccc]['waveform']['wf_len']:
                 if ccc not in self.wf_len_errs:
                     print(f'ORCAFlashCamADCWaveformDecoder Warning: waveform from ccc {ccc} of length {wf_samples} with expected length {rb_wf_len}')
                     self.wf_len_errs[ccc] = True
-            # Now resize buffer only if it is still empty. 
+            # Now resize buffer only if it is still empty.
             # Otherwise emit a warning and keep the smaller length
-            if ii != 0: 
+            if ii != 0:
                 if ccc not in self.wf_len_errs:
                     print(f'ORCAFlashCamADCWaveformDecoder Warning: tried to resize buffer according to config record but it was not empty!')
                     self.wf_len_errs[ccc] = True

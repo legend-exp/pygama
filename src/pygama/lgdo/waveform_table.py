@@ -142,7 +142,7 @@ class WaveformTable(Table):
         shape = self.values.nda.shape
         shape = (shape[0], wf_len)
         self.values.nda.resize(shape)
-    def resize_wf_len(self, new_len): 
+    def resize_wf_len(self, new_len):
         ''' alias for wf_len.setter
         (for when we want to make it clear in the code that memory is being reallocated)
         '''
