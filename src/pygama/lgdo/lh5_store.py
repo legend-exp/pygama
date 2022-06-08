@@ -200,6 +200,23 @@ class LH5Store:
         datatype = h5f[name].attrs['datatype']
         datatype, shape, elements = parse_datatype(datatype)
 
+        # check field_mask and make it a default dict
+        if datatype == 'struct' or datatype == 'table':
+            if field_mask is None: field_mask = defaultdict(lambda : True)
+            elif isinstance(field_mask, dict):
+                default = True
+                if len(field_mask) > 0:
+                    default = not field_mask[field_mask.keys[0]]
+                field_mask = defaultdict(lambda : default, field_mask)
+            elif isinstance(field_mask, (list, tuple)):
+                field_mask = defaultdict(lambda : False, { field : True for field in field_mask} )
+            elif not isinstance(field_mask, defaultdict):
+                print('bad field_mask of type', type(field_mask).__name__)
+                return None, 0
+        elif field_mask is not None:
+            print(f'Warning: datatype {datatype} does not accept a field_mask')
+
+
         # Scalar
         # scalars are dim-0 datasets
         if datatype == 'scalar':
@@ -222,19 +239,6 @@ class LH5Store:
             # (optionally?) prep buffers for each field
             if obj_buf is not None:
                 print("obj_buf not implemented for structs.  Returning new object")
-
-            # build field_mask
-            if field_mask is None: field_mask = defaultdict(lambda : True)
-            elif isinstance(field_mask, dict):
-                default = True
-                if len(field_mask) > 0:
-                    default = not field_mask[field_mask.keys[0]]
-                field_mask = defaultdict(lambda : default, field_mask)
-            elif isinstance(field_mask, (list, tuple)):
-                field_mask = defaultdict(lambda : False, { field : True for field in field_mask} )
-            elif not isinstance(field_mask, defaultdict):
-                print('bad field_mask of type', type(field_mask).__name__)
-                return None, 0
 
             # loop over fields and read
             obj_dict = {}
@@ -270,19 +274,6 @@ class LH5Store:
         # Table or WaveformTable
         if datatype == 'table':
             col_dict = {}
-
-            # build field_mask
-            if field_mask is None: field_mask = defaultdict(lambda : True)
-            elif isinstance(field_mask, dict):
-                default = True
-                if len(field_mask) > 0:
-                    default = not (field_mask[list(field_mask.keys())[0]])
-                field_mask = defaultdict(lambda : default, field_mask)
-            elif isinstance(field_mask, (list, tuple)):
-                field_mask = defaultdict(lambda : False, { field : True for field in field_mask} )
-            elif not isinstance(field_mask, defaultdict):
-                print('bad field_mask of type', type(field_mask).__name__)
-                return None, 0
 
             # read out each of the fields
             rows_read = []
