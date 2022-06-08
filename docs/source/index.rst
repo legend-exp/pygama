@@ -18,4 +18,4 @@ Table of Contents
    manuals/index
    tutorials
    Package API reference <generated/modules>
-   contributing
+   developer
