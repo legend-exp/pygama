@@ -10,10 +10,10 @@ class OrcaHeaderDecoder(OrcaDecoder):
     """
     Decodes Orca headers
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.header is not None:
+    def __init__(self, header=None, **kwargs):
+        if header is not None:
             print("Warning: OrcaHeaderDecoder: unexpected non-None header in __init__")
+        super().__init__(header=header, **kwargs)
         self.header = orca_header.OrcaHeader()
 
     def make_lgdo(self, key=None, size=None): return lgdo.Scalar(value='')

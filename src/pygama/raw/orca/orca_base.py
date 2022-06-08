@@ -6,8 +6,8 @@ class OrcaDecoder(DataDecoder):
 
     Mostly here to provide a standard interface for setting the header in init
     """
-    def __init__(self, header=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, header=None, **kwargs):
+        super().__init__(**kwargs)
         self.header = None
         if header: self.set_header(header) # allow for derived class function to be called
 
