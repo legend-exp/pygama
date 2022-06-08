@@ -6,16 +6,14 @@ from ..fc.fc_event_decoder import fc_decoded_values
 from .orca_base import OrcaDecoder, get_ccc
 
 
-class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
-    """
+class ORFlashCamListenerConfigDecoder(OrcaDecoder):
     '''
     Decoder for FlashCam listener config written by ORCA
     '''
-    def __init__(self, *args, **kwargs):
-
-        self.decoder_name    = 'ORFlashCamListenerConfigDecoder'
-        self.orca_class_name = 'ORFlashCamListenerModel'
-
+    def __init__(self, header=None, **kwargs):
+        """
+        DOCME
+        """
         # up through ch_inputnum, these are in order of the fcio data format
         # for similicity.  append any additional values after this.
         self.decoded_values = {
@@ -41,43 +39,39 @@ class ORCAFlashCamListenerConfigDecoder(OrcaDecoder):
                               'array_of_equalsized_arrays<1,1>{real}',
                               'length': 2400, },
             }
+        super().__init__(header=header, **kwargs)
 
-        super().__init__(args, kwargs)
 
-
-    def get_decoded_values(self, channel=None):
+    def get_decoded_values(self, key=None):
         return self.decoded_values
 
 
-    def max_n_rows_per_packet(self):
-        return 1
+    def decode_packet(self, packet, packet_id, rbl, verbosity=0):
+        if len(rbl) != 1:
+            print(f"FC config decoder: got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
+        rb = rbl[0]
+        tbl = rb.lgdo
+        ii  = rb.loc
 
-
-    def decode_packet(self, packet, lh5_tables,
-                      packet_id, header_dict, verbose=False):
-
-        data = np.frombuffer(packet, dtype=np.int32)
-        tbl  = lh5_tables
-        ii   = tbl.loc
-
-        tbl['readout_id'].nda[ii]  = (data[0] & 0xffff0000) >> 16
-        tbl['listener_id'].nda[ii] =  data[0] & 0x0000ffff
+        int_packet = packet.astype(np.int32)
+        tbl['readout_id'].nda[ii]  = (int_packet[1] & 0xffff0000) >> 16
+        tbl['listener_id'].nda[ii] =  int_packet[1] & 0x0000ffff
 
         for i,k in enumerate(self.decoded_values):
             if i < 2: continue
-            tbl[k].nda[ii] = data[i-1]
+            tbl[k].nda[ii] = int_packet[i]
             if k == 'gps': break
 
-        data = np.frombuffer(packet, dtype=np.uint32)
-        data = data[list(self.decoded_values.keys()).index('ch_boardid')-1:]
-        for i in range(len(data)):
-            tbl['ch_boardid'].nda[ii][i]  = (data[i] & 0xffff0000) >> 16
-            tbl['ch_inputnum'].nda[ii][i] =  data[i] & 0x0000ffff
+        packet = packet[list(self.decoded_values.keys()).index('ch_boardid'):]
+        for i in range(len(packet)):
+            tbl['ch_boardid'].nda[ii][i]  = (packet[i] & 0xffff0000) >> 16
+            tbl['ch_inputnum'].nda[ii][i] =  packet[i] & 0x0000ffff
 
-        tbl.push_row()
-
+        rb.loc += 1
+        return rb.is_full()
 
 class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
+    """
     '''
     Decoder for FlashCam status packets written by ORCA
 
@@ -227,7 +221,7 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
         self.nCards = ncards
 
 
-    def get_decoded_values(self, channel=None):
+    def get_decoded_values(self, key=None):
         return self.decoded_values
 
 
@@ -299,7 +293,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
     """
     Decoder for FlashCam ADC data written by ORCA
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, header=None, **kwargs):
         """
         DOCME
         """
@@ -313,7 +307,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             'fcio_id' : { 'dtype': 'uint16', }
         } )
         self.decoded_values = {}
-        super().__init__(*args, **kwargs)
+        super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
 
 
@@ -360,16 +354,16 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         return list(self.decoded_values.keys())
 
 
-    def get_decoded_values(self, channel=None):
-        if channel is None:
+    def get_decoded_values(self, key=None):
+        if key is None:
             dec_vals_list = self.decoded_values.items()
             if len(dec_vals_list) == 0:
                 print('ORFlashCamADCWaveformDecoder: error - decoded_values not built')
                 return None
             return list(dec_vals_list)[0][1] # return first thing found
-        if channel in self.decoded_values: return self.decoded_values[channel]
+        if key in self.decoded_values: return self.decoded_values[key]
         print('ORFlashCamADCWaveformDecoder: error - '
-              'no decoded values for channel ', channel)
+              'no decoded values for channel ', key)
         return None
 
 
