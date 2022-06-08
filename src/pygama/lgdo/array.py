@@ -21,7 +21,7 @@ class Array:
     """
 
 
-    def __init__(self, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
+    def __init__(self, nda=None, shape=(), dtype=None, fill_val=None, attrs={}):
         """
         Parameters
         ----------
@@ -58,14 +58,14 @@ class Array:
         else: self.attrs['datatype'] = self.form_datatype()
 
 
-    def dataype_name(self):
+    def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
         return 'array'
 
 
     def form_datatype(self):
         """Return this lgdo's datatype attribute string"""
-        dt = self.dataype_name()
+        dt = self.datatype_name()
         nD = str(len(self.nda.shape))
         et = get_element_type(self)
         return dt + '<' + nD + '>{' + et + '}'
@@ -79,7 +79,7 @@ class Array:
     def resize(self, new_size):
         """Resize the array to new_size (int)"""
         new_shape = (new_size,) + self.nda.shape[1:]
-        self.nda.resize(new_shape)
+        self.nda.resize(new_shape, refcheck=True)
 
     def __str__(self):
         """Convert to string (e.g. for printing)"""

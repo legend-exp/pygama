@@ -82,14 +82,14 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
 
     # try to guess the input stream type if it's not provided
     if in_stream_type is None:
-        i_ext = in_stream.rfind('.')
+        i_ext = in_stream.split('/')[-1].rfind('.')
         if i_ext == -1:
             if OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
             else:
                 print('unknown file type. Specify in_stream_type')
                 return
         else:
-            ext = in_stream[i_ext+1:]
+            ext = in_stream.split('/')[-1][i_ext+1:]
             if ext == 'fcio': in_stream_type = 'FlashCam'
             if ext == 'gz' and OrcaStreamer.is_orca_stream(in_stream): in_stream_type = 'ORCA'
             else:
