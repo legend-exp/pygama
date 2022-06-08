@@ -111,8 +111,8 @@ class Table(Struct):
             use_obj_size is True
         """
         if not hasattr(obj, '__len__'):
-            print('Table: Error: cannot add field of type', type(obj).__name__)
-            return
+            raise TypeError('cannot add field of type', type(obj).__name__)
+
         super().add_field(name, obj)
 
         # check / update sizes
