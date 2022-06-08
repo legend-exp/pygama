@@ -1,16 +1,23 @@
-Contribution guide
-==================
+Developer's guide
+=================
 
 The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
+
+To start developing *pygama*, clone the remote repository:
+
+.. code-block:: console
+
+  $ git clone https://github.com/legend-exp/pygama
 
 All extra tools needed to develop *pygama* are listed as optional dependencies
 and can be installed via pip by running:
 
 .. code-block:: console
 
-  $ pip install .[all]
+  $ cd pygama
+  $ pip install '.[all]'  # single quotes are not needed on bash
 
 Code style
 ----------
@@ -26,7 +33,8 @@ pull request (recommended):
 
 .. code-block:: console
 
-  $ pip install .[test]
+  $ cd pygama
+  $ pip install '.[test]'
   $ pre-commit run --all-files  # analyse the source code and fix it wherever possible
   $ pre-commit install          # install a Git pre-commit hook (optional)
 
@@ -67,7 +75,8 @@ Testing
 
   .. code-block:: console
 
-    $ pip install .[test]
+    $ cd pygama
+    $ pip install '.[test]'
     $ pytest
 
 * Additionally, pull request authors are required to provide tests with
@@ -132,12 +141,13 @@ Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
 
 Scripts and tools to build documentation are located below ``docs/``. To build
-documentation, ``sphinx``, ``sphinx-rtd-theme`` and a couple of additional
-Python packages are required. You can get all the needed dependencies by running:
+documentation, ``sphinx`` and a couple of additional Python packages are
+required. You can get all the needed dependencies by running:
 
 .. code-block:: console
 
-  $ pip install .[docs]
+  $ cd pygama
+  $ pip install '.[docs]'
 
 To build documentation for the current Git ref, run the following commands:
 
