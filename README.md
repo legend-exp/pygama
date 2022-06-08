@@ -1,39 +1,19 @@
 # pygama
-Python based package for data processing and analysis
 
-## installation
-Install on local systems with:
-```bash
-$ git clone [url]
-$ pip install -e pygama
-```
-Installation at NERSC:
-```
-pip install -e pygama --user
-```
-Uninstall: `pip uninstall pygama`
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/legend-exp/pygama?logo=git)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/legend-exp/pygama/pygama/main?label=main%20branch&logo=github)](https://github.com/legend-exp/pygama/actions)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
+[![Codecov](https://img.shields.io/codecov/c/github/legend-exp/pygama?logo=codecov)](https://app.codecov.io/gh/legend-exp/pygama)
+![GitHub issues](https://img.shields.io/github/issues/legend-exp/pygama?logo=github)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/legend-exp/pygama?logo=github)
+![License](https://img.shields.io/github/license/legend-exp/pygama)
+[![Documentation](https://img.shields.io/badge/documentation-online-purple?logo=readthedocs)](https://legend-exp.github.io/pygama)
 
-To run pygama at NERSC (and set up JupyterHub), we have additional instructions [at this link](https://github.com/legend-exp/legend/wiki/Computing-Resources-at-NERSC#configuring-jupyter--nersc).  
+*pygama* is a Python package for:
 
-## overview
-
-`pygama` is a python package for:
-* converting physics data acquisition system output to "lh5"-format hdf5 files
-* performing bulk digital signal processing on time-series data
-* optimizing those DSP routines and tuning associated analysis parameters
+* converting physics data acquisition system output to [LH5-format](https://github.com/legend-exp/legend-data-format-specs) HDF5 files
+* performing bulk digital signal processing (DSP) on time-series data
+* optimizing DSP routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
-The basic steps for a typical analysis are:
-
-1. Convert DAQ output to "raw" lh5 format using [`build_raw`](pygama/raw)
-2. Browse the [LEGEND data objects](pygama/lgdo) in the lh5 files to verify its integrity
-3. Optimize the DSP parameters using `dsp_optimize.py` in [pargen](pygama/pargen)
-4. Run [`build_dsp`](pygama/dsp) on the raw files to generate "dsp" lh5 output
-5. Optimize the hit parameters using routines in [pargen](pygama/pargen)
-4. Run `build_hit` (or create your own version) to generate hit files from the dsp data
-5. Run `hit_to_evt` to generate files with event structures
-6. Concatenate / join / filter evt and raw-dsp-hit data to extract the fields you need for higher-level analysis
-
-## testing
-
-pygama testing uses the [pytest](https://pytest.org) framework following the [numpy testing guidelines](https://numpy.org/doc/stable/reference/testing.html#testing-guidelines). To run tests, just enter `pytest` at the command line.
+Check out the [online documentation](https://legend-exp.github.io/pygama).
