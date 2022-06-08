@@ -6,7 +6,7 @@ import numpy as np
 from ..data_streamer import DataStreamer
 from ..raw_buffer import RawBuffer
 from . import orca_packet
-from .orca_flashcam import ORFlashCamADCWaveformDecoder
+from .orca_flashcam import ORFlashCamADCWaveformDecoder, ORFlashCamListenerConfigDecoder
 from .orca_header_decoder import OrcaHeaderDecoder
 
 
