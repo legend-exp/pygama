@@ -3,10 +3,10 @@ import sys
 import numpy as np
 import pandas as pd
 
-from .io_base import DataTaker
+from ..data_decoder import DataDecoder
 
 
-class MJDPreampDecoder(DataTaker):
+class MJDPreampDecoder(DataDecoder):
     """
     members:
     - decode_event (decodes raw data from an MJDPreAmp object)
@@ -104,7 +104,7 @@ class MJDPreampDecoder(DataTaker):
         return channel_names
 
 
-class ISegHVDecoder(DataTaker):
+class ISegHVDecoder(DataDecoder):
     """ iSeg HV Card """
 
     def __init__(self, *args, **kwargs):

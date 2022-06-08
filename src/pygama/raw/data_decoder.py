@@ -71,17 +71,6 @@ class DataDecoder(ABC):
         return None
 
 
-    def setup_raw_buffers(self, rb_list, size=None):
-        """ Setup raw buffers for this decoder
-
-        Uses the first key in a RawBuffer's key_list for initialization
-        """
-        for rb in rb_list:
-            if rb.lgdo is not None: print("warning: replacing non-None lgdo")
-            key = None if len(rb.key_list) == 0 else rb.key_list[0]
-            rb.lgdo = self.make_lgdo(key=key, size=size)
-
-
     def make_lgdo(self, key=None, size=None):
         """ Make an lgdo for this DataDecoder to fill
 
