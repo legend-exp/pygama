@@ -1,4 +1,5 @@
 import copy
+import gc
 
 import numpy as np
 
@@ -66,6 +67,14 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         for i in range(len(packet)):
             tbl['ch_boardid'].nda[ii][i]  = (packet[i] & 0xffff0000) >> 16
             tbl['ch_inputnum'].nda[ii][i] =  packet[i] & 0x0000ffff
+
+        # check that the ADC decoder has the right number of samples
+        objs = []
+        for obj in gc.get_objects():
+            if isinstance(obj, ORFlashCamADCWaveformDecoder): objs.append(obj)
+        if len(objs) != 1:
+            print(f'Warning: Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
+        else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['listener_id'].nda[ii])
 
         rb.loc += 1
         return rb.is_full()
@@ -307,6 +316,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             'fcio_id' : { 'dtype': 'uint16', }
         } )
         self.decoded_values = {}
+        self.lid_to_ccc_dict = {}
         super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
 
@@ -345,6 +355,8 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             for channel in range(len(enabled)):
                 if not enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
+                if listener not in self.lid_to_ccc_dict: self.lid_to_ccc_dict[listener] = []
+                self.lid_to_ccc_dict[listener].append(ccc)
                 if samples > 0:
                     self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                     self.decoded_values[ccc]['waveform']['wf_len'] = samples
@@ -367,7 +379,23 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         return None
 
 
+    def assert_nsamples(self, nsamples, listener_id):
+        if listener_id not in self.lid_to_ccc_dict:
+            print(f"Warning: listener_id {listener_id} not in lid_to_ccc_dict!  dict = {lid_to_ccc_dict}")
+            return
+        reported_cc = []
+        for ccc in self.lid_to_ccc_dict[listener_id]:
+            orca_nsamples = self.decoded_values[ccc]['waveform']['wf_len']
+            if orca_nsamples != nsamples:
+                cc = ccc >> 4
+                if cc not in reported_cc:
+                    print(f"Warning: orca miscalc'd nsamples = {orca_nsamples} for crate {cc >> 5} card {cc & 0x1f}, updating to {nsamples}")
+                    reported_cc.append(cc)
+                self.decoded_values[ccc]['waveform']['wf_len'] = nsamples
+
+
     def decode_packet(self, packet, packet_id, rbl, verbosity=0):
+        ''' decode the orca FC ADC packet '''
         evt_rbkd = rbl.get_keyed_dict()
 
         # unpack lengths and ids from the header words
@@ -393,10 +421,20 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         rb_wf_len = tbl['waveform']['values'].nda.shape[1]
         if wf_samples != rb_wf_len:
             if not hasattr(self, 'wf_len_errs'): self.wf_len_errs = {}
-            if ccc not in self.wf_len_errs:
-                print(f'ORCAFlashCamADCWaveformDecoder warning: waveform from ccc {ccc} of length {wf_samples} with expected length {rb_wf_len}')
-                self.wf_len_errs[ccc] = True
-            if wf_samples > rb_wf_len: wf_samples = rb_wf_len
+            # if dec_vals has been updated, orca miscalc'd and a warning has
+            # already been emitted.  Otherwise, emit a new warning.
+            if wf_samples != self.decoded_values[ccc]['waveform']['wf_len']:
+                if ccc not in self.wf_len_errs:
+                    print(f'ORCAFlashCamADCWaveformDecoder Warning: waveform from ccc {ccc} of length {wf_samples} with expected length {rb_wf_len}')
+                    self.wf_len_errs[ccc] = True
+            # Now resize buffer only if it is still empty.
+            # Otherwise emit a warning and keep the smaller length
+            if ii != 0:
+                if ccc not in self.wf_len_errs:
+                    print(f'ORCAFlashCamADCWaveformDecoder Warning: tried to resize buffer according to config record but it was not empty!')
+                    self.wf_len_errs[ccc] = True
+                if wf_samples > rb_wf_len: wf_samples = rb_wf_len
+            else: tbl['waveform'].resize_wf_len(wf_samples)
 
         # set the values decoded from the header words
         tbl['packet_id'].nda[ii] = packet_id
