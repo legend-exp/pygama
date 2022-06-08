@@ -110,15 +110,14 @@ class LH5Store:
         return group
 
 
-    def get_buffer(self, name, lh5_file, size=None):
+    def get_buffer(self, name, lh5_file, size=None, field_mask=None):
         """
         Returns an lh5 object appropriate for use as a pre-allocated buffer
         in a read loop. Sets size to size if object has a size.
         """
-        obj, n_rows = self.read_object(name, lh5_file, n_rows=0)
+        obj, n_rows = self.read_object(name, lh5_file, n_rows=0, field_mask=field_mask)
         if hasattr(obj, 'resize') and size is not None: obj.resize(new_size=size)
         return obj
-
 
 
     def read_object(self, name, lh5_file, start_row=0, n_rows=sys.maxsize, idx=None,
@@ -131,7 +130,7 @@ class LH5Store:
         name : str
             Name of the lh5 object to be read (including its group path)
         lh5_file : str or h5py File object, or a list of either
-            The file(s) containing the object to be read oad out. If a list of
+            The file(s) containing the object to be read out. If a list of
             files, array-like object data will be concatenated into the output
             object
         start_row : int (optional)
@@ -331,8 +330,8 @@ class LH5Store:
                                                                 obj_buf=fld_buf,
                                                                 obj_buf_start=obj_buf_start,
                                                                 verbosity=verbosity)
-                if obj_buf is not None and obj_buf_start+n_rows > len(obj_buf):
-                    obj_buf.resize(obj_buf_start+n_rows, do_warn=(verbosity>0))
+                if obj_buf is not None and obj_buf_start+n_rows_read > len(obj_buf):
+                    obj_buf.resize(obj_buf_start+n_rows_read, do_warn=(verbosity>0))
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
             n_rows_read = rows_read[0]
@@ -889,7 +888,7 @@ class LH5Iterator:
         self.group = group
         self.buffer_len = buffer_len
 
-        self.lh5_buffer = self.lh5_st.get_buffer(self.group, self.lh5_files[0], self.buffer_len) if len(self.lh5_files)>0 else None
+        self.lh5_buffer = self.lh5_st.get_buffer(self.group, self.lh5_files[0], size=self.buffer_len, field_mask=field_mask) if len(self.lh5_files)>0 else None
         self.n_rows = 0
         self.current_entry = 0
 
