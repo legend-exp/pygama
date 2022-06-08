@@ -156,7 +156,7 @@ def test_read_table(lh5_file):
     assert n_rows == 3
 
     # TODO: test failure here?
-    # store.read_object('/data/struct/table', [lh5_file, lh5_file])
+    store.read_object('/data/struct/table', [lh5_file, lh5_file])
 
 
 def test_read_lgnd_array(lgnd_file):
@@ -203,7 +203,7 @@ def test_lh5_iterator(lgnd_file):
     lh5_obj, n_rows = lh5_it.read(4)
     assert n_rows == 5
     assert isinstance(lh5_obj, lgdo.Table)
-    # assert list(lh5_obj.keys()) == ['baseline'] # BUG
+     assert list(lh5_obj.keys()) == ['baseline'] # BUG
     assert (lh5_obj['baseline'].nda == np.array([14353, 14254, 14525, 11656, 13576])).all()
 
     for lh5_obj, entry, n_rows in lh5_it:
