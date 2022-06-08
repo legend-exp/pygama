@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 
 from .orcadaq import OrcaDecoder, get_ccc, get_readout_info, get_auxhw_info
 from .fcdaq import FlashCamEventDecoder
@@ -364,8 +365,8 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
             for channel in range(len(enabled)):
                 if not enabled[channel]: continue
                 ccc = get_ccc(crate, card, channel)
-                self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                 if samples > 0:
+                    self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
                     self.decoded_values[ccc]['waveform']['length'] = samples
 
                     
@@ -395,11 +396,19 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
             tbl = lh5_tables[ccc]
         ii = tbl.loc
 
-        # check that the waveform length is as expected
+        # check that the waveform length is as expected. If different, keep
+        # the smaller one
         if wf_samples != tbl['waveform']['values'].nda.shape[1]:
-            print('ORCAFlashCamADCWaveformDecoder warning: '
-                  'waveform of length ', wf_samples,' with expected length ',
-                  self.decoded_values[ccc]['waveform']['length'])
+            if not hasattr(self, 'wf_len_errs'): self.wf_len_errs = []
+            if ccc not in self.wf_len_errs:
+                print('ORCAFlashCamADCWaveformDecoder warning: '
+                      'waveform of length ', wf_samples,' with expected length ',
+                      self.decoded_values[ccc]['waveform']['length'])
+                if self.decoded_values[ccc]['waveform']['length'] != tbl['waveform']['values'].nda.shape[1]:
+                    print(f"and dec vals len ({self.decoded_values[ccc]['waveform']['length']}) != nda shape ({tbl['waveform']['values'].nda.shape[1]})")
+                self.wf_len_errs.append(ccc)
+            if wf_samples > tbl['waveform']['values'].nda.shape[1]:
+                wf_samples = tbl['waveform']['values'].nda.shape[1]
 
         # set the values decoded from the header words
         tbl['packet_id'].nda[ii] = packet_id
@@ -447,6 +456,7 @@ class ORCAFlashCamADCWaveformDecoder(OrcaDecoder):
         tbl['energy'].nda[ii]   = (data[offset-1] & 0xffff0000) >> 16
         wf = np.frombuffer(packet, dtype=np.uint16)[offset*2:
                                                     offset*2 + wf_samples]
-        tbl['waveform']['values'].nda[ii][:] = wf
+
+        tbl['waveform']['values'].nda[ii][:wf_samples] = wf
 
         tbl.push_row()
