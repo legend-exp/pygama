@@ -1,20 +1,28 @@
-# Minimal makefile for Sphinx documentation
-#
+SOURCEDIR = source
+BUILDDIR = build
 
-# You can set these variables from the command line, and also
-# from the environment for the first two.
-SPHINXOPTS    ?=
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = source
-BUILDDIR      = build
+# docs for all project versions will be placed here
+BUILDDIRALL = $(BUILDDIR)/allver/html
 
-# Put it first so that "make" without argument is like "make help".
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+# list in source/.py_api_exclude files or directories that should be excluded
+# from the API auto-generated documentation. No regex allowed
+PY_SOURCE_EXCLUDE = $(shell cat source/.py_api_exclude)
 
-.PHONY: help Makefile
+all: apidoc
+	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going
 
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+allver:
+	sphinx-multiversion "$(SOURCEDIR)" "$(BUILDDIRALL)"
+	cp source/_assets/redirect.html "$(BUILDDIRALL)/index.html"
+
+allver-info:
+	sphinx-multiversion --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
+
+apidoc: clean-apidoc
+	sphinx-apidoc --private --module-first --force --output-dir "$(SOURCEDIR)/generated" ../src/pygama $(PY_SOURCE_EXCLUDE)
+
+clean-apidoc:
+	rm -rf "$(SOURCEDIR)/generated"
+
+clean: clean-apidoc
+	rm -rf "$(BUILDDIR)"
