@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pf
+import pygama.math.binned_fitting as pf
 from pygama.pargen import energy_cal
 
 
