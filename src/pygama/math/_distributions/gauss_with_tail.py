@@ -6,7 +6,7 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math.distributions import gauss_cdf, gauss_norm
+from pygama.math._distributions.gauss import gauss_cdf, gauss_norm
 from pygama.math.functions import gauss_tail_exact, nb_erf
 
 limit = np.log(sys.float_info.max)/10

@@ -5,7 +5,8 @@ import math
 
 import numpy as np
 
-from pygama.math.distributions import gauss_norm, step_pdf
+from pygama.math._distributions.gauss import gauss_norm
+from pygama.math._distributions.step import step_pdf
 
 
 def Am_double(x,  n_sig1, mu1, sigma1,  n_sig2, mu2,sigma2, n_sig3, mu3,sigma3, n_bkg1, hstep1, n_bkg2, hstep2,
