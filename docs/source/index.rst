@@ -15,6 +15,7 @@ Table of Contents
    :maxdepth: 1
 
    install
+   manuals/index
    tutorials
    Package API reference <generated/modules>
-   contributing
+   developer

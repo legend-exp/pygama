@@ -124,19 +124,34 @@ class WaveformTable(Table):
     @property
     def values(self):
         return self['values']
+
     @property
     def values_units(self):
         return self.values.attrs.get('units', None)
     @values_units.setter
     def values_units(self, units):
         self.values.attrs['units'] = f'{units}'
+
     @property
     def wf_len(self):
+        if isinstance(self.values, VectorOfVectors): return -1
         return self.values.nda.shape[1]
+    @wf_len.setter
+    def wf_len(self, wf_len):
+        if isinstance(self.values, VectorOfVectors): return
+        shape = self.values.nda.shape
+        shape = (shape[0], wf_len)
+        self.values.nda.resize(shape)
+    def resize_wf_len(self, new_len):
+        ''' alias for wf_len.setter
+        (for when we want to make it clear in the code that memory is being reallocated)
+        '''
+        self.wf_len = new_len
 
     @property
     def t0(self):
         return self['t0']
+
     @property
     def t0_units(self):
         return self.t0.attrs.get('units', None)

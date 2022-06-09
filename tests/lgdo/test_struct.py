@@ -1,64 +1,36 @@
-import pytest
-from numpy.testing import assert_
-
 import pygama.lgdo as lgdo
 
 
-@pytest.fixture()
-def struct():
-    print('--------setup--------')
-    yield lgdo.Struct()
-    print('--------tear down--------')
+def test_datatype_name():
+    struct = lgdo.Struct()
+    assert struct.datatype_name() == 'struct'
 
 
-@pytest.fixture()
-def scalar():
-    print('--------setup--------')
-    yield lgdo.Scalar
+def test_form_datatype():
+    struct = lgdo.Struct()
+    assert struct.form_datatype() == 'struct{}'
 
 
-@pytest.fixture()
-def array():
-    print('--------setup--------')
-    yield lgdo.Array
+def test_update_datatype():
+    struct = lgdo.Struct()
+    struct.update_datatype()
+    assert struct.attrs['datatype'] == 'struct{}'
 
 
-class Test_Struct:
+def test_init():
+    obj_dict = {'scalar1': lgdo.Scalar(value=10)}
+    attrs = {'attr1': 1}
+    struct = lgdo.Struct(obj_dict=obj_dict, attrs=attrs)
+    assert dict(struct) == obj_dict
+    assert struct.attrs == attrs | {'datatype': 'struct{scalar1}'}
 
-    def test_datatype_name(self, struct):
-        result = struct.datatype_name()
-        desired = 'struct'
-        assert_(result == desired)
 
-    def test_form_datatype(self, struct):
-        result = struct.form_datatype()
-        # verify
-        desired = 'struct{}'
-        assert_(desired == result)
+def test_add_field():
+    struct = lgdo.Struct()
+    struct.add_field('scalar1', lgdo.Scalar(value=10))
 
-    def test_add_field(self, struct, scalar, array):
-        # set up,add scalar object
-        obj = scalar(value=10)
-        name = 'scalar1'
-        struct.add_field(name, obj)
+    assert struct.attrs['datatype'] == 'struct{scalar1}'
+    assert struct['scalar1'].__class__.__name__ == 'Scalar'
 
-        # verify 'struct{scl1}' is in attributes
-        desired_attr = 'struct{scalar1}'
-        result_attr = struct.attrs['datatype']
-
-        # and the correct type
-        desired_type = 'Scalar'
-        result_type = struct[name].__class__.__name__
-
-        assert_(result_attr == desired_attr, f'Error with {desired_attr}: got {result_attr}')
-        assert_(result_type == desired_type, f'got {result_type}')
-
-        # add array and test updated attributes
-        arr_obj = array(shape=(700, 21), dtype='f', fill_val=2)
-        name2 = 'array1'
-        struct.add_field(name2, arr_obj)
-        expected = 'struct{scalar1,array1}'
-        got = struct.attrs['datatype']
-
-        # verify
-        assert_(got == expected, f'Got {got}')
+    struct.add_field('array1', lgdo.Array(shape=(700, 21), dtype='f', fill_val=2))
+    assert struct.attrs['datatype'] == 'struct{scalar1,array1}'

@@ -14,7 +14,7 @@ class ArrayOfEqualSizedArrays(Array):
     """
 
 
-    def __init__(self, dims=None, nda=None, shape=None, dtype=None, fill_val=None, attrs={}):
+    def __init__(self, dims=None, nda=None, shape=(), dtype=None, fill_val=None, attrs={}):
         """
         Parameters
         ----------
@@ -46,14 +46,14 @@ class ArrayOfEqualSizedArrays(Array):
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
 
 
-    def dataype_name(self):
+    def datatype_name(self):
         """The name for this lgdo's datatype attribute"""
         return 'array_of_equalsized_arrays'
 
 
     def form_datatype(self):
         """Return this lgdo's datatype attribute string"""
-        dt = self.dataype_name()
+        dt = self.datatype_name()
         nD = str(len(self.nda.shape))
         if self.dims is not None: nD = ','.join([str(i) for i in self.dims])
         et = get_element_type(self)
