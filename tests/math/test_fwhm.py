@@ -1,7 +1,7 @@
 import numpy as np
 from pytest import approx
 
-import pygama.math.distributions as pgd
+import pygama.math.binned_fitting as pgb
 
 
 def test_mostly_gauss_fwhm():
@@ -14,7 +14,7 @@ def test_mostly_gauss_fwhm():
            [0, 0, 0, 0, 0, 1e-16, 0], # dbg02
            [0, 0, 0, 0, 0, 0, 1e-16]] # damp2
     mu, sig, hstep, htail, tau, bg0, amp = pars
-    fwhm, dfwhm = pgd.radford_fwhm(sig, htail, tau, cov)
+    fwhm, dfwhm = pgb.radford_fwhm(sig, htail, tau, cov)
     assert fwhm == approx(2.3548, rel=1E-5)
     assert dfwhm == approx(2.3548E-8, rel=1E-5)
 
@@ -29,6 +29,6 @@ def test_mostly_exp_fwhm():
            [0, 0, 0, 0, 0, 1e-16, 0], # dbg02
            [0, 0, 0, 0, 0, 0, 1e-16]] # damp2
     mu, sig, hstep, htail, tau, bg0, amp = pars
-    fwhm, dfwhm = pgd.radford_fwhm(sig, htail, tau, cov)
+    fwhm, dfwhm = pgb.radford_fwhm(sig, htail, tau, cov)
     assert fwhm == approx(np.log(2), rel=1E-5)
     assert dfwhm == approx(np.log(2)/10, rel=1E-5)
