@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-import pygama.math.histogram as pgh
 import pygama.math.binned_fitting as pf
+import pygama.math.histogram as pgh
 from pygama.pargen import energy_cal
 
 
