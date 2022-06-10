@@ -1,8 +1,10 @@
+import os.path
+from pathlib import Path
+
+import pytest
+
 import pygama.raw as raw
 from pygama.lgdo.lh5_store import LH5Store, ls
-import os.path
-import pytest
-from pathlib import Path
 
 config_dir = Path(__file__).parent/'configs'
 

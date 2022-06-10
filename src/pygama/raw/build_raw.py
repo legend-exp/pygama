@@ -11,10 +11,7 @@ from pygama.math.utils import sizeof_fmt
 
 from .fc.fc_streamer import FCStreamer
 from .orca.orca_streamer import OrcaStreamer
-from .raw_buffer import (
-    RawBufferLibrary,
-    write_to_lh5_and_clear,
-)
+from .raw_buffer import RawBufferLibrary, write_to_lh5_and_clear
 
 
 def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
