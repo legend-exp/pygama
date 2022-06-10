@@ -304,12 +304,12 @@ def expand_rblist_json_dict(json_dict, kw_dict):
     buffer_names = list(json_dict.keys())
     for name in buffer_names:
         if name == '':
-            print("Error: name can't be ''")
-            return
+            raise ValueError("buffer name can't be empty")
+
         info = json_dict[name] # changes to info will change json_dict[name]
         # make sure we have a key list
         if 'key_list' not in info:
-            print(f'expand_json_dict: {name} is missing key_list')
+            raise ValueError(f"'{name}' is missing key_list")
             continue
 
         # find and expand any ranges in the key_list
@@ -340,7 +340,10 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             kw_dict['key'] = info['key_list'][0]
         if 'out_stream' in info:
             if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
-            info['out_stream'] = info['out_stream'].format(**kw_dict)
+            try:
+                info['out_stream'] = info['out_stream'].format(**kw_dict)
+            except KeyError as msg:
+                raise KeyError(f"variable {msg} dereferenced in 'out_stream' not defined in kw_dict")
             info['out_stream'] = os.path.expandvars(info['out_stream'])
 
 
