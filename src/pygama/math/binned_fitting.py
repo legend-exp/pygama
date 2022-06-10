@@ -10,11 +10,11 @@ from scipy.optimize import brentq, minimize_scalar
 import pygama.math.histogram as pgh
 from pygama.math.distributions import (
     gauss_norm,
-    gauss_tail_pdf,
+    exgauss,
     gauss_with_tail_pdf,
     unnorm_step_pdf,
 )
-from pygama.math.functions import gauss_amp
+from pygama.math.functions.gauss import gauss_amp
 
 
 def fit_binned(func, hist, bins, var=None, guess=None,
@@ -334,44 +334,44 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     return (mode, maximum), cov
 
 
-def radford_fwhm(sigma, htail, tau,  cov = None):
+def hpge_peak_fwhm(sigma, htail, tau,  cov = None):
     """
-    Return the FWHM of the radford_peak function, ignoring background and step
+    Return the FWHM of the hpge_peak_peak function, ignoring background and step
     components. If calculating error also need the normalisation for the step
     function.
     """
     # optimize this to find max value
-    def neg_radford_peak_bgfree(E, sigma, htail, tau):
+    def neg_hpge_peak_peak_bgfree(E, sigma, htail, tau):
         return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
 
     if htail<0 or htail>1:
         print("htail outside allowed limits of 0 and 1")
         raise ValueError
 
-    res = minimize_scalar( neg_radford_peak_bgfree,
+    res = minimize_scalar( neg_hpge_peak_peak_bgfree,
                            args=(sigma, htail, tau),
                            bounds=(-sigma-htail, sigma+htail) )
     Emax = res.x
-    half_max = -neg_radford_peak_bgfree(Emax, sigma, htail, tau)/2.
+    half_max = -neg_hpge_peak_peak_bgfree(Emax, sigma, htail, tau)/2.
 
     # root find this to find the half-max energies
-    def radford_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
+    def hpge_peak_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
         return gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0] - half_max
 
     try:
-        lower_hm = brentq( radford_peak_bgfree_halfmax,
+        lower_hm = brentq( hpge_peak_peak_bgfree_halfmax,
                        -(2.5*sigma/2 + htail*tau), Emax,
                        args = (sigma, htail, tau, half_max) )
     except:
-        lower_hm = brentq( radford_peak_bgfree_halfmax,
+        lower_hm = brentq( hpge_peak_peak_bgfree_halfmax,
                -(5*sigma + htail*tau), Emax,
                args = (sigma, htail, tau, half_max) )
     try:
-        upper_hm = brentq( radford_peak_bgfree_halfmax,
+        upper_hm = brentq( hpge_peak_peak_bgfree_halfmax,
                        Emax, 2.5*sigma/2,
                        args = (sigma, htail, tau, half_max) )
     except:
-        upper_hm = brentq( radford_peak_bgfree_halfmax,
+        upper_hm = brentq( hpge_peak_peak_bgfree_halfmax,
                    Emax, 5*sigma,
                    args = (sigma, htail, tau, half_max) )
 
@@ -381,14 +381,14 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     #amp set to 1, mu to 0, hstep+bg set to 0
     pars = [1,0, sigma, htail, tau,0,0]
     step_norm = 1
-    gradmax = radford_parameter_gradient(Emax, pars, step_norm)
+    gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
     gradmax *= 0.5
-    grad1 = radford_parameter_gradient(lower_hm, pars,step_norm)
+    grad1 = hpge_peak_parameter_gradient(lower_hm, pars,step_norm)
     grad1 -= gradmax
-    grad1 /= radford_peakshape_derivative(lower_hm, pars,step_norm)
-    grad2 = radford_parameter_gradient(upper_hm, pars,step_norm)
+    grad1 /= hpge_peak_peakshape_derivative(lower_hm, pars,step_norm)
+    grad2 = hpge_peak_parameter_gradient(upper_hm, pars,step_norm)
     grad2 -= gradmax
-    grad2 /= radford_peakshape_derivative(upper_hm, pars,step_norm)
+    grad2 /= hpge_peak_peakshape_derivative(upper_hm, pars,step_norm)
     grad2 -= grad1
 
     fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
@@ -396,9 +396,9 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
     return upper_hm - lower_hm, fwfm_unc
 
 
-def radford_peakshape_derivative(E, pars, step_norm):
+def hpge_peak_peakshape_derivative(E, pars, step_norm):
     """
-    Computes the derivative of the Radford peak shape
+    Computes the derivative of the hpge_peak (Radford) peak shape
     """
     n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
 
@@ -406,19 +406,19 @@ def radford_peakshape_derivative(E, pars, step_norm):
     gaus = gauss_norm(E, mu, sigma)
     y = (E-mu)/sigma
     ret = -(1-htail)*(y/sigma)*gaus
-    ret -= htail/tau*(-gauss_tail_pdf(np.array([E,E-1]), mu, sigma, tau)[0]+gaus)
+    ret -= htail/tau*(-exgauss(np.array([E,E-1]), mu, sigma, tau)[0]+gaus)
 
     return n_sig*ret - n_bkg*hstep*gaus/step_norm #need norm factor for bkg
 
 
-def radford_parameter_gradient(E, pars, step_norm):
+def hpge_peak_parameter_gradient(E, pars, step_norm):
     """
-    Computes the gradient of the Radford parameter
+    Computes the gradient of the hpge_peak (Radford) parameter
     """
     n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
 
     gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0]
-    tailL = gauss_tail_pdf(np.array([E, E-1]), mu, sigma, tau)[0]
+    tailL = exgauss(np.array([E, E-1]), mu, sigma, tau)[0]
     if n_bkg ==0:
         step_f = 0
     else:

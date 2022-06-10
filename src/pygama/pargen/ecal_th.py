@@ -12,7 +12,6 @@ from scipy.optimize import curve_fit
 
 import pygama.math.distribution_selector as pgds
 import pygama.math.distributions as pgd
-import pygama.math.functions as pgf
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as cal
 
@@ -47,10 +46,10 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
 
     glines    = [583.191, 727.330, 860.564,1592.53,1620.50,2103.53,2614.50] # gamma lines used for calibration
     range_keV = [(20,20),(30,30), (40,40),(40,25),(25,40),(40,40),(60,60)] # side bands width
-    funcs = [pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf,
-         pgd.extended_radford_pdf,pgd.extended_radford_pdf,pgd.extended_radford_pdf]
-    gof_funcs = [pgd.gauss_step_pdf,pgd.gauss_step_pdf,pgd.radford_pdf,pgd.radford_pdf,
-            pgd.radford_pdf,pgd.radford_pdf,pgd.radford_pdf]
+    funcs = [pgd.extended_hpge_peak_pdf,pgd.extended_hpge_peak_pdf,pgd.extended_hpge_peak_pdf,pgd.extended_hpge_peak_pdf,
+         pgd.extended_hpge_peak_pdf,pgd.extended_hpge_peak_pdf,pgd.extended_hpge_peak_pdf]
+    gof_funcs = [pgd.gauss_step_pdf,pgd.gauss_step_pdf,pgd.hpge_peak_pdf,pgd.hpge_peak_pdf,
+            pgd.hpge_peak_pdf,pgd.hpge_peak_pdf,pgd.hpge_peak_pdf]
     output_dict = {}
     for energy_param in energy_params:
         datatype, detector, measurement, run, timestamp = os.path.basename(files[0]).split('-')
@@ -115,7 +114,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
                     fitted_funcs.append(funcs[i])
                     fitted_gof_funcs.append(gof_funcs[i])
 
-            ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
+            ecal_pass = pgd.poly(uncal_pass[energy_param], pars)
             xpb = 1
             xlo = 0
             xhi = 4000
@@ -218,7 +217,7 @@ def energy_cal_th(files, energy_params,  save_path, lh5_path='raw',n_events=1500
             ax1.plot(qbb_line_vx,qbb_line_vy,lw=1, c='r')
             ax1.set_ylim([1,3])
             ax1.set_ylabel("FWHM energy resolution (keV)", ha='right', y=1)
-            ax2.plot(fwhm_peaks,pgf.poly(mus, pars)-fwhm_peaks, lw=1, c='b')
+            ax2.plot(fwhm_peaks,pgd.poly(mus, pars)-fwhm_peaks, lw=1, c='b')
             ax2.set_xlabel("Energy (keV)",    ha='right', x=1)
             ax2.set_ylabel("Residuals (keV)", ha='right', y=1)
             fig.suptitle(plot_title)
@@ -245,7 +244,7 @@ def get_peak_labels(labels, pars):
         if i%2 == 1:
             continue
         else:
-            out.append( f'{pgf.poly(label, pars):.1f}')
+            out.append( f'{pgd.poly(label, pars):.1f}')
             out_labels.append(label)
     return out_labels, out
 

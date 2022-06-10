@@ -3,14 +3,14 @@ Radford Ge peak shape distributions for pygama
 """
 import numpy as np
 
-from pygama.math._distributions.gauss_with_tail import (
+from pygama.math.functions.gauss_with_tail import (
     gauss_with_tail_cdf,
     gauss_with_tail_pdf,
 )
-from pygama.math._distributions.step import step_cdf, step_pdf
+from pygama.math.functions.step import step_cdf, step_pdf
 
 
-def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
+def hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                 lower_range=np.inf , upper_range=np.inf,  components=False):
     """
     David Radford's HPGe peak shape PDF consists of a gaussian with tail signal
@@ -32,7 +32,7 @@ def radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
         return n_sig *peak, n_sig*tail, n_bkg * bkg
 
 
-def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
+def hpge_peak_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
     """
     Cdf for gaussian with tail signal and step background
     """
@@ -52,14 +52,14 @@ def radford_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.in
         return (n_sig/(n_sig+n_bkg))*peak, (n_sig/(n_sig+n_bkg))*tail, (n_bkg/(n_sig+n_bkg))*bkg
 
 
-def extended_radford_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
+def extended_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
                          lower_range=np.inf , upper_range=np.inf, components=False):
     """
     Pdf for gaussian with tail signal and step background, also returns number of events
     """
     if components ==False:
-        return n_sig + n_bkg, radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
+        return n_sig + n_bkg, hpge_peak_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
     else:
-        peak, tail, bkg = radford_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep,
+        peak, tail, bkg = hpge_peak_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep,
                                       lower_range, upper_range,components=components)
         return n_sig + n_bkg, peak, tail, bkg

@@ -10,27 +10,27 @@ also be called to return a NumPy array, but if this is done, memory will be
 allocated for this array, slowing things down.
 """
 
-from ._distributions.double_gauss import (
-    Am_double,
-    double_gauss_pdf,
-    extended_Am_double,
-    extended_double_gauss_pdf,
+from pygama.math.functions.triple_gauss import (
+    triple_gauss_double_step_pdf,
+    triple_gauss_double_step
 )
-from ._distributions.gauss import gauss_cdf, gauss_norm, gauss_pdf
-from ._distributions.gauss_on_background import gauss_linear, gauss_uniform
-from ._distributions.gauss_step import (
-    extended_gauss_step_pdf,
+from pygama.math.functions.gauss import gauss_cdf, gauss_norm, gauss_pdf, gauss
+from pygama.math.functions.gauss_on_background import gauss_linear, gauss_uniform
+from pygama.math.functions.gauss_step import (
+    gauss_step,
     gauss_step_cdf,
     gauss_step_pdf,
 )
-from ._distributions.gauss_with_tail import (
+from pygama.math.functions.gauss_with_tail import (
     gauss_tail_approx,
     gauss_tail_cdf,
     gauss_tail_integral,
     gauss_tail_norm,
-    gauss_tail_pdf,
+    exgauss,
     gauss_with_tail_cdf,
     gauss_with_tail_pdf,
 )
-from ._distributions.radford import extended_radford_pdf, radford_cdf, radford_pdf
-from ._distributions.step import step_cdf, step_pdf, unnorm_step_pdf
+from pygama.math.functions.hpge_peak import extended_hpge_peak_pdf, hpge_peak_cdf, hpge_peak_pdf
+from pygama.math.functions.step import step_cdf, step_pdf, unnorm_step_pdf
+from pygama.math.functions.crystall_ball import xtalball
+from pygama.math.functions.polynomial import poly

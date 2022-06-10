@@ -11,7 +11,8 @@ import numpy as np
 from scipy import stats
 
 from pygama.math.binned_fitting import *
-from pygama.math.functions import *
+from pygama.math.distributions import *
+from pygama.math.functions.gauss import gauss
 from pygama.math.histogram import *
 
 

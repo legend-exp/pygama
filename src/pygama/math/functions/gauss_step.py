@@ -6,11 +6,8 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math._distributions.gauss import gauss_cdf, gauss_norm
-from pygama.math._distributions.step import step_cdf, step_pdf
-
-limit = np.log(sys.float_info.max)/10
-kwd = {"parallel": False, "fastmath": True}
+from pygama.math.functions.gauss import gauss_cdf, gauss_norm
+from pygama.math.functions.step import step_cdf, step_pdf
 
 
 def gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
@@ -51,7 +48,7 @@ def gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper
         return (1/(n_sig+n_bkg))*n_sig*gauss_cdf(x, mu, sigma), (1/(n_sig+n_bkg))*(n_bkg*bkg)
 
 
-def extended_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
+def gauss_step(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
     """
     Pdf for Gaussian on step background for Compton spectrum, returns also the total number of events for extended unbinned fits
     args: n_sig mu, sigma for the signal and n_bkg, hstep for the background

@@ -3,14 +3,14 @@ Convenience functions to select distributions
 """
 import numpy as np
 
-from pygama.math.binned_fitting import radford_fwhm
+from pygama.math.binned_fitting import hpge_peak_fwhm
 from pygama.math.distributions import (
-    extended_gauss_step_pdf,
-    extended_radford_pdf,
+    gauss_step,
+    extended_hpge_peak_pdf,
     gauss_step_cdf,
     gauss_step_pdf,
-    radford_cdf,
-    radford_pdf,
+    hpge_peak_cdf,
+    hpge_peak_pdf,
 )
 
 
@@ -18,7 +18,7 @@ def get_mu_func(func, pars, cov = None, errors=None):
     """
     Function to select which distribution to get the centroid from
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -30,7 +30,7 @@ def get_mu_func(func, pars, cov = None, errors=None):
         else:
             return mu
 
-    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
@@ -51,7 +51,7 @@ def get_fwhm_func(func, pars, cov = None):
     """
     Function to select which distribution to get the FWHM of
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -61,13 +61,13 @@ def get_fwhm_func(func, pars, cov = None):
         else:
             return sigma*2*np.sqrt(2*np.log(2)), np.sqrt(cov[2][2])*2*np.sqrt(2*np.log(2))
 
-    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
 
-        return radford_fwhm(sigma, htail, tau, cov)
+        return hpge_peak_fwhm(sigma, htail, tau, cov)
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
@@ -77,7 +77,7 @@ def get_total_events_func(func, pars, cov = None, errors=None):
     """
     Function to select which distribution to get the total number of events from
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -89,7 +89,7 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
 
-    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:

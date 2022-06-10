@@ -6,18 +6,20 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math._distributions.gauss import gauss_cdf, gauss_norm
-from pygama.math.functions import gauss_tail_exact, nb_erf
+from pygama.math.functions.gauss import gauss_cdf, gauss_norm
+from pygama.math.functions.error_function import nb_erf, nb_erfc
 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}
 
 
 @nb.njit(**kwd)
-def gauss_tail_pdf(x, mu, sigma, tau):
+def exgauss(x, mu, sigma, tau):
     """
     A gaussian tail function template
     Can be used as a component of other fit functions w/args mu,sigma,tau
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     x = np.asarray(x)
     tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
@@ -31,6 +33,8 @@ def gauss_tail_pdf(x, mu, sigma, tau):
 def gauss_tail_cdf(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
     """
     CDF for gaussian tail
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     cdf = gauss_tail_integral(x,mu,sigma,tau)
     if lower_range ==np.inf and upper_range ==np.inf:
@@ -55,7 +59,7 @@ def gauss_with_tail_pdf(x, mu, sigma,  htail,tau, components=False):
 
     peak = gauss_norm(x,mu,sigma)
     try:
-        tail = gauss_tail_pdf(x, mu, sigma, tau)
+        tail = exgauss(x, mu, sigma, tau)
     except ZeroDivisionError:
         tail = np.zeros_like(x, dtype=np.float64)
     if components ==False:
@@ -86,9 +90,24 @@ def gauss_with_tail_cdf(x, mu, sigma, htail,  tau, components=False):
 
 
 @nb.njit(**kwd)
+def gauss_tail_exact(x, mu, sigma, tau):
+    """
+    Exact form of gaussian tail
+    """
+    tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
+    abstau = np.absolute(tau)
+    tmp = np.where(tmp < limit, tmp, limit)
+    z = (x-mu)/sigma
+    tail_f = (1/(2*abstau)) * np.exp(tmp) * nb_erfc( (tau*z + sigma)/(np.sqrt(2)*abstau))
+    return tail_f
+
+
+@nb.njit(**kwd)
 def gauss_tail_approx(x, mu, sigma, tau):
     """
     Approximate form of gaussian tail
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     den = 1/(sigma + tau*(x-mu)/sigma)
     tail_f = sigma * gauss_norm(x, mu, sigma) * den * (1.-tau*tau*den*den)
@@ -99,10 +118,12 @@ def gauss_tail_approx(x, mu, sigma, tau):
 def gauss_tail_integral(x,mu,sigma,tau):
     """
     Integral for gaussian tail
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     abstau = np.abs(tau)
     part1 = (tau/(2*abstau)) * nb_erf((tau*(x-mu) )/(np.sqrt(2)*sigma*abstau))
-    part2 =    tau * gauss_tail_pdf(x,mu,sigma,tau)
+    part2 =    tau * exgauss(x,mu,sigma,tau)
     return part1+part2
 
 
@@ -111,8 +132,10 @@ def gauss_tail_norm(x,mu,sigma,tau, lower_range=np.inf , upper_range=np.inf):
     """
     Normalised gauss tail. Note: this is only needed when the fitting range
     does not include the whole tail
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
-    tail = gauss_tail_pdf(x,mu,sigma,tau)
+    tail = exgauss(x,mu,sigma,tau)
     if lower_range ==np.inf and upper_range ==np.inf:
         integral = gauss_tail_integral(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, tau)
     else:

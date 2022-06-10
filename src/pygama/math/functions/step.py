@@ -6,9 +6,10 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math.functions import nb_erf, step_int
+from pygama.math.functions.error_function import nb_erf
+from pygama.math.functions.gauss import gauss
 
-limit = np.log(sys.float_info.max)/10
+
 kwd = {"parallel": False, "fastmath": True}
 
 
@@ -16,6 +17,8 @@ kwd = {"parallel": False, "fastmath": True}
 def unnorm_step_pdf(x,  mu, sigma, hstep):
     """
     Unnormalised step function for use in pdfs
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     invs = (np.sqrt(2)*sigma)
     z = (x-mu)/invs
@@ -28,6 +31,8 @@ def step_pdf(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
     """
     Normalised step function w/args mu, sigma, hstep
     Can be used as a component of other fit functions
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     step_f = unnorm_step_pdf(x,  mu, sigma, hstep)
     if lower_range ==np.inf and upper_range ==np.inf:
@@ -43,6 +48,8 @@ def step_pdf(x,  mu, sigma, hstep, lower_range=np.inf , upper_range=np.inf):
 def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
     """
     CDF for step function w/args mu, sigma, hstep
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
     """
     cdf = step_int(x,mu,sigma,hstep)
     if lower_range ==np.inf and upper_range ==np.inf:
@@ -53,3 +60,16 @@ def step_cdf(x,mu,sigma, hstep, lower_range=np.inf , upper_range=np.inf):
     cdf =  (1/norm) * cdf
     c = 1-cdf[-1]
     return cdf+c
+
+
+@nb.njit(**kwd)
+def step_int(x,mu,sigma, hstep):
+    """
+    Integral of step function w/args mu, sigma, hstep
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+    """
+    part1 = x+hstep*(x-mu)*nb_erf((x-mu)/(np.sqrt(2)*sigma))
+    part2 = - np.sqrt(2/np.pi)*hstep*sigma*gauss(x,mu,sigma)
+    return  part1-part2
+
