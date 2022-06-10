@@ -88,5 +88,7 @@ def gauss_pdf(x, mu, sigma, n_sig):
         The centroid of the Gaussian
     sigma : float
         The standard deviation of the Gaussian
+    n_sig : float 
+        The number of counts in the signal 
     """
     return n_sig * gauss_norm(x,mu,sigma)
