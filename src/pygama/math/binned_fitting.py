@@ -9,8 +9,8 @@ from scipy.optimize import brentq, minimize_scalar
 
 import pygama.math.histogram as pgh
 from pygama.math.distributions import (
-    gauss_norm,
     exgauss,
+    gauss_norm,
     gauss_with_tail_pdf,
     unnorm_step_pdf,
 )

@@ -9,7 +9,6 @@ import numpy as np
 from pygama.math.functions.error_function import nb_erf
 from pygama.math.functions.gauss import gauss
 
-
 kwd = {"parallel": False, "fastmath": True}
 
 
@@ -72,4 +71,3 @@ def step_int(x,mu,sigma, hstep):
     part1 = x+hstep*(x-mu)*nb_erf((x-mu)/(np.sqrt(2)*sigma))
     part2 = - np.sqrt(2/np.pi)*hstep*sigma*gauss(x,mu,sigma)
     return  part1-part2
-

@@ -8,7 +8,6 @@ import numpy as np
 
 from pygama.math.functions.error_function import nb_erf
 
-
 kwd = {"parallel": False, "fastmath": True}
 
 

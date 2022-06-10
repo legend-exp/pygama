@@ -3,7 +3,6 @@ import math
 import numba as nb
 import numpy as np
 
-
 kwd = {"parallel": False, "fastmath": True}
 
 

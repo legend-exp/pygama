@@ -6,8 +6,8 @@ import sys
 import numba as nb
 import numpy as np
 
-from pygama.math.functions.gauss import gauss_cdf, gauss_norm
 from pygama.math.functions.error_function import nb_erf, nb_erfc
+from pygama.math.functions.gauss import gauss_cdf, gauss_norm
 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}

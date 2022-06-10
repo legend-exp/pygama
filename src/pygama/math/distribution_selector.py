@@ -5,8 +5,8 @@ import numpy as np
 
 from pygama.math.binned_fitting import hpge_peak_fwhm
 from pygama.math.distributions import (
-    gauss_step,
     extended_hpge_peak_pdf,
+    gauss_step,
     gauss_step_cdf,
     gauss_step_pdf,
     hpge_peak_cdf,
