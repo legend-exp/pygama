@@ -24,6 +24,8 @@ class FCStreamer(DataStreamer):
         self.status_decoder = FCStatusDecoder()
         self.event_decoder = FCEventDecoder()
         self.event_tables = {}
+        self.event_rbkd = None
+        self.status_rb = None
 
 
 
