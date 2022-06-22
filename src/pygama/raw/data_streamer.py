@@ -127,6 +127,10 @@ class DataStreamer(ABC):
 
 
 
+    def close_stream(self): 
+        """ close this data stream. needs to be implemented in derived class """
+        pass
+
     def read_packet(self, verbosity=0):
         """
         Reads a single packet's worth of data in to the rb_lib
