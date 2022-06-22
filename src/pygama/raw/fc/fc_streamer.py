@@ -1,3 +1,4 @@
+import logging
 import os
 
 import fcutils
@@ -10,6 +11,8 @@ from ..raw_buffer import *
 from .fc_config_decoder import FCConfigDecoder
 from .fc_event_decoder import FCEventDecoder
 from .fc_status_decoder import FCStatusDecoder
+
+log = logging.getLogger(__name__)
 
 
 class FCStreamer(DataStreamer):
@@ -39,7 +42,7 @@ class FCStreamer(DataStreamer):
 
 
     def open_stream(self, fcio_filename, rb_lib=None, buffer_size=8192,
-                    chunk_mode='any_full', out_stream='', verbosity=0):
+                    chunk_mode='any_full', out_stream=''):
         """ Initialize the FC data stream
 
         Parameters
@@ -54,8 +57,6 @@ class FCStreamer(DataStreamer):
             DOCME
         out_stream : str
             DOCME
-        verbosity : int
-            verbosity level for the initialize function
 
         Returns
         -------
@@ -72,14 +73,14 @@ class FCStreamer(DataStreamer):
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(fcio_filename, rb_lib, buffer_size=buffer_size,
-                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
+                            chunk_mode=chunk_mode, out_stream=out_stream)
         if rb_lib is None: rb_lib = self.rb_lib
 
         # get the status rb_list and pull out its first element
         status_rb_list = rb_lib['FCStatusDecoder'] if 'FCStatusDecoder' in rb_lib else None
         if status_rb_list is not None:
             if len(status_rb_list) != 1:
-                print(f'warning! status_rb_list had length {len(status_rb_list)}, ignoring all but the first')
+                log.warning(f'status_rb_list had length {len(status_rb_list)}, ignoring all but the first')
             if len(status_rb_list) == 0:
                 self.status_rb = None
             else: self.status_rb = status_rb_list[0]
@@ -91,7 +92,7 @@ class FCStreamer(DataStreamer):
         if 'FCConfigDecoder' in rb_lib:
             config_rb_list = rb_lib['FCConfigDecoder']
             if len(config_rb_list) != 1:
-                print(f'warning! config_rb_list had length {len(config_rb_list)}, ignoring all but the first')
+                log.warning(f'config_rb_list had length {len(config_rb_list)}, ignoring all but the first')
             rb = config_rb_list[0]
         else: rb = RawBuffer(lgdo=fc_config)
         rb.loc = 1 # we have filled this buffer
@@ -99,7 +100,7 @@ class FCStreamer(DataStreamer):
 
 
 
-    def read_packet(self, verbosity=0):
+    def read_packet(self):
         """ Read a packet of data.
 
         Data written to self.rb_lib.
@@ -111,24 +112,19 @@ class FCStreamer(DataStreamer):
 
         self.packet_id += 1
 
-        if verbosity>0: print(f'packet {self.packet_id}: rc = {rc}')
-
         if rc == 1: # config (header) data
-            print(f'warning: got a header after start of run?')
-            print(f'         n_bytes_read = {self.n_bytes_read}')
+            log.warning(f'got a header after start of run? n_bytes_read = {self.n_bytes_read}')
             self.n_bytes_read += 11*4 # there are 11 ints in the fcio_config struct
             return True
 
         elif rc == 2: # calib record -- no longer supported
-            print(f'warning: got a calib record?')
-            print(f'         n_bytes_read = {self.n_bytes_read}')
+            log.warning(f'warning: got a calib record? n_bytes_read = {self.n_bytes_read}')
             return True
 
         # FIXME: push to a buffer of skipped packets?
         # FIXME: need to at least update n_bytes?
         elif rc == 5: # recevent
-            print(f'warning: got a RecEvent packet -- skipping?')
-            print(f'         n_bytes_read = {self.n_bytes_read}')
+            log.warning(f'got a RecEvent packet -- skipping? n_bytes_read = {self.n_bytes_read}')
             # sizeof(fcio_recevent): (6 + 3*10 + 1*2304 + 3*4000)*4
             self.n_bytes_read += 57360
             return True
@@ -138,8 +134,7 @@ class FCStreamer(DataStreamer):
             if self.status_rb is not None:
                 self.any_full |= self.status_decoder.decode_packet(self.fcio,
                                                                    self.status_rb,
-                                                                   self.packet_id,
-                                                                   verbosity=verbosity)
+                                                                   self.packet_id)
             # sizeof(fcio_status): (3 + 10 + 256*(10 + 9 + 16 + 4 + 256))*4
             self.n_bytes_read += 302132
             return True
@@ -149,8 +144,7 @@ class FCStreamer(DataStreamer):
             if self.event_rbkd is not None:
                 self.any_full |= self.event_decoder.decode_packet(self.fcio,
                                                                   self.event_rbkd,
-                                                                  self.packet_id,
-                                                                  verbosity=verbosity)
+                                                                  self.packet_id)
             # sizeof(fcio_event): (5 + 3*10 + 1)*4 + numtraces*(1 + nsamples+2)*2
             self.n_bytes_read += 144 + self.fcio.numtraces*(self.fcio.nsamples + 3)*2
             return True
