@@ -98,6 +98,9 @@ class FCStreamer(DataStreamer):
         return [rb]
 
 
+    def close_stream(self): 
+        self.fcio = None # should cause close file in fcio.__dealloc__
+
 
     def read_packet(self, verbosity=0):
         """ Read a packet of data.
