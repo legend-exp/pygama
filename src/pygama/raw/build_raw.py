@@ -81,7 +81,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
             ext = in_stream.split('/')[-1][i_ext+1:]
             if ext == 'fcio':
                 in_stream_type = 'FlashCam'
-            elif ext == 'gz' and OrcaStreamer.is_orca_stream(in_stream):
+            elif ext == 'orca' and OrcaStreamer.is_orca_stream(in_stream):
                 in_stream_type = 'ORCA'
             else:
                 raise RuntimeError(f'unknown file extension {ext}. Specify in_stream_type')
