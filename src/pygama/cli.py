@@ -23,7 +23,7 @@ def pygama_cli():
 
     # build_raw interface
     parser_d2r = subparsers.add_parser(
-        'daq2raw', description="""Convert data into LEGEND HDF5 (LH5) raw format""")
+        'build-raw', description="""Convert data into LEGEND HDF5 (LH5) raw format""")
     parser_d2r.add_argument('in_stream', nargs='+',
                             help="""Input stream. Can be a single file, a list
                             of files or any other input type supported by the
@@ -47,7 +47,7 @@ def pygama_cli():
 
     # TODO: build_dsp interface
     parser_r2d = subparsers.add_parser(
-        'raw2dsp', description="""Process LH5 raw files and produce a
+        'build-dsp', description="""Process LH5 raw files and produce a
         dsp file using a JSON configuration""")
 
     parser_r2d.set_defaults(func=build_dsp_cli)
