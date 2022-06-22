@@ -127,7 +127,7 @@ class DataStreamer(ABC):
 
 
 
-    def close_stream(self): 
+    def close_stream(self):
         """ close this data stream. needs to be implemented in derived class """
         pass
 

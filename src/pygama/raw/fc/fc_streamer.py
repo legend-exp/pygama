@@ -98,7 +98,7 @@ class FCStreamer(DataStreamer):
         return [rb]
 
 
-    def close_stream(self): 
+    def close_stream(self):
         self.fcio = None # should cause close file in fcio.__dealloc__
 
 
