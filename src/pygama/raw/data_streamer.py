@@ -1,6 +1,9 @@
+import logging
 from abc import ABC
 
 from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
+
+log = logging.getLogger(__name__)
 
 
 class DataStreamer(ABC):
@@ -29,7 +32,7 @@ class DataStreamer(ABC):
 
 
     def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
-                    chunk_mode='any_full', out_stream='', verbosity=0):
+                    chunk_mode='any_full', out_stream=''):
         """ Open and initialize a data stream
 
         Open the stream, read in the header, set up the buffers
@@ -56,8 +59,6 @@ class DataStreamer(ABC):
             sets the mode use for read_chunk
         out_stream : str
             optional name of output stream for default rb_lib generation
-        verbosity : int
-            verbosity level for the initialize function
 
         Returns
         -------
@@ -123,7 +124,7 @@ class DataStreamer(ABC):
         if '*' in rb_lib: rb_lib.pop('*')
         for dec_name in rb_lib.keys():
             if dec_name not in dec_names:
-                print(f"Warning: no decoder named {dec_name} requested by rb_lib")
+                log.warning("no decoder named {dec_name} requested by rb_lib")
 
 
 
@@ -131,7 +132,9 @@ class DataStreamer(ABC):
         """ close this data stream. needs to be implemented in derived class """
         pass
 
-    def read_packet(self, verbosity=0):
+
+
+    def read_packet(self):
         """
         Reads a single packet's worth of data in to the rb_lib
 
@@ -150,7 +153,7 @@ class DataStreamer(ABC):
         return True
 
 
-    def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True, verbosity=0):
+    def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True):
         """
         Reads a chunk of data into raw buffers
 
@@ -181,8 +184,6 @@ class DataStreamer(ABC):
             automatically clear any buffers that report themselves as being full
             prior to reading the chunk. Set to False if clearing manually for a
             minor speed-up
-        verbosity : int
-            verbosity level for the initialize function
 
         Returns
         -------
@@ -198,7 +199,6 @@ class DataStreamer(ABC):
         self.any_full = False
 
         chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override
-        if verbosity>1: print(f'reading chunk with chunk_mode {chunk_mode}')
 
         read_one_packet = (chunk_mode == 'single_packet')
         only_full = (chunk_mode == 'only_full')
@@ -206,7 +206,7 @@ class DataStreamer(ABC):
         n_packets = 0
         still_has_data = True
         while True:
-            still_has_data = self.read_packet(verbosity=verbosity-1)
+            still_has_data = self.read_packet()
             if not still_has_data: break
             n_packets += 1
             if read_one_packet or n_packets > rp_max: break
@@ -243,7 +243,7 @@ class DataStreamer(ABC):
         rb_lib = RawBufferLibrary()
         decoders = self.get_decoder_list()
         if len(decoders) == 0:
-            print(f'No decoders returned by get_decoder_list() for {type(self).__name__}')
+            log.warning(f'no decoders returned by get_decoder_list() for {type(self).__name__}')
             return rb_lib
         for decoder in decoders:
             dec_name = type(decoder).__name__

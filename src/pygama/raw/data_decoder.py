@@ -26,7 +26,7 @@ class DataDecoder(ABC):
     DataDecoder and define how data gets formatted into lgdo's
 
     Subclasses should define a method for decoding data to a buffer like
-    decode_packet(packet, raw_buffer_list, packet_id, verbosity=0)
+    decode_packet(packet, raw_buffer_list, packet_id)
     This function should return the number of bytes read
 
     Garbage collection writes binary data as an array of uint32s to a
@@ -66,9 +66,8 @@ class DataDecoder(ABC):
         """
         if key is None:
             return self.decoded_values if hasattr(self, 'decoded_values') else None
-        name = type(self).__name__
-        print("You need to implement key-specific get_decoded_values for", name)
-        return None
+
+        raise NotImplementedError("you need to implement key-specific get_decoded_values for", type(self).__name__)
 
 
     def make_lgdo(self, key=None, size=None):
@@ -94,9 +93,7 @@ class DataDecoder(ABC):
         """
 
         if not hasattr(self, 'decoded_values'):
-            name = type(self).__name__
-            print(name, 'Error: no decoded_values available for setting up table')
-            return None
+            raise AttributeError(type(self).__name__, ':no decoded_values available for setting up table')
 
         data_obj = lgdo.Table(size=size)
         dec_vals = self.get_decoded_values(key)
@@ -107,9 +104,8 @@ class DataDecoder(ABC):
 
             # get the dtype
             if 'dtype' not in attrs:
-                name = type(self).__name__
-                print(name, 'Error: must specify dtype for', field)
-                continue
+                raise AttributeError(type(self).__name__, ': must specify dtype for', field)
+
             dtype = attrs.pop('dtype')
 
             # no datatype: just a "normal" array
@@ -158,8 +154,8 @@ class DataDecoder(ABC):
                 continue
 
             # if we get here, got a bad datatype
-            name = type(self).__name__
-            print(name, 'Error: do not know how to make a', datatype, 'for', field)
+            raise RuntimeError(type(self).__name__, ': do not know how to make a', datatype, 'for', field)
+
         return data_obj
 
 
