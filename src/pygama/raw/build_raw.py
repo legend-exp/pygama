@@ -188,6 +188,8 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         write_to_lh5_and_clear(chunk_list, lh5_store)
         if n_max <= 0: break
 
+    streamer.close_stream()
+
     # --------- summary ------------
 
     if verbosity > 0:
