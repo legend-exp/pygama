@@ -69,7 +69,7 @@ class FCStatusDecoder(DataDecoder):
 
 
 
-    def decode_packet(self, fcio, status_rb, packet_id, verbosity=0):
+    def decode_packet(self, fcio, status_rb, packet_id):
         """
         access FC status (temp., log, ...)
         """

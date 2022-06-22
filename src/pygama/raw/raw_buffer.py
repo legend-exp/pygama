@@ -347,7 +347,7 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             info['out_stream'] = os.path.expandvars(info['out_stream'])
 
 
-def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbosity=0):
+def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append'):
     """Write a list of RawBuffers to lh5 files and then clears them
 
     Parameters
@@ -360,8 +360,6 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
         files (saves some time opening / closing files)
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
-    verbosity : bool
-        print debug messages
     """
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
@@ -377,6 +375,6 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
         # write if requested...
         if filename != '':
             lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
-                                   n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+                                   n_rows=rb.loc, wo_mode=wo_mode)
         # and clear
         rb.loc = 0
