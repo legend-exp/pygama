@@ -1,11 +1,12 @@
-import sys
 import argparse
-import numpy as np
 import logging
+import sys
+
+import numpy as np
 
 import pygama
-from pygama.raw import build_raw
 from pygama.dsp import build_dsp
+from pygama.raw import build_raw
 
 
 def pygama_cli():
