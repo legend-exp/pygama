@@ -79,14 +79,18 @@ class OrcaStreamer(DataStreamer):
 
 
     def close_in_stream(self):
+        if self.in_stream is None:
+            raise RuntimeWarning("tried to close an unopened stream")
         self.in_stream.close()
         self.in_stream = None
 
+    def close_stream(self): self.close_in_stream()
 
     def is_orca_stream(stream_name): # static function
         orca = OrcaStreamer()
         orca.set_in_stream(stream_name)
         first_bytes = orca.in_stream.read(12)
+        orca.close_in_stream()
 
         # that read should have succeeded
         if len(first_bytes) != 12: return False
