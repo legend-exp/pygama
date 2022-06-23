@@ -61,6 +61,7 @@ keys.
 later: could initially make field "lgdo" a dict of args for lgdo.__init__(),
 e.g. to have object-specific buffer sizes
 """
+from __future__ import annotations
 
 import os
 
@@ -69,10 +70,11 @@ from pygama import lgdo
 
 class RawBuffer:
     """
-    A RawBuffer is in essence a an lgdo object (typically a Table) to which
-    decoded data will be written, along with some meta-data distinguishing
-    what data goes into it, and where the lgdo gets written out. Also holds on
-    to the current location in the buffer for writing.
+    A :class:`RawBuffer` is in essence a an lgdo object (typically a
+    :class:`~.lgdo.table.Table`) to which decoded data will be written, along
+    with some meta-data distinguishing what data goes into it, and where the
+    lgdo gets written out. Also holds on to the current location in the buffer
+    for writing.
 
     Attributes
     ----------
@@ -95,7 +97,7 @@ class RawBuffer:
     """
 
 
-    def __init__(self, lgdo=None, key_list=[], out_stream='', out_name=''):
+    def __init__(self, lgdo=None, key_list: list = [], out_stream: str = '', out_name: str = ''):
         self.lgdo = lgdo
         self.key_list = key_list
         self.out_stream = out_stream
@@ -110,7 +112,7 @@ class RawBuffer:
         return len(self.lgdo)
 
 
-    def is_full(self):
+    def is_full(self) -> bool:
         return (len(self) - self.loc) < self.fill_safety
 
 
@@ -121,21 +123,20 @@ class RawBuffer:
     def __repr__(self): return str(self)
 
 
-
 class RawBufferList(list):
-    """
-    A RawBufferList holds a collection of RawBuffers of identical structure
-    (same format lgdo's with the same fields).
+    r"""A :class:`.RawBufferList` holds a collection of :class:`.RawBuffer`\ s
+    of identical structure (same format lgdo's with the same fields).
     """
     def __init__(self):
         self.keyed_dict = None
 
 
-    def get_keyed_dict(self):
-        """ returns a dict of RawBuffers built from the buffers' key_lists
+    def get_keyed_dict(self) -> dict:
+        """Returns a dictionary of :class:`.RawBuffer`\ s built from the
+        buffers' ``key_lists``.
 
-        Different keys may point to the same buffer. Requires the buffers in the
-        RawBufferList to have non-overlapping key lists.
+        Different keys may point to the same buffer. Requires the buffers in
+        the :class:`.RawBufferList` to have non-overlapping key lists.
         """
         if self.keyed_dict is None:
             self.keyed_dict = {}
@@ -144,12 +145,11 @@ class RawBufferList(list):
         return self.keyed_dict
 
 
-    def set_from_json_dict(self, json_dict, kw_dict={}):
-        """set up a RawBufferList from a dict written in json shorthand
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict = {}) -> None:
+        """Set up a :class:`.RawBufferList` from a dictionary written in JSON
+        shorthand. See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
 
-        See RawBufferLibrary.set_from_json_dict() for details
-
-        Note: ``json_dict`` is changed by this function
+        .. note:: ``json_dict`` is changed by this function
         """
         expand_rblist_json_dict(json_dict, kw_dict)
         for name in json_dict:
@@ -164,9 +164,8 @@ class RawBufferList(list):
             self.append(rb);
 
 
-    def get_list_of(self, attribute):
-        """
-        Return a list of values of RawBuffer.attribute
+    def get_list_of(self, attribute: str) -> list:
+        """Return a list of values of :class:`.RawBuffer` attributes.
 
         Parameters
         ----------
@@ -195,17 +194,17 @@ class RawBufferList(list):
 
 
 class RawBufferLibrary(dict):
+    r"""A :class:`.RawBufferLibrary` is a collection of
+    :class:`.RawBufferList`\ s associated with the names of decoders that can
+    write to them.
     """
-    A RawBufferLibrary is a collection of RawBufferLists associated with the
-    names of decoders that can write to them
-    """
-    def __init__(self, json_dict=None, kw_dict={}):
+    def __init__(self, json_dict: dict = None, kw_dict: dict = {}):
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
-
-    def set_from_json_dict(self, json_dict, kw_dict={}):
-        """ set up a RawBufferLibrary from a dict written in json shorthand
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict = {}) -> None:
+        r"""Set up a :class:`.RawBufferLibrary` from a dictionary written in
+        JSON shorthand.
 
         Basic structure:
 
@@ -220,30 +219,32 @@ class RawBufferLibrary(dict):
               }
             }
 
-        By default "name" is used for the RawBuffer's "out_name" attribute, but
-        this can be overridden if desired by providing an explicit "out_name"
+        By default ``name`` is used for the :class:`RawBuffer`\ 's ``out_name``
+        attribute, but this can be overridden if desired by providing an
+        explicit ``out_name``.
 
         Allowed shorthands, in order of expansion:
 
-        * key_list may have entries that are 2-integer lists corresponding to
-          the first and last integer keys in a contiguous range (e.g. of
+        * ``key_list`` may have entries that are 2-integer lists corresponding
+          to the first and last integer keys in a contiguous range (e.g. of
           channels) that get stored to the same buffer. These simply get
-          replaced with the explicit list of integers in the range. We use lists
-          not tuples for json compliance.
-        * The "name" can include {key:xxx} format specifiers, indicating that
-          each key in key_list should be given its own buffer with the
-          corresponding name.  The same specifier can appear in out_path to
+          replaced with the explicit list of integers in the range. We use
+          lists not tuples for JSON compliance.
+        * The ``name`` can include ``{key:xxx}`` format specifiers, indicating
+          that each key in ``key_list`` should be given its own buffer with the
+          corresponding name.  The same specifier can appear in ``out_path`` to
           write the key's data to its own output path.
-        * You may also include keywords in your out_stream and out_name
-          specification whose values get sent in via kwdict These get evaluated
-          simultaneously with the {key:xxx} specifiers.
-        * Environment variables can also be used in out_stream. They get
-          expanded after kw_dict is handled and thus can be used inside kw_dict
-        * list_name can use the wildcard "*" to match any other list_name known
-          to a streamer
-        * out_stream and out_name can also include {name}, to be replaced with
-          the buffer's "name". In the case of list_name="*", {name} evaluates to
-          list_name
+        * You may also include keywords in your ``out_stream`` and ``out_name``
+          specification whose values get sent in via ``kwdict``. These get
+          evaluated simultaneously with the ``{key:xxx}`` specifiers.
+        * Environment variables can also be used in ``out_stream``. They get
+          expanded after ``kw_dict`` is handled and thus can be used inside
+          ``kw_dict``
+        * ``list_name`` can use the wildcard ``*`` to match any other
+          ``list_name`` known to a streamer
+        * ``out_stream`` and ``out_name`` can also include ``{name}``, to be
+          replaced with the buffer's ``name``. In the case of
+          ``list_name="*"``, ``{name}`` evaluates to ``list_name``
 
         Parameters
         ----------
@@ -258,10 +259,8 @@ class RawBufferLibrary(dict):
             if list_name not in self: self[list_name] = RawBufferList()
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
 
-
-    def get_list_of(self, attribute, unique=True):
-        """
-        Return a list of values of RawBuffer.attribute
+    def get_list_of(self, attribute: str, unique: bool = True) -> list:
+        """Return a list of values of :class:`.RawBuffer` attributes
 
         Parameters
         ----------
@@ -285,17 +284,17 @@ class RawBufferLibrary(dict):
         if unique: values = list(set(values))
         return values
 
-    def clear_full(self):
+    def clear_full(self) -> None:
         for rb_list in self.values(): rb_list.clear_full()
 
 
+def expand_rblist_json_dict(json_dict: dict, kw_dict: dict) -> None:
+    """Expand shorthands in a JSON dictionary representing a
+    :class:`.RawBufferList`
 
-def expand_rblist_json_dict(json_dict, kw_dict):
-    """Expand shorthands in json_dict representing a RawBufferList
+    See :meth:`.RawBufferLibrary.set_from_json_dict` for details
 
-    See RawBufferLibrary.set_from_json_dict() for details
-
-    Note: json_dict is changed by this function
+    Note: The input JSON dictionary is changed by this function
     """
     # get the original list of groups because we are going to change the
     # dict.keys() of json_dict inside the next list. Note: we have to convert
@@ -347,8 +346,10 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             info['out_stream'] = os.path.expandvars(info['out_stream'])
 
 
-def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append'):
-    """Write a list of RawBuffers to lh5 files and then clears them
+def write_to_lh5_and_clear(raw_buffers: list[RawBuffer], lh5_store: LH5Store = None,
+                           wo_mode: str = 'append') -> None:
+    r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
+    them.
 
     Parameters
     ----------

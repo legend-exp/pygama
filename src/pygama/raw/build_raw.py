@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import glob
 import json
 import logging
@@ -17,8 +19,9 @@ from .raw_buffer import RawBufferLibrary, write_to_lh5_and_clear
 log = logging.getLogger(__name__)
 
 
-def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
-              n_max=np.inf, overwrite=True, **kwargs):
+def build_raw(in_stream: int, in_stream_type: str = None,
+              out_spec: str | dict | RawBufferLibrary = None, buffer_size: int = 8192,
+              n_max: int = np.inf, overwrite: bool = True, **kwargs) -> None:
     """Convert data into LEGEND HDF5 "raw" format.
 
     Takes an input stream of a given type and writes to output file(s)
