@@ -100,7 +100,7 @@ class VectorOfVectors:
         start = 0 if i_vec == 0 else self.cumulative_length.nda[i_vec-1]
         end = start + len(nda)
         while end >= len(self.flattened_data.nda):
-            self.flattened_data.nda.resize(2*len(self.flattened_data.nda))
+            self.flattened_data.nda.resize(2*len(self.flattened_data.nda), refcheck=True)
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
 
