@@ -76,8 +76,8 @@ class OrcaHeader(dict):
     def get_readout_info(self, orca_class_name, unique_id=-1):
         """
         returns a list with all the readout list info from the header with name
-        orca_class_name.  optionally, if unique_id >= 0 only return the list for
-        that Orca unique id number.
+        orca_class_name.  optionally, if unique_id >= 0 only return the
+        readout info for that Orca unique id number.
         """
         readout_info_list = []
         try:
@@ -85,8 +85,7 @@ class OrcaHeader(dict):
             for readout in readouts:
                 try:
                     if readout["name"] == orca_class_name:
-                        if unique_id >= 0:
-                            if obj["uniqueID"] != unique_id: continue
+                        if unique_id >= 0 and obj["uniqueID"] == unique_id: return readout
                         readout_info_list.append(readout)
                 except KeyError: continue
         except KeyError: pass
@@ -108,8 +107,7 @@ class OrcaHeader(dict):
             for obj in objs:
                 try:
                     if obj["Class Name"] == orca_class_name:
-                        if unique_id >= 0:
-                            if obj["uniqueID"] != unique_id: continue
+                        if unique_id >= 0 and obj["uniqueID"] == unique_id: return obj
                         auxhw_info_list.append(obj)
                 except KeyError: continue
         except KeyError: pass
