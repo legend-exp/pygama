@@ -1,5 +1,6 @@
 import gzip
 import json
+import logging
 
 import numpy as np
 
@@ -8,6 +9,8 @@ from ..raw_buffer import RawBuffer
 from . import orca_packet
 from .orca_flashcam import ORFlashCamADCWaveformDecoder, ORFlashCamListenerConfigDecoder
 from .orca_header_decoder import OrcaHeaderDecoder
+
+log = logging.getLogger(__name__)
 
 
 class OrcaStreamer(DataStreamer):
@@ -128,7 +131,7 @@ class OrcaStreamer(DataStreamer):
 
 
     def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
-                    chunk_mode='any_full', out_stream='', verbosity=0):
+                    chunk_mode='any_full', out_stream=''):
         """ Initialize the ORCA data stream
 
         Parameters
@@ -144,8 +147,6 @@ class OrcaStreamer(DataStreamer):
             sets the mode use for read_chunk
         out_stream : str
             optional name of output stream for default rb_lib generation
-        verbosity : int
-            verbosity level for the initialize function
 
         Returns
         -------
@@ -161,7 +162,7 @@ class OrcaStreamer(DataStreamer):
             print(f'Error: got data id {orca_packet.get_data_id(packet)} for header')
             return []
         self.packet_id = 0
-        self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id, verbosity=verbosity)
+        self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id)
         self.header = self.header_decoder.header
 
         # instantiate decoders listed in the header AND in the rb_lib (if specified)
@@ -198,7 +199,7 @@ class OrcaStreamer(DataStreamer):
         for name in self.rb_lib.keys():
             data_id = self.decoder_name_dict[name]
             self.rbl_id_dict[data_id] = self.rb_lib[name]
-        if verbosity > 2: print(f"rb_lib = {self.rb_lib}")
+        log.debug(f"rb_lib = {self.rb_lib}")
 
         # return header raw buffer
         if 'OrcaHeaderDecoder' in rb_lib:
@@ -212,7 +213,7 @@ class OrcaStreamer(DataStreamer):
         return [rb]
 
 
-    def read_packet(self, verbosity=0):
+    def read_packet(self):
         """ Read a packet of data.
 
         Data written to self.rb_lib.
@@ -225,13 +226,13 @@ class OrcaStreamer(DataStreamer):
 
             # look up the data id, decoder, and rbl
             data_id = orca_packet.get_data_id(packet, shift=False)
-            if verbosity>0: print(f'packet {self.packet_id}: data_id = {data_id}')
+            log.debug(f'packet {self.packet_id}: data_id = {data_id}')
             if data_id in self.decoder_id_dict: break
 
         # now decode
         decoder = self.decoder_id_dict[data_id]
         rbl = self.rbl_id_dict[data_id]
-        self.any_full |= decoder.decode_packet(packet, self.packet_id, rbl, verbosity=verbosity)
+        self.any_full |= decoder.decode_packet(packet, self.packet_id, rbl)
         return True
 
         '''
