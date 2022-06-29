@@ -128,7 +128,13 @@ class DataStreamer(ABC):
             if dec_name not in dec_names:
                 log.warning("no decoder named {dec_name} requested by rb_lib")
 
+    def close_stream(self):
+        """Close this data stream.
 
+        .. note::
+            Needs to be overloaded.
+        """
+        pass
 
     def read_packet(self) -> bool:
         """Reads a single packet's worth of data in to the
@@ -145,7 +151,7 @@ class DataStreamer(ABC):
         """
         return True
 
-    def read_chunk(self, chunk_mode_override: str = None, rp_max : int = 1000000,
+    def read_chunk(self, chunk_mode_override: str = None, rp_max: int = 1000000,
                    clear_full_buffers: bool = True) -> tuple[list[RawBuffer], int]:
         """Reads a chunk of data into raw buffers
 

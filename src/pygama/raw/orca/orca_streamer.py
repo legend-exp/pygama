@@ -79,14 +79,18 @@ class OrcaStreamer(DataStreamer):
 
 
     def close_in_stream(self):
+        if self.in_stream is None:
+            raise RuntimeWarning("tried to close an unopened stream")
         self.in_stream.close()
         self.in_stream = None
 
+    def close_stream(self): self.close_in_stream()
 
     def is_orca_stream(stream_name): # static function
         orca = OrcaStreamer()
         orca.set_in_stream(stream_name)
         first_bytes = orca.in_stream.read(12)
+        orca.close_in_stream()
 
         # that read should have succeeded
         if len(first_bytes) != 12: return False
@@ -189,7 +193,7 @@ class OrcaStreamer(DataStreamer):
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(stream_name, rb_lib, buffer_size=buffer_size,
-                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
+                            chunk_mode=chunk_mode, out_stream=out_stream)
         if rb_lib is None: rb_lib = self.rb_lib
         for name in self.rb_lib.keys():
             data_id = self.decoder_name_dict[name]
