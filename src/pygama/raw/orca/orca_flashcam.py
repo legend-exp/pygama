@@ -1,10 +1,21 @@
 import copy
 import gc
+import logging
 
 import numpy as np
 
 from ..fc.fc_event_decoder import fc_decoded_values
-from .orca_base import OrcaDecoder, get_ccc
+from .orca_base import OrcaDecoder
+
+log = logging.getLogger(__name__)
+
+
+def get_key(fcid, ch): return (fcid-1)*1000 + ch
+
+def get_fcid(key): return int(np.floor(key/1000))+1
+
+def get_ch(key): return key % 1000
+
 
 
 class ORFlashCamListenerConfigDecoder(OrcaDecoder):
@@ -19,7 +30,7 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         # for similicity.  append any additional values after this.
         self.decoded_values = {
             'readout_id':   { 'dtype': 'uint16', },
-            'listener_id':  { 'dtype': 'uint16', },
+            'fcid':         { 'dtype': 'uint16', },
             'telid':        { 'dtype': 'int32',  },
             'nadcs':        { 'dtype': 'int32',  },
             'ntriggers':    { 'dtype': 'int32',  },
@@ -47,7 +58,7 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         return self.decoded_values
 
 
-    def decode_packet(self, packet, packet_id, rbl, verbosity=0):
+    def decode_packet(self, packet, packet_id, rbl):
         if len(rbl) != 1:
             print(f"FC config decoder: got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
         rb = rbl[0]
@@ -56,7 +67,7 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
 
         int_packet = packet.astype(np.int32)
         tbl['readout_id'].nda[ii]  = (int_packet[1] & 0xffff0000) >> 16
-        tbl['listener_id'].nda[ii] =  int_packet[1] & 0x0000ffff
+        tbl['fcid'].nda[ii] =  int_packet[1] & 0x0000ffff
 
         for i,k in enumerate(self.decoded_values):
             if i < 2: continue
@@ -73,11 +84,13 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         for obj in gc.get_objects():
             if isinstance(obj, ORFlashCamADCWaveformDecoder): objs.append(obj)
         if len(objs) != 1:
-            print(f'Warning: Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
-        else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['listener_id'].nda[ii])
+            log.warning(f'Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
+        else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['fcid'].nda[ii])
 
         rb.loc += 1
         return rb.is_full()
+
+
 
 class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     """
@@ -238,8 +251,7 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     #     return 1
 
 
-    # def decode_packet(self, packet, lh5_tables,
-    #                   packet_id, header_dict, verbose=False):
+    # def decode_packet(self, packet, lh5_tables, packet_id, header_dict):
 
     #     data = np.frombuffer(packet, dtype=np.uint32)
     #     tbl  = lh5_tables
@@ -312,10 +324,11 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             'crate' :   { 'dtype': 'uint8',  },
             'card' :    { 'dtype': 'uint8',  },
             'ch_orca' : { 'dtype': 'uint8',  },
-            'fcio_id' : { 'dtype': 'uint16', }
+            'fcid' :    { 'dtype': 'uint8',  },
         } )
-        self.decoded_values = {}
-        self.lid_to_ccc_dict = {}
+        self.decoded_values = {} # dict[fcid]
+        self.fcid = {} # dict[crate][card]
+        self.nadc = {} # dict[fcid]
         super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
 
@@ -323,77 +336,59 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
     def set_header(self, header):
         self.header = header
 
-        # get the readout list for looking up the waveform length.
-        # catch AttributeError for when the header is not yet set.
-        object_info = header.get_object_info('ORFlashCamADCModel')
-        rol = []
-        try: rol=header.get_readout_info('ORFlashCamListenerModel')
-        except AttributeError: pass
+        # set up decoded values, key list, fcid map, etc. based on header info
+        fc_listener_info = header.get_readout_info('ORFlashCamListenerModel')
+        for info in fc_listener_info:
+            fcid = info['uniqueID']
+            # we are going to subtract 1 from fcid for the keys, so it better start from 1
+            if fcid == 0: raise ValueError("got fcid=0 unexpectedly!")
 
-        for card_dict in object_info:
-            crate   = card_dict['Crate']
-            card    = card_dict['Card']
-            enabled = card_dict['Enabled']
-            # find the listener id for this card from the readout list
-            listener = -1
-            for ro in rol:
-                try:
-                    for obj in ro['children']:
-                        if obj['crate']   == crate and obj['station'] == card:
-                            listener = ro['uniqueID']
-                            break
-                except KeyError: pass
-            # with the listener id, find the event samples for that listener
-            samples = 0
-            if listener >= 0:
-                aux = header.get_auxhw_info('ORFlashCamListenerModel', listener)
-                for info in aux:
-                    try: samples = max(samples, info['eventSamples'])
-                    except KeyError: continue
-            # for each enabled channel, set the decoded values and wf length
-            for channel in range(len(enabled)):
-                if not enabled[channel]: continue
-                ccc = get_ccc(crate, card, channel)
-                if listener not in self.lid_to_ccc_dict: self.lid_to_ccc_dict[listener] = []
-                self.lid_to_ccc_dict[listener].append(ccc)
-                if samples > 0:
-                    self.decoded_values[ccc] = copy.deepcopy(self.decoded_values_template)
-                    self.decoded_values[ccc]['waveform']['wf_len'] = samples
+            self.nadc[fcid] = 0
+            for child in info['children']:
+                # load self.fcid
+                crate = child['crate']
+                if crate not in self.fcid: self.fcid[crate] = {}
+                card = child['station']
+                self.fcid[crate][card] = fcid
+
+                # load self.nadc
+                card_info = header['ObjectInfo']['Crates'][crate]['Cards'][card]
+                self.nadc[fcid] += np.count_nonzero(card_info['Enabled'])
+
+            # we are going to shift by 1000 for each fcid, so we better not have that many adcs!
+            if self.nadc[fcid] > 1000: raise ValueError(f"got too many adc's! ({nadc})")
+
+            # get the wf len for this fcid and set up decoded_values
+            wf_len = header.get_auxhw_info('ORFlashCamListenerModel', fcid)['eventSamples']
+            self.decoded_values[fcid] = copy.deepcopy(self.decoded_values_template)
+            self.decoded_values[fcid]['waveform']['wf_len'] = wf_len
 
 
     def get_key_list(self):
-        return list(self.decoded_values.keys())
+        key_list = []
+        for fcid, nadc in self.nadc.items():
+            key_list += list( get_key(fcid, np.array(range(nadc))) )
+        return key_list
 
 
     def get_decoded_values(self, key=None):
         if key is None:
-            dec_vals_list = self.decoded_values.items()
-            if len(dec_vals_list) == 0:
-                print('ORFlashCamADCWaveformDecoder: error - decoded_values not built')
-                return None
-            return list(dec_vals_list)[0][1] # return first thing found
-        if key in self.decoded_values: return self.decoded_values[key]
-        print('ORFlashCamADCWaveformDecoder: error - '
-              'no decoded values for channel ', key)
-        return None
+            dec_vals_list = self.decoded_values.values()
+            if len(dec_vals_list) >= 0: return dec_vals_list[0]
+            raise RuntimeError('decoded_values not built')
+        fcid = get_fcid(key)
+        if fcid in self.decoded_values: return self.decoded_values[fcid]
+        raise KeyError(f'no decoded values for key {key} (fcid {fcid})')
 
 
-    def assert_nsamples(self, nsamples, listener_id):
-        if listener_id not in self.lid_to_ccc_dict:
-            print(f"Warning: listener_id {listener_id} not in lid_to_ccc_dict!  dict = {lid_to_ccc_dict}")
-            return
-        reported_cc = []
-        for ccc in self.lid_to_ccc_dict[listener_id]:
-            orca_nsamples = self.decoded_values[ccc]['waveform']['wf_len']
-            if orca_nsamples != nsamples:
-                cc = ccc >> 4
-                if cc not in reported_cc:
-                    print(f"Warning: orca miscalc'd nsamples = {orca_nsamples} for crate {cc >> 5} card {cc & 0x1f}, updating to {nsamples}")
-                    reported_cc.append(cc)
-                self.decoded_values[ccc]['waveform']['wf_len'] = nsamples
+    def assert_nsamples(self, nsamples, fcid):
+        orca_nsamples = self.decoded_values[fcid]['waveform']['wf_len']
+        if orca_nsamples != nsamples:
+            log.warning(f"orca miscalculated nsamples = {orca_nsamples} for fcid {fcid}, updating to {nsamples}")
+            self.decoded_values[fcid]['waveform']['wf_len'] = nsamples
 
 
-    def decode_packet(self, packet, packet_id, rbl, verbosity=0):
+    def decode_packet(self, packet, packet_id, rbl):
         ''' decode the orca FC ADC packet '''
         evt_rbkd = rbl.get_keyed_dict()
 
@@ -403,18 +398,19 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         wf_samples         = (packet[1] & 0x003fffc0) >> 6
         crate              = (packet[2] & 0xf8000000) >> 27
         card               = (packet[2] & 0x07c00000) >> 22
-        channel            = (packet[2] & 0x00003c00) >> 10
-        fcio_id            =  packet[2] & 0x000003ff
-        ccc = get_ccc(crate, card, channel)
+        fcid = self.fcid[crate][card]
+        ch_orca            = (packet[2] & 0x00003c00) >> 10
+        channel            =  packet[2] & 0x000003ff
+        key = get_key(fcid, channel)
 
         # get the table for this crate/card/channel
-        if ccc not in evt_rbkd:
-            if ccc not in self.skipped_channels:
-                self.skipped_channels[ccc] = 0
-            self.skipped_channels[ccc] += 1
+        if key not in evt_rbkd:
+            if key not in self.skipped_channels:
+                self.skipped_channels[key] = 0
+            self.skipped_channels[key] += 1
             return False
-        tbl = evt_rbkd[ccc].lgdo
-        ii = evt_rbkd[ccc].loc
+        tbl = evt_rbkd[key].lgdo
+        ii = evt_rbkd[key].loc
 
         # check that the waveform length is as expected
         rb_wf_len = tbl['waveform']['values'].nda.shape[1]
@@ -422,16 +418,16 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             if not hasattr(self, 'wf_len_errs'): self.wf_len_errs = {}
             # if dec_vals has been updated, orca miscalc'd and a warning has
             # already been emitted.  Otherwise, emit a new warning.
-            if wf_samples != self.decoded_values[ccc]['waveform']['wf_len']:
-                if ccc not in self.wf_len_errs:
-                    print(f'ORCAFlashCamADCWaveformDecoder Warning: waveform from ccc {ccc} of length {wf_samples} with expected length {rb_wf_len}')
-                    self.wf_len_errs[ccc] = True
+            if wf_samples != self.decoded_values[fcid]['waveform']['wf_len']:
+                if fcid not in self.wf_len_errs:
+                    log.warning(f'got waveform from fcid {fcid} of length {wf_samples} with expected length {rb_wf_len}')
+                    self.wf_len_errs[fcid] = True
             # Now resize buffer only if it is still empty.
             # Otherwise emit a warning and keep the smaller length
             if ii != 0:
-                if ccc not in self.wf_len_errs:
-                    print(f'ORCAFlashCamADCWaveformDecoder Warning: tried to resize buffer according to config record but it was not empty!')
-                    self.wf_len_errs[ccc] = True
+                if fcid not in self.wf_len_errs:
+                    log.warning(f'tried to resize buffer according to config record but it was not empty!')
+                    self.wf_len_errs[fcid] = True
                 if wf_samples > rb_wf_len: wf_samples = rb_wf_len
             else: tbl['waveform'].resize_wf_len(wf_samples)
 
@@ -439,8 +435,9 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         tbl['packet_id'].nda[ii] = packet_id
         tbl['crate'].nda[ii]     = crate
         tbl['card'].nda[ii]      = card
+        tbl['ch_orca'].nda[ii]   = ch_orca
         tbl['channel'].nda[ii]   = channel
-        tbl['fcio_id'].nda[ii]   = fcio_id
+        tbl['fcid'].nda[ii]      = fcid
         tbl['numtraces'].nda[ii] = 1
 
         # set the time offsets
@@ -484,5 +481,5 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
 
         tbl['waveform']['values'].nda[ii][:wf_samples] = wf
 
-        evt_rbkd[ccc].loc += 1
-        return evt_rbkd[ccc].is_full()
+        evt_rbkd[key].loc += 1
+        return evt_rbkd[key].is_full()

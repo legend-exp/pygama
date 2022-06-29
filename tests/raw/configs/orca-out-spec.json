@@ -1,0 +1,8 @@
+{
+    "ORFlashCamADCWaveformDecoder": {
+        "geds": {
+            "key_list": [[0, 3]],
+            "out_stream": "/tmp/L200-comm-20220519-phy-geds.lh5"
+        }
+    }
+}
