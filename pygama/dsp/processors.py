@@ -82,3 +82,4 @@ from ._processors.multi_t_filter import multi_t_filter, remove_duplicates
 from ._processors.multi_a_filter import multi_a_filter
 from ._processors.Wiener_filter import Wiener_filter
 from ._processors.pulse_injector import inject_sig_pulse,inject_exp_pulse
+from ._processors.upsampler import upsampler
