@@ -1,8 +1,8 @@
 r"""
-:mod:`.raw_buffer` manages data buffering for raw data conversion
+Manage data buffering for raw data conversion.
 
-Manages LGDO buffers and their corresponding output streams. Allows for
-one-to-many mapping of input sreams to output streams.
+This module manages LGDO buffers and their corresponding output streams. Allows
+for one-to-many mapping of input sreams to output streams.
 
 Primary Classes
 ---------------
@@ -57,9 +57,6 @@ keys.
         }
       }
     }
-
-later: could initially make field "lgdo" a dict of args for lgdo.__init__(),
-e.g. to have object-specific buffer sizes
 """
 from __future__ import annotations
 
@@ -69,7 +66,8 @@ from pygama import lgdo
 
 
 class RawBuffer:
-    """
+    """Base class to represent a buffer of raw data.
+
     A :class:`RawBuffer` is in essence a an lgdo object (typically a
     :class:`~.lgdo.table.Table`) to which decoded data will be written, along
     with some meta-data distinguishing what data goes into it, and where the
@@ -132,7 +130,7 @@ class RawBufferList(list):
 
 
     def get_keyed_dict(self) -> dict:
-        """Returns a dictionary of :class:`.RawBuffer`\ s built from the
+        r"""Returns a dictionary of :class:`.RawBuffer`\ s built from the
         buffers' ``key_lists``.
 
         Different keys may point to the same buffer. Requires the buffers in

@@ -1,5 +1,5 @@
 """
-The primary function for data conversion into raw lh5 files is
+The primary function for data conversion into raw LH5 files is
 :func:`.build_raw`. This is a one-to many function: one input DAQ file can
 generate one or more output raw files. Control of which data ends up in which
 files, and in which HDF5 groups inside of each file, is controlled via

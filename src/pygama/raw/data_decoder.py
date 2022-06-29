@@ -1,9 +1,11 @@
 """
-Base classes for decoding data into raw lgdo Tables or files
+Base classes for decoding data into raw LGDO Tables or files
 """
 from __future__ import annotations
-from typing import Any
+
 from abc import ABC
+from typing import Any
+
 import numpy as np
 
 from pygama import lgdo
@@ -23,7 +25,7 @@ class DataDecoder(ABC):
 
     Some decoders (like for file headers) do not need to push to a table, so they
     do not need ``decoded_values``. Such classes should still derive from
-    :class:`DataDecoder` and define how data gets formatted into lgdo's
+    :class:`DataDecoder` and define how data gets formatted into LGDO's
 
     Subclasses should define a method for decoding data to a buffer like
     ``decode_packet(packet, raw_buffer_list, packet_id)``.
@@ -36,7 +38,7 @@ class DataDecoder(ABC):
     """
     def __init__(self, garbage_length: int = 256, packet_size_guess: int = 1024):
         self.garbage_table = lgdo.Table(garbage_length)
-        shape_guess=(garbage_length, packet_size_guess)
+        shape_guess = (garbage_length, packet_size_guess)
         self.garbage_table.add_field('packets',
                                      lgdo.VectorOfVectors(shape_guess=shape_guess, dtype='uint8'))
         self.garbage_table.add_field('packet_id',
@@ -46,53 +48,49 @@ class DataDecoder(ABC):
         self.garbage_table.add_field('garbage_code',
                                      lgdo.Array(shape=garbage_length, dtype='uint32'))
 
-
     def get_key_list(self) -> list:
         """Overload with list of keys for this decoder, e.g. ``return
         range(n_channels)``.  The default version works for decoders with
-        single / no keys """
+        single / no keys"""
         return [None]
 
-
     def get_decoded_values(self, key: Any = None):
-        """Get decoded values (optionally for a given key, typically a channel)
-
-        Must overload for your decoder if it has key-specific decoded
-        values.
+        """Get decoded values (optionally for a given key, typically a channel).
 
         .. note::
-            Must implement ``key = None`` returns a "default" ``decoded_values``
-
-        Otherwise, just returns :attr:`self.decoded_values`, which should be defined in
-        the constructor.
+            Must overload for your decoder if it has key-specific decoded
+            values. Must also implement ``key = None`` returns a "default"
+            ``decoded_values``. Otherwise, just returns
+            :attr:`self.decoded_values`, which should be defined in the
+            constructor.
         """
         if key is None:
             return self.decoded_values if hasattr(self, 'decoded_values') else None
 
         raise NotImplementedError("you need to implement key-specific get_decoded_values for", type(self).__name__)
 
-
     def make_lgdo(self, key: Any = None, size: int = None):
-        """Make an lgdo for this :class:`DataDecoder` to fill
+        """Make an LGDO for this :class:`DataDecoder` to fill.
 
         This default version of this function allocates a
         :class:`~.lgdo.table.Table` using the ``decoded_values`` for key. If a
-        different type of lgdo object is required for this decoder, overload
+        different type of LGDO object is required for this decoder, overload
         this function.
 
         Parameters
         ----------
         key : int or str or else
-            used by init_obj to initialize the lgdo for a particular key (e.g.
-            to have different trace lengths for different channels of a piece of
-            hardware). Leave as None if such specialization is not necessary
+            used to initialize the LGDO for a particular key (e.g.  to have
+            different trace lengths for different channels of a piece of
+            hardware). Leave as ``None`` if such specialization is not
+            necessary
         size : int
-            the size to be allocated for the lgdo, if applicable
+            the size to be allocated for the LGDO, if applicable
 
         Returns
         -------
         data_obj : lgdo
-            the newly allocated lgdo
+            the newly allocated LGDO
         """
 
         if not hasattr(self, 'decoded_values'):
@@ -178,7 +176,8 @@ class DataDecoder(ABC):
 
 
     def get_max_rows_in_packet(self) -> int:
-        """Returns the max number of rows that could be read out in a packet
+        """Returns the maximum number of rows that could be read out in a
+        packet.
 
         1 by default, overload as necessary to avoid writing past the ends of
         buffers.

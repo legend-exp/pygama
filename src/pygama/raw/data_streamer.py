@@ -1,7 +1,10 @@
+"""
+Base classes for streaming data.
+"""
 from __future__ import annotations
 
-from abc import ABC
 import logging
+from abc import ABC
 
 from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
 
@@ -9,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 class DataStreamer(ABC):
-    """Base clase for data streams
+    """Base clase for data streams.
 
     Provides a uniform interface for streaming, e.g.:
 
@@ -34,7 +37,7 @@ class DataStreamer(ABC):
     def open_stream(self, stream_name: str, rb_lib: RawBufferLibrary = None,
                     buffer_size: int = 8192, chunk_mode: str = 'any_full',
                     out_stream: str = '') -> tuple[list[RawBuffer], int]:
-        """Open and initialize a data stream
+        """Open and initialize a data stream.
 
         Open the stream, read in the header, set up the buffers.
 
@@ -138,7 +141,7 @@ class DataStreamer(ABC):
 
     def read_packet(self) -> bool:
         """Reads a single packet's worth of data in to the
-        :class:`.RawBufferLibrary`
+        :class:`.RawBufferLibrary`.
 
         Needs to be overloaded. Gets called by :meth:`.read_chunk` Needs to
         update :attr:`self.any_full` if any buffers would possibly over-fill on
@@ -153,7 +156,7 @@ class DataStreamer(ABC):
 
     def read_chunk(self, chunk_mode_override: str = None, rp_max: int = 1000000,
                    clear_full_buffers: bool = True) -> tuple[list[RawBuffer], int]:
-        """Reads a chunk of data into raw buffers
+        """Reads a chunk of data into raw buffers.
 
         Reads packets until at least one buffer is too full to perform another
         read.
@@ -168,12 +171,12 @@ class DataStreamer(ABC):
         Parameters
         ----------
         chunk_mode_override : 'any_full', 'only_full', 'single_packet', or None
-            - None : do not override self.chunk_mode
-            - 'any_full' : returns all raw buffers with data as soon as any one
+            - ``None`` : do not override self.chunk_mode
+            - ``any_full`` : returns all raw buffers with data as soon as any one
               buffer gets full
-            - 'only_full' : returns only those raw buffers that became full (or
+            - ``only_full`` : returns only those raw buffers that became full (or
               nearly full) during the read. This minimizes the number of write calls.
-            - 'single_packet' : returns all raw buffers with data after a single
+            - ``single_packet`` : returns all raw buffers with data after a single
               read is performed. This is useful for streaming data out as soon
               as it is read in (e.g. for diagnostics or in-line analysis)
         rp_max : int
