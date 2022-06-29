@@ -2,6 +2,7 @@ import glob
 import json
 import logging
 import os
+import sys
 import time
 
 import numpy as np
@@ -115,15 +116,17 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     if len(out_files) == 1: log.debug(f'output: {out_files[0]}')
     else:
         log.debug('output:')
-        for out_file in out_files: log.debug(f' - {out_file}')
+        for out_file in out_files: log.debug(f' -> {out_file}')
     log.debug(f'buffer size: {buffer_size}')
-    if n_max < np.inf: log.info(f'maximum number of events: {n_max}')
+    if n_max < np.inf:
+        log.info(f'maximum number of events: {n_max}')
     if log.level <= logging.INFO:
         if n_max < np.inf:
-            progress_bar = tqdm.tqdm(desc='Processing', total=n_max, delay=2, unit='rows')
+            progress_bar = tqdm.tqdm(desc='Processing', total=n_max, delay=2, unit='rows',
+                                     file=sys.stdout)
         else:
             progress_bar = tqdm.tqdm(desc='Processing', total=in_stream_size, delay=2,
-                                     unit='B', unit_scale=True)
+                                     unit='B', unit_scale=True, file=sys.stdout)
 
     # start a timer and a byte counter
     t_start = time.time()
@@ -144,7 +147,9 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         raise NotImplementedError('unknown input stream type {in_stream_type}')
 
     # initialize the stream and read header. Also initializes rb_lib
-    if log.level <= logging.INFO: progress_bar.update(0)
+    if log.level <= logging.INFO:
+        progress_bar.update(0)
+
     out_stream = out_spec if isinstance(out_spec, str) else ''
     header_data = streamer.open_stream(in_stream, rb_lib=rb_lib, buffer_size=buffer_size,
                                        chunk_mode='full_only', out_stream=out_stream)
@@ -184,31 +189,32 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
             if rb.loc > n_max: rb.loc = n_max
             n_max -= rb.loc
             n_read += rb.loc
-        if log.level <= logging.INFO and n_max < np.inf: progress_bar.update(n_read)
+        if log.level <= logging.INFO and n_max < np.inf:
+            progress_bar.update(n_read)
         write_to_lh5_and_clear(chunk_list, lh5_store)
         if n_max <= 0: break
 
     streamer.close_stream()
+    progress_bar.close()
 
     elapsed = time.time() - t_start
     log.info(f"time elapsed: {elapsed:.2f} sec")
     out_files = rb_lib.get_list_of('out_stream')
     if len(out_files) == 1:
-        out_file = out_files[0]
-        colpos = out_file.find(':')
-        if colpos != -1: out_file = out_file[:colpos]
+        out_file = out_files[0].split(':', 1)[0]
         if os.path.exists(out_file):
             file_size = os.stat(out_file).st_size
             log.info(f"output file: {out_file} ({sizeof_fmt(file_size)})")
-        else: log.info(f"output file: {out_file} (not written)")
+        else:
+            log.info(f"output file: {out_file} (not written)")
     else:
         log.info("output files:")
-        for out_file in out_files:
-            colpos = out_file.find(':')
-            if colpos != -1: out_file = out_file[:colpos]
+        unique_outfilenames = set([file.split(':', 1)[0] for file in out_files])
+        for out_file in unique_outfilenames:
             if os.path.exists(out_file):
                 file_size = os.stat(out_file).st_size
-                log.info(f" - {out_file} ({sizeof_fmt(file_size)})")
-            else: log.info(f" - {out_file} (not written)")
+                log.info(f" -> {out_file} ({sizeof_fmt(file_size)})")
+            else:
+                log.info(f" -> {out_file} (not written)")
     log.info(f"total converted: {sizeof_fmt(streamer.n_bytes_read)}")
     log.info(f"conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
