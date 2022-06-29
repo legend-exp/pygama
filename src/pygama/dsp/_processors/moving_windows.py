@@ -7,9 +7,7 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),()->(n)", nopython=True, cache=True)
-
 def moving_window_left(w_in, length, w_out):
-
     '''
     Applies a moving average window to the waveform from the left, assumes that the baseline is at 0.
 
@@ -53,9 +51,7 @@ def moving_window_left(w_in, length, w_out):
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),()->(n)", nopython=True, cache=True)
-
 def moving_window_right(w_in, length, w_out):
-
     '''
     Applies a moving average window to the waveform from the right.
 
@@ -88,7 +84,6 @@ def moving_window_right(w_in, length, w_out):
 
     if (not length >= 0 or not length< len(w_in)):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
-
 
     w_out[-1]= w_in[-1]
     for i in range(1, int(length),1):
@@ -170,9 +165,6 @@ def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),(),(m)", nopython=True, cache=True)
-
-
-
 def avg_current(w_in, length, w_out):
     """
     Calculate the derivative of a WF, averaged across n samples. Dimension of
