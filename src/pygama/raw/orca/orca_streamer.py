@@ -193,7 +193,7 @@ class OrcaStreamer(DataStreamer):
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(stream_name, rb_lib, buffer_size=buffer_size,
-                            chunk_mode=chunk_mode, out_stream=out_stream, verbosity=verbosity)
+                            chunk_mode=chunk_mode, out_stream=out_stream)
         if rb_lib is None: rb_lib = self.rb_lib
         for name in self.rb_lib.keys():
             data_id = self.decoder_name_dict[name]

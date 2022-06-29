@@ -81,7 +81,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
             ext = in_stream.split('/')[-1][i_ext+1:]
             if ext == 'fcio':
                 in_stream_type = 'FlashCam'
-            elif ext == 'gz' and OrcaStreamer.is_orca_stream(in_stream):
+            elif OrcaStreamer.is_orca_stream(in_stream):
                 in_stream_type = 'ORCA'
             else:
                 raise RuntimeError(f'unknown file extension {ext}. Specify in_stream_type')
@@ -115,7 +115,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
     if len(out_files) == 1: log.debug(f'output: {out_files[0]}')
     else:
         log.debug('output:')
-        for out_file in out_files: log.debug(' - {out_file}')
+        for out_file in out_files: log.debug(f' - {out_file}')
     log.debug(f'buffer size: {buffer_size}')
     if n_max < np.inf: log.info(f'maximum number of events: {n_max}')
     if log.level <= logging.INFO:
@@ -200,7 +200,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         if os.path.exists(out_file):
             file_size = os.stat(out_file).st_size
             log.info(f"output file: {out_file} ({sizeof_fmt(file_size)})")
-        else: log.info("output file: {out_file} (not written)")
+        else: log.info(f"output file: {out_file} (not written)")
     else:
         log.info("output files:")
         for out_file in out_files:
