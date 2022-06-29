@@ -89,7 +89,7 @@ def test_build_raw_orca_out_spec(lgnd_test_data):
     out_spec = {
       'ORFlashCamADCWaveformDecoder': {
         'geds': {
-          'key_list': [[0, 5]],
+          'key_list': [[2, 4]],
           'out_stream': out_file
         }
       }
@@ -101,7 +101,7 @@ def test_build_raw_orca_out_spec(lgnd_test_data):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object('/geds', out_file)
     assert n_rows == 10
-    # assert (lh5_obj['channel'].nda == [2, 3, 4, 2, 3, 4, 2, 3, 4, 2]).all()
+    assert (lh5_obj['channel'].nda == [2, 3, 4, 2, 3, 4, 2, 3, 4, 2]).all()
 
     raw.build_raw(in_stream=lgnd_test_data.get_path('orca/fc/L200-comm-20220519-phy-geds.orca'),
                   out_spec=f'{config_dir}/orca-out-spec.json', n_max=10)
