@@ -1,7 +1,7 @@
 import argparse
 import logging
-import sys
 import os
+import sys
 
 import numpy as np
 

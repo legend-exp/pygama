@@ -209,7 +209,7 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
             log.info(f"output file: {out_file} (not written)")
     else:
         log.info("output files:")
-        unique_outfilenames = set([file.split(':', 1)[0] for file in out_files])
+        unique_outfilenames = {file.split(':', 1)[0] for file in out_files}
         for out_file in unique_outfilenames:
             if os.path.exists(out_file):
                 file_size = os.stat(out_file).st_size
