@@ -11,7 +11,7 @@ from pygama.dsp.errors import DSPFatal
 def moving_window_left(w_in, length, w_out):
 
     '''
-    Applies a moving average window to the waveform from the left, assumes that the baseline is at 0. 
+    Applies a moving average window to the waveform from the left, assumes that the baseline is at 0.
 
     Parameters
     ----------
@@ -34,7 +34,7 @@ def moving_window_left(w_in, length, w_out):
             "prereqs": ["wf_pz"]
         }
     '''
-    
+
     w_out[:] = np.nan
 
     if (np.isnan(w_in).any()):
@@ -57,7 +57,7 @@ def moving_window_left(w_in, length, w_out):
 def moving_window_right(w_in, length, w_out):
 
     '''
-    Applies a moving average window to the waveform from the right. 
+    Applies a moving average window to the waveform from the right.
 
     Parameters
     ----------
@@ -90,7 +90,7 @@ def moving_window_right(w_in, length, w_out):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
 
 
-    w_out[-1]= w_in[-1] 
+    w_out[-1]= w_in[-1]
     for i in range(1, int(length),1):
         w_out[len(w_in)-1-i] = w_out[len(w_in)-i] + (w_in[len(w_in)-1-i]-w_out[-1])/length
     for i in range(int(length), len(w_in), 1):
@@ -151,7 +151,7 @@ def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
     w_buf = w_in.copy()
     for i in range(0, int(num_mw), 1):
         if ((i % 2 == 1) & (mw_type==0))|(mw_type==2):
-            w_out[-1]= w_buf[-1] 
+            w_out[-1]= w_buf[-1]
             for i in range(1, int(length),1):
                 w_out[len(w_buf)-1-i] = w_out[len(w_buf)-i] + (w_buf[len(w_buf)-1-i]-w_out[-1])/length
             for i in range(int(length), len(w_buf), 1):
@@ -207,7 +207,7 @@ def avg_current(w_in, length, w_out):
 
     if (not length >= 0 or not length< len(w_in)):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
-    
+
 
     w_out[:] = w_in[int(length):] - w_in[:-int(length)]
     w_out/=length
