@@ -1,4 +1,7 @@
-import copy, gc, logging
+import copy
+import gc
+import logging
+
 import numpy as np
 
 from ..fc.fc_event_decoder import fc_decoded_values
@@ -363,7 +366,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
 
     def get_key_list(self):
         key_list = []
-        for fcid, nadc in self.nadc.items(): 
+        for fcid, nadc in self.nadc.items():
             key_list += list( get_key(fcid, np.array(range(nadc))) )
         return key_list
 
