@@ -11,6 +11,9 @@ coverage:
 github_checks:
     annotations: false
 
+comment:
+  require_changes: true
+
 ignore:
   - tests
   - docs
