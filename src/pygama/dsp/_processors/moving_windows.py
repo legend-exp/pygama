@@ -99,6 +99,7 @@ def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
     """
     Apply a series of moving-average windows to the waveform, alternating
     its application between the left and the right.
+
     Parameters
     ----------
     w_in : array-like
@@ -107,10 +108,10 @@ def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
         Length of the moving window to be applied
     num_mw : int
         The number of moving windows
-    mw_type: int
-        0: alternate moving windows right and left
-        1: only left
-        2: only right
+    mw_type : int
+        0 = alternate moving windows right and left
+        1 = only left
+        2 = only right
     w_out : array-like
         The windowed waveform
 
