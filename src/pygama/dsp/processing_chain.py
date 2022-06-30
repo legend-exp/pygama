@@ -195,7 +195,7 @@ class ProcChainVar:
         return self.grid.offset if self.grid else None
 
     def description(self):
-        return "{}(shape: {}, dtype: {}, grid: {}, unit: {}, is_coord: {})".format(self.name, str(self.shape), str(self.dtype), str(self.grid), str(self.unit), str(self.is_coord))
+        return f"{self.name}(shape: {str(self.shape)}, dtype: {str(self.dtype)}, grid: {str(self.grid)}, unit: {str(self.unit)}, is_coord: {str(self.is_coord)})"
 
     # Update any variables set to auto; leave the others alone. Emit a message
     # only if anything was updated
@@ -1086,7 +1086,7 @@ class LGDOWaveformIOManager(IOManager):
         t0_units = wf_table.t0_units
         if dt_units is None: dt_units = t0_units
         elif t0_units is None: t0_units = dt_units
-        
+
         # If needed create a new coordinate grid from the IO buffer
         if variable.grid is auto and \
            isinstance(dt_units, str) and dt_units in ureg and \
