@@ -32,9 +32,9 @@ class DataLoader:
         fileDB : pd.DataFrame, FileDB, or filename of existing fileDB
             A fileDB must be specified, either with
                 1) An instance of FileDB
-                1) file written by FileDB.tolgdo() 
-                2) config file with enough info for FileDB to perform a DAQ scan
-                3) pd.DataFrame with a config file
+                2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
+                3) config file with enough info for FileDB to perform a DAQ scan
+                4) pd.DataFrame with a config file
         fileDB_config : dict or filename of JSON config file
             Config file mentioned above for fileDB
         file_query : str
@@ -68,15 +68,13 @@ class DataLoader:
             else:
                 self.fileDB = FileDB(config=fileDB_config)
         else:
-            if isinstance(fileDB, pd.DataFrame):
+            if isinstance(fileDB, pd.DataFrame) or isinstance(fileDB, str):
                 if fileDB_config is None:
                     print("Must provide a config file with a fileDB dataframe")
                     return
                 self.fileDB = FileDB(config=fileDB_config, file_df=fileDB)
             elif isinstance(fileDB, FileDB):
                 self.fileDB = fileDB
-            elif isinstance(fileDB, str):
-                self.fileDB = FileDB(lgdo_file=fileDB) 
             else:
                 print("fileDB must be a string or instance of fileDB or pd.DataFrame")
         
@@ -91,18 +89,33 @@ class DataLoader:
         """
         self.config = config 
         self.data_dir = config["data_dir"]
-        #self.subsystems = config["subsystems"]
-        self.levels = config["levels"]
-        self.tiers = config["tiers"]
-        self.tcm_cols = config["tcm_cols"]
-
+        self.levels = list(config["levels"].keys())
+        self.tiers = {}
+        self.cut_priority = {}
+        self.tcm_cols = {}
+        for level in self.levels:
+            self.tiers[level] = config["levels"][level]["tiers"]
+            #Set cut priority
+            if "dependency" in config["levels"][level].keys():
+                dep = config["levels"][level]["dependency"]
+                self.cut_priority[level] = self.cut_priority[dep] + 1
+                #Set TCM columns to lookup
+                if "tcm_cols" in config["levels"][level].keys():
+                    self.tcm_cols[level] = config["levels"][level]["tcm_cols"]
+                else:
+                    print(f"Config Warning: Levels dependent on lower levels, e.g. {level}, need to specify the TCM lookup columns")
+            else:
+                self.cut_priority[level] = 0
+                
+        
+        #Set channel map
         if isinstance(config["channel_map"], dict):
             self.channel_map = config["channel_map"]
         elif isinstance(config["channel_map"], str):
             with open(config["channel_map"]) as f:
                 self.channel_map = json.load(f)
         else:
-            print("Channel map must be dict or path to JSON file")
+            print("Config Warning: Channel map must be dict or path to JSON file")
 
     def set_files(self, query:str):
         """
@@ -119,39 +132,50 @@ class DataLoader:
         -------
         None.
         """
-        self.file_list = list(self.fileDB.df.query(query, inplace=False).index)     
+        inds = list(self.fileDB.df.query(query, inplace=False).index)    
+        if self.file_list is None:
+            self.file_list = inds
+        else:
+            self.file_list += inds
 
-    def set_datastreams(self, ds, type): #TODO when I have a better idea of channel_map format
+    def set_datastreams(self, ds, keyword): #TODO Make this able to handle more complicated requests
         """
         Set the datastreams (detectors) of interest
 
         Parameters
         -----------
-            ds : array-like of strings
+            ds : array-like 
             Identifies the detectors of interest
             Can be a list of detectorID, serialno, or channels
             or a list of subsystems of interest e.g. "ged" 
 
-            type : string
+            keyword : string
             The type of identifier used in ds 
-            Should be a key in the given channel map 
+            Should be a key in the given channel map or a keyword in the config file
         table_list = {
             "hit": [0, 1, 2]
             "evt": []        
         }
-        Will store lists of "table identifiers" i.e. the number/string that needs to be inputted into the "table_format" for a tier to get the table. 
-        Must be the same for each tier in a level.
+        
+        As far as I know there is only one table per evt file. 
+        We want to be able to handle things more generally, but for now let's just support setting "channel".
         """
-        table_format = self.fileDB.table_format
-        table_fields = {}
-        for level in self.levels:
-            for tier in self.tiers[level]:
-                parse_arr = np.array(list(string.Formatter.parse(table_format[tier], table_format[tier])))
-                tb_fields = list(parse_arr[:,1])
-                table_fields[tier] = tb_fields
-        
-        self.table_list = []
-        
+        if self.table_list is None:
+            self.table_list = {}
+
+        found = False
+        for level, word in self.fileDB.table_keyword.items():
+            if word == keyword:
+                found = True
+                if level in self.table_list.keys():
+                    self.table_list[level] += ds
+                else:
+                    self.table_list[level] = ds
+
+        if not found:
+            #look in channel map
+            pass
+
 
     def set_cuts(self, cuts):
         """
@@ -179,17 +203,21 @@ class DataLoader:
         -------
         None.
         """
+        if self.cuts is None:
+            self.cuts = {}
         if isinstance(cuts, dict):
             # verify the correct structure
             for key, value in cuts.items():
                 if not(key in self.levels and isinstance(value, str)):
                     print("Error: cuts dictionary must be in the format \{ level: string \}")
                     return 
-            
-            self.cuts = cuts 
+                if key in self.cuts.keys():
+                    self.cuts[key] += " and " + value 
+                else:
+                    self.cuts[key] = value
         elif isinstance(cuts, list):
             self.cuts = {}
-            # TODO Parse strings to match column names so the order doesn't matter
+            # TODO Parse strings to match column names so you don't have to specify which level it is
 
             for i in range(len(cuts)):
                 self.cuts[self.levels[i]] = cuts[i] 
@@ -243,17 +271,17 @@ class DataLoader:
 
         Returns
         -------
-        entries: nested dictionary
-        entries[file_index] = {
-                "hit": {
-                    "table1": [indices]
-                    "table2": [indices]
-                }
-                "evt": {
-                    "table1": [hit_indices] 
-                    "table2": [hit_indices]
-                }
-        }
+        entries:  
+        -------------------------------
+        event   |   channel |   row 
+        -------------------------------
+        0           5           0
+        0           6           0
+        0           12          0
+        1           5           1
+        2           5           2
+        2           6           1
+
         """
         if self.file_list is None:
             print("You need to make a query on fileDB, use set_file_list")
@@ -310,7 +338,7 @@ class DataLoader:
                         for tier, path in level_paths.items():
                             template = self.fileDB.table_format[tier]
                             try:
-                                args = {self.fileDB.table_keyword[level]: float(tb)}
+                                args = {self.fileDB.table_keyword[level]: int(tb)}
                             except:
                                 args = {self.fileDB.table_keyword[level]: tb}
                             tb_name = template.format(**args)
@@ -510,7 +538,7 @@ class FileDB():
     read/write to disk in an LGDO format
     """
 
-    def __init__(self, config=None, file_df=None, lgdo_file=None, scan=True):
+    def __init__(self, config, file_df=None, scan=True):
         """
         Parameters
         ----------
@@ -527,79 +555,76 @@ class FileDB():
             True by default, whether the fileDB should scan the DAQ directory to
             fill its rows with file information
         """
-        if lgdo_file is None:
-            if config is None:
-                print('Need to specify a configuration file or a file containing a fileDB!')
-                return
-
+        if file_df is None:
             self.df = None 
             if isinstance(config, str):
                 with open(config) as f:
                     config = json.load(f)                   
 
-            self.config = config
-            self.tiers = list(config["tier_dirs"].keys())
-            self.file_format = config["file_format"]
-            self.daq_template = config["daq_template"]
-            self.daq_dir = config["daq_dir"]
-            self.data_dir = config["data_dir"]
-            self.tier_dirs = config["tier_dirs"]
-            self.table_format = config["table_format"]
-            self.table_keyword = config["table_keyword"]
+            self.set_config(config)
 
-            if file_df is not None:
-                self.df = file_df
-            else:
-                # Set up column names
-                parse_arr = np.array(list(string.Formatter.parse(self.daq_template, self.daq_template)))
-                names = list(parse_arr[:,1]) # fields required to generate file name
-                names += [f'{tier}_file' for tier in self.tiers] # the generated file names
-                names += [f'{tier}_size' for tier in self.tiers] # file sizes
-                names += ['file_status', 'runtime'] # bonus columns 
+            # Set up column names
+            parse_arr = np.array(list(string.Formatter.parse(self.file_format[self.tiers[0]], self.file_format[self.tiers[0]])))
+            names = list(parse_arr[:,1]) # fields required to generate file name
+            names += [f'{tier}_file' for tier in self.tiers] # the generated file names
+            names += [f'{tier}_size' for tier in self.tiers] # file sizes
+            names += ['file_status', 'runtime'] # bonus columns 
+            names = [n for n in names if n]
 
-                self.df = pd.DataFrame(columns=names)
+            self.df = pd.DataFrame(columns=names)
 
             if scan:
                 self.scan_files()
                 self.set_file_status()
         else:
-            self.from_lgdo(lgdo_file)
+            self.from_disk(config, file_df)
+
+    def set_config(self, config):
+        self.config = config
+        self.tiers = list(self.config["tier_dirs"].keys())
+        self.file_format = self.config["file_format"]
+        self.data_dir = self.config["data_dir"]
+        self.tier_dirs = self.config["tier_dirs"]
+        self.table_format = self.config["table_format"]
+        self.table_keyword = self.config["table_keyword"]
 
     def scan_files(self, verbose=False):
         """
-        Scan the DAQ directory and fill the DataFrame
+        Scan the raw directory and fill the DataFrame
         Only fills columns that can be populated with just the DAQ file
         """
         file_keys = []
         n_files = 0
+        low_tier = self.tiers[0]
+        template = self.file_format[low_tier]
+        scan_dir = self.data_dir + self.tier_dirs[low_tier]
 
-        for path, folders, files in os.walk(self.daq_dir):
+        for path, folders, files in os.walk(scan_dir):
             n_files += len(files)
 
             for f in files:
-
                 # in some cases, we need information from the path name
-                if '/' in self.daq_template:
-                    f_tmp = path.replace(self.daq_dir,'') + '/' + f
+                if '/' in template:
+                    f_tmp = path.replace(scan_dir,'') + '/' + f
                 else:
                     f_tmp = f
 
-                finfo = parse(self.daq_template, f_tmp)
+                finfo = parse(template, f_tmp)
                 if finfo is not None:
                     finfo = finfo.named
-                    file_keys.append(finfo)
-                for tier in self.tiers:
-                    finfo[f'{tier}_file'] = self.file_format[tier].format(**finfo)
+                    for tier in self.tiers:
+                        finfo[f'{tier}_file'] = self.file_format[tier].format(**finfo)
+                    print(finfo)
 
+                    file_keys.append(finfo)
                 
 
-
         if n_files == 0:
-            print("no daq files found...")
+            print(f"no {low_tier} files found...")
             return
 
         if len(file_keys) == 0:
-            print("no daq files matched pattern", self.daq_template)
+            print(f"no {low_tier} files matched pattern", template)
             return
 
         temp_df = pd.DataFrame(file_keys)
@@ -625,12 +650,7 @@ class FileDB():
         file1       0b100
         """
         def check_status(row):
-            # first check for DAQ file
-            daq_file = self.daq_dir + "/" + self.daq_template.format(**row)
-            if os.path.exists(daq_file):
-                status = 2**len(self.tiers)
-            else:
-                status = 0
+            status = 0
             for i, tier in enumerate(self.tiers):
                 path_name = self.data_dir + self.tier_dirs[tier] + '/' + row[f'{tier}_file']
                 if os.path.exists(path_name):
@@ -721,19 +741,91 @@ class FileDB():
             
         return columns
 
-    def from_lgdo(self, fname): #TODO
+    def from_disk(self, cfg_name, df_name):
         """
-        Fills self.df with the information from a file created by to_lgdo()
+        Fills self.df and config with the information from a file created by to_lgdo()
         """
-        pass
+        with open(cfg_name, "r") as cfg:
+            config = json.load(cfg)
+        self.set_config(config)
+        self.df = pd.read_hdf(df_name, key="file_df")
 
-    def to_lgdo(self, fname, update=True): #TODO
-        """
-        Converts self.df to an lgdo.Table, and writes it to disk 
-        along with the config information
-        """
 
-        pass
+    def to_disk(self, cfg_name, df_name):
+        """
+        Writes config information to cfg_name and DataFrame to df_name
+
+        cfg_name should be a JSON file
+        df_name should be an HDF5 file
+
+        Parameters
+        -----------
+            cfg_name : string
+            Path to output file for config
+
+            df_name : string
+            Path to output file for DataFrame
+        Returns
+        -------
+            None. 
+        """
+        with open(cfg_name, "w") as cfg:
+            json.dump(self.config, cfg)
+
+        self.df.to_hdf(df_name, "file_df")
+        
+
+    def scan_daq_files(self, verbose=False):
+        """
+        Does the exact same thing as scan_files but with extra config arguments for a DAQ directory and template
+        instead of using the lowest (raw) tier 
+        """
+        file_keys = []
+        n_files = 0
+
+        for path, folders, files in os.walk(self.daq_dir):
+            n_files += len(files)
+
+            for f in files:
+
+                # in some cases, we need information from the path name
+                if '/' in self.daq_template:
+                    f_tmp = path.replace(self.daq_dir,'') + '/' + f
+                else:
+                    f_tmp = f
+
+                finfo = parse(self.daq_template, f_tmp)
+                if finfo is not None:
+                    finfo = finfo.named
+                    file_keys.append(finfo)
+                for tier in self.tiers:
+                    finfo[f'{tier}_file'] = self.file_format[tier].format(**finfo)
+
+                
+
+
+        if n_files == 0:
+            print("no daq files found...")
+            return
+
+        if len(file_keys) == 0:
+            print("no daq files matched pattern", self.daq_template)
+            return
+
+        temp_df = pd.DataFrame(file_keys)
+
+        # fill the main DataFrame
+        self.df = pd.concat([self.df, temp_df])
+
+        # convert cols to numeric dtypes where possible
+        for col in self.df.columns:
+            try:
+                self.df[col] = pd.to_numeric(self.df[col])
+            except:
+                pass
+        
+        if verbose:
+            print(self)
 
 if __name__=='__main__':
     doc="""
@@ -758,6 +850,11 @@ if __name__=='__main__':
                     fileDB_config="../../../../fileDB_config.json")
     dl.show_fileDB()
     print()
+
+    print("Read/write FileDB: ")
+    dl.fileDB.to_disk("fileDB_cfg.json", "fileDB_df.h5")
+    dl2 = DataLoader(config="../../../../loader_config.json", fileDB_config="fileDB_cfg.json", fileDB="fileDB_df.h5")
+    dl2.show_fileDB()
 
     print("Get table names: ")
     dl.fileDB.get_table_names()
