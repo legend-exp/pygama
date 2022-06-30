@@ -75,5 +75,21 @@ from ._processors.moving_windows import (
     moving_window_right,
 )
 from ._processors.multi_a_filter import multi_a_filter
+from ._processors.multi_t_filter import multi_t_filter, remove_duplicates
+from ._processors.optimize import optimize_1pz, optimize_2pz
+from ._processors.param_lookup import param_lookup
+from ._processors.pole_zero import double_pole_zero, pole_zero
+from ._processors.presum import presum
 from ._processors.pulse_injector import inject_exp_pulse, inject_sig_pulse
+from ._processors.saturation import saturation
+from ._processors.soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
+from ._processors.time_point_thresh import time_point_thresh
+from ._processors.trap_filters import (
+    asym_trap_filter,
+    trap_filter,
+    trap_norm,
+    trap_pickoff,
+)
+from ._processors.upsampler import upsampler
 from ._processors.wiener_filter import wiener_filter
+from ._processors.windower import windower

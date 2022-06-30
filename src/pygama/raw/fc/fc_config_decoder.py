@@ -1,4 +1,8 @@
+import logging
+
 from pygama import lgdo
+
+log = logging.getLogger(__name__)
 
 from ..data_decoder import *
 
@@ -36,7 +40,7 @@ class FCConfigDecoder(DataDecoder):
         ]
         for name in config_names:
             if name in self.config:
-                print(f'warning: {name} already in self.config. skipping...')
+                log.warning(f'{name} already in self.config. skipping...')
                 continue
             value = np.int32(getattr(fcio, name)) # all config fields are int32
             self.config.add_field(name, lgdo.Scalar(value))
