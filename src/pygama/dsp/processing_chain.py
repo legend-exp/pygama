@@ -195,9 +195,7 @@ class ProcChainVar:
         return self.grid.offset if self.grid else None
 
     def description(self):
-        return "{}({}, {}, coords: {}, unit: {}{})".format(self.name, \
-            str(self.shape), str(self.dtype), str(self.grid), \
-            str(self.unit), " (coord)" if self.is_coord is True else '' )
+        return f"{self.name}(shape: {str(self.shape)}, dtype: {str(self.dtype)}, grid: {str(self.grid)}, unit: {str(self.unit)}, is_coord: {str(self.is_coord)})"
 
     # Update any variables set to auto; leave the others alone. Emit a message
     # only if anything was updated
@@ -932,9 +930,12 @@ class ProcessorManager:
             elif param is not None:
                 # Convert scalar to right type, including units
                 if isinstance(param, (Quantity, Unit)):
-                    if not isinstance(grid, CoordinateGrid) or not ureg.is_compatible_with(grid.period, param):
+                    if ureg.is_compatible_with(ureg.dimensionless, param):
+                        param = float(param)
+                    elif not isinstance(grid, CoordinateGrid) or not ureg.is_compatible_with(grid.period, param):
                         raise ProcessingChainError("Could not find valid conversion for " + str(param) + "; CoordinateGrid is "+str(grid))
-                    param = float(param/grid.period)
+                    else:
+                        param = float(param/grid.period)
                 if np.issubdtype(dtype, np.integer):
                     param = dtype.type(round(param))
                 else:
@@ -1086,9 +1087,19 @@ class LGDOWaveformIOManager(IOManager):
         if dt_units is None: dt_units = t0_units
         elif t0_units is None: t0_units = dt_units
 
-        period = wf_table.dt_units
-        if isinstance(period, str) and period in ureg:
-            grid = CoordinateGrid(ureg.Quantity(self.dt_buf[0], period), self.t0_buf[0])
+        # If needed create a new coordinate grid from the IO buffer
+        if variable.grid is auto and \
+           isinstance(dt_units, str) and dt_units in ureg and \
+           isinstance(t0_units, str) and t0_units in ureg:
+            grid = CoordinateGrid(ureg.Quantity(self.dt_buf[0], dt_units),
+                                  ProcChainVar(variable.proc_chain,
+                                               variable.name+"_dt",
+                                               shape = (),
+                                               dtype = self.t0_buf.dtype,
+                                               grid = None,
+                                               unit = dt_units,
+                                               is_coord = True)
+                                  )
         else:
             grid = None
 
@@ -1116,6 +1127,7 @@ class LGDOWaveformIOManager(IOManager):
 
     def read(self, start, end):
         self.wf_var[0:end-start, ...] = self.wf_buf[start:end, ...]
+        self.t0_var[0:end-start, ...] = self.t0_buf[start:end, ...]
 
     def write(self, start, end):
         self.wf_buf[start:end, ...] = self.wf_var[0:end-start, ...]
@@ -1347,7 +1359,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                 for db_var in db_parser.findall(arg):
                     try:
                         db_node = db_dict
-                        for key in db_val[3:].split('.'):
+                        for key in db_var[3:].split('.'):
                             db_node = db_node[key]
                         if(verbosity>0):
                             print("Database lookup: found", db_node, "for", db_var)
