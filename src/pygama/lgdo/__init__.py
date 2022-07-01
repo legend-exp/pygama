@@ -33,7 +33,7 @@ from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .fixedsizearray import FixedSizeArray
 from .lgdo_utils import *
-from .lh5_store import LH5Store, load_dfs, load_nda
+from .lh5_store import LH5Store, load_dfs, load_nda, ls
 from .scalar import Scalar
 from .struct import Struct
 from .table import Table
