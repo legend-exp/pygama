@@ -54,23 +54,23 @@ class OrcaHeader(dict):
 
     def get_object_info(self, orca_class_name):
         """
-        returns a list with all info from the header for each card with name
+        returns a dict[crate#][card#] with all info from the header for each card with name
         orca_class_name.
         """
-        object_info_list = []
+        object_info_dict = {}
 
         crates = self["ObjectInfo"]["Crates"]
         for crate in crates:
+            object_info_dict[crate['CrateNumber']] = {}
             cards = crate["Cards"]
             for card in cards:
                 if card["Class Name"] == orca_class_name:
-                    card["Crate"] = crate["CrateNumber"]
-                    object_info_list.append(card)
+                    object_info_dict[crate['CrateNumber']][card['Card']] = card
 
-        if len(object_info_list) == 0:
-            print('OrcaHeader::get_object_info(): Warning: no object info '
-                  'for class name', orca_class_name)
-        return object_info_list
+        if len(object_info_dict) == 0:
+            raise KeyError(f'no object info for class {orca_class_name}')
+
+        return object_info_dict
 
 
     def get_readout_info(self, orca_class_name, unique_id=-1):
