@@ -12,10 +12,28 @@ kwd = {"parallel": False, "fastmath": True}
 @nb.njit(**kwd)
 def nb_gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
     """
-    define a gaussian signal on a uniform background,
-    args: n_sig mu, sigma for the signal and n_bkg for the background
-    TO DO: candidate for replacement by gauss_poly
+    A Gaussian signal on a uniform background
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    n_bkg : float 
+        The number of counts in the background 
+    components : bool 
+        If true, returns the signal and background components separately 
+   
+    TODO: candidate for replacement by gauss_poly
     """
+
     if components==False:
         return 1/(np.nanmax(x)-np.nanmin(x)) * n_bkg + n_sig * nb_gauss_norm(x,mu,sigma)
     else:
@@ -25,10 +43,32 @@ def nb_gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
 @nb.njit(**kwd)
 def nb_gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
     """
-    gaussian signal + linear background function
-    args: n_sig mu, sigma for the signal and n_bkg,b,m for the background
-    TO DO: candidate for replacement by gauss_poly
+    Gaussian signal on top of a linear background function
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    n_bkg : float 
+        The number of counts in the background 
+    b : float
+        The y-intercept of the linear background
+    m : float 
+        Slope of the linear background
+    components : bool 
+        If true, returns the signal and background components separately 
+
+    TODO: candidate for replacement by gauss_poly
     """
+    
     norm = (m/2 *np.nanmax(x)**2 + b*np.nanmax(x)) - (m/2 *np.nanmin(x)**2 + b*np.nanmin(x))
 
     if components==False:

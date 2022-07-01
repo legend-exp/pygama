@@ -13,10 +13,32 @@ kwd = {"parallel": False, "fastmath": True}
 
 
 @nb.njit(**kwd)
-def nb_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
+def nb_gauss_step_pdf(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upper_range=np.inf, components=False):
     """
-    Pdf for Gaussian on step background
-    args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
+    PDF for Gaussian on top of a step background
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     try:
         bkg= nb_step_pdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -33,10 +55,32 @@ def nb_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , u
 
 
 @nb.njit(**kwd)
-def nb_gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
+def nb_gauss_step_cdf(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upper_range=np.inf, components=False):
     """
-    Cdf for Gaussian on step background
-    args: n_sig mu, sigma for the signal and n_bkg,hstep for the background
+    CDF for Gaussian on step background
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     try:
         bkg = nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -53,10 +97,32 @@ def nb_gauss_step_cdf(x,  n_sig, mu, sigma,n_bkg, hstep, lower_range=np.inf , up
 
 
 @nb.njit(**kwd)
-def nb_gauss_step(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf, components=False):
+def nb_gauss_step(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upper_range=np.inf, components=False):
     """
     Pdf for Gaussian on step background for Compton spectrum, returns also the total number of events for extended unbinned fits
-    args: n_sig mu, sigma for the signal and n_bkg, hstep for the background
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     if components ==False:
         return n_sig+n_bkg , nb_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range)

@@ -47,8 +47,7 @@ def get_mu_func(func, pars, cov = None, errors=None):
             return mu
 
     else:
-        log.warning(f'get_mu_func not implemented for {func.__name__}')
-        raise NameError
+        raise NotImplementedError(f'get_mu_func not implemented for {func.__name__}')
 
 
 def get_fwhm_func(func, pars, cov = None):
@@ -73,8 +72,7 @@ def get_fwhm_func(func, pars, cov = None):
 
         return hpge_peak_fwhm(sigma, htail, tau, cov)
     else:
-        log.warning(f'get_fwhm_func not implemented for {func.__name__}')
-        raise NameError
+        raise NotImplementedError(f'get_fwhm_func not implemented for {func.__name__}')
 
 
 def get_total_events_func(func, pars, cov = None, errors=None):
@@ -105,5 +103,4 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
     else:
-        log.warning(f'get_total_events_func not implemented for {func.__name__}')
-        raise NameError
+        raise NotImplementedError(f'get_total_events_func not implemented for {func.__name__}')

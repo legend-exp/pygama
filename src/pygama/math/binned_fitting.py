@@ -45,8 +45,7 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     cov_matrix : array
     """
     if guess is None:
-        log.warning("auto-guessing not yet implemented, you must supply a guess.")
-        raise NameError
+        raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
 
     if cost_func == 'LL':
 
@@ -121,14 +120,11 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     # arg checks
     if method == 'var':
         if var is None:
-            log.warning("goodness_of_fit: var must be non-None to use method 'var'")
-            raise NameError
+            raise RuntimeError("var must be non-None to use method 'var'")
         if np.any(var==0):
-            log.warning("goodness_of_fit: var cannot contain zeros")
-            raise ValueError
+            raise ValueError("var cannot contain zeros")
     if method == 'Neyman' and np.any(hist==0):
-        log.warning("goodness_of_fit: hist cannot contain zeros for Neyman method")
-        raise ValueError
+        raise ValueError("hist cannot contain zeros for Neyman method")
 
 
     # compute expected values
@@ -149,8 +145,7 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
         elif method == 'Neyman':
             denominator = hist
         else:
-            log.warning(f"goodness_of_fit: unknown method {method}")
-            raise NameError
+            raise NameError(f"goodness_of_fit: unknown method {method}")
 
         # compute chi2 and dof
         chisq = np.sum(numerator/denominator)
@@ -244,8 +239,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
         pars, errors, cov = fit_binned(nb_gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, cost_func=cost_func)
     except:
-        log.warning("fit binned failed to work in gauss_mode_width_max")
-        raise Exception
+        raise RuntimeError("fit binned failed to work")
     if pars[1] < 0: pars[1] = -pars[1]
     if inflate_errors:
         chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars)
@@ -278,8 +272,7 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     """
     pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
     if pars is None or cov is None:
-        log.warning("fit binned failed to work in gauss_mode_max")
-        raise Exception
+        raise RuntimeError("fit binned failed to work")
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
 
 

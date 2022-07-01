@@ -28,8 +28,7 @@ def hpge_peak_fwhm(sigma, htail, tau,  cov = None):
         return -nb_gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
 
     if htail<0 or htail>1:
-        log.warning("htail outside allowed limits of 0 and 1")
-        raise ValueError
+        raise ValueError("htail outside allowed limits of 0 and 1")
 
     res = minimize_scalar( neg_hpge_peak_peak_bgfree,
                            args=(sigma, htail, tau),

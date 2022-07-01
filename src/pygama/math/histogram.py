@@ -128,23 +128,20 @@ def better_int_binning(x_lo=0, x_hi=None, dx=None, n_bins=None):
     # process inputs
     n_Nones = int(x_hi is None) + int(dx is None) + int(n_bins is None)
     if n_Nones > 1:
-        log.warning('better_int_binning: must provide two of x_hi, dx or n_bins')
-        raise Exception
+        raise ValueError('must provide two of x_hi, dx or n_bins')
     if n_Nones == 0:
-        log.warning('better_int_binning: overconstrained. Ignoring x_hi.')
+        log.warning('Overconstrained. Ignoring x_hi.')
         x_hi = None
 
     # get valid dx or n_bins
     if dx is not None:
         if dx <= 0:
-            log.warning(f'better_int_binning: invalid dx={dx}')
-            raise Exception
+            raise ValueError(f'invalid dx={dx}')
         dx = np.round(dx)
         if dx == 0: dx = 1
     if n_bins is not None:
         if n_bins <= 0:
-            log.warning(f'better_int_binning: invalid n_bins={n_bins}')
-            raise Exception
+            raise ValueError(f'invalid n_bins={n_bins}')
         n_bins = np.round(n_bins)
 
     # can already return if no x_hi
@@ -169,7 +166,10 @@ def get_bin_centers(bins):
     Returns an array of bin centers from an input array of bin edges.
     Works for non-uniform binning. Note: a new array is allocated
 
-    Parameters:
+    Parameters
+    ----------
+    bins : array-like 
+        The input array of bin-edges 
     """
     return (bins[:-1] + bins[1:]) / 2.
 
@@ -178,6 +178,11 @@ def get_bin_widths(bins):
     """
     Returns an array of bin widths from an input array of bin edges.
     Works for non-uniform binning.
+
+    Parameters
+    ----------
+    bins : array-like 
+        The input array of bin-edges
     """
     return (bins[1:] - bins[:-1])
 
@@ -188,6 +193,13 @@ def find_bin(x, bins):
     Returns -1 for underflow, and len(bins) for overflow
     For uniform bins, jumps directly to the appropriate index.
     For non-uniform bins, binary search is used.
+
+    Parameters
+    ----------
+    x : float 
+        The value to search for amongst the bins
+    bins : array-like 
+        The input array of bin-edges
     """
     # first handle overflow / underflow
     if len(bins) == 0: return 0 # i.e. overflow
@@ -226,7 +238,7 @@ def get_fwhm(hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method='bins_ove
     get_fwfm : for parameters and return values
     """
     if len(bins) == len(hist):
-        log.warning("note: this function has been updated to require bins rather, than bin_centers. Don't trust this result")
+        log.warning("note: this function has been updated to require bins rather than bin_centers. Don't trust this result")
     return get_fwfm(0.5, hist, bins, var, mx, dmx, bl, dbl, method, n_slope)
 
 
@@ -326,8 +338,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # interpolate between the two bins that cross the [fraction] line
         # works well for high stats
         if bin_lo < 1 or bin_hi >= len(hist)-1:
-            log.warning(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
-            raise Exception
+            raise ValueError(f"Can't interpolate ({bin_lo}, {bin_hi})")
 
         val_f = bl + fraction*(mx-bl)
 
@@ -348,12 +359,10 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         dhf = hist[bin_hi] - val_f
         dh = hist[bin_hi] - hist[bin_hi+1]
         if dh == 0:
-            log.warning(f"get_fwhm: interpolation failed, dh == 0")
-            raise ValueError
+            raise ValueError(f"Interpolation failed, dh == 0")
         x_hi = bin_centers[bin_hi] + dx * dhf/dh
         if x_hi < x_lo:
-            log.warning(f"get_fwfm: interpolation produced negative fwfm")
-            raise ValueError
+            raise ValueError(f"Interpolation produced negative fwfm")
         # uncertainty
         dx2_hi = 0
         if var is not None:
@@ -371,8 +380,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # x_lo
         i_0 = bin_lo - int(np.floor(n_slope/2))
         if i_0 < 0:
-            log.warning(f"get_fwfm: fit slopes failed")
-            raise Exception
+            raise RuntimeError(f"Fit slopes failed")
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n]) #fails for any var = 0
         wts = [w if w != np.inf else 0 for w in wts]
@@ -380,8 +388,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         except np.linalg.LinAlgError:
-            log.warning(f"get_fwfm: LinAlgError in x_lo")
-            raise RuntimeError
+            raise RuntimeError(f"LinAlgError in x_lo")
         x_lo = (val_f-b)/m
         #uncertainty
         dxl2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
@@ -390,8 +397,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # x_hi
         i_0 = bin_hi - int(np.floor(n_slope/2)) + 1
         if i_0 == len(hist):
-            log.warning(f"get_fwfm: fit slopes failed")
-            raise RuntimeError
+            raise RuntimeError(f"Fit slopes failed")
 
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
@@ -399,12 +405,10 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         except np.linalg.LinAlgError:
-            log.warning(f"get_fwfm: LinAlgError in x_hi")
-            raise RuntimeError
+            raise RuntimeError(f"LinAlgError in x_hi")
         x_hi = (val_f-b)/m
         if x_hi < x_lo:
-            log.warning(f"get_fwfm: fit slopes produced negative fwfm")
-            raise RuntimeError
+            raise RuntimeError(f"Fit slopes produced negative fwfm")
 
         #uncertainty
         dxh2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
@@ -413,8 +417,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         return x_hi - x_lo, np.sqrt(dxl2 + dxh2)
 
     else:
-        log.warning(f"get_fwhm: unrecognized method {method}")
-        raise NameError
+        raise NameError(f"Unrecognized method {method}")
 
 
 def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, fill=False, fillcolor='r', fillalpha=0.2, **kwargs):
@@ -441,8 +444,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
         bin_centers = get_bin_centers(bins)
         N = np.sum(hist)
         if N <= 1:
-            log.warning(f"can't compute sigma for N = {N}")
-            raise RuntimeError
+            raise RuntimeError(f"can't compute sigma for N = {N}")
         mean = np.sum(hist*bin_centers)/N
         x2ave = np.sum(hist*bin_centers*bin_centers)/N
         stddev = np.sqrt(N/(N-1) * (x2ave - mean*mean))

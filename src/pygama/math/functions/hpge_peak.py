@@ -15,10 +15,37 @@ kwd = {"parallel": False, "fastmath": True}
 
 @nb.njit(**kwd)
 def nb_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
-                lower_range=np.inf , upper_range=np.inf,  components=False):
+                lower_range=np.inf, upper_range=np.inf, components=False):
     """
-    David Radford's HPGe peak shape PDF consists of a gaussian with tail signal
-    on a step background
+    HPGe peak shape PDF consists of a gaussian with tail signal
+    on a step background.
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    htail : float 
+        The height of the Gaussian tail 
+    tau : float 
+        The characteristic scale of the Gaussian tail
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     try:
         bkg= nb_step_pdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -26,7 +53,7 @@ def nb_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
         bkg = np.zeros_like(x, dtype=np.float64)
     if np.any(bkg<0):
         bkg = np.zeros_like(x, dtype=np.float64)
-    if components ==False:
+    if components == False:
         sig = nb_gauss_with_tail_pdf(x, mu, sigma, htail,  tau)
         pdf = (n_bkg * bkg +\
              n_sig *  sig)
@@ -37,9 +64,36 @@ def nb_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
 
 
 @nb.njit(**kwd)
-def nb_hpge_peak_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf , upper_range=np.inf,  components=False):
+def nb_hpge_peak_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf, upper_range=np.inf, components=False):
     """
     Cdf for gaussian with tail signal and step background
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    htail : float 
+        The height of the Gaussian tail 
+    tau : float 
+        The characteristic scale of the Gaussian tail
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     try:
         bkg = nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -59,9 +113,36 @@ def nb_hpge_peak_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=
 
 @nb.njit(**kwd)
 def nb_extended_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
-                         lower_range=np.inf , upper_range=np.inf, components=False):
+                         lower_range=np.inf, upper_range=np.inf, components=False):
     """
-    Pdf for gaussian with tail signal and step background, also returns number of events
+    PDF for gaussian with tail signal and step background, also returns number of events
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    n_sig : float 
+        Number of counts in the signal 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float 
+        The standard deviation of the Gaussian 
+    htail : float 
+        The height of the Gaussian tail 
+    tau : float 
+        The characteristic scale of the Gaussian tail
+    n_bkg : float 
+        The number of counts in the background 
+    hstep : float
+        The height of the step function background
+    lower_range : float 
+        Lower bound of the step function
+    upper_range : float
+        Upper bound of the step function 
+    components : bool 
+        If true, returns the signal and background components separately 
     """
     if components ==False:
         return n_sig + n_bkg, nb_hpge_peak_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)

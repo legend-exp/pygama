@@ -27,8 +27,7 @@ def fit_unbinned(func, data, guess=None,
     coeff, cov_matrix : tuple(array, matrix)
     """
     if guess is None:
-        log.warning("auto-guessing not yet implemented, you must supply a guess.")
-        raise NameError
+        raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
 
     if cost_func =='LL':
         if Extended ==True:

@@ -14,7 +14,18 @@ kwd = {"parallel": False, "fastmath": True}
 @nb.njit(**kwd)
 def nb_gauss(x, mu, sigma):
     """
-    Gaussian, unnormalised for use in building pdfs, w/ args: mu, sigma.
+    Gaussian, unnormalised for use in building pdfs
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float
+        The standard deviation of the Gaussian 
     """
     if sigma ==0: invs=np.nan
     else: invs = 1.0 / sigma
@@ -25,8 +36,22 @@ def nb_gauss(x, mu, sigma):
 @nb.njit(**kwd)
 def nb_gauss_amp(x, mu, sigma, a):
     """
-    Gaussian with height as a parameter for fwhm etc. args mu sigma, amplitude
-    TO DO: replace with the pdf Gaussian times the appropriate value
+    Gaussian with height as a parameter for fwhm etc.
+    As a Numba JIT function, it runs slightly faster than
+    'out of the box' functions.
+
+    Parameters
+    ----------
+    x : array-like 
+        Input data 
+    mu : float 
+        The centroid of the Gaussian 
+    sigma : float
+        The standard deviation of the Gaussian  
+    a : float 
+        The amplitude of the Gaussian
+        
+    TODO: replace with the pdf Gaussian times the appropriate value
     """
     return a * nb_gauss(x,mu,sigma)
 
