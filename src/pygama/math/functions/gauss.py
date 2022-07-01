@@ -88,7 +88,7 @@ def nb_gauss_pdf(x, mu, sigma, n_sig):
         The centroid of the Gaussian
     sigma : float
         The standard deviation of the Gaussian
-    n_sig : float 
-        The number of counts in the signal 
+    n_sig : float
+        The number of counts in the signal
     """
     return n_sig * nb_gauss_norm(x,mu,sigma)
