@@ -87,7 +87,6 @@ def build_evt(f_hit:str, f_evt:str=None, lh5_tables:list=None, copy_cols:list=No
     print('Tables to merge:\n', lh5_tables)
     print('Event builder config:')
     print(builder_config)
-    exit()
 
     # read LH5 tables and convert to DataFrame.  This copy and conversion is
     # a required step!  (Clint will be happy to discuss the reasons with you.)
@@ -143,8 +142,6 @@ def build_evt(f_hit:str, f_evt:str=None, lh5_tables:list=None, copy_cols:list=No
     print(f'Done!  Time elapsed: {t_elap:.2f} sec.')
 
 
-
-
 if __name__=='__main__':
     doc = """Demonstrate usage of the `build_evt` function, to build a time
     coincidence map and organize data from many channels in a single cycle file,
@@ -157,9 +154,6 @@ if __name__=='__main__':
     arg('input', type=str, help='input file name (required)')
     arg('-o', '--output', type=str, help='output file name')
     args = par.parse_args()
-
-    # test file -- deleteme
-    # /global/project/projectdirs/legend/data/lngs/l200_commissioning/orca_data/pygama/raw/cal/p00/r001/L60_p0_r1_20220606T015344Z_f0.lh5
 
     # set i/o
     f_in = args.input

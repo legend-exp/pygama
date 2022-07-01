@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 def cluster_events(tb_list:list, ts_unit:float=1e-8, ch_col:str='channel',
                    ts_col:str='timestamp', coin_window:float=4e-6,
                    data_cols:list=None):
@@ -54,8 +57,8 @@ def cluster_events(tb_list:list, ts_unit:float=1e-8, ch_col:str='channel',
             print('Warning! timestamps reset for this channel.  TC map will be total nonsense!  AAAAAHHH')
 
         # save the original index for reverse lookup
-        chan = df[ch_col].unique()[0]
-        df[f'ix_row_{chan}'] = df.index.values
+        # chan = df[ch_col].unique()[0]
+        # df[f'ix_row_{chan}'] = df.index.values
 
     # # make a list of columns from the input tables we want to copy over
     # copy_cols = ['tcm_sec'] + ch_rows
