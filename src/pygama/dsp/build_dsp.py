@@ -34,41 +34,31 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
     ----------
     f_raw : str
         name of raw LH5 file to read from
-
     f_dsp : str
         name of dsp LH5 file to write to
-
     dsp_config : str
         name of JSON file containing
         :class:`~.processing_chain.ProcessingChain` config. See
         :func:`~.processing_chain.build_processing_chain` for details
-
     lh5_tables : list of str, optional
         list of HDF5 groups to consider in the input file. If None, process all
         valid groups
-
     database : str, optional
         name of JSON file containing a parameter database. See
         :func:`~.processing_chain.build_processing_chain` for details
-
     outputs : list of str, optional
         list of parameter names to write to the output file. If not provided,
         use list provided under ``"outputs"`` in the DSP configuration file
-
     n_max : int, optional
         Number of waveforms to process. Default all
-
     write_mode : {'r', 'a', 'u'}, optional
         - `'r'` -- delete existing output file with same name before writing
         - `'a'` -- append to end of existing output file
         - `'u'` -- update values in existing output file
-
     buffer_len : int, optional, default=3200
         number of waveforms to read/write from disk at a time
-
     block_width : int, optional, default=16
         number of waveforms to process at a time
-
     chan_config : dict, optional
         contains JSON DSP configuration file names for every table in
         `lh5_tables`
