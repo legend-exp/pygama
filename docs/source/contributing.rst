@@ -43,7 +43,7 @@ Versioning
   * The *pygama* version is updated in ``pygama/version.py``
   * A new branch with name ``releases/vMAJOR.MINOR`` (note the ``v``) containing
     the code at the intended stage is created
-  * The commit is tagged: ``git tag vMAJOR.MINOR.0`` (note the ``v``)
+  * The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0 -m 'short descriptive message here'`` (note the ``v``)
   * Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
 
 * To release a new patch version, the following procedure should be followed:

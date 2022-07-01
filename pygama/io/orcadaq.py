@@ -426,6 +426,15 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
         # Clear the tables if the next read could overflow them.
         # Only have to check this when the max table size is within
         # max_n_rows_per_packet of being full.
+        # WRONG -- max_tbl_size is shared among all decoders. So this
+        # update doesn't work right. Will keep the old logic below, but add
+        # this first explicit for loop (slows down conversion!) to avoid
+        # the bug. This is fixed in the refactor branch so ignore the
+        # performance hit
+        ch_groups = ch_groups_dict[id2dn_dict[data_id]]
+        for group_info in ch_groups.values():
+            tbl = group_info['table']
+            if tbl.loc > max_tbl_size: max_tbl_size = tbl.loc
         if max_tbl_size + decoder.max_n_rows_per_packet() >= buffer_size:
             ch_groups = ch_groups_dict[id2dn_dict[data_id]]
             max_tbl_size = 0
@@ -468,7 +477,10 @@ def process_orca(daq_filename, raw_file_pattern, n_max=np.inf, ch_groups_dict=No
     if len(unrecognized_data_ids) > 0:
         print("WARNING, Found the following unknown data IDs:")
         for data_id in unrecognized_data_ids:
-            print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            try:
+                print("  {}: {}".format(data_id, id2dn_dict[data_id]))
+            except KeyError:
+                print("  {}: Unknown".format(data_id))
         print("hopefully they weren't important!\n")
 
     print("Wrote RAW File:\n    {}\nFILE INFO:".format(raw_file_pattern))
