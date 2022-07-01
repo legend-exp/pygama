@@ -8,7 +8,7 @@ import sys
 import time
 
 import numpy as np
-import tqdm
+from tqdm import tqdm
 
 from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
@@ -125,11 +125,11 @@ def build_raw(in_stream: int, in_stream_type: str = None,
         log.info(f'maximum number of events: {n_max}')
     if log.level <= logging.INFO:
         if n_max < np.inf:
-            progress_bar = tqdm.tqdm(desc='Processing', total=n_max, delay=2, unit='rows',
-                                     file=sys.stdout)
+            progress_bar = tqdm(desc='Processing', total=n_max, delay=2, unit='rows',
+                                file=sys.stdout)
         else:
-            progress_bar = tqdm.tqdm(desc='Processing', total=in_stream_size, delay=2,
-                                     unit='B', unit_scale=True, file=sys.stdout)
+            progress_bar = tqdm(desc='Processing', total=in_stream_size, delay=2,
+                                unit='B', unit_scale=True, file=sys.stdout)
 
     # start a timer and a byte counter
     t_start = time.time()

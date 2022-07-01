@@ -1,16 +1,19 @@
 import json
+import logging
 import os
 import sys
 import time
 
 import h5py
 import numpy as np
+from tqdm import tqdm
 
 import pygama
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processing_chain import build_processing_chain
-from pygama.math.utils import tqdm_range
+
+log = logging.getLogger(__name__)
 
 
 def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
@@ -155,7 +158,7 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
             # Initialize
             if proc_chain is None:
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, verbose, block_width)
-                tqdm_it = iter(tqdm_range(0, tot_n_rows, buffer_len, verbose))
+                progress_bar = tqdm(desc='Processing', total=tot_n_rows, delay=2, unit='rows', file=sys.stdout)
 
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:
@@ -172,11 +175,14 @@ def build_dsp(f_raw, f_dsp, dsp_config, lh5_tables=None, database=None,
                                    wo_mode= 'o' if write_mode=='u' else 'a',
                                    write_start=write_offset+start_row,
             )
-            next(tqdm_it)
+            if log.level <= logging.INFO:
+                progress_bar.update(buffer_len)
 
             if start_row+n_rows > tot_n_rows:
                 break
 
+        if log.level <= logging.INFO:
+            progress_bar.close()
         print(f'Done.  Writing to file {f_dsp}')
 
     raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
