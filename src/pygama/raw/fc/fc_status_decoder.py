@@ -1,18 +1,11 @@
-import os
-
-import numpy as np
-
-from ..data_decoder import *
+from pygama.raw.data_decoder import DataDecoder
 
 
 class FCStatusDecoder(DataDecoder):
     """
-    decode FlashCam digitizer status data.
+    Decode FlashCam digitizer status data.
     """
     def __init__(self, *args, **kwargs):
-        """
-        DOCME
-        """
         self.decoded_values = {
             'status': { # 0: Errors occurred, 1: no errors
               'dtype': 'int32',
@@ -67,12 +60,7 @@ class FCStatusDecoder(DataDecoder):
         }
         super().__init__(*args, **kwargs)
 
-
-
     def decode_packet(self, fcio, status_rb, packet_id):
-        """
-        access FC status (temp., log, ...)
-        """
         # aliases for brevity
         tbl = status_rb.lgdo
         ii = status_rb.loc
