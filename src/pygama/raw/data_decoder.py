@@ -4,7 +4,6 @@ Base classes for decoding data into raw LGDO Tables or files
 from __future__ import annotations
 
 from abc import ABC
-from typing import Any
 
 import numpy as np
 
@@ -54,7 +53,7 @@ class DataDecoder(ABC):
         single / no keys"""
         return [None]
 
-    def get_decoded_values(self, key: Any = None):
+    def get_decoded_values(self, key: int | str = None):
         """Get decoded values (optionally for a given key, typically a channel).
 
         .. note::
@@ -69,7 +68,7 @@ class DataDecoder(ABC):
 
         raise NotImplementedError("you need to implement key-specific get_decoded_values for", type(self).__name__)
 
-    def make_lgdo(self, key: Any = None, size: int = None):
+    def make_lgdo(self, key: int | str = None, size: int = None):
         """Make an LGDO for this :class:`DataDecoder` to fill.
 
         This default version of this function allocates a

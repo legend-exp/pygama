@@ -33,7 +33,6 @@ class DataStreamer(ABC):
         self.any_full = False
         self.packet_id = 0
 
-
     def open_stream(self, stream_name: str, rb_lib: RawBufferLibrary = None,
                     buffer_size: int = 8192, chunk_mode: str = 'any_full',
                     out_stream: str = '') -> tuple[list[RawBuffer], int]:
