@@ -52,6 +52,9 @@ def pygama_cli():
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG,
                             format="%(name)s [%(levelname)s] %(message)s")
+        logging.getLogger('numba').setLevel(logging.INFO)
+        logging.getLogger('parse').setLevel(logging.INFO)
+        logging.getLogger('h5py').setLevel(logging.INFO)
     else:
         logging.basicConfig(level=logging.INFO,
                             format="%(name)s [%(levelname)s] %(message)s")
