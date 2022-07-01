@@ -139,7 +139,7 @@ def add_build_dsp_parser(subparsers):
                             time. Default is 3200""")
 
     group = parser_r2d.add_mutually_exclusive_group()
-    group.add_argument('--recreate', '-r', action='store_const',
+    group.add_argument('--overwrite', '-w', action='store_const',
                        const='r', dest='writemode', default='r',
                        help="""Overwrite file if it already exists. Default
                        option""")
