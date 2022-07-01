@@ -1,7 +1,11 @@
 """
 pygama convenience functions for fitting ubinned data
 """
+import logging
+
 from iminuit import Minuit, cost
+
+log = logging.getLogger(__name__)
 
 
 def fit_unbinned(func, data, guess=None,
@@ -23,8 +27,8 @@ def fit_unbinned(func, data, guess=None,
     coeff, cov_matrix : tuple(array, matrix)
     """
     if guess is None:
-        print("auto-guessing not yet implemented, you must supply a guess.")
-        return None, None
+        log.warning("auto-guessing not yet implemented, you must supply a guess.")
+        raise NameError
 
     if cost_func =='LL':
         if Extended ==True:

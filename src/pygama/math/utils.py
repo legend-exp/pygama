@@ -6,19 +6,29 @@ import sys
 import numpy as np
 import tqdm
 
+import logging
+
+log = logging.getLogger(__name__)
+
 
 def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, unit=None):
     """
     Uses tqdm.trange which wraps around the python range and also has the option
     to display a progress
     For example:
-    .. code-block :: python
+
+    .. code-block:: python
+
         for start_row in range(0, tot_n_rows, buffer_len):
-            ...
+        ...
+
     Can be converted to the following
-    .. code-block :: python
+    
+    .. code-block:: python
+
         for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
-            ...
+        ...
+
     Parameters
     ----------
     start : int
@@ -35,7 +45,6 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
         horizontal length of the bar in cursor spaces
     unit : str
         physical units to be displayed
-
     Returns
     -------
     iterable : tqdm.trange
@@ -104,13 +113,13 @@ def print_fit_results(pars, cov, func=None, title=None, pad=True):
     convenience function for scipy.optimize.curve_fit results
     """
     if title is not None:
-        print(title+":")
+        log.info(f"{title}:")
     if func is None:
         for i in range(len(pars)): par_names.append("p"+str(i))
     else:
         par_names = get_par_names(func)
     for i in range(len(pars)):
         mean, sigma = get_formatted_stats(pars[i], np.sqrt(cov[i][i]))
-        print(par_names[i], "=", mean, "+/-", sigma)
+        log.info(f"{par_names[i]} = {mean} +/- {sigma}")
     if pad:
-        print("")
+        log.info("")

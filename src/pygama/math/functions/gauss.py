@@ -12,7 +12,7 @@ kwd = {"parallel": False, "fastmath": True}
 
 
 @nb.njit(**kwd)
-def gauss(x, mu, sigma):
+def nb_gauss(x, mu, sigma):
     """
     Gaussian, unnormalised for use in building pdfs, w/ args: mu, sigma.
     """
@@ -23,16 +23,16 @@ def gauss(x, mu, sigma):
 
 
 @nb.njit(**kwd)
-def gauss_amp(x, mu, sigma, a):
+def nb_gauss_amp(x, mu, sigma, a):
     """
     Gaussian with height as a parameter for fwhm etc. args mu sigma, amplitude
     TO DO: replace with the pdf Gaussian times the appropriate value
     """
-    return a * gauss(x,mu,sigma)
+    return a * nb_gauss(x,mu,sigma)
 
 
 @nb.njit(**kwd)
-def gauss_norm(x, mu, sigma):
+def nb_gauss_norm(x, mu, sigma):
     """
     Normalised Gaussian, w/ args: mu, sigma.
     As a Numba JIT function, it runs slightly faster than
@@ -55,7 +55,7 @@ def gauss_norm(x, mu, sigma):
 
 
 @nb.njit(**kwd)
-def gauss_cdf(x, mu, sigma):
+def nb_gauss_cdf(x, mu, sigma):
     """
     gaussian cdf, w/ args: mu, sigma.
     As a Numba JIT function, it runs slightly faster than
@@ -74,7 +74,7 @@ def gauss_cdf(x, mu, sigma):
 
 
 @nb.njit(**kwd)
-def gauss_pdf(x, mu, sigma, n_sig):
+def nb_gauss_pdf(x, mu, sigma, n_sig):
     """
     Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
     As a Numba JIT function, it runs slightly faster than
@@ -91,4 +91,4 @@ def gauss_pdf(x, mu, sigma, n_sig):
     n_sig : float 
         The number of counts in the signal 
     """
-    return n_sig * gauss_norm(x,mu,sigma)
+    return n_sig * nb_gauss_norm(x,mu,sigma)

@@ -1,7 +1,7 @@
 import numpy as np
 from pytest import approx
 
-import pygama.math.binned_fitting as pgb
+import pygama.math.hpge_peak_fitting as pgb
 
 
 def test_mostly_gauss_fwhm():

@@ -3,26 +3,27 @@ import math
 import numba as nb
 import numpy as np
 
-kwd = {"parallel": False, "fastmath": True}
 
-
-@nb.njit(**kwd)
+@nb.vectorize([nb.float32(nb.float32),
+nb.float64(nb.float64)])
 def nb_erf(x):
     """
-    Numba version of error function
+    Numba version of error function. 
+    Vectorization is necessary here for the math.erf
+    This runs faster than numpy vectorized and the 
+    out-of-the-box math.erf
     """
-    y = np.empty_like(x)
-    for i in nb.prange(len(x)):
-        y[i] = math.erf(x[i])
-    return y
+    return math.erf(x)
 
 
-@nb.njit(**kwd)
+
+@nb.vectorize([nb.float32(nb.float32),
+nb.float64(nb.float64)])
 def nb_erfc(x):
     """
     Numba version of complementary error function
+    Vectorization is necessary here for the math.erfc
+    This runs faster than numpy vectorized and the 
+    out-of-the-box math.erfc
     """
-    y = np.empty_like(x)
-    for i in nb.prange(len(x)):
-        y[i] = math.erfc(x[i])
-    return y
+    return math.erfc(x)

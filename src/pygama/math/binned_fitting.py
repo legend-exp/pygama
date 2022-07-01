@@ -1,6 +1,7 @@
 """
 pygama convenience functions for fitting binned data
 """
+import logging
 import math
 
 import numpy as np
@@ -9,12 +10,14 @@ from scipy.optimize import brentq, minimize_scalar
 
 import pygama.math.histogram as pgh
 from pygama.math.distributions import (
-    exgauss,
-    gauss_norm,
-    gauss_with_tail_pdf,
-    unnorm_step_pdf,
+    nb_exgauss,
+    nb_gauss_norm,
+    nb_gauss_with_tail_pdf,
+    nb_unnorm_step_pdf,
 )
-from pygama.math.functions.gauss import gauss_amp
+from pygama.math.functions.gauss import nb_gauss_amp
+
+log = logging.getLogger(__name__)
 
 
 def fit_binned(func, hist, bins, var=None, guess=None,
@@ -42,8 +45,8 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     cov_matrix : array
     """
     if guess is None:
-        print("auto-guessing not yet implemented, you must supply a guess.")
-        return None, None
+        log.warning("auto-guessing not yet implemented, you must supply a guess.")
+        raise NameError
 
     if cost_func == 'LL':
 
@@ -118,14 +121,14 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
     # arg checks
     if method == 'var':
         if var is None:
-            print("goodness_of_fit: var must be non-None to use method 'var'")
-            return 0, 0
+            log.warning("goodness_of_fit: var must be non-None to use method 'var'")
+            raise NameError
         if np.any(var==0):
-            print("goodness_of_fit: var cannot contain zeros")
-            return 0, 0
+            log.warning("goodness_of_fit: var cannot contain zeros")
+            raise ValueError
     if method == 'Neyman' and np.any(hist==0):
-        print("goodness_of_fit: hist cannot contain zeros for Neyman method")
-        return 0, 0
+        log.warning("goodness_of_fit: hist cannot contain zeros for Neyman method")
+        raise ValueError
 
 
     # compute expected values
@@ -146,8 +149,8 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
         elif method == 'Neyman':
             denominator = hist
         else:
-            print(f"goodness_of_fit: unknown method {method}")
-            return 0, 0
+            log.warning(f"goodness_of_fit: unknown method {method}")
+            raise NameError
 
         # compute chi2 and dof
         chisq = np.sum(numerator/denominator)
@@ -238,13 +241,14 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
     try:
-        pars, errors, cov = fit_binned(gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv,
+        pars, errors, cov = fit_binned(nb_gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv,
                          guess=guess, cost_func=cost_func)
     except:
-        return None, None
+        log.warning("fit binned failed to work in gauss_mode_width_max")
+        raise Exception
     if pars[1] < 0: pars[1] = -pars[1]
     if inflate_errors:
-        chi2, dof = goodness_of_fit(hist, bins, var, gauss_amp, pars)
+        chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars)
         if chi2 > dof: cov *= chi2/dof
     return pars, cov
 
@@ -273,7 +277,9 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
     """
     pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
-    if pars is None or cov is None: return None, None
+    if pars is None or cov is None: 
+        log.warning("fit binned failed to work in gauss_mode_max")
+        raise Exception
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
 
 
@@ -323,7 +329,7 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     i_n = i_0 + n_bins
     wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
 
-    pars, cov = np.polyfit(pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
+    pars, cov = np.nb_polyfit(pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
     mode = -pars[1] / 2 / pars[0]
     maximum = pars[2] - pars[0] * mode**2
     # build the jacobian to compute the output covariance matrix
@@ -332,120 +338,3 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     cov_jact = np.matmul(cov, jac.transpose())
     cov = np.matmul(jac, cov_jact)
     return (mode, maximum), cov
-
-
-def hpge_peak_fwhm(sigma, htail, tau,  cov = None):
-    """
-    Return the FWHM of the hpge_peak_peak function, ignoring background and step
-    components. If calculating error also need the normalisation for the step
-    function.
-    """
-    # optimize this to find max value
-    def neg_hpge_peak_peak_bgfree(E, sigma, htail, tau):
-        return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
-
-    if htail<0 or htail>1:
-        print("htail outside allowed limits of 0 and 1")
-        raise ValueError
-
-    res = minimize_scalar( neg_hpge_peak_peak_bgfree,
-                           args=(sigma, htail, tau),
-                           bounds=(-sigma-htail, sigma+htail) )
-    Emax = res.x
-    half_max = -neg_hpge_peak_peak_bgfree(Emax, sigma, htail, tau)/2.
-
-    # root find this to find the half-max energies
-    def hpge_peak_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
-        return gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0] - half_max
-
-    try:
-        lower_hm = brentq( hpge_peak_peak_bgfree_halfmax,
-                       -(2.5*sigma/2 + htail*tau), Emax,
-                       args = (sigma, htail, tau, half_max) )
-    except:
-        lower_hm = brentq( hpge_peak_peak_bgfree_halfmax,
-               -(5*sigma + htail*tau), Emax,
-               args = (sigma, htail, tau, half_max) )
-    try:
-        upper_hm = brentq( hpge_peak_peak_bgfree_halfmax,
-                       Emax, 2.5*sigma/2,
-                       args = (sigma, htail, tau, half_max) )
-    except:
-        upper_hm = brentq( hpge_peak_peak_bgfree_halfmax,
-                   Emax, 5*sigma,
-                   args = (sigma, htail, tau, half_max) )
-
-    if cov is None: return upper_hm - lower_hm
-
-    #calculate uncertainty
-    #amp set to 1, mu to 0, hstep+bg set to 0
-    pars = [1,0, sigma, htail, tau,0,0]
-    step_norm = 1
-    gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
-    gradmax *= 0.5
-    grad1 = hpge_peak_parameter_gradient(lower_hm, pars,step_norm)
-    grad1 -= gradmax
-    grad1 /= hpge_peak_peakshape_derivative(lower_hm, pars,step_norm)
-    grad2 = hpge_peak_parameter_gradient(upper_hm, pars,step_norm)
-    grad2 -= gradmax
-    grad2 /= hpge_peak_peakshape_derivative(upper_hm, pars,step_norm)
-    grad2 -= grad1
-
-    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
-
-    return upper_hm - lower_hm, fwfm_unc
-
-
-def hpge_peak_peakshape_derivative(E, pars, step_norm):
-    """
-    Computes the derivative of the hpge_peak (Radford) peak shape
-    """
-    n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
-
-    sigma = abs(sigma)
-    gaus = gauss_norm(E, mu, sigma)
-    y = (E-mu)/sigma
-    ret = -(1-htail)*(y/sigma)*gaus
-    ret -= htail/tau*(-exgauss(np.array([E,E-1]), mu, sigma, tau)[0]+gaus)
-
-    return n_sig*ret - n_bkg*hstep*gaus/step_norm #need norm factor for bkg
-
-
-def hpge_peak_parameter_gradient(E, pars, step_norm):
-    """
-    Computes the gradient of the hpge_peak (Radford) parameter
-    """
-    n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
-
-    gaus = gauss_norm(np.array([E, E-1]), mu, sigma)[0]
-    tailL = exgauss(np.array([E, E-1]), mu, sigma, tau)[0]
-    if n_bkg ==0:
-        step_f = 0
-    else:
-        step_f = unnorm_step_pdf(np.array([E, E-1]), mu, sigma, hstep)[0] /step_norm
-
-    #some unitless numbers that show up a bunch
-    y = (E-mu)/sigma
-    sigtauL = sigma/tau
-
-    g_n_sig = 0.5*(htail*tailL + (1-htail)*gaus)
-    g_n_bkg = step_f
-
-    g_hs = n_bkg*math.erfc(y/np.sqrt(2))/step_norm
-
-    g_ht = (n_sig/2)*(tailL-gaus)
-
-    #gradient of gaussian part
-    g_mu = (1-htail)*y/sigma*gaus
-    g_sigma = (1-htail)*(y*y +-1)/sigma*gaus
-
-    #gradient of low tail, use approximation if necessary
-    g_mu += htail/tau*(-tailL+gaus)
-    g_sigma += htail/tau*(sigtauL*tailL-(sigtauL-y)*gaus)
-    g_tau = -htail/tau*( (1.+sigtauL*y+sigtauL*sigtauL)*tailL - sigtauL*sigtauL*gaus) * n_sig
-
-    g_mu = n_sig*g_mu + (2*n_bkg*hstep*gaus)/step_norm
-    g_sigma = n_sig*g_sigma + (2*n_bkg*hstep*gaus*y)/(step_norm*np.sqrt(sigma))
-
-    gradient = g_n_sig, g_mu, g_sigma,g_ht, g_tau, g_n_bkg, g_hs
-    return np.array(gradient)

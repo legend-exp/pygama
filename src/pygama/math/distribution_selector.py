@@ -1,24 +1,28 @@
 """
 Convenience functions to select distributions
 """
+import logging
+
 import numpy as np
 
-from pygama.math.binned_fitting import hpge_peak_fwhm
+from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 from pygama.math.distributions import (
-    extended_hpge_peak_pdf,
-    gauss_step,
-    gauss_step_cdf,
-    gauss_step_pdf,
-    hpge_peak_cdf,
-    hpge_peak_pdf,
+    nb_extended_hpge_peak_pdf,
+    nb_gauss_step,
+    nb_gauss_step_cdf,
+    nb_gauss_step_pdf,
+    nb_hpge_peak_cdf,
+    nb_hpge_peak_pdf,
 )
+
+log = logging.getLogger(__name__)
 
 
 def get_mu_func(func, pars, cov = None, errors=None):
     """
     Function to select which distribution to get the centroid from
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
+    if  func == nb_gauss_step_cdf or func == nb_gauss_step_pdf or func == nb_gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -30,7 +34,7 @@ def get_mu_func(func, pars, cov = None, errors=None):
         else:
             return mu
 
-    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
+    elif  func == nb_hpge_peak_cdf or func == nb_hpge_peak_pdf or func == nb_extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
@@ -43,15 +47,15 @@ def get_mu_func(func, pars, cov = None, errors=None):
             return mu
 
     else:
-        print(f'get_mu_func not implemented for {func.__name__}')
-        return None
+        log.warning(f'get_mu_func not implemented for {func.__name__}')
+        raise NameError
 
 
 def get_fwhm_func(func, pars, cov = None):
     """
     Function to select which distribution to get the FWHM of
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
+    if  func == nb_gauss_step_cdf or func == nb_gauss_step_pdf or func == nb_gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -61,7 +65,7 @@ def get_fwhm_func(func, pars, cov = None):
         else:
             return sigma*2*np.sqrt(2*np.log(2)), np.sqrt(cov[2][2])*2*np.sqrt(2*np.log(2))
 
-    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
+    elif  func == nb_hpge_peak_cdf or func == nb_hpge_peak_pdf or func == nb_extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
@@ -69,15 +73,15 @@ def get_fwhm_func(func, pars, cov = None):
 
         return hpge_peak_fwhm(sigma, htail, tau, cov)
     else:
-        print(f'get_fwhm_func not implemented for {func.__name__}')
-        return None
+        log.warning(f'get_fwhm_func not implemented for {func.__name__}')
+        raise NameError
 
 
 def get_total_events_func(func, pars, cov = None, errors=None):
     """
     Function to select which distribution to get the total number of events from
     """
-    if  func == gauss_step_cdf or func == gauss_step_pdf or func == gauss_step:
+    if  func == nb_gauss_step_cdf or func == nb_gauss_step_pdf or func == nb_gauss_step:
         if len(pars) ==5:
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
@@ -89,7 +93,7 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
 
-    elif  func == hpge_peak_cdf or func == hpge_peak_pdf or func == extended_hpge_peak_pdf:
+    elif  func == nb_hpge_peak_cdf or func == nb_hpge_peak_pdf or func == nb_extended_hpge_peak_pdf:
         if len(pars) ==7:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
@@ -101,5 +105,5 @@ def get_total_events_func(func, pars, cov = None, errors=None):
         else:
             return n_sig+n_bkg
     else:
-        print(f'get_total_events_func not implemented for {func.__name__}')
-        return None
+        log.warning(f'get_total_events_func not implemented for {func.__name__}')
+        raise NameError

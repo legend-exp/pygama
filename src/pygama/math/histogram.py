@@ -13,12 +13,15 @@ These are just convenience functions, provided for your convenience. Hopefully
 they will help you if you need to do something trickier than is provided (e.g.
 2D hists).
 """
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rcParams
 
 import pygama.math.utils as pgu
+
+log = logging.getLogger(__name__)
 
 
 def get_hist(data, bins=None, range=None, dx=None, wts=None):
@@ -125,23 +128,23 @@ def better_int_binning(x_lo=0, x_hi=None, dx=None, n_bins=None):
     # process inputs
     n_Nones = int(x_hi is None) + int(dx is None) + int(n_bins is None)
     if n_Nones > 1:
-        print('better_int_binning: must provide two of x_hi, dx or n_bins')
-        return
+        log.warning('better_int_binning: must provide two of x_hi, dx or n_bins')
+        raise Exception
     if n_Nones == 0:
-        print('better_int_binning: overconstrained. Ignoring x_hi.')
+        log.warning('better_int_binning: overconstrained. Ignoring x_hi.')
         x_hi = None
 
     # get valid dx or n_bins
     if dx is not None:
         if dx <= 0:
-            print(f'better_int_binning: invalid dx={dx}')
-            return
+            log.warning(f'better_int_binning: invalid dx={dx}')
+            raise Exception
         dx = np.round(dx)
         if dx == 0: dx = 1
     if n_bins is not None:
         if n_bins <= 0:
-            print(f'better_int_binning: invalid n_bins={n_bins}')
-            return
+            log.warning(f'better_int_binning: invalid n_bins={n_bins}')
+            raise Exception
         n_bins = np.round(n_bins)
 
     # can already return if no x_hi
@@ -223,8 +226,7 @@ def get_fwhm(hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method='bins_ove
     get_fwfm : for parameters and return values
     """
     if len(bins) == len(hist):
-        print("note: this function has been updated to require bins rather",
-              "than bin_centers. Don't trust this result")
+        log.warning("note: this function has been updated to require bins rather, than bin_centers. Don't trust this result")
     return get_fwfm(0.5, hist, bins, var, mx, dmx, bl, dbl, method, n_slope)
 
 
@@ -324,8 +326,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # interpolate between the two bins that cross the [fraction] line
         # works well for high stats
         if bin_lo < 1 or bin_hi >= len(hist)-1:
-            print(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
-            return 0, 0
+            log.warning(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
+            raise Exception
 
         val_f = bl + fraction*(mx-bl)
 
@@ -346,10 +348,12 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         dhf = hist[bin_hi] - val_f
         dh = hist[bin_hi] - hist[bin_hi+1]
         if dh == 0:
-            raise ValueError(f"get_fwhm: interpolation failed, dh == 0")
+            log.warning(f"get_fwhm: interpolation failed, dh == 0")
+            raise ValueError
         x_hi = bin_centers[bin_hi] + dx * dhf/dh
         if x_hi < x_lo:
-            raise ValueError(f"get_fwfm: interpolation produced negative fwfm")
+            log.warning(f"get_fwfm: interpolation produced negative fwfm")
+            raise ValueError
         # uncertainty
         dx2_hi = 0
         if var is not None:
@@ -367,8 +371,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # x_lo
         i_0 = bin_lo - int(np.floor(n_slope/2))
         if i_0 < 0:
-            print(f"get_fwfm: fit slopes failed")
-            return 0, 0
+            log.warning(f"get_fwfm: fit slopes failed")
+            raise Exception
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n]) #fails for any var = 0
         wts = [w if w != np.inf else 0 for w in wts]
@@ -376,8 +380,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         except np.linalg.LinAlgError:
-            print(f"get_fwfm: LinAlgError")
-            return 0, 0
+            log.warning(f"get_fwfm: LinAlgError in x_lo")
+            raise RuntimeError
         x_lo = (val_f-b)/m
         #uncertainty
         dxl2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
@@ -386,8 +390,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # x_hi
         i_0 = bin_hi - int(np.floor(n_slope/2)) + 1
         if i_0 == len(hist):
-            print(f"get_fwfm: fit slopes failed")
-            return 0, 0
+            log.warning(f"get_fwfm: fit slopes failed")
+            raise RuntimeError
 
         i_n = i_0 + n_slope
         wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
@@ -395,12 +399,12 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         try:
             (m, b), cov = np.polyfit(bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov='unscaled')
         except np.linalg.LinAlgError:
-            print(f"get_fwfm: LinAlgError")
-            return 0, 0
+            log.warning(f"get_fwfm: LinAlgError in x_hi")
+            raise RuntimeError
         x_hi = (val_f-b)/m
         if x_hi < x_lo:
-            print(f"get_fwfm: fit slopes produced negative fwfm")
-            return 0, 0
+            log.warning(f"get_fwfm: fit slopes produced negative fwfm")
+            raise RuntimeError
 
         #uncertainty
         dxh2 = cov[0,0]/m**2 + (cov[1,1] + dheight2)/(val_f-b)**2 + 2*cov[0,1]/(val_f-b)/m
@@ -409,8 +413,8 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         return x_hi - x_lo, np.sqrt(dxl2 + dxh2)
 
     else:
-        print(f"get_fwhm: unrecognized method {method}")
-        return 0, 0
+        log.warning(f"get_fwhm: unrecognized method {method}")
+        raise NameError
 
 
 def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vloc=0.85, fill=False, fillcolor='r', fillalpha=0.2, **kwargs):
@@ -437,8 +441,8 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
         bin_centers = get_bin_centers(bins)
         N = np.sum(hist)
         if N <= 1:
-            print("can't compute sigma for N =", N)
-            return
+            log.warning(f"can't compute sigma for N = {N}")
+            raise RuntimeError
         mean = np.sum(hist*bin_centers)/N
         x2ave = np.sum(hist*bin_centers*bin_centers)/N
         stddev = np.sqrt(N/(N-1) * (x2ave - mean*mean))
@@ -455,8 +459,7 @@ def get_gaussian_guess(hist, bins):
     given a hist, gives guesses for mu, sigma, and amplitude
     """
     if len(bins) == len(hist):
-        print("note: this function has been updated to require bins rather",
-              "than bin_centers. Don't trust this result")
+        log.warning("note: this function has been updated to require bins rather than bin_centers. Don't trust this result")
 
     max_idx = np.argmax(hist)
     guess_e = (bins[max_idx] + bins[max_idx])/2 # bin center
@@ -469,14 +472,15 @@ def get_gaussian_guess(hist, bins):
     return (guess_e, guess_sigma, guess_area)
 
 
-def get_bin_estimates(pars, func, hist, bins, integral=None, **kwargs):
+def get_bin_estimates(pars, func, hist, bins, is_integral, **kwargs):
     """
     Bin expected means are estimated by f(bin_center)*bin_width. Supply an
     integrating function to compute the integral over the bin instead.
     TODO: make default integrating function a numerical method that is off by
     default.
     """
-    if integral is None:
+    if is_integral is False:
         return func(get_bin_centers(bins), *pars, **kwargs) * get_bin_widths(bins)
     else:
-        return integral(bins[1:], *pars, **kwargs) - integral(bins[:-1], *pars, **kwargs)
+        # func can be an integral functions
+        return func(bins[1:], *pars, **kwargs) - func(bins[:-1], *pars, **kwargs)
