@@ -186,11 +186,21 @@ new project version must implement the following procedures:
      the code at the intended stage is created
   2. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
      -m 'short descriptive message here'`` (note the ``v``)
-  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote:
+
+     .. code-block:: console
+
+       $ git push origin releases/vMAJOR.MINOR
+       $ git push origin refs/tags/vMAJOR.MINOR.0
 
 * To release a new **patch version**, the following procedure should be followed:
 
   1. A commit with the patch is created on the relevant release branch
      ``releases/vMAJOR.MINOR``
   2. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
-  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote:
+
+     .. code-block:: console
+
+       $ git push origin releases/vMAJOR.MINOR
+       $ git push origin refs/tags/vMAJOR.MINOR.PATCH
