@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 
 # later on we might want a tcm class, or interface / inherit from an entry list
 # class. For now we just need the key clustering functionality
 
-def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last', 
+def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last',
                       array_ids:list=None, array_idxs:list=None):
     """
     Generate the columns of a time coincidence map from a list of arrays of
@@ -28,7 +29,7 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
     coin_window : float (optional)
         The clustering window. coin_data within the coin_window get aggregated
         into the same coincidence cluster. A value of 0 means an equality test.
-    window_ref: str
+    window_ref : str
         When testing one datum for inclusion in a cluster, test if it is within
         coin_window of
         'first' -- the first element in the cluster (rigid window width) (not
@@ -36,11 +37,11 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
         'last' -- the last element in the clustur (window grows until two data
         are separated by more than coin_window)
         In the future, can add more options, like mean/median/mode
-    array_ids: list of ints or None
+    array_ids : list of ints or None
         If provided, use array_ids in place of "index in coin_data" as the
         integer corresponding to each element of coin_data (e.g. a channel
         number)
-    array_idxs: list of indices or None
+    array_idxs : list of indices or None
         If provided, use these values in places of df.index for the return
         values of array_idx
 
@@ -49,7 +50,7 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
     col_dict : dict of ndarrays
         keys are 'coin_idx', 'array_id', and 'array_idx'
         coin_idx specifies which rows of the output arrays correspond to the
-        which coincidence event 
+        which coincidence event
         array_id and array_idx specify the location in coin_data of each datum
         belonging to the coincidence event
     """
@@ -61,7 +62,7 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
         col_dict = {'array_id':array_id, 'coin_data':array}
         if array_idxs is not None: col_dict['array_idx'] = array_idxs[ii]
         dfs.append(pd.DataFrame(col_dict, copy=False))
-    
+
     # concat and sort
     tcm = pd.concat(dfs).sort_values(['coin_data', 'array_id'])
 

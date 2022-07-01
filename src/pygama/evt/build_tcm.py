@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 import re
-import pygama.lgdo as lgdo
+
 import pygama.evt.tcm as ptcm
+import pygama.lgdo as lgdo
+
 
 def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
-              coin_window:float=0, window_ref:str='last', 
+              coin_window:float=0, window_ref:str='last',
               out_file:str=None, out_name:str='tcm', overwrite:bool=True):
     """
     Given a list of input tables, create an ouput table containting an entry
