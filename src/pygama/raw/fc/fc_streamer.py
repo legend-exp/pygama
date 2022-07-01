@@ -1,24 +1,20 @@
 import logging
-import os
 
 import fcutils
-import numpy as np
 
-from pygama import lgdo
-
-from ..data_streamer import DataStreamer
-from ..raw_buffer import *
-from .fc_config_decoder import FCConfigDecoder
-from .fc_event_decoder import FCEventDecoder
-from .fc_status_decoder import FCStatusDecoder
+from pygama.raw.data_streamer import DataStreamer
+from pygama.raw.fc.fc_config_decoder import FCConfigDecoder
+from pygama.raw.fc.fc_event_decoder import FCEventDecoder
+from pygama.raw.fc.fc_status_decoder import FCStatusDecoder
+from pygama.raw.raw_buffer import RawBuffer
 
 log = logging.getLogger(__name__)
 
 
 class FCStreamer(DataStreamer):
     """
-    decode FlashCam data, using the fcutils package to handle file access,
-    and the FlashCam DataDecoders to save the results and write to output.
+    Decode FlashCam data, using the ``fcutils`` package to handle file access,
+    and the FlashCam data decoders to save the results and write to output.
     """
     def __init__(self):
         super().__init__()
@@ -43,25 +39,17 @@ class FCStreamer(DataStreamer):
 
     def open_stream(self, fcio_filename, rb_lib=None, buffer_size=8192,
                     chunk_mode='any_full', out_stream=''):
-        """ Initialize the FC data stream
+        """Initialize the FlashCam data stream.
 
-        Parameters
-        ----------
-        fcio_filename : str
-            the FCIO filename
-        rb_lib : RawBufferLibrary
-            library of buffers for this stream
-        buffer_size : int
-            length of tables to be read out in read_chunk
-        chunk_mode : str
-            DOCME
-        out_stream : str
-            DOCME
+        Refer to the documentation for
+        :meth:`.raw.data_streamer.DataStreamer.open_stream` for a description
+        of the parameters.
 
         Returns
         -------
         header_data : list(RawBuffer)
-            a list of length 1 containing the raw buffer holding the fc_config table
+            a list of length 1 containing the raw buffer holding the
+            :class:`~.fc_config_decoder.FCConfig` table
         """
         self.fcio = fcutils.fcio(fcio_filename)
         self.n_bytes_read = 0
@@ -102,14 +90,7 @@ class FCStreamer(DataStreamer):
     def close_stream(self):
         self.fcio = None # should cause close file in fcio.__dealloc__
 
-
     def read_packet(self):
-        """ Read a packet of data.
-
-        Data written to self.rb_lib.
-        Updates self.n_bytes_read
-        """
-
         rc = self.fcio.get_record()
         if rc == 0: return False # no more data
 
