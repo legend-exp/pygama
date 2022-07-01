@@ -1,16 +1,16 @@
 class DSPError(Exception):
-    """Base class for signal processors"""
+    """Base class for signal processors."""
     pass
 
+
 class DSPFatal(DSPError):
-    """
-    Fatal error thrown by DSP processors that halts production
+    """Fatal error thrown by DSP processors that halts production.
 
     Attributes
     ----------
     wf_range: range
-     range of wf indices. This will be set after the exception is caught, and
-     appended to the error message
+        range of wf indices. This will be set after the exception is caught,
+        and appended to the error message
     processor: str
         string of processor and arguments. This will be set after the exception
         is caught, and appended to the error message
@@ -28,6 +28,7 @@ class DSPFatal(DSPError):
             suffix += '\nThrown by ' + self.processor
         return super().__str__() + suffix
 
+
 class ProcessingChainError(DSPError):
-    """Error thrown when there is a problem setting up a processing chain"""
+    """Error thrown when there is a problem setting up a processing chain."""
     pass

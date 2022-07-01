@@ -4,11 +4,11 @@ import ast
 import importlib
 import itertools as it
 import json
+import logging
 import re
 from abc import ABCMeta, abstractmethod
-from copy import copy, deepcopy
-from dataclasses import dataclass, field
-from typing import Union
+from copy import deepcopy
+from dataclasses import dataclass
 
 import numpy as np
 from numba import vectorize
@@ -18,6 +18,8 @@ from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
 from .errors import DSPFatal, ProcessingChainError
+
+log = logging.getLogger(__name__)
 
 # Filler value for variables to be automatically deduced later
 auto = 'auto'
@@ -30,12 +32,16 @@ ast_ops_dict = {ast.Add: (np.add, '{}+{}'),
                 ast.FloorDiv: (np.floor_divide, '{}//{}'),
                 ast.USub: (np.negative, '-{}')}
 
+
 @dataclass
 class CoordinateGrid:
     """Helper class that describes a system of units, consisting of a period
-    and offset. Period is a unitted Quantity, offset is a scalar in units of
-    period, a Unit or a ProcChainVar. In the last case, a ProcessingChain
-    variable is used to store a different offset for each event"""
+    and offset.
+
+    Period is a unitted Quantity, offset is a scalar in units of period, a Unit
+    or a ProcChainVar. In the last case, a ProcessingChain variable is used to
+    store a different offset for each event
+    """
     period: Quantity | Unit | str
     offset: Quantity | ProcChainVar | float | int
 
@@ -79,8 +85,11 @@ class CoordinateGrid:
 
 class ProcChainVar:
     """Helper data class with buffer and information for internal variables in
-    ProcessingChain. Members can be set to auto to attempt to deduce these
-    when adding this variable to a processor for the first time"""
+    ProcessingChain.
+
+    Members can be set to auto to attempt to deduce these when adding this
+    variable to a processor for the first time
+    """
     def __init__(self,
                  proc_chain: ProcessingChain,
                  name: str,
@@ -88,7 +97,7 @@ class ProcChainVar:
                  dtype: np.dtype = auto,
                  grid: CoordinateGrid = auto,
                  unit: str = auto,
-                 is_coord: bool = auto ):
+                 is_coord: bool = auto):
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
         self.proc_chain = proc_chain
         self.name = name
@@ -103,7 +112,7 @@ class ProcChainVar:
         self.unit = unit
         self.is_coord = is_coord
 
-        self.proc_chain._print(2, 'Added variable:', self.description())
+        log.debug(f'added variable: {self.description()}')
 
     # Use this to enforce type constraints and perform conversions
     def __setattr__(self, name, value):
@@ -142,9 +151,9 @@ class ProcChainVar:
         # If buffer needs to be created, do so now
         if self._buffer is None:
             if self.shape is auto:
-                raise ProcessingChainError("Cannot deduce shape of "+self.name)
+                raise ProcessingChainError(f"cannot deduce shape of {self.name}")
             if self.dtype is auto:
-                raise ProcessingChainError("Cannot deduce shape of "+self.name)
+                raise ProcessingChainError(f"cannot deduce shape of {self.name}")
 
             # create the buffer so that the array start is aligned in memory on a multiple of 64 bytes
             self._buffer = np.zeros(shape=(self.proc_chain._block_width,)+self.shape, dtype=self.dtype)
@@ -163,9 +172,9 @@ class ProcChainVar:
         # if this is our first time accessing, no conversion is needed
         if len(self._buffer)==0:
             if self.shape is auto:
-                raise ProcessingChainError("Cannot deduce shape of "+self.name)
+                raise ProcessingChainError(f"cannot deduce shape of {self.name}")
             if self.dtype is auto:
-                raise ProcessingChainError("Cannot deduce shape of "+self.name)
+                raise ProcessingChainError(f"cannot deduce shape of {self.name}")
 
             buff = np.zeros(shape=(self.proc_chain._block_width,)+self.shape, dtype=self.dtype)
             self._buffer.append((buff, unit))
@@ -224,14 +233,11 @@ class ProcChainVar:
             self.is_coord = is_coord
             updated = True
         if updated:
-            self.proc_chain._print(2, 'Updated variable:', self.description())
+            log.debug(f'updated variable: {self.description()}')
 
     def __str__(self):
         return self.name
 
-###############################################################################
-############################### The Main Class ################################
-###############################################################################
 
 class ProcessingChain:
     """
@@ -263,7 +269,7 @@ class ProcessingChain:
     add_scalar.
     """
 
-    def __init__(self, block_width=8, buffer_len=None, verbosity=1):
+    def __init__(self, block_width=8, buffer_len=None):
         """
         Parameters
         ----------
@@ -272,10 +278,6 @@ class ProcessingChain:
         buffer_len : int
             length of input and output buffers. Should be a multiple of
             block_width
-        verbosity : int
-            integer indicating the verbosity level. 0: Print nothing (except
-            errors...); 1: Print basic warnings (default); 2: Print basic debug
-            info
         """
         # Dictionary from name to scratch data buffers as ProcChainVar
         self._vars_dict = {}
@@ -287,24 +289,31 @@ class ProcessingChain:
 
         self._block_width = block_width
         self._buffer_len = buffer_len
-        self._verbosity = verbosity
 
-
-    def add_variable(self, name, dtype=auto, shape=auto, grid=auto, unit=auto, is_coord=auto, period=None, offset=0):
+    def add_variable(self, name, dtype=auto, shape=auto, grid=auto, unit=auto,
+                     is_coord=auto, period=None, offset=0):
         """Add a named variable containing a block of values or arrays
+
         Parameters
         ----------
-        name : name of variable
-        dtype : numpy dtype or type string. Default is None, meaning dtype
-            will be deduced later, if possible
-        shape : length or shape tuple of element. Default is None, meaning
-            length will be deduced later, if possible
-        grid : CoordinateGrid for variable, containing period and offset
-        period : unit with period of waveform associated with object. Do
-            not use if grid is provided
-        offset : unit with offset of waveform associated with object. Require
-            a period to be provided
-        is_coord : if True, transform value based on period and offset
+        name : str
+            name of variable
+        dtype : numpy.dtype or type string, optional, default=None
+            default is None, meaning dtype will be deduced later, if possible
+        shape : length or shape tuple of element, optional, default=None
+            default is None, meaning length will be deduced later, if possible
+        grid : CoordinateGrid
+            for variable, containing period and offset
+        unit
+            DOCME
+        period : unit
+            with period of waveform associated with object. Do not use if grid
+            is provided
+        offset : unit
+            with offset of waveform associated with object. Require a period to
+            be provided
+        is_coord : bool
+            if True, transform value based on period and offset
         """
         self._validate_name(name, raise_exception=True)
         if name in self._vars_dict:
@@ -327,7 +336,7 @@ class ProcessingChain:
 
         Parameters
         ----------
-        varname
+        varname : str
             name of internal variable to copy into buffer at the end
             of processor execution. If variable does not yet exist, it will
             be created with a similar shape to the provided buffer
@@ -371,7 +380,7 @@ class ProcessingChain:
         else:
             raise ProcessingChainError("Could not link input buffer of unknown type", str(buff))
 
-        self._print(2, "Added input buffer:", str(out_man))
+        log.debug(f"added input buffer: {out_man}")
         self._input_managers.append(out_man)
 
         return buff
@@ -426,7 +435,7 @@ class ProcessingChain:
         else:
             raise ProcessingChainError("Could not link output buffer of unknown type", str(buff))
 
-        self._print(2, "Added output buffer:", str(out_man))
+        log.debug(f"added output buffer: {out_man}")
         self._output_managers.append(out_man)
 
         return buff
@@ -510,11 +519,12 @@ class ProcessingChain:
 
     def _parse_expr(self, node, expr, dry_run, var_name_list):
         """
-        helper function for get_variable that recursively evaluates the AST tree
-        based on: https://stackoverflow.com/a/9558001. Whenever we encounter
-        a variable name, add it to var_name_list (which should begin as an
-        empty list). Only add new variables and processors to the chain if
-        dry_run is True
+        helper function for get_variable that recursively evaluates the AST
+        tree. Whenever we encounter a variable name, add it to var_name_list
+        (which should begin as an empty list). Only add new variables and
+        processors to the chain if dry_run is True.
+
+        Based on: https://stackoverflow.com/a/9558001
         """
         if node is None:
             return None
@@ -582,7 +592,6 @@ class ProcessingChain:
             return out
 
         elif isinstance(node, ast.Subscript):
-            # print(ast.dump(node))
             val = self._parse_expr(node.value, expr, dry_run, var_name_list)
             if val is None: return None
             if not isinstance(val, ProcChainVar):
@@ -597,8 +606,7 @@ class ProcessingChain:
                 if isinstance(ret, float):
                     round_ret = int(round(ret))
                     if abs(ret - round_ret) > 0.0001:
-                        self._print(0, 'Slice value', str(slice_value), \
-                                    'is non-integer. Rounding to', round_ret)
+                        log.debug(f'slice value {slice_value} is non-integer. Rounding to {round_ret}')
                     return round_ret
                 return int(ret)
 
@@ -674,22 +682,24 @@ class ProcessingChain:
                     var.update_auto(*args, **kwargs)
                     return self._vars_dict[var_name]
                 elif not dry_run:
-                    print(args, kwargs)
+                    log.debug(f"{args} {kwargs}")
                     return self.add_variable(var_name, *args, **kwargs)
                 else:
                     return None
 
             else:
-                raise ProcessingChainError("Do not recognize call to "+func+" with arguments " + str([str(arg.__dict__) for arg in node.args]))
+                raise ProcessingChainError(
+                    f"""do not recognize call to {func} with arguments
+                    {[str(arg.__dict__) for arg in node.args]}""")
 
-        raise ProcessingChainError("Cannot parse AST nodes of type " + str(node.__dict__))
+        raise ProcessingChainError(f"cannot parse AST nodes of type {node.__dict__}")
 
     def _validate_name(self, name, raise_exception=False):
         """Check that name is alphanumeric, and not an already used keyword"""
         isgood = re.match(r"\A\w+$", name) and name not in self.func_list \
             and not name in ureg
         if raise_exception and not isgood:
-            raise ProcessingChainError(name+" is not a valid variable name")
+            raise ProcessingChainError(f"{name} is not a valid variable name")
         return isgood
 
 
@@ -716,17 +726,6 @@ class ProcessingChain:
         for out_man in self._output_managers:
             out_man.write(begin, end)
 
-
-
-    def _print(self, verbosity, *args, **kwargs):
-        """Helper for output that checks verbosity before printing and
-        converts things into strings. At verbosity 0, print to stderr"""
-        if verbosity==0 and not 'file' in kwargs:
-            kwargs['file']=sys.stderr
-        if self._verbosity >= verbosity:
-            print(*[str(arg) for arg in args], **kwargs)
-
-
     def __str__(self):
         return 'Input variables:\n  ' \
         + '\n  '.join([str(in_man) for in_man in self._input_managers]) \
@@ -741,9 +740,9 @@ class ProcessingChain:
         if var is None:
             return None
         if not isinstance(var, ProcChainVar):
-            raise ProcessingChainError("Cannot call len() on " + str(var))
-        if not len(var.buffer.shape)==2:
-            raise ProcessingChainError(str(var)+" has wrong number of dims")
+            raise ProcessingChainError(f"cannot call len() on {var}")
+        if not len(var.buffer.shape) == 2:
+            raise ProcessingChainError(f"{var} has wrong number of dims")
         return var.buffer.shape[1]
 
     # round value
@@ -756,14 +755,11 @@ class ProcessingChain:
             raise ProcessingChainError("round() is not implemented for variables, only constants.")
 
     # dict of functions that can be parsed by get_variable
-    func_list = {'len':_length,
-                 'round':_round, }
+    func_list = {'len':_length, 'round':_round, }
 
 
-###########################################################################
-# The class that calls processors and makes sure variables are compatible #
-###########################################################################
 class ProcessorManager:
+    """The class that calls processors and makes sure variables are compatible."""
 
     @dataclass
     class DimInfo:
@@ -797,7 +793,9 @@ class ProcessorManager:
         if types is None:
             types = func.types.copy()
         if types is None:
-            raise ProcessingChainError("Could not find a type signature list for " + func.__name__ + ". Please supply a valid list of types.")
+            raise ProcessingChainError(f"""could not find a type signature list
+                                       for {func.__name__}. Please supply a
+                                       valid list of types.""")
         if not isinstance(types, list):
             types = [types]
         found_types = [ typestr.replace('->', '') for typestr in types]
@@ -807,7 +805,10 @@ class ProcessorManager:
         dims_list = re.findall(r"\((.*?)\)", self.signature)
 
         if not len(dims_list)==len(params)+len(kw_params):
-            raise ProcessingChainError("Expected {} arguments from signature {}; found {}: ({})".format(len(dims_list), self.signature, len(params), ', '.join([str(par) for par in params])))
+            raise ProcessingChainError(
+                f"""expected {len(dims_list)} arguments from signature
+                {self.signature}; found {len(params)}: ({', '.join([str(par)
+                for par in params])})""")
 
         dims_dict = {} # map from dim name -> DimInfo
         outerdims = [] # list of DimInfo
@@ -837,15 +838,21 @@ class ProcessorManager:
                 fd = fun_dims[-i-1] if i<len(fun_dims) else None
                 ad = arr_dims[-i-1] if i<len(arr_dims) else None
 
-                if(isinstance(fd, str)):
+                if (isinstance(fd, str)):
                     if fd in dims_dict:
                         this_dim = dims_dict[fd]
                         if not ad or this_dim.length!=ad:
-                            raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Could not find consistent value for dimension "+fd)
+                            raise ProcessingChainError(
+                                f"""failed to broadcast array dimensions for
+                                {func.__name}. Could not find consistent value
+                                for dimension {fd}""")
                         if not this_dim.grid:
                             dims_dict[fd].grid = arr_grid
                         elif arr_grid and arr_grid!=this_dim.grid:
-                            self._print(0, "Arrays of dimension", fd, "for", func.__name__, "do not have consistent period and offset!")
+                            log.debug(
+                                f"""arrays of dimension {fd} for
+                                {func.__name__} do not have consistent period
+                                and offset!""")
                     else:
                         dims_dict[fd] = self.DimInfo(ad, arr_grid)
 
@@ -864,23 +871,30 @@ class ProcessorManager:
                         outerdims.insert(len(fun_dims)-i, self.DimInfo(ad, arr_grid))
                         fun_dims.insert(len(fun_dims)-i, ad)
                     else:
-                        raise ProcessingChainError("Failed to broadcast array dimensions for "+func.__name__+". Input arrays do not have consistent outer dimensions. Require: "+str(tuple(dim.length for dim in outerdims+fun_dims))+"; found "+str(tuple(arr_dims)) + " for "+str(param))
+                        raise ProcessingChainError(
+                            f"""failed to broadcast array dimensions for
+                            {func.__name__}. Input arrays do not have
+                            consistent outer dimensions.  Require:
+                            {tuple(dim.length for dim in outerdims+fun_dims)};
+                            found {tuple(arr_dims)} for {param}""")
                 elif not fd.grid:
                     outerdims[len(fun_dims)-i].grid = arr_grid
 
                 elif arr_grid and fd.grid!=arr_grid:
-                    self._print(0, "Arrays of dimension", fd, "for", func.__name__, "do not have consistent period and offset!")
+                    log.debug(f"""arrays of dimension {fd} for {func.__name__}
+                              do not have consistent period and offset!""")
 
                 arr_grid = None # this is only used for inner most dim
 
 
         # Get the type signature we are using
-        if(not found_types):
-            error_str = "Could not find a type signature matching the types of the variables given for " + str(self) + " (types: " + str(types) + ")"
+        if not found_types:
             for param in it.chain(self.params, self.kw_params.values()):
                 if not isinstance(param, ProcChainVar): continue
                 error_str += '\n\t' + str(param) + ': ' + str(param.dtype)
-            raise ProcessingChainError(error_str)
+            raise ProcessingChainError(
+                f"""Could not find a type signature matching the types of the
+                variables given for {self} (types: {types})""")
         # Use the first types in the list that all our types can be cast to
         self.types = [np.dtype(t) for t in found_types[0]]
 
@@ -896,7 +910,7 @@ class ProcessorManager:
             for d in dims.split(','):
                 if not d: continue
                 if not d in dims_dict:
-                    raise ProcessingChainError("Could not deduce dimension " + d + " for " + str(param))
+                    raise ProcessingChainError(f"Could not deduce dimension {d} for {param}")
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
@@ -933,7 +947,9 @@ class ProcessorManager:
                     if ureg.is_compatible_with(ureg.dimensionless, param):
                         param = float(param)
                     elif not isinstance(grid, CoordinateGrid) or not ureg.is_compatible_with(grid.period, param):
-                        raise ProcessingChainError("Could not find valid conversion for " + str(param) + "; CoordinateGrid is "+str(grid))
+                        raise ProcessingChainError(
+                            f"""could not find valid conversion for {param};
+                            CoordinateGrid is {grid}""")
                     else:
                         param = float(param/grid.period)
                 if np.issubdtype(dtype, np.integer):
@@ -944,7 +960,7 @@ class ProcessorManager:
             if arg_name is None: self.args.append(param)
             else: self.kwargs[arg_name] = param
 
-        self.proc_chain._print(2, 'Added processor:', str(self))
+        log.debug(f'added processor: {self}')
 
     def execute(self):
         self.processor(*self.args, **self.kwargs)
@@ -954,9 +970,9 @@ class ProcessorManager:
             + ", ".join([str(par) for par in self.params] + [f"{k}={str(v)}" for k, v in self.kw_params.items()]) + ')'
 
 
-
-# A special processor manager for handling converting variables between unit systems
 class UnitConversionManager(ProcessorManager):
+    """A special processor manager for handling converting variables between unit systems"""
+
     @vectorize(nopython=True, cache=True)
     def convert(buf_in, offset_in, offset_out, period_ratio):
         return (buf_in - offset_in) * period_ratio + offset_out
@@ -977,17 +993,16 @@ class UnitConversionManager(ProcessorManager):
                            unit.get_offset(), period_ratio, self.out_buffer]
         self.kwargs = {}
 
-        self.proc_chain._print(2, 'Added conversion:', str(self))
+        log.debug(f'added conversion: {self}')
 
-##########################################################################
-# Now, classes to manage I/O from buffers into ProcessingChain variables #
-##########################################################################
 
-# Base class. IOManagers will be associated with a type of input/output
-#  buffer, and must define a read and write for each one. __init__ methods
-#  should update variable with any information from buffer, and check that
-#  buffer and variable are compatible.
 class IOManager(metaclass=ABCMeta):
+    """
+    Base class. IOManagers will be associated with a type of input/output
+    buffer, and must define a read and write for each one. __init__ methods
+    should update variable with any information from buffer, and check that
+    buffer and variable are compatible.
+    """
     @abstractmethod
     def read(self, start: int, end: int):
         pass
@@ -1011,7 +1026,10 @@ class NumpyIOManager(IOManager):
                         shape = io_buf.shape[1:])
 
         if var.shape != io_buf.shape[1:] or var.dtype != io_buf.dtype:
-            raise ProcessingChainError(r"numpy.array<{}>\{{}\}@{}) is not compatible with variable {}".format(self.io_buf.shape, self.io_buf.dtype, self.io_buf.data, str(self.var)))
+            raise ProcessingChainError(
+                r"""numpy.array<{}>\{{}\}@{}) is not compatible with variable
+                {}""".format(self.io_buf.shape, self.io_buf.dtype,
+                             self.io_buf.data, str(self.var)))
 
         self.io_buf = io_buf
         self.var = var
@@ -1026,7 +1044,7 @@ class NumpyIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self):
-        return f'{str(self.var)} linked to numpy.array({self.io_buf.shape}, {self.io_buf.dtype})@{self.io_buf.data})'
+        return f"""{self.var} linked to numpy.array({self.io_buf.shape}, {self.io_buf.dtype})@{self.io_buf.data})"""
 
 
 class LGDOArrayIOManager(IOManager):
@@ -1040,7 +1058,10 @@ class LGDOArrayIOManager(IOManager):
                         unit = unit )
 
         if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError(f'LGDO object {self.io_buf.form_datatype()}@{self.raw_buf.data} is incompatible with {str(self.var)}')
+            raise ProcessingChainError(
+                f"""LGDO object
+                {self.io_buf.form_datatype()}@{self.raw_buf.data} is
+                incompatible with {str(self.var)}""")
 
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
@@ -1048,7 +1069,9 @@ class LGDOArrayIOManager(IOManager):
             elif ureg.is_compatible_with(var.unit.period, unit):
                 unit = ureg.Quantity(unit).u
             else:
-                raise ProcessingChainError(f"LGDO array and variable {str(var)} have incompatible units ({str(var.unit.period.u)} and {str(unit)})")
+                raise ProcessingChainError(
+                    f"""LGDO array and variable {var} have incompatible units
+                    ({var.unit.period.u} and {unit})""")
 
         if unit is None and not var.unit is None:
             io_array.attrs['units'] = str(var.unit)
@@ -1068,10 +1091,9 @@ class LGDOArrayIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self):
-        return f'{str(self.var)} linked to {str(self.io_array)}'
+        return f'{self.var} linked to {self.io_array}'
 
 
-# Waveforms
 class LGDOWaveformIOManager(IOManager):
     def __init__(self, wf_table: lh5.WaveformTable, variable: ProcChainVar):
         assert isinstance(wf_table, lh5.WaveformTable) \
@@ -1098,8 +1120,7 @@ class LGDOWaveformIOManager(IOManager):
                                                dtype = self.t0_buf.dtype,
                                                grid = None,
                                                unit = dt_units,
-                                               is_coord = True)
-                                  )
+                                               is_coord = True))
         else:
             grid = None
 
@@ -1134,14 +1155,12 @@ class LGDOWaveformIOManager(IOManager):
         if self.variable_t0:
             self.t0_buf[start:end, ...] = self.t0_var[0:end-start, ...]
 
-
     def __str__(self):
-        return  f'{str(self.var)} linked to <pygama.lgdo.WaveformTable: values: {str(self.wf_table.values)}, dt: {str(self.wf_table.dt)}, t0: {str(self.wf_table.t0)}>'
-
+        return f"""{self.var} linked to <pygama.lgdo.WaveformTable: values: {self.wf_table.values}, dt: {self.wf_table.dt}, t0: {self.wf_table.t0}>"""
 
 
 def build_processing_chain(lh5_in, dsp_config, db_dict = None,
-                           outputs = None, verbosity=1, block_width=16):
+                           outputs = None, block_width=16):
     """
     Produces a ProcessingChain object and an lh5 table for output parameters
     from an input lh5 table and a json recipe.
@@ -1195,12 +1214,6 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         and use the found value. If no value is found, use the default
         defined in the config file.
 
-    verbosity : int, optional
-        0: Print nothing (except errors...)
-        1: Print basic warnings (default)
-        2: Print basic debug info
-        3: Print friggin' everything!
-
     block_width : int, optional
         number of entries to process at once. To optimize performance,
         a multiple of 16 is preferred, but if performance is not an issue
@@ -1213,7 +1226,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         field_mask : List of input fields that are used
         lh5_out : output lh5 table containing processed values
     """
-    proc_chain = ProcessingChain(block_width, lh5_in.size, verbosity = verbosity)
+    proc_chain = ProcessingChain(block_width, lh5_in.size)
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as f:
@@ -1248,15 +1261,15 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     db_node = db_dict
                     for key in db_var[3:].split('.'):
                         db_node = db_node[key]
-                    if(verbosity>0):
-                        print("Database lookup: found", db_node, "for", db_var)
+                    log.debug(f"database lookup: found {db_node} for {db_var}")
                 except (KeyError, TypeError):
                     try:
                         db_node = node['defaults'][db_var]
-                        if(verbosity>0):
-                            print("Database lookup: using default value of", db_node, "for", db_var)
+                        log.debug(f"Database lookup: using default value of {db_node} for {db_var}")
                     except (KeyError, TypeError):
-                        raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                        raise ProcessingChainError(
+                            f"""did not find {db_var} in database, and could
+                            not find default value.""")
                 if arg==db_var: arg = db_node
                 else: arg = arg.replace(db_var, str(db_node))
             args[i] = arg
@@ -1271,17 +1284,19 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                         prereqs.append(prereq)
             node['prereqs'] = prereqs
 
-        if verbosity>=2:
-            print("Prereqs for", key, "are", node['prereqs'])
+        log.debug(f"prereqs for {key} are {node['prereqs']}")
 
     processors.update(multi_out_procs)
 
-    # Recursive function to crawl through the parameters/processors and get
-    # a sequence of unique parameters such that parameters always appear after
-    # their dependencies. For parameters that are not produced by the ProcChain
-    # (i.e. input/db parameters), add them to the list of leafs
-    # https://www.electricmonk.nl/docs/dependency_resolving_algorithm/dependency_resolving_algorithm.html
     def resolve_dependencies(par, resolved, leafs, unresolved=[]):
+        """
+        Recursive function to crawl through the parameters/processors and get a
+        sequence of unique parameters such that parameters always appear after
+        their dependencies. For parameters that are not produced by the
+        ProcessingChain (i.e. input/db parameters), add them to the list of leafs
+
+        https://www.electricmonk.nl/docs/dependency_resolving_algorithm/dependency_resolving_algorithm.html
+        """
         if par in resolved:
             return
         elif par in unresolved:
@@ -1317,17 +1332,16 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
             resolve_dependencies(out_par, proc_par_list, input_par_list)
             out_par_list.append(out_par)
 
-    if verbosity>0:
-        print('Processing parameters:', str(proc_par_list))
-        print('Required input parameters:', str(input_par_list))
-        print('Copied output parameters:', str(copy_par_list))
-        print('Processed output parameters:', str(out_par_list))
+    log.debug(f'processing parameters: {proc_par_list}')
+    log.debug(f'required input parameters: {input_par_list}')
+    log.debug(f'copied output parameters: {copy_par_list}')
+    log.debug(f'processed output parameters: {out_par_list}')
 
     # Now add all of the input buffers from lh5_in (and also the clk time)
     for input_par in input_par_list:
         buf_in = lh5_in.get(input_par)
         if buf_in is None:
-            print("I don't know what to do with " + input_par + ". Building output without it!")
+            log.warning(f"I don't know what to do with {input_par}. Building output without it!")
         proc_chain.link_input_buffer(input_par, buf_in)
 
     # now add the processors
@@ -1361,15 +1375,15 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                         db_node = db_dict
                         for key in db_var[3:].split('.'):
                             db_node = db_node[key]
-                        if(verbosity>0):
-                            print("Database lookup: found", db_node, "for", db_var)
+                        log.debug(f"database lookup: found {db_node} for {db_var}")
                     except (KeyError, TypeError):
                         try:
                             db_node = recipe['defaults'][db_var]
-                            if(verbosity>0):
-                                print("Database lookup: using default value of", db_node, "for", db_var)
+                            log.debug("database lookup: using default value of {db_node} for {db_var}")
                         except (KeyError, TypeError):
-                            raise ProcessingChainError('Did not find', db_var, 'in database, and could not find default value.')
+                            raise ProcessingChainError(
+                                f"""did not find {db_var} in database, and
+                                could not find default value.""")
 
                     if arg==db_var: arg = db_node
                     else: arg = arg.replace(db_var, str(db_node))
@@ -1382,14 +1396,13 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                 else:
                     init_args.append(arg)
 
-            if(verbosity>1):
-                print("Building function from init_args: {}({})".format(func.__name__, ", ".join([f"{a}" for a in init_args] + [f"{k}={v}" for k, v in init_kwargs.items()])))
+            expr = ", ".join([f"{a}" for a in init_args] + [f"{k}={v}" for k, v in init_kwargs.items()])
+            log.debug(f"""building function from init_args: {func.__name__}({expr})""")
             func = func(*init_args)
         except KeyError:
             pass
 
         proc_chain.add_processor(func, *args, **kwargs)
-
 
     # build the output buffers
     lh5_out = lh5.Table(size=proc_chain._buffer_len)
@@ -1398,7 +1411,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     for copy_par in copy_par_list:
         buf_in = lh5_in.get(copy_par)
         if buf_in is None:
-            print("I don't know what to do with " + copy_par + ". Building output without it!")
+            log.warning(f"I don't know what to do with {copy_par}. Building output without it!")
         else:
             lh5_out.add_field(copy_par, buf_in)
 
