@@ -1,82 +1,83 @@
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 
+# later on we might want a tcm class, or interface / inherit from an entry list
+# class. For now we just need the key clustering functionality
 
-def cluster_events(tb_list:list, ts_unit:float=1e-8, ch_col:str='channel',
-                   ts_col:str='timestamp', coin_window:float=4e-6,
-                   data_cols:list=None):
+def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last',
+                      array_ids:list=None, array_idxs:list=None):
     """
-    Create a time coincidence map (TCM), given a list of data tables from separate channels.
-    Assume that all tables are from different channels in a SINGLE cycle file.
-    Hopefully we won't need to extend this to event building across multiple cycles
-    as in Majorana.
-    - Sort events in DataFrames by strictly ascending timestamps
-    - Group hits if the difference between times is less than `coin_window` (default length 4*us)
-    - Don't allow events from the same channel into any event.
-    - TODO: add a "t_offset" output column which is the time since the FIRST hit in the event.
+    Generate the columns of a time coincidence map from a list of arrays of
+    coincidence data (e.g. hit times from different channels). Returns 3
+    equal-length ndarrays containing the coincidence index (e.g. event number),
+    array id (e.g. channel number), and array index (e.g. hit id). These can be
+    used to retrieve other data at the same tier as the input data into
+    coincidence structures.
+
+    Makes use of pandas DataFrame's concat, sort, groupby, and cumsum/count
+    functions:
+    - pull data into a DataFrame
+    - Sort events by strictly ascending value of coin_col
+    - Group hits if the difference in coin_data is less than coin_window
 
     Parameters
     ----------
-    tb_list : list
-        A list of N tables containing 'channel' & 'timestamp' columns.
-    ts_unit : float (optional)
-        Conversion factor for timestamps in native units to SECONDS.
-    ch_col : str (optional)
-        Name of the common column to use as 'channel'.  Default is 'channel'.
-    ts_col : str (optional)
-        Name of the common column to use as 'timestamp'.  Default is 'timestamp'.
+    coin_data : list of ndarrays
+        A list of ndarrays of the data to be clustered
     coin_window : float (optional)
-        The default clustering time in seconds. (4e-6 sec is good for HPGe detectors)
-        If events in other channels occur within the first window, extend the window
-        by this amount and search again.
-    data_cols : list (optional)
-        Copy over additional columns (such as DSP parameters) when we sort events together
-        by timestamps.  This is handy for event building DSP files with pandas, then
-        optionally converting back to LH5 tables for file i/o.
+        The clustering window. coin_data within the coin_window get aggregated
+        into the same coincidence cluster. A value of 0 means an equality test.
+    window_ref : str
+        When testing one datum for inclusion in a cluster, test if it is within
+        coin_window of
+        'first' -- the first element in the cluster (rigid window width) (not
+        implemented yet)
+        'last' -- the last element in the clustur (window grows until two data
+        are separated by more than coin_window)
+        In the future, can add more options, like mean/median/mode
+    array_ids : list of ints or None
+        If provided, use array_ids in place of "index in coin_data" as the
+        integer corresponding to each element of coin_data (e.g. a channel
+        number)
+    array_idxs : list of indices or None
+        If provided, use these values in places of df.index for the return
+        values of array_idx
 
     Returns
     -------
-    tcm : DataFrame
-        Return a table with NEW columns: ['ix_evt','ix_hit','tcm_sec','tcm_dt','idx_row_{ch}'].
-        If data_cols is set, these columns will be added to the input tables,
-        usually dsp data.
+    col_dict : dict of ndarrays
+        keys are 'coin_idx', 'array_id', and 'array_idx'
+        coin_idx specifies which rows of the output arrays correspond to the
+        which coincidence event
+        array_id and array_idx specify the location in coin_data of each datum
+        belonging to the coincidence event
     """
-    if not isinstance(tb_list[0], pd.DataFrame):
-        print("LH5 tables not supported yet, but easy, just need to convert them to DataFrame")
-        return None
+    dfs = []
+    for ii, array in enumerate(coin_data):
+        array = np.array(array)
+        array_id = array_ids[ii] if array_ids is not None else ii
+        array_id = np.full_like(array, array_id)
+        col_dict = {'array_id':array_id, 'coin_data':array}
+        if array_idxs is not None: col_dict['array_idx'] = array_idxs[ii]
+        dfs.append(pd.DataFrame(col_dict, copy=False))
 
-    # create 'ts_sec' timestamps for each channel, using the supplied conversion to seconds.
-    for df in tb_list:
-        df['tcm_sec'] = df[ts_col] * ts_unit
+    # concat and sort
+    tcm = pd.concat(dfs).sort_values(['coin_data', 'array_id'])
 
-        # throw an error if we detect resetting timestamps
-        ts = df['tcm_sec'].values
-        tdiff = np.diff(ts)
-        tdiff = np.insert(tdiff, 0 , 0)
-        ix_resets = np.where(tdiff < 0)
-        if len(ix_resets[0]) > 0:
-            print('Warning! timestamps reset for this channel.  TC map will be total nonsense!  AAAAAHHH')
+    # compute coin_data diffs
+    tcm['dcoin'] = tcm['coin_data'].diff()
 
-        # save the original index for reverse lookup
-        # chan = df[ch_col].unique()[0]
-        # df[f'ix_row_{chan}'] = df.index.values
+    # window into coincidences
+    if window_ref == 'last':
+        # create the event column by comparing the time since last event to the coincindence window
+        tcm['coin_idx'] = (tcm.dcoin > coin_window).cumsum()
+    else:
+        raise NotImplementedError(f'window_ref {window_ref}')
 
-    # # make a list of columns from the input tables we want to copy over
-    # copy_cols = ['tcm_sec'] + ch_rows
-    # if data_cols is not None:
-    #     copy_cols.extend(data_cols)
-    # copy_cols = sorted(list(set(copy_cols))) # drop duplicates
-
-    # create a new dataframe where we SORT ALL ROWS by a strictly ascending timestamp
-    dfs = tb_list
-    tcm = pd.concat(dfs).sort_values('tcm_sec')
-    tcm.reset_index(inplace=True, drop=True)
-
-    # create the event column by comparing the time since last event to the coincindence window
-    tcm['tcm_dt'] = tcm['tcm_sec'].diff()
-    tcm['ix_evt'] = (tcm.tcm_dt > coin_window).cumsum()
-
-    # create the sub-event column (groupbys are easy with pandas, hard with LH5 tables.)
-    tcm['ix_hit'] = tcm.groupby(tcm.ix_evt).cumcount()
-
-    return tcm
+    # now build the outputs
+    coin_idx = tcm.coin_idx.to_numpy()
+    array_id = tcm.array_id.to_numpy()
+    array_idx = tcm.array_idx.to_numpy() if 'array_idx' in tcm else tcm.index.to_numpy() # beautiful!
+    return { 'coin_idx':coin_idx, 'array_id':array_id, 'array_idx':array_idx }

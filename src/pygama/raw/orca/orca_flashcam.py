@@ -343,6 +343,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             # we are going to subtract 1 from fcid for the keys, so it better start from 1
             if fcid == 0: raise ValueError("got fcid=0 unexpectedly!")
 
+            obj_info_dict = header.get_object_info('ORFlashCamADCModel')
             self.nadc[fcid] = 0
             for child in info['children']:
                 # load self.fcid
@@ -352,8 +353,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
                 self.fcid[crate][card] = fcid
 
                 # load self.nadc
-                card_info = header['ObjectInfo']['Crates'][crate]['Cards'][card]
-                self.nadc[fcid] += np.count_nonzero(card_info['Enabled'])
+                self.nadc[fcid] += np.count_nonzero(obj_info_dict[crate][card]['Enabled'])
 
             # we are going to shift by 1000 for each fcid, so we better not have that many adcs!
             if self.nadc[fcid] > 1000: raise ValueError(f"got too many adc's! ({nadc})")
