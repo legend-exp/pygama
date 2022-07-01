@@ -1,12 +1,11 @@
 """
 pygama utility functions.
 """
+import logging
 import sys
 
 import numpy as np
 import tqdm
-
-import logging
 
 log = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
         ...
 
     Can be converted to the following
-    
+
     .. code-block:: python
 
         for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
@@ -45,10 +44,6 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
         horizontal length of the bar in cursor spaces
     unit : str
         physical units to be displayed
-    Returns
-    -------
-    iterable : tqdm.trange
-        object that can be iterated over in a for loop
     """
     hide_bar = True
     if isinstance(verbose, int):

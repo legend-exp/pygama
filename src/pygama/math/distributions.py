@@ -11,9 +11,18 @@ allocated for this array, slowing things down.
 """
 
 from pygama.math.functions.crystall_ball import nb_xtalball_cdf, nb_xtalball_pdf
-from pygama.math.functions.gauss import nb_gauss, nb_gauss_cdf, nb_gauss_norm, nb_gauss_pdf
+from pygama.math.functions.gauss import (
+    nb_gauss,
+    nb_gauss_cdf,
+    nb_gauss_norm,
+    nb_gauss_pdf,
+)
 from pygama.math.functions.gauss_on_background import nb_gauss_linear, nb_gauss_uniform
-from pygama.math.functions.gauss_step import nb_gauss_step, nb_gauss_step_cdf, nb_gauss_step_pdf
+from pygama.math.functions.gauss_step import (
+    nb_gauss_step,
+    nb_gauss_step_cdf,
+    nb_gauss_step_pdf,
+)
 from pygama.math.functions.gauss_with_tail import (
     nb_exgauss,
     nb_gauss_tail_approx,

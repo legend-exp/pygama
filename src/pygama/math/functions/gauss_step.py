@@ -9,7 +9,6 @@ import numpy as np
 from pygama.math.functions.gauss import nb_gauss_cdf, nb_gauss_norm
 from pygama.math.functions.step import nb_step_cdf, nb_step_pdf
 
-
 kwd = {"parallel": False, "fastmath": True}
 
 

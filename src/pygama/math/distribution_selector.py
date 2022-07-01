@@ -5,7 +5,6 @@ import logging
 
 import numpy as np
 
-from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 from pygama.math.distributions import (
     nb_extended_hpge_peak_pdf,
     nb_gauss_step,
@@ -14,6 +13,7 @@ from pygama.math.distributions import (
     nb_hpge_peak_cdf,
     nb_hpge_peak_pdf,
 )
+from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 
 log = logging.getLogger(__name__)
 

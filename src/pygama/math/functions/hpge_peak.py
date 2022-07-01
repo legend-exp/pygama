@@ -1,15 +1,14 @@
 """
 Radford Ge peak shape distributions for pygama
 """
-import numpy as np
 import numba as nb
+import numpy as np
 
 from pygama.math.functions.gauss_with_tail import (
     nb_gauss_with_tail_cdf,
     nb_gauss_with_tail_pdf,
 )
 from pygama.math.functions.step import nb_step_cdf, nb_step_pdf
-
 
 kwd = {"parallel": False, "fastmath": True}
 

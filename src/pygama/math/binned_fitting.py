@@ -277,7 +277,7 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
     >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
     """
     pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
-    if pars is None or cov is None: 
+    if pars is None or cov is None:
         log.warning("fit binned failed to work in gauss_mode_max")
         raise Exception
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns

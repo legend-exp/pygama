@@ -1,8 +1,8 @@
 """
 Gaussian distributions on linear and uniform backgrounds for pygama
 """
-import numpy as np
 import numba as nb
+import numpy as np
 
 from pygama.math.functions.gauss import nb_gauss_norm
 

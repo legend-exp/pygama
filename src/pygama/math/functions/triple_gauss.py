@@ -3,8 +3,8 @@ Double Gaussian distributions with different backgrounds for pygama
 """
 import math
 
-import numpy as np
 import numba as nb
+import numpy as np
 
 from pygama.math.functions.gauss import nb_gauss_norm
 from pygama.math.functions.step import nb_step_pdf
