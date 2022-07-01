@@ -41,6 +41,7 @@ def test_gimme_group(lgnd_file):
 
 def test_ls(lgnd_file):
     assert lh5.ls(lgnd_file) == ['geds']
+    assert lh5.ls(lgnd_file, '/*/raw') == ['geds/raw']
     assert lh5.ls(lgnd_file, 'geds/raw/') == [
         'geds/raw/baseline',
         'geds/raw/channel',
