@@ -1,3 +1,8 @@
+"""
+Base classes for streaming data.
+"""
+from __future__ import annotations
+
 import logging
 from abc import ABC
 
@@ -7,20 +12,18 @@ log = logging.getLogger(__name__)
 
 
 class DataStreamer(ABC):
-    """ Base clase for data streams
+    """Base clase for data streams.
 
     Provides a uniform interface for streaming, e.g.:
 
-    > header = ds.open_stream(stream_name)
-    > for chunk in ds: do_something(chunk)
+    >>> header = ds.open_stream(stream_name)
+    >>> for chunk in ds: do_something(chunk)
 
-    Also provides default management of the RawBufferLibrary used for data reading:
-    - allocation (if needed)
-    - configuration (to match the stream)
-    - fill level checking
-
-    Derived classes must define the functions get_decoder_list(), open_stream(),
-    and read_packet(); see below.
+    Also provides default management of the :class:`.RawBufferLibrary` used for
+    data reading: allocation (if needed), configuration (to match the stream)
+    and fill level checking.  Derived classes must define the functions
+    :meth:`.get_decoder_list`, :meth:`.open_stream`, and :meth:`.read_packet`;
+    see below.
     """
 
     def __init__(self):
@@ -30,20 +33,21 @@ class DataStreamer(ABC):
         self.any_full = False
         self.packet_id = 0
 
+    def open_stream(self, stream_name: str, rb_lib: RawBufferLibrary = None,
+                    buffer_size: int = 8192, chunk_mode: str = 'any_full',
+                    out_stream: str = '') -> tuple[list[RawBuffer], int]:
+        """Open and initialize a data stream.
 
-    def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
-                    chunk_mode='any_full', out_stream=''):
-        """ Open and initialize a data stream
+        Open the stream, read in the header, set up the buffers.
 
-        Open the stream, read in the header, set up the buffers
+        Call ``super().initialize([args])`` from derived class after loading
+        header info to run this default version that sets up buffers in
+        ``rb_lib`` using the stream's decoders.
 
-        Call super().initialize([args]) from derived class after loading header
-        info to run this default version that sets up buffers in rb_lib using
-        the stream's decoders
-
-        Note: this default version has no actual return value! You must overload
-        this function, set self.n_bytes_read to the header packet size, and
-        return the header data
+        .. note::
+            this default version has no actual return value! You must overload
+            this function, set :attr:`self.n_bytes_read` to the header packet
+            size, and return the header data.
 
         Parameters
         ----------
@@ -126,24 +130,21 @@ class DataStreamer(ABC):
             if dec_name not in dec_names:
                 log.warning("no decoder named {dec_name} requested by rb_lib")
 
-
-
     def close_stream(self):
-        """ close this data stream. needs to be implemented in derived class """
+        """Close this data stream.
+
+        .. note::
+            Needs to be overloaded.
+        """
         pass
 
+    def read_packet(self) -> bool:
+        """Reads a single packet's worth of data in to the
+        :class:`.RawBufferLibrary`.
 
-
-    def read_packet(self):
-        """
-        Reads a single packet's worth of data in to the rb_lib
-
-        Needs to be overloaded. Gets called by read_chunk()
-
-        Needs to update self.any_full if any buffers would possibly over-fill on
-        the next read
-
-        Needs to update self.n_bytes_read too
+        Needs to be overloaded. Gets called by :meth:`.read_chunk` Needs to
+        update :attr:`self.any_full` if any buffers would possibly over-fill on
+        the next read. Needs to update :attr:`self.n_bytes_read` too.
 
         Returns
         -------
@@ -152,29 +153,29 @@ class DataStreamer(ABC):
         """
         return True
 
-
-    def read_chunk(self, chunk_mode_override=None, rp_max=1000000, clear_full_buffers=True):
-        """
-        Reads a chunk of data into raw buffers
+    def read_chunk(self, chunk_mode_override: str = None, rp_max: int = 1000000,
+                   clear_full_buffers: bool = True) -> tuple[list[RawBuffer], int]:
+        """Reads a chunk of data into raw buffers.
 
         Reads packets until at least one buffer is too full to perform another
         read.
 
-        Note: user is responsible for resetting / clearing the raw buffers prior
-        to calling read_chunk again.
+        .. note::
+            user is responsible for resetting / clearing the raw buffers prior
+            to calling :meth:`.read_chunk` again.
 
-        Default version just calls read_packet() over and over. Overload as
-        necessary.
+        Default version just calls :meth:`.read_packet` over and over. Overload
+        as necessary.
 
         Parameters
         ----------
         chunk_mode_override : 'any_full', 'only_full', 'single_packet', or None
-            - None : do not override self.chunk_mode
-            - 'any_full' : returns all raw buffers with data as soon as any one
+            - ``None`` : do not override self.chunk_mode
+            - ``any_full`` : returns all raw buffers with data as soon as any one
               buffer gets full
-            - 'only_full' : returns only those raw buffers that became full (or
+            - ``only_full`` : returns only those raw buffers that became full (or
               nearly full) during the read. This minimizes the number of write calls.
-            - 'single_packet' : returns all raw buffers with data after a single
+            - ``single_packet`` : returns all raw buffers with data after a single
               read is performed. This is useful for streaming data out as soon
               as it is read in (e.g. for diagnostics or in-line analysis)
         rp_max : int
@@ -223,22 +224,22 @@ class DataStreamer(ABC):
                 elif rb.is_full(): list_of_rbs.append(rb)
         return list_of_rbs
 
-
-
-
-    def get_decoder_list(self):
+    def get_decoder_list(self) -> list:
         """Returns a list of decoder objects for this data stream.
-        Needs to be overloaded. Gets called during open_stream().
+
+        .. note::
+            Needs to be overloaded. Gets called during :meth:`.open_stream`.
         """
         return []
 
+    def build_default_rb_lib(self, out_stream: str = '') -> RawBufferLibrary:
+        """Build the most basic :class:`~.RawBufferLibrary` that will work for
+        this stream.
 
-    def build_default_rb_lib(self, out_stream=''):
-        """ Build the most basic RawBufferLibrary that will work for this stream.
-
-        A RawBufferList containing a single RawBuffer is built for each decoder
-        name returned by get_decoder_list. Each buffer's out_name is set to the
-        decoder name. The lgdo's do not get initialized.
+        A :class:`.RawBufferList` containing a single :class:`.RawBuffer` is
+        built for each decoder name returned by :meth:`.get_decoder_list`. Each
+        buffer's ``out_name`` is set to the decoder name. The lgdo's do not get
+        initialized.
         """
         rb_lib = RawBufferLibrary()
         decoders = self.get_decoder_list()
