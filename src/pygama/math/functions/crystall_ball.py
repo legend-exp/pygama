@@ -6,18 +6,18 @@ import numpy as np
 
 @nb.vectorize([nb.float64(nb.float64,nb.float64,nb.float64,nb.float64,nb.float64,nb.float64),
 nb.float32(nb.float32,nb.float32,nb.float32,nb.float32,nb.float32,nb.float32)])
-def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A: float) -> float: 
+def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A: float) -> float:
     """
     PDF of a power-law tail plus gaussian.
     As a Numba vectorized function, it runs slightly faster than
     'out of the box' functions.
-    It computes 
+    It computes
 
-    .. math:: 
-        y = \\frac{x-mu}{sigma} 
+    .. math::
+        y = \\frac{x-mu}{sigma}
 
 
-        PDF = A\\frac{pdf(y, beta, m)}{sigma} 
+        PDF = A\\frac{pdf(y, beta, m)}{sigma}
 
     Parameters
     ----------
@@ -38,7 +38,7 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
     """
     if (beta <= 0) or (m <= 1):
         raise ValueError("beta must be greater than 0, and m must be greater than 1")
-    # Define some constants to calculate the function 
+    # Define some constants to calculate the function
     const_A = np.power(m/np.abs(beta),m) * np.exp(-1*beta**2/2)
     const_B = m/np.abs(beta) - np.abs(beta)
 
@@ -47,16 +47,16 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
         + ((const_A*np.power(const_B+beta,1-m))/(m-1))
     N = 1/normalization_denom
 
-    # Shift the distribution 
+    # Shift the distribution
     y = (x-mu)/sigma
 
     # Check if it is powerlaw
-    if y <= -1*beta: 
+    if y <= -1*beta:
         return N*const_A*np.power((const_B-y),-1*m)*A/sigma
-    
+
     # If it isn't power law, then it Gaussian
 
-    else: 
+    else:
         return N*np.exp(-1*y**2/2)*A/sigma
 
 
@@ -69,7 +69,7 @@ def nb_xtalball_cdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
     'out of the box' functions.
     It computes
 
-    .. math:: 
+    .. math::
         y = \\frac{x-mu}{sigma}
 
 
@@ -105,11 +105,11 @@ def nb_xtalball_cdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
     # Shift the distribution
     y = (x-mu)/sigma
 
-    # Check if it is in the power law part 
-    if y <= -1*beta: 
+    # Check if it is in the power law part
+    if y <= -1*beta:
         return N*const_A*np.power(const_B-y,1-m)/(m-1)*A
 
-    # If it isn't in the power law, then it is Gaussian 
-    else: 
+    # If it isn't in the power law, then it is Gaussian
+    else:
         return (((const_A*N*np.power(const_B+beta,1-m))/(m-1))\
             + N*np.sqrt(np.pi/2)*(math.erf(beta/np.sqrt(2))+math.erf(y/np.sqrt(2))))*A

@@ -20,12 +20,12 @@ def nb_gauss(x, mu, sigma):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
+        The standard deviation of the Gaussian
     """
     if sigma ==0: invs=np.nan
     else: invs = 1.0 / sigma
@@ -42,16 +42,14 @@ def nb_gauss_amp(x, mu, sigma, a):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian  
-    a : float 
+        The standard deviation of the Gaussian
+    a : float
         The amplitude of the Gaussian
-        
-    TODO: replace with the pdf Gaussian times the appropriate value
     """
     return a * nb_gauss(x,mu,sigma)
 

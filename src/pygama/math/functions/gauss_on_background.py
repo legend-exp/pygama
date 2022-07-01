@@ -18,20 +18,18 @@ def nb_gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    n_sig : float 
-        Number of counts in the signal 
-    mu : float 
-        The centroid of the Gaussian 
-    sigma : float 
-        The standard deviation of the Gaussian 
-    n_bkg : float 
-        The number of counts in the background 
-    components : bool 
-        If true, returns the signal and background components separately 
-   
-    TODO: candidate for replacement by gauss_poly
+    x : array-like
+        Input data
+    n_sig : float
+        Number of counts in the signal
+    mu : float
+        The centroid of the Gaussian
+    sigma : float
+        The standard deviation of the Gaussian
+    n_bkg : float
+        The number of counts in the background
+    components : bool
+        If true, returns the signal and background components separately
     """
 
     if components==False:
@@ -49,26 +47,24 @@ def nb_gauss_linear(x, n_sig, mu, sigma, n_bkg, b, m, components=False):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    n_sig : float 
-        Number of counts in the signal 
-    mu : float 
-        The centroid of the Gaussian 
-    sigma : float 
-        The standard deviation of the Gaussian 
-    n_bkg : float 
-        The number of counts in the background 
+    x : array-like
+        Input data
+    n_sig : float
+        Number of counts in the signal
+    mu : float
+        The centroid of the Gaussian
+    sigma : float
+        The standard deviation of the Gaussian
+    n_bkg : float
+        The number of counts in the background
     b : float
         The y-intercept of the linear background
-    m : float 
+    m : float
         Slope of the linear background
-    components : bool 
-        If true, returns the signal and background components separately 
-
-    TODO: candidate for replacement by gauss_poly
+    components : bool
+        If true, returns the signal and background components separately
     """
-    
+
     norm = (m/2 *np.nanmax(x)**2 + b*np.nanmax(x)) - (m/2 *np.nanmin(x)**2 + b*np.nanmin(x))
 
     if components==False:

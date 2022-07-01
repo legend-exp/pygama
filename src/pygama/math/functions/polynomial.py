@@ -12,11 +12,10 @@ def nb_poly(x, pars):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    pars : array-like 
+    x : array-like
+        Input data
+    pars : array-like
         Coefficients of the polynomial, in polyfit convention
-    TODO: add a CDF as well
     """
     result = x*0 # do x*0 to keep shape of x (scalar or array)
     if len(pars) == 0: return result

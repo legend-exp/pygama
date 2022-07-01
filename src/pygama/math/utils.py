@@ -50,7 +50,7 @@ def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, uni
     iterable : tqdm.trange
         object that can be iterated over in a for loop
     """
-    
+
     hide_bar = True
     if isinstance(verbose, int):
         if verbose > 0:

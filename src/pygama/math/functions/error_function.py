@@ -17,7 +17,7 @@ def nb_erf(x: float) -> float:
     ----------
     x : float or array-like
         The input data
-   
+
     Returns
     -------
     math.erf(x): float or array-like
@@ -41,7 +41,7 @@ def nb_erfc(x:float) -> float:
     ----------
     x : float or array-like
         The input data
-   
+
     Returns
     -------
     math.erfc(x): float or array-like

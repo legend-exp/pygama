@@ -23,13 +23,13 @@ def nb_exgauss(x, mu, sigma, tau):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
 
     """
@@ -50,18 +50,18 @@ def nb_gauss_tail_cdf(x, mu, sigma, tau, lower_range=np.inf, upper_range=np.inf)
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
-    lower_range : float 
+    lower_range : float
         Lower bound of the Gaussian with tail
     upper_range : float
-        Upper bound of the Gaussian with tail 
+        Upper bound of the Gaussian with tail
     """
     cdf = nb_gauss_tail_integral(x,mu,sigma,tau)
     if lower_range ==np.inf and upper_range ==np.inf:
@@ -83,18 +83,18 @@ def nb_gauss_with_tail_pdf(x, mu, sigma, htail, tau, components=False):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    htail : float 
-        The height of the tail 
-    tau : float 
+        The standard deviation of the Gaussian
+    htail : float
+        The height of the tail
+    tau : float
         The characteristic scale of the Gaussian tail
-    components : bool 
-        If true, returns the signal and background components separately 
+    components : bool
+        If true, returns the signal and background components separately
     """
     if htail < 0 or htail > 1:
         if components ==False:
@@ -122,18 +122,18 @@ def nb_gauss_with_tail_cdf(x, mu, sigma, htail, tau, components=False):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    htail : float 
-        The height of the tail 
-    tau : float 
+        The standard deviation of the Gaussian
+    htail : float
+        The height of the tail
+    tau : float
         The characteristic scale of the Gaussian tail
-    components : bool 
-        If true, returns the signal and background components separately 
+    components : bool
+        If true, returns the signal and background components separately
     """
     if htail < 0 or htail > 1:
         if components ==False:
@@ -161,13 +161,13 @@ def nb_gauss_tail_exact(x, mu, sigma, tau):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
     """
     tmp = ((x-mu)/tau) + ((sigma**2)/(2*tau**2))
@@ -187,13 +187,13 @@ def nb_gauss_tail_approx(x, mu, sigma, tau):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
     """
     den = 1/(sigma + tau*(x-mu)/sigma)
@@ -210,13 +210,13 @@ def nb_gauss_tail_integral(x, mu, sigma, tau):
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
     """
     abstau = np.abs(tau)
@@ -228,26 +228,26 @@ def nb_gauss_tail_integral(x, mu, sigma, tau):
 @nb.njit(**kwd)
 def nb_gauss_tail_norm(x, mu, sigma, tau, lower_range=np.inf, upper_range=np.inf):
     """
-    Normalised gauss tail. 
+    Normalised gauss tail.
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    mu : float 
-        The centroid of the Gaussian 
+    x : array-like
+        Input data
+    mu : float
+        The centroid of the Gaussian
     sigma : float
-        The standard deviation of the Gaussian 
-    tau : float 
+        The standard deviation of the Gaussian
+    tau : float
         The characteristic scale of the Gaussian tail
-    lower_range : float 
+    lower_range : float
         Lower bound of the Gaussian with tail
     upper_range : float
-        Upper bound of the Gaussian with tail 
+        Upper bound of the Gaussian with tail
 
-    Notes 
+    Notes
     -----
     This is only needed when the fitting range
     does not include the whole tail

@@ -168,8 +168,8 @@ def get_bin_centers(bins):
 
     Parameters
     ----------
-    bins : array-like 
-        The input array of bin-edges 
+    bins : array-like
+        The input array of bin-edges
     """
     return (bins[:-1] + bins[1:]) / 2.
 
@@ -181,7 +181,7 @@ def get_bin_widths(bins):
 
     Parameters
     ----------
-    bins : array-like 
+    bins : array-like
         The input array of bin-edges
     """
     return (bins[1:] - bins[:-1])
@@ -196,9 +196,9 @@ def find_bin(x, bins):
 
     Parameters
     ----------
-    x : float 
+    x : float
         The value to search for amongst the bins
-    bins : array-like 
+    bins : array-like
         The input array of bin-edges
     """
     # first handle overflow / underflow

@@ -21,24 +21,24 @@ def nb_gauss_step_pdf(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upp
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    n_sig : float 
-        Number of counts in the signal 
-    mu : float 
-        The centroid of the Gaussian 
-    sigma : float 
-        The standard deviation of the Gaussian 
-    n_bkg : float 
-        The number of counts in the background 
+    x : array-like
+        Input data
+    n_sig : float
+        Number of counts in the signal
+    mu : float
+        The centroid of the Gaussian
+    sigma : float
+        The standard deviation of the Gaussian
+    n_bkg : float
+        The number of counts in the background
     hstep : float
         The height of the step function background
-    lower_range : float 
+    lower_range : float
         Lower bound of the step function
     upper_range : float
-        Upper bound of the step function 
-    components : bool 
-        If true, returns the signal and background components separately 
+        Upper bound of the step function
+    components : bool
+        If true, returns the signal and background components separately
     """
     try:
         bkg= nb_step_pdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -63,24 +63,24 @@ def nb_gauss_step_cdf(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upp
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    n_sig : float 
-        Number of counts in the signal 
-    mu : float 
-        The centroid of the Gaussian 
-    sigma : float 
-        The standard deviation of the Gaussian 
-    n_bkg : float 
-        The number of counts in the background 
+    x : array-like
+        Input data
+    n_sig : float
+        Number of counts in the signal
+    mu : float
+        The centroid of the Gaussian
+    sigma : float
+        The standard deviation of the Gaussian
+    n_bkg : float
+        The number of counts in the background
     hstep : float
         The height of the step function background
-    lower_range : float 
+    lower_range : float
         Lower bound of the step function
     upper_range : float
-        Upper bound of the step function 
-    components : bool 
-        If true, returns the signal and background components separately 
+        Upper bound of the step function
+    components : bool
+        If true, returns the signal and background components separately
     """
     try:
         bkg = nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
@@ -105,24 +105,24 @@ def nb_gauss_step(x, n_sig, mu, sigma, n_bkg, hstep, lower_range=np.inf, upper_r
 
     Parameters
     ----------
-    x : array-like 
-        Input data 
-    n_sig : float 
-        Number of counts in the signal 
-    mu : float 
-        The centroid of the Gaussian 
-    sigma : float 
-        The standard deviation of the Gaussian 
-    n_bkg : float 
-        The number of counts in the background 
+    x : array-like
+        Input data
+    n_sig : float
+        Number of counts in the signal
+    mu : float
+        The centroid of the Gaussian
+    sigma : float
+        The standard deviation of the Gaussian
+    n_bkg : float
+        The number of counts in the background
     hstep : float
         The height of the step function background
-    lower_range : float 
+    lower_range : float
         Lower bound of the step function
     upper_range : float
-        Upper bound of the step function 
-    components : bool 
-        If true, returns the signal and background components separately 
+        Upper bound of the step function
+    components : bool
+        If true, returns the signal and background components separately
     """
     if components ==False:
         return n_sig+n_bkg , nb_gauss_step_pdf(x,  n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range)
