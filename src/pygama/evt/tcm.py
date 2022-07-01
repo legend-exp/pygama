@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def cluster_events(tb_list:list, ts_unit:float=1e-8, ch_col:str='channel',
                    ts_col:str='timestamp', coin_window:float=4e-6,

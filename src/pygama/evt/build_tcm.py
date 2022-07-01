@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+
 import pandas as pd
 
-from pygama.evt.build_evt import build_evt
 import pygama.lgdo.lh5_store as lh5
+from pygama.evt.build_evt import build_evt
 
 # EXAMPLE USAGE:
 # ./build_tcm.py /global/project/projectdirs/legend/data/lngs/l200_commissioning/orca_data/pygama/raw/cal/p00/r001/L60_p0_r1_20220606T015344Z_f0.lh5 -o ~/tcm_test/L60_p0_r1_20220606T015344Z_f0_tcm.lh5
