@@ -1,0 +1,8 @@
+{
+    "ORFlashCamADCWaveformDecoder": {
+        "g{key}": {
+            "key_list": [[0, 3]],
+            "out_stream": "/tmp/{orig_basename}.lh5"
+        }
+    }
+}

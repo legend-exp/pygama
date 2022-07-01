@@ -1,5 +1,9 @@
+"""
+pygama's command line interface utilities.
+"""
 import argparse
 import logging
+import os
 import sys
 
 import numpy as np
@@ -10,14 +14,28 @@ from pygama.raw import build_raw
 
 
 def pygama_cli():
+    """pygama's command line interface.
+
+    Defines the command line interface (CLI) of the package, which exposes some
+    of the most used functions to the console.  This function is added to the
+    ``entry_points.console_scripts`` list and defines the ``pygama`` executable
+    (see ``setuptools``' documentation). To learn more about the CLI, have a
+    look at the help section:
+
+    .. code-block:: console
+
+      $ pygama --help
+      $ pygama build-raw --help  # help section for a specific sub-command
+    """
+
     parser = argparse.ArgumentParser(
         prog='pygama',
         description="pygama's command-line interface")
 
     # global options
-    parser.add_argument('--version', '-v', action='store_true',
+    parser.add_argument('--version', action='store_true',
                         help="""Print pygama version and exit""")
-    parser.add_argument('--verbose', action='store_true',
+    parser.add_argument('--verbose', '-v', action='store_true',
                         help="""Increase the program verbosity""")
 
     subparsers = parser.add_subparsers()
@@ -29,11 +47,11 @@ def pygama_cli():
                             help="""Input stream. Can be a single file, a list
                             of files or any other input type supported by the
                             selected streamer""")
-    parser_d2r.add_argument('--stream-type', '-t', nargs=1,
+    parser_d2r.add_argument('--stream-type', '-t',
                             help="""Input stream type name. Use this if the
                             stream type cannot be automatically deduced by
                             pygama""")
-    parser_d2r.add_argument('--out-spec', '-o', nargs=1,
+    parser_d2r.add_argument('--out-spec', '-o',
                             help="""Specification for the output stream. HDF5
                             or JSON file name""")
     parser_d2r.add_argument('--buffer_size', '-b', type=int, default=8192,
@@ -62,6 +80,10 @@ def pygama_cli():
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG,
                             format="%(name)s [%(levelname)s] %(message)s")
+    else:
+        logging.basicConfig(level=logging.INFO,
+                            format="%(name)s [%(levelname)s] %(message)s")
+
     if args.version:
         print(pygama.__version__)
         sys.exit()
@@ -70,13 +92,17 @@ def pygama_cli():
 
 
 def build_raw_cli(args):
+    """Passes command line arguments to :func:`.raw.build_raw.build_raw`."""
     for stream in args.in_stream:
+        basename = os.path.splitext(os.path.basename(stream))[0]
         build_raw(stream, in_stream_type=args.stream_type,
                   out_spec=args.out_spec, buffer_size=args.buffer_size,
-                  n_max=args.max_rows, overwrite=args.overwrite)
+                  n_max=args.max_rows, overwrite=args.overwrite,
+                  orig_basename=basename)
 
 
 def build_dsp_cli(args):
+    """Passes command line arguments to :func:`.dsp.build_dsp.build_dsp`."""
     for file in args.files:
         build_dsp(file, args.output, args.jsonconfig, lh5_tables=args.group,
                   database=args.dbfile, verbose=args.verbose,
