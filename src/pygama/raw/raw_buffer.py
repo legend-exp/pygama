@@ -304,12 +304,12 @@ def expand_rblist_json_dict(json_dict, kw_dict):
     buffer_names = list(json_dict.keys())
     for name in buffer_names:
         if name == '':
-            print("Error: name can't be ''")
-            return
+            raise ValueError("buffer name can't be empty")
+
         info = json_dict[name] # changes to info will change json_dict[name]
         # make sure we have a key list
         if 'key_list' not in info:
-            print(f'expand_json_dict: {name} is missing key_list')
+            raise ValueError(f"'{name}' is missing key_list")
             continue
 
         # find and expand any ranges in the key_list
@@ -340,11 +340,14 @@ def expand_rblist_json_dict(json_dict, kw_dict):
             kw_dict['key'] = info['key_list'][0]
         if 'out_stream' in info:
             if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
-            info['out_stream'] = info['out_stream'].format(**kw_dict)
+            try:
+                info['out_stream'] = info['out_stream'].format(**kw_dict)
+            except KeyError as msg:
+                raise KeyError(f"variable {msg} dereferenced in 'out_stream' not defined in kw_dict")
             info['out_stream'] = os.path.expandvars(info['out_stream'])
 
 
-def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbosity=0):
+def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append'):
     """Write a list of RawBuffers to lh5 files and then clears them
 
     Parameters
@@ -357,8 +360,6 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
         files (saves some time opening / closing files)
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
-    verbosity : bool
-        print debug messages
     """
     if lh5_store is None: lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
@@ -374,6 +375,6 @@ def write_to_lh5_and_clear(raw_buffers, lh5_store=None, wo_mode='append', verbos
         # write if requested...
         if filename != '':
             lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
-                                   n_rows=rb.loc, wo_mode=wo_mode, verbosity=verbosity)
+                                   n_rows=rb.loc, wo_mode=wo_mode)
         # and clear
         rb.loc = 0

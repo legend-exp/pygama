@@ -1,7 +1,10 @@
 import copy
+import logging
 
 from pygama import lgdo
 from pygama.raw.data_decoder import *
+
+log = logging.getLogger(__name__)
 
 # put decoded values here where they can be used also by the orca decoder
 fc_decoded_values = {
@@ -156,7 +159,7 @@ class FCEventDecoder(DataDecoder):
         self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples'].value
 
 
-    def decode_packet(self, fcio, evt_rbkd, packet_id, verbosity=0):
+    def decode_packet(self, fcio, evt_rbkd, packet_id):
         """
         access FCIOEvent members for each event in the raw file
 
@@ -171,8 +174,6 @@ class FCEventDecoder(DataDecoder):
         packet_id : int
             The index of the packet in the fcio stream. Incremented by
             fc_streamer
-        verbosity : int
-            verbosity level for packet decoding
 
         Returns
         -------
@@ -190,17 +191,16 @@ class FCEventDecoder(DataDecoder):
         for iwf in fcio.tracelist:
             if iwf not in evt_rbkd:
                 if iwf not in self.skipped_channels:
-                    if verbosity>-2: print(f'skipping packets from channel {iwf}...')
+                    # TODO: should this be a warning instead?
+                    log.debug(f'skipping packets from channel {iwf}...')
                     self.skipped_channels[iwf] = 0
                 self.skipped_channels[iwf] += 1
                 continue
             tbl = evt_rbkd[iwf].lgdo
             if fcio.nsamples != tbl['waveform']['values'].nda.shape[1]:
-                print('FCEventDecoder Warning: event wf length was',
-                      fcio.nsamples, 'when',
-                      self.decoded_values['waveform']['wf_len'], 'were expected')
+                log.warning('event wf length was', fcio.nsamples, 'when',
+                            self.decoded_values['waveform']['wf_len'], 'were expected')
             ii = evt_rbkd[iwf].loc
-            if verbosity>0: print(f'packet_id {packet_id}: writing wf {iwf} at loc {ii}')
 
             # fill the table
             tbl['channel'].nda[ii] = iwf
