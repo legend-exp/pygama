@@ -175,8 +175,7 @@ def build_dsp_cli(args):
 
     for i in range(len(args.raw_lh5_file)):
         build_dsp(args.raw_lh5_file[i], out_files[i], args.config,
-                  lh5_tables=args.hdf5_groups,
-                  database=args.database, verbose=args.verbose,
+                  lh5_tables=args.hdf5_groups, database=args.database,
                   outputs=args.output_pars, n_max=args.max_rows,
                   write_mode=args.writemode, buffer_len=args.chunk,
                   block_width=args.block)

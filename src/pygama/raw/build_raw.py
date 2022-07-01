@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 def build_raw(in_stream: int, in_stream_type: str = None,
               out_spec: str | dict | RawBufferLibrary = None, buffer_size: int = 8192,
               n_max: int = np.inf, overwrite: bool = True, **kwargs) -> None:
-    """Convert data into LEGEND HDF5 "raw" format.
+    """Convert data into LEGEND HDF5 raw-tier format.
 
     Takes an input stream of a given type and writes to output file(s)
     according to the user's a specification.
@@ -200,8 +200,6 @@ def build_raw(in_stream: int, in_stream_type: str = None,
     streamer.close_stream()
     progress_bar.close()
 
-    elapsed = time.time() - t_start
-    log.info(f"time elapsed: {elapsed:.2f} sec")
     out_files = rb_lib.get_list_of('out_stream')
     if len(out_files) == 1:
         out_file = out_files[0].split(':', 1)[0]
@@ -220,4 +218,5 @@ def build_raw(in_stream: int, in_stream_type: str = None,
             else:
                 log.info(f" -> {out_file} (not written)")
     log.info(f"total converted: {sizeof_fmt(streamer.n_bytes_read)}")
+    elapsed = time.time() - t_start
     log.info(f"conversion speed: {sizeof_fmt(streamer.n_bytes_read/elapsed)}ps")
