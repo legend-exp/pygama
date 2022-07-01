@@ -1,3 +1,6 @@
+"""
+pygama's command line interface utilities.
+"""
 import argparse
 import logging
 import os
@@ -11,6 +14,20 @@ from pygama.raw import build_raw
 
 
 def pygama_cli():
+    """pygama's command line interface.
+
+    Defines the command line interface (CLI) of the package, which exposes some
+    of the most used functions to the console.  This function is added to the
+    ``entry_points.console_scripts`` list and defines the ``pygama`` executable
+    (see ``setuptools``' documentation). To learn more about the CLI, have a
+    look at the help section:
+
+    .. code-block:: console
+
+      $ pygama --help
+      $ pygama build-raw --help  # help section for a specific sub-command
+    """
+
     parser = argparse.ArgumentParser(
         prog='pygama',
         description="pygama's command-line interface")
@@ -75,6 +92,7 @@ def pygama_cli():
 
 
 def build_raw_cli(args):
+    """Passes command line arguments to :func:`.raw.build_raw.build_raw`."""
     for stream in args.in_stream:
         basename = os.path.splitext(os.path.basename(stream))[0]
         build_raw(stream, in_stream_type=args.stream_type,
@@ -84,6 +102,7 @@ def build_raw_cli(args):
 
 
 def build_dsp_cli(args):
+    """Passes command line arguments to :func:`.dsp.build_dsp.build_dsp`."""
     for file in args.files:
         build_dsp(file, args.output, args.jsonconfig, lh5_tables=args.group,
                   database=args.dbfile, verbose=args.verbose,
