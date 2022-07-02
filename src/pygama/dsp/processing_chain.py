@@ -574,7 +574,7 @@ class ProcessingChain:
         elif isinstance(node, ast.Name):
             # check if it is a unit
             if node.id in ureg:
-                return ureg[node.id]
+                return ureg(node.id)
 
             #check if it is a variable
             var_name_list.append(node.id)
