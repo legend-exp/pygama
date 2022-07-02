@@ -37,9 +37,11 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
     store = lgdo.LH5Store()
     coin_data = []
     array_ids = []
+    all_tables = []
     for filename, pattern in input_tables:
         tables = lgdo.ls(filename, lh5_group=pattern)
         for table in tables:
+            all_tables.append(table)
             array_id = len(array_ids)
             if hash_func is not None:
                 if isinstance(hash_func, str):
@@ -52,7 +54,9 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
     tcm_cols = ptcm.generate_tcm_cols(coin_data, coin_window=coin_window,
                                       window_ref=window_ref, array_ids=array_ids)
 
-    tcm = lgdo.Table(col_dict=tcm_cols, attrs={'hash_func':str(hash_func)})
+    for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
+    tcm = lgdo.Table(col_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
+
     if out_file is None: return tcm
-    if overwrite: store.write_object(tcm, out_name, out_file, wo_mode='o')
+    if overwrite: store.write_object(tcm, out_name, out_file, wo_mode='o', verbosity=1)
     else: store.write_object(tcm, out_name, out_file)
