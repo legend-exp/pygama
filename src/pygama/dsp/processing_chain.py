@@ -64,10 +64,10 @@ class CoordinateGrid:
         return self.period == other.period and (self.offset is other.offset if isinstance(self.offset, ProcChainVar) else self.offset == other.offset)
 
     def unit_str(self) -> str:
-        strng = format(self.period.u, '~')
-        if strng == '':
-            strng = str(self.period.u)
-        return strng
+        string = format(self.period.u, '~')
+        if string == '':
+            string = str(self.period.u)
+        return string
 
     def get_period(self, unit: str | Unit) -> float:
         if isinstance(unit, str):
