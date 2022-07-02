@@ -10,19 +10,18 @@ import itertools as it
 import json
 import logging
 import re
-from typing import Any
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numba import vectorize
 
 import pygama.lgdo as lgdo
+from pygama.dsp.errors import DSPFatal, ProcessingChainError
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
-
-from pygama.dsp.errors import DSPFatal, ProcessingChainError
 
 log = logging.getLogger(__name__)
 
@@ -106,19 +105,19 @@ class ProcChainVar:
         """
         Parameters
         ----------
-        proc_chain: ProcessingChain
+        proc_chain : ProcessingChain
             DOCME
-        name: str
+        name : str
             DOCME
-        shape: tuple, optional, default='auto'
+        shape : tuple, optional, default='auto'
             DOCME
-        dtype: numpy.dtype or str, optional, default='auto'
+        dtype : numpy.dtype or str, optional, default='auto'
             DOCME
-        grid: CoordinateGrid
+        grid : CoordinateGrid
             DOCME
-        unit: str or pint.Unit, optional, default='auto'
+        unit : str or pint.Unit, optional, default='auto'
             DOCME
-        is_coord: bool, optional, default='auto'
+        is_coord : bool, optional, default='auto'
             DOCME
         """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
@@ -339,7 +338,7 @@ class ProcessingChain:
         period
             unit with period of waveform associated with object. Do not use if
             `grid` is provided
-        offset :
+        offset
             unit with offset of waveform associated with object. Requires a
             `period` to be provided
         is_coord : bool
