@@ -15,12 +15,12 @@ class DSPFatal(DSPError):
         string of processor and arguments. This will be set after the exception
         is caught, and appended to the error message
     """
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         super().__init__(*args)
         self.wf_range = None
         self.processor = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         suffix = ''
         if self.wf_range:
             suffix += '\nThrown while processing entries ' + str(self.wf_range)

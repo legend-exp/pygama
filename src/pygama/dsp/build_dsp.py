@@ -15,6 +15,7 @@ import numpy as np
 from tqdm import tqdm
 
 import pygama
+import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processing_chain import build_processing_chain
@@ -22,10 +23,10 @@ from pygama.dsp.processing_chain import build_processing_chain
 log = logging.getLogger(__name__)
 
 
-def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = None,
-              database: str = None, outputs: list[str] = None, n_max: int = np.inf,
-              write_mode: str = 'r', buffer_len: int = 3200, block_width: int = 16,
-              chan_config: dict = None):
+def build_dsp(f_raw: str, f_dsp: str, dsp_config: str | dict, lh5_tables:
+              list[str] = None, database: str = None, outputs: list[str] =
+              None, n_max: int = np.inf, write_mode: str = 'r', buffer_len: int
+              = 3200, block_width: int = 16, chan_config: dict = None) -> None:
     """
     Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence of
     processors via the :class:`~.processing_chain.ProcessingChain`.
@@ -118,13 +119,13 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
             os.remove(f_dsp)
 
     # write processing metadata
-    dsp_info = lh5.Struct()
-    dsp_info.add_field('timestamp', lh5.Scalar(np.uint64(time.time())))
-    dsp_info.add_field('python_version', lh5.Scalar(sys.version))
-    dsp_info.add_field('numpy_version', lh5.Scalar(np.version.version))
-    dsp_info.add_field('h5py_version', lh5.Scalar(h5py.version.version))
-    dsp_info.add_field('hdf5_version', lh5.Scalar(h5py.version.hdf5_version))
-    dsp_info.add_field('pygama_version', lh5.Scalar(pygama.__version__))
+    dsp_info = lgdo.Struct()
+    dsp_info.add_field('timestamp', lgdo.Scalar(np.uint64(time.time())))
+    dsp_info.add_field('python_version', lgdo.Scalar(sys.version))
+    dsp_info.add_field('numpy_version', lgdo.Scalar(np.version.version))
+    dsp_info.add_field('h5py_version', lgdo.Scalar(h5py.version.version))
+    dsp_info.add_field('hdf5_version', lgdo.Scalar(h5py.version.hdf5_version))
+    dsp_info.add_field('pygama_version', lgdo.Scalar(pygama.__version__))
 
     # loop over tables to run DSP on
     for tb in lh5_tables:
@@ -161,7 +162,7 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, block_width)
                 if log.level <= logging.INFO:
                     progress_bar = tqdm(desc=f'Processing table {tb}', total=tot_n_rows,
-                                    delay=2, unit='rows', file=sys.stdout)
+                                        delay=2, unit='rows', file=sys.stdout)
 
             n_rows = min(tot_n_rows-start_row, n_rows)
             try:

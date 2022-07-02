@@ -1,3 +1,7 @@
+"""
+This module provides routines for setting up and running signal processing
+chains on waveform data.
+"""
 from __future__ import annotations
 
 import ast
@@ -6,6 +10,7 @@ import itertools as it
 import json
 import logging
 import re
+from typing import Any
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
@@ -13,11 +18,11 @@ from dataclasses import dataclass
 import numpy as np
 from numba import vectorize
 
-import pygama.lgdo.lh5_store as lh5
+import pygama.lgdo as lgdo
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
-from .errors import DSPFatal, ProcessingChainError
+from pygama.dsp.errors import DSPFatal, ProcessingChainError
 
 log = logging.getLogger(__name__)
 
@@ -38,66 +43,84 @@ class CoordinateGrid:
     """Helper class that describes a system of units, consisting of a period
     and offset.
 
-    Period is a unitted Quantity, offset is a scalar in units of period, a Unit
-    or a ProcChainVar. In the last case, a ProcessingChain variable is used to
-    store a different offset for each event
+    `period` is a unitted :class:`pint.Quantity`, `offset` is a scalar in units
+    of `period`, a :class:`pint.Unit` or a :class:`ProcChainVar`. In the last
+    case, a :class:`ProcChainVar` variable is used to store a different offset
+    for each event.
     """
     period: Quantity | Unit | str
     offset: Quantity | ProcChainVar | float | int
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if isinstance(self.period, str):
             self.period = Quantity(1., self.period)
         elif isinstance(self.period, Unit):
-            self.period *= 1 # make Quantity
+            self.period *= 1  # make Quantity
         if isinstance(self.offset, (int, float)):
             self.offset = self.offset*self.period
         assert isinstance(self.period, Quantity) and isinstance(self.offset, (Quantity, ProcChainVar))
 
-    def __eq__(self, other):
-        # true if values are equal; if offset is a variable, compare reference
-        return self.period==other.period and \
-            (self.offset is other.offset if isinstance(self.offset, ProcChainVar) else self.offset==other.offset)
+    def __eq__(self, other: CoordinateGrid) -> bool:
+        """True if values are equal; if offset is a variable, compares reference"""
+        return self.period == other.period and (self.offset is other.offset if isinstance(self.offset, ProcChainVar) else self.offset == other.offset)
 
-    def unit_str(self):
-        str = format(self.period.u, '~')
-        if str=='': str = str(self.period.u)
-        return str
+    def unit_str(self) -> str:
+        strng = format(self.period.u, '~')
+        if strng == '':
+            strng = str(self.period.u)
+        return strng
 
-    def get_period(self, unit):
-        if isinstance(unit, str): unit = ureg.Quantity(unit)
+    def get_period(self, unit: str | Unit) -> float:
+        if isinstance(unit, str):
+            unit = ureg.Quantity(unit)
         return float(self.period/unit)
 
-    def get_offset(self, unit=None):
-        # Get the offset (convert)ed to unit. If unit is None use period
-        if unit is None: unit = self.period
-        elif isinstance(unit, str): unit = ureg.Quantity(unit)
+    def get_offset(self, unit: str | Unit = None) -> float:
+        """Get the offset (convert)ed to unit. If `unit` is ``None`` use period."""
+        if unit is None:
+            unit = self.period
+        elif isinstance(unit, str):
+            unit = ureg.Quantity(unit)
 
         if isinstance(self.offset, ProcChainVar):
             return self.offset.get_buffer(CoordinateGrid(unit, 0))
         else:
             return float(self.offset/unit)
 
-    def __str__(self):
+    def __str__(self) -> str:
         offset = self.offset.name if isinstance(self.offset, ProcChainVar) \
             else str(self.offset)
         return f"({str(self.period)},{offset})"
 
+
 class ProcChainVar:
     """Helper data class with buffer and information for internal variables in
-    ProcessingChain.
+    :class:`ProcessingChain`.
 
-    Members can be set to auto to attempt to deduce these when adding this
-    variable to a processor for the first time
+    Members can be set to ``auto`` to attempt to deduce these when adding this
+    variable to a processor for the first time.
     """
-    def __init__(self,
-                 proc_chain: ProcessingChain,
-                 name: str,
-                 shape: tuple = auto,
-                 dtype: np.dtype = auto,
-                 grid: CoordinateGrid = auto,
-                 unit: str = auto,
-                 is_coord: bool = auto):
+    def __init__(self, proc_chain: ProcessingChain, name: str, shape: tuple = auto,
+                 dtype: np.dtype = auto, grid: CoordinateGrid = auto,
+                 unit: str | Unit = auto, is_coord: bool = auto) -> None:
+        """
+        Parameters
+        ----------
+        proc_chain: ProcessingChain
+            DOCME
+        name: str
+            DOCME
+        shape: tuple, optional, default='auto'
+            DOCME
+        dtype: numpy.dtype or str, optional, default='auto'
+            DOCME
+        grid: CoordinateGrid
+            DOCME
+        unit: str or pint.Unit, optional, default='auto'
+            DOCME
+        is_coord: bool, optional, default='auto'
+            DOCME
+        """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
         self.proc_chain = proc_chain
         self.name = name
@@ -115,11 +138,11 @@ class ProcChainVar:
         log.debug(f'added variable: {self.description()}')
 
     # Use this to enforce type constraints and perform conversions
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: Any) -> None:
         if value is auto:
             pass
 
-        elif name=='shape':
+        elif name == 'shape':
             if hasattr(value, '__iter__'):
                 value = tuple(value)
             else:
@@ -127,17 +150,17 @@ class ProcChainVar:
             value = tuple(value)
             assert all(isinstance(d, int) for d in value)
 
-        elif name=='dtype' and not isinstance(value, np.dtype):
+        elif name == 'dtype' and not isinstance(value, np.dtype):
             value = np.dtype(value)
 
-        elif name=='grid' and not isinstance(value, CoordinateGrid) and not value is None:
+        elif name == 'grid' and not isinstance(value, CoordinateGrid) and value is not None:
             period, offset = value if isinstance(value, tuple) else value, 0
             value = CoordinateGrid(period, offset)
 
-        elif name=='unit' and not value is None:
+        elif name == 'unit' and value is not None:
             value = str(value)
 
-        elif name=='is_coord':
+        elif name == 'is_coord':
             value = bool(value)
             if value:
                 if self._buffer is None:
@@ -147,7 +170,7 @@ class ProcChainVar:
 
         super().__setattr__(name, value)
 
-    def get_buffer(self, unit=None):
+    def get_buffer(self, unit: str | Unit = None) -> np.array:
         # If buffer needs to be created, do so now
         if self._buffer is None:
             if self.shape is auto:
@@ -170,7 +193,7 @@ class ProcChainVar:
             unit = CoordinateGrid(unit, 0.)
 
         # if this is our first time accessing, no conversion is needed
-        if len(self._buffer)==0:
+        if len(self._buffer) == 0:
             if self.shape is auto:
                 raise ProcessingChainError(f"cannot deduce shape of {self.name}")
             if self.dtype is auto:
@@ -204,17 +227,24 @@ class ProcChainVar:
         return self.grid.offset if self.grid else None
 
     def description(self):
-        return f"{self.name}(shape: {str(self.shape)}, dtype: {str(self.dtype)}, grid: {str(self.grid)}, unit: {str(self.unit)}, is_coord: {str(self.is_coord)})"
+        return (f"{self.name}(shape: {self.shape}, "
+                f"dtype: {self.dtype}, grid: {self.grid}, "
+                f"unit: {self.unit}, is_coord: {self.is_coord})")
 
-    # Update any variables set to auto; leave the others alone. Emit a message
-    # only if anything was updated
-    def update_auto(self, shape=auto, dtype=auto, grid=auto, unit=auto, is_coord=auto, period=None, offset=0):
+    def update_auto(self, shape: tuple = auto, dtype: np.dtype = auto,
+                    grid: CoordinateGrid = auto, unit: str | Unit = auto,
+                    is_coord: bool = auto, period: period = None,
+                    offset: offset = 0) -> None:
+        """
+        Update any variables set to auto; leave the others alone. Emit a message
+        only if anything was updated.
+        """
         updated = False
 
         # Construct coordinate grid from period/offset if given
         if grid is auto and period is not None:
             if isinstance(offset, str):
-                offset = get_variable(offset, expr_only=True)
+                offset = self.get_variable(offset, expr_only=True)
             grid = CoordinateGrid(period, offset)
 
         if self.shape is auto and shape is not auto:
@@ -235,30 +265,27 @@ class ProcChainVar:
         if updated:
             log.debug(f'updated variable: {self.description()}')
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
 class ProcessingChain:
-    """
-    A :class:`ProcessingChain` is used to efficiently perform a sequence of
-    digital signal processing (DSP) transforms. It contains a list of DSP
-    functions and a set of constant values and named variables contained in
-    fixed memory locations. When executing the :class:`ProcessingChain`,
-    processors will act on the internal memory without allocating new memory in
-    the process. Furthermore, the memory is allocated in blocks, enabling
-    vectorized processing of many entries at once. To set up a
-    :class:`ProcessingChain`, use the following methods:
+    """A class to efficiently perform a sequence of digital signal processing
+    (DSP) transforms.
 
-    :meth:`.link_input_buffer`
-        bind a named variable to an external numpy array to read data from
+    It contains a list of DSP functions and a set of constant values and named
+    variables contained in fixed memory locations. When executing the
+    :class:`ProcessingChain`, processors will act on the internal memory
+    without allocating new memory in the process. Furthermore, the memory is
+    allocated in blocks, enabling vectorized processing of many entries at
+    once. To set up a :class:`ProcessingChain`, use the following methods:
 
-    :meth:`.add_processor`
-        add a dsp function and bind its inputs to a set of named variables and
-        constant values
-
-    :meth:`.link_output_buffer`
-        bind a named variable to an external numpy array to write data into
+    - :meth:`.link_input_buffer` bind a named variable to an external NumPy
+      array to read data from
+    - :meth:`.add_processor` add a dsp function and bind its inputs to a set of
+      named variables and constant values
+    - :meth:`.link_output_buffer` bind a named variable to an external NumPy
+      array to write data into
 
     When calling these methods, the :class:`ProcessingChain` class will use
     available information to allocate buffers to the correct sizes and data
@@ -269,7 +296,7 @@ class ProcessingChain:
     add_scalar.
     """
 
-    def __init__(self, block_width=8, buffer_len=None):
+    def __init__(self, block_width: int = 8, buffer_len: int = None) -> None:
         """
         Parameters
         ----------
@@ -277,7 +304,7 @@ class ProcessingChain:
             number of entries to simultaneously process.
         buffer_len : int
             length of input and output buffers. Should be a multiple of
-            block_width
+            `block_width`
         """
         # Dictionary from name to scratch data buffers as ProcChainVar
         self._vars_dict = {}
@@ -290,30 +317,33 @@ class ProcessingChain:
         self._block_width = block_width
         self._buffer_len = buffer_len
 
-    def add_variable(self, name, dtype=auto, shape=auto, grid=auto, unit=auto,
-                     is_coord=auto, period=None, offset=0):
-        """Add a named variable containing a block of values or arrays
+    def add_variable(self, name: str, dtype: np.dtype | str = auto, shape: int | tuple = auto,
+                     grid: CoordinateGrid = auto, unit: str | Unit = auto, is_coord: bool = auto,
+                     period: Unit = None, offset: Unit = 0) -> ProcChainVar:
+        """Add a named variable containing a block of values or arrays.
 
         Parameters
         ----------
         name : str
             name of variable
-        dtype : numpy.dtype or type string, optional, default=None
-            default is None, meaning dtype will be deduced later, if possible
-        shape : length or shape tuple of element, optional, default=None
-            default is None, meaning length will be deduced later, if possible
+        dtype : numpy.dtype or str, optional, default='auto'
+            default is ``None``, meaning `dtype` will be deduced later, if
+            possible
+        shape : int or tuple, optional, default='auto'
+            length or shape tuple of element. Default is ``None``, meaning length
+            will be deduced later, if possible
         grid : CoordinateGrid
             for variable, containing period and offset
         unit
             DOCME
-        period : unit
-            with period of waveform associated with object. Do not use if grid
-            is provided
-        offset : unit
-            with offset of waveform associated with object. Require a period to
-            be provided
+        period
+            unit with period of waveform associated with object. Do not use if
+            `grid` is provided
+        offset :
+            unit with offset of waveform associated with object. Requires a
+            `period` to be provided
         is_coord : bool
-            if True, transform value based on period and offset
+            if ``True``, transform value based on `period` and `offset`
         """
         self._validate_name(name, raise_exception=True)
         if name in self._vars_dict:
@@ -322,7 +352,7 @@ class ProcessingChain:
         # Construct coordinate grid from period/offset if given
         if grid is auto and period is not None:
             if isinstance(offset, str):
-                offset = get_variable(offset, expr_only=True)
+                offset = self.get_variable(offset, expr_only=True)
             grid = CoordinateGrid(period, offset)
 
         var = ProcChainVar(self, name, shape=shape, dtype=dtype, grid=grid,
@@ -330,8 +360,8 @@ class ProcessingChain:
         self._vars_dict[name] = var
         return var
 
-
-    def link_input_buffer(self, varname, buff=None):
+    # TODO: type: numpy array or lgdo. need an lgdo type
+    def link_input_buffer(self, varname: str, buff=None):
         """Link an input buffer to a variable
 
         Parameters
@@ -340,13 +370,13 @@ class ProcessingChain:
             name of internal variable to copy into buffer at the end
             of processor execution. If variable does not yet exist, it will
             be created with a similar shape to the provided buffer
-        buff : numpy.array or lgdo class
-            object to use as input buffer. If None, create a new buffer with a
-            similar shape to the variable
+        buff : numpy.array or lgdo class, optional, default=None
+            object to use as input buffer. If ``None``, create a new buffer
+            with a similar shape to the variable
 
         Returns
         -------
-        numpy.array or lgdo class
+        buffer: numpy.array or lgdo class
             buff or newly allocated input buffer
         """
         self._validate_name(varname, raise_exception=True)
@@ -360,22 +390,22 @@ class ProcessingChain:
         # Create input buffer that will be linked and returned if none exists
         if buff is None:
             if var is None:
-                raise ProcessingChainError(varname+" does not exist and no buffer was provided")
-            elif isinstance(var.grid, CoordinateGrid) and len(var.shape)==1:
-                buff = lh5.WaveformTable(size = self._buffer_len,
-                                         wf_len = var.shape[0],
-                                         dtype = var.dtype)
-            elif len(var.shape)==0:
-                buff = lh5.Array(shape=(self._buffer_len), dtype = var.dtype)
+                raise ProcessingChainError(f"{varname} does not exist and no buffer was provided")
+            elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
+                buff = lgdo.WaveformTable(size=self._buffer_len,
+                                          wf_len=var.shape[0],
+                                          dtype=var.dtype)
+            elif len(var.shape) == 0:
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
             else:
                 buff = np.ndarray((self._buffer_len,) + var.shape[1:], var.dtype)
 
         # Add the buffer to the input buffers list
         if isinstance(buff, np.ndarray):
             out_man = NumpyIOManager(buff, var)
-        elif isinstance(buff, lh5.Array):
+        elif isinstance(buff, lgdo.Array):
             out_man = LGDOArrayIOManager(buff, var)
-        elif isinstance(buff, lh5.WaveformTable):
+        elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
             raise ProcessingChainError("Could not link input buffer of unknown type", str(buff))
@@ -385,9 +415,8 @@ class ProcessingChain:
 
         return buff
 
-
-    def link_output_buffer(self, varname, buff=None):
-        """Link an output buffer to a variable
+    def link_output_buffer(self, varname: str, buff=None):
+        """Link an output buffer to a variable.
 
         Parameters
         ----------
@@ -410,39 +439,41 @@ class ProcessingChain:
             var = self.add_variable(varname)
 
         if not isinstance(var, ProcChainVar):
-            raise ProcessingChainError("Must link an output buffer to a processing chain variable")
+            raise ProcessingChainError("must link an output buffer to a processing chain variable")
 
         # Create output buffer that will be linked and returned if none exists
         if buff is None:
             if var is None:
                 raise ProcessingChainError(varname+" does not exist and no buffer was provided")
-            elif isinstance(var.grid, CoordinateGrid) and len(var.shape)==1:
-                buff = lh5.WaveformTable(size = self._buffer_len,
-                                         wf_len = var.shape[0],
-                                         dtype = var.dtype)
-            elif len(var.shape)==0:
-                buff = lh5.Array(shape=(self._buffer_len), dtype = var.dtype)
+            elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
+                buff = lgdo.WaveformTable(size=self._buffer_len,
+                                          wf_len=var.shape[0],
+                                          dtype=var.dtype)
+            elif len(var.shape) == 0:
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
             else:
                 buff = np.ndarray((self._buffer_len,) + var.shape[1:], var.dtype)
 
         # Add the buffer to the output buffers list
         if isinstance(buff, np.ndarray):
             out_man = NumpyIOManager(buff, var)
-        elif isinstance(buff, lh5.Array):
+        elif isinstance(buff, lgdo.Array):
             out_man = LGDOArrayIOManager(buff, var)
-        elif isinstance(buff, lh5.WaveformTable):
+        elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
-            raise ProcessingChainError("Could not link output buffer of unknown type", str(buff))
+            raise ProcessingChainError("could not link output buffer of unknown type", str(buff))
 
         log.debug(f"added output buffer: {out_man}")
         self._output_managers.append(out_man)
 
         return buff
 
-    def add_processor(self, func, *args, signature=None, types=None):
-        # make a list of parameters from *args. Replace any strings in the list
-        # with numpy objects from vars_dict, where able
+    def add_processor(self, func: np.ufunc, *args, signature: str = None,
+                      types: list[str] = None) -> None:
+        """Make a list of parameters from `*args`. Replace any strings in the
+        list with NumPy objects from `vars_dict`, where able.
+        """
         params = []
         kw_params = {}
         for i, param in enumerate(args):
@@ -456,45 +487,48 @@ class ProcessingChain:
         proc_man = ProcessorManager(self, func, params, kw_params, signature, types)
         self._proc_managers.append(proc_man)
 
-    def execute(self, start=0, stop=None):
-        """Execute the dsp chain on the entire input/output buffers"""
-        if stop is None: stop = self._buffer_len
+    def execute(self, start: int = 0, stop: int = None) -> None:
+        """Execute the dsp chain on the entire input/output buffers."""
+        if stop is None:
+            stop = self._buffer_len
         for i in range(start, stop, self._block_width):
             self._execute_procs(i, min(i+self._block_width, self._buffer_len))
 
-
-
-    def get_variable(self, expr, get_names_only=False, expr_only=False):
-        """Parse string expr into a NumPy array or value, using the following
+    def get_variable(self, expr: str, get_names_only: bool = False,
+                     expr_only: bool = False) -> Any:
+        r"""Parse string `expr` into a NumPy array or value, using the following
         syntax:
 
-          - numeric values are parsed into ints or floats
+          - numeric values are parsed into ``int``\ s or ``float``\ s
           - units found in the :mod:`pint` package
-          - other strings are parsed into variable names. If get_name_only is
-            False, fetch the internal buffer (creating it as needed). Else,
+          - other strings are parsed into variable names. If `get_names_only` is
+            ``False``, fetch the internal buffer (creating it as needed). Else,
             return a string of the name
-          - if a string is followed by (...), try parsing into one of the
+          - if a string is followed by ``(...)``, try parsing into one of the
             following expressions:
 
-              - len(expr): return the length of the array found with expr
-              - round(expr): return the value found with expr to the nearest int
-              - varname(shape, type): allocate a new buffer with the specified
-                shape and type, using varname. This is used if the automatic
-                type and shape deduction for allocating variables fails
+              - ``len(expr)``: return the length of the array found with `expr`
+              - ``round(expr)``: return the value found with `expr` to the
+                nearest integer
+              - ``varname(shape, type)``: allocate a new buffer with the
+                specified shape and type, using ``varname``. This is used if
+                the automatic type and shape deduction for allocating variables
+                fails
 
           - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
             :obj:`//` are available. If a variable name is included in the
             expression, a processor will be added to the
             :class:`ProcessingChain` and a new buffer allocated to store the
             output
-          - varname[slice]: return the variable with a slice applied. Slice
-            values can be floats, and will have round applied to them
-          - keyword = expr: return a dict with a single element pointing from
-            keyword to the parsed expr. This is used for kwargs. If expr_only
-            is True, raise an exception if we see this
+          - ``varname[slice]``: return the variable with a slice applied. Slice
+            values can be ``float``\ s, and will have round applied to them
+          - ``keyword = expr``: return a ``dict`` with a single element
+            pointing from keyword to the parsed `expr`. This is used for
+            `kwargs`. If `expr_only` is ``True``, raise an exception if we see
+            this
 
-        If get_names_only is set to True, do not fetch or allocate new arrays,
-        instead return a list of variable names found in the expression
+        If `get_names_only` is set to ``True``, do not fetch or allocate new
+        arrays, instead return a list of variable names found in the expression.
         """
         names = []
         try:
@@ -507,24 +541,23 @@ class ProcessingChain:
         if not get_names_only:
             if isinstance(stmt, ast.Expr):
                 return var
-            elif isinstance(stmt, ast.Assign) and len(stmt.targets)==1:
+            elif isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
                 if expr_only:
                     raise ProcessingChainError("kwarg assignment is not allowed in this context\n  " + expr)
-                return {stmt.targets[0].id : var}
+                return {stmt.targets[0].id: var}
             else:
                 raise ProcessingChainError("Could not parse expression:\n  " + expr)
         else:
             return names
 
-
-    def _parse_expr(self, node, expr, dry_run, var_name_list):
+    def _parse_expr(self, node: Any, expr: str, dry_run: bool, var_name_list: list[str]) -> Any:
         """
-        helper function for get_variable that recursively evaluates the AST
-        tree. Whenever we encounter a variable name, add it to var_name_list
-        (which should begin as an empty list). Only add new variables and
-        processors to the chain if dry_run is True.
-
-        Based on: https://stackoverflow.com/a/9558001
+        Helper function for :meth:`ProcessingChain.get_variable` that
+        recursively evaluates the AST tree. Whenever we encounter a variable
+        name, add it to `var_name_list` (which should begin as an empty list).
+        Only add new variables and processors to the chain if `dry_run` is
+        ``True``. Based on `this Stackoverflow
+        answer <https://stackoverflow.com/a/9558001>`_.
         """
         if node is None:
             return None
@@ -688,25 +721,21 @@ class ProcessingChain:
 
             else:
                 raise ProcessingChainError(
-                    f"""do not recognize call to {func} with arguments
-                    {[str(arg.__dict__) for arg in node.args]}""")
+                    f"do not recognize call to {func} with arguments "
+                    f"{[str(arg.__dict__) for arg in node.args]}")
 
         raise ProcessingChainError(f"cannot parse AST nodes of type {node.__dict__}")
 
-    def _validate_name(self, name, raise_exception=False):
+    def _validate_name(self, name: str, raise_exception: bool = False) -> bool:
         """Check that name is alphanumeric, and not an already used keyword"""
-        isgood = re.match(r"\A\w+$", name) and name not in self.func_list \
-            and not name in ureg
+        isgood = re.match(r"\A\w+$", name) and name not in self.func_list and name not in ureg
         if raise_exception and not isgood:
             raise ProcessingChainError(f"{name} is not a valid variable name")
         return isgood
 
-
-    def _execute_procs(self, begin, end):
-        """
-        copy from input buffers to variables
-        call all the processors on their paired arg tuples
-        copy from variables to list of output buffers
+    def _execute_procs(self, begin: int, end: int) -> str:
+        """Copy from input buffers to variables, call all the processors on
+        their paired arg tuples, copy from variables to list of output buffers.
         """
         # Copy input buffers into proc chain buffers
         for in_man in self._input_managers:
@@ -727,15 +756,15 @@ class ProcessingChain:
 
     def __str__(self):
         return 'Input variables:\n  ' \
-        + '\n  '.join([str(in_man) for in_man in self._input_managers]) \
-        + '\nProcessors:\n  ' \
-        + '\n  '.join([str(proc_man) for proc_man in self._proc_managers]) \
-        + '\nOutput variables:\n  ' \
-        + '\n  '.join([str(out_man) for out_man in self._output_managers])
+             + '\n  '.join([str(in_man) for in_man in self._input_managers]) \
+             + '\nProcessors:\n  ' \
+             + '\n  '.join([str(proc_man) for proc_man in self._proc_managers]) \
+             + '\nOutput variables:\n  ' \
+             + '\n  '.join([str(out_man) for out_man in self._output_managers])
 
     # Define functions that can be parsed by get_variable
     # Get length of ProcChainVar
-    def _length(var):
+    def _length(var: ProcChainVar) -> int:
         if var is None:
             return None
         if not isinstance(var, ProcChainVar):
@@ -745,7 +774,7 @@ class ProcessingChain:
         return var.buffer.shape[1]
 
     # round value
-    def _round(var):
+    def _round(var: ProcChainVar) -> float:
         if var is None:
             return None
         if not isinstance(var, ProcChainVar):
@@ -754,7 +783,7 @@ class ProcessingChain:
             raise ProcessingChainError("round() is not implemented for variables, only constants.")
 
     # dict of functions that can be parsed by get_variable
-    func_list = {'len':_length, 'round':_round, }
+    func_list = {'len': _length, 'round': _round}
 
 
 class ProcessorManager:
@@ -762,10 +791,12 @@ class ProcessorManager:
 
     @dataclass
     class DimInfo:
-        length : int # length of arrays in this dimension
-        grid : CoordinateGrid # period and offset of arrays in this dimension
+        length: int  # length of arrays in this dimension
+        grid: CoordinateGrid  # period and offset of arrays in this dimension
 
-    def __init__(self, proc_chain, func, params, kw_params={}, signature=None, types=None):
+    def __init__(self, proc_chain: ProcessingChain, func: np.ufunc, params: list[str],
+                 kw_params: dict = {}, signature: str = None, types: list[str] = None) -> None:
+
         assert isinstance(proc_chain, ProcessingChain) and callable(func) \
             and isinstance(params, list)
 
@@ -793,25 +824,25 @@ class ProcessorManager:
             types = func.types.copy()
         if types is None:
             raise ProcessingChainError(f"""could not find a type signature list
-                                       for {func.__name__}. Please supply a
-                                       valid list of types.""")
+                                           for {func.__name__}. Please supply a
+                                           valid list of types.""")
         if not isinstance(types, list):
             types = [types]
-        found_types = [ typestr.replace('->', '') for typestr in types]
+        found_types = [typestr.replace('->', '') for typestr in types]
 
         # Make sure arrays obey the broadcasting rules, and make a dictionary
         # of the correct dimensions and unit system
         dims_list = re.findall(r"\((.*?)\)", self.signature)
 
-        if not len(dims_list)==len(params)+len(kw_params):
+        if not len(dims_list) == len(params) + len(kw_params):
             raise ProcessingChainError(
-                f"""expected {len(dims_list)} arguments from signature
-                {self.signature}; found {len(params)}: ({', '.join([str(par)
-                for par in params])})""")
+                f"expected {len(dims_list)} arguments from signature "
+                f"{self.signature}; found "
+                f"{len(params)}: ({', '.join([str(par) for par in params])})")
 
-        dims_dict = {} # map from dim name -> DimInfo
-        outerdims = [] # list of DimInfo
-        grid = None # period/offset to use for unit and coordinate conversions
+        dims_dict = {}  # map from dim name -> DimInfo
+        outerdims = []  # list of DimInfo
+        grid = None  # period/offset to use for unit and coordinate conversions
 
         for ipar, (dims, param) in enumerate(zip(dims_list, it.chain(self.params, self.kw_params.values()))):
             if not isinstance(param, ProcChainVar):
@@ -832,26 +863,26 @@ class ProcessorManager:
             if not grid:
                 grid = arr_grid
 
-            #check if arr_dims can be broadcast to match fun_dims
+            # check if arr_dims can be broadcast to match fun_dims
             for i in range(max(len(fun_dims), len(arr_dims))):
-                fd = fun_dims[-i-1] if i<len(fun_dims) else None
-                ad = arr_dims[-i-1] if i<len(arr_dims) else None
+                fd = fun_dims[-i-1] if i < len(fun_dims) else None
+                ad = arr_dims[-i-1] if i < len(arr_dims) else None
 
-                if (isinstance(fd, str)):
+                if isinstance(fd, str):
                     if fd in dims_dict:
                         this_dim = dims_dict[fd]
-                        if not ad or this_dim.length!=ad:
+                        if not ad or this_dim.length != ad:
                             raise ProcessingChainError(
-                                f"""failed to broadcast array dimensions for
-                                {func.__name}. Could not find consistent value
-                                for dimension {fd}""")
+                                f"failed to broadcast array dimensions for "
+                                f"{func.__name}. Could not find consistent value "
+                                f"for dimension {fd}")
                         if not this_dim.grid:
                             dims_dict[fd].grid = arr_grid
-                        elif arr_grid and arr_grid!=this_dim.grid:
+                        elif arr_grid and arr_grid != this_dim.grid:
                             log.debug(
-                                f"""arrays of dimension {fd} for
-                                {func.__name__} do not have consistent period
-                                and offset!""")
+                                f"arrays of dimension {fd} for "
+                                f"{func.__name__} do not have consistent period "
+                                f"and offset!")
                     else:
                         dims_dict[fd] = self.DimInfo(ad, arr_grid)
 
@@ -864,52 +895,50 @@ class ProcessorManager:
 
                 elif fd.length != ad:
                     # If dimensions disagree, either insert a broadcasted array dimension or raise an exception
-                    if len(fun_dims)>len(arr_dims):
+                    if len(fun_dims) > len(arr_dims):
                         arr_dims.insert(len(arr_dims)-i, 1)
-                    elif len(fun_dims)<len(arr_dims):
+                    elif len(fun_dims) < len(arr_dims):
                         outerdims.insert(len(fun_dims)-i, self.DimInfo(ad, arr_grid))
                         fun_dims.insert(len(fun_dims)-i, ad)
                     else:
                         raise ProcessingChainError(
-                            f"""failed to broadcast array dimensions for
-                            {func.__name__}. Input arrays do not have
-                            consistent outer dimensions.  Require:
-                            {tuple(dim.length for dim in outerdims+fun_dims)};
-                            found {tuple(arr_dims)} for {param}""")
+                            f"failed to broadcast array dimensions for "
+                            f"{func.__name__}. Input arrays do not have "
+                            f"consistent outer dimensions.  Require: "
+                            f"{tuple(dim.length for dim in outerdims+fun_dims)}; "
+                            f"found {tuple(arr_dims)} for {param}")
                 elif not fd.grid:
                     outerdims[len(fun_dims)-i].grid = arr_grid
 
-                elif arr_grid and fd.grid!=arr_grid:
-                    log.debug(f"""arrays of dimension {fd} for {func.__name__}
-                              do not have consistent period and offset!""")
+                elif arr_grid and fd.grid != arr_grid:
+                    log.debug(f"arrays of dimension {fd} for {func.__name__} "
+                              f"do not have consistent period and offset!")
 
-                arr_grid = None # this is only used for inner most dim
-
+                arr_grid = None  # this is only used for inner most dim
 
         # Get the type signature we are using
         if not found_types:
             for param in it.chain(self.params, self.kw_params.values()):
-                if not isinstance(param, ProcChainVar): continue
-                error_str += '\n\t' + str(param) + ': ' + str(param.dtype)
+                if not isinstance(param, ProcChainVar):
+                    continue
             raise ProcessingChainError(
-                f"""Could not find a type signature matching the types of the
-                variables given for {self} (types: {types})""")
+                f"could not find a type signature matching the types of the "
+                f"variables given for {self} (types: {types})")
         # Use the first types in the list that all our types can be cast to
         self.types = [np.dtype(t) for t in found_types[0]]
 
         # Finish setting up of input parameters for function
-        #   Iterate through args and then kwargs
-        #   Reshape variable arrays to add broadcast dimensions
-        #   Allocate new arrays as needed
-        #   Convert coords to right system of units as needed
-        for i, ((arg_name, param), dims, dtype) in enumerate(zip(
-            it.chain(zip(it.repeat(None), self.params), self.kw_params.items()),
-            dims_list, self.types)):
+        # Iterate through args and then kwargs
+        # Reshape variable arrays to add broadcast dimensions
+        # Allocate new arrays as needed
+        # Convert coords to right system of units as needed
+        for i, ((arg_name, param), dims, dtype) in enumerate(zip(it.chain(zip(it.repeat(None), self.params), self.kw_params.items()), dims_list, self.types)):
             dim_list = outerdims.copy()
             for d in dims.split(','):
-                if not d: continue
-                if not d in dims_dict:
-                    raise ProcessingChainError(f"Could not deduce dimension {d} for {param}")
+                if not d:
+                    continue
+                if d not in dims_dict:
+                    raise ProcessingChainError(f"could not deduce dimension {d} for {param}")
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
@@ -918,15 +947,13 @@ class ProcessorManager:
                 # Deduce any automated descriptions of parameter
                 unit = None
                 is_coord = False
-                if param.is_coord==True and grid is not None:
+                if param.is_coord == True and grid is not None:
                     unit = str(grid.period.u)
                 elif isinstance(param.unit, str) and param.unit in ureg and grid is not None and ureg.is_compatible_with(grid.period, param.unit):
                     is_coord = True
 
-                param.update_auto(shape=shape,
-                                  dtype=np.dtype(dtype),
-                                  grid=this_grid,
-                                  unit=unit,
+                param.update_auto(shape=shape, dtype=np.dtype(dtype),
+                                  grid=this_grid, unit=unit,
                                   is_coord=is_coord)
 
                 if param.is_coord and not grid:
@@ -936,7 +963,7 @@ class ProcessorManager:
                 # reshape just in case there are some missing dimensions
                 arshape = list(param.shape)
                 for idim in range(-1, -1-len(shape), -1):
-                    if arshape[idim]!=shape[idim]:
+                    if arshape[idim] != shape[idim]:
                         arshape.insert(len(arshape)+idim+1, 1)
                 param = param.reshape(tuple(arshape))
 
@@ -947,8 +974,8 @@ class ProcessorManager:
                         param = float(param)
                     elif not isinstance(grid, CoordinateGrid) or not ureg.is_compatible_with(grid.period, param):
                         raise ProcessingChainError(
-                            f"""could not find valid conversion for {param};
-                            CoordinateGrid is {grid}""")
+                            f"could not find valid conversion for {param}; "
+                            f"CoordinateGrid is {grid}")
                     else:
                         param = float(param/grid.period)
                 if np.issubdtype(dtype, np.integer):
@@ -956,27 +983,29 @@ class ProcessorManager:
                 else:
                     param = dtype.type(param)
 
-            if arg_name is None: self.args.append(param)
-            else: self.kwargs[arg_name] = param
+            if arg_name is None:
+                self.args.append(param)
+            else:
+                self.kwargs[arg_name] = param
 
         log.debug(f'added processor: {self}')
 
-    def execute(self):
+    def execute(self) -> None:
         self.processor(*self.args, **self.kwargs)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.processor.__name__ + '(' \
             + ", ".join([str(par) for par in self.params] + [f"{k}={str(v)}" for k, v in self.kw_params.items()]) + ')'
 
 
 class UnitConversionManager(ProcessorManager):
-    """A special processor manager for handling converting variables between unit systems"""
+    """A special processor manager for handling converting variables between unit systems."""
 
     @vectorize(nopython=True, cache=True)
     def convert(buf_in, offset_in, offset_out, period_ratio):
         return (buf_in - offset_in) * period_ratio + offset_out
 
-    def __init__(self, var, unit):
+    def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
         # reference back to our processing chain
         self.proc_chain = var.proc_chain
         # callable function used to process data
@@ -989,7 +1018,7 @@ class UnitConversionManager(ProcessorManager):
         period_ratio = from_grid.get_period(unit.period)
         self.out_buffer = np.zeros_like(from_buffer)
         self.args = [from_buffer, from_grid.get_offset(),
-                           unit.get_offset(), period_ratio, self.out_buffer]
+                     unit.get_offset(), period_ratio, self.out_buffer]
         self.kwargs = {}
 
         log.debug(f'added conversion: {self}')
@@ -1003,64 +1032,67 @@ class IOManager(metaclass=ABCMeta):
     buffer and variable are compatible.
     """
     @abstractmethod
-    def read(self, start: int, end: int):
+    def read(self, start: int, end: int) -> None:
         pass
 
     @abstractmethod
-    def write(self, start: int, end: int):
+    def write(self, start: int, end: int) -> None:
         pass
 
     @abstractmethod
-    def __str__(self):
+    def __str__(self) -> str:
         pass
 
 
 # Ok, this one's not LGDO
 class NumpyIOManager(IOManager):
-    def __init__(self, io_buf, var):
+    def __init__(self, io_buf: np.array, var: ProcChainVar):
         assert isinstance(io_buf, np.ndarray) \
             and isinstance(var, ProcChainVar)
 
-        var.update_auto(dtype = io_buf.dtype,
-                        shape = io_buf.shape[1:])
+        var.update_auto(dtype=io_buf.dtype,
+                        shape=io_buf.shape[1:])
 
         if var.shape != io_buf.shape[1:] or var.dtype != io_buf.dtype:
             raise ProcessingChainError(
-                r"""numpy.array<{}>\{{}\}@{}) is not compatible with variable
-                {}""".format(self.io_buf.shape, self.io_buf.dtype,
-                             self.io_buf.data, str(self.var)))
+                r"numpy.array<{}>(\{{}\}@{}) is not compatible with variable {}".format(
+                    self.io_buf.shape, self.io_buf.dtype, self.io_buf.data,
+                    str(self.var)
+                )
+            )
 
         self.io_buf = io_buf
         self.var = var
         self.raw_var = var.buffer
 
-    def read(self, start, end):
+    def read(self, start: int, end: int) -> None:
         np.copyto(self.raw_var[0:end-start, ...],
                   self.io_buf[start:end, ...], 'unsafe')
 
-    def write(self, start, end):
+    def write(self, start: int, end: int) -> None:
         np.copyto(self.io_buf[start:end, ...],
                   self.raw_var[0:end-start, ...], 'unsafe')
 
-    def __str__(self):
-        return f"""{self.var} linked to numpy.array({self.io_buf.shape}, {self.io_buf.dtype})@{self.io_buf.data})"""
+    def __str__(self) -> str:
+        return (f"{self.var} linked to numpy.array({self.io_buf.shape}, "
+                f"{self.io_buf.dtype})@{self.io_buf.data})")
 
 
 class LGDOArrayIOManager(IOManager):
-    def __init__(self, io_array, var):
-        assert isinstance(io_array, lh5.Array) \
+    def __init__(self, io_array: np.array, var: ProcChainVar) -> None:
+        assert isinstance(io_array, lgdo.Array) \
             and isinstance(var, ProcChainVar)
 
         unit = io_array.attrs.get('units', None)
-        var.update_auto(dtype = io_array.dtype,
-                        shape = io_array.nda.shape[1:],
-                        unit = unit )
+        var.update_auto(dtype=io_array.dtype,
+                        shape=io_array.nda.shape[1:],
+                        unit=unit)
 
         if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
             raise ProcessingChainError(
-                f"""LGDO object
-                {self.io_buf.form_datatype()}@{self.raw_buf.data} is
-                incompatible with {str(self.var)}""")
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
+                f"incompatible with {str(self.var)}")
 
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
@@ -1069,10 +1101,10 @@ class LGDOArrayIOManager(IOManager):
                 unit = ureg.Quantity(unit).u
             else:
                 raise ProcessingChainError(
-                    f"""LGDO array and variable {var} have incompatible units
-                    ({var.unit.period.u} and {unit})""")
+                    f"LGDO array and variable {var} have incompatible units "
+                    f"({var.unit.period.u} and {unit})")
 
-        if unit is None and not var.unit is None:
+        if unit is None and var.unit is not None:
             io_array.attrs['units'] = str(var.unit)
 
         self.io_array = io_array
@@ -1080,22 +1112,21 @@ class LGDOArrayIOManager(IOManager):
         self.var = var
         self.raw_var = var.get_buffer(unit)
 
-
-    def read(self, start, end):
+    def read(self, start: int, end: int) -> None:
         np.copyto(self.raw_var[0:end-start, ...],
                   self.raw_buf[start:end, ...], 'unsafe')
 
-    def write(self, start, end):
+    def write(self, start: int, end: int) -> None:
         np.copyto(self.raw_buf[start:end, ...],
                   self.raw_var[0:end-start, ...], 'unsafe')
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.var} linked to {self.io_array}'
 
 
 class LGDOWaveformIOManager(IOManager):
-    def __init__(self, wf_table: lh5.WaveformTable, variable: ProcChainVar):
-        assert isinstance(wf_table, lh5.WaveformTable) \
+    def __init__(self, wf_table: lgdo.WaveformTable, variable: ProcChainVar):
+        assert isinstance(wf_table, lgdo.WaveformTable) \
             and isinstance(variable, ProcChainVar)
 
         self.wf_table = wf_table
@@ -1105,8 +1136,10 @@ class LGDOWaveformIOManager(IOManager):
 
         dt_units = wf_table.dt_units
         t0_units = wf_table.t0_units
-        if dt_units is None: dt_units = t0_units
-        elif t0_units is None: t0_units = dt_units
+        if dt_units is None:
+            dt_units = t0_units
+        elif t0_units is None:
+            t0_units = dt_units
 
         # If needed create a new coordinate grid from the IO buffer
         if variable.grid is auto and \
@@ -1114,21 +1147,21 @@ class LGDOWaveformIOManager(IOManager):
            isinstance(t0_units, str) and t0_units in ureg:
             grid = CoordinateGrid(ureg.Quantity(self.dt_buf[0], dt_units),
                                   ProcChainVar(variable.proc_chain,
-                                               variable.name+"_dt",
-                                               shape = (),
-                                               dtype = self.t0_buf.dtype,
-                                               grid = None,
-                                               unit = dt_units,
-                                               is_coord = True))
+                                               variable.name + "_dt",
+                                               shape=(),
+                                               dtype=self.t0_buf.dtype,
+                                               grid=None,
+                                               unit=dt_units,
+                                               is_coord=True))
         else:
             grid = None
 
         self.var = variable
-        self.var.update_auto(shape = self.wf_buf.shape[1:],
-                             dtype = self.wf_buf.dtype,
-                             grid = grid,
-                             unit = wf_table.values_units,
-                             is_coord = False)
+        self.var.update_auto(shape=self.wf_buf.shape[1:],
+                             dtype=self.wf_buf.dtype,
+                             grid=grid,
+                             unit=wf_table.values_units,
+                             is_coord=False)
 
         if dt_units is None:
             dt_units = self.var.grid.unit_str()
@@ -1145,24 +1178,26 @@ class LGDOWaveformIOManager(IOManager):
         self.dt_buf[:] = self.var.grid.get_period(dt_units)
         self.wf_table.dt_units = dt_units
 
-    def read(self, start, end):
+    def read(self, start: int, end: int) -> None:
         self.wf_var[0:end-start, ...] = self.wf_buf[start:end, ...]
         self.t0_var[0:end-start, ...] = self.t0_buf[start:end, ...]
 
-    def write(self, start, end):
+    def write(self, start: int, end: int) -> None:
         self.wf_buf[start:end, ...] = self.wf_var[0:end-start, ...]
         if self.variable_t0:
             self.t0_buf[start:end, ...] = self.t0_var[0:end-start, ...]
 
-    def __str__(self):
-        return f"""{self.var} linked to <pygama.lgdo.WaveformTable: values: {self.wf_table.values}, dt: {self.wf_table.dt}, t0: {self.wf_table.t0}>"""
+    def __str__(self) -> str:
+        return (f"{self.var} linked to <pygama.lgdo.WaveformTable: values: "
+                f"{self.wf_table.values}, dt: {self.wf_table.dt}, t0: "
+                f"{self.wf_table.t0}>")
 
 
-def build_processing_chain(lh5_in, dsp_config, db_dict = None,
-                           outputs = None, block_width=16):
-    """
-    Produces a ProcessingChain object and an lh5 table for output parameters
-    from an input lh5 table and a json recipe.
+def build_processing_chain(lh5_in: lgdo.Table, dsp_config: dict | str, db_dict: dict = None,
+                           outputs: list[str] = None, block_width: int = 16) -> tuple[ProcessingChain, list[str], lgdo.Table]:
+    """Produces a :class:`ProcessingChain` object and an LH5
+    :class:`~.lgdo.table.Table` for output parameters from an input LH5
+    :class:`~.lgdo.table.Table` and a JSON recipe.
 
     Parameters
     ----------
@@ -1172,48 +1207,62 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     dsp_config : dict or str
         A dict or json filename containing the recipes for computing DSP
-        parameter from raw parameters. The format is as follows: ::
+        parameter from raw parameters. The format is as follows:
+
+        .. code-block:: json
 
             {
-               "outputs" : [ "parnames", ... ] -> list of output parameters
-                  to compute by default; see outputs parameter.
+               "outputs" : [ "par1", "par2" ]
                "processors" : {
-                  "name1, ..." : { -> names of parameters computed
-                    "function" : str -> name of function to call. Function
-                      should implement the gufunc interface, a factory
-                      function returning a gufunc, or an arbitrary
-                      function that can be mapped onto a gufunc
-                    "module" : str -> name of module containing function
-                    "args" : [ str or numeric, ... ] -> list of names of
-                      computed and input parameters or constant values
-                      used as inputs to function. Note that outputs
-                      should be fed by reference as args! Arguments read
-                      from the database are prepended with db.
-                    "kwargs" : dict -> keyword arguments for
-                      ProcesssingChain.add_processor.
-                    "init_args" : [ str or numeric, ... ] -> list of names
-                      of computed and input parameters or constant values
-                      used to initialize a gufunc via a factory function
-                    "unit" : str or [ strs, ... ] -> units for parameters
-                    "defaults" : dict -> default value to be used for
-                      arguments read from the database
-                    "prereqs" : DEPRECATED [ strs, ...] -> list of parameters
-                      that must be computed before these can
+                  "name1, name2" : {
+                    "function" : "func1"
+                    "module" : "mod1"
+                    "args" : ["arg1", 3, "arg2"]
+                    "kwargs" : {"key1": "val1"}
+                    "init_args" : ["arg1", 3, "arg2"]
+                    "unit" : ["u1", "u2"]
+                    "defaults" : {"arg1": "defval1"}
                   }
                }
             }
 
-    outputs : [str, ...], optional
-        List of parameters to put in the output lh5 table. If None,
-        use the parameters in the 'outputs' list from config
+        - ``outputs`` -- list of output parameters (strings) to compute by
+          default. See `outputs` argument
+        - ``processors`` -- configuration dictionary
 
-    db_dict : dict, optional
+           - ``name1, name2`` -- dictionary. key contains comma-separated
+             names of parameters computed
+
+              - ``function`` -- string, name of function to call.  Function
+                should implement the gufunc interface, a factory function
+                returning a gufunc, or an arbitrary function that can be
+                mapped onto a gufunc
+              - ``module`` -- string, name of module containing function
+              - ``args``-- list of strings or numerical values. Contains
+                list of names of computed and input parameters or
+                constant values used as inputs to function. Note that
+                outputs should be fed by reference as args! Arguments read
+                from the database are prepended with db.
+              - ``kwargs`` -- dictionary. Keyword arguments for
+                :meth:`ProcesssingChain.add_processor`.
+              - ``init_args`` --  list of strings or numerical values. List
+                of names of computed and input parameters or constant values
+                used to initialize a gufunc via a factory function
+              - ``unit`` -- list of strings. Units for parameters
+              - ``defaults`` -- dictionary. Default value to be used for
+                arguments read from the database
+
+    db_dict : dict, optional, default=None
         A nested dict pointing to values for db args. e.g. if a processor
         uses arg db.trap.risetime, it will look up db_dict['trap']['risetime']
         and use the found value. If no value is found, use the default
         defined in the config file.
 
-    block_width : int, optional
+    outputs : list of str, optional, default=None
+        List of parameters to put in the output lh5 table. If None,
+        use the parameters in the 'outputs' list from config
+
+    block_width : int, optional, default=16
         number of entries to process at once. To optimize performance,
         a multiple of 16 is preferred, but if performance is not an issue
         any value can be used.
@@ -1221,9 +1270,10 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     Returns
     -------
     (proc_chain, field_mask, lh5_out) : tuple
-        proc_chain : ProcessingChain object that is executed
-        field_mask : List of input fields that are used
-        lh5_out : output lh5 table containing processed values
+        - `proc_chain` -- :class:`ProcessingChain` object that is executed
+        - `field_mask` -- list of input fields that are used
+        - `lh5_out` -- output :class:`~.lgdo.table.Table` containing processed
+          values
     """
     proc_chain = ProcessingChain(block_width, lh5_in.size)
 
@@ -1231,7 +1281,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         with open(dsp_config) as f:
             dsp_config = json.load(f)
     elif dsp_config is None:
-        dsp_config = {'outputs':[], 'processors':{}}
+        dsp_config = {'outputs': [], 'processors': {}}
     else:
         # We don't want to modify the input!
         dsp_config = deepcopy(dsp_config)
@@ -1246,15 +1296,16 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
     db_parser = re.compile(r"db.[\w_.]+")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
-        keys = [k for k in re.split(",| ", key) if k!='']
-        if len(keys)>1:
+        keys = [k for k in re.split(",| ", key) if k != '']
+        if len(keys) > 1:
             for k in keys:
                 multi_out_procs[k] = key
 
         # find DB lookups in args and replace the values
         args = node['args']
         for i, arg in enumerate(args):
-            if not isinstance(arg, str): continue
+            if not isinstance(arg, str):
+                continue
             for db_var in db_parser.findall(arg):
                 try:
                     db_node = db_dict
@@ -1268,16 +1319,19 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     except (KeyError, TypeError):
                         raise ProcessingChainError(
                             f"""did not find {db_var} in database, and could
-                            not find default value.""")
-                if arg==db_var: arg = db_node
-                else: arg = arg.replace(db_var, str(db_node))
+                                not find default value.""")
+                if arg == db_var:
+                    arg = db_node
+                else:
+                    arg = arg.replace(db_var, str(db_node))
             args[i] = arg
 
         # parse the arguments list for prereqs, if not included explicitly
-        if not 'prereqs' in node:
+        if 'prereqs' not in node:
             prereqs = []
             for arg in node['args']:
-                if not isinstance(arg, str): continue
+                if not isinstance(arg, str):
+                    continue
                 for prereq in proc_chain.get_variable(arg, True):
                     if prereq not in prereqs and prereq not in keys:
                         prereqs.append(prereq)
@@ -1287,14 +1341,16 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
     processors.update(multi_out_procs)
 
-    def resolve_dependencies(par, resolved, leafs, unresolved=[]):
+    def resolve_dependencies(par: str, resolved: list[str],
+                             leafs: list[str], unresolved: list[str] = []) -> None:
         """
         Recursive function to crawl through the parameters/processors and get a
         sequence of unique parameters such that parameters always appear after
         their dependencies. For parameters that are not produced by the
-        ProcessingChain (i.e. input/db parameters), add them to the list of leafs
+        :class:`ProcessingChain` (i.e. input/db parameters), add them to the
+        list of leafs.
 
-        https://www.electricmonk.nl/docs/dependency_resolving_algorithm/dependency_resolving_algorithm.html
+        .. [ref] https://www.electricmonk.nl/docs/dependency_resolving_algorithm/dependency_resolving_algorithm.html
         """
         if par in resolved:
             return
@@ -1320,9 +1376,9 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         resolved.append(par)
         unresolved.remove(par)
 
-    proc_par_list = [] # calculated from processors
-    input_par_list = [] # input from file and used for processors
-    copy_par_list = [] # copied from input to output
+    proc_par_list = []  # calculated from processors
+    input_par_list = []  # input from file and used for processors
+    copy_par_list = []  # copied from input to output
     out_par_list = []
     for out_par in outputs:
         if out_par not in processors:
@@ -1352,15 +1408,16 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
 
         # Initialize the new variables, if needed
         if 'unit' in recipe:
-            new_vars = [k for k in re.split(",| ", proc_par) if k!='']
+            new_vars = [k for k in re.split(",| ", proc_par) if k != '']
             for i, name in enumerate(new_vars):
                 unit = recipe.get('unit', auto)
-                if isinstance(unit, list): unit = unit[i]
+                if isinstance(unit, list):
+                    unit = unit[i]
 
                 proc_chain.add_variable(name, unit=unit)
 
         # get this list of kwargs
-        kwargs = recipe.get('kwargs', {}) # might also need db lookup here
+        kwargs = recipe.get('kwargs', {})  # might also need db lookup here
 
         # if init_args are defined, parse any strings and then call func
         # as a factory/constructor function
@@ -1381,11 +1438,13 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                             log.debug("database lookup: using default value of {db_node} for {db_var}")
                         except (KeyError, TypeError):
                             raise ProcessingChainError(
-                                f"""did not find {db_var} in database, and
-                                could not find default value.""")
+                                f"did not find {db_var} in database, and "
+                                f"could not find default value.")
 
-                    if arg==db_var: arg = db_node
-                    else: arg = arg.replace(db_var, str(db_node))
+                    if arg == db_var:
+                        arg = db_node
+                    else:
+                        arg = arg.replace(db_var, str(db_node))
 
                 # see if string can be parsed by proc_chain
                 if isinstance(arg, str):
@@ -1396,7 +1455,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
                     init_args.append(arg)
 
             expr = ", ".join([f"{a}" for a in init_args] + [f"{k}={v}" for k, v in init_kwargs.items()])
-            log.debug(f"""building function from init_args: {func.__name__}({expr})""")
+            log.debug(f"building function from init_args: {func.__name__}({expr})")
             func = func(*init_args)
         except KeyError:
             pass
@@ -1404,7 +1463,7 @@ def build_processing_chain(lh5_in, dsp_config, db_dict = None,
         proc_chain.add_processor(func, *args, **kwargs)
 
     # build the output buffers
-    lh5_out = lh5.Table(size=proc_chain._buffer_len)
+    lh5_out = lgdo.Table(size=proc_chain._buffer_len)
 
     # add inputs that are directly copied
     for copy_par in copy_par_list:
