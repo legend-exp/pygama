@@ -318,7 +318,7 @@ class ProcessingChain:
 
     def add_variable(self, name: str, dtype: np.dtype | str = auto, shape: int | tuple = auto,
                      grid: CoordinateGrid = auto, unit: str | Unit = auto, is_coord: bool = auto,
-                     period: Unit = None, offset: Unit = 0) -> ProcChainVar:
+                     period: CoordinateGrid.period = None, offset: CoordinateGrid.offset = 0) -> ProcChainVar:
         """Add a named variable containing a block of values or arrays.
 
         Parameters
