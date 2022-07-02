@@ -606,7 +606,7 @@ class ProcessingChain:
                 if isinstance(ret, float):
                     round_ret = int(round(ret))
                     if abs(ret - round_ret) > 0.0001:
-                        log.debug(f'slice value {slice_value} is non-integer. Rounding to {round_ret}')
+                        log.warning(f'slice value {slice_value} is non-integer. Rounding to {round_ret}')
                     return round_ret
                 return int(ret)
 
@@ -682,7 +682,6 @@ class ProcessingChain:
                     var.update_auto(*args, **kwargs)
                     return self._vars_dict[var_name]
                 elif not dry_run:
-                    log.debug(f"{args} {kwargs}")
                     return self.add_variable(var_name, *args, **kwargs)
                 else:
                     return None

@@ -36,8 +36,8 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
         name of raw LH5 file to read from
     f_dsp : str
         name of dsp LH5 file to write to
-    dsp_config : str
-        name of JSON file containing
+    dsp_config : str or dict
+        dict or name of JSON file containing
         :class:`~.processing_chain.ProcessingChain` config. See
         :func:`~.processing_chain.build_processing_chain` for details
     lh5_tables : list of str, optional
@@ -100,7 +100,7 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
     # load DSP config (default: one config file for all tables)
     if isinstance(dsp_config, str):
         with open(dsp_config) as config_file:
-            dsp_config = json.load(config_file, object_pairs_hook=json.OrderedDict)
+            dsp_config = json.load(config_file)
 
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
@@ -137,11 +137,11 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
         if chan_config is not None:
             f_config = chan_config[tb]
             with open(f_config) as config_file:
-                dsp_config = json.load(config_file, object_pairs_hook=json.OrderedDict)
+                dsp_config = json.load(config_file)
             log.debug(f'processing table: {tb} with DSP config file {f_config}')
 
         if not isinstance(dsp_config, dict):
-            raise RuntimeError('dsp_config for {tb} must be a dict')
+            raise RuntimeError(f'dsp_config for {tb} must be a dict')
 
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
@@ -159,7 +159,8 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str, lh5_tables: list[str] = N
             # Initialize
             if proc_chain is None:
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(lh5_in, dsp_config, db_dict, outputs, block_width)
-                progress_bar = tqdm(desc=f'Processing table {tb}', total=tot_n_rows,
+                if log.level <= logging.INFO:
+                    progress_bar = tqdm(desc=f'Processing table {tb}', total=tot_n_rows,
                                     delay=2, unit='rows', file=sys.stdout)
 
             n_rows = min(tot_n_rows-start_row, n_rows)
