@@ -1,8 +1,14 @@
-import fnmatch, glob, os, sys, h5py, logging
-import numpy as np
-import pandas as pd
+import fnmatch
+import glob
+import logging
+import os
+import sys
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
+
+import h5py
+import numpy as np
+import pandas as pd
 
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
