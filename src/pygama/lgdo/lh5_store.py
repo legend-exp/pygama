@@ -1,5 +1,6 @@
 import fnmatch
 import glob
+import logging
 import os
 import sys
 from bisect import bisect_left, bisect_right
@@ -18,6 +19,8 @@ from .struct import Struct
 from .table import Table
 from .vectorofvectors import VectorOfVectors
 from .waveform_table import WaveformTable
+
+log = logging.getLogger(__name__)
 
 
 class LH5Store:
@@ -69,7 +72,7 @@ class LH5Store:
         if mode == 'r' and not os.path.exists(full_path):
             raise FileNotFoundError(f'file {full_path} not found')
         if verbosity > 0 and mode != 'r' and os.path.exists(full_path):
-            print(f'opening existing file {full_path} in mode {mode}...')
+            log.info(f'opening existing file {full_path} in mode {mode}...')
         h5f = h5py.File(full_path, mode)
         if self.keep_open: self.files[lh5_file] = h5f
         return h5f
@@ -99,13 +102,12 @@ class LH5Store:
                 group = base_group.create_group(group)
                 if grp_attrs is not None: group.attrs.update(grp_attrs)
                 return group
-        if grp_attrs is not None:
-            if not overwrite and grp_attrs != group.attrs:
-                print('warning: grp_attrs != group.attrs but overwrite not set')
-                print('ignoring grp_attrs')
-            elif overwrite:
+        if grp_attrs is not None and len(set(grp_attrs.items()) ^ set(group.attrs.items())) > 0:
+            if not overwrite:
+                raise RuntimeWarning('grp_attrs != group.attrs but overwrite not set, ignoring grp_attrs')
+            else:
                 if verbosity > 0: print(f'overwriting {group}.attrs...')
-                group.attrs = {}
+                for key in group.attrs.keys(): group.attrs.pop(key)
                 group.attrs.update(grp_attrs)
         return group
 
@@ -558,6 +560,10 @@ class LH5Store:
             print(f'Unknown wo_mode {wo_mode}')
             return
 
+        # "mode" is for the h5df.File and wo_mode is for this function
+        # In hdf5, 'a' is really "modify" -- in addition to appending, you can
+        # change any object in the file. So we use file:append for
+        # write_object:overwrite.
         mode = 'w' if wo_mode == 'of' else 'a'
         lh5_file = self.gimme_file(lh5_file, mode=mode, verbosity=verbosity)
         group = self.gimme_group(group, lh5_file, verbosity=verbosity)
@@ -640,11 +646,10 @@ class LH5Store:
             # need to create dataset from ndarray the first time for speed
             # creating an empty dataset and appending to that is super slow!
             if (wo_mode != 'a' and write_start == 0) or name not in group:
-                if verbosity > 0 and wo_mode == 'o' and name in group:
-                    print(f'write_object: overwriting {name} in {group}')
-                maxshape = list(nda.shape)
-                maxshape[0] = None
-                maxshape = tuple(maxshape)
+                maxshape = (None,) + nda.shape[1:]
+                if wo_mode == 'o' and name in group:
+                    log.info(f'overwriting {name} in {group}')
+                    del group[name]
                 ds = group.create_dataset(name, data=nda, maxshape=maxshape)
                 ds.attrs.update(obj.attrs)
                 return
