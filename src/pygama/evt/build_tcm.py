@@ -18,7 +18,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
     ----------
     input_tables : list of tuples
         each entry is (filename, table_name_pattern). All tables matching
-        [table_name_pattern] in [filename] will be added to the list of intput
+        [table_name_pattern] in [filename] will be added to the list of input
         tables.
     coin_col : str
         the name of the column in each tables used to build coincidences. All
