@@ -121,7 +121,7 @@ def build_raw(in_stream: int, in_stream_type: str = None,
         log.info('output:')
         for out_file in out_files: log.info(f' -> {out_file}')
     log.info(f'buffer size: {buffer_size}')
-    if n_max < np.inf: 
+    if n_max < np.inf:
         log.info(f'maximum number of events: {n_max}')
     if log.level <= logging.INFO:
         if n_max < np.inf:
