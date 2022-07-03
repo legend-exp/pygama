@@ -29,11 +29,11 @@ def fit_unbinned(func, data, guess=None,
     simplex : bool
         whether to include a round of simpson minimisation before main minimisation
     bounds : list of tuples
-        Each tuple is (min, max) for the corresponding parameters. 
+        Each tuple is (min, max) for the corresponding parameters.
         Bounds can be None, e.g. [(0,None), (0,10)]
     fixed : list of bools
         list of parameter indices to fix
-    
+
     Returns
     -------
     pars, errs, cov : tuple of ndarrays
