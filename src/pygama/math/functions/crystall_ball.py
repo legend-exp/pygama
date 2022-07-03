@@ -33,7 +33,7 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
         The amount to scale the distribution
     A : float
         An overall scale factor
-    
+
     Returns
     -------
     y : float
