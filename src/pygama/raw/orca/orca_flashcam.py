@@ -82,7 +82,10 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         # check that the ADC decoder has the right number of samples
         objs = []
         for obj in gc.get_objects():
-            if isinstance(obj, ORFlashCamADCWaveformDecoder): objs.append(obj)
+            try: 
+                if isinstance(obj, ORFlashCamADCWaveformDecoder): objs.append(obj)
+            except ReferenceError: 
+                pass
         if len(objs) != 1:
             log.warning(f'Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
         else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['fcid'].nda[ii])
