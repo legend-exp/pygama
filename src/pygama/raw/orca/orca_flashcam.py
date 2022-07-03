@@ -85,6 +85,7 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
             try: 
                 if isinstance(obj, ORFlashCamADCWaveformDecoder): objs.append(obj)
             except ReferenceError: 
+                # avoids "weakly-referenced object no longer exists"
                 pass
         if len(objs) != 1:
             log.warning(f'Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
