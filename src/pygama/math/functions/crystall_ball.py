@@ -7,17 +7,19 @@ import numpy as np
 @nb.vectorize([nb.float64(nb.float64,nb.float64,nb.float64,nb.float64,nb.float64,nb.float64),
 nb.float32(nb.float32,nb.float32,nb.float32,nb.float32,nb.float32,nb.float32)])
 def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A: float) -> float:
-    """
+    r"""
     PDF of a power-law tail plus gaussian.
     As a Numba vectorized function, it runs slightly faster than
     'out of the box' functions.
     It computes
 
     .. math::
-        y = \\frac{x-mu}{sigma}
+        y = \frac{x - \mu}{\sigma} \\
+        PDF = A \frac{pdf(y, \beta, m)}{\sigma}
 
-
-        PDF = A\\frac{pdf(y, beta, m)}{sigma}
+    .. note::
+        Later: potentially replace by a guvectorized factory function so that
+        the normalization isn't computed every time
 
     Parameters
     ----------
@@ -38,8 +40,6 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
     -------
     y : float
         The value at x given the parameters
-
-    Later -- Potentially replace by a guvectorized factory function so that the normalization isn't computed every time
     """
     if (beta <= 0) or (m <= 1):
         raise ValueError("beta must be greater than 0, and m must be greater than 1")
@@ -68,17 +68,19 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
 @nb.vectorize([nb.float64(nb.float64,nb.float64,nb.float64,nb.float64,nb.float64,nb.float64),
 nb.float32(nb.float32,nb.float32,nb.float32,nb.float32,nb.float32,nb.float32)])
 def nb_xtalball_cdf(x: float, beta: float, m: float, mu: float, sigma: float, A: float) -> float:
-    """
+    r"""
     CDF for power-law tail plus gaussian.
     As a Numba vectorized function, it runs slightly faster than
     'out of the box' functions.
     It computes
 
     .. math::
-        y = \\frac{x-mu}{sigma}
+        y = \frac{x-\mu}{\sigma} \\
+        PDF = A \times cdf(y, \beta, m)
 
-
-        PDF = A\\times cdf(y, beta, m)
+    .. note::
+        TODO:: potentially replace by a guvectorized factory function so that
+        the normalization isn't computed every time
 
     Parameters
     ----------
@@ -99,8 +101,6 @@ def nb_xtalball_cdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
     -------
     y : float
         The value at x given the parameters
-
-    Later -- Potentially replace by a guvectorized factory function so that the normalization isn't computed every time
     """
     if (beta <= 0) or (m <= 1):
         raise ValueError("beta must be greater than 0, and m must be greater than 1")
