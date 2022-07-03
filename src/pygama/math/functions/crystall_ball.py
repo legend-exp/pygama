@@ -33,6 +33,11 @@ def nb_xtalball_pdf(x: float, beta: float, m: float, mu: float, sigma: float, A:
         The amount to scale the distribution
     A : float
         An overall scale factor
+    
+    Returns
+    -------
+    y : float
+        The value at x given the parameters
 
     TODO: Potentially replace by a guvectorized factory function so that the normalization isn't computed every time
     """
