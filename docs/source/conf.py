@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, the LEGEND Collaboration'
+copyright = '2022, the LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
