@@ -108,15 +108,15 @@ def build_raw(in_stream, in_stream_type=None, out_spec=None, buffer_size=8192,
         raise ValueError(f'bad buffer_size {buffer_size}')
     if buffer_size > n_max: buffer_size = n_max
 
-    log.debug(f'input: {in_stream}')
+    log.info(f'input: {in_stream}')
     out_files = [out_spec]
     if isinstance(out_spec, RawBufferLibrary):
         out_files = out_spec.get_list_of('out_stream')
-    if len(out_files) == 1: log.debug(f'output: {out_files[0]}')
+    if len(out_files) == 1: log.info(f'output: {out_files[0]}')
     else:
-        log.debug('output:')
-        for out_file in out_files: log.debug(f' - {out_file}')
-    log.debug(f'buffer size: {buffer_size}')
+        log.info('output:')
+        for out_file in out_files: log.info(f' - {out_file}')
+    log.info(f'buffer size: {buffer_size}')
     if n_max < np.inf: log.info(f'maximum number of events: {n_max}')
     if log.level <= logging.INFO:
         if n_max < np.inf:
