@@ -28,7 +28,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
         str hash_func is a regexp pattern that acts on each table_name. The
         default hash_func pull the first int out of the table name
         setting to None will use a table's index in input_tables
-        Later can add list or dict or a function(str) --> int 
+        Later can add list or dict or a function(str) --> int
     coin_window : float
         The clustering window width (see generate_tcm_cols)
     window_ref : str
@@ -71,8 +71,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
     for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
     tcm = lgdo.Table(col_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
 
-    if out_file is not None: 
+    if out_file is not None:
         store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
 
     return tcm
-
