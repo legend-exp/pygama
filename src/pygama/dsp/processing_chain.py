@@ -397,7 +397,7 @@ class ProcessingChain:
             elif len(var.shape) == 0:
                 buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape[1:], var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
 
         # Add the buffer to the input buffers list
         if isinstance(buff, np.ndarray):
@@ -451,7 +451,7 @@ class ProcessingChain:
             elif len(var.shape) == 0:
                 buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape[1:], var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
 
         # Add the buffer to the output buffers list
         if isinstance(buff, np.ndarray):
@@ -574,7 +574,7 @@ class ProcessingChain:
         elif isinstance(node, ast.Name):
             # check if it is a unit
             if node.id in ureg:
-                return ureg[node.id]
+                return ureg(node.id)
 
             #check if it is a variable
             var_name_list.append(node.id)
