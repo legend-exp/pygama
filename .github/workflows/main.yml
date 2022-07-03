@@ -52,7 +52,7 @@ jobs:
           python -m pip install --upgrade .[test]
           pytest --cov=pygama --cov-report=xml
       - name: Upload Coverage to codecov.io
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
 
   deploy-docs:
     name: Build documentation
@@ -82,7 +82,7 @@ jobs:
           make allver
       - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
-        uses: JamesIves/github-pages-deploy-action@v4.2.2
+        uses: JamesIves/github-pages-deploy-action@v4.3.4
         with:
           branch: gh-pages
           folder: docs/build/allver/html
