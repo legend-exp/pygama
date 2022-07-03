@@ -9,7 +9,7 @@ BUILDDIRALL = $(BUILDDIR)/allver/html
 PY_SOURCE_EXCLUDE = $(shell cat source/.py_api_exclude)
 
 all: apidoc
-	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)"
+	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going
 
 allver:
 	sphinx-multiversion "$(SOURCEDIR)" "$(BUILDDIRALL)"
@@ -19,7 +19,7 @@ allver-info:
 	sphinx-multiversion --dump-metadata "$(SOURCEDIR)" "$(BUILDDIRALL)"
 
 apidoc: clean-apidoc
-	sphinx-apidoc --module-first --force --output-dir "$(SOURCEDIR)/generated" ../pygama $(PY_SOURCE_EXCLUDE)
+	sphinx-apidoc --private --module-first --force --output-dir "$(SOURCEDIR)/generated" ../src/pygama $(PY_SOURCE_EXCLUDE)
 
 clean-apidoc:
 	rm -rf "$(SOURCEDIR)/generated"
