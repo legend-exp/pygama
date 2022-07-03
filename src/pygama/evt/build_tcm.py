@@ -6,32 +6,45 @@ import pygama.evt.tcm as ptcm
 import pygama.lgdo as lgdo
 
 
-def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
+def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
               coin_window:float=0, window_ref:str='last',
-              out_file:str=None, out_name:str='tcm', overwrite:bool=True):
+              out_file:str=None, out_name:str='tcm', wo_mode:str='write_safe'):
     """
     Given a list of input tables, create an output table containing an entry
-    list of coincidences among the inputs. Uses tcm.generate_coincidence_map_cols().
-    For use with the data loader.
+    list of coincidences among the inputs. Uses tcm.generate_tcm_cols().  For
+    use with the data loader.
 
     Parameters
     ----------
     input_tables : list of tuples
-        each entry is (filename, group_name_pattern)
+        each entry is (filename, table_name_pattern). All tables matching
+        [table_name_pattern] in [filename] will be added to the list of input
+        tables.
     coin_col : str
-    hash_func : str (re) or list or dict or a function(str) --> int or None
-        hash function for table_name --> int to use as an array_id in the tcm
-        set to None to use index in input_tables list as array_id
+        the name of the column in each tables used to build coincidences. All
+        tables must contain a column with this name
+    hash_func : str (re) or None
+        function to map table names to ints for use in the tcm
+        str hash_func is a regexp pattern that acts on each table_name. The
+        default hash_func pull the first int out of the table name
+        setting to None will use a table's index in input_tables
+        Later can add list or dict or a function(str) --> int
     coin_window : float
+        The clustering window width (see generate_tcm_cols)
     window_ref : str
-    out_file : str
+        Configuration for the clustering window (see generate_tcm_cols)
+    out_file : str or None
+        Name (including path) for the output file. If None, no file will be
+        written; the tcm will just be returned in memory
     out_name : str
-    overwrite : bool
+        Name for the tcm table in the output file
+    wo_mode : str
+        mode to send to LH5Store.write_object(). Typically 'w', 'o', or 'of'
 
     Returns
     -------
-    tcm : lgdo.Table or None
-        If out_file is None, return the lgdo Table
+    tcm : lgdo.Table
+        The tcm!
     """
 
     store = lgdo.LH5Store()
@@ -47,6 +60,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
                 if isinstance(hash_func, str):
                     array_id = int(re.search(hash_func, table).group())
                 else: raise NotImplementedError(f"hash_func of type {type(hash_func).__name__}")
+            else: array_id = len(all_tables)-1
             table = table + '/' + coin_col
             coin_data.append(store.read_object(table, filename)[0].nda)
             array_ids.append(array_id)
@@ -57,6 +71,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str|list|dict=r'\d+',
     for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
     tcm = lgdo.Table(col_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
 
-    if out_file is None: return tcm
-    if overwrite: store.write_object(tcm, out_name, out_file, wo_mode='o', verbosity=1)
-    else: store.write_object(tcm, out_name, out_file)
+    if out_file is not None:
+        store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
+
+    return tcm
