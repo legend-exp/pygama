@@ -230,7 +230,7 @@ class WaveformBrowser:
             if not name in self.lh5_out:
                 raise KeyError("Could not find "+name+" in input lh5 file, DSP config file, or aux values")
 
-        self.x_unit = ureg[x_unit] if x_unit else None
+        self.x_unit = ureg(x_unit) if x_unit else None
         self.x_lim = x_lim
         self.y_lim = y_lim
         self.auto_x_lim = [np.inf, -np.inf]
@@ -253,7 +253,7 @@ class WaveformBrowser:
         if self.x_unit is None:
             for wf in self.lh5_out.values():
                 if not isinstance(wf, lh5.WaveformTable): continue
-                self.x_unit = ureg[wf.dt_units]
+                self.x_unit = ureg(wf.dt_units)
 
         self.fig = None
         self.ax = None
@@ -339,7 +339,7 @@ class WaveformBrowser:
                 ref_time = data.nda[i_tb]
                 unit = data.attrs.get('units', None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
-                    ref_time *= float(ureg[unit]/self.x_unit)
+                    ref_time *= float(ureg(unit)/self.x_unit)
             elif data is None:
                 ref_time = self.aux_vals[self.align_par][entry]
             else:
@@ -354,8 +354,8 @@ class WaveformBrowser:
             data = self.lh5_out.get(name, None)
             if isinstance(data, lh5.WaveformTable):
                 y = data.values.nda[i_tb,:]/norm - ref_time
-                dt = data.dt.nda[i_tb] * float(ureg[data.dt_units]/self.x_unit)
-                t0 = data.t0.nda[i_tb] * float(ureg[data.t0_units]/self.x_unit)
+                dt = data.dt.nda[i_tb] * float(ureg(data.dt_units)/self.x_unit)
+                t0 = data.t0.nda[i_tb] * float(ureg(data.t0_units)/self.x_unit)
                 x = np.linspace(t0, t0+dt*(data.wf_len-1), data.wf_len)
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
@@ -365,7 +365,7 @@ class WaveformBrowser:
                 unit = data.attrs.get('units', None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
                     # Vertical line
-                    val = val*float(ureg[unit]/self.x_unit) - ref_time
+                    val = val*float(ureg(unit)/self.x_unit) - ref_time
                     lines.append(Line2D([val]*2, [-lim, lim]))
                     self._update_auto_limit(val, None)
                 else:
@@ -391,7 +391,7 @@ class WaveformBrowser:
             elif isinstance(data, lh5.Array):
                 unit = data.attrs.get('units', None)
                 if unit and unit in ureg:
-                    data = data.nda[i_tb]*ureg[unit]
+                    data = data.nda[i_tb]*ureg(unit)
                 else:
                     data = ureg.Quantity(data.nda[i_tb])
             else:

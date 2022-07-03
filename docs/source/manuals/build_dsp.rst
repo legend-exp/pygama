@@ -3,6 +3,35 @@ Digital Signal Processing
 
 *Under construction...*
 
+Command line interface
+----------------------
+
+A command line interface to :func:`~.dsp.build_dsp.build_dsp` is available
+through the ``pygama`` executable via the ``build-dsp`` sub-command. This can
+be used to quickly run signal processing routines without custom scripting.
+Here are some examples of what can be achieved:
+
+.. code-block:: console
+
+    $ pygama build-dsp --help  # display usage and exit
+
+Convert files and save them in the original directory with the same filenames
+(but new extension ``_dsp.lh5``):
+
+.. code-block:: console
+
+    $ pygama [-v] build-dsp --config dsp-config.json raw/*.lh5  # increase verbosity with -v
+    $ pygama build-dsp --overwrite -c dsp-config.json raw/*.lh5  # overwrite output files
+    $ # set maximum number of rows to be considered from each file
+    $ pygama build-dsp --max-rows 100 -c dsp-config.json raw/*.lh5
+
+The signal processors are configured with the ``dsp-config.json`` JSON file
+(refer to the :func:`~.dsp.build_dsp.build_dsp` documentation for details).
+
+.. seealso::
+   See :func:`~.dsp.build_dsp.build_dsp` and ``pygama build-dsp --help`` for a
+   full list of conversion options.
+
 Writing custom processors
 -------------------------
 

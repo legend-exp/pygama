@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, the LEGEND Collaboration'
+copyright = '2022, the LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
@@ -74,7 +74,8 @@ intersphinx_mapping = {
     'pandas': ('https://pandas.pydata.org/docs', None),
     'matplotlib': ('https://matplotlib.org/stable', None),
     'iminuit': ('https://iminuit.readthedocs.io/en/stable', None),
-    'h5py': ('https://docs.h5py.org/en/stable', None)
+    'h5py': ('https://docs.h5py.org/en/stable', None),
+    'pint': ('https://pint.readthedocs.io/en/stable', None)
 }
 
 # sphinx-autodoc

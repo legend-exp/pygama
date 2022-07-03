@@ -5,71 +5,8 @@ import logging
 import sys
 
 import numpy as np
-import tqdm
 
 log = logging.getLogger(__name__)
-
-
-def tqdm_range(start, stop, step=1, verbose=False, text=None, bar_length=20, unit=None):
-    """
-    Uses tqdm.trange which wraps around the python range and also has the option
-    to display a progress
-    For example:
-
-    .. code-block:: python
-
-        for start_row in range(0, tot_n_rows, buffer_len):
-        ...
-
-    Can be converted to the following
-
-    .. code-block:: python
-
-        for start_row in tqdm_range(0, tot_n_rows, buffer_len, verbose):
-        ...
-
-    Parameters
-    ----------
-    start : int
-        starting iteration value
-    stop : int
-        ending iteration value
-    step : int
-        step size in between each iteration
-    verbose : int
-        verbose = 0 hides progress bar verbose > 0 displays progress bar
-    text : str
-        text to display in front of the progress bar
-    bar_length : str
-        horizontal length of the bar in cursor spaces
-    unit : str
-        physical units to be displayed
-
-    Returns
-    -------
-    iterable : tqdm.trange
-        object that can be iterated over in a for loop
-    """
-
-    hide_bar = True
-    if isinstance(verbose, int):
-        if verbose > 0:
-            hide_bar = False
-    elif isinstance(verbose, bool):
-        if verbose is True:
-            hide_bar = False
-
-    if text is None:
-        text = "Processing"
-
-    if unit is None:
-        unit = "it"
-
-    bar_format = f"{{l_bar}}{{bar:{bar_length}}}{{r_bar}}{{bar:{-bar_length}b}}"
-
-    return tqdm.trange(start, stop, step,
-                       disable=hide_bar, desc=text,
-                       bar_format=bar_format, unit=unit, unit_scale=True)
 
 
 def sizeof_fmt(num, suffix='B'):

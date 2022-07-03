@@ -27,8 +27,9 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
     coin_data : list of ndarrays
         A list of ndarrays of the data to be clustered
     coin_window : float (optional)
-        The clustering window. coin_data within the coin_window get aggregated
-        into the same coincidence cluster. A value of 0 means an equality test.
+        The clustering window width. coin_data within the coin_window get
+        aggregated into the same coincidence cluster. A value of 0 means an
+        equality test.
     window_ref : str
         When testing one datum for inclusion in a cluster, test if it is within
         coin_window of

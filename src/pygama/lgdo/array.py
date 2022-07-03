@@ -83,10 +83,10 @@ class Array:
 
     def __str__(self):
         """Convert to string (e.g. for printing)"""
-        string = str(self.nda)
         tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop('datatype')
-        if len(tmp_attrs) > 0: string += '\n' + str(tmp_attrs)
+        datatype = tmp_attrs.pop('datatype')
+        string = datatype + " = " + str(self.nda)
+        if len(tmp_attrs) > 0: string += '\n attrs = ' + str(tmp_attrs)
         return string
 
     def __repr__(self): return str(self)
