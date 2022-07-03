@@ -1,70 +1,77 @@
-#!/usr/bin/env python3
-import argparse
+from __future__ import annotations
 
-import pandas as pd
+import re
 
-import pygama.lgdo.lh5_store as lh5
-from pygama.evt.build_evt import build_evt
-
-# EXAMPLE USAGE:
-# ./build_tcm.py /global/project/projectdirs/legend/data/lngs/l200_commissioning/orca_data/pygama/raw/cal/p00/r001/L60_p0_r1_20220606T015344Z_f0.lh5 -o ~/tcm_test/L60_p0_r1_20220606T015344Z_f0_tcm.lh5
-
-def main():
-    doc = """Demonstrate usage of the `build_tcm` function, to build a time
-    coincidence map and organize data from many channels in a single cycle file,
-    into an event-like structure where coincindent events are time-ordered and
-    grouped together into sub-events."""
-
-    rthf = argparse.RawTextHelpFormatter
-    par = argparse.ArgumentParser(description=doc, formatter_class=rthf)
-    arg, st, sf = par.add_argument, 'store_true', 'store_false'
-    arg('input', type=str, help='input file name (required)')
-    arg('-o', '--output', type=str, help='output file name')
-    args = par.parse_args()
-
-    # set i/o
-    f_in = args.input
-    f_out = None if not args.output else args.output
-
-    # run routines
-    gen_tcm(f_in, f_out)
-    show_tcm(f_out)
+import pygama.evt.tcm as ptcm
+import pygama.lgdo as lgdo
 
 
-def gen_tcm(f_in, f_out):
-    """ run build_evt with the special hardware TCM config on a raw file. """
+def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
+              coin_window:float=0, window_ref:str='last',
+              out_file:str=None, out_name:str='tcm', wo_mode:str='write_safe'):
+    """
+    Given a list of input tables, create an output table containing an entry
+    list of coincidences among the inputs. Uses tcm.generate_tcm_cols().  For
+    use with the data loader.
 
-    # test case -- create a hardware TCM for ORCA FlashCam data.
-    # test file:
-    # /global/project/projectdirs/legend/data/lngs/l200_commissioning/orca_data/pygama/raw/cal/p00/r001/L60_p0_r1_20220606T015344Z_f0.lh5
-    copy_cols = ['eventnumber', 'channel']
+    Parameters
+    ----------
+    input_tables : list of tuples
+        each entry is (filename, table_name_pattern). All tables matching
+        [table_name_pattern] in [filename] will be added to the list of input
+        tables.
+    coin_col : str
+        the name of the column in each tables used to build coincidences. All
+        tables must contain a column with this name
+    hash_func : str (re) or None
+        function to map table names to ints for use in the tcm
+        str hash_func is a regexp pattern that acts on each table_name. The
+        default hash_func pull the first int out of the table name
+        setting to None will use a table's index in input_tables
+        Later can add list or dict or a function(str) --> int
+    coin_window : float
+        The clustering window width (see generate_tcm_cols)
+    window_ref : str
+        Configuration for the clustering window (see generate_tcm_cols)
+    out_file : str or None
+        Name (including path) for the output file. If None, no file will be
+        written; the tcm will just be returned in memory
+    out_name : str
+        Name for the tcm table in the output file
+    wo_mode : str
+        mode to send to LH5Store.write_object(). Typically 'w', 'o', or 'of'
 
-    # this makes a 'hardware TCM' which just uses the event counter from FlashCam instead of a timestamp.
-    builder_config = {
-    'ts_unit' : 1,       # give the conversion of timestamps to seconds
-    'ch_col' : 'channel',   # name of column with channel ID (should be int)
-    'ts_col' : 'eventnumber', # name of column with timestamps
-    'coin_window' : 0.5,   # length of coincidence window in seconds
-    'data_cols' : copy_cols # columns to copy over into output table
-    }
+    Returns
+    -------
+    tcm : lgdo.Table
+        The tcm!
+    """
 
-    # run build_evt
-    build_evt(f_in, f_out, builder_config=builder_config, copy_cols=copy_cols)
+    store = lgdo.LH5Store()
+    coin_data = []
+    array_ids = []
+    all_tables = []
+    for filename, pattern in input_tables:
+        tables = lgdo.ls(filename, lh5_group=pattern)
+        for table in tables:
+            all_tables.append(table)
+            array_id = len(array_ids)
+            if hash_func is not None:
+                if isinstance(hash_func, str):
+                    array_id = int(re.search(hash_func, table).group())
+                else: raise NotImplementedError(f"hash_func of type {type(hash_func).__name__}")
+            else: array_id = len(all_tables)-1
+            table = table + '/' + coin_col
+            coin_data.append(store.read_object(table, filename)[0].nda)
+            array_ids.append(array_id)
 
+    tcm_cols = ptcm.generate_tcm_cols(coin_data, coin_window=coin_window,
+                                      window_ref=window_ref, array_ids=array_ids)
 
-def show_tcm(f_tcm):
-    """ read back the TCM we just made """
+    for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
+    tcm = lgdo.Table(col_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
 
-    par_list = [
-        'eventnumber', 'channel', 'tcm_sec',
-           'tcm_dt', 'ix_evt', 'ix_hit']
+    if out_file is not None:
+        store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
 
-    dfs = lh5.load_dfs(f_tcm, par_list, 'events')
-
-    pd.set_option('display.max_rows', 200)
-    print(dfs[:200])
-
-
-
-if __name__=='__main__':
-    main()
+    return tcm

@@ -1,24 +1,30 @@
 import logging
 
+import numpy as np
+
 from pygama import lgdo
+from pygama.raw.data_decoder import DataDecoder
 
 log = logging.getLogger(__name__)
 
-from ..data_decoder import *
-
 
 class FCConfigDecoder(DataDecoder):
-    """
-    Decode FlashCam config data
+    """Decode FlashCam config data.
 
-    Derives from DataDecoder in anticipation of possible future functionality;
-    currently DataDecoder interface is not used.
+    .. note::
+        Derives from :class:`~.raw.data_decoder.DataDecoder` in anticipation of
+        possible future functionality. Currently the base class interface is
+        not used.
 
-    Typical usage:
-
-    fc_config = FCConfigDecoder.decode_config(fcio)
-
-    Then you just use the fcio_config, which is a lgdo Struct (i.e. a dict)
+    Example
+    -------
+    >>> import fcutils
+    >>> from pygama.raw.fc.fc_config_decoder import FCConfigDecoder
+    >>> fc = fcutils.fcio('file.fcio')
+    >>> decoder = FCConfigDecoder()
+    >>> config = decoder.decode_config(fc)
+    >>> type(config)
+    pygama.lgdo.struct.Struct
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,6 +52,7 @@ class FCConfigDecoder(DataDecoder):
             self.config.add_field(name, lgdo.Scalar(value))
         return self.config
 
-    def make_lgdo(self, key=None, size=None): return self.config
+    def make_lgdo(self, key=None, size=None):
+        return self.config
 
     def buffer_is_full(self, rb): return rb.loc > 0
