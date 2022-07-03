@@ -9,22 +9,35 @@ log = logging.getLogger(__name__)
 
 
 def fit_unbinned(func, data, guess=None,
-             Extended=True, cost_func = 'LL',simplex=False,
+             Extended=True, cost_func = 'LL', simplex=False,
              bounds=None, fixed=None):
     """Do a unbinned fit to data.
     Default is Extended Log Likelihood fit, with option for other cost functions.
 
     Parameters
     ----------
-    func : the function to fit
-    data : the data
-    guess : initial guess parameters
-    Extended : run extended or non extended fit
-    cost_func : cost function to use
-    simplex : whether to include a round of simpson minimisation before main minimisation
-    bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-    fixed : list of parameter indices to fix
-    coeff, cov_matrix : tuple(array, matrix)
+    func : function
+        the function to fit
+    data : ndarray
+        the data values to be fit
+    guess : ndarray
+        initial guess parameters
+    Extended : bool
+        run extended or non extended fit
+    cost_func : str or None
+        cost function to use. LL is ExtendedUnbinnedNLL, None is for just UnbinnedNLL
+    simplex : bool
+        whether to include a round of simpson minimisation before main minimisation
+    bounds : list of tuples
+        Each tuple is (min, max) for the corresponding parameters. 
+        Bounds can be None, e.g. [(0,None), (0,10)]
+    fixed : list of bools
+        list of parameter indices to fix
+    
+    Returns
+    -------
+    pars, errs, cov : tuple of ndarrays
+        the best-fit parameters and their errors / covariance
     """
     if guess is None:
         raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
