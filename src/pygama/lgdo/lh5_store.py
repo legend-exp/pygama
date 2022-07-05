@@ -8,6 +8,7 @@ import fnmatch
 import glob
 import logging
 import os
+import sys
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from typing import Any
@@ -142,7 +143,7 @@ class LH5Store:
     def read_object(self, name: str,
                     lh5_file: str | h5py.File | list[str | h5py.File],
                     start_row: int = 0,
-                    n_rows: int = np.inf,
+                    n_rows: int = sys.maxsize,
                     idx: np.ndarray | list | tuple | list[np.ndarray | list | tuple] = None,
                     field_mask: dict[str, bool] | list[str] | tuple[str] = None,
                     obj_buf: LGDO = None,
