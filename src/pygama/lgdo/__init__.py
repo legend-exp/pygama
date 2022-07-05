@@ -32,9 +32,9 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from pygama.lgdo.lh5_store import LH5Store, load_dfs, load_nda, ls
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
+from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.waveform_table import WaveformTable
-from pygama.lgdo.lh5_store import LH5Store, load_dfs, load_nda, ls

@@ -5,15 +5,15 @@ equal length and corresponding utilities.
 
 from __future__ import annotations
 
-from typing import Any
 import logging
+from typing import Any
 
 import pandas as pd
 
 from pygama.lgdo.array import Array
-from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
+from pygama.lgdo.vectorofvectors import VectorOfVectors
 
 LGDO = Array | Scalar | Struct | VectorOfVectors
 
@@ -145,8 +145,8 @@ class Table(Struct):
              do_warn: bool = True) -> None:
         """Add the columns of another table to this table.
 
-        Note
-        ----
+        Notes
+        -----
         Following the join, both tables have access to `other_table`'s fields
         (but `other_table` doesn't have access to this table's fields). No
         memory is allocated in this process. `other_table` can go out of scope
@@ -174,8 +174,8 @@ class Table(Struct):
                       copy: bool = False) -> pd.DataFrame:
         """Get a :class:`pandas.DataFrame` from the data in the table.
 
-        Note
-        ----
+        Notes
+        -----
         The requested data must be array-like, with the ``nda`` attribute.
 
         Parameters

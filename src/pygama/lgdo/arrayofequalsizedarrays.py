@@ -45,8 +45,8 @@ class ArrayOfEqualSizedArrays(Array):
         attrs
             A set of user attributes to be carried along with this LGDO.
 
-        Note
-        ----
+        Notes
+        -----
         If shape is not "1D array of arrays of shape given by axes 1-N" (of
         `nda`) then specify the dimensionality split in the constructor.
 

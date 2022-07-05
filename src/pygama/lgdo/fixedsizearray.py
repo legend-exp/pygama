@@ -29,7 +29,7 @@ class FixedSizeArray(Array):
         """
         See Also
         --------
-        :class:`~.Array`
+        :class:`.Array`
         """
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
 
