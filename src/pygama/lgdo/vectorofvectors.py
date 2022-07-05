@@ -2,7 +2,6 @@
 Implements a LEGEND Data Object representing a variable-length array of
 variable-length arrays and corresponding utilities.
 """
-
 from __future__ import annotations
 
 import logging

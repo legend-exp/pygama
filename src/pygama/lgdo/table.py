@@ -2,11 +2,10 @@
 Implements a LEGEND Data Object representing a special struct of arrays of
 equal length and corresponding utilities.
 """
-
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Union
 
 import pandas as pd
 
@@ -15,7 +14,7 @@ from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
 
-LGDO = Array | Scalar | Struct | VectorOfVectors
+LGDO = Union[Scalar, Struct, Array, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 

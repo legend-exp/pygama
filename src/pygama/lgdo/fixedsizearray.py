@@ -2,7 +2,6 @@
 Implements a LEGEND Data Object representing an n-dimensional array of fixed
 size and corresponding utilities.
 """
-
 from __future__ import annotations
 
 from typing import Any

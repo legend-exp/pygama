@@ -11,7 +11,7 @@ import os
 import sys
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
-from typing import Any
+from typing import Any, Union
 
 import h5py
 import numpy as np
@@ -27,7 +27,7 @@ from pygama.lgdo.table import Table
 from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.waveform_table import WaveformTable
 
-LGDO = Array | Scalar | Struct | VectorOfVectors
+LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 
