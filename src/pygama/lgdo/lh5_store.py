@@ -20,13 +20,12 @@ import pandas as pd
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
+from pygama.lgdo.lgdo_utils import parse_datatype
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
 from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.waveform_table import WaveformTable
-
-from pygama.lgdo.lgdo_utils import parse_datatype
 
 LGDO = Array | Scalar | Struct | VectorOfVectors
 
@@ -385,9 +384,9 @@ class LH5Store:
                 obj_buf.loc = obj_buf_start+n_rows_read
                 # check attributes
                 if set(obj_buf.attrs.keys()) != set(attrs.keys()):
-                    log.warning((
+                    log.warning(
                         f"attrs mismatch. obj_buf.attrs: "
-                        f"{obj_buf.attrs}, h5f[{name}].attrs: {attrs}"))
+                        f"{obj_buf.attrs}, h5f[{name}].attrs: {attrs}")
                 return obj_buf, n_rows_read
 
         # VectorOfVectors
@@ -423,14 +422,14 @@ class LH5Store:
 
                 # check limits for values that will be used subsequently
                 if this_cumulen_nda[-1] < da_start:
-                    log.warning((
+                    log.warning(
                         f"cumulative_length non-increasing between entries "
-                        f"{start_row} and {start_row+n_rows_read} ??"))
-                    log.warning((
+                        f"{start_row} and {start_row+n_rows_read} ??")
+                    log.warning(
                         f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
                         f"da_start = {da_start}, "
                         f"start_row = {start_row}, "
-                        f"n_rows_read = {n_rows_read}"))
+                        f"n_rows_read = {n_rows_read}")
 
             # determine the number of rows for the flattened_data readout
             da_nrows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
@@ -537,10 +536,10 @@ class LH5Store:
                                                    attrs=attrs), n_rows_to_read
             else:
                 if set(obj_buf.attrs.keys()) != set(attrs.keys()):
-                    log.warning((
+                    log.warning(
                         f"attrs mismatch. "
                         f"obj_buf.attrs: {obj_buf.attrs}, "
-                        f"h5f[{name}].attrs: {attrs}"))
+                        f"h5f[{name}].attrs: {attrs}")
                 return obj_buf, n_rows_to_read
 
         raise RuntimeError("don't know how to read datatype {datatype}")
@@ -573,16 +572,16 @@ class LH5Store:
         n_rows
             number of rows in `obj` to be written.
         wo_mode
-          - ``write_safe`` or ``w``: only proceed with writing if the
-            object does not already exist in the file.
-          - ``append`` or ``a``: append along axis 0 (the first dimension)
-            of array-like objects and array-like subfields of structs.
-            :class:`~.lgdo.scalar.Scalar` objects get overwritten.
-          - ``overwrite`` or ``o``: replace data in the file if present,
-            starting from `write_start`. Note: overwriting with `write_start` =
-            end of array is the same as ``append``.
-          - ``overwrite_file`` or ``of``: delete file if present prior to
-            writing to it. `write_start` should be 0 (its ignored).
+            - ``write_safe`` or ``w``: only proceed with writing if the
+              object does not already exist in the file.
+            - ``append`` or ``a``: append along axis 0 (the first dimension)
+              of array-like objects and array-like subfields of structs.
+              :class:`~.lgdo.scalar.Scalar` objects get overwritten.
+            - ``overwrite`` or ``o``: replace data in the file if present,
+              starting from `write_start`. Note: overwriting with `write_start` =
+              end of array is the same as ``append``.
+            - ``overwrite_file`` or ``of``: delete file if present prior to
+              writing to it. `write_start` should be 0 (its ignored).
         write_start
             row in the output file (if already existing) to start overwriting
             from.
@@ -736,9 +735,9 @@ class LH5Store:
                 n_rows_read = self.read_n_rows(name+'/'+field, h5f)
                 if not rows_read: rows_read = n_rows_read
                 elif rows_read != n_rows_read:
-                    log.warning((
+                    log.warning(
                         f"table '{name}' got strange n_rows_read = {rows_read}, "
-                        f"{n_rows_read} was expected"))
+                        f"{n_rows_read} was expected")
             return rows_read
 
         # read out vector of vectors of different size
@@ -822,7 +821,7 @@ def load_nda(f_list: str | list[str],
         if idx_list is not None:
             idx_list = [idx_list]
     if idx_list is not None and len(f_list) != len(idx_list):
-        raise ValueError(f"f_list lenght ({len(f_list)}) != idx_list lenght ({len(idx_list)})!")
+        raise ValueError(f"f_list length ({len(f_list)}) != idx_list length ({len(idx_list)})!")
 
     # Expand wildcards
     f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]

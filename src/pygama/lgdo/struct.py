@@ -5,12 +5,12 @@ utilities.
 
 from __future__ import annotations
 
-from typing import Any
 import logging
+from typing import Any
 
 from pygama.lgdo.array import Array
-from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.scalar import Scalar
+from pygama.lgdo.vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 
@@ -40,11 +40,11 @@ class Struct(dict):
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning((
+                log.warning(
                     "datatype does not match obj_dict! "
                     f"datatype: {self.attrs['datatype']}, "
                     f"obj_dict.keys(): {obj_dict.keys()}, "
-                    f"form_datatype(): {self.form_datatype()}"))
+                    f"form_datatype(): {self.form_datatype()}")
                 log.warning("will be updated to the latter.")
         self.update_datatype()
 

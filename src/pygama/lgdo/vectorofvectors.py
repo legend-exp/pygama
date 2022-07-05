@@ -5,8 +5,8 @@ variable-length arrays and corresponding utilities.
 
 from __future__ import annotations
 
-from typing import Any
 import logging
+from typing import Any
 
 import numpy as np
 
@@ -73,10 +73,10 @@ class VectorOfVectors:
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning((
+                log.warning(
                     f"datatype does not match dtype! "
                     f"datatype: {self.attrs['datatype']}, "
-                    f"form_datatype(): {self.form_datatype()}"))
+                    f"form_datatype(): {self.form_datatype()}")
         else:
             self.attrs['datatype'] = self.form_datatype()
 
@@ -99,8 +99,8 @@ class VectorOfVectors:
     def set_vector(self, i_vec: int, nda: np.ndarray) -> None:
         """Insert vector `nda` at location `i_vec`.
 
-        Note
-        ----
+        Notes
+        -----
         `flattened_data` is doubled in length until `nda` can be appended to
         it.
         """

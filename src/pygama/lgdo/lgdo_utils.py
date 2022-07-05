@@ -4,6 +4,7 @@ Implements utilities for LEGEND Data Objects.
 from __future__ import annotations
 
 import logging
+
 import numpy as np
 
 log = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def get_element_type(obj: object) -> str:
 
 
 def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]]:
-    """Parse datatype string and return type, dimentions and elements.
+    """Parse datatype string and return type, dimensions and elements.
 
     Parameters
     ----------

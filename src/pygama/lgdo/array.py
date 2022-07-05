@@ -4,8 +4,9 @@ corresponding utilities.
 """
 from __future__ import annotations
 
-from typing import Any
 import logging
+from typing import Any
+
 import numpy as np
 
 from pygama.lgdo.lgdo_utils import get_element_type
@@ -63,10 +64,10 @@ class Array:
         self.attrs = dict(attrs)
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning(('datatype does not match nda! '
+                log.warning('datatype does not match nda! '
                              f'datatype: {self.attrs["datatype"]} '
                              f'form_datatype(): {self.form_datatype()} '
-                             f'dtype: {self.dtype}'))
+                             f'dtype: {self.dtype}')
         else:
             self.attrs['datatype'] = self.form_datatype()
 
