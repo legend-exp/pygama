@@ -134,7 +134,7 @@ class DataDecoder(ABC):
                 continue
 
             # Parse datatype for remaining lgdos
-            datatype, shape, elements = lgdo.parse_datatype(datatype)
+            datatype, shape, elements = lgdo.lgdo_utils.parse_datatype(datatype)
 
             # ArrayOfEqualSizedArrays
             if datatype == 'array_of_equalsized_arrays':
