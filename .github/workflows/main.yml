@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
-      - dev
       - refactor
       - 'releases/**'
   pull_request:
@@ -19,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
+        python-version: ['3.9', '3.10']
         os: [ubuntu-latest, macOS-latest]
 
     steps:
@@ -30,38 +28,47 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Get dependencies and install the package
       run: |
-        .github/workflows/get-dependencies.sh
-        python -m pip install .
+        python -m pip install --upgrade pip wheel setuptools
+        python -m pip install --upgrade .[test]
     - name: Run unit tests
-      run: pytest test
-
-  test-in-legend-container:
-    name: Test pygama in LEGEND container
-    runs-on: ubuntu-latest
-    container: docker://legendexp/legend-base:latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install and run unit tests
       run: |
-        pip install .
-        pytest test
+        pytest
 
-  deploy-docs:
-    name: Deploy documentation on legend-exp.github.io/pygama
+  test-coverage:
+    name: Calculate and upload test coverage
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.8
+          python-version: '3.10'
+
+      - name: Generate Report
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install --upgrade .[test]
+          pytest --cov=pygama --cov-report=xml
+      - name: Upload Coverage to codecov.io
+        uses: codecov/codecov-action@v3
+
+  deploy-docs:
+    name: Build documentation
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
       - name: Setup build environment
         run: |
-          git fetch --prune --no-recurse-submodules --depth=1 origin
-          .github/workflows/get-dependencies.sh
-          pip install sphinx sphinx-rtd-theme myst-parser
-          pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install --upgrade .[docs]
       - name: Build docs for current ref
         run: |
           cd docs
@@ -75,7 +82,7 @@ jobs:
           make allver
       - if: ${{ github.event_name == 'push' }}
         name: Deploy to GitHub pages
-        uses: JamesIves/github-pages-deploy-action@v4.2.2
+        uses: JamesIves/github-pages-deploy-action@v4.3.4
         with:
           branch: gh-pages
           folder: docs/build/allver/html

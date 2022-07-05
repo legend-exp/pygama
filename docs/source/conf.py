@@ -1,20 +1,22 @@
 # Configuration file for the Sphinx documentation builder.
 
-import pathlib
 import sys
-import os
-sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
+from pathlib import Path
+
+sys.path.insert(0, Path('../../src').resolve().as_posix())
 
 project = 'pygama'
-copyright = '2020, LEGEND Collaboration'
+copyright = '2022, the LEGEND Collaboration'
 
 extensions = [
     'sphinx.ext.githubpages',
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
     'sphinx_rtd_theme',
     'sphinx_multiversion',
+    'sphinx_copybutton',
     'myst_parser'
 ]
 
@@ -24,18 +26,23 @@ source_suffix = {
 }
 master_doc = 'index'
 language = 'python'
+# in _templates/ we have a custom layout.html to include the version menu
+# (adapted from sphinx-multiversion docs)
 templates_path = ['_templates']
 pygments_style = 'sphinx'
+
+# readthedocs.io Sphinx theme
 html_theme = 'sphinx_rtd_theme'
 
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
 autodoc_mock_imports = [
+    'pygama._version',
     'pandas',
-    'numpy',
+    # 'numpy',
     'matplotlib',
     'mplhep',
-    'scimath',
+    'scipy',
     'numba',
     'pytest',
     'pyhf',
@@ -58,6 +65,19 @@ autodoc_mock_imports = [
 napoleon_numpy_docstring = True
 napoleon_google_docstring = False
 
+# intersphinx
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable', None),
+    'numba': ('https://numba.readthedocs.io/en/stable', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy', None),
+    'pandas': ('https://pandas.pydata.org/docs', None),
+    'matplotlib': ('https://matplotlib.org/stable', None),
+    'iminuit': ('https://iminuit.readthedocs.io/en/stable', None),
+    'h5py': ('https://docs.h5py.org/en/stable', None),
+    'pint': ('https://pint.readthedocs.io/en/stable', None)
+}
+
 # sphinx-autodoc
 # Include __init__() docstring in class docstring
 autoclass_content = 'both'
@@ -77,8 +97,7 @@ smv_prefer_remote_refs = False
 # but it's not possible with the current sphinx-multiversion. Changes have been
 # proposed in this PR: https://github.com/Holzhaus/sphinx-multiversion/pull/62
 # but there's no timeline for merging yet. For the following option to be considered,
-# one needs to install sphinx-multiversion from a fork with the following:
-# $ pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
+# one needs to install the sphinx-multiversion-pre-post-build fork from PyPI
 smv_prebuild_command = 'make -ik apidoc'
 
 # The right way to find all docs versions is to look for matching branches on

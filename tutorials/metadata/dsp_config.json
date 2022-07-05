@@ -25,7 +25,7 @@
     "wf_trap": {
       "function": "trap_norm",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "round(10*us)", "round(5*us)", "wf_trap"],
+      "args": ["wf_pz", "10*us", "5*us", "wf_trap"],
       "unit": "ADC"
     },
     "wf_triangle": {
@@ -37,7 +37,7 @@
     "wf_atrap": {
       "function": "asym_trap_filter",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", "round(0.05*us)", "round(2*us)", "round(3*us)", "wf_atrap"],
+      "args": ["wf_pz", "0.05*us", "2*us", "3*us", "wf_atrap"],
       "unit": "ADC"
     },
     "tp_min, tp_max, wf_min, wf_max":{
@@ -91,7 +91,7 @@
      "dcr_raw": {
        "function": "trap_pickoff",
        "module": "pygama.dsp.processors",
-       "args": ["wf_pz", 200, 1000, "tp_0+round(1.504*us)", "dcr_raw"],
+       "args": ["wf_pz", 200, 1000, "tp_0+1.504*us", "dcr_raw"],
        "unit": "ADC"
      },
      "dcr": {
@@ -118,7 +118,7 @@
       "comment": "3rd argument allocates memory for a derivative of type float",
       "function": "avg_current",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", 10, "curr10(len(wf_pz)-10, f)"],
+      "args": ["wf_pz", 10, "curr10(len(wf_pz)-10, 'f')"],
       "unit": "ADC/sample"
     },
     "A_10": {
@@ -137,8 +137,8 @@
     "zac_wf": {
       "function": "zac_filter",
       "module": "pygama.dsp.processors",
-      "args": ["waveform", "zac_wf(101, f)"],
-      "init_args": ["len(waveform)", "3.5*us", "2.5*us", "72*us"],
+      "args": ["waveform", "zac_wf(101, 'f')"],
+      "init_args": ["len(waveform)", "round(3.5*us/waveform.period)", "round(2.5*us/waveform.period)", "round(72*us/waveform.period)"],
       "unit": "ADC"
     },
     "zacE": {
@@ -151,8 +151,8 @@
     "cusp_wf": {
       "function": "cusp_filter",
       "module": "pygama.dsp.processors",
-      "args": ["waveform", "cusp_wf(101, f)"],
-      "init_args": ["len(waveform)", "10*us", "1*us", "200*us"],
+      "args": ["waveform", "cusp_wf(101, 'f')"],
+      "init_args": ["len(waveform)", "round(10*us/waveform.period)", "round(1*us/waveform.period)", "round(200*us/waveform.period)"],
       "unit": "ADC"
     },
     "cuspE": {
@@ -165,20 +165,20 @@
     "curr": {
       "function": "avg_current",
       "module": "pygama.dsp.processors",
-      "args": ["wf_pz", 1, "curr(len(wf_pz)-1, f)"],
+      "args": ["wf_pz", 1, "curr(len(wf_pz)-1, 'f')"],
       "unit": "ADC/sample"
     },
     "curr_psd": {
       "function": "psd",
       "module": "pygama.dsp.processors",
       "args": ["curr", "curr_psd"],
-      "init_args": ["curr", "curr_psd(len(curr)//2+1, f)"],
+      "init_args": ["curr", "curr_psd(len(curr)//2+1, 'f')"],
       "unit": ""
     },
     "hf_max": {
       "function": "amax",
       "module": "numpy",
-      "args": ["curr_psd[round(10*mhz*len(curr)):]", 1, "hf_max"],
+      "args": ["curr_psd[10*mhz*len(curr):]", 1, "hf_max"],
       "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
       "unit": ""
     },
@@ -186,9 +186,9 @@
       "function": "psd",
       "module": "pygama.dsp.processors",
       "args": ["wf_blsub", "power_spect"],
-      "init_args": ["wf_blsub", "power_spect(len(wf_blsub)//2+1, f)"],
+      "init_args": ["wf_blsub", "power_spect(len(wf_blsub)//2+1, 'f')"],
       "unit": "MHz"
     }
-    
+
   }
 }

@@ -8,22 +8,14 @@ Welcome to pygama's documentation!
 * optimizing those digital signal processing (DSP) routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
-Work in progress...
-
-Package index
-=============
+Table of Contents
+-----------------
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 1
 
    install
-   contributing
+   manuals/index
    tutorials
-   Package API reference <generated/pygama>
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   Package API reference <generated/modules>
+   developer
