@@ -2,7 +2,6 @@
 Implements a LEGEND Data Object representing a scalar and corresponding
 utilities.
 """
-
 from __future__ import annotations
 
 import logging
