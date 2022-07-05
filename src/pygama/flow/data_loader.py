@@ -5,6 +5,7 @@ import string
 import re
 import numpy as np
 import h5py
+import time
 from parse import parse
 from pygama.lgdo import *
 #from pygama import WaveformBrowser
@@ -287,14 +288,32 @@ class DataLoader:
             print("You need to make a query on fileDB, use set_file_list")
             return 
         
-        entries = {}
+        entries = []
         
-        for file in self.file_list:
-            entries[file] = {}
+        for file in self.file_list:            
+            cut_cols = {}
+            for_output = ["event", "table", "idx_row"]
+
+            #Find out which columns we need to save
+            for level in self.levels:
+                cut_cols[level] = []
+                if self.cuts is not None:
+                    cut = self.cuts[level] 
+                else: 
+                    cut = ""
+
+                # String parsing to determine which columns need to be loaded
+                split = re.split(' |<|>|=|and|or|&|\|', cut) 
+                for term in split:
+                    if term.isidentifier(): #Assumes that column names are valid python variable names
+                        cut_cols[level].append(term)
+                        if term in self.output_columns and term not in for_output:
+                            for_output.append(term)
+            
+            f_entries = pd.DataFrame(columns=for_output)
             
             # Grab file paths from fileDB
             for l_idx, level in enumerate(self.levels):
-                entries[file][level] = {}
                 level_paths = {}
                 tables = []
                 for tier in self.tiers[level]:
@@ -322,6 +341,7 @@ class DataLoader:
                     for term in split:
                         if term.isidentifier(): #Assumes that column names are valid python variable names
                             cut_cols.append(term)
+
                     if not cut_cols:
                         cut_cols = None
 
@@ -564,12 +584,14 @@ class FileDB():
             self.set_config(config)
 
             # Set up column names
-            parse_arr = np.array(list(string.Formatter.parse(self.file_format[self.tiers[0]], self.file_format[self.tiers[0]])))
+            fm = string.Formatter()
+            parse_arr = np.array(list(fm.parse(self.file_format[self.tiers[0]])))
             names = list(parse_arr[:,1]) # fields required to generate file name
+            names = [n for n in names if n] #Remove none values
+            names = list(np.unique(names))
             names += [f'{tier}_file' for tier in self.tiers] # the generated file names
             names += [f'{tier}_size' for tier in self.tiers] # file sizes
             names += ['file_status', 'runtime'] # bonus columns 
-            names = [n for n in names if n]
 
             self.df = pd.DataFrame(columns=names)
 
@@ -586,7 +608,6 @@ class FileDB():
         self.data_dir = self.config["data_dir"]
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
-        self.table_keyword = self.config["table_keyword"]
 
     def scan_files(self, verbose=False):
         """
@@ -614,7 +635,6 @@ class FileDB():
                     finfo = finfo.named
                     for tier in self.tiers:
                         finfo[f'{tier}_file'] = self.file_format[tier].format(**finfo)
-                    print(finfo)
 
                     file_keys.append(finfo)
                 
@@ -671,22 +691,36 @@ class FileDB():
         """
         Adds the available channels in each tier as a column in fileDB
         by searching for key names that match the provided table_format
+        and saving the associated keyword values
                 "raw_tables"            "evt_tables"
-        file1   ["ch0", "ch1", ...]     ["evt0", "evt1", ...]
+        file1   [0, 1, ...]     ["tcm", "grp_name", ...]
         """
                
         def update_table_names(row, tier):
-            def table_names(name, node):
-                if parse(self.table_format[tier], name) is not None:
-                    tier_tables.append(name)
+            def table_names(name):
+                # if isinstance(node, h5py.Dataset):
+                #     return
+                fm = string.Formatter()
+                value, var, form, _ = tuple(fm.parse(self.table_format[tier]))[0]
+                par_res = parse(self.table_format[tier], name)
+        
+                if par_res is not None:
+                    keys = list(par_res.named.keys()) # Should only have one key
+                    if len(keys) != 1:
+                        print("Tables can only have one identifier")
+                    else:
+                        tb = par_res.named[keys[0]]
 
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f'{tier}_file']
+            print(fpath)
+            t = time.perf_counter()
             try:
                 tier_tables = []
                 f = h5py.File(fpath)
-                f.visititems(table_names)
+                f.visit(table_names)
             except:
-                pass
+                print(tier_tables)
+            print("Time: ", time.perf_counter()-t)
             return tier_tables
 
         for tier in self.tiers:
@@ -861,13 +895,13 @@ if __name__=='__main__':
     dl.show_fileDB()
     print()
 
-    print("Files where YYYY == 2023")
-    dl.set_files("YYYY == 2023")
+    print("Files where timestamp >= 20230101T0000")
+    dl.set_files("timestamp >= 20230101T0000")
     dl.show_file_list()
     print()
 
-    print("Files where YYYY == 2022")
-    dl.set_files("YYYY == 2022")
+    print("Files where timestamp >= 20220101T0000")
+    dl.set_files("timestamp >= 20230101T0000")
     dl.show_file_list(columns=["raw_file", "raw_tables", "YYYY"])
     print()
 
