@@ -1,69 +1,97 @@
+"""
+Implements a LEGEND Data Object representing a special
+:class:`~.lgdo.table.Table` to store blocks of one-dimensional time-series
+data.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+import logging
+
 import numpy as np
 
-from .array import Array
-from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from .table import Table
-from .vectorofvectors import VectorOfVectors
+from pygama.lgdo.array import Array
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from pygama.lgdo.table import Table
+from pygama.lgdo.vectorofvectors import VectorOfVectors
+
+log = logging.getLogger(__name__)
 
 
 class WaveformTable(Table):
+    r"""An LGDO for storing blocks of (1D) time-series data.
+
+    A :class:`WaveformTable` is an LGDO :class:`~.lgdo.table.Table` with the 3
+    columns ``t0``, ``dt``, and ``values``:
+
+    * ``t0[i]`` is a time offset (relative to a user-defined global reference)
+      for the sample in ``values[i][0]``. Implemented as an LGDO
+      :class:`.Array` with optional attribute ``units``.
+    * ``dt[i]`` is the sampling period for the waveform at ``values[i]``.
+      Implemented as an LGDO :class:`.Array` with optional attribute ``units``.
+    * ``values[i]`` is the ``i``'th waveform in the table. Internally, the
+      waveforms values may be either an LGDO :class:`.ArrayOfEqualSizedArrays`\
+      ``<1,1>`` or as an LGDO :class:`.VectorOfVectors` that supports
+      waveforms of unequal length. Can optionally be given a ``units``
+      attribute.
+
+    Note
+    ----
+    On-disk and in-memory versions could be different e.g. if a compression
+    routine is used.
     """
-    An lgdo for storing blocks of (1D) time-series data.
 
-    A WaveformTable is an lgdo Table with the 3 columns t0, dt, and values:
-
-    * t0[i] is a time offset (relative to a user-defined global reference) for
-      the sample in values[i][0]. Implemented as an lgdo Array with optional
-      attribute "units"
-    * dt[i] is the sampling period for the waveform at values[i]. Implemented as
-      an lgdo Array with optional attribute "units"
-    * values[i] is the i'th waveform in the table. Internally, the waveforms
-      "values" may be either an lgdo ArrayOfEqualSizedArrays<1,1> or as an lgdo
-      VectorOfVectors that supports waveforms of unequal length. Can optionally
-      be given a "units" attribute
-
-    Note that on-disk and in-memory versions could be different e.g. if a
-    compression routine is used.
-    """
-
-    def __init__(self, size=None, t0=0, t0_units=None, dt=1, dt_units=None,
-                 values=None, values_units=None, wf_len=None, dtype=None, attrs={}):
-        """
+    def __init__(self,
+                 size: int = None,
+                 t0: float | Array | np.ndarray = 0,
+                 t0_units: str = None,
+                 dt: float | Array | np.ndarray = 1,
+                 dt_units: str = None,
+                 values: ArrayOfEqualSizedArrays | VectorOfVectors | np.ndarray = None,
+                 values_units: str = None,
+                 wf_len: int = None,
+                 dtype: np.dtype = None,
+                 attrs: dict[str, Any] = {}) -> None:
+        r"""
         Parameters
         ----------
-        size : int or None (optional)
-            sets the number of rows in the table. If None, the size will be
-            determined from the first among t0, dt, or values to return a valid
-            length. If not None, t0, dt, and values will be resized as necessary
-            to match size. If size is None and t0, dt, and values are all
-            non-array-like, a default size of 1024 is used.
-        t0 : float, array-like, or lgdo.Array (optional)
-            t0 values to be used (or broadcast) to the t0 column. 0 by default.
-        t0_units : str or None
-            units for the t0 values. If not none and t0 is an lgdo Array,
-            overrides what's in t0.
-        dt : float, array-like, or lgdo.Array (optional)
-            dt values to be used (or broadcast) to the t0 column
-        dt_units : str or None
-            units for the dt values. If not none and dt is an lgdo Array,
-            overrides what's in dt.
-        values : 2D ndarray, lgdo VectorOfVectors, lgdo ArrayOfEqualSizedArrays, or None (optional)
-            The waveform data to be stored in the table. If None (the default) a
-            block of data is prepared based on the wf_len and dtype arguments.
-        values_units : str or None
-            units for the waveform values. If not none and values is an lgdo
-            Array, overrides what's in values
-        wf_len : int or None (optional)
-            The length of the waveforms in each entry of a table. If None (the
-            default), unequal lengths are assumed and VectorOfVectors is used
-            for the values column. Ignored if values is a 2D ndarray, in which
-            case values.shape[1] is used
-        dtype : numpy dtype or None (optional)
-            The numpy dtype of the waveform data. If values is not None, this
-            argument is ignored. If both values and dtype are None, np.float64
-            is used.
-        attrs : dict (optional)
-            A set of user attributes to be carried along with this lgdo
+        size
+            sets the number of rows in the table. If ``None``, the size will be
+            determined from the first among `t0`, `dt`, or `values` to return a
+            valid length. If not ``None``, `t0`, `dt`, and values will be
+            resized as necessary to match `size`. If `size` is ``None`` and
+            `t0`, `dt`, and `values` are all non-array-like, a default size of
+            1024 is used.
+        t0
+            :math:`t_0` values to be used (or broadcast) to the `t0` column.
+        t0_units
+            units for the :math:`t_0` values. If not ``None`` and `t0` is an
+            LGDO :class:`.Array`, overrides what's in `t0`.
+        dt
+            :math:`\delta t` values (sampling period) to be used (or
+            broadcasted) to the `t0` column.
+        dt_units
+            units for the `dt` values. If not ``None`` and `dt` is an LGDO
+            :class:`.Array`, overrides what's in `dt`.
+        values
+            The waveform data to be stored in the table. If ``None`` a block of
+            data is prepared based on the `wf_len` and `dtype` arguments.
+        values_units
+            units for the waveform values. If not ``None`` and `values` is an
+            LGDO :class:`.Array`, overrides what's in `values`.
+        wf_len
+            The length of the waveforms in each entry of a table. If ``None``
+            (the default), unequal lengths are assumed and
+            :class:`.VectorOfVectors` is used for the `values` column. Ignored
+            if `values` is a 2D ndarray, in which case ``values.shape[1]`` is
+            used.
+        dtype
+            The NumPy :class:`numpy.dtype` of the waveform data. If `values` is
+            not ``None``, this argument is ignored. If both `values` and
+            `dtype` are ``None``, :class:`numpy.float64` is used.
+        attrs
+            A set of user attributes to be carried along with this LGDO.
         """
 
         if size is None:
@@ -122,50 +150,57 @@ class WaveformTable(Table):
         super().__init__(size=size, col_dict=col_dict, attrs=attrs)
 
     @property
-    def values(self):
+    def values(self) -> ArrayOfEqualSizedArrays | VectorOfVectors:
         return self['values']
 
     @property
-    def values_units(self):
+    def values_units(self) -> str:
         return self.values.attrs.get('units', None)
+
     @values_units.setter
-    def values_units(self, units):
+    def values_units(self, units) -> None:
         self.values.attrs['units'] = f'{units}'
 
     @property
-    def wf_len(self):
-        if isinstance(self.values, VectorOfVectors): return -1
+    def wf_len(self) -> int:
+        if isinstance(self.values, VectorOfVectors):
+            return -1
         return self.values.nda.shape[1]
+
     @wf_len.setter
-    def wf_len(self, wf_len):
-        if isinstance(self.values, VectorOfVectors): return
+    def wf_len(self, wf_len) -> None:
+        if isinstance(self.values, VectorOfVectors):
+            return
         shape = self.values.nda.shape
         shape = (shape[0], wf_len)
         self.values.nda.resize(shape, refcheck=True)
-    def resize_wf_len(self, new_len):
-        ''' alias for wf_len.setter
-        (for when we want to make it clear in the code that memory is being reallocated)
-        '''
+
+    def resize_wf_len(self, new_len: int) -> None:
+        """Alias for `wf_len.setter`, for when we want to make it clear in
+        the code that memory is being reallocated.
+        """
         self.wf_len = new_len
 
     @property
-    def t0(self):
+    def t0(self) -> Array:
         return self['t0']
 
     @property
-    def t0_units(self):
+    def t0_units(self) -> str:
         return self.t0.attrs.get('units', None)
+
     @t0_units.setter
-    def t0_units(self, units):
+    def t0_units(self, units: str) -> None:
         self.t0.attrs['units'] = f'{units}'
 
     @property
-    def dt(self):
+    def dt(self) -> Array:
         return self['dt']
 
     @property
-    def dt_units(self):
+    def dt_units(self) -> str:
         return self.dt.attrs.get('units', None)
+
     @dt_units.setter
-    def dt_units(self, units):
+    def dt_units(self, units: str) -> None:
         self.dt.attrs['units'] = f'{units}'

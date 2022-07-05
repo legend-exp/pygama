@@ -8,11 +8,11 @@ functions. The basic data object classes are:
 
 * :class:`.Scalar`: typed Python scalar. Access data via the :attr:`value`
   attribute
-* :class:`.Array`: basic NumPy :class:`ndarray`. Access data via the
+* :class:`.Array`: basic :class:`numpy.ndarray`. Access data via the
   :attr:`nda` attribute.
-* :class:`.FixedSizeArray`: basic NumPy :class:`ndarray`. Access data via the
+* :class:`.FixedSizeArray`: basic :class:`numpy.ndarray`. Access data via the
   :attr:`nda` attribute.
-* :class:`.ArrayOfEqualSizedArrays`: multi-dimensional NumPy :class:`ndarray`.
+* :class:`.ArrayOfEqualSizedArrays`: multi-dimensional :class:`numpy.ndarray`.
   Access data via the :attr:`nda` attribute.
 * :class:`.VectorOfVectors`: a variable length array of variable length arrays.
   Implemented as a pair of :class:`.Array`: :attr:`flattened_data` holding the
@@ -29,13 +29,12 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 `h5py <https://www.h5py.org>`_.
 """
 
-from .array import Array
-from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from .fixedsizearray import FixedSizeArray
-from .lgdo_utils import *
-from .lh5_store import LH5Store, load_dfs, load_nda, ls
-from .scalar import Scalar
-from .struct import Struct
-from .table import Table
-from .vectorofvectors import VectorOfVectors
-from .waveform_table import WaveformTable
+from pygama.lgdo.array import Array
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from pygama.lgdo.fixedsizearray import FixedSizeArray
+from pygama.lgdo.vectorofvectors import VectorOfVectors
+from pygama.lgdo.scalar import Scalar
+from pygama.lgdo.struct import Struct
+from pygama.lgdo.table import Table
+from pygama.lgdo.waveform_table import WaveformTable
+from pygama.lgdo.lh5_store import LH5Store, load_dfs, load_nda, ls
