@@ -1,7 +1,7 @@
 import pytest
 
-from pygama.dsp.processing_chain import build_processing_chain
 from pygama import lgdo
+from pygama.dsp.processing_chain import build_processing_chain
 
 
 def test_waveform_slicing(geds_raw_tbl):

@@ -1,7 +1,7 @@
 import pytest
 
-from pygama.lgdo import LH5Store
 import pygama.dsp.processors  # noqa: F401
+from pygama.lgdo import LH5Store
 
 
 @pytest.fixture(scope='session')
