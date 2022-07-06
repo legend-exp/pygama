@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 def build_raw(in_stream: int, in_stream_type: str = None,
               out_spec: str | dict | RawBufferLibrary = None, buffer_size: int = 8192,
-              n_max: int = np.inf, overwrite: bool = True, **kwargs) -> None:
+              n_max: int = np.inf, overwrite: bool = False, **kwargs) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
 
     Takes an input stream of a given type and writes to output file(s)
@@ -171,7 +171,7 @@ def build_raw(in_stream: int, in_stream_type: str = None,
         if len(out_file_glob) > 1:
             raise RuntimeError(f'got multiple matches for out_file {out_file}: {out_file_glob}')
         if not overwrite:
-            raise RuntimeError(f'file {out_file_glob[0]} exists. Use option overwrite to proceed.')
+            raise FileExistsError(f'file {out_file_glob[0]} exists. Use option overwrite to proceed.')
 
         os.remove(out_file_glob[0])
 
