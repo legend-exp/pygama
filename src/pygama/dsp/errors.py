@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class DSPError(Exception):
     """Base class for signal processors."""
     pass
