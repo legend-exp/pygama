@@ -1,6 +1,7 @@
-import pytest
 import os
 from pathlib import Path
+
+import pytest
 
 from pygama.dsp import build_dsp
 from pygama.raw import build_raw
