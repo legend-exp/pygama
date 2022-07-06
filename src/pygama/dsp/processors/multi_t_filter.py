@@ -1,8 +1,9 @@
 import numpy as np
 from numba import guvectorize
 
-from .time_point_thresh import time_point_thresh
 from pygama.dsp.errors import DSPFatal
+
+from .time_point_thresh import time_point_thresh
 
 
 @guvectorize(["void(float32[:],float32[:],float32[:])",
