@@ -13,7 +13,7 @@ import re
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 from numba import vectorize
@@ -25,7 +25,7 @@ from pygama.math.units import unit_registry as ureg
 
 log = logging.getLogger(__name__)
 
-LGDO = lgdo.Scalar | lgdo.Array | lgdo.VectorOfVectors | lgdo.Struct
+LGDO = Union[lgdo.Scalar, lgdo.Array, lgdo.VectorOfVectors, lgdo.Struct]
 
 # Filler value for variables to be automatically deduced later
 auto = 'auto'
