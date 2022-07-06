@@ -23,46 +23,52 @@ from pygama.dsp.processing_chain import build_processing_chain
 log = logging.getLogger(__name__)
 
 
-def build_dsp(f_raw: str, f_dsp: str, dsp_config: str | dict, lh5_tables:
-              list[str] = None, database: str = None, outputs: list[str] =
-              None, n_max: int = np.inf, write_mode: str = 'r', buffer_len: int
-              = 3200, block_width: int = 16, chan_config: dict = None) -> None:
-    """
-    Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence of
-    processors via the :class:`~.processing_chain.ProcessingChain`.
+def build_dsp(f_raw: str,
+              f_dsp: str,
+              dsp_config: str | dict,
+              lh5_tables: list[str] = None,
+              database: str = None,
+              outputs: list[str] = None,
+              n_max: int = np.inf,
+              write_mode: str = 'r',
+              buffer_len: int = 3200,
+              block_width: int = 16,
+              chan_config: dict[str, str] = None) -> None:
+    """Convert raw-tier LH5 data into dsp-tier LH5 data by running a sequence
+    of processors via the :class:`~.processing_chain.ProcessingChain`.
 
     Parameters
     ----------
-    f_raw : str
-        name of raw LH5 file to read from
-    f_dsp : str
-        name of dsp LH5 file to write to
-    dsp_config : str or dict
-        dict or name of JSON file containing
+    f_raw
+        name of raw-tier LH5 file to read from.
+    f_dsp
+        name of dsp-tier LH5 file to write to.
+    dsp_config
+        :class:`dict` or name of JSON file containing
         :class:`~.processing_chain.ProcessingChain` config. See
-        :func:`~.processing_chain.build_processing_chain` for details
-    lh5_tables : list of str, optional
-        list of HDF5 groups to consider in the input file. If None, process all
-        valid groups
-    database : str, optional
+        :func:`~.processing_chain.build_processing_chain` for details.
+    lh5_tables
+        list of HDF5 groups to consider in the input file. If ``None``, process
+        all valid groups.
+    database
         name of JSON file containing a parameter database. See
-        :func:`~.processing_chain.build_processing_chain` for details
-    outputs : list of str, optional
+        :func:`~.processing_chain.build_processing_chain` for details.
+    outputs
         list of parameter names to write to the output file. If not provided,
-        use list provided under ``"outputs"`` in the DSP configuration file
-    n_max : int, optional
-        Number of waveforms to process. Default all
-    write_mode : {'r', 'a', 'u'}, optional
+        use list provided under ``"outputs"`` in the DSP configuration file.
+    n_max
+        number of waveforms to process.
+    write_mode
         - `'r'` -- delete existing output file with same name before writing
         - `'a'` -- append to end of existing output file
         - `'u'` -- update values in existing output file
-    buffer_len : int, optional, default=3200
-        number of waveforms to read/write from disk at a time
-    block_width : int, optional, default=16
-        number of waveforms to process at a time
-    chan_config : dict, optional
+    buffer_len
+        number of waveforms to read/write from/to disk at a time.
+    block_width
+        number of waveforms to process at a time.
+    chan_config
         contains JSON DSP configuration file names for every table in
-        `lh5_tables`
+        `lh5_tables`.
     """
 
     if isinstance(dsp_config, str):
