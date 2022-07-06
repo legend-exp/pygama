@@ -70,6 +70,7 @@ def test_build_raw_fc_channelwise_out_spec(lgnd_test_data):
               out_spec=out_spec, overwrite=True)
 
     assert ls(out_file) == ['ch0', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5']
+    assert ls(out_file, 'ch0/') == ['ch0/raw']
 
 
 def test_build_raw_orca(lgnd_test_data):
