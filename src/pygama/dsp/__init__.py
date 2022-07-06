@@ -1,14 +1,13 @@
-"""
+r"""
 The pygama signal processing framework is contained in the :mod:`.dsp`
 submodule. This code is responsible for running a variety of discrete signal
 processors on data, producing tier 2 (dsp) files from tier 1 (raw) files. The
 main contents of this submodule are:
 
 * :mod:`.processors`: A collection of Numba functions that perform individual
-  DSP transforms and reductions on our data. Individual processors are held in
-  the ``_processors`` directory, which is where contributors will write new
-  processors for inclusion in the analysis. Available processors include all
-  numpy ufuncs as well.
+  DSP transforms and reductions on our data. Here is where contributors will
+  write new processors for inclusion in the analysis. Available processors
+  include all :class:`numpy.ufunc`\ s as well.
 * :class:`.ProcessingChain`: A class that manages and efficiently runs a list
   of DSP processors
 * :func:`.build_processing_chain`: A function that builds a :class:`.ProcessingChain`

@@ -1,7 +1,7 @@
 import numpy as np
 from numba import guvectorize
 
-from pygama.dsp._processors.fixed_time_pickoff import fixed_time_pickoff
+from .fixed_time_pickoff import fixed_time_pickoff
 from pygama.dsp.errors import DSPFatal
 
 
