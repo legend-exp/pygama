@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from pygama.raw import build_raw
 from pygama.lgdo.lh5_store import LH5Store, ls
+from pygama.raw import build_raw
 
 config_dir = Path(__file__).parent/'configs'
 
