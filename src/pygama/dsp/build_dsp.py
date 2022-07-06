@@ -145,10 +145,10 @@ def build_dsp(f_raw: str,
             f_config = chan_config[tb]
             with open(f_config) as config_file:
                 dsp_config = json.load(config_file)
-            log.debug(f'processing table: {tb} with DSP config file {f_config}')
+            log.debug(f"processing table: '{tb}' with DSP config file {f_config}")
 
         if not isinstance(dsp_config, dict):
-            raise RuntimeError(f'dsp_config for {tb} must be a dict')
+            raise RuntimeError(f"dsp_config for '{tb}' must be a dict")
 
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
