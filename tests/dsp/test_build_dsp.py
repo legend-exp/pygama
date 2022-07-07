@@ -61,6 +61,7 @@ def test_build_dsp_channelwise(multich_raw_file):
     build_dsp(multich_raw_file,
               out_file,
               {},
+              n_max=5,
               lh5_tables=chan_config.keys(),
               chan_config=chan_config,
               write_mode='r')
@@ -72,3 +73,4 @@ def test_build_dsp_channelwise(multich_raw_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object('/ch0/dsp/bl_mean', out_file)
     assert isinstance(lh5_obj, lgdo.Array)
+    assert len(lh5_obj) == 5
