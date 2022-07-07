@@ -26,7 +26,7 @@ class DataStreamer(ABC):
     see below.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.rb_lib = None
         self.chunk_mode = None
         self.n_bytes_read = 0
@@ -36,40 +36,42 @@ class DataStreamer(ABC):
     def open_stream(self, stream_name: str, rb_lib: RawBufferLibrary = None,
                     buffer_size: int = 8192, chunk_mode: str = 'any_full',
                     out_stream: str = '') -> tuple[list[RawBuffer], int]:
-        """Open and initialize a data stream.
+        r"""Open and initialize a data stream.
 
         Open the stream, read in the header, set up the buffers.
 
         Call ``super().initialize([args])`` from derived class after loading
         header info to run this default version that sets up buffers in
-        ``rb_lib`` using the stream's decoders.
+        `rb_lib` using the stream's decoders.
 
-        .. note::
-            this default version has no actual return value! You must overload
-            this function, set :attr:`self.n_bytes_read` to the header packet
-            size, and return the header data.
+        Notes
+        -----
+        this default version has no actual return value! You must overload this
+        function, set :attr:`self.n_bytes_read` to the header packet size, and
+        return the header data.
 
         Parameters
         ----------
-        stream_name : str
-            typically a filename or e.g. a port for streaming
-        rb_lib : RawBufferLibrary
-            A library of buffers for readout from the data stream. rb_lib will
-            have its lgdo's initialized during this function
-        buffer_size : int
-            length of buffers to be read out in read_chunk (for buffers with
-            variable length)
-        chunk_mode : 'any_full', 'only_full', or 'single_packet'
-            sets the mode use for read_chunk
-        out_stream : str
-            optional name of output stream for default rb_lib generation
+        stream_name
+            typically a filename or e.g. a port for streaming.
+        rb_lib
+            a library of buffers for readout from the data stream. `rb_lib`
+            will have its LGDO's initialized during this function.
+        buffer_size
+            length of buffers to be read out in :meth:`read_chunk` (for buffers
+            with variable length).
+        chunk_mode : 'any_full', 'only_full' or 'single_packet'
+            sets the mode use for :meth:`read_chunk`.
+        out_stream
+            optional name of output stream for default `rb_lib` generation.
 
         Returns
         -------
-        header_data: list(RawBuffer), int
-            header_data is a list of RawBuffer's containing any file header
-            data, ready for writing to file or further processing. It's not a
-            RawBufferList since the buffers may have a different format
+        header_data
+            header_data is a list of :class:`.RawBuffer`\ 's containing any
+            file header data, ready for writing to file or further processing.
+            It's not a :class:`.RawBufferList` since the buffers may have a
+            different format.
         """
         # call super().initialize([args]) to run this default code
         # after loading header info, then follow it with the return call.
@@ -130,7 +132,7 @@ class DataStreamer(ABC):
             if dec_name not in dec_names:
                 log.warning("no decoder named {dec_name} requested by rb_lib")
 
-    def close_stream(self):
+    def close_stream(self) -> None:
         """Close this data stream.
 
         .. note::
@@ -148,8 +150,8 @@ class DataStreamer(ABC):
 
         Returns
         -------
-        still_has_data : bool
-            Returns true while there is still data to read
+        still_has_data
+            returns `True` while there is still data to read.
         """
         return True
 
@@ -158,18 +160,17 @@ class DataStreamer(ABC):
         """Reads a chunk of data into raw buffers.
 
         Reads packets until at least one buffer is too full to perform another
-        read.
+        read. Default version just calls :meth:`.read_packet` over and over.
+        Overload as necessary.
 
-        .. note::
-            user is responsible for resetting / clearing the raw buffers prior
-            to calling :meth:`.read_chunk` again.
-
-        Default version just calls :meth:`.read_packet` over and over. Overload
-        as necessary.
+        Notes
+        -----
+        user is responsible for resetting / clearing the raw buffers prior to
+        calling :meth:`.read_chunk` again.
 
         Parameters
         ----------
-        chunk_mode_override : 'any_full', 'only_full', 'single_packet', or None
+        chunk_mode_override : 'any_full', 'only_full' or 'single_packet'
             - ``None`` : do not override self.chunk_mode
             - ``any_full`` : returns all raw buffers with data as soon as any one
               buffer gets full
@@ -177,14 +178,14 @@ class DataStreamer(ABC):
               nearly full) during the read. This minimizes the number of write calls.
             - ``single_packet`` : returns all raw buffers with data after a single
               read is performed. This is useful for streaming data out as soon
-              as it is read in (e.g. for diagnostics or in-line analysis)
-        rp_max : int
+              as it is read in (e.g. for diagnostics or in-line analysis).
+        rp_max
             maximum number of packets to read before returning anyway, even if
-            one of the other conditions is not met
-        clear_full_buffers : bool
-            automatically clear any buffers that report themselves as being full
-            prior to reading the chunk. Set to False if clearing manually for a
-            minor speed-up
+            one of the other conditions is not met.
+        clear_full_buffers
+            automatically clear any buffers that report themselves as being
+            full prior to reading the chunk. Set to `False` if clearing
+            manually for a minor speed-up.
 
         Returns
         -------
@@ -227,8 +228,9 @@ class DataStreamer(ABC):
     def get_decoder_list(self) -> list:
         """Returns a list of decoder objects for this data stream.
 
-        .. note::
-            Needs to be overloaded. Gets called during :meth:`.open_stream`.
+        Notes
+        -----
+        Needs to be overloaded. Gets called during :meth:`.open_stream`.
         """
         return []
 
@@ -238,7 +240,7 @@ class DataStreamer(ABC):
 
         A :class:`.RawBufferList` containing a single :class:`.RawBuffer` is
         built for each decoder name returned by :meth:`.get_decoder_list`. Each
-        buffer's ``out_name`` is set to the decoder name. The lgdo's do not get
+        buffer's `out_name` is set to the decoder name. The LGDO's do not get
         initialized.
         """
         rb_lib = RawBufferLibrary()
