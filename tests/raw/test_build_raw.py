@@ -61,7 +61,8 @@ def test_build_raw_fc_channelwise_out_spec(lgnd_test_data):
       'FCEventDecoder': {
         'ch{key}': {
           'key_list': [[0, 6]],
-          'out_stream': out_file + ":{name}/raw"
+          'out_stream': out_file + ":{name}",
+          'out_name': 'raw'
         }
       }
     }
@@ -71,6 +72,7 @@ def test_build_raw_fc_channelwise_out_spec(lgnd_test_data):
 
     assert ls(out_file) == ['ch0', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5']
     assert ls(out_file, 'ch0/') == ['ch0/raw']
+    assert ls(out_file, 'ch0/raw/waveform') == ['ch0/raw/waveform']
 
 
 def test_build_raw_orca(lgnd_test_data):
