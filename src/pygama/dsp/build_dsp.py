@@ -30,7 +30,7 @@ def build_dsp(f_raw: str,
               database: str = None,
               outputs: list[str] = None,
               n_max: int = np.inf,
-              write_mode: str = 'r',
+              write_mode: str = None,
               buffer_len: int = 3200,
               block_width: int = 16,
               chan_config: dict[str, str] = None) -> None:
@@ -59,6 +59,7 @@ def build_dsp(f_raw: str,
     n_max
         number of waveforms to process.
     write_mode
+        - ``None`` -- create new output file if it does not exist
         - `'r'` -- delete existing output file with same name before writing
         - `'a'` -- append to end of existing output file
         - `'u'` -- update values in existing output file
@@ -118,6 +119,9 @@ def build_dsp(f_raw: str,
     if database and not isinstance(database, dict):
         database = None
         raise ValueError('input database is not a valid JSON file or dict')
+
+    if write_mode is None and os.path.isfile(f_dsp):
+        raise FileExistsError(f"output file {f_dsp} exists. Set the 'write_mode' keyword")
 
     # clear existing output files
     if write_mode == 'r':
