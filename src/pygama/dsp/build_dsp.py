@@ -27,7 +27,7 @@ def build_dsp(f_raw: str,
               f_dsp: str,
               dsp_config: str | dict,
               lh5_tables: list[str] = None,
-              database: str = None,
+              database: str | dict = None,
               outputs: list[str] = None,
               n_max: int = np.inf,
               write_mode: str = None,
@@ -51,7 +51,7 @@ def build_dsp(f_raw: str,
         list of HDF5 groups to consider in the input file. If ``None``, process
         all valid groups.
     database
-        name of JSON file containing a parameter database. See
+        dictionary or name of JSON file containing a parameter database. See
         :func:`~.processing_chain.build_processing_chain` for details.
     outputs
         list of parameter names to write to the output file. If not provided,

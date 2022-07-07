@@ -1,10 +1,11 @@
+import pytest
 import os
 from pathlib import Path
 
-import pytest
-
+from pygama import lgdo
 from pygama.dsp import build_dsp
 from pygama.raw import build_raw
+from pygama.lgdo.lh5_store import LH5Store, ls
 
 config_dir = Path(__file__).parent/'configs'
 
@@ -16,7 +17,8 @@ def multich_raw_file(lgnd_test_data):
       'FCEventDecoder': {
         'ch{key}': {
           'key_list': [[0, 6]],
-          'out_stream': out_file + ":{name}/raw"
+          'out_stream': out_file + ":{name}",
+          'out_name': 'raw'
         }
       }
     }
@@ -30,11 +32,43 @@ def multich_raw_file(lgnd_test_data):
 def test_build_dsp_basics(lgnd_test_data):
     build_dsp(lgnd_test_data.get_path('lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5'),
               '/tmp/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5',
-              dsp_config=f'{config_dir}/icpc-dsp-config.json')
+              dsp_config=f'{config_dir}/icpc-dsp-config.json',
+              database={'pz': {'tau': 27460.5}},
+              write_mode='r')
 
     assert os.path.exists('/tmp/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5')
+
+    with pytest.raises(FileExistsError):
+        build_dsp(lgnd_test_data.get_path('lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5'),
+                  '/tmp/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5',
+                  dsp_config=f'{config_dir}/icpc-dsp-config.json')
 
     with pytest.raises(FileNotFoundError):
         build_dsp('non-existent-file.lh5',
                   '/tmp/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5',
-                  dsp_config=f'{config_dir}/icpc-dsp-config.json')
+                  dsp_config=f'{config_dir}/icpc-dsp-config.json',
+                  write_mode='r')
+
+
+def test_build_dsp_channelwise(multich_raw_file):
+    chan_config = {
+        'ch0/raw': f'{config_dir}/sipm-dsp-config.json',
+        'ch1/raw': f'{config_dir}/sipm-dsp-config.json',
+        'ch2/raw': f'{config_dir}/sipm-dsp-config.json'
+    }
+
+    out_file = '/tmp/L200-comm-20211130-phy-spms_dsp.lh5'
+    build_dsp(multich_raw_file,
+              out_file,
+              {},
+              lh5_tables=chan_config.keys(),
+              chan_config=chan_config,
+              write_mode='r')
+
+    assert ls(out_file) == ['ch0', 'ch1', 'ch2', 'dsp_info']
+    assert ls(out_file, 'ch0/') == ['ch0/dsp']
+    assert ls(out_file, 'ch0/dsp/') == ['ch0/dsp/bl_mean', 'ch0/dsp/bl_std']
+
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object('/ch0/dsp/bl_mean', out_file)
+    assert isinstance(lh5_obj, lgdo.Array)

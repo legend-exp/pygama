@@ -1,0 +1,19 @@
+{
+    "outputs": [
+        "bl_mean", "bl_std"
+    ],
+    "processors": {
+        "wf_blsub": {
+            "function": "bl_subtract",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform", "baseline", "wf_blsub"],
+            "unit": "ADC"
+        },
+        "bl_mean , bl_std, bl_slope, bl_intercept": {
+            "function": "linear_slope_fit",
+            "module": "pygama.dsp.processors",
+            "args" : ["wf_blsub[0:750]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
+            "unit": ["ADC", "ADC", "ADC", "ADC"]
+        }
+    }
+}

@@ -1223,7 +1223,7 @@ def build_processing_chain(lh5_in: lgdo.Table,
         should be read in prior to calling this!
 
     dsp_config
-        A dict or json filename containing the recipes for computing DSP
+        A dictionary or JSON filename containing the recipes for computing DSP
         parameter from raw parameters. The format is as follows:
 
         .. code-block:: json
@@ -1251,33 +1251,34 @@ def build_processing_chain(lh5_in: lgdo.Table,
              names of parameters computed
 
               - ``function`` -- string, name of function to call.  Function
-                should implement the gufunc interface, a factory function
-                returning a gufunc, or an arbitrary function that can be
-                mapped onto a gufunc
+                should implement the :class:`numpy.gufunc` interface, a factory
+                function returning a ``gufunc``, or an arbitrary function that
+                can be mapped onto a ``gufunc``
               - ``module`` -- string, name of module containing function
               - ``args``-- list of strings or numerical values. Contains
                 list of names of computed and input parameters or
                 constant values used as inputs to function. Note that
                 outputs should be fed by reference as args! Arguments read
-                from the database are prepended with db.
+                from the database are prepended with ``db``.
               - ``kwargs`` -- dictionary. Keyword arguments for
                 :meth:`ProcesssingChain.add_processor`.
               - ``init_args`` --  list of strings or numerical values. List
                 of names of computed and input parameters or constant values
-                used to initialize a gufunc via a factory function
+                used to initialize a :class:`numpy.gufunc` via a factory
+                function
               - ``unit`` -- list of strings. Units for parameters
               - ``defaults`` -- dictionary. Default value to be used for
                 arguments read from the database
 
     db_dict
-        A nested dict pointing to values for db args. e.g. if a processor
-        uses arg db.trap.risetime, it will look up db_dict['trap']['risetime']
-        and use the found value. If no value is found, use the default
-        defined in the config file.
+        A nested :class:`dict` pointing to values for database arguments. As
+        instance, if a processor uses the argument ``db.trap.risetime``, it
+        will look up ``db_dict['trap']['risetime']`` and use the found value.
+        If no value is found, use the default defined in `dsp_config`.
 
     outputs
-        List of parameters to put in the output lh5 table. If None,
-        use the parameters in the 'outputs' list from config
+        List of parameters to put in the output LH5 table. If ``None``,
+        use the parameters in the ``"outputs"`` list from `dsp_config`.
 
     block_width
         number of entries to process at once. To optimize performance,
