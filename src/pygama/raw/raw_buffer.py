@@ -1,22 +1,23 @@
 r"""
-Manage data buffering for raw data conversion.
-
-This module manages LGDO buffers and their corresponding output streams. Allows
-for one-to-many mapping of input sreams to output streams.
+Utilities to manage data buffering for raw data conversion. This module manages
+LGDO buffers and their corresponding output streams. Allows for one-to-many
+mapping of input streams to output streams.
 
 Primary Classes
 ---------------
 :class:`.RawBuffer`: an LGDO (e.g. a table) along with buffer metadata, such as the
 current write location, the list of keys (e.g. channels) that write to it, the
-output stream it is associated with (if any), etc. Each data_decoder is
-associated with a :class:`.RawBuffer` of a particular format.
+output stream it is associated with (if any), etc. Each
+:class:`~.raw.data_decoder.DataDecoder` is associated with a
+:class:`.RawBuffer` of a particular format.
 
 :class:`.RawBufferList`: a collection of :class:`RawBuffer` with LGDO's that
-all have the same structure (same type, same fields, etc). A data_decoder will
-write its output to a :class:`.RawBufferList`.
+all have the same structure (same type, same fields, etc). A
+:class:`~.raw.data_decoder.DataDecoder` will write its output to a
+:class:`.RawBufferList`.
 
-:class:`.RawBufferLibrary`: a collection (dict) of :class:`RawBufferList`\ s,
-e.g. one for each data_decoder. Keyed by the decoder name.
+:class:`.RawBufferLibrary`: a dictionary of :class:`RawBufferList`\ s, e.g. one
+for each :class:`~.raw.data_decoder.DataDecoder`. Keyed by the decoder name.
 
 :class:`.RawBuffer` supports a JSON short-hand notation, see
 :meth:`.RawBufferLibrary.set_from_json_dict` for full specification.
@@ -61,41 +62,48 @@ keys.
 from __future__ import annotations
 
 import os
+from typing import Union
 
 from pygama import lgdo
+from pygama.lgdo.lh5_store import LH5Store
+
+LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
 
 class RawBuffer:
-    """Base class to represent a buffer of raw data.
+    r"""Base class to represent a buffer of raw data.
 
-    A :class:`RawBuffer` is in essence a an lgdo object (typically a
+    A :class:`RawBuffer` is in essence a an LGDO object (typically a
     :class:`~.lgdo.table.Table`) to which decoded data will be written, along
     with some meta-data distinguishing what data goes into it, and where the
-    lgdo gets written out. Also holds on to the current location in the buffer
+    LGDO gets written out. Also holds on to the current location in the buffer
     for writing.
 
     Attributes
     ----------
-    lgdo : lgdo
-        the lgdo used as the actual buffer. Typically a table. Set to None upon
-        creation so that the user or a decoder can initialize it later.
-    key_list : list
+    lgdo
+        the LGDO used as the actual buffer. Typically a
+        :class:`~.lgdo.table.Table`. Set to ``None`` upon creation so that the
+        user or a decoder can initialize it later.
+    key_list
         a list of keys (e.g. channel numbers) identifying data to be written
         into this buffer. The key scheme is specific to the decoder with which
-        the RawBuffer is associated. This is called "key_list" instead of "keys"
-        to avoid confusion with the dict function "keys()", i.e. raw_buffer.lgdo.keys()
-    out_stream : str (optional)
-        the output stream to which the raw_buffer's lgdo should be sent or
-        written. A colon can be used to separate the stream name/address from an
-        in-stream path / port:
-        File example: '/path/filename.lh5:/group'
-        Socket example: '198.0.0.100:8000'
-    out_name : str (optional)
-        the name / identifier of the object in the output stream
+        the :class:`.RawBuffer` is associated. This is called `key_list`
+        instead of `keys` to avoid confusion with the dict function
+        :meth:`dict.keys`, i.e.  ``raw_buffer.lgdo.keys()``.
+    out_stream
+        the output stream to which the :class:`.RawBuffer`\ 's LGDO should be
+        sent or written. A colon (``,``) can be used to separate the stream
+        name/address from an in-stream path/port:
+        - file example: ``/path/filename.lh5:/group``
+        - socket example: ``198.0.0.100:8000``
+    out_name
+        the name or identifier of the object in the output stream.
     """
 
 
-    def __init__(self, lgdo=None, key_list: list = [], out_stream: str = '', out_name: str = ''):
+    def __init__(self, lgdo: LGDO = None, key_list: list[int | str] = [],
+                 out_stream: str = '', out_name: str = '') -> None:
         self.lgdo = lgdo
         self.key_list = key_list
         self.out_stream = out_stream
@@ -103,35 +111,31 @@ class RawBuffer:
         self.loc = 0
         self.fill_safety = 1
 
-
-    def __len__(self):
+    def __len__(self) -> int:
         if self.lgdo is None: return 0
         if not hasattr(self.lgdo, '__len__'): return 1
         return len(self.lgdo)
 
-
     def is_full(self) -> bool:
         return (len(self) - self.loc) < self.fill_safety
 
-
-    def __str__(self):
+    def __str__(self) -> str:
         return f'RawBuffer {"{"} lgdo={self.lgdo}, key_list={self.key_list}, out_stream={self.out_stream}, out_name={self.out_name}, loc={self.loc}, fill_safety={self.fill_safety} {"}"}'
 
-
-    def __repr__(self): return str(self)
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class RawBufferList(list):
     r"""A :class:`.RawBufferList` holds a collection of :class:`.RawBuffer`\ s
-    of identical structure (same format lgdo's with the same fields).
+    of identical structure (same format LGDO's with the same fields).
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self.keyed_dict = None
 
-
-    def get_keyed_dict(self) -> dict:
+    def get_keyed_dict(self) -> dict[int | str, RawBuffer]:
         r"""Returns a dictionary of :class:`.RawBuffer`\ s built from the
-        buffers' ``key_lists``.
+        buffers' `key_lists`.
 
         Different keys may point to the same buffer. Requires the buffers in
         the :class:`.RawBufferList` to have non-overlapping key lists.
@@ -142,12 +146,13 @@ class RawBufferList(list):
                 for key in rb.key_list: self.keyed_dict[key] = rb
         return self.keyed_dict
 
-
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict = {}) -> None:
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
         """Set up a :class:`.RawBufferList` from a dictionary written in JSON
         shorthand. See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
 
-        .. note:: ``json_dict`` is changed by this function
+        Notes
+        -----
+        `json_dict` is changed by this function.
         """
         expand_rblist_json_dict(json_dict, kw_dict)
         for name in json_dict:
@@ -159,21 +164,20 @@ class RawBufferList(list):
             if 'out_name' in json_dict[name]:
                 rb.out_name = json_dict[name]['out_name']
             else: rb.out_name = name
-            self.append(rb);
-
+            self.append(rb)
 
     def get_list_of(self, attribute: str) -> list:
         """Return a list of values of :class:`.RawBuffer` attributes.
 
         Parameters
         ----------
-        attribute : str
-            The RawBuffer attribute queried to make the list
+        attribute
+            The :class:`.RawBuffer` attribute queried to make the list.
 
         Returns
         -------
-        values : list
-            The list of values of RawBuffer.attribute
+        values
+            The list of values of `RawBuffer.attribute`.
 
         Examples
         --------
@@ -186,7 +190,7 @@ class RawBufferList(list):
             if val not in values: values.append(val)
         return values
 
-    def clear_full(self):
+    def clear_full(self) -> None:
         for rb in self:
             if rb.is_full(): rb.loc = 0
 
@@ -196,11 +200,11 @@ class RawBufferLibrary(dict):
     :class:`.RawBufferList`\ s associated with the names of decoders that can
     write to them.
     """
-    def __init__(self, json_dict: dict = None, kw_dict: dict = {}):
+    def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = {}) -> None:
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict = {}) -> None:
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
         r"""Set up a :class:`.RawBufferLibrary` from a dictionary written in
         JSON shorthand.
 
@@ -233,44 +237,44 @@ class RawBufferLibrary(dict):
           corresponding name.  The same specifier can appear in ``out_path`` to
           write the key's data to its own output path.
         * You may also include keywords in your ``out_stream`` and ``out_name``
-          specification whose values get sent in via ``kwdict``. These get
+          specification whose values get sent in via `kw_dict`. These get
           evaluated simultaneously with the ``{key:xxx}`` specifiers.
         * Environment variables can also be used in ``out_stream``. They get
-          expanded after ``kw_dict`` is handled and thus can be used inside
-          ``kw_dict``
+          expanded after `kw_dict` is handled and thus can be used inside
+          `kw_dict`.
         * ``list_name`` can use the wildcard ``*`` to match any other
-          ``list_name`` known to a streamer
+          ``list_name`` known to a streamer.
         * ``out_stream`` and ``out_name`` can also include ``{name}``, to be
           replaced with the buffer's ``name``. In the case of
-          ``list_name="*"``, ``{name}`` evaluates to ``list_name``
+          ``list_name="*"``, ``{name}`` evaluates to ``list_name``.
 
         Parameters
         ----------
-        json_dict : dict
-            dict loaded from a json file written in the allowed shorthand.
-            Note: json_dict is changed by this function
-        kw_dict : dict
-            dict of keyword-value pairs for substitutions into the out_stream
-            and out_name fields
+        json_dict
+            loaded from a JSON file written in the allowed shorthand.
+            `json_dict` is changed by this function.
+        kw_dict
+            dictionary of keyword-value pairs for substitutions into the
+            ``out_stream`` and ``out_name`` fields.
         """
         for list_name in json_dict:
             if list_name not in self: self[list_name] = RawBufferList()
             self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
 
     def get_list_of(self, attribute: str, unique: bool = True) -> list:
-        """Return a list of values of :class:`.RawBuffer` attributes
+        """Return a list of values of :class:`.RawBuffer` attributes.
 
         Parameters
         ----------
-        attribute : str
-            The RawBuffer attribute queried to make the list
-        unique : bool
-            Remove duplicates
+        attribute
+            The :class:`.RawBuffer` attribute queried to make the list.
+        unique
+            whether to remove duplicates.
 
         Returns
         -------
-        values : list
-            The list of values of RawBuffer.attribute
+        values
+            The list of values of `RawBuffer.attribute`.
 
         Examples
         --------
@@ -286,13 +290,15 @@ class RawBufferLibrary(dict):
         for rb_list in self.values(): rb_list.clear_full()
 
 
-def expand_rblist_json_dict(json_dict: dict, kw_dict: dict) -> None:
+def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
     """Expand shorthands in a JSON dictionary representing a
-    :class:`.RawBufferList`
+    :class:`.RawBufferList`.
 
-    See :meth:`.RawBufferLibrary.set_from_json_dict` for details
+    See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
 
-    Note: The input JSON dictionary is changed by this function
+    Notes
+    -----
+    The input JSON dictionary is changed by this function.
     """
     # get the original list of groups because we are going to change the
     # dict.keys() of json_dict inside the next list. Note: we have to convert
