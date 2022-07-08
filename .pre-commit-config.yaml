@@ -24,12 +24,6 @@ repos:
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
-- repo: https://github.com/Carreau/velin.git
-  rev: "0.0.12"
-  hooks:
-    - id: velin
-      args: ["--check", "--write"]
-
 - repo: https://github.com/asottile/setup-cfg-fmt
   rev: "v1.20.1"
   hooks:
