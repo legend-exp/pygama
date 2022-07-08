@@ -33,7 +33,7 @@ class WaveformBrowser:
                  legend = None, legend_opts = None,
                  n_drawn = 1, x_unit = None, x_lim = None, y_lim = None,
                  norm = None, align=None,
-                 buffer_len = 128, block_width = 8, verbosity=1):
+                 buffer_len = 128, block_width = 8):
         """
         Parameters
         ----------
@@ -124,11 +124,7 @@ class WaveformBrowser:
 
         block_width : int (default 16)
             block width for processing chain
-
-        verbosity : bool
-            print debug messages
         """
-        self.verbosity = verbosity
 
         self.norm_par = norm
         self.align_par = align
@@ -222,7 +218,7 @@ class WaveformBrowser:
         if self.aux_vals is not None:
             outputs = [ o for o in outputs if o not in self.aux_vals ]
 
-        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, verbosity=self.verbosity, block_width=block_width)
+        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, block_width=block_width)
         self.proc_chain.execute()
 
         # Check if all of our outputs can be found
