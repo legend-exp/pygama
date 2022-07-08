@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -5,21 +7,28 @@ import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 
 
-def wiener_filter(file_name_array):
-    """Apply a wiener filter to the waveform.
+def wiener_filter(file_name_array: list[str]) -> np.ndarray:
+    """Apply a Wiener filter to the waveform.
 
-    Note that this convolution is performed in the frequency domain
+    Note
+    ----
+    The convolution is performed in the frequency domain.  This processor is
+    composed of a factory function that is called using the `init_args`
+    argument. The input and output waveforms are passed using `args`. The input
+    must be the Fourier transform of the waveform. The output is the filtered
+    waveform in the frequency domain.
 
     Parameters
     ----------
-    file_name_array : string
-        Array with path to an lh5 file containing the time domain version
-        of the superpulse in one column and noise waveform in another,
-        the superpulse group must be titled 'spms/processed/superpulse' and
-        the noise waveform must be called 'spms/processed/noise_wf'
+    file_name_array
+        Array with path to an HDF5 file containing the time domain version of
+        the superpulse in one column and noise waveform in another, the
+        superpulse HDF5 group must be titled ``spms/processed/superpulse`` and
+        the noise waveform must be called ``spms/processed/noise_wf``.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_wiener": {
@@ -27,7 +36,6 @@ def wiener_filter(file_name_array):
             "module": "pygama.dsp.processors",
             "args": ["wf_bl_fft", "wf_wiener(2000,f)"],
             "unit": "dB",
-            "prereqs": ["wf_bl_fft"],
             "init_args": ["/path/to/file/wiener.lh5"]
         }
     """
@@ -97,14 +105,14 @@ def wiener_filter(file_name_array):
     @guvectorize(["void(complex64[:], complex64[:])",
                   "void(complex128[:], complex128[:])"],
                  "(n)->(n)", forceobj=True)
-    def wiener_out(fft_w_in, fft_w_out):
+    def wiener_out(fft_w_in: np.ndarray, fft_w_out: np.ndarray) -> None:
         """
         Parameters
         ----------
-        fft_w_in : array-like
-            The fourier transform input waveform
-        fft_w_out : array-like
-            The filtered waveform, in the frequency domain
+        fft_w_in
+            the Fourier transformed input waveform.
+        fft_w_out
+            the filtered waveform, in the frequency domain.
         """
         fft_w_out[:] = np.nan
 

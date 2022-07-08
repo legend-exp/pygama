@@ -33,26 +33,27 @@
 # The only thing changed was the calculation of the convulution, which
 # originally called a function from a C library.  In this code, the convolution is
 # performed with NumPy's built in convolution function.
+from __future__ import annotations
 
 import numpy
 from numba import guvectorize
 
 
-def gaussian_filter1d(sigma, truncate):
+def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
     """1-D Gaussian filter.
+
+    Note
+    ----
+    This processor is composed of a factory function that is called using the
+    `init_args` argument. The input and output waveforms are passed using
+    `args`.
 
     Parameters
     ----------
-    %(input)s
-    sigma : scalar
+    sigma
         standard deviation for Gaussian kernel
-    truncate : float, optional
-        Truncate the filter at this many standard deviations.
-        Default is 4.0.
-
-    Returns
-    -------
-    gaussian_filter1d : ndarray
+    truncate
+        truncate the filter at this many standard deviations.
     """
     def _gaussian_kernel1d(sigma, radius):
         """
@@ -79,17 +80,6 @@ def gaussian_filter1d(sigma, truncate):
 
     extension_length = int(len(weights) / 2) + 1
 
-    """Calculate a 1-D correlation along the given axis.
-    The lines of the array along the given axis are correlated with the
-    given weights.
-
-    Parameters
-    ----------
-    %(input)s
-    weights : array
-        1-D sequence of numbers.
-    %(mode_reflect)s
-    """
     @guvectorize(["void(float32[:], float32[:])",
                   "void(float64[:], float64[:])",
                   "void(int32[:], int32[:])",

@@ -41,7 +41,7 @@ several advantages:
    vectorization on a vector-CPU. Modern CPUs typically have 256- or 512-bit
    wide processing units, which can accommodate multiple 32- or 64-bit numbers.
    Programming with these, however, is quite difficult and requires specialized
-   commands to be called.  Luckily for us, many NumPy :class`~numpy.ufunc`\ s
+   commands to be called.  Luckily for us, many NumPy :class:`~numpy.ufunc`\ s
    will automatically use these for us, speeding up our code!
 
 3. :class:`~numpy.ufunc`\ s are capable of calculating their output in place,

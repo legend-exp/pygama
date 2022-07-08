@@ -1,13 +1,14 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
-
-from pygama.dsp.errors import DSPFatal
 
 
 @guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
               "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
              "(n)->(),(),(),()", nopython=True, cache=True)
-def linear_slope_fit(w_in, mean, stdev, slope, intercept):
+def linear_slope_fit(w_in: np.ndarray, mean: float, stdev: float,
+                     slope: float, intercept: float) -> None:
     """
     Calculate the mean and standard deviation of the waveform using
     Welford's method as well as the slope an intercept of the waveform
@@ -15,19 +16,20 @@ def linear_slope_fit(w_in, mean, stdev, slope, intercept):
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    mean : float
-        The mean of the waveform
-    stdev : float
-        The standard deviation of the waveform
-    slope : float
-        The slope of the linear fit
-    intercept : float
-        The intercept of the linear fit
+    w_in
+        the input waveform.
+    mean
+        the mean of the waveform.
+    stdev
+        the standard deviation of the waveform.
+    slope
+        the slope of the linear fit.
+    intercept
+        the intercept of the linear fit.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "bl_mean, bl_std, bl_slope, bl_intercept": {
@@ -35,7 +37,6 @@ def linear_slope_fit(w_in, mean, stdev, slope, intercept):
             "module": "pygama.dsp.processors",
             "args": ["wf_blsub[0:1650]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
             "unit": ["ADC", "ADC", "ADC", "ADC"],
-            "prereqs": ["wf_blsub"]
         }
     """
     mean     [0] = np.nan
