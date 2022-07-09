@@ -8,9 +8,9 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
+import pint
 from cycler import cycler
 from matplotlib.lines import Line2D
-import pint
 
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.processing_chain import build_processing_chain
@@ -52,30 +52,39 @@ class WaveformBrowser:
         ----------
         files_in
             name of file or list of names to browse. Can use wildcards.
+
         lh5_group
             name of LH5 group in file to browse.
+
         base_path
             base path for file. See :class:`~.lgdo.lh5_store.LH5Store`.
+
         entry_list
             list of event indices to draw. If it is a nested list, use local
             indices for each file, otherwise use global indices.
+
         entry_mask
             boolean mask indicating which events to draw. If a nested list, use
             a mask for each file, else use a global mask. Cannot be used with
             `entry_list`.
+
         dsp_config
             name of DSP config JSON file containing a list of processors that
             can be applied to waveforms.
+
         database
             dictionary or JSON file with database of processing parameters.
+
         aux_values
             table of auxiliary values that are one-to-one with the input
             waveforms that can be drawn or placed in the legend.
+
         lines
             name(s) of objects to draw 2D lines for. Waveforms will be drawn as
             a time-series. Scalar quantities will be drawn as horizontal or
             vertical lines, depending on units. Vectors will be drawn as
             multiple horizontal or vertical lines.
+
         styles
             line colors and other style parameters to cycle through when
             drawing waveforms. Can be given as
@@ -88,6 +97,7 @@ class WaveformBrowser:
 
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
+
         legend
             formatting string and values to include in the legend. This can
             be a list of values (one for each drawn object). If just a name
@@ -95,12 +105,15 @@ class WaveformBrowser:
             formatting strings in brackets can be used (e.g. ``{energy:0.1f}
             keV, {timestamp:d} ns``).  Names will be searched in the input
             file, DSP processed parameters, or auxiliary data-table.
+
         legend_opts
             dictionary containing additional keyword arguments for
             :mod:`matplotlib.legend`.
+
         n_drawn
             number of events to draw simultaneously when calling
             :meth:`draw_next`.
+
         x_lim, y_lim
             range of x- or y-values and units passed as tuple.
 
@@ -109,16 +122,21 @@ class WaveformBrowser:
               - ``float``: get unit from first waveform drawn
               - ``str``: convert to :class:`pint.Quantity` (e.g. ``('0*us',
                 '10*us')``).
+
         x_unit
             unit of x-axis.
+
         norm
             name of parameter (probably energy) to use to normalize waveforms.
             Useful when drawing multiple waveforms.
+
         align
             name of parameter to use for x-offset. Useful, e.g., for aligning
             multiple waveforms at a particular timepoint.
+
         buffer_len
             number of waveforms to keep in memory at a time.
+
         block_width
             block width for :class:`~.dsp.processing_chain.ProcessinChain`.
         """
@@ -373,9 +391,9 @@ class WaveformBrowser:
                 self._update_auto_limit(None, val)
 
             else:
-                raise TypeError((
+                raise TypeError(
                     f"Cannot draw '{name}'. WaveformBrowser does not support "
-                    f"drawing lines for data of type {data.__class__}"))
+                    f"drawing lines for data of type {data.__class__}")
 
         # legend data
         for name, vals in self.legend_vals.items():
@@ -390,9 +408,9 @@ class WaveformBrowser:
                 else:
                     data = ureg.Quantity(data.nda[i_tb])
             else:
-                raise TypeError((
+                raise TypeError(
                     "WaveformBrowser does not adding legend entries for data "
-                    f"of type {data.__class__}"))
+                    f"of type {data.__class__}")
 
             vals.append(data)
 
