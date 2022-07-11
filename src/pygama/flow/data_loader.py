@@ -83,7 +83,6 @@ class DataLoader:
             # set the file_list
             self.file_list = list(self.fileDB.df.query(file_query).index)
 
-
     def set_config(self, config:dict):
         """
         load JSON config file
@@ -139,7 +138,7 @@ class DataLoader:
         else:
             self.file_list += inds
 
-    def set_datastreams(self, ds, keyword): #TODO Make this able to handle more complicated requests
+    def set_datastreams(self, ds, word): #TODO Make this able to handle more complicated requests
         """
         Set the datastreams (detectors) of interest
 
@@ -150,9 +149,10 @@ class DataLoader:
             Can be a list of detectorID, serialno, or channels
             or a list of subsystems of interest e.g. "ged" 
 
-            keyword : string
+            word : string
             The type of identifier used in ds 
-            Should be a key in the given channel map or a keyword in the config file
+            Should be a key in the given channel map or a word in the config file
+
         table_list = {
             "hit": [0, 1, 2]
             "evt": []        
@@ -165,18 +165,20 @@ class DataLoader:
             self.table_list = {}
 
         found = False
-        for level, word in self.fileDB.table_keyword.items():
+        for level in self.levels:
+            tier = self.tiers[level][0]
+            table_template = self.fileDB.table_format[tier] 
+            keyword = list(parse(table_template, table_template).named.keys())[0] 
             if word == keyword:
                 found = True
                 if level in self.table_list.keys():
-                    self.table_list[level] += ds
+                    self.table_list[level] += ds 
                 else:
                     self.table_list[level] = ds
 
         if not found:
-            #look in channel map
+            #look for word in channel map
             pass
-
 
     def set_cuts(self, cuts):
         """
@@ -220,11 +222,7 @@ class DataLoader:
             self.cuts = {}
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
-            for i in range(len(cuts)):
-                self.cuts[self.levels[i]] = cuts[i] 
-
-
-    def set_output(self, fmt=None, merge_files=True, columns=None):
+    def set_output(self, fmt=None, merge_files=None, columns=None):
         """
         Parameters
         ----------
@@ -242,9 +240,12 @@ class DataLoader:
         -------
         None.
         """
-        self.output_format = fmt 
-        self.merge_files = merge_files 
-        self.output_columns = columns 
+        if fmt is not None:
+            self.output_format = fmt 
+        if merge_files is not None:
+            self.merge_files = merge_files 
+        if columns is not None:
+            self.output_columns = columns 
 
     def show_file_list(self, columns=None):
         if columns is None:
@@ -253,7 +254,7 @@ class DataLoader:
             print(self.fileDB.df[columns].iloc[self.file_list])
 
     def show_fileDB(self, columns=None):
-            self.fileDB.show(columns)   
+        self.fileDB.show(columns)   
 
     def gen_entry_list(self, chunk=False, mode='only'): #TODO: mode, chunking, etc
         """
@@ -288,32 +289,106 @@ class DataLoader:
             print("You need to make a query on fileDB, use set_file_list")
             return 
         
-        entries = []
-        
-        for file in self.file_list:            
-            cut_cols = {}
-            for_output = ["event", "table", "idx_row"]
+        entries = {}
 
-            #Find out which columns we need to save
-            for level in self.levels:
-                cut_cols[level] = []
-                if self.cuts is not None:
-                    cut = self.cuts[level] 
-                else: 
-                    cut = ""
+        # Default columns in the entry_list
+        entry_cols = [f"{level}_table" for level in self.levels]
+        entry_cols += [f"{level}_idx" for level in self.levels]
 
-                # String parsing to determine which columns need to be loaded
-                split = re.split(' |<|>|=|and|or|&|\|', cut) 
-                for term in split:
-                    if term.isidentifier(): #Assumes that column names are valid python variable names
-                        cut_cols[level].append(term)
+        # Find out which columns are needed for the cut
+        cut_cols = {}
+        for level in self.levels:
+            cut_cols[level] = []
+            if self.cuts is not None and level in self.cuts.keys():
+                cut = self.cuts[level] 
+            else: 
+                cut = ""
+            # String parsing to determine which columns need to be loaded
+            split = re.split(' |<|>|=|and|or|&|\|', cut) 
+            for term in split:
+                if term.isidentifier(): #Assumes that column names are valid python variable names
+                    cut_cols[level].append(term)
+                    # Add column to entry_cols if they are needed for both the cut and the output
+                    if self.output_columns is not None:
                         if term in self.output_columns and term not in for_output:
-                            for_output.append(term)
-            
-            f_entries = pd.DataFrame(columns=for_output)
-            
+                            entry_cols.append(term)
+        
+        # Make the entry list for each file
+        for file in self.file_list:
+            f_entries = pd.DataFrame(columns=entry_cols)
+            # Get levels needed for cuts, and sort by cut priority
+            cut_levels = sorted(list(self.cuts.keys()), key=lambda level: self.cut_priority[level], reverse=True)
+            first_cut_made = False
+            for level in cut_levels:
+                tables = []
+                level_paths = {}
+                for tier in self.tiers[level]:
+                    path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
+                    # Only add to level_paths if the file exists
+                    if os.path.exists(path):
+                        level_paths[tier] = path
+                        if not tables:
+                            # Tables should be shared across tiers in one level
+                            tables = self.fileDB.df.iloc[file][f'{tier}_tables']
+                
+                if self.table_list is not None:
+                    if level in self.table_list.keys():
+                        tables = self.table_list[level]
+
+                # Continue if the paths exist
+                if level_paths:
+                    cut = self.cuts[level]
+                    level_table = None 
+                    fields = []
+                    # Use tcm_cols to find column names that correspond to level_table and level_idx 
+                    if level in self.tcm_cols.keys():
+                        fields = list(self.tcm_cols[level].values())
+
+                    sto = LH5Store()
+                    for tb in tables:
+                        # Try to create index mask for this table
+                        try:
+                            idx = f_entries.query(f"{level}_table == {tb}")[f"{level}_idx"]
+                        except:
+                            idx = None
+
+                        for tier, path in level_paths.items():
+                            template = self.fileDB.table_format[tier]
+                            keyword = list(parse(template, template).named.keys())[0]
+                            args = {keyword: tb}
+                            table_name = template.format(**args)
+                            temp_table, _ = sto.read_object(table_name, path, idx=idx, field_mask=fields + cut_cols)
+                            if level_table is None:
+                                level_table = temp_table
+                            else:
+                                level_table.join(temp_table) 
+                        level_df = level_table.get_dataframe()
+                        cut_df = level_df.query(cut)
+                        # rename columns to match entry_cols
+                        if level in self.tcm_cols.keys():
+                            dep = self.config["levels"][level]["dependency"]
+                            renaming = {
+                                self.tcm_cols[level]["table_col"]: f"{dep}_table", 
+                                self.tcm_cols[level]["idx_col"]: f"{dep}_idx", 
+                            }
+                            cut_df = cut_df.rename(renaming, axis="columns")
+                            cut_df = cut_df.explode(list(renaming.values()), ignore_index=True)
+                        else:
+                            cut_df[f"{level}_idx"] = cut_df.index
+                            cut_df[f"{level}_table"] = tb
+                        # THIS NEXT PART NEEDS WORK
+                        if not first_cut_made:
+                            f_entries = pd.concat((f_entries, cut_df), ignore_index=True)[entry_cols]
+                        else:
+                            tb_entries = f_entries.query(f"{level}_table == {tb}")
+                            drop_entries = tb_entries.query(f"{level}_idx not in {list(cut_df.index)}")
+                            f_entries = f_entries.drop(list(drop_entries.index))
+                first_cut_made = True
+####################################################################################################################################################### 
+################################################################## Old Code Under HERE ################################################################
+#######################################################################################################################################################
             # Grab file paths from fileDB
-            for l_idx, level in enumerate(self.levels):
+            for level in self.levels:
                 level_paths = {}
                 tables = []
                 for tier in self.tiers[level]:
@@ -322,28 +397,17 @@ class DataLoader:
                     if os.path.exists(path):
                         level_paths[tier] = path
                         if not tables:
-                            tier_tbs = self.fileDB.df.iloc[file][f'{tier}_tables']
-                            k_ind = [list(parse(self.fileDB.table_format[tier], tb).spans.values())[0] for tb in tier_tbs]
-                            tables = [tier_tbs[i][k_ind[i][0]:k_ind[i][1]] for i in range(len(tier_tbs))]
+                            tables = self.fileDB.df.iloc[file][f'{tier}_tables']
 
                 if self.table_list is not None:
                     tables = self.table_list[level]
 
                 if level_paths:
-                    if self.cuts is not None:
+                    if self.cuts is not None and level in self.cuts.keys():
                         cut = self.cuts[level] 
                     else: 
                         cut = ""
                     
-                    # String parsing to determine which columns need to be loaded
-                    cut_cols = []
-                    split = re.split(' |<|>|=|and|or|&|\|', cut) 
-                    for term in split:
-                        if term.isidentifier(): #Assumes that column names are valid python variable names
-                            cut_cols.append(term)
-
-                    if not cut_cols:
-                        cut_cols = None
 
                     sto = LH5Store()
                     for tb in tables:
@@ -357,11 +421,10 @@ class DataLoader:
                         level_table = None
                         for tier, path in level_paths.items():
                             template = self.fileDB.table_format[tier]
-                            try:
-                                args = {self.fileDB.table_keyword[level]: int(tb)}
-                            except:
-                                args = {self.fileDB.table_keyword[level]: tb}
+                            keyword = list(parse(template, template).named.keys())[0]
+                            args = {keyword: tb}
                             tb_name = template.format(**args)
+                            print(tb_name)
                             temp_tb, _ = sto.read_object(tb_name, path, idx=idx, field_mask=cut_cols)
                             if level_table is None:
                                 level_table = temp_tb 
@@ -380,7 +443,6 @@ class DataLoader:
 
 
         return entries
-
 
     def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit'): #TODO
         if rows == 'hit':
@@ -416,11 +478,8 @@ class DataLoader:
                 tier_loads = []
                 for tier in self.tiers[level]: 
                     template = self.fileDB.table_format[tier]
-                    try:
-                        args = {self.fileDB.table_keyword[level]: int(tb)}
-                    except:
-                        args = {self.fileDB.table_keyword[level]: tb}
-                    #print(args)
+                    keyword = list(parse(template, template).named.keys())[0]
+                    args = {keyword: tb}
                     tb_name = template.format(**args)
                     file_paths = []
                     for file in self.file_list:
@@ -468,10 +527,8 @@ class DataLoader:
                     level_table = None
                     for tier, path in level_paths.items():
                         template = self.fileDB.table_format[tier]
-                        try:
-                            args = {self.fileDB.table_keyword[level]: int(tb)}
-                        except:
-                            args = {self.fileDB.table_keyword[level]: tb}
+                        keyword = list(parse(template, template).named.keys())[0]
+                        args = {keyword: tb}
                         tb_name = template.format(**args)
                         temp_tb, _ = sto.read_object(tb_name, path, idx=idx, field_mask=self.output_columns)
                         if level_table is None:
@@ -494,7 +551,6 @@ class DataLoader:
                     print("I don't know how to output " + self.output_format + ", here is a lgdo.Table")
                     return load_ret
             
-
     def load_detector(self, det_id): #TODO
         """
         special version of `load` designed to retrieve all file files, tables,
@@ -503,13 +559,11 @@ class DataLoader:
         """
         pass
 
-
     def load_settings(self): #TODO
         """
         get metadata stored in raw files, usually from a DAQ machine.
         """
         pass
-
 
     def load_dsp_pars(self, query): #TODO
         """
@@ -518,7 +572,6 @@ class DataLoader:
         and return some tables.
         """
         pass
-
 
     def load_cal_pars(self, query): #TODO
         """
@@ -598,6 +651,7 @@ class FileDB():
             if scan:
                 self.scan_files()
                 self.set_file_status()
+                self.set_file_sizes()
         else:
             self.from_disk(config, file_df)
 
@@ -609,7 +663,7 @@ class FileDB():
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
 
-    def scan_files(self, verbose=False):
+    def scan_files(self):
         """
         Scan the raw directory and fill the DataFrame
         Only fills columns that can be populated with just the DAQ file
@@ -659,9 +713,6 @@ class FileDB():
             except:
                 pass
         
-        if verbose:
-            print(self)
-
     def set_file_status(self):
         """
         Add a column to the dataframe with a bit corresponding to whether each tier's file exists
@@ -675,8 +726,20 @@ class FileDB():
                 path_name = self.data_dir + self.tier_dirs[tier] + '/' + row[f'{tier}_file']
                 if os.path.exists(path_name):
                     status |= 1 << len(self.tiers)-i-1
+
             return status
         self.df['file_status'] = self.df.apply(check_status, axis=1)
+
+    def set_file_sizes(self):
+        def get_size(row, tier):
+            size = 0
+            path_name = self.data_dir + self.tier_dirs[tier] + '/' + row[f'{tier}_file']
+            if os.path.exists(path_name):
+                size = os.path.getsize(path_name)
+            return size
+
+        for tier in self.tiers:
+            self.df[f'{tier}_size'] = self.df.apply(get_size, axis=1, tier=tier)
 
     def show(self, col_names:list=None):
         """
@@ -697,34 +760,60 @@ class FileDB():
         """
                
         def update_table_names(row, tier):
-            def table_names(name):
-                # if isinstance(node, h5py.Dataset):
-                #     return
-                fm = string.Formatter()
-                value, var, form, _ = tuple(fm.parse(self.table_format[tier]))[0]
-                par_res = parse(self.table_format[tier], name)
-        
-                if par_res is not None:
-                    keys = list(par_res.named.keys()) # Should only have one key
-                    if len(keys) != 1:
-                        print("Tables can only have one identifier")
-                    else:
-                        tb = par_res.named[keys[0]]
-
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f'{tier}_file']
-            print(fpath)
-            t = time.perf_counter()
-            try:
-                tier_tables = []
-                f = h5py.File(fpath)
-                f.visit(table_names)
-            except:
-                print(tier_tables)
-            print("Time: ", time.perf_counter()-t)
-            return tier_tables
 
+            try:
+                f = h5py.File(fpath)
+            except:
+                return
+
+            tier_tables = []
+            template = self.table_format[tier]
+            slashes = list(re.finditer('/', template))
+            braces = list(re.finditer('{|}', template))
+
+            if len(braces) > 2:
+                print("Tables can only have one identifier")
+            if len(braces)%2 != 0:
+                print("Braces mismatch in table format")
+
+             # Only need index of matches
+            braces = [b.span()[0] for b in braces]
+            slashes = [s.span()[0] for s in slashes]
+
+            left_i = 0
+            right_i = len(template)
+            for s in slashes:
+                if s < braces[0]:
+                    left_i = s 
+                if s > braces[1] and s < right_i:
+                    right_i = s
+
+            left = template[:left_i] 
+            right = template[right_i+1:]
+            mid = template[left_i:right_i] 
+
+            if left:
+                group = f[left]
+            else:
+                group = f 
+            
+            for key in group.keys():
+                par_res = parse(mid, key)
+                keys = list(par_res.named.keys())
+            
+                if par_res is not None:
+                    tb = par_res.named[keys[0]]
+                    if f"{left}/{key}/{right}" in f:
+                        tier_tables.append(tb)
+
+            return tier_tables 
+            # End update_table_names
+
+        t = time.perf_counter()
         for tier in self.tiers:
             self.df[f'{tier}_tables'] = self.df.apply(update_table_names, axis=1, tier=tier)
+        print("Time: ", time.perf_counter()-t)
 
     def get_col_names(self, f_output:str=None):
         """
@@ -741,20 +830,24 @@ class FileDB():
             try:
                 f = h5py.File(fpath)
                 for tb in row[f'{tier}_tables']:
-                    col = list(f[tb].keys())
+                    template = self.table_format[tier]
+                    keyword = list(parse(template, template).named.keys())[0]
+                    args = {keyword: tb}
+                    tb_name = template.format(**args)
+                    col = list(f[tb_name].keys())
                     if col not in columns:
                         columns.append(col)
                         col_idx.append(len(columns)-1)
                     else:
                         col_idx.append(columns.index(col))
             except KeyError:
-                print("Please run get_table_names() before running get_col_names()")
-            except:
-                pass
+                print(f"Need \'{tier}_tables\' to get column names")
+            except Exception as e:
+                if tier == "raw":
+                    print(e)
             return col_idx
 
         columns = []
-
         for tier in self.tiers:
             self.df[f'{tier}_col_idx'] = self.df.apply(col_indices, axis=1, tier=tier)
         
@@ -768,7 +861,7 @@ class FileDB():
                 else:
                     length.append(length[i-1]+len(col))
                 for c in col:
-                    flattened.append(c) 
+                    flattened.append(c)
             columns_vov = VectorOfVectors(flattened_data=flattened, cumulative_length=length)
             sto = LH5Store()
             sto.write_object(columns_vov, 'unique_columns', f_output)
@@ -783,7 +876,6 @@ class FileDB():
             config = json.load(cfg)
         self.set_config(config)
         self.df = pd.read_hdf(df_name, key="file_df")
-
 
     def to_disk(self, cfg_name, df_name):
         """
@@ -808,7 +900,6 @@ class FileDB():
 
         self.df.to_hdf(df_name, "file_df")
         
-
     def scan_daq_files(self, verbose=False):
         """
         Does the exact same thing as scan_files but with extra config arguments for a DAQ directory and template
@@ -885,10 +976,10 @@ if __name__=='__main__':
     dl.show_fileDB()
     print()
 
-    print("Read/write FileDB: ")
-    dl.fileDB.to_disk("fileDB_cfg.json", "fileDB_df.h5")
-    dl2 = DataLoader(config="../../../../loader_config.json", fileDB_config="fileDB_cfg.json", fileDB="fileDB_df.h5")
-    dl2.show_fileDB()
+    # print("Read/write FileDB: ")
+    # dl.fileDB.to_disk("fileDB_cfg.json", "fileDB_df.h5")
+    # dl2 = DataLoader(config="../../../../loader_config.json", fileDB_config="fileDB_cfg.json", fileDB="fileDB_df.h5")
+    # dl2.show_fileDB()
 
     print("Get table names: ")
     dl.fileDB.get_table_names()
@@ -896,13 +987,13 @@ if __name__=='__main__':
     print()
 
     print("Files where timestamp >= 20230101T0000")
-    dl.set_files("timestamp >= 20230101T0000")
+    dl.set_files("timestamp >= '20230101T0000'")
     dl.show_file_list()
     print()
 
-    print("Files where timestamp >= 20220101T0000")
-    dl.set_files("timestamp >= 20230101T0000")
-    dl.show_file_list(columns=["raw_file", "raw_tables", "YYYY"])
+    print("Files where timestamp == 20220629T003837")
+    dl.set_files("timestamp == '20220629T003837'")
+    dl.show_file_list(columns=["raw_file", "file_status", "tcm_file"])
     print()
 
     print("Get Columns: ")
@@ -912,7 +1003,7 @@ if __name__=='__main__':
     print()
 
     print("Set cuts and get entries: ")
-    dl.set_cuts({"hit": "timestamp > 1653016641.6"})
+    dl.set_cuts({"hit": "timestamp > "})
     el = dl.gen_entry_list() 
     pretty_print_dict(el)
     print()
@@ -935,13 +1026,3 @@ if __name__=='__main__':
         for df in ftb:
             print(df)
     print('-------------------------------------------------------')
-    
-
-#    dl.get_table_names()
-
-#    dl.set_files(query='date == 2022-5-20')
-#    dl.set_datastreams(ds=['g024'])
-#    dl.set_cuts(cut='daqenergy > 100')
-#    el = dl.gen_entry_list()
-#    el.saveto('file.lh5')
-#    df = dl.load(entry_list=el, merge_files=True, fmt=pd.DataFrame, in_mem=True, columns=['channel', 'daqenergy', 'runtime'])
