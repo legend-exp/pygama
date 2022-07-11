@@ -1,66 +1,68 @@
 import copy
 import gc
 import logging
+from typing import Any
 
 import numpy as np
 
-from ..fc.fc_event_decoder import fc_decoded_values
-from .orca_base import OrcaDecoder
+from pygama.raw.fc.fc_event_decoder import fc_decoded_values
+from pygama.raw.orca.orca_base import OrcaDecoder
+from pygama.raw.orca.orca_header import OrcaHeader
+from pygama.raw.orca.orca_packet import OrcaPacket
+from pygama.raw.raw_buffer import RawBufferLibrary
 
 log = logging.getLogger(__name__)
 
 
-def get_key(fcid, ch): return (fcid-1)*1000 + ch
+def get_key(fcid, ch: int) -> int:
+    return (fcid-1)*1000 + ch
 
-def get_fcid(key): return int(np.floor(key/1000))+1
 
-def get_ch(key): return key % 1000
+def get_fcid(key: int) -> int:
+    return int(np.floor(key/1000))+1
 
+
+def get_ch(key: int) -> int:
+    return key % 1000
 
 
 class ORFlashCamListenerConfigDecoder(OrcaDecoder):
-    '''
-    Decoder for FlashCam listener config written by ORCA
-    '''
-    def __init__(self, header=None, **kwargs):
-        """
-        DOCME
-        """
+    """Decoder for FlashCam listener config written by ORCA."""
+
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # up through ch_inputnum, these are in order of the fcio data format
         # for similicity.  append any additional values after this.
         self.decoded_values = {
-            'readout_id':   { 'dtype': 'uint16', },
-            'fcid':         { 'dtype': 'uint16', },
-            'telid':        { 'dtype': 'int32',  },
-            'nadcs':        { 'dtype': 'int32',  },
-            'ntriggers':    { 'dtype': 'int32',  },
-            'nsamples':     { 'dtype': 'int32',  },
-            'adcbits':      { 'dtype': 'int32',  },
-            'sumlength':    { 'dtype': 'int32',  },
-            'blprecision':  { 'dtype': 'int32',  },
-            'mastercards':  { 'dtype': 'int32',  },
-            'triggercards': { 'dtype': 'int32',  },
-            'adccards':     { 'dtype': 'int32',  },
-            'gps':          { 'dtype': 'int32',  },
-            'ch_boardid':   { 'dtype': 'uint16',
-                              'datatype':
-                              'array_of_equalsized_arrays<1,1>{real}',
-                              'length': 2400, },
-            'ch_inputnum':  { 'dtype': 'uint16',
-                              'datatype':
-                              'array_of_equalsized_arrays<1,1>{real}',
-                              'length': 2400, },
+            'readout_id':   {'dtype': 'uint16'},
+            'fcid':         {'dtype': 'uint16'},
+            'telid':        {'dtype': 'int32'},
+            'nadcs':        {'dtype': 'int32'},
+            'ntriggers':    {'dtype': 'int32'},
+            'nsamples':     {'dtype': 'int32'},
+            'adcbits':      {'dtype': 'int32'},
+            'sumlength':    {'dtype': 'int32'},
+            'blprecision':  {'dtype': 'int32'},
+            'mastercards':  {'dtype': 'int32'},
+            'triggercards': {'dtype': 'int32'},
+            'adccards':     {'dtype': 'int32'},
+            'gps':          {'dtype': 'int32'},
+            'ch_boardid':   {'dtype': 'uint16',
+                             'datatype':
+                             'array_of_equalsized_arrays<1,1>{real}',
+                             'length': 2400, },
+            'ch_inputnum':  {'dtype': 'uint16',
+                             'datatype':
+                             'array_of_equalsized_arrays<1,1>{real}',
+                             'length': 2400, },
             }
         super().__init__(header=header, **kwargs)
 
-
-    def get_decoded_values(self, key=None):
+    def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         return self.decoded_values
 
-
-    def decode_packet(self, packet, packet_id, rbl):
+    def decode_packet(self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary) -> bool:
         if len(rbl) != 1:
-            print(f"FC config decoder: got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
+            log.warning(f"got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
         rb = rbl[0]
         tbl = rb.lgdo
         ii  = rb.loc
@@ -88,15 +90,14 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
                 # avoids "weakly-referenced object no longer exists"
                 pass
         if len(objs) != 1:
-            log.warning(f'Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
+            log.warning(f'got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
         else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['fcid'].nda[ii])
 
         rb.loc += 1
         return rb.is_full()
 
 
-
-class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
+class ORFlashCamListenerStatusDecoder(OrcaDecoder):
     """
     Decoder for FlashCam status packets written by ORCA
 
@@ -105,6 +106,9 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     supports a 1d vector of 1d vectors, this (card,value) data has to be
     flattened before populating the lh5 table.
     """
+
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
+        raise NotImplementedError("decoding of FlashCam status packets (written by ORCA) is not implemented yet")
 
     # def __init__(self, *args, **kwargs):
 
@@ -314,22 +318,18 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     #     tbl.push_row()
 
 class ORFlashCamADCWaveformDecoder(OrcaDecoder):
-    """
-    Decoder for FlashCam ADC data written by ORCA
-    """
-    def __init__(self, header=None, **kwargs):
-        """
-        DOCME
-        """
+    """Decoder for FlashCam ADC data written by ORCA."""
+
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # start with the values defined in fcdaq
         self.decoded_values_template = copy.deepcopy(fc_decoded_values)
         # add header values from Orca
-        self.decoded_values_template.update( {
-            'crate' :   { 'dtype': 'uint8',  },
-            'card' :    { 'dtype': 'uint8',  },
-            'ch_orca' : { 'dtype': 'uint8',  },
-            'fcid' :    { 'dtype': 'uint8',  },
-        } )
+        self.decoded_values_template.update({
+            'crate':   {'dtype': 'uint8'},
+            'card':    {'dtype': 'uint8'},
+            'ch_orca': {'dtype': 'uint8'},
+            'fcid':    {'dtype': 'uint8'},
+        })
         self.decoded_values = {} # dict[fcid]
         self.fcid = {} # dict[crate][card]
         self.nadc = {} # dict[fcid]
@@ -337,7 +337,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         self.skipped_channels = {}
 
 
-    def set_header(self, header):
+    def set_header(self, header: OrcaHeader) -> None:
         self.header = header
 
         # set up decoded values, key list, fcid map, etc. based on header info
@@ -367,15 +367,13 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             self.decoded_values[fcid] = copy.deepcopy(self.decoded_values_template)
             self.decoded_values[fcid]['waveform']['wf_len'] = wf_len
 
-
-    def get_key_list(self):
+    def get_key_list(self) -> list[int]:
         key_list = []
         for fcid, nadc in self.nadc.items():
             key_list += list( get_key(fcid, np.array(range(nadc))) )
         return key_list
 
-
-    def get_decoded_values(self, key=None):
+    def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
             dec_vals_list = self.decoded_values.values()
             if len(dec_vals_list) >= 0: return dec_vals_list[0]
@@ -384,16 +382,14 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         if fcid in self.decoded_values: return self.decoded_values[fcid]
         raise KeyError(f'no decoded values for key {key} (fcid {fcid})')
 
-
-    def assert_nsamples(self, nsamples, fcid):
+    def assert_nsamples(self, nsamples: int, fcid: int) -> None:
         orca_nsamples = self.decoded_values[fcid]['waveform']['wf_len']
         if orca_nsamples != nsamples:
             log.warning(f"orca miscalculated nsamples = {orca_nsamples} for fcid {fcid}, updating to {nsamples}")
             self.decoded_values[fcid]['waveform']['wf_len'] = nsamples
 
-
-    def decode_packet(self, packet, packet_id, rbl):
-        ''' decode the orca FC ADC packet '''
+    def decode_packet(self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary) -> bool:
+        """Decode the ORCA FlashCam ADC packet."""
         evt_rbkd = rbl.get_keyed_dict()
 
         # unpack lengths and ids from the header words
