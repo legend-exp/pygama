@@ -1,0 +1,45 @@
+{ 
+    "outputs": [
+        "channel","bl_mean","t0","wf_blsub", "bl_slope","bl_std","timestamp"
+    ],
+    "processors":{
+        "bl_mean , bl_std, bl_slope, bl_intercept": {
+            "function": "linear_slope_fit",
+            "module": "pygama.dsp.processors",
+            "args" : ["waveform[0:200]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
+            "unit": ["ADC", "ADC", "ADC", "ADC"]
+        },
+        "wf_blsub":{
+            "function": "bl_subtract",
+            "module": "pygama.dsp.processors",
+            "args": ["waveform[0:3500]", "bl_mean", "wf_blsub"],
+            "unit": "ADC"
+        },
+        "bl_mean_end, bl_std_end, bl_slope_end, bl_intercept_end": {
+            "function": "linear_slope_fit",
+            "module": "pygama.dsp.processors",
+            "args" : ["wf_blsub[1700:19000]", "bl_mean_end", "bl_std_end", "bl_slope_end", "bl_intercept_end"],
+            "unit": ["ADC", "ADC", "ADC", "ADC"]
+        },
+        "sum_wf": {
+            "function": "sum",
+            "module": "numpy",
+            "args": ["wf_blsub[0:1900]", 1,0, "sum_wf"],
+            "kwargs": {"signature": "(n),(),()->()", "types":["fii->f"]},
+            "unit": "ADC"
+        },
+        "max_val_wf":{
+            "function": "amax",
+            "module": "numpy",
+            "args": ["wf_blsub[0:1900]", 1, "max_val_wf"],
+            "kwargs": {"signature": "(n),()->()", "types":["fi->f"]},
+            "unit": "ADC"
+        },
+        "t0": {
+            "function": "time_point_thresh",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_blsub", "5*bl_std", 0, 1, "t0"],
+            "unit": "16*ns"
+        }
+    }
+}
