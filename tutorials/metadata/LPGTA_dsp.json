@@ -1,15 +1,28 @@
 {
-  "outputs": [ "trapE", "trapEftp", "ct_corr", "bl", "bl_sig", "A_10", "AoE",
-             "tp_max", "tp_0", "tp_10", "tp_50", "tp_80", "tp_90",
-             "dcr_raw"],
-  "processors":{
-  "bl , bl_sig, slope, intercept":{
+  "outputs": [
+    "trapE",
+    "trapEftp",
+    "ct_corr",
+    "bl",
+    "bl_sig",
+    "A_10",
+    "AoE",
+    "tp_max",
+    "tp_0",
+    "tp_10",
+    "tp_50",
+    "tp_80",
+    "tp_90",
+    "dcr_raw"
+  ],
+  "processors": {
+    "bl , bl_sig, slope, intercept": {
       "function": "linear_slope_fit",
       "module": "pygama.dsp.processors",
-      "args" : ["waveform[:1650]", "bl","bl_sig", "slope","intercept"],
-      "unit": ["ADC","ADC","ADC","ADC"]
+      "args": ["waveform[:1650]", "bl", "bl_sig", "slope", "intercept"],
+      "unit": ["ADC", "ADC", "ADC", "ADC"]
     },
-    "wf_blsub":{
+    "wf_blsub": {
       "function": "subtract",
       "module": "numpy",
       "args": ["waveform", "bl", "wf_blsub"],
@@ -22,7 +35,7 @@
       "args": ["wf_blsub", "db.pz_const", "wf_pz"],
       "prereqs": ["wf_blsub"],
       "unit": "ADC",
-      "defaults": { "db.pz_const":"400*us" }
+      "defaults": { "db.pz_const": "400*us" }
     },
     "wf_trap": {
       "function": "trap_norm",
@@ -35,15 +48,25 @@
       "function": "asym_trap_filter",
       "module": "pygama.dsp.processors",
       "prereqs": ["wf_pz"],
-      "args": ["wf_pz", "db.atrap.rise", "db.atrap.flat", "db.atrap.fall", "wf_atrap"],
-      "defaults" : {"db.atrap.rise":"round(20*ns)", "db.atrap.flat":"round(1*us)","db.atrap.fall":"round(4*us)"},
+      "args": [
+        "wf_pz",
+        "db.atrap.rise",
+        "db.atrap.flat",
+        "db.atrap.fall",
+        "wf_atrap"
+      ],
+      "defaults": {
+        "db.atrap.rise": "round(20*ns)",
+        "db.atrap.flat": "round(1*us)",
+        "db.atrap.fall": "round(4*us)"
+      },
       "unit": "ADC"
     },
     "trapE": {
       "function": "amax",
       "module": "numpy",
       "args": ["wf_trap", 1, "trapE"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
       "unit": "ADC",
       "prereqs": ["wf_trap"]
     },
@@ -51,7 +74,7 @@
       "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
       "args": ["wf_trap", "tp_0+13.5*us", "trapEftp"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
       "unit": "ADC",
       "prereqs": ["wf_trap", "tp_0"]
     },
@@ -67,14 +90,14 @@
       "function": "amax",
       "module": "numpy",
       "args": ["curr10", 1, "A_10"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->f"]},
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
       "unit": "ADC",
       "prereqs": ["curr10"]
     },
     "AoE": {
       "function": "divide",
       "module": "numpy",
-      "args":["A_10", "trapE", "AoE"],
+      "args": ["A_10", "trapE", "AoE"],
       "unit": "1/sample",
       "prereqs": ["A_10", "trapE"]
     },
@@ -82,7 +105,7 @@
       "function": "argmax",
       "module": "numpy",
       "args": ["wf_blsub", 1, "tp_max"],
-      "kwargs": {"signature":"(n),()->()", "types":["fi->i"]},
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->i"] },
       "unit": "ns",
       "prereqs": ["wf_blsub"]
     },
@@ -130,7 +153,7 @@
     "ct_corr": {
       "function": "trap_pickoff",
       "module": "pygama.dsp.processors",
-      "args":["wf_pz", "4*us", 0, "tp_0", "ct_corr"],
+      "args": ["wf_pz", "4*us", 0, "tp_0", "ct_corr"],
       "unit": "ADC",
       "prereqs": ["wf_pz", "tp_0"]
     }
