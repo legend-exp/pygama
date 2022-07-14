@@ -172,7 +172,7 @@ class ProcChainVar:
 
         super().__setattr__(name, value)
 
-    def get_buffer(self, unit: str | Unit = None) -> np.array:
+    def get_buffer(self, unit: str | Unit = None) -> np.ndarray:
         # If buffer needs to be created, do so now
         if self._buffer is None:
             if self.shape is auto:
@@ -370,8 +370,8 @@ class ProcessingChain:
 
     def link_input_buffer(self,
                           varname: str,
-                          buff: np.array | LGDO = None
-                          ) -> np.array | LGDO:
+                          buff: np.ndarray | LGDO = None
+                          ) -> np.ndarray | LGDO:
         """Link an input buffer to a variable.
 
         Parameters
@@ -427,8 +427,8 @@ class ProcessingChain:
 
     def link_output_buffer(self,
                            varname: str,
-                           buff: np.array | LGDO = None
-                           ) -> np.array | LGDO:
+                           buff: np.ndarray | LGDO = None
+                           ) -> np.ndarray | LGDO:
         """Link an output buffer to a variable.
 
         Parameters
@@ -1059,7 +1059,7 @@ class IOManager(metaclass=ABCMeta):
 
 # Ok, this one's not LGDO
 class NumpyIOManager(IOManager):
-    def __init__(self, io_buf: np.array, var: ProcChainVar) -> None:
+    def __init__(self, io_buf: np.ndarray, var: ProcChainVar) -> None:
         assert isinstance(io_buf, np.ndarray) \
             and isinstance(var, ProcChainVar)
 
@@ -1092,7 +1092,7 @@ class NumpyIOManager(IOManager):
 
 
 class LGDOArrayIOManager(IOManager):
-    def __init__(self, io_array: np.array, var: ProcChainVar) -> None:
+    def __init__(self, io_array: np.ndarray, var: ProcChainVar) -> None:
         assert isinstance(io_array, lgdo.Array) \
             and isinstance(var, ProcChainVar)
 
