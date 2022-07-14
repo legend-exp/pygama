@@ -25,7 +25,7 @@ class VectorOfVectors:
 
     def __init__(self, flattened_data: Array = None,
                  cumulative_length: Array = None, shape_guess: tuple[int, int] = None,
-                 dtype: np.dtype = None, attrs: dict[str, Any] = {}) -> None:
+                 dtype: np.dtype = None, attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -69,7 +69,8 @@ class VectorOfVectors:
             else:
                 self.dtype = np.dtype(dtype)
 
-        self.attrs = dict(attrs)
+        self.attrs = {} if attrs is None else dict(attrs)
+
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 log.warning(

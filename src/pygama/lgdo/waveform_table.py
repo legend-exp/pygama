@@ -51,7 +51,7 @@ class WaveformTable(Table):
                  values_units: str = None,
                  wf_len: int = None,
                  dtype: np.dtype = None,
-                 attrs: dict[str, Any] = {}) -> None:
+                 attrs: dict[str, Any] = None) -> None:
         r"""
         Parameters
         ----------
@@ -119,7 +119,7 @@ class WaveformTable(Table):
             if isinstance(values, np.ndarray):
                 try:
                     wf_len = values.shape[1]
-                except:
+                except Exception:
                     wf_len = None
             if wf_len is None: # VectorOfVectors
                 shape_guess = (size, 100)

@@ -33,7 +33,7 @@ class Array:
 
     def __init__(self, nda: np.ndarray = None, shape: tuple[int, ...] = (),
                  dtype: np.dtype = None, fill_val: float | int = None,
-                 attrs: dict[str, Any] = {}) -> None:
+                 attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -61,7 +61,9 @@ class Array:
             else: nda = np.full(shape, fill_val, dtype=dtype)
         self.nda = nda
         self.dtype = self.nda.dtype
-        self.attrs = dict(attrs)
+
+        self.attrs = {} if attrs is None else dict(attrs)
+
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 log.warning('datatype does not match nda! '

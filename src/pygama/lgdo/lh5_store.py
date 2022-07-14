@@ -974,7 +974,7 @@ class LH5Iterator:
             if isinstance(entry_mask, np.ndarray):
                 self.entry_list = []
                 f_start = 0
-                for i_file, f_end in enumerate(self.file_map):
+                for _, f_end in enumerate(self.file_map):
                     self.entry_list.append(list(np.nonzero(entry_mask[f_start:f_end])[0]))
                     f_start = f_end
             else:
