@@ -1,7 +1,5 @@
-"""
-Implements a LEGEND Data Object representing a scalar and corresponding
-utilities.
-"""
+"""Implements a LEGEND Data Object representing a scalar and corresponding utilities."""
+
 from __future__ import annotations
 
 import logging
@@ -15,12 +13,11 @@ log = logging.getLogger(__name__)
 
 
 class Scalar:
-    """Holds just a scalar value and some attributes (datatype, units, ...).
-    """
+    """Holds just a scalar value and some attributes (datatype, units, ...)."""
     # TODO: do scalars need proper numpy dtypes?
 
     def __init__(self, value: int | float,
-                 attrs: dict[str, Any] = {}) -> None:
+                 attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -33,7 +30,8 @@ class Scalar:
             raise ValueError('cannot instantiate a Scalar with a non-scalar value')
 
         self.value = value
-        self.attrs = dict(attrs)
+        self.attrs = {} if attrs is None else dict(attrs)
+
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 log.warning(
@@ -43,7 +41,7 @@ class Scalar:
             self.attrs['datatype'] = get_element_type(self.value)
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
+        """Returns the name for this LGDO's datatype attribute."""
         if hasattr(self.value, 'datatype_name'):
             return self.value.datatype_name
         else:

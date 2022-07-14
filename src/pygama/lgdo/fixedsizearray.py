@@ -24,7 +24,7 @@ class FixedSizeArray(Array):
 
     def __init__(self, nda: numpy.ndarray = None, shape: tuple[int, ...] = (),
                  dtype: numpy.dtype = None, fill_val: int | float = None,
-                 attrs: dict[str, Any] = {}) -> None:
+                 attrs: dict[str, Any] = None) -> None:
         """
         See Also
         --------

@@ -24,8 +24,8 @@ class Struct(dict):
     """
     # TODO: overload setattr to require add_field for setting?
 
-    def __init__(self, obj_dict: dict[str, LGDO | Struct] = {},
-                 attrs: dict[str, Any] = {}) -> None:
+    def __init__(self, obj_dict: dict[str, LGDO | Struct] = None,
+                 attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -35,8 +35,11 @@ class Struct(dict):
         attrs
             a set of user attributes to be carried along with this LGDO.
         """
-        self.update(obj_dict)
-        self.attrs = dict(attrs)
+        if obj_dict is not None:
+            self.update(obj_dict)
+
+        self.attrs = {} if attrs is None else dict(attrs)
+
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
                 log.warning(

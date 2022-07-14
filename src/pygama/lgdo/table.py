@@ -34,8 +34,8 @@ class Table(Struct):
     """
     # TODO: overload getattr to allow access to fields as object attributes?
 
-    def __init__(self, size: int = None, col_dict: dict[str, LGDO] = {},
-                 attrs: dict[str, Any] = {}) -> None:
+    def __init__(self, size: int = None, col_dict: dict[str, LGDO] = None,
+                 attrs: dict[str, Any] = None) -> None:
         r"""
         Parameters
         ----------
@@ -63,7 +63,7 @@ class Table(Struct):
         # if col_dict is not empty, set size according to it
         # if size is also supplied, resize all fields to match it
         # otherwise, warn if the supplied fields have varying size
-        if len(col_dict) > 0:
+        if col_dict is not None and len(col_dict) > 0:
             do_warn = True if size is None else False
             self.resize(new_size=size, do_warn=do_warn)
 

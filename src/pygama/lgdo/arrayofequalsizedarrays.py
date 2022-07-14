@@ -21,7 +21,7 @@ class ArrayOfEqualSizedArrays(Array):
 
     def __init__(self, dims: tuple[int, ...] = None, nda: numpy.ndarray = None,
                  shape: tuple[int, ...] = (), dtype: numpy.dtype = None,
-                 fill_val: int | float = None, attrs: dict[str, Any] = {}) -> None:
+                 fill_val: int | float = None, attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -58,7 +58,7 @@ class ArrayOfEqualSizedArrays(Array):
         super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
+        """Returns the name for this LGDO's datatype attribute."""
         return 'array_of_equalsized_arrays'
 
     def form_datatype(self) -> str:
