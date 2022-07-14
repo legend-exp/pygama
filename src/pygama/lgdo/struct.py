@@ -48,6 +48,30 @@ class Struct(dict):
         self[name] = obj
         self.update_datatype()
 
+    def explode(self, columns):
+        if isinstance(columns, str):
+            columns = [columns]
+        c = [self[col] for col in columns]
+        z = list(zip(*c))
+        exploded = []
+        for i in range(len(z)):
+            for j in range(len(z[i]))
+            exploded.append([a for a in z[i][j]])
+
+        exp_dict = {}
+        count = 0
+        for col in test.keys():
+            if col == columns[count]:
+                exp_dict[col] = exploded[count]
+                count += 1
+                if count == len(columns):
+                        count = 0
+            else:
+                exp_dict[col] = []
+                for i in range(len(test)):
+                        exp_dict[col].append([test[col][i]]*len(test[columns[0]][i]))
+
+        return Struct(obj_dict=exp_dict) 
 
     def __len__(self):
         """Structs are considered length=1 """

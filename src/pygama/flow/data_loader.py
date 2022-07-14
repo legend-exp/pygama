@@ -6,6 +6,7 @@ import re
 import numpy as np
 import h5py
 import time
+from keyword import iskeyword
 from parse import parse
 from pygama.lgdo import *
 #from pygama import WaveformBrowser
@@ -262,7 +263,7 @@ class DataLoader:
     def show_fileDB(self, columns=None):
         self.fileDB.show(columns)   
 
-    def gen_entry_list(self, chunk=False, mode='only'): #TODO: mode, chunking, etc
+    def gen_entry_list(self, chunk=False, mode='only', f_output=None): #TODO: mode, chunking, etc
         """
         This should apply cuts to the tables and files of interest
         but it does NOT load the column information into memory
@@ -315,7 +316,7 @@ class DataLoader:
             # String parsing to determine which columns need to be loaded
             split = re.split(' |<|>|=|and|or|&|\|', cut) 
             for term in split:
-                if term.isidentifier(): #Assumes that column names are valid python variable names
+                if term.isidentifier() and not iskeyword(term): #Assumes that column names are valid python variable names
                     cut_cols[level].append(term)
                     # Add column to entry_cols if they are needed for both the cut and the output
                     if self.output_columns is not None:
@@ -351,6 +352,8 @@ class DataLoader:
                     # Use tcm_cols to find column names that correspond to level_table and level_idx 
                     if level in self.tcm_cols.keys():
                         fields = list(self.tcm_cols[level].values())
+                    
+                    columns = entry_cols + fields + cut_cols[level]
 
                     sto = LH5Store()
                     for tb in tables:
@@ -366,14 +369,13 @@ class DataLoader:
                             template = self.fileDB.table_format[tier]
                             fm = string.Formatter()
                             parse_arr = np.array(list(fm.parse(template)))
-                            names = list(parse_arr[:,1]) # fields required to generate file name
+                            names = list(parse_arr[:,1])
                             if len(names) > 0:
                                 keyword = names[0]
                                 args = {keyword: tb}
                                 table_name = template.format(**args)
                             else:
                                 table_name = template
-                            columns = entry_cols + fields + cut_cols[level]
                             temp_table, _ = sto.read_object(table_name, path, idx=idx, field_mask=columns)
                             if level_table is None:
                                 level_table = temp_table
@@ -385,6 +387,7 @@ class DataLoader:
                         if level in self.tcm_cols.keys():
                             dep = self.config["levels"][level]["dependency"]
                             renaming = {
+                                self.tcm_cols[level]["self_idx"]: f"{level}_idx",
                                 self.tcm_cols[level]["table_col"]: f"{dep}_table", 
                                 self.tcm_cols[level]["idx_col"]: f"{dep}_idx", 
                             }
@@ -402,9 +405,26 @@ class DataLoader:
                             drop_entries = tb_entries.query(f"{level}_idx not in {list(cut_df.index)}")
                             f_entries = f_entries.drop(list(drop_entries.index))
                         f_entries = f_entries.reset_index(drop=True)
-                        entries[file] = f_entries
-                first_cut_made = True
+                        #end for each table loop
 
+                first_cut_made = True
+                # end for each level loop
+                            
+            entries[file] = f_entries
+            #end for each file loop
+
+
+        if f_output is not None:
+            sto = LH5Store()
+            # Convert entry dataframe to lgdo.Table to write to disk
+            # Can do this because we know each column of the entry list is just a list of scalars
+            for file, entry_df in entries.items():
+                col_dict = {}
+                for col in entry_df.columns:
+                    arr = Array(nda=np.array(entry_df[col]))
+                    col_dict[col] = arr 
+                entry_tb = Table(col_dict)
+                sto.write_object(entry_tb, f"entries{file}", f_output)
         return entries
 
     def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit'): #TODO
@@ -429,102 +449,182 @@ class DataLoader:
             print("If in_mem is False, need to specify an output file")
             return
 
+        low_level = self.levels[0]
+
         sto = LH5Store()
         writing = False
         if self.merge_files: # Try to load all information at once
-            if in_mem:
-                load_ret = Table()
-            level = self.levels[0]
-            tables = entry_list[self.file_list[0]][level].keys()
-            for tb in tables:
-                lowest_idx = [entry_list[file][level][tb] for file in self.file_list]
-                tier_loads = []
-                for tier in self.tiers[level]: 
-                    template = self.fileDB.table_format[tier]
-                    fm = string.Formatter()
-                    parse_arr = np.array(list(fm.parse(template)))
-                    names = list(parse_arr[:,1]) # fields required to generate file name
-                    if len(names) > 0:
-                        keyword = names[0]
-                        args = {keyword: tb}
-                        table_name = template.format(**args)
-                    else:
-                        table_name = template
-                    file_paths = []
-                    for file in self.file_list:
-                        path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
-                        if os.path.exists(path):
-                            file_paths.append(path)
-                    if file_paths:
-                        tb_out, _ = sto.read_object(table_name, file_paths, idx=lowest_idx, field_mask=self.output_columns)
-                        tier_loads.append(tb_out)
-                for i in range(len(tier_loads)-1):
-                    tier_loads[0].join(tier_loads[i+1])
+            load_out = Struct()
+
+
+            load_tbs = []
             
-                if f_output:
-                    if not writing:
-                        writing = True
-                        sto.write_object(tier_loads[0], f"load{tb}", f_output, wo_mode="overwrite_file")
-                    else:
-                        sto.write_object(tier_loads[0], f"load{tb}", f_output, wo_mode="append")
-                if in_mem:
-                    load_ret.add_column(f"load{tb}", tier_loads[0], use_obj_size=True)
+            #Get all tables we may be interested in
+            for file in entry_list.keys():
+                f_tbs = entry_list[file][f"{low_level}_table"].unique()
+                for tb in f_tbs:
+                    if tb not in load_tbs:
+                        load_tbs.append(tb) 
 
-            if in_mem:
-                if self.output_format == "lgdo.Table":
-                        return load_ret
-                elif self.output_format == "pd.DataFrame":
-                    return [tb.get_dataframe() for tb in load_ret.values()]
-                else:
-                    print("I don't know how to output " + self.output_format + ", here is a lgdo.Table")
-                    return load_ret
-            else:
-                return
-        else: #Not merge_files
-            level = self.levels[0]
-            load_ret = []
-            for file, fdict in entry_list.items():
-                level_paths = {}
-                for tier in self.tiers[level]:
-                    path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
-                    # Only add to level_paths if the file exists
-                    if os.path.exists(path):
-                        level_paths[tier] = path
+            for tb in load_tbs:
+                tb_table = None
+                for level in self.levels:
+                    level_table = None
+                    for tier in self.tiers[level]:
+                        # Determine if tier needs to be loaded 
+                        if level == low_level:
+                            tb_idx = []
+                            for i in range(len(entry_list)):
+                                if list((self.fileDB.df[f"{tier}_tables"].loc[entry_list.keys()]))[i] is None:
+                                    continue
+                                tb_idx.append(list(self.fileDB.df[f"{tier}_tables"][entry_list.keys()])[i].index(tb))
+                        else:
+                            tb_idx = [0]*len(entry_list) # Assumes that higher levels only have one table per file
+                        if not tb_idx:
+                            print(f"Skipping {tier}")
+                            continue
+                        else:
+                            print(f"Keeping {tier}")
+                        col_idx = []
+                        for i, row in enumerate(self.fileDB.df[f"{tier}_col_idx"].loc[entry_list.keys()]):
+                            if row:
+                                if row[tb_idx[i]] not in col_idx:
+                                    col_idx.append(row[tb_idx[i]])
 
-                file_table = Table()
-                level_table = None
-                for tb, idx in fdict[level].items():
-                    for tier, path in level_paths.items():
+                        tier_cols = [] 
+                        for idx in col_idx:
+                            tier_cols += self.fileDB.columns[idx]
+                            
+                        if set(self.output_columns).isdisjoint(tier_cols):
+                            continue
+
+                        # Get table name
                         template = self.fileDB.table_format[tier]
                         fm = string.Formatter()
                         parse_arr = np.array(list(fm.parse(template)))
-                        names = list(parse_arr[:,1]) # fields required to generate file name
+                        names = list(parse_arr[:,1]) 
                         if len(names) > 0:
                             keyword = names[0]
                             args = {keyword: tb}
                             table_name = template.format(**args)
                         else:
                             table_name = template
-                        temp_tb, _ = sto.read_object(table_name, path, idx=idx, field_mask=self.output_columns)
-                        if level_table is None:
-                            level_table = temp_tb 
-                        else: 
-                            level_table.join(temp_tb)
-                    file_table.add_column(f"load{tb}", level_table, use_obj_size=True)
-                if in_mem:
-                    load_ret.append(file_table)
+
+                        # Get file paths
+                        paths = [ self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file'] for file in entry_list.keys()]
+                        p_exists = [os.path.exists(p) for p in paths] 
+                        paths = [p for p, t in zip(paths, p_exists) if t] 
+
+                        # Get index lists
+                        inds = [ entry_list[file].query(f"{level}_table == {tb}")[f"{level}_idx"].to_list() for file in entry_list.keys()]
+
+                        if paths:
+                            sto = LH5Store()
+                            tier_table, _ = sto.read_object(table_name, paths, idx=inds, field_mask=self.output_columns)                             
+                            if level_table is None:
+                                level_table = tier_table 
+                            else:
+                                print("level joining tier")
+                                print("level_table", level_table) 
+                                print("tier_table", tier_table)
+                                level_table.join(tier_table) 
+                    if level_table is not None:
+                        if self.cut_priority[level] > 0:
+                            level_table = level_table.explode(list(self.tcm_cols[level].values()))
+
+                        if tb_table is None:
+                            tb_table = level_table 
+                        else:
+                            print("tb joining level")
+                            tb_table.join(level_table)
+                    load_out[tb] = tb_table
+                
+
+            if in_mem:
+                if self.output_format == "lgdo.Table":
+                        return load_out
+                elif self.output_format == "pd.DataFrame":
+                    return [tb.get_dataframe() for tb in load_out.values()]
+                else:
+                    print("I don't know how to output " + self.output_format + ", here is a lgdo.Table")
+                    return load_out
+            else:
+                return
+        else: #Not merge_files
+            load_out = {}
+            
+            for file, f_entries in entry_list.items():
+                f_struct = Struct()
+                for tb in f_entries[f"{low_level}_table"].unique(): # Assumes that higher levels only have one table per file
+                    tb_table = None
+                    for level in self.levels:
+                        level_table = None
+
+                        # Get valid file paths
+                        level_paths = {}
+                        for tier in self.tiers[level]:
+                            path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
+                            # Only add to level_paths if the file exists
+                            if os.path.exists(path):
+                                level_paths[tier] = path
+                        
+                        # Make index mask
+                        idx = list(f_entries.query(f"{low_level}_table == {tb}")[f"{level}_idx"])
+
+                        if level_paths:
+                            for tier, path in level_paths.items():
+                                # Determine if tier needs to be loaded 
+                                if level == low_level:
+                                    tb_idx = list(self.fileDB.df[f"{tier}_tables"][file]).index(tb)
+                                else:
+                                    tb_idx = 0 # Assumes that higher levels only have one table per file
+                                tier_cols = self.fileDB.columns[ self.fileDB.df[f"{tier}_col_idx"][file][tb_idx] ]
+                                if set(self.output_columns).isdisjoint(tier_cols):
+                                    continue
+
+                                # Get table name for tier
+                                template = self.fileDB.table_format[tier]
+                                fm = string.Formatter()
+                                parse_arr = np.array(list(fm.parse(template)))
+                                names = list(parse_arr[:,1]) 
+                                if len(names) > 0:
+                                    keyword = names[0]
+                                    args = {keyword: tb}
+                                    table_name = template.format(**args)
+                                else:
+                                    table_name = template
+                                
+                                # Load tier
+                                temp_tb, _ = sto.read_object(table_name, path, idx=idx, field_mask=self.output_columns)
+
+                                if level_table is None:
+                                    level_table = temp_tb 
+                                else:
+                                    level_table.join(temp_tb) 
+
+                        if level_table is not None:
+                            if self.cut_priority[level] > 0:
+                                level_table = level_table.explode(list(self.tcm_cols.values()))
+
+                            if tb_table is None:
+                                tb_table = level_table 
+                            else:
+                                tb_table.join(level_table) 
+                    f_struct[tb] = tb_table
+
+                load_out[file] = f_struct
                 if f_output:
                     fname = f_output + file
-                    sto.write_object(file_table, f"file{file}", fname, wo_mode="overwrite_file")
+                    sto.write_object(f_struct, f"file{file}", fname, wo_mode="overwrite_file")
 
             if in_mem: 
                 if self.output_format == "lgdo.Table":
-                    return load_ret
+                    return load_out
                 elif self.output_format == "pd.DataFrame":
-                    return [[t_out.get_dataframe() for t_out in f_tb.values()] for f_tb in load_ret]
+                    return [[t_out.get_dataframe() for t_out in f_tb.values()] for f_tb in load_out]
                 else:
                     print("I don't know how to output " + self.output_format + ", here is a lgdo.Table")
-                    return load_ret
+                    return load_out
             
     def load_detector(self, det_id): #TODO
         """
@@ -852,6 +952,7 @@ class FileDB():
             sto = LH5Store()
             sto.write_object(columns_vov, 'unique_columns', f_output)
             
+        self.columns = columns
         return columns
 
     def from_disk(self, cfg_name, df_name):
@@ -978,8 +1079,8 @@ if __name__=='__main__':
     dl.show_file_list()
     print()
 
-    print("Files where timestamp == 20220629T003837Z")
-    dl.set_files("timestamp == '20220629T003837Z'")
+    print("Files where timestamp >= 20220629T003746Z")
+    dl.set_files("timestamp >= '20220629T003746Z'")
     dl.show_file_list(columns=["raw_file", "file_status", "tcm_file"])
     print()
 
@@ -999,19 +1100,15 @@ if __name__=='__main__':
     pretty_print_dict(el) 
     print()
 
-    # print("Load data, merge, Tables: ")    
-    # lout = dl.load(el, f_output="test_load.lh5", in_mem=True)
-    # pretty_print_dict(lout)
-    # print()
+    cols = ["daqenergy", "timestamp"]
+    print("Load data, merge, Tables: ")    
+    dl.set_output(fmt="lgdo.Table", merge_files=True, columns=cols)
+    lout = dl.load(el, in_mem=True)
+    pretty_print_dict(lout)
+    print()
 
-    # print("Load data, no merge, DataFrames: ")
-    # cols = ["daqenergy", "timestamp"]
-    # dl.set_output(fmt="pd.DataFrame", merge_files=False, columns=cols)
-    # lout = dl.load(el, in_mem=True)
-    # print(len(lout))
-    # print(len(lout[0]))
-    # for f, ftb in enumerate(lout):
-    #     print(f"File {f}")
-    #     for df in ftb:
-    #         print(df)
+    print("Load data, no merge: ")
+    dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
+    lout = dl.load(el, in_mem=True)
+    pretty_print_dict(lout)
     print('-------------------------------------------------------')
