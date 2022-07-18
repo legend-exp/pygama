@@ -66,10 +66,10 @@ class Array:
 
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning('datatype does not match nda! '
-                             f'datatype: {self.attrs["datatype"]} '
-                             f'form_datatype(): {self.form_datatype()} '
-                             f'dtype: {self.dtype}')
+                raise RuntimeError('datatype does not match nda! '
+                                   f'datatype: {self.attrs["datatype"]} '
+                                   f'form_datatype(): {self.form_datatype()} '
+                                   f'dtype: {self.dtype}')
         else:
             self.attrs['datatype'] = self.form_datatype()
 
