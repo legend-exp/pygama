@@ -404,10 +404,10 @@ class ProcessingChain:
         # Add the buffer to the input buffers list
         if isinstance(buff, np.ndarray):
             out_man = NumpyIOManager(buff, var)
-        elif isinstance(buff, lgdo.Array):
-            out_man = LGDOArrayIOManager(buff, var)
         elif isinstance(buff, lgdo.ArrayOfEqualSizedArrays):
             out_man = LGDOArrayOfEqualSizedArraysIOManager(buff, var)
+        elif isinstance(buff, lgdo.Array):
+            out_man = LGDOArrayIOManager(buff, var)
         elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
@@ -462,10 +462,10 @@ class ProcessingChain:
         # Add the buffer to the output buffers list
         if isinstance(buff, np.ndarray):
             out_man = NumpyIOManager(buff, var)
-        elif isinstance(buff, lgdo.Array):
-            out_man = LGDOArrayIOManager(buff, var)
         elif isinstance(buff, lgdo.ArrayOfEqualSizedArrays):
             out_man = LGDOArrayOfEqualSizedArraysIOManager(buff, var)
+        elif isinstance(buff, lgdo.Array):
+            out_man = LGDOArrayIOManager(buff, var)
         elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
