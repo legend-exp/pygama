@@ -10,7 +10,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from pygama.math.peak_fitting import *
+from pygama.math.binned_fitting import *
+from pygama.math.distributions import *
+from pygama.math.functions.gauss import nb_gauss
+from pygama.math.histogram import *
 
 
 def gaussian_cut(data, cut_sigma=3, plotAxis=None):
@@ -34,7 +37,7 @@ def gaussian_cut(data, cut_sigma=3, plotAxis=None):
     # print("unbinned: {}".format(result))
 
     result = fit_binned(
-        gauss, hist, bin_centers,
+        nb_gauss, hist, bin_centers,
         [median, width / 2,
          np.amax(hist) * (width / 2) * np.sqrt(2 * np.pi)])
     # print("binned: {}".format(result))
@@ -44,7 +47,7 @@ def gaussian_cut(data, cut_sigma=3, plotAxis=None):
     if plotAxis is not None:
         plotAxis.plot(
             bin_centers, hist, ls="steps-mid", color="k", label="data")
-        fit = gauss(bin_centers, *result)
+        fit = nb_gauss(bin_centers, *result)
         plotAxis.plot(bin_centers, fit, label="gaussian fit")
         plotAxis.axvline(result[0], color="g", label="fit mean")
         plotAxis.axvline(
@@ -79,7 +82,7 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     bounds = [(p0[0] * .5, p0[1] * .5, p0[2] * .2, 0, 1),
               (p0[0] * 1.5, p0[1] * 1.5, p0[2] * 5, np.inf, np.inf)]
     result = fit_binned(
-        xtalball,
+        nb_xtalball_pdf,
         hist,
         bin_centers, [p0[0], p0[1], p0[2], 10, 1],
         bounds=bounds)
@@ -90,7 +93,7 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     if plotFigure is not None:
         plt.figure(plotFigure.number)
         plt.plot(bin_centers, hist, ls="steps-mid", color="k", label="data")
-        fit = xtalball(bin_centers, *result)
+        fit = nb_xtalball_pdf(bin_centers, *result)
         plt.plot(bin_centers, fit, label="xtalball fit")
         plt.axvline(result[0], color="g", label="fit mean")
         plt.axvline(cut_lo, color="r", label=f"+/- {cut_sigma} sigma")
