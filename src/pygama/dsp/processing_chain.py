@@ -396,6 +396,8 @@ class ProcessingChain:
                                           dtype=var.dtype)
             elif len(var.shape) == 0:
                 buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+            elif len(var.shape) > 0:
+                buff = lgdo.ArrayOfEqualSizedArrays(shape=(self._buffer_len, *var.shape), dtype=var.dtype)
             else:
                 buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
 
@@ -404,6 +406,8 @@ class ProcessingChain:
             out_man = NumpyIOManager(buff, var)
         elif isinstance(buff, lgdo.Array):
             out_man = LGDOArrayIOManager(buff, var)
+        elif isinstance(buff, lgdo.ArrayOfEqualSizedArrays):
+            out_man = LGDOArrayOfEqualSizedArraysIOManager(buff, var)
         elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
@@ -450,6 +454,8 @@ class ProcessingChain:
                                           dtype=var.dtype)
             elif len(var.shape) == 0:
                 buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+            elif len(var.shape) > 0:
+                buff = lgdo.ArrayOfEqualSizedArrays(shape=(self._buffer_len, *var.shape), dtype=var.dtype)
             else:
                 buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
 
@@ -458,6 +464,8 @@ class ProcessingChain:
             out_man = NumpyIOManager(buff, var)
         elif isinstance(buff, lgdo.Array):
             out_man = LGDOArrayIOManager(buff, var)
+        elif isinstance(buff, lgdo.ArrayOfEqualSizedArrays):
+            out_man = LGDOArrayOfEqualSizedArraysIOManager(buff, var)
         elif isinstance(buff, lgdo.WaveformTable):
             out_man = LGDOWaveformIOManager(buff, var)
         else:
@@ -1045,6 +1053,7 @@ class IOManager(metaclass=ABCMeta):
 
 # Ok, this one's not LGDO
 class NumpyIOManager(IOManager):
+    """IO Manager for buffers that are numpy arrays"""
     def __init__(self, io_buf: np.array, var: ProcChainVar):
         assert isinstance(io_buf, np.ndarray) \
             and isinstance(var, ProcChainVar)
@@ -1078,8 +1087,55 @@ class NumpyIOManager(IOManager):
 
 
 class LGDOArrayIOManager(IOManager):
-    def __init__(self, io_array: np.array, var: ProcChainVar) -> None:
+    """IO Manager for buffers that are lgdo Arrays"""
+    def __init__(self, io_array: lgdo.Array, var: ProcChainVar) -> None:
         assert isinstance(io_array, lgdo.Array) \
+            and isinstance(var, ProcChainVar)
+
+        unit = io_array.attrs.get('units', None)
+        var.update_auto(dtype=io_array.dtype,
+                        shape=io_array.nda.shape[1:],
+                        unit=unit)
+
+        if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
+            raise ProcessingChainError(
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
+                f"incompatible with {str(self.var)}")
+
+        if isinstance(var.unit, CoordinateGrid):
+            if unit is None:
+                unit = var.unit.period.u
+            elif ureg.is_compatible_with(var.unit.period, unit):
+                unit = ureg.Quantity(unit).u
+            else:
+                raise ProcessingChainError(
+                    f"LGDO array and variable {var} have incompatible units "
+                    f"({var.unit.period.u} and {unit})")
+
+        if unit is None and var.unit is not None:
+            io_array.attrs['units'] = str(var.unit)
+
+        self.io_array = io_array
+        self.raw_buf = io_array.nda
+        self.var = var
+        self.raw_var = var.get_buffer(unit)
+
+    def read(self, start: int, end: int) -> None:
+        np.copyto(self.raw_var[0:end-start, ...],
+                  self.raw_buf[start:end, ...], 'unsafe')
+
+    def write(self, start: int, end: int) -> None:
+        np.copyto(self.raw_buf[start:end, ...],
+                  self.raw_var[0:end-start, ...], 'unsafe')
+
+    def __str__(self) -> str:
+        return f'{self.var} linked to {self.io_array}'
+
+class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
+    """IO Manager for buffers that are numpy ArrayOfEqualSizedArrays"""
+    def __init__(self, io_array: np.ArrayOfEqualSizedArrays, var: ProcChainVar) -> None:
+        assert isinstance(io_array, lgdo.ArrayOfEqualSizedArrays) \
             and isinstance(var, ProcChainVar)
 
         unit = io_array.attrs.get('units', None)
