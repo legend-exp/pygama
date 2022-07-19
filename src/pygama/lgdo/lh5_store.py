@@ -120,7 +120,7 @@ class LH5Store:
                 return group
         if grp_attrs is not None and len(set(grp_attrs.items()) ^ set(group.attrs.items())) > 0:
             if not overwrite:
-                raise RuntimeError('grp_attrs != group.attrs but overwrite not set, ignoring grp_attrs')
+                raise RuntimeError('grp_attrs != group.attrs but overwrite not set')
             else:
                 log.debug(f'overwriting {group}.attrs...')
                 for key in group.attrs.keys(): group.attrs.pop(key)
@@ -384,7 +384,7 @@ class LH5Store:
                 obj_buf.loc = obj_buf_start+n_rows_read
                 # check attributes
                 if set(obj_buf.attrs.keys()) != set(attrs.keys()):
-                    log.warning(
+                    raise RuntimeError(
                         f"attrs mismatch. obj_buf.attrs: "
                         f"{obj_buf.attrs}, h5f[{name}].attrs: {attrs}")
                 return obj_buf, n_rows_read
@@ -422,14 +422,14 @@ class LH5Store:
 
                 # check limits for values that will be used subsequently
                 if this_cumulen_nda[-1] < da_start:
-                    log.warning(
-                        f"cumulative_length non-increasing between entries "
-                        f"{start_row} and {start_row+n_rows_read} ??")
-                    log.warning(
+                    log.debug(
                         f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
                         f"da_start = {da_start}, "
                         f"start_row = {start_row}, "
                         f"n_rows_read = {n_rows_read}")
+                    raise RuntimeError(
+                        f"cumulative_length non-increasing between entries "
+                        f"{start_row} and {start_row+n_rows_read} ??")
 
             # determine the number of rows for the flattened_data readout
             da_nrows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
@@ -536,7 +536,7 @@ class LH5Store:
                                                    attrs=attrs), n_rows_to_read
             else:
                 if set(obj_buf.attrs.keys()) != set(attrs.keys()):
-                    log.warning(
+                    raise RuntimeError(
                         f"attrs mismatch. "
                         f"obj_buf.attrs: {obj_buf.attrs}, "
                         f"h5f[{name}].attrs: {attrs}")
@@ -723,11 +723,11 @@ class LH5Store:
         if datatype == 'scalar':
             return None
 
-        # recursively build a struct, return as a dictionary
+        # structs don't have rows
         if datatype == 'struct':
             return None
 
-        # read a table into a dataframe
+        # tables should have elements with all the same length
         if datatype == 'table':
             # read out each of the fields
             rows_read = None
@@ -740,11 +740,11 @@ class LH5Store:
                         f"{n_rows_read} was expected")
             return rows_read
 
-        # read out vector of vectors of different size
+        # length of vector of vectors is the length of its cumulative_length
         if elements.startswith('array'):
             return self.read_n_rows(f"{name}/cumulative_length", h5f)
 
-        # read out all arrays by slicing
+        # return array length (without reading the array!)
         if 'array' in datatype:
             # compute the number of rows to read
             return h5f[name].shape[0]
@@ -974,7 +974,7 @@ class LH5Iterator:
             if isinstance(entry_mask, np.ndarray):
                 self.entry_list = []
                 f_start = 0
-                for _, f_end in enumerate(self.file_map):
+                for f_end in self.file_map:
                     self.entry_list.append(list(np.nonzero(entry_mask[f_start:f_end])[0]))
                     f_start = f_end
             else:
