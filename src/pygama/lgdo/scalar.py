@@ -34,7 +34,7 @@ class Scalar:
 
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning(
+                raise ValueError(
                     f"datatype ({self.attrs['datatype']}) does "
                     f"not match value type ({type(value).__name__})!")
         else:
