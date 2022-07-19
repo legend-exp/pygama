@@ -42,12 +42,11 @@ class Struct(dict):
 
         if 'datatype' in self.attrs:
             if self.attrs['datatype'] != self.form_datatype():
-                log.warning(
+                raise ValueError(
                     "datatype does not match obj_dict! "
                     f"datatype: {self.attrs['datatype']}, "
                     f"obj_dict.keys(): {obj_dict.keys()}, "
                     f"form_datatype(): {self.form_datatype()}")
-                log.warning("will be updated to the latter.")
         self.update_datatype()
 
     def datatype_name(self) -> str:
