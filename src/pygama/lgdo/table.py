@@ -191,7 +191,7 @@ class Table(Struct):
             cols = self.keys()
         for col in cols:
             if not hasattr(self[col], 'nda'):
-                log.warning(f'column {col} does not have an nda, skipping...')
+                raise ValueError(f'column {col} does not have an nda')
             else:
                 df[col] = self[col].nda
 
