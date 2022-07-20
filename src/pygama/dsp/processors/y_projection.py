@@ -50,24 +50,19 @@ def y_projection(w_in, bin_in, proj_out, borders_out):
 
     
     #define our bin edges
-    # delta =(max(w_in) - min(w_in))/(bin_in-1)
+    delta =(max(w_in) - min(w_in))/(bin_in-1)
     
-    # for i in range(0,bin_in,1): 
-    #     borders_out[i] = min(w_in)+delta*i
+    for i in range(0,bin_in,1): 
+        borders_out[i] = min(w_in)+delta*i
     
-    # #get the projection on the y axis
-    # for i in range(0,len(w_in),1):
-    #     if(w_in[i]<=borders_out[0]):
-    #         if proj_out[0] == np.nan: proj_out[0]=0
-    #         proj_out[0]+=1
-    #     elif(w_in[i]>=borders_out[-1]):
-    #         if proj_out[-1] == np.nan: proj_out[-1]=0
-    #         proj_out[-1]+=1
-    #     else:
-    #         j=floor((w_in[i]-borders_out[0])/delta)
-    #         if proj_out[j] == np.nan: proj_out[j]=0
-    #         proj_out[j]+=1
-    proj_out[:], borders_out[:]= np.histogram(w_in, np.linspace(0,bin_in,1))
+    #get the projection on the y axis
+    for i in range(0,len(w_in),1):
+        j=floor((w_in[i]-borders_out[0])/delta)
+        if j<0:j=0
+        if j>=len(borders_out): j=len(borders_out)-1
+        proj_out[j]+=1
+    #h, b= np.histogram(w_in, np.linspace(0,bin_in,1))
+
 
 
    
