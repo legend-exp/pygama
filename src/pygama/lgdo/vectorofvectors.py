@@ -1,4 +1,5 @@
 import numpy as np
+from numba import guvectorize
 
 from .array import Array
 from .lgdo_utils import *
@@ -135,3 +136,37 @@ class VectorOfVectors:
         return string
 
     def __repr__(self): return str(self)
+
+    @staticmethod
+    def explode(cumulative_length, *arrays, out_arrays=None):
+        out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+        if out_arrays is None:
+            out_arrays = []
+            for ii in len(arrays): out_arrays.append(np.empty(out_len, dtype=arrays[ii].dtype))
+        for ii, array_in, array_out in enumerate(zip(arrays, out_arrays)):
+            if len(array) != len(cumulative_length):
+                raise ValueError(f"array {ii} has len {len(array)} != cl length {len(cumulative_length)}")
+            if len(array) != len(out_arrays[ii]):
+                raise ValueError(f"array {ii} has len {len(array)} != out_array length {len(out_array)}")
+            allocated_explode(cumulative_length, array_in, array_out)
+        return out_arrays
+
+
+@guvectorize(["void(int64[:], float32[:], float32[:])",
+              "void(int64[:], float64[:], float64[:])",
+              "void(int64[:], int32[:], int32[:])",
+              "void(int64[:], int64[:], int64[:])"],
+              "(n),()->(n)", nopython=True, cache=True)
+def allocated_explode(cumulative_length, array_in, array_out)
+    if len(cumulative_length) != len(array_in):
+        return
+    if cumulative_length[-1] != len(array_out):
+        return
+
+    ii = 0
+    for jj in range(len(array_out)):
+        while ii < len(cumulative_length) and jj > cumulative_length[ii]: 
+            ii += 1
+        array_out[jj] = array_out[ii]
+
+
