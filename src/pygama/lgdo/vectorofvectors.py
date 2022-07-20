@@ -142,7 +142,7 @@ class VectorOfVectors:
         out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
         if out_arrays is None:
             out_arrays = []
-            for array in arrays: 
+            for array in arrays:
                 out_arrays.append(np.empty(out_len, dtype=array.dtype))
         for ii in range(len(arrays)):
             if len(arrays[ii]) != len(cumulative_length):
@@ -165,8 +165,6 @@ def allocated_explode(cumulative_length, array_in, array_out):
         return
     ii = 0
     for jj in range(len(array_out)):
-        while ii < len(cumulative_length) and jj >= cumulative_length[ii]: 
+        while ii < len(cumulative_length) and jj >= cumulative_length[ii]:
             ii += 1
         array_out[jj] = array_in[ii]
-
-
