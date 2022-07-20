@@ -78,7 +78,9 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
         raise NotImplementedError(f'window_ref {window_ref}')
 
     # now build the outputs
-    coin_idx = tcm.coin_idx.to_numpy()
+    cumulative_length = np.where(tcm.coin_idx.diff().to_numpy() != 0)[0]
+    cumulative_length[:-1] = cumulative_length[1:]
+    cumulative_length[-1] = len(tcm.coin_idx)
     array_id = tcm.array_id.to_numpy()
     array_idx = tcm.array_idx.to_numpy() if 'array_idx' in tcm else tcm.index.to_numpy() # beautiful!
-    return { 'coin_idx':coin_idx, 'array_id':array_id, 'array_idx':array_idx }
+    return { 'cumulative_length':cumulative_length, 'array_id':array_id, 'array_idx':array_idx }
