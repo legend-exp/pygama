@@ -142,13 +142,14 @@ class VectorOfVectors:
         out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
         if out_arrays is None:
             out_arrays = []
-            for ii in len(arrays): out_arrays.append(np.empty(out_len, dtype=arrays[ii].dtype))
-        for ii, array_in, array_out in enumerate(zip(arrays, out_arrays)):
-            if len(array) != len(cumulative_length):
-                raise ValueError(f"array {ii} has len {len(array)} != cl length {len(cumulative_length)}")
-            if len(array) != len(out_arrays[ii]):
-                raise ValueError(f"array {ii} has len {len(array)} != out_array length {len(out_array)}")
-            allocated_explode(cumulative_length, array_in, array_out)
+            for array in arrays: 
+                out_arrays.append(np.empty(out_len, dtype=array.dtype))
+        for ii in range(len(arrays)):
+            if len(arrays[ii]) != len(cumulative_length):
+                raise ValueError(f"array {ii} has len {len(arrays[ii])} != cl length {len(cumulative_length)}")
+            if cumulative_length[-1] != len(out_arrays[ii]):
+                raise ValueError(f"out_array length {len(out_arrays[ii])} != cl[-1] = {cumulative_length[-1]}")
+            allocated_explode(cumulative_length, arrays[ii], out_arrays[ii])
         return out_arrays
 
 
@@ -156,17 +157,16 @@ class VectorOfVectors:
               "void(int64[:], float64[:], float64[:])",
               "void(int64[:], int32[:], int32[:])",
               "void(int64[:], int64[:], int64[:])"],
-              "(n),()->(n)", nopython=True, cache=True)
-def allocated_explode(cumulative_length, array_in, array_out)
-    if len(cumulative_length) != len(array_in):
+              "(n),(n),(m)", nopython=True, cache=True)
+def allocated_explode(cumulative_length, array_in, array_out):
+    if len(cumulative_length) != len(array_in) or cumulative_length[-1] != len(array_out):
+        for jj in range(len(array_out)):
+            array_out[jj] = np.NaN
         return
-    if cumulative_length[-1] != len(array_out):
-        return
-
     ii = 0
     for jj in range(len(array_out)):
-        while ii < len(cumulative_length) and jj > cumulative_length[ii]: 
+        while ii < len(cumulative_length) and jj >= cumulative_length[ii]: 
             ii += 1
-        array_out[jj] = array_out[ii]
+        array_out[jj] = array_in[ii]
 
 
