@@ -130,7 +130,7 @@ class DataStreamer(ABC):
         if '*' in rb_lib: rb_lib.pop('*')
         for dec_name in rb_lib.keys():
             if dec_name not in dec_names:
-                log.warning("no decoder named {dec_name} requested by rb_lib")
+                log.warning(f"no decoder named '{dec_name}' requested by rb_lib")
 
     def close_stream(self) -> None:
         """Close this data stream.

@@ -102,10 +102,10 @@ class RawBuffer:
     """
 
 
-    def __init__(self, lgdo: LGDO = None, key_list: list[int | str] = [],
+    def __init__(self, lgdo: LGDO = None, key_list: list[int | str] = None,
                  out_stream: str = '', out_name: str = '') -> None:
         self.lgdo = lgdo
-        self.key_list = key_list
+        self.key_list = [] if key_list is None else key_list
         self.out_stream = out_stream
         self.out_name = out_name
         self.loc = 0
@@ -146,6 +146,7 @@ class RawBufferList(list):
                 for key in rb.key_list: self.keyed_dict[key] = rb
         return self.keyed_dict
 
+
     def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
         """Set up a :class:`.RawBufferList` from a dictionary written in JSON
         shorthand. See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
@@ -154,7 +155,7 @@ class RawBufferList(list):
         -----
         `json_dict` is changed by this function.
         """
-        expand_rblist_json_dict(json_dict, kw_dict)
+        expand_rblist_json_dict(json_dict, {} if kw_dict is None else kw_dict)
         for name in json_dict:
             rb = RawBuffer()
             if 'key_list' in json_dict[name]:
@@ -200,6 +201,7 @@ class RawBufferLibrary(dict):
     :class:`.RawBufferList`\ s associated with the names of decoders that can
     write to them.
     """
+
     def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = {}) -> None:
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
