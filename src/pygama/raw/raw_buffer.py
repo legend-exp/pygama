@@ -146,7 +146,8 @@ class RawBufferList(list):
                 for key in rb.key_list: self.keyed_dict[key] = rb
         return self.keyed_dict
 
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = None) -> None:
+
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
         """Set up a :class:`.RawBufferList` from a dictionary written in JSON
         shorthand. See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
 
@@ -200,11 +201,12 @@ class RawBufferLibrary(dict):
     :class:`.RawBufferList`\ s associated with the names of decoders that can
     write to them.
     """
-    def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = None) -> None:
+
+    def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = {}) -> None:
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = None) -> None:
+    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
         r"""Set up a :class:`.RawBufferLibrary` from a dictionary written in
         JSON shorthand.
 
