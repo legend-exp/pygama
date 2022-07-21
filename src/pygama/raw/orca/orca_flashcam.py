@@ -1,66 +1,68 @@
 import copy
 import gc
 import logging
+from typing import Any
 
 import numpy as np
 
-from ..fc.fc_event_decoder import fc_decoded_values
-from .orca_base import OrcaDecoder
+from pygama.raw.fc.fc_event_decoder import fc_decoded_values
+from pygama.raw.orca.orca_base import OrcaDecoder
+from pygama.raw.orca.orca_header import OrcaHeader
+from pygama.raw.orca.orca_packet import OrcaPacket
+from pygama.raw.raw_buffer import RawBufferLibrary
 
 log = logging.getLogger(__name__)
 
 
-def get_key(fcid, ch): return (fcid-1)*1000 + ch
+def get_key(fcid, ch: int) -> int:
+    return (fcid-1)*1000 + ch
 
-def get_fcid(key): return int(np.floor(key/1000))+1
 
-def get_ch(key): return key % 1000
+def get_fcid(key: int) -> int:
+    return int(np.floor(key/1000))+1
 
+
+def get_ch(key: int) -> int:
+    return key % 1000
 
 
 class ORFlashCamListenerConfigDecoder(OrcaDecoder):
-    '''
-    Decoder for FlashCam listener config written by ORCA
-    '''
-    def __init__(self, header=None, **kwargs):
-        """
-        DOCME
-        """
+    """Decoder for FlashCam listener config written by ORCA."""
+
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # up through ch_inputnum, these are in order of the fcio data format
         # for similicity.  append any additional values after this.
         self.decoded_values = {
-            'readout_id':   { 'dtype': 'uint16', },
-            'fcid':         { 'dtype': 'uint16', },
-            'telid':        { 'dtype': 'int32',  },
-            'nadcs':        { 'dtype': 'int32',  },
-            'ntriggers':    { 'dtype': 'int32',  },
-            'nsamples':     { 'dtype': 'int32',  },
-            'adcbits':      { 'dtype': 'int32',  },
-            'sumlength':    { 'dtype': 'int32',  },
-            'blprecision':  { 'dtype': 'int32',  },
-            'mastercards':  { 'dtype': 'int32',  },
-            'triggercards': { 'dtype': 'int32',  },
-            'adccards':     { 'dtype': 'int32',  },
-            'gps':          { 'dtype': 'int32',  },
-            'ch_boardid':   { 'dtype': 'uint16',
-                              'datatype':
-                              'array_of_equalsized_arrays<1,1>{real}',
-                              'length': 2400, },
-            'ch_inputnum':  { 'dtype': 'uint16',
-                              'datatype':
-                              'array_of_equalsized_arrays<1,1>{real}',
-                              'length': 2400, },
+            'readout_id':   {'dtype': 'uint16'},
+            'fcid':         {'dtype': 'uint16'},
+            'telid':        {'dtype': 'int32'},
+            'nadcs':        {'dtype': 'int32'},
+            'ntriggers':    {'dtype': 'int32'},
+            'nsamples':     {'dtype': 'int32'},
+            'adcbits':      {'dtype': 'int32'},
+            'sumlength':    {'dtype': 'int32'},
+            'blprecision':  {'dtype': 'int32'},
+            'mastercards':  {'dtype': 'int32'},
+            'triggercards': {'dtype': 'int32'},
+            'adccards':     {'dtype': 'int32'},
+            'gps':          {'dtype': 'int32'},
+            'ch_boardid':   {'dtype': 'uint16',
+                             'datatype':
+                             'array_of_equalsized_arrays<1,1>{real}',
+                             'length': 2400, },
+            'ch_inputnum':  {'dtype': 'uint16',
+                             'datatype':
+                             'array_of_equalsized_arrays<1,1>{real}',
+                             'length': 2400, },
             }
         super().__init__(header=header, **kwargs)
 
-
-    def get_decoded_values(self, key=None):
+    def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         return self.decoded_values
 
-
-    def decode_packet(self, packet, packet_id, rbl):
+    def decode_packet(self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary) -> bool:
         if len(rbl) != 1:
-            print(f"FC config decoder: got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
+            log.warning(f"got {len(rbl)} rb's, should have only 1 (no keyed decoded values)")
         rb = rbl[0]
         tbl = rb.lgdo
         ii  = rb.loc
@@ -88,15 +90,14 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
                 # avoids "weakly-referenced object no longer exists"
                 pass
         if len(objs) != 1:
-            log.warning(f'Got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
+            log.warning(f'got {len(objs)} ORFlashCamADCWaveformDecoders in memory!')
         else: objs[0].assert_nsamples(tbl['nsamples'].nda[ii], tbl['fcid'].nda[ii])
 
         rb.loc += 1
         return rb.is_full()
 
 
-
-class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
+class ORFlashCamListenerStatusDecoder(OrcaDecoder):
     """
     Decoder for FlashCam status packets written by ORCA
 
@@ -106,230 +107,23 @@ class ORCAFlashCamListenerStatusDecoder(OrcaDecoder):
     flattened before populating the lh5 table.
     """
 
-    # def __init__(self, *args, **kwargs):
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
+        raise NotImplementedError("decoding of FlashCam status packets (written by ORCA) is not implemented yet")
 
-    #     self.decoder_name    = 'ORFlashCamListenerStatusDecoder'
-    #     self.orca_class_name = 'ORFlashCamListenerModel'
-    #     self.nOtherErrors    = np.uint32(5)
-    #     self.nEnvMonitors    = np.uint32(16)
-    #     self.nCardTemps      = np.uint32(5)
-    #     self.nCardVoltages   = np.uint32(6)
-    #     self.nADCTemps       = np.uint32(2)
-    #     self.nCTILinks       = np.uint32(4)
-    #     self.nCards          = np.uint32(1)
-
-    #     self.decoded_values = {
-    #         'readout_id':  { 'dtype': 'uint16', },
-    #         'listener_id': { 'dtype': 'uint16', },
-    #         'cards':       { 'dtype': 'int32',  },
-    #         'status':      { 'dtype': 'int32',  },
-    #         'statustime':  { 'dtype': 'float64', 'units': 's', },
-    #         'cputime':     { 'dtype': 'float64', 'units': 's', },
-    #         'startoffset': { 'dtype': 'float64', 'units': 's', },
-    #         'card_fcio_id':  {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_status': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_event_number': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_pps_count': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_tick_count': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_max_ticks': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_total_errors': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_env_errors': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_cti_errors': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_link_errors': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards, },
-    #         'card_other_errors': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nOtherErrors, },
-    #         'card_temp': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nCardTemps,
-    #             'units':        'mC', },
-    #         'card_voltage': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nCardVoltages,
-    #             'units':        'mV', },
-    #         'card_current': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards,
-    #             'units':        'mA', },
-    #         'card_humidity': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards,
-    #             'units':        'o/oo', },
-    #         'card_adc_temp': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nADCTemps,
-    #             'units':        'mC', },
-    #         'card_cti_link': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nCTILinks, },
-    #         'card_card_link_state': {
-    #             'dtype':        'uint32',
-    #             'datatype':     'array<1>{array<1>{real}}',
-    #             'length_guess':  self.nCards * self.nCards, },
-    #     }
-
-    #     # arrays to temporarily store card-level decoded data
-    #     self.cdata = {}
-    #     self.resize_card_data(ncards=self.nCards)
-
-    #     super().__init__(args, kwargs)
-
-
-    # def resize_card_data(self, ncards):
-    #     try: ncards = np.uint32(ncards)
-    #     except ValueError: return
-    #     if ncards == 0: return
-    #     for key in self.decoded_values:
-    #         # ignore keys that aren't card level
-    #         if key.find('card_') != 0: continue
-    #         try:
-    #             # skip keys for things that aren't arrays with a length_guess
-    #             if self.decoded_values[key]['datatype'].find('array') != 0:
-    #                 continue
-    #             length = self.decoded_values[key]['length_guess']
-    #             try:
-    #                 # resize if ncards differs from the old shape
-    #                 oldshape = self.cdata[key].shape
-    #                 if oldshape[0] == ncards: continue
-    #                 if key.find('card_card_') == 0:
-    #                     self.cdata[key].resize((ncards,ncards,) + oldshape[2:])
-    #                 else:
-    #                     self.cdata[key].resize((ncards,) + oldshape[1:])
-    #             except KeyError:
-    #                 # if the key didn't exist set the ndarray for this key
-    #                 if ((length == ncards or (length % ncards) != 0) and
-    #                     key.find('card_card_') == -1):
-    #                     self.cdata[key] = np.ndarray(shape=(length),
-    #                                                  dtype=np.uint32)
-    #                 else:
-    #                     nval = np.uint32(length / ncards)
-    #                     self.cdata[key] = np.ndarray(shape=(ncards, nval),
-    #                                                  dtype=np.uint32)
-    #         except KeyError: continue
-    #     # set nCards to allow for not calling this function during decoding
-    #     self.nCards = ncards
-
-
-    # def get_decoded_values(self, key=None):
-    #     return self.decoded_values
-
-
-    # def max_n_rows_per_packet(self):
-    #     return 1
-
-
-    # def decode_packet(self, packet, lh5_tables, packet_id, header_dict):
-
-    #     data = np.frombuffer(packet, dtype=np.uint32)
-    #     tbl  = lh5_tables
-    #     ii   = tbl.loc
-
-    #     # populate the packet header information
-    #     tbl['readout_id'].nda[ii]  = (data[0] & 0xffff0000) >> 16
-    #     tbl['listener_id'].nda[ii] =  data[0] & 0x0000ffff
-    #     tbl['status'].nda[ii]      = np.int32(data[1])
-    #     tbl['statustime'].nda[ii]  = np.float64(data[2] + data[3] / 1.0e6)
-    #     tbl['cputime'].nda[ii]     = np.float64(data[4] + data[5] / 1.0e6)
-    #     tbl['startoffset'].nda[ii] = np.float64(data[7] + data[8] / 1.0e6)
-    #     tbl['cards'].nda[ii]       = np.int32(data[12])
-
-    #     # resize the card level data if necessary
-    #     if data[12] != self.nCards:
-    #         print('ORlashCamListenerStatusDecoder: resizing card arrays '
-    #               'from', self.nCards, ' cards to', data[12])
-    #         self.resize_card_data(ncards=data[12])
-
-    #     # set the local card level data
-    #     for i in range(np.int(data[12])):
-    #         j = 14 + i * (data[12] + 14 + self.nOtherErrors +
-    #                       self.nEnvMonitors + self.nCTILinks)
-
-    #         self.cdata['card_fcio_id'][i]      = data[j]
-    #         self.cdata['card_status'][i]       = data[j+1]
-    #         self.cdata['card_event_number'][i] = data[j+2]
-    #         self.cdata['card_pps_count'][i]    = data[j+3]
-    #         self.cdata['card_tick_count'][i]   = data[j+4]
-    #         self.cdata['card_max_ticks'][i]    = data[j+5]
-    #         self.cdata['card_total_errors'][i] = data[j+10]
-    #         self.cdata['card_env_errors'][i]   = data[j+11]
-    #         self.cdata['card_cti_errors'][i]   = data[j+12]
-    #         self.cdata['card_link_errors'][i]  = data[j+13]
-    #         k = j + 14
-    #         self.cdata['card_other_errors'][i][:]= data[k:k+self.nOtherErrors]
-    #         k += self.nOtherErrors
-    #         self.cdata['card_temp'][i][:]        = data[k:k+self.nCardTemps]
-    #         k += self.nCardTemps
-    #         self.cdata['card_voltage'][i][:]     = data[k:k+self.nCardVoltages]
-    #         k += self.nCardVoltages
-    #         self.cdata['card_current'][i]        = data[k]
-    #         self.cdata['card_humidity'][i]       = data[k+1]
-    #         k += 2
-    #         self.cdata['card_adc_temp'][i][:]    = data[k:k+self.nADCTemps]
-    #         k += self.nADCTemps
-    #         self.cdata['card_cti_link'][i][:]    = data[k:k+self.nCTILinks]
-    #         k += self.nCTILinks
-    #         self.cdata['card_card_link_state'][i][:]  = data[k:k+data[12]]
-
-    #     # populate the card level data with the flattened local data, then push
-    #     for key in self.cdata:
-    #         tbl[key].set_vector(ii, self.cdata[key].flatten())
-
-    #     tbl.push_row()
 
 class ORFlashCamADCWaveformDecoder(OrcaDecoder):
-    """
-    Decoder for FlashCam ADC data written by ORCA
-    """
-    def __init__(self, header=None, **kwargs):
-        """
-        DOCME
-        """
+    """Decoder for FlashCam ADC data written by ORCA."""
+
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # start with the values defined in fcdaq
         self.decoded_values_template = copy.deepcopy(fc_decoded_values)
         # add header values from Orca
-        self.decoded_values_template.update( {
-            'crate' :   { 'dtype': 'uint8',  },
-            'card' :    { 'dtype': 'uint8',  },
-            'ch_orca' : { 'dtype': 'uint8',  },
-            'fcid' :    { 'dtype': 'uint8',  },
-        } )
+        self.decoded_values_template.update({
+            'crate':   {'dtype': 'uint8'},
+            'card':    {'dtype': 'uint8'},
+            'ch_orca': {'dtype': 'uint8'},
+            'fcid':    {'dtype': 'uint8'},
+        })
         self.decoded_values = {} # dict[fcid]
         self.fcid = {} # dict[crate][card]
         self.nadc = {} # dict[fcid]
@@ -337,7 +131,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         self.skipped_channels = {}
 
 
-    def set_header(self, header):
+    def set_header(self, header: OrcaHeader) -> None:
         self.header = header
 
         # set up decoded values, key list, fcid map, etc. based on header info
@@ -367,15 +161,13 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             self.decoded_values[fcid] = copy.deepcopy(self.decoded_values_template)
             self.decoded_values[fcid]['waveform']['wf_len'] = wf_len
 
-
-    def get_key_list(self):
+    def get_key_list(self) -> list[int]:
         key_list = []
         for fcid, nadc in self.nadc.items():
             key_list += list( get_key(fcid, np.array(range(nadc))) )
         return key_list
 
-
-    def get_decoded_values(self, key=None):
+    def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
             dec_vals_list = self.decoded_values.values()
             if len(dec_vals_list) >= 0: return dec_vals_list[0]
@@ -384,16 +176,14 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         if fcid in self.decoded_values: return self.decoded_values[fcid]
         raise KeyError(f'no decoded values for key {key} (fcid {fcid})')
 
-
-    def assert_nsamples(self, nsamples, fcid):
+    def assert_nsamples(self, nsamples: int, fcid: int) -> None:
         orca_nsamples = self.decoded_values[fcid]['waveform']['wf_len']
         if orca_nsamples != nsamples:
             log.warning(f"orca miscalculated nsamples = {orca_nsamples} for fcid {fcid}, updating to {nsamples}")
             self.decoded_values[fcid]['waveform']['wf_len'] = nsamples
 
-
-    def decode_packet(self, packet, packet_id, rbl):
-        ''' decode the orca FC ADC packet '''
+    def decode_packet(self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary) -> bool:
+        """Decode the ORCA FlashCam ADC packet."""
         evt_rbkd = rbl.get_keyed_dict()
 
         # unpack lengths and ids from the header words
