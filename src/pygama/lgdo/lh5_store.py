@@ -354,11 +354,10 @@ class LH5Store:
             if obj_buf is None:
                 # if col_dict contains just 3 objects called t0, dt, and values,
                 # return a WaveformTable
-                if len(col_dict) == 3:
-                    if 't0' in col_dict and 'dt' in col_dict and 'values' in col_dict:
-                        table = WaveformTable(t0=col_dict['t0'],
-                                              dt=col_dict['dt'],
-                                              values=col_dict['values'])
+                if len(col_dict) == 3 and 't0' in col_dict and 'dt' in col_dict and 'values' in col_dict:
+                    table = WaveformTable(t0=col_dict['t0'],
+                                          dt=col_dict['dt'],
+                                          values=col_dict['values'])
                 else: table = Table(col_dict=col_dict, attrs=attrs)
                 # set (write) loc to end of tree
                 table.loc = n_rows_read
