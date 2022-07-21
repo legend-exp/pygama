@@ -364,10 +364,16 @@ class WaveformBrowser:
             # Get the data; note this is implicitly copying it!
             data = self.lh5_out.get(name, None)
             if isinstance(data, lh5.WaveformTable):
-                y = data.values.nda[i_tb,:]/norm - ref_time
+                y = data.values.nda[i_tb,:]/norm
                 dt = data.dt.nda[i_tb] * float(ureg(data.dt_units)/self.x_unit)
-                t0 = data.t0.nda[i_tb] * float(ureg(data.t0_units)/self.x_unit)
+                t0 = data.t0.nda[i_tb] * float(ureg(data.t0_units)/self.x_unit) - ref_time
                 x = np.linspace(t0, t0+dt*(data.wf_len-1), data.wf_len)
+                lines.append(Line2D(x, y))
+                self._update_auto_limit(x, y)
+
+            elif isinstance(data, lh5.ArrayOfEqualSizedArrays):
+                y = data.nda[i_tb,:]/norm
+                x = np.arange(len(y), dtype='float')
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
 

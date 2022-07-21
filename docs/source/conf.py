@@ -67,6 +67,7 @@ napoleon_google_docstring = False
 napoleon_use_ivar = True
 napoleon_custom_sections = ["JSON Configuration Example"]
 
+
 # intersphinx
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
@@ -83,6 +84,9 @@ intersphinx_mapping = {
 # sphinx-autodoc
 # Include __init__() docstring in class docstring
 autoclass_content = 'both'
+autodoc_typehints = 'both'
+autodoc_typehints_description_target = 'documented_params'
+autodoc_typehints_format = 'short'
 
 # sphinx-multiversion
 
