@@ -30,38 +30,38 @@ def build_raw(in_stream: int, in_stream_type: str = None,
 
     Parameters
     ----------
-    in_stream : str
-        The name of the input stream to be converted. Typically a filename,
+    in_stream
+        the name of the input stream to be converted. Typically a filename,
         including path. Can use environment variables. Some streamers may be
         able to (eventually) accept e.g. streaming over a port as an input.
 
-    in_stream_type : {None, 'ORCA', 'FlashCam', 'LlamaDaq', 'Compass', 'MGDO'}
-        Type of stream used to write the input file.
+    in_stream_type : 'ORCA', 'FlashCam', 'LlamaDaq', 'Compass' or 'MGDO'
+        type of stream used to write the input file.
 
-    out_spec : str or dict or RawBufferLibrary or None
+    out_spec
         Specification for the output stream.
 
-        - If None, uses ``{in_stream}.lh5`` as the output filename.
-        - If a str not ending in ``.json``, interpreted as the output filename.
-        - If a str ending in ``.json``, interpreted as a filename containing
-          json-shorthand for the output specification (see :mod:`.raw_buffer`)
-        - If a JSON dict, should be a dict loaded from the json shorthand
+        - if None, uses ``{in_stream}.lh5`` as the output filename.
+        - if a str not ending in ``.json``, interpreted as the output filename.
+        - if a str ending in ``.json``, interpreted as a filename containing
+          json-shorthand for the output specification (see :mod:`.raw_buffer`).
+        - if a JSON dict, should be a dict loaded from the json shorthand
           notation for RawBufferLibraries (see :mod:`.raw_buffer`), which is
-          then used to build a :class:`.RawBufferLibrary`
-        - If a :class:`.RawBufferLibrary`, the mapping of data to output file /
+          then used to build a :class:`.RawBufferLibrary`.
+        - if a :class:`.RawBufferLibrary`, the mapping of data to output file /
           group is taken from that.
 
-    buffer_size : int
-        Default size to use for data buffering
+    buffer_size
+        default size to use for data buffering.
 
-    n_max : int
-        Maximum number of rows of data to process from the input file
+    n_max
+        maximum number of rows of data to process from the input file.
 
-    overwrite : bool
-        Sets whether to overwrite the output file(s) if it (they) already exist
+    overwrite
+        sets whether to overwrite the output file(s) if it (they) already exist.
 
-    **kwargs : kwargs
-        Sent to :class:`.RawBufferLibrary` generation as ``kw_dict``
+    **kwargs
+        sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
     """
 
     # convert any environment variables in in_stream so that we can check for readability
