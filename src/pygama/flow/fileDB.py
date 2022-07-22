@@ -8,7 +8,6 @@ import h5py
 import time
 from parse import parse
 from pygama.lgdo import *
-from pygama.flow import FileDB
 
 class FileDB():
     """

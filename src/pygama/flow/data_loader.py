@@ -9,7 +9,8 @@ import time
 from keyword import iskeyword
 from parse import parse
 from pygama.lgdo import *
-from pygama.flow import FileDB
+from pygama.flow.fileDB import FileDB
+from pprint import pprint
 #from pygama import WaveformBrowser
 
 
@@ -94,24 +95,21 @@ class DataLoader:
         self.levels = list(config["levels"].keys())
         self.tiers = {}
         self.cut_priority = {}
-        self.tcm_cols = {}
         self.evts = {}
-        self.tcms = []
+        self.tcms = {}
         for level in self.levels:
             self.tiers[level] = config["levels"][level]["tiers"]
             #Set cut priority
-            if "dependency" in config["levels"][level].keys(): # This level is a TCM
-                dep = config["levels"][level]["dependency"]
-                evt = config["levels"][level]["dependent"]
-                self.cut_priority[level] = self.cut_priority[dep] + 1
-                self.cut_priority[evt] = self.cut_priority[dep] + 1
-                self.evts[evt] = {"tcm": level, "dependency": dep}
-                self.tcms.append(level)
+            if "parent" in config["levels"][level].keys(): # This level is a TCM
+                parent = config["levels"][level]["parent"]
+                child = config["levels"][level]["child"]
+                self.tcms[level] = config["levels"][level] 
+                self.cut_priority[level] = self.cut_priority[parent] + 2
+                self.cut_priority[child] = self.cut_priority[parent] + 1
+                self.evts[child] = {"tcm": level, "parent": parent}
 
                 #Set TCM columns to lookup
-                if "tcm_cols" in config["levels"][level].keys():
-                    self.tcm_cols[level] = config["levels"][level]["tcm_cols"]
-                else:
+                if "tcm_cols" not in config["levels"][level].keys():
                     print(f"Config Warning: TCM levels, e.g. {level}, need to specify the TCM lookup columns")
             else:
                 self.cut_priority[level] = 0
@@ -284,7 +282,7 @@ class DataLoader:
     def show_fileDB(self, columns=None):
         self.fileDB.show(columns)   
 
-    def get_tiers_for_col(self, columns):
+    def get_tiers_for_col(self, columns, merge_files=None):
         """
         Get the tiers, and tables in that tier, that contain the columns given
 
@@ -307,7 +305,10 @@ class DataLoader:
         """
         col_tiers = {}
         
-        if self.merge_files:
+        if merge_files is None:
+            merge_files = self.merge_files
+
+        if merge_files:
             for file in self.file_list:
                 col_inds = set()
                 for i, col_list in enumerate(self.fileDB.columns):
@@ -324,7 +325,7 @@ class DataLoader:
         else:
             for file in self.file_list:
                 col_tiers[file] = {
-                    "tables": {}
+                    "tables": {},
                     "columns": {}
                 }
                 col_inds = set()
@@ -346,13 +347,24 @@ class DataLoader:
                         
         return col_tiers 
 
-    def gen_entry_list(self, chunk=False, mode='only', f_output=None): #TODO: mode, chunking, etc
+    def gen_entry_list(self, tcm_level=None, tcm_table=None, chunk=False, mode='only', save_output_columns=False, in_mem=True, f_output=None): #TODO: mode, chunking, etc
         """
         This should apply cuts to the tables and files of interest
         but it does NOT load the column information into memory
+
+        Can only load up to two levels, those joined by tcm_level
         
         Parameters
         ----------
+        tcm_level : string 
+        The type of tcm to be used
+        If None, will only return information from lowest level
+        
+        tcm_table : int or string
+        The identifier of the table inside this TCM level that you want to use
+        If not specified, there must only be one table inside a TCM file in tcm_level
+
+
         chunk : bool ?????????????????
         If true, iterates through each file in file_list
         If false, opens all files at once 
@@ -360,6 +372,9 @@ class DataLoader:
         mode : 'any' or 'only'
         'any' : returns every hit in the event if any hit in the event passes the cuts
         'only' : only returns hits that pass the cuts
+
+        save_output_columns : bool
+        If true, saves any columns needed for both the cut and the output to the entry_list
 
         Returns
         -------
@@ -378,148 +393,199 @@ class DataLoader:
         if self.file_list is None:
             print("You need to make a query on fileDB, use set_file_list")
             return 
-
-        entries = {}
+        if in_mem:
+            entries = {}
+        low_level = self.levels[0]
 
         # Default columns in the entry_list
-        entry_cols = [f"{level}_table" for level in self.levels]
-        entry_cols += [f"{level}_idx" for level in self.levels]
+        if tcm_level is None:
+            return self.gen_hit_entries(save_output_columns, in_mem, f_output)
+        else:
+            # Assumes only one tier in a TCM level
+            parent = self.tcms[tcm_level]["parent"]
+            child = self.tcms[tcm_level]["child"]
+            entry_cols = [f"{parent}_table", f"{parent}_idx", f"{child}_table", f"{child}_idx"]
+            if save_output_columns:
+                for_output = []
 
-        # Columns to save because we know the user wants them in the final output
-        for_output = []
+            # Find out which columns are needed for any cuts
+            cut_cols = {}
+
+            for level in [child, parent]:
+                cut_cols[level] = []
+                if self.cuts is not None and level in self.cuts.keys():
+                    cut = self.cuts[level] 
+                else: 
+                    cut = ""
+                # String parsing to determine which columns need to be loaded
+                split = re.split(' |<|>|=|and|or|&|\|', cut) 
+                for term in split:
+                    if term.isidentifier() and not iskeyword(term): #Assumes that column names are valid python variable names
+                        cut_cols[level].append(term)
+                        # Add column to entry_cols if they are needed for both the cut and the output
+                        if self.output_columns is not None:
+                            if term in self.output_columns and term not in entry_cols and save_output_columns:
+                                for_output.append(term)
+            if save_output_columns:
+                entry_cols += for_output
+            sto = LH5Store()
+
+            # Make the entry list for each file
+            for file in self.file_list:
+                # Get the TCM specified
+                tcm_tier = self.tiers[tcm_level][0] # Assumes that each TCM level only has one tier
+                tcm_tables = self.fileDB.df.loc[file,f"{tcm_tier}_tables"]
+                if len(tcm_tables) > 1 and tcm_table is None:
+                    print(f"There are {len(tcm_tables)} TCM tables, need to specify which to use")
+                    print(tcm_tables)
+                    return 
+                else:
+                    if tcm_table is not None:
+                        if tcm_table in tcm_tables:
+                            tcm_tb = tcm_table 
+                        else:
+                            print(f"Table {tcm_table} doesn't exist in {tcm_level}")
+                            return
+                    else:
+                        tcm_tb = tcm_tables[0]
+                tcm_path = self.data_dir + self.fileDB.tier_dirs[tcm_tier] + '/' + self.fileDB.df.iloc[file][f'{tcm_tier}_file']
+                if not os.path.exists(tcm_path):
+                    print(f"Can't find TCM file for {tcm_level}")
+                    return 
+                tcm_table_name = self.get_table_name(tcm_tier, tcm_tb)
+                tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path) 
+                f_entries = tcm_lgdo.get_dataframe() 
+                renaming = {
+                    self.tcms[tcm_level]["tcm_cols"]["child_idx"]: f"{child}_idx", 
+                    self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
+                    self.tcms[tcm_level]["tcm_cols"]["parent_idx"]: f"{parent}_idx"
+                }
+                f_entries.rename(columns=renaming, inplace=True)
+                # At this point, should have a list of all available hits/evts joined by tcm
+
+                # Perform cuts specified for child or parent level, in that order
+                for level in [child, parent]:
+                    if level not in self.cuts.keys():
+                        continue
+                    cut = self.cuts[level]
+                    col_tiers = self.get_tiers_for_col(cut_cols[level], merge_files=False)
+                    # Tables in first tier of event should be the same for all tiers in one level
+                    tables = self.fileDB.df.loc[file, f'{self.tiers[level][0]}_tables'] 
+                    if self.table_list is not None:
+                        if level in self.table_list.keys():
+                            tables = self.table_list[level]
+                    # Cut any rows of TCM not relating to requested tables
+                    f_entries.query(f"{level}_table in {tables}", inplace=True) 
+
+                    for tb in tables:
+                        tb_table = None 
+                        tcm_idx = f_entries.query(f"{level}_table == {tb}").index 
+                        idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
+                        for tier in self.tiers[level]:
+                            tier_path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.loc[file,f'{tier}_file']
+                            if tier in col_tiers[file]["tables"].keys():
+                                if tb in col_tiers[file]["tables"][tier]:
+                                    table_name = self.get_table_name(tier, tb)
+                                    tier_table, _ = sto.read_object(table_name, tier_path, field_mask=cut_cols[level], idx=list(idx_mask))
+                                    if tb_table is None:
+                                        tb_table = tier_table 
+                                    else:
+                                        tb_table.join(tier_table) 
+                        tb_df = tb_table.get_dataframe()
+                        tb_df.query(cut, inplace=True) 
+                        keep_idx = f_entries.query(f"{level}_table == {tb} and {level}_idx in {list(tb_df.index)}").index
+                        drop_idx = set.symmetric_difference(set(tcm_idx), list(keep_idx))
+                        f_entries.drop(drop_idx, inplace=True)
+                        if save_output_columns:
+                            for col in tb_df.columns:
+                                if col in for_output:
+                                    f_entries.loc[keep_idx, col] = tb_df[col]
+                        #end for each table loop
+                    # end for each level loop
+
+                if in_mem:
+                    entries[file] = f_entries
+                if f_output:
+                    # Convert f_entries DataFrame to Struct
+                    f_dict = f_entries.to_dict('list')
+                    f_struct = Struct(f_dict)
+                    sto.write_object(f_struct, f"entries/{file}", f_output, wo_mode='o')
+                #end for each file loop
+        if in_mem:
+            return entries
+
+    def gen_hit_entries(self, save_output_columns=False, in_mem=True, f_output=None):
+        """
+        Called by gen_entry_list() to handle the case when tcm_level is None
+        Ignores any cuts set on levels above lowest level
+        """
+        low_level = self.levels[0]
+        if in_mem:
+            entries = {}
+        entry_cols = [f"{low_level}_table", f"{low_level}_idx"]
 
         # Find out which columns are needed for the cut
-        cut_cols = {}
-
-        for level in self.levels:
-            cut_cols[level] = []
-            if self.cuts is not None and level in self.cuts.keys():
-                cut = self.cuts[level] 
-            else: 
-                cut = ""
+        cut_cols = []
+        cut = ""
+        if self.cuts is not None and low_level in self.cuts.keys():
+            cut = self.cuts[low_level] 
             # String parsing to determine which columns need to be loaded
-            split = re.split(' |<|>|=|and|or|&|\|', cut) 
-            for term in split:
-                if term.isidentifier() and not iskeyword(term): #Assumes that column names are valid python variable names
-                    cut_cols[level].append(term)
+            terms = re.findall('[^\W0-9]\w*', cut) # Matches any valid python variable name
+            for term in terms:
+                if not iskeyword(term):
+                    cut_cols.append(term)
                     # Add column to entry_cols if they are needed for both the cut and the output
                     if self.output_columns is not None:
-                        if term in self.output_columns and term not in entry_cols:
-                            for_output.append(term)
-        
-        # Make the entry list for each file
+                        if term in self.output_columns and term not in entry_cols and save_output_columns:
+                            entry_cols.append(term)
+
+        col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
+        sto = LH5Store()
         for file in self.file_list:
             f_entries = pd.DataFrame(columns=entry_cols)
-            # Get levels needed for cuts, and sort by cut priority
-            cut_levels = sorted(list(self.cuts.keys()), key=lambda level: self.cut_priority[level], reverse=True)
-            first_cut_made = False
-            for level in cut_levels:
-                # print("level: ", level)
-                tables = []
-                level_paths = {}
-                for tier in self.tiers[level]:
-                    path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
-                    # Only add to level_paths if the file exists
-                    if os.path.exists(path):
-                        level_paths[tier] = path
-                        if not tables:
-                            # Tables should be shared across tiers in one level
-                            tables = self.fileDB.df.iloc[file][f'{tier}_tables']
-                
-                if self.table_list is not None:
-                    if level in self.table_list.keys():
-                        tables = self.table_list[level]
+            if self.table_list is not None:
+                if low_level in self.table_list.keys():
+                    tables = self.table_list[low_level] 
+            else:
+                tables = self.fileDB.df.loc[file, f"{self.tiers[low_level][0]}_tables"]
 
-                # Continue if the paths exist
-                if level_paths:
-                    # print("found level paths")
-                    cut = self.cuts[level]
-                    fields = []
-                    # Use tcm_cols to find column names that correspond to level_table and level_idx 
-                    if level in self.tcm_cols.keys():
-                        fields = list(self.tcm_cols[level].values())
-                    
-                    columns = entry_cols + fields + cut_cols[level]
-                    
-                    # Find which tiers we need to load
-                    col_tiers = self.get_tiers_for_col(columns)
-
-
-                    sto = LH5Store()
-                    for tb in tables:
-                        # Try to create index mask for this table
-                        if first_cut_made:
-                            idx = list(f_entries.query(f"{level}_table == {tb}")[f"{level}_idx"])
-                        else:
-                            idx = None
-                        if idx == []:
-                            continue
-                        level_table = None 
-                        for tier, path in level_paths.items():
-                            if tb in col_tiers[file][tier]:
-                                table_name = self.get_table_name(tier, tb)
-                                temp_table, _ = sto.read_object(table_name, path, idx=idx, field_mask=columns)
-                                if level_table is None:
-                                    level_table = temp_table
-                                else:
-                                    level_table.join(temp_table) 
-                        level_df = level_table.get_dataframe()
-                        cut_df = level_df.query(cut)
-                        # Rename columns to match entry_cols
-                        if level in self.evts.keys():
-                            tcm = self.evts[level]["tcm"]
-                            dep = self.evts[level]["dependency"]
-                            renaming = {
-                                self.tcm_cols[tcm]["evt_idx"]: f"{level}_idx",
-                                self.tcm_cols[tcm]["hit_tb"]: f"{dep}_table", 
-                                self.tcm_cols[tcm]["hit_idx"]: f"{dep}_idx", 
-                            }
-                            cut_df = cut_df.rename(renaming, axis="columns")
-                            cut_df = cut_df.explode(list(renaming.values()), ignore_index=True)
-                        elif level in self.tcms:
-                            evt = self.config["levels"][level]["dependent"]
-                            hit = self.config["levels"][level]["dependency"]
-                            cut_df.loc[:,f"{level}_idx"] = cut_df.index
-                            cut_df.loc[:,f"{level}_table"] = [tb]*len(cut_df)
-                            cut_df.loc[:,f"{evt}_idx"] = cut_df[self.tcm_cols[level]["evt_idx"]]
-                            cut_df.loc[:,f"{hit}_idx"] = cut_df[self.tcm_cols[level]["hit_idx"]]
-                            cut_df.loc[:,f"{hit}_table"] = cut_df[self.tcm_cols[level]["hit_tb"]]
-                        else:
-                            cut_df.loc[:,f"{level}_idx"] = cut_df.index
-                            cut_df.loc[:,f"{level}_table"] = [tb]*len(cut_df)
-
-                        # Update the entry list with latest cut
-                        if not first_cut_made:
-                            f_entries = pd.concat((f_entries, cut_df), ignore_index=True)[entry_cols]
-                        else:
-                            tb_entries = f_entries.query(f"{level}_table == {tb}")
-                            drop_entries = tb_entries.query(f"{level}_idx not in {list(cut_df.index)}")
-                            f_entries = f_entries.drop(list(drop_entries.index))
-                        f_entries = f_entries.reset_index(drop=True)
-                        #end for each table loop
-
-                first_cut_made = True
-                # end for each level loop
-
-            # TODO: Go back and fill in level information for levels without cuts
-
-
-            entries[file] = f_entries
-            #end for each file loop
-
-
-        if f_output is not None:
-            sto = LH5Store()
-            # Convert entry dataframe to lgdo.Table to write to disk
-            # Can do this because we know each column of the entry list is just a list of scalars
-            for file, entry_df in entries.items():
-                col_dict = {}
-                for col in entry_df.columns:
-                    arr = Array(nda=np.array(entry_df[col]))
-                    col_dict[col] = arr 
-                entry_tb = Table(col_dict)
-                sto.write_object(entry_tb, f"entries{file}", f_output)
-        return entries
+            for tb in tables:
+                tb_table = None
+                if not cut:
+                    tier = self.tiers[low_level][0]
+                    tb_idx = self.fileDB.df.loc[file, f"{tier}_tables"].index(tb)
+                    columns = self.fileDB.columns[self.fileDB.df.loc[file, f"{tier}_col_idx"][tb_idx]]
+                    tier_path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
+                    if os.path.exists(tier_path):
+                        table_name = self.get_table_name(tier, tb)
+                        tb_table, _ = sto.read_object(table_name, tier_path, field_mask=[columns[0]])
+                else:
+                    for tier in self.tiers[low_level]:
+                        if tier in col_tiers[file]["tables"].keys():
+                            tier_path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
+                            if tier in col_tiers[file]["tables"].keys():
+                                if tb in col_tiers[file]["tables"][tier]:
+                                    table_name = self.get_table_name(tier, tb)
+                                    tier_tb, _ = sto.read_object(table_name, tier_path, field_mask=cut_cols)
+                                    if tb_table is None:
+                                        tb_table = tier_tb 
+                                    else:
+                                        tb_table.join(tier_tb) 
+                tb_df = tb_table.get_dataframe()
+                if cut:
+                    tb_df.query(cut, inplace=True)
+                tb_df[f"{low_level}_table"] = tb
+                tb_df[f"{low_level}_idx"] = tb_df.index
+                f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
+            if in_mem:
+                entries[file] = f_entries 
+            if f_output:
+                # Convert f_entries DataFrame to Struct
+                f_dict = f_entries.to_dict('list')
+                f_struct = Struct(f_dict)
+                sto.write_object(f_struct, f"entries/{file}", f_output, wo_mode='o')
+        if in_mem:
+            return entries
 
     def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit', tcm_level=None): #TODO
         if entry_list is None:
@@ -540,7 +606,6 @@ class DataLoader:
         else:
             print(f"I don't understand what rows={rows} means!")
             return
-
 
     def load_hits(self, entry_list=None, in_mem=False, f_output=None):
         """
@@ -833,14 +898,9 @@ if __name__=='__main__':
     dl.show_file_list()
     print()
 
-    print("Files where timestamp >= '20220628T232559Z' and timestamp <= '20220628T233014Z'")
-    dl.set_files("timestamp >= '20220628T232559Z' and timestamp <= '20220628T233014Z'")
+    print("Files where timestamp == '20220628T233014Z'")
+    dl.set_files("timestamp == '20220628T233014Z'")
     dl.show_file_list(columns=["raw_file", "file_status", "tcm_file"])
-    print()
-
-    print("Get column index")
-    col_tiers = dl.get_tiers_for_col(columns=["waveform", "trapEmax", "array_id"])
-    print(col_tiers)
     print()
 
     dl.set_datastreams([1, 42], "ch")
@@ -848,12 +908,19 @@ if __name__=='__main__':
     print()
 
     print("Set cuts and get entries: ")
-    dl.set_cuts({"hit": "daqenergy > 0", "tcm": "coin_idx < 4"})
-    el = dl.gen_entry_list() 
-    pretty_print_dict(el) 
+    hit_el = dl.gen_entry_list() 
+    print("No cuts, no arguments:")
+    pprint(hit_el) 
+    dl.set_cuts({"hit": "daqenergy > 0"})
+    print("Energy cut, no arguments")
+    hit_cut_el = dl.gen_entry_list()
+    pprint(hit_cut_el)
+    print("Energy cut, tcm")
+    tcm_el = dl.gen_entry_list(tcm_level="tcm")
+    pprint(tcm_el)
     print()
 
-    cols = ["trapEmax", "waveform"]
+    cols = ["energy", "waveform"]
     # print("Load data, merge, Tables: ")    
     # dl.set_output(fmt="lgdo.Table", merge_files=True, columns=cols)
     # lout = dl.load(el, in_mem=True)
