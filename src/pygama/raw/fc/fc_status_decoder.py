@@ -1,11 +1,15 @@
-from pygama.raw.data_decoder import DataDecoder
+from __future__ import annotations
+
+import fcutils
+
+from pygama.raw.data_decoder import DataDecoder, RawBuffer
 
 
 class FCStatusDecoder(DataDecoder):
     """
     Decode FlashCam digitizer status data.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.decoded_values = {
             'status': { # 0: Errors occurred, 1: no errors
               'dtype': 'int32',
@@ -60,7 +64,7 @@ class FCStatusDecoder(DataDecoder):
         }
         super().__init__(*args, **kwargs)
 
-    def decode_packet(self, fcio, status_rb, packet_id):
+    def decode_packet(self, fcio: fcutils.fcio, status_rb: RawBuffer, packet_id: int) -> bool:
         # aliases for brevity
         tbl = status_rb.lgdo
         ii = status_rb.loc
