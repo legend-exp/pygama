@@ -589,8 +589,9 @@ class LH5Store:
 
         # scalars
         elif isinstance(obj, Scalar):
-            if verbosity > 0 and name in group:
-                print('overwriting {name} in {group}')
+            if wo_mode == 'o' and name in group:
+                log.info(f'overwriting {name} in {group}')
+                del group[name]
             ds = group.create_dataset(name, shape=(), data=obj.value)
             ds.attrs.update(obj.attrs)
             return
