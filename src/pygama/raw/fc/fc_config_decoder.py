@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import logging
 
+import fcutils
 import numpy as np
 
 from pygama import lgdo
 from pygama.raw.data_decoder import DataDecoder
+from pygama.raw.raw_buffer import RawBuffer
 
 log = logging.getLogger(__name__)
 
@@ -11,10 +15,11 @@ log = logging.getLogger(__name__)
 class FCConfigDecoder(DataDecoder):
     """Decode FlashCam config data.
 
-    .. note::
-        Derives from :class:`~.raw.data_decoder.DataDecoder` in anticipation of
-        possible future functionality. Currently the base class interface is
-        not used.
+    Note
+    ----
+    Derives from :class:`~.raw.data_decoder.DataDecoder` in anticipation of
+    possible future functionality. Currently the base class interface is not
+    used.
 
     Example
     -------
@@ -26,11 +31,11 @@ class FCConfigDecoder(DataDecoder):
     >>> type(config)
     pygama.lgdo.struct.Struct
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.config = lgdo.Struct()
 
-    def decode_config(self, fcio):
+    def decode_config(self, fcio: fcutils.fcio) -> lgdo.Struct:
         config_names = [
             'nsamples', # samples per channel
             'nadcs', # number of adc channels
@@ -52,7 +57,8 @@ class FCConfigDecoder(DataDecoder):
             self.config.add_field(name, lgdo.Scalar(value))
         return self.config
 
-    def make_lgdo(self, key=None, size=None):
+    def make_lgdo(self, key: int = None, size: int = None) -> lgdo.Struct:
         return self.config
 
-    def buffer_is_full(self, rb): return rb.loc > 0
+    def buffer_is_full(self, rb: RawBuffer) -> bool:
+        return rb.loc > 0

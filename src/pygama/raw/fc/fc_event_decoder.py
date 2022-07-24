@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import copy
 import logging
+from typing import Any
 
+import fcutils
+
+from pygama import lgdo
 from pygama.raw.data_decoder import DataDecoder
 
 log = logging.getLogger(__name__)
@@ -127,7 +133,7 @@ class FCEventDecoder(DataDecoder):
     """
     Decode FlashCam digitizer event data.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         # these are read for every event (decode_event)
         self.decoded_values = copy.deepcopy(fc_decoded_values)
         super().__init__(*args, **kwargs)
@@ -135,42 +141,45 @@ class FCEventDecoder(DataDecoder):
         self.fc_config = None
         self.max_numtraces = 1
 
-    def get_key_list(self): return range(self.fc_config['nadcs'].value)
+    def get_key_list(self) -> range:
+        return range(self.fc_config['nadcs'].value)
 
-    def get_decoded_values(self, channel=None):
+    def get_decoded_values(self, channel: int = None) -> dict[str, dict[str, Any]]:
         # FC uses the same values for all channels
         return self.decoded_values
 
-    def set_file_config(self, fc_config):
+    def set_file_config(self, fc_config: lgdo.Struct) -> None:
         """Access ``FCIOConfig`` members once when each file is opened.
 
         Parameters
         ----------
-        fc_config : lgdo.Struct
-            extracted via :meth:`~.fc_config_decoder.FCConfigDecoder.decode_config`
+        fc_config
+            extracted via :meth:`~.fc_config_decoder.FCConfigDecoder.decode_config`.
         """
         self.fc_config = fc_config
         self.decoded_values['waveform']['wf_len'] = self.fc_config['nsamples'].value
 
-    def decode_packet(self, fcio, evt_rbkd, packet_id):
+    def decode_packet(self, fcio: fcutils.fcio,
+                      evt_rbkd: lgdo.Table | dict[int, lgdo.Table],
+                      packet_id: int) -> bool:
         """Access ``FCIOEvent`` members for each event in the DAQ file.
 
         Parameters
         ----------
-        fcio : fcutils.fcio
-            The interface to the fcio data. Enters this function after a call
-            to ``fcio.get_record()`` so that data for ``packet_id`` ready to be
-            read out
-        evt_rbkd : lgdo.Table or dict
+        fcio
+            The interface to the ``fcio`` data. Enters this function after a
+            call to ``fcio.get_record()`` so that data for `packet_id` ready to
+            be read out.
+        evt_rbkd
             A single table for reading out all data, or a dictionary of tables
-            keyed by channel number
-        packet_id : int
-            The index of the packet in the fcio stream. Incremented by
-            :class:`~.raw.fc.fc_streamer.FCStreamer`
+            keyed by channel number.
+        packet_id
+            The index of the packet in the `fcio` stream. Incremented by
+            :class:`~.raw.fc.fc_streamer.FCStreamer`.
 
         Returns
         -------
-        n_bytes : int
+        n_bytes
             (estimated) number of bytes in the packet that was just decoded.
         """
         if fcio.numtraces > self.max_numtraces:
