@@ -1,22 +1,27 @@
+from __future__ import annotations
+
 import gzip
 import json
 import logging
 
 import numpy as np
 
-from ..data_streamer import DataStreamer
-from ..raw_buffer import RawBuffer
-from . import orca_packet
-from .orca_flashcam import ORFlashCamADCWaveformDecoder, ORFlashCamListenerConfigDecoder
-from .orca_header_decoder import OrcaHeaderDecoder
+from pygama.raw.data_streamer import DataStreamer
+from pygama.raw.orca import orca_packet
+from pygama.raw.orca.orca_base import OrcaDecoder
+from pygama.raw.orca.orca_flashcam import (
+    ORFlashCamADCWaveformDecoder,
+    ORFlashCamListenerConfigDecoder,
+)
+from pygama.raw.orca.orca_header_decoder import OrcaHeaderDecoder
+from pygama.raw.raw_buffer import RawBuffer, RawBufferLibrary
 
 log = logging.getLogger(__name__)
 
 
 class OrcaStreamer(DataStreamer):
-    """ Data streamer for ORCA data
-    """
-    def __init__(self):
+    """Data streamer for ORCA data."""
+    def __init__(self) -> None:
         super().__init__()
         self.in_stream = None
         self.buffer = np.empty(1024, dtype='uint32') # start with a 4 kB packet buffer
@@ -26,17 +31,15 @@ class OrcaStreamer(DataStreamer):
         self.decoder_name_dict = {} # dict of name to decoder object
         self.rbl_id_dict = {} # dict of RawBufferLists for each data_id
 
+    # TODO: need to correct for endianness?
+    def load_packet(self, skip_unknown_ids: bool = False) -> np.uint32 | None:
+        """Loads the next packet into the internal buffer.
 
-    def load_packet(self, skip_unknown_ids=False):
-        """ Loads the next packet into the internal buffer
-        Returns packet as a uint32 view of the buffer (a slice)
-        Returns None at EOF or for an error
-
-        CHECK: need to correct for endianness?
+        Returns packet as a :class:`numpy.uint32` view of the buffer (a slice),
+        returns ``None`` at EOF.
         """
         if self.in_stream is None:
-            print('Error: in_stream is None')
-            return None
+            raise RuntimeError('self.in_stream is None')
 
         # read packet header
         pkt_hdr = self.buffer[:1]
@@ -44,8 +47,7 @@ class OrcaStreamer(DataStreamer):
         self.n_bytes_read += n_bytes_read
         if n_bytes_read == 0: return None
         if n_bytes_read != 4:
-            print(f'Error: only got {n_bytes_read} bytes for packet header')
-            return None
+            raise RuntimeError(f'only got {n_bytes_read} bytes for packet header')
 
         # if it's a short packet, we are done
         if orca_packet.is_short(pkt_hdr): return pkt_hdr
@@ -62,18 +64,16 @@ class OrcaStreamer(DataStreamer):
         n_bytes_read = self.in_stream.readinto(self.buffer[1:n_words])
         self.n_bytes_read += n_bytes_read
         if n_bytes_read != (n_words-1)*4:
-            print(f'Error: only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected.')
-            return None
+            raise RuntimeError(f'only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected.')
 
         # return just the packet
         return self.buffer[:n_words]
 
-
-    def get_decoder_list(self):
+    def get_decoder_list(self) -> list[OrcaDecoder]:
         return list(self.decoder_id_dict.values())
 
 
-    def set_in_stream(self, stream_name):
+    def set_in_stream(self, stream_name: str) -> None:
         if self.in_stream is not None: self.close_in_stream()
         if stream_name.endswith('.gz'):
             self.in_stream = gzip.open(stream_name.encode('utf-8'), 'rb')
@@ -81,15 +81,16 @@ class OrcaStreamer(DataStreamer):
         self.n_bytes_read = 0
 
 
-    def close_in_stream(self):
+    def close_in_stream(self) -> None:
         if self.in_stream is None:
-            raise RuntimeWarning("tried to close an unopened stream")
+            raise RuntimeError("tried to close an unopened stream")
         self.in_stream.close()
         self.in_stream = None
 
-    def close_stream(self): self.close_in_stream()
+    def close_stream(self) -> None:
+        self.close_in_stream()
 
-    def is_orca_stream(stream_name): # static function
+    def is_orca_stream(stream_name: str) -> bool: # static function
         orca = OrcaStreamer()
         orca.set_in_stream(stream_name)
         first_bytes = orca.in_stream.read(12)
@@ -112,10 +113,10 @@ class OrcaStreamer(DataStreamer):
         # it must be an orca stream
         return True
 
-
-    def hex_dump(self, stream_name, n_packets=np.inf,
-                 skip_header=False, shift_data_id=True, print_n_words=False,
-                 max_words=np.inf, as_int=False, as_short=False):
+    def hex_dump(self, stream_name: str, n_packets: int = np.inf,
+                 skip_header: bool = False, shift_data_id: bool = True,
+                 print_n_words: bool = False, max_words: int = np.inf,
+                 as_int: bool = False, as_short: bool = False) -> None:
         self.set_in_stream(stream_name)
         if skip_header: self.load_packet()
         while n_packets > 0:
@@ -129,29 +130,32 @@ class OrcaStreamer(DataStreamer):
                                  as_short=as_short)
             n_packets -= 1
 
-
-    def open_stream(self, stream_name, rb_lib=None, buffer_size=8192,
-                    chunk_mode='any_full', out_stream=''):
-        """ Initialize the ORCA data stream
+    def open_stream(self,
+                    stream_name: str,
+                    rb_lib: RawBufferLibrary = None,
+                    buffer_size: int = 8192,
+                    chunk_mode: str = 'any_full',
+                    out_stream: str = '') -> list[RawBuffer]:
+        """Initialize the ORCA data stream.
 
         Parameters
         ----------
-        stream_name : str
-            The ORCA filename.  Only file streams are currently supported.
+        stream_name
+            The ORCA filename. Only file streams are currently supported.
             Socket stream reading can be added later.
-        rb_lib : RawBufferLibrary
-            library of buffers for this stream
-        buffer_size : int
-            length of tables to be read out in read_chunk
+        rb_lib
+            library of buffers for this stream.
+        buffer_size
+            length of tables to be read out in :meth:`read_chunk`.
         chunk_mode : 'any_full', 'only_full', or 'single_packet'
-            sets the mode use for read_chunk
-        out_stream : str
-            optional name of output stream for default rb_lib generation
+            sets the mode use for :meth:`read_chunk`.
+        out_stream
+            optional name of output stream for default `rb_lib` generation.
 
         Returns
         -------
-        header_data : list(RawBuffer)
-            a list of length 1 containing the raw buffer holding the ORCA header
+        header_data
+            a list of length 1 containing the raw buffer holding the ORCA header.
         """
 
         self.set_in_stream(stream_name)
@@ -159,8 +163,8 @@ class OrcaStreamer(DataStreamer):
         # read in the header
         packet = self.load_packet()
         if orca_packet.get_data_id(packet) != 0:
-            print(f'Error: got data id {orca_packet.get_data_id(packet)} for header')
-            return []
+            raise RuntimeError(f'got data id {orca_packet.get_data_id(packet)} for header')
+
         self.packet_id = 0
         self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id)
         self.header = self.header_decoder.header
@@ -176,7 +180,7 @@ class OrcaStreamer(DataStreamer):
             # check that all requested decoders are present
             for name in rb_lib.keys():
                 if name not in keep_decoders:
-                    print(f'Warning: decoder {name} (requested in rb_lib) not in data description in header')
+                    log.warning(f'decoder {name} (requested in rb_lib) not in data description in header')
         for name in decoder_names:
             # handle header decoder specially
             if name == 'OrcaHeaderDecoder':
@@ -185,7 +189,7 @@ class OrcaStreamer(DataStreamer):
                 continue
             # instantiate other decoders by name
             if name not in globals():
-                print(f'Warning: No implementation of {name}, corresponding packets will be skipped')
+                log.warning(f'no implementation of {name}, corresponding packets will be skipped')
                 continue
             decoder = globals()[name]
             decoder.data_id = self.header.get_data_id(name)
@@ -205,18 +209,17 @@ class OrcaStreamer(DataStreamer):
         if 'OrcaHeaderDecoder' in rb_lib:
             header_rb_list = rb_lib['OrcaHeaderDecoder']
             if len(header_rb_list) != 1:
-                print(f'warning! header_rb_list had length {len(header_rb_list)}, ignoring all but the first')
+                log.warning(f'header_rb_list had length {len(header_rb_list)}, ignoring all but the first')
             rb = header_rb_list[0]
         else: rb = RawBuffer(lgdo=self.header_decoder.make_lgdo())
         rb.lgdo.value = json.dumps(self.header)
         rb.loc = 1 # we have filled this buffer
         return [rb]
 
+    def read_packet(self) -> bool:
+        """Read a packet of data.
 
-    def read_packet(self):
-        """ Read a packet of data.
-
-        Data written to self.rb_lib.
+        Data written to the `rb_lib` attribute.
         """
         # read until we get a decodeable packet
         while True:
