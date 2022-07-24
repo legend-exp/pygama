@@ -181,9 +181,9 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str | dict = None,
                                    write_start=write_offset+start_row)
 
             if log.level <= logging.INFO:
-                progress_bar.update(buffer_len)
+                progress_bar.update(n_rows)
 
-            if start_row+n_rows > tot_n_rows:
+            if start_row+n_rows >= tot_n_rows:
                 break
 
         if log.level <= logging.INFO:
