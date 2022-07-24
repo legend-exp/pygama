@@ -197,7 +197,7 @@ def explode_arrays(cumulative_length, *arrays, out_arrays=None):
     out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
     if out_arrays is None:
         out_arrays = []
-        for array in arrays: 
+        for array in arrays:
             out_arrays.append(np.empty(out_len, dtype=array.dtype))
     for ii in range(len(arrays)):
         if len(arrays[ii]) != len(cumulative_length):
@@ -206,4 +206,3 @@ def explode_arrays(cumulative_length, *arrays, out_arrays=None):
             raise ValueError(f"out_array length {len(out_arrays[ii])} != cl[-1] = {cumulative_length[-1]}")
         allocated_explode(cumulative_length, arrays[ii], out_arrays[ii])
     return out_arrays
-
