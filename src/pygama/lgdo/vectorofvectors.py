@@ -1,5 +1,5 @@
 import numpy as np
-from numba import guvectorize
+from numba import jit
 
 from .array import Array
 from .lgdo_utils import *
@@ -137,31 +137,41 @@ class VectorOfVectors:
 
     def __repr__(self): return str(self)
 
-    @staticmethod
-    def explode(cumulative_length, *arrays, out_arrays=None):
-        out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
-        if out_arrays is None:
-            out_arrays = []
-            for array in arrays: 
-                out_arrays.append(np.empty(out_len, dtype=array.dtype))
-        for ii in range(len(arrays)):
-            if len(arrays[ii]) != len(cumulative_length):
-                raise ValueError(f"array {ii} has len {len(arrays[ii])} != cl length {len(cumulative_length)}")
-            if cumulative_length[-1] != len(out_arrays[ii]):
-                raise ValueError(f"out_array length {len(out_arrays[ii])} != cl[-1] = {cumulative_length[-1]}")
-            allocated_explode(cumulative_length, arrays[ii], out_arrays[ii])
-        return out_arrays
 
+@jit(nopython=True)
+def allocated_group_by(sorted_array_in, cumulative_length_out):
+    if len(cumulative_length_out) == 0 and len(sorted_array_in) > 0:
+        raise ValueError("cumulative_length_out too short ({len(cumulative_length_out)})")
+    cumulative_length_out.fill(0)
+    ii = 0
+    last_val = sorted_array_in[0]
+    for val in sorted_array_in:
+        if val != last_val:
+            ii += 1
+            cumulative_length_out[ii] = cumulative_length_out[ii-1]
+            if ii >= len(cumulative_length_out):
+                raise RuntimeError("cumulative_length_out too short ({len(cumulative_length_out)})")
+                return
+            last_val = val
+        cumulative_length_out[ii] += 1
+    ii += 1
+    return cumulative_length_out[:ii]
 
-@guvectorize(["void(int64[:], float32[:], float32[:])",
-              "void(int64[:], float64[:], float64[:])",
-              "void(int64[:], int32[:], int32[:])",
-              "void(int64[:], int64[:], int64[:])"],
-              "(n),(n),(m)", nopython=True, cache=True)
+@jit(nopython=True)
+def allocated_explode_cl(cumulative_length, array_out):
+    if cumulative_length[-1] != len(array_out):
+        raise ValueWarning(f"bad lengths: cl[-1] ({cumulative_length[-1]}) != out ({len(array_out)})")
+        return
+    start = 0
+    for ii in range(len(cumulative_length)):
+        for jj in range(cumulative_length[ii]):
+            array_out[start+jj] = ii
+        start = cumulative_length[ii]
+
+@jit(nopython=True)
 def allocated_explode(cumulative_length, array_in, array_out):
     if len(cumulative_length) != len(array_in) or cumulative_length[-1] != len(array_out):
-        for jj in range(len(array_out)):
-            array_out[jj] = np.NaN
+        raise ValueWarning(f"bad lengths: cl ({len(cumulative_length)}) != in ({len(array_in)}) and cl[-1] ({cumulative_length[-1]}) != out ({len(array_out)})")
         return
     ii = 0
     for jj in range(len(array_out)):
@@ -169,4 +179,17 @@ def allocated_explode(cumulative_length, array_in, array_out):
             ii += 1
         array_out[jj] = array_in[ii]
 
+def explode_arrays(cumulative_length, *arrays, out_arrays=None):
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if out_arrays is None:
+        out_arrays = []
+        for array in arrays: 
+            out_arrays.append(np.empty(out_len, dtype=array.dtype))
+    for ii in range(len(arrays)):
+        if len(arrays[ii]) != len(cumulative_length):
+            raise ValueError(f"array {ii} has len {len(arrays[ii])} != cl length {len(cumulative_length)}")
+        if cumulative_length[-1] != len(out_arrays[ii]):
+            raise ValueError(f"out_array length {len(out_arrays[ii])} != cl[-1] = {cumulative_length[-1]}")
+        allocated_explode(cumulative_length, arrays[ii], out_arrays[ii])
+    return out_arrays
 
