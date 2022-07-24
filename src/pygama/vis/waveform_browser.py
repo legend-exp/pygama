@@ -39,7 +39,7 @@ class WaveformBrowser:
                  styles: dict[str, list] | str = None,
                  legend: str | list[str] = None,
                  legend_opts: dict = None,
-                 n_drawn: 1 = 1,
+                 n_drawn: int = 1,
                  x_unit: pint.Unit | str = None,
                  x_lim: tuple[float | str | pint.Quantity] = None,
                  y_lim: tuple[float | str | pint.Quantity] = None,
