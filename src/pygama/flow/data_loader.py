@@ -393,6 +393,11 @@ class DataLoader:
         if self.file_list is None:
             print("You need to make a query on fileDB, use set_file_list")
             return 
+
+        if not in_mem and f_output is None:
+            print("Need to specify output file if not returning in memory")
+            return
+
         if in_mem:
             entries = {}
         low_level = self.levels[0]
@@ -499,7 +504,7 @@ class DataLoader:
                         if save_output_columns:
                             for col in tb_df.columns:
                                 if col in for_output:
-                                    f_entries.loc[keep_idx, col] = tb_df[col]
+                                    f_entries.loc[keep_idx, col] = tb_df[col].tolist()
                         #end for each table loop
                     # end for each level loop
 
@@ -864,14 +869,6 @@ if __name__=='__main__':
     in different stages.  More advanced tests would be moved to a notebook or
     separate script.
     """
-    def pretty_print_dict(d, indent=0):
-        for key, value in d.items():
-            if isinstance(value, dict):
-                print('\t' * indent + str(key))
-                pretty_print_dict(value, indent+1)
-            else:
-                print('\t' * indent + str(key) + ":")
-                print('\t' * indent + str(value))
 
     print('-------------------------------------------------------')
 
@@ -920,7 +917,18 @@ if __name__=='__main__':
     pprint(tcm_el)
     print()
 
-    cols = ["energy", "waveform"]
+    print("Save output columns to entry list: ")
+    cols = ["daqenergy", "tp_20"]
+    dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
+    dl.set_cuts({"hit": "daqenergy > 0"})
+    print("Energy cut, no arguments")
+    hit_cut_el = dl.gen_entry_list(save_output_columns=True)
+    pprint(hit_cut_el)
+    print("Energy cut, tcm")
+    tcm_el = dl.gen_entry_list(tcm_level="tcm", save_output_columns=True)
+    pprint(tcm_el)
+    print()
+
     # print("Load data, merge, Tables: ")    
     # dl.set_output(fmt="lgdo.Table", merge_files=True, columns=cols)
     # lout = dl.load(el, in_mem=True)
@@ -928,7 +936,6 @@ if __name__=='__main__':
     # print()
 
     print("Load data, no merge: ")
-    dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
     lout = dl.load(el, in_mem=True, rows="evt", tcm_level="tcm")
-    pretty_print_dict(lout)
+    pprint(lout)
     print('-------------------------------------------------------')
