@@ -622,9 +622,12 @@ class LH5Store:
 
         # scalars
         elif isinstance(obj, Scalar):
-            if wo_mode == 'o' and name in group:
-                log.debug(f'overwriting {name} in {group}')
-                del group[name]
+            if name in group:
+                if wo_mode in ['o', 'a']:
+                    log.debug(f'overwriting {name} in {group}')
+                    del group[name]
+                else:
+                    raise RuntimeError(f"tried to overwrite {name} in {group} for wo_mode {wo_mode}")
             ds = group.create_dataset(name, shape=(), data=obj.value)
             ds.attrs.update(obj.attrs)
             return
