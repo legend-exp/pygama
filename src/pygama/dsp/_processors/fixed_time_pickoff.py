@@ -42,6 +42,6 @@ def fixed_time_pickoff(w_in, t_in, a_out):
     if int(t_in) < 0 or int(t_in) >= len(w_in):
         return
 
-    i = int(t_in)
+    i_in = int(t_in)
     w = t_in-i
-    a_out[0] = (1-2)*w_in[i] + w*w_in[i+1]
+    a_out[0] = (1-w)*w_in[i_in] + w*w_in[i_in+1]
