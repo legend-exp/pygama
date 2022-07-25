@@ -395,7 +395,7 @@ class DataLoader:
             return 
 
         if not in_mem and f_output is None:
-            print("Need to specify output file if not returning in memory")
+            print("If in_mem is False, need to specify an output file")
             return
 
         if in_mem:
@@ -423,8 +423,8 @@ class DataLoader:
                 else: 
                     cut = ""
                 # String parsing to determine which columns need to be loaded
-                split = re.split(' |<|>|=|and|or|&|\|', cut) 
-                for term in split:
+                terms = re.findall('[^\W0-9]\w*', cut) # Matches any valid python variable name
+                for term in terms:
                     if term.isidentifier() and not iskeyword(term): #Assumes that column names are valid python variable names
                         cut_cols[level].append(term)
                         # Add column to entry_cols if they are needed for both the cut and the output
@@ -558,12 +558,11 @@ class DataLoader:
                 tb_table = None
                 if not cut:
                     tier = self.tiers[low_level][0]
-                    tb_idx = self.fileDB.df.loc[file, f"{tier}_tables"].index(tb)
-                    columns = self.fileDB.columns[self.fileDB.df.loc[file, f"{tier}_col_idx"][tb_idx]]
                     tier_path = self.data_dir + self.fileDB.tier_dirs[tier] + '/' + self.fileDB.df.iloc[file][f'{tier}_file']
                     if os.path.exists(tier_path):
                         table_name = self.get_table_name(tier, tb)
-                        tb_table, _ = sto.read_object(table_name, tier_path, field_mask=[columns[0]])
+                        n_rows = sto.read_n_rows(table_name, tier_path)
+                        tb_df = pd.DataFrame({f"{low_level}_idx": np.arange(n_rows), f"{low_level}_table": tb})
                 else:
                     for tier in self.tiers[low_level]:
                         if tier in col_tiers[file]["tables"].keys():
@@ -576,11 +575,10 @@ class DataLoader:
                                         tb_table = tier_tb 
                                     else:
                                         tb_table.join(tier_tb) 
-                tb_df = tb_table.get_dataframe()
-                if cut:
+                    tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)
-                tb_df[f"{low_level}_table"] = tb
-                tb_df[f"{low_level}_idx"] = tb_df.index
+                    tb_df[f"{low_level}_table"] = tb
+                    tb_df[f"{low_level}_idx"] = tb_df.index
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
             if in_mem:
                 entries[file] = f_entries 
