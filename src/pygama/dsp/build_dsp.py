@@ -65,7 +65,7 @@ def build_dsp(f_raw: str, f_dsp: str, dsp_config: str | dict = None,
         contains JSON DSP configuration file names for every table in
         `lh5_tables`
     """
-    
+
     if chan_config is not None:
         # clear existing output files
         if write_mode == 'r':
