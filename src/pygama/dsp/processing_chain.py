@@ -1082,8 +1082,8 @@ class NumpyIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self) -> str:
-        return (f"{self.var} linked to numpy.array({self.io_buf.shape}, "
-                f"{self.io_buf.dtype})@{self.io_buf.data})")
+        return (f"{self.var} linked to numpy.array(shape={self.io_buf.shape}, "
+                f"dtype={self.io_buf.dtype})")
 
 
 class LGDOArrayIOManager(IOManager):
@@ -1130,7 +1130,7 @@ class LGDOArrayIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self) -> str:
-        return f'{self.var} linked to {self.io_array}'
+        return f'{self.var} linked to lgdo.Array(shape={self.io_array.nda.shape}, dtype={self.io_array.nda.dtype}, attrs={self.io_array.attrs})'
 
 class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
     """IO Manager for buffers that are numpy ArrayOfEqualSizedArrays"""
@@ -1176,7 +1176,7 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
                   self.raw_var[0:end-start, ...], 'unsafe')
 
     def __str__(self) -> str:
-        return f'{self.var} linked to {self.io_array}'
+        return f'{self.var} linked to lgdo.ArrayOfEqualSizedArrays(shape={self.io_array.nda.shape}, dtype={self.io_array.nda.dtype}, attrs={self.io_array.attrs})'
 
 
 class LGDOWaveformIOManager(IOManager):
@@ -1243,9 +1243,10 @@ class LGDOWaveformIOManager(IOManager):
             self.t0_buf[start:end, ...] = self.t0_var[0:end-start, ...]
 
     def __str__(self) -> str:
-        return (f"{self.var} linked to <pygama.lgdo.WaveformTable: values: "
-                f"{self.wf_table.values}, dt: {self.wf_table.dt}, t0: "
-                f"{self.wf_table.t0}>")
+        return (f"{self.var} linked to pygama.lgdo.WaveformTable("
+                f"values(shape={self.wf_table.values.nda.shape}, dtype={self.wf_table.values.nda.dtype}, attrs={self.wf_table.values.attrs}), "
+                f"dt(shape={self.wf_table.dt.nda.shape}, dtype={self.wf_table.dt.nda.dtype}, attrs={self.wf_table.dt.attrs}), "
+                f"t0(shape={self.wf_table.t0.nda.shape}, dtype={self.wf_table.t0.nda.dtype}, attrs={self.wf_table.t0.attrs}))")
 
 
 def build_processing_chain(lh5_in: lgdo.Table, dsp_config: dict | str, db_dict: dict = None,
