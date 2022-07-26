@@ -156,7 +156,7 @@ class VectorOfVectors:
 def build_cl(sorted_array_in : Array, cumulative_length_out : np.ndarray = None) -> np.ndarray:
     """ build a cumulative_length array from an array of sorted data
 
-    So for example if sorted_array_in contains [ 3, 3, 3, 4 ], would return 
+    So for example if sorted_array_in contains [ 3, 3, 3, 4 ], would return
     [ 2, 3 ]
 
     For a sorted_array_in of indices, this is the inverse of explode_cl() below,
@@ -182,7 +182,7 @@ def build_cl(sorted_array_in : Array, cumulative_length_out : np.ndarray = None)
     """
     if len(sorted_array_in) == 0: return None
     sorted_array_in = np.asarray(sorted_array_in)
-    if cumulative_length_out is None: 
+    if cumulative_length_out is None:
         cumulative_length_out = np.zeros(len(sorted_array_in), dtype=np.uint64)
     else:
         cumulative_length_out.fill(0)
@@ -303,7 +303,7 @@ def explode_arrays(cumulative_length : Array, arrays : list, out_arrays : list =
     arrays
         the data arrays to be exploded. Each array must have same length as
         cumulative_length
-    array_out
+    out_arrays
         an optional list of pre-allocated arrays to hold the exploded data. The
         length of the list should be equal to the number of "arrays", and each
         entry in array_out should have length cumulative_length[-1]. If not

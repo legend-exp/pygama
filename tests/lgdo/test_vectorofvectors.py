@@ -99,4 +99,3 @@ def test_build_cl_and_explodes():
     assert len(out_arrays) == 2
     assert (out_arrays[0] == array_exp).all()
     assert (out_arrays[1] == exp).all()
-
