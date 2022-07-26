@@ -1,13 +1,14 @@
-import glob
+from __future__ import annotations
+
 import itertools
 import math
-import os
 import string
 import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import pandas
+import pint
 from cycler import cycler
 from matplotlib.lines import Line2D
 
@@ -17,113 +18,127 @@ from pygama.math.units import unit_registry as ureg
 
 
 class WaveformBrowser:
-    """
-    The Waveform Browser is a tool meant for interacting with waveforms from
-    LH5 files. This defines an interface for drawing waveforms from a file,
-    drawing transformed waveforms defined using build_dsp style json files,
-    drawing horizontal and vertical lines at the values of calculated
-    parameters, and filling a legend with calculated parameters.
+    """The :class:`WaveformBrowser` is a tool meant for interacting with
+    waveforms from LEGEND HDF5 files. It defines an interface for drawing
+    waveforms from a file, drawing transformed waveforms defined using
+    :func:`~.dsp.build_dsp.build_dsp` style JSON files, drawing horizontal and
+    vertical lines at the values of calculated parameters, and filling a legend
+    with calculated parameters.
     """
 
-    def __init__(self, files_in, lh5_group, base_path = '',
-                 entry_list = None, entry_mask = None,
-                 dsp_config = None, database = None,
-                 aux_values = None,
-                 lines = 'waveform', styles = None,
-                 legend = None, legend_opts = None,
-                 n_drawn = 1, x_unit = None, x_lim = None, y_lim = None,
-                 norm = None, align=None,
-                 buffer_len = 128, block_width = 8):
+    def __init__(self,
+                 files_in: str | list[str],
+                 lh5_group: str,
+                 base_path: str = '',
+                 entry_list: list[int] | list[list[int]] = None,
+                 entry_mask: list[int] | list[list[int]] = None,
+                 dsp_config: str = None,
+                 database: str | dict = None,
+                 aux_values: pandas.DataFrame = None,
+                 lines: str | list[str] = 'waveform',
+                 styles: dict[str, list] | str = None,
+                 legend: str | list[str] = None,
+                 legend_opts: dict = None,
+                 n_drawn: int = 1,
+                 x_unit: pint.Unit | str = None,
+                 x_lim: tuple[float | str | pint.Quantity] = None,
+                 y_lim: tuple[float | str | pint.Quantity] = None,
+                 norm: str = None,
+                 align: str = None,
+                 buffer_len: int = 128,
+                 block_width: int = 8) -> None:
         """
         Parameters
         ----------
-        files_in : str
-            name of file or list of names to browse. Can use wildcards
+        files_in
+            name of file or list of names to browse. Can use wildcards.
 
-        lh5_group : str
-            name of LH5 group in file to browse
+        lh5_group
+            name of LH5 group in file to browse.
 
-        base_path : str
-            base path for file. See LH5Store
+        base_path
+            base path for file. See :class:`~.lgdo.lh5_store.LH5Store`.
 
-        entry_list : list-like or nested list-like (optional)
-            List of event indices to draw. If it is a nested list, use local
-            indices for each file, otherwise use global indices
+        entry_list
+            list of event indices to draw. If it is a nested list, use local
+            indices for each file, otherwise use global indices.
 
-        entry_mask : array-like or list of array-likes (optional)
-            Boolean mask indicating which events to draw. If a nested list, use
+        entry_mask
+            boolean mask indicating which events to draw. If a nested list, use
             a mask for each file, else use a global mask. Cannot be used with
-            entry_list...
+            `entry_list`.
 
-        dsp_config : str (optional)
-            name of DSP config json file containing a list of processors that
-            can be applied to waveforms
+        dsp_config
+            name of DSP config JSON file containing a list of processors that
+            can be applied to waveforms.
 
-        database : str or dict-like (optional)
-            dict or JSON file with database of processing parameters
+        database
+            dictionary or JSON file with database of processing parameters.
 
-        aux_values : pandas dataframe (optional)
+        aux_values
             table of auxiliary values that are one-to-one with the input
-            waveforms that can be drawn or placed in the legend
+            waveforms that can be drawn or placed in the legend.
 
-        lines : str or [strs] (default 'waveform')
-            name(s) of objects to draw 2D lines for. Waveforms will be drawn
-            as a time-series. Scalar quantities will be drawn as horizontal
-            or vertical lines, depending on units. Vectors will be drawn
-            as multiple horizontal/vertical lines
+        lines
+            name(s) of objects to draw 2D lines for. Waveforms will be drawn as
+            a time-series. Scalar quantities will be drawn as horizontal or
+            vertical lines, depending on units. Vectors will be drawn as
+            multiple horizontal or vertical lines.
 
-        styles : (default None)
+        styles
             line colors and other style parameters to cycle through when
-            drawing waveforms. Can be given as:
+            drawing waveforms. Can be given as
 
-              - dict of lists: e.g. {'color':['r', 'g', 'b'], 'linestyle':['-', '--', '.']}
-              - name of predefined style; see matplotlib.style documentation
-              - None: use current matplotlib rcparams style
+              - dictionary of lists (e.g. ``{'color':['r', 'g', 'b'],
+                'linestyle':['-', '--', '.']}``)
+              - name of predefined style (see :mod:`matplotlib.style`
+                documentation)
+              - ``None`` (use current :obj:`matplotlib.rcParams` style).
 
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
 
-        legend : str or [strs] (default None)
-            Formatting string and values to include in the legend. This can
+        legend
+            formatting string and values to include in the legend. This can
             be a list of values (one for each drawn object). If just a name
             is given, it will be auto-formatted to 3 digits. Otherwise,
-            formatting strings in brackets can be used: ::
+            formatting strings in brackets can be used (e.g. ``{energy:0.1f}
+            keV, {timestamp:d} ns``).  Names will be searched in the input
+            file, DSP processed parameters, or auxiliary data-table.
 
-              "{energy:0.1f} keV, {timestamp:d} ns"
+        legend_opts
+            dictionary containing additional keyword arguments for
+            :mod:`matplotlib.legend`.
 
-            Names will be searched in the input file, DSP processed parameters,
-            or auxiliary data-table
+        n_drawn
+            number of events to draw simultaneously when calling
+            :meth:`draw_next`.
 
-        legend_opts : dict (default None)
-            dict containing additional kwargs for matplotlib.legend
+        x_lim, y_lim
+            range of x- or y-values and units passed as tuple.
 
-        n_drawn : int (default 1)
-            number of events to draw simultaneously when calling DrawNext
+              - ``None``: Get range from first waveform drawn
+              - :class:`pint.Quantity`: set value and x-unit
+              - ``float``: get unit from first waveform drawn
+              - ``str``: convert to :class:`pint.Quantity` (e.g. ``('0*us',
+                '10*us')``).
 
-        x_lim, y_lim : tuple-pair of float, pint.Quantity or str (default auto)
-            range of x- or y-values and units passes as tuple.
+        x_unit
+            unit of x-axis.
 
-              - None: Get range from first waveform drawn
-              - pint.Quantity: set value and x-unit
-              - float: get unit from first waveform drawn
-              - str: convert to pint.Quanity (e.g. ('0*us', '10*us'))
+        norm
+            name of parameter (probably energy) to use to normalize waveforms.
+            Useful when drawing multiple waveforms.
 
-        x_unit : pint.Unit or str (default auto)
-            unit of x-axis
+        align
+            name of parameter to use for x-offset. Useful, e.g., for aligning
+            multiple waveforms at a particular timepoint.
 
-        norm : str (default None)
-            name of parameter (probably energy) to use to normalize WFs
-            useful when drawing multiple WFs
+        buffer_len
+            number of waveforms to keep in memory at a time.
 
-        align : str (default None)
-            name of parameter to use for x-offset; useful, e.g., for aligning
-            multiple waveforms at a particular timepoint
-
-        buffer_len : int (default 16)
-            number of waveforms to keep in memory at a time
-
-        block_width : int (default 16)
-            block width for processing chain
+        block_width
+            block width for :class:`~.dsp.processing_chain.ProcessinChain`.
         """
 
         self.norm_par = norm
@@ -164,7 +179,7 @@ class WaveformBrowser:
                 if isinstance(sty, str):
                     try:
                         self.styles[i] = plt.style.library[sty]['axes.prop_cycle']
-                    except:
+                    except KeyError:
                         self.styles[i] = itertools.repeat(None)
                 elif sty is None:
                     self.styles[i] = itertools.repeat(None)
@@ -174,7 +189,7 @@ class WaveformBrowser:
             if isinstance(styles, str):
                 try:
                     self.styles = plt.style.library[styles]['axes.prop_cycle']
-                except:
+                except KeyError:
                     self.styles = itertools.repeat(None)
             elif styles is None:
                 self.styles = itertools.repeat(None)
@@ -254,19 +269,21 @@ class WaveformBrowser:
         self.fig = None
         self.ax = None
 
-    def new_figure(self):
-        """Create a new figure and draw in it"""
+    def new_figure(self) -> None:
+        """Create a new figure and draw in it."""
         self.fig, self.ax = plt.subplots(1)
 
-    def save_figure(self, f_out, *args, **kwargs):
-        """ Write figure to file named f_out. See matplotlib.pyplot.savefig
-        for args and kwargs"""
+    def save_figure(self, f_out: str, *args, **kwargs) -> None:
+        """Write figure to file named `f_out`. See
+        :func:`matplotlib.pyplot.savefig` for `args` and `kwargs`."""
         self.fig.savefig(f_out)
 
-    def set_figure(self, fig, ax=None):
-        """Use an already existing figure and axis; make sure to set clear
-        to False when drawing if you don't want to clear what's already there!
-        Can give a WaveformBrowser object to use the fig/axis from that"""
+    def set_figure(self, fig: WaveformBrowser | plt.Figure, ax: plt.Axes = None) -> None:
+        """Use an already existing figure and axis.
+
+        Make sure to set ``clear=False`` when drawing if you don't want to
+        clear what's already there! Can give a :class:`WaveformBrowser` object
+        to use the figure / axis from that."""
         if isinstance(fig, WaveformBrowser):
             self.fig = fig.fig
             self.ax = fig.ax
@@ -281,27 +298,27 @@ class WaveformBrowser:
         else:
             raise TypeError("fig must be matplotlib.Figure or WaveformBrowser")
 
-    def clear_data(self):
-        """ Reset the currently stored data """
+    def clear_data(self) -> None:
+        """Reset the currently stored data."""
         for line_data in self.lines.values(): line_data.clear()
         for leg_data in self.legend_vals.values(): leg_data.clear()
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
         self.n_stored = 0
 
-    def find_entry(self, entry, append=True, safe=False):
-        """
-        Find the requested data associated with entry in input files and
+    def find_entry(self, entry: int | list[int], append: bool = True,
+                   safe: bool = False) -> None:
+        """Find the requested data associated with entry in input files and
         place store it internally without drawing it.
 
         Parameters
         ----------
-        entry : int or [ints]
-            index of entry or list of entries to find
-        append : bool (default True)
-            if False, clear previously found data before finding more
-        safe : bool (default False)
-            if False, throw an exception for out of range entries
+        entry
+            index of entry or list of entries to find.
+        append
+            if ``False``, clear previously found data before finding more.
+        safe
+            if ``False``, throw an exception for out of range entries.
         """
         if not append: self.clear_data()
         if hasattr(entry, '__iter__'):
@@ -340,8 +357,6 @@ class WaveformBrowser:
                 ref_time = self.aux_vals[self.align_par][entry]
             else:
                 raise
-
-        leg_handle = None
 
         # lines
         lim = math.sqrt(sys.float_info.max) # limits for v/h lines
@@ -382,7 +397,9 @@ class WaveformBrowser:
                 self._update_auto_limit(None, val)
 
             else:
-                raise TypeError("Cannot draw "+name+". WaveformBrowser does not support drawing lines for data of type " + str(data.__class__))
+                raise TypeError(
+                    f"Cannot draw '{name}'. WaveformBrowser does not support "
+                    f"drawing lines for data of type {data.__class__}")
 
         # legend data
         for name, vals in self.legend_vals.items():
@@ -397,16 +414,17 @@ class WaveformBrowser:
                 else:
                     data = ureg.Quantity(data.nda[i_tb])
             else:
-                raise TypeError("WaveformBrowser does not adding legend entries for data of type " + data.__class__)
+                raise TypeError(
+                    "WaveformBrowser does not adding legend entries for data "
+                    f"of type {data.__class__}")
 
             vals.append(data)
 
         self.n_stored += 1
         self.next_entry = entry + 1
 
-    def draw_current(self, clear=True):
-        """
-        Draw the waveforms and data currently held internally by this class.
+    def draw_current(self, clear: bool = True) -> None:
+        """Draw the waveforms and data currently held internally by this class.
         """
         # Make figure/axis if needed
         if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
@@ -448,7 +466,7 @@ class WaveformBrowser:
             leg_cycle = cycler(**self.legend_vals)
         except Exception:
             for form in self.legend_format:
-                for i in range(self.n_stored):
+                for _ in range(self.n_stored):
                     leg_labels.append(form)
         else:
             for form in self.legend_format:
@@ -468,7 +486,7 @@ class WaveformBrowser:
                     leg_labels = [t.get_text() for t in old_leg.get_texts()] + leg_labels
             self.ax.legend(leg_handles, leg_labels, **self.legend_kwargs)
 
-    def _update_auto_limit(self, x, y):
+    def _update_auto_limit(self, x: np.ndarray, y: np.ndarray) -> None:
         # Helper to update the automatic limits
         y_where = {}
         if isinstance(y, np.ndarray) and self.y_lim is not None:
@@ -483,42 +501,45 @@ class WaveformBrowser:
             self.auto_y_lim[0] = np.amin(y, **y_where, initial=self.auto_y_lim[0])
             self.auto_y_lim[1] = np.amax(y, **y_where, initial=self.auto_y_lim[1])
 
-    def draw_entry(self, entry, append=False, clear=True, safe=False):
-        """
-        Draw specified entry in the current figure/axes
+    def draw_entry(self, entry: int | list[int], append: bool = False,
+                   clear: bool = True, safe: bool = False) -> None:
+        """Draw specified entry in the current figure/axes.
 
         Parameters
         ----------
-        entry : int or [ints]
-            entry or list of entries to draw
-        append : bool (default False)
-            if True, do not clear previously drawn entries before drawing more
-        clear : bool (default True)
-            if True, clear previously drawn objects in the axes before drawing
-        safe : bool (default False)
-            if False, throw an exception for out of range entries
+        entry
+            entry or list of entries to draw.
+        append
+            if ``True``, do not clear previously drawn entries before drawing more.
+        clear
+            if ``True``, clear previously drawn objects in the axes before drawing.
+        safe
+            if ``False``, throw an exception for out of range entries.
         """
         self.find_entry(entry, append)
         self.draw_current(clear)
 
-    def find_next(self, n_wfs = None, append = False):
-        """Find the next n_wfs waveforms (default self.n_drawn). See find_entry"""
+    def find_next(self, n_wfs: int = None, append: bool = False) -> tuple[int, int]:
+        """Find the next `n_wfs` waveforms (default `self.n_drawn`). See
+        :meth:`find_entry`."""
         if not n_wfs: n_wfs = self.n_drawn
         entries = (self.next_entry, self.next_entry+n_wfs)
         self.find_entry(range(*entries), append, safe=True)
         return entries
 
-    def draw_next(self, n_wfs = None, append = False, clear = True):
-        """Draw the next n_wfs waveforms (default self.n_drawn). See draw_next"""
+    def draw_next(self, n_wfs: int = None, append: bool = False,
+                  clear: bool = True) -> tuple[int, int]:
+        """Draw the next `n_wfs` waveforms (default `self.n_drawn`). See
+        :meth:`draw_next`."""
         entries = self.find_next(append)
         self.draw_current(clear)
         return entries
 
-    def reset(self):
-        """ Reset to the start of the file for draw_next """
+    def reset(self) -> None:
+        """Reset to the start of the file for :meth:`draw_next`."""
         self.clear_data()
         self.next_entry = 0
 
-    def __iter__(self):
+    def __iter__(self) -> tuple[int, int]:
         while self.next_entry < len(self.lh5_it):
             yield self.draw_next()
