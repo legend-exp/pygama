@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 def build_dsp(f_raw: str,
               f_dsp: str,
-              dsp_config: str | dict,
+              dsp_config: str | dict = None,
               lh5_tables: list[str] = None,
               database: str | dict = None,
               outputs: list[str] = None,
@@ -72,6 +72,22 @@ def build_dsp(f_raw: str,
         `lh5_tables`.
     """
 
+    if chan_config is not None:
+        # clear existing output files
+        if write_mode == 'r':
+            if os.path.isfile(f_dsp):
+                os.remove(f_dsp)
+            write_mode = 'a'
+
+        for tb, dsp_config in chan_config.items():
+            log.debug(f'processing table: {tb} with DSP config file {dsp_config}')
+            try:
+                build_dsp(f_raw, f_dsp, dsp_config, [tb], database,
+                          outputs, n_max, write_mode, buffer_len, block_width)
+            except RuntimeError:
+                log.debug(f'table {tb} not found')
+        return
+
     if isinstance(dsp_config, str):
         with open(dsp_config) as config_file:
             dsp_config = json.load(config_file)
@@ -87,21 +103,15 @@ def build_dsp(f_raw: str,
 
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
-        lh5_tables = []
-        lh5_keys = lh5.ls(f_raw)
+        lh5_tables = lh5.ls(f_raw)
 
-        # sometimes 'raw' is nested, e.g g024/raw
-        for tb in lh5_keys:
-            if "raw" not in tb:
-                tbname = lh5.ls(lh5_file[tb])[0]
-                if "raw" in tbname:
-                    tb = f'{tb}/{tbname}'  # g024 + /raw
-            lh5_tables.append(tb)
+    # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
+    for i, tb in enumerate(lh5_tables):
+        if "raw" not in tb and lh5.ls(lh5_file, f"{tb}/raw"):
+            lh5_tables[i] = f'{tb}/raw'
+        elif not lh5.ls(lh5_file, tb):
+            del lh5_tables[i]
 
-    # make sure every group points to waveforms, if not, remove the group
-    for tb in lh5_tables:
-        if 'raw' not in tb:
-            lh5_tables.remove(tb)
     if len(lh5_tables) == 0:
         raise RuntimeError(f"could not find any valid LH5 table in {f_raw}")
 
@@ -144,16 +154,6 @@ def build_dsp(f_raw: str,
         if n_max and n_max < tot_n_rows:
             tot_n_rows = n_max
 
-        # if we have separate DSP files for each table, read them in here
-        if chan_config is not None:
-            f_config = chan_config[tb]
-            with open(f_config) as config_file:
-                dsp_config = json.load(config_file)
-            log.debug(f"processing table: '{tb}' with DSP config file {f_config}")
-
-        if not isinstance(dsp_config, dict):
-            raise RuntimeError(f"dsp_config for '{tb}' must be a dict")
-
         chan_name = tb.split('/')[0]
         db_dict = database.get(chan_name) if database else None
         tb_name = tb.replace('/raw', '/dsp')
@@ -190,12 +190,12 @@ def build_dsp(f_raw: str,
                                    write_start=write_offset+start_row)
 
             if log.level <= logging.INFO:
-                progress_bar.update(buffer_len)
+                progress_bar.update(n_rows)
 
-            if start_row+n_rows > tot_n_rows:
+            if start_row+n_rows >= tot_n_rows:
                 break
 
         if log.level <= logging.INFO:
             progress_bar.close()
 
-    raw_store.write_object(dsp_info, 'dsp_info', f_dsp)
+    raw_store.write_object(dsp_info, 'dsp_info', f_dsp, wo_mode='o')

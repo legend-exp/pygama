@@ -69,7 +69,7 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
                                       window_ref=window_ref, array_ids=array_ids)
 
     for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
-    tcm = lgdo.Table(col_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
+    tcm = lgdo.Struct(obj_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
 
     if out_file is not None:
         store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)

@@ -39,7 +39,7 @@ class WaveformBrowser:
                  styles: dict[str, list] | str = None,
                  legend: str | list[str] = None,
                  legend_opts: dict = None,
-                 n_drawn: 1 = 1,
+                 n_drawn: int = 1,
                  x_unit: pint.Unit | str = None,
                  x_lim: tuple[float | str | pint.Quantity] = None,
                  y_lim: tuple[float | str | pint.Quantity] = None,
@@ -179,7 +179,7 @@ class WaveformBrowser:
                 if isinstance(sty, str):
                     try:
                         self.styles[i] = plt.style.library[sty]['axes.prop_cycle']
-                    except:
+                    except KeyError:
                         self.styles[i] = itertools.repeat(None)
                 elif sty is None:
                     self.styles[i] = itertools.repeat(None)
@@ -189,7 +189,7 @@ class WaveformBrowser:
             if isinstance(styles, str):
                 try:
                     self.styles = plt.style.library[styles]['axes.prop_cycle']
-                except:
+                except KeyError:
                     self.styles = itertools.repeat(None)
             elif styles is None:
                 self.styles = itertools.repeat(None)
@@ -466,7 +466,7 @@ class WaveformBrowser:
             leg_cycle = cycler(**self.legend_vals)
         except Exception:
             for form in self.legend_format:
-                for i in range(self.n_stored):
+                for _ in range(self.n_stored):
                     leg_labels.append(form)
         else:
             for form in self.legend_format:
