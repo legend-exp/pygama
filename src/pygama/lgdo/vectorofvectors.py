@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 import numpy as np
+from numba import jit, njit
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.lgdo_utils import get_element_type
@@ -150,3 +151,172 @@ class VectorOfVectors:
 
     def __repr__(self) -> str:
         return str(self)
+
+
+def build_cl(sorted_array_in : Array, cumulative_length_out : np.ndarray = None) -> np.ndarray:
+    """ build a cumulative_length array from an array of sorted data
+
+    So for example if sorted_array_in contains [ 3, 3, 3, 4 ], would return
+    [ 2, 3 ]
+
+    For a sorted_array_in of indices, this is the inverse of explode_cl() below,
+    in the sense that doing build_cl(explode_cl(cumulative_length)) would
+    recover the original cumulative_length.
+
+    Parameters
+    ----------
+    sorted_array_in
+        Array of data already sorted; each N matching contiguous entries will be
+        converted into a new row of cumulative_length_out
+    cumulative_length_out
+        This is an optional pre-allocated array for the output
+        cumulative_length. It will always have length <= sorted_array_in, so
+        giving them the same length is safe if there is not a better guess.
+
+    Returns
+    -------
+    cumulative_length_out
+        The output cumulative_length. If the user provides a
+        cumulative_length_out that is too long, this return value is sliced to
+        contain only the used portion of the allocated memory
+    """
+    if len(sorted_array_in) == 0: return None
+    sorted_array_in = np.asarray(sorted_array_in)
+    if cumulative_length_out is None:
+        cumulative_length_out = np.zeros(len(sorted_array_in), dtype=np.uint64)
+    else:
+        cumulative_length_out.fill(0)
+    if len(cumulative_length_out) == 0 and len(sorted_array_in) > 0:
+        raise ValueError("cumulative_length_out too short ({len(cumulative_length_out)})")
+    return nb_build_cl(sorted_array_in, cumulative_length_out)
+
+@njit
+def nb_build_cl(sorted_array_in : np.ndarray, cumulative_length_out : np.ndarray) -> np.ndarray:
+    """ numbified inner loop for build_cl """
+    ii = 0
+    last_val = sorted_array_in[0]
+    for val in sorted_array_in:
+        if val != last_val:
+            ii += 1
+            cumulative_length_out[ii] = cumulative_length_out[ii-1]
+            if ii >= len(cumulative_length_out):
+                raise RuntimeError("cumulative_length_out too short")
+            last_val = val
+        cumulative_length_out[ii] += 1
+    ii += 1
+    return cumulative_length_out[:ii]
+
+
+def explode_cl(cumulative_length : Array, array_out : np.ndarray = None) -> np.ndarray:
+    """ explode a cumulative_length array
+
+    So for example if cumulative_length is [ 2, 3 ], would return [ 0, 0, 0, 1]
+
+    This is the inverse of build_cl() above, in the sense that doing
+    build_cl(explode_cl(cumulative_length)) would recover the original
+    cumulative_length.
+
+    Parameters
+    ----------
+    cumulative_length
+        the cumulative_length array to be exploded
+    array_out
+        an optional pre-allocated array to hold the exploded cumulative_length.
+        The length should be equal to cumulative_length[-1]
+
+    Returns
+    -------
+    array_out
+        the exploded cumulative_length array
+    """
+    cumulative_length = np.asarray(cumulative_length)
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if array_out is None:
+        array_out = np.empty(int(out_len), dtype=np.uint64)
+    if len(array_out) != out_len:
+        raise ValueError(f"bad lengths: cl[-1] ({cumulative_length[-1]}) != out ({len(array_out)})")
+    return nb_explode_cl(cumulative_length, array_out)
+
+@njit
+def nb_explode_cl(cumulative_length : np.ndarray, array_out : np.ndarray) -> np.ndarray:
+    """ numbified inner loop for explode_cl"""
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if len(array_out) != out_len:
+        raise ValueError("bad lengths")
+    start = 0
+    for ii in range(len(cumulative_length)):
+        nn = int(cumulative_length[ii] - start)
+        for jj in range(nn):
+            array_out[int(start+jj)] = ii
+        start = cumulative_length[ii]
+    return array_out
+
+
+
+def explode(cumulative_length : Array, array_in : Array, array_out : np.ndarray = None) -> np.ndarray :
+    """ explode a data array using a cumulative_length array
+
+    This is identical to allocated_explode_cl, except array_in gets exploded
+    instead of cumulative_length. So for example, if array_in = [ 3, 4 ] and
+    cumulative_length = [ 2, 3 ], array_out would be [ 3, 3, 3, 4 ]
+
+    Parameters
+    ----------
+    cumulative_length
+        the cumulative_length array to use for exploding
+    array_in
+        the data to be exploded. Must have same length as cumulative_length
+    array_out
+        a pre-allocated array to hold the exploded data. The length should be
+        equal to cumulative_length[-1]
+    """
+    cumulative_length = np.asarray(cumulative_length)
+    array_in = np.asarray(array_in)
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if array_out is None:
+        array_out = np.empty(out_len, dtype=array_in.dtype)
+    if len(cumulative_length) != len(array_in) or len(array_out) != out_len:
+        raise ValueError(f"bad lengths: cl ({len(cumulative_length)}) != in ({len(array_in)}) and cl[-1] ({cumulative_length[-1]}) != out ({len(array_out)})")
+    return nb_explode(cumulative_length, array_in, array_out)
+
+@njit
+def nb_explode(cumulative_length : np.ndarray, array_in : np.ndarray, array_out : np.ndarray) -> np.ndarray :
+    """ numbified inner loop for explode"""
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if len(cumulative_length) != len(array_in) or len(array_out) != out_len:
+        raise ValueError("bad lengths")
+    ii = 0
+    for jj in range(len(array_out)):
+        while ii < len(cumulative_length) and jj >= cumulative_length[ii]:
+            ii += 1
+        array_out[jj] = array_in[ii]
+    return array_out
+
+
+def explode_arrays(cumulative_length : Array, arrays : list, out_arrays : list = None) -> list:
+    """ explode a set of arrays using a cumulative_length array
+
+    Parameters
+    ----------
+    cumulative_length
+        the cumulative_length array to use for exploding
+    arrays
+        the data arrays to be exploded. Each array must have same length as
+        cumulative_length
+    out_arrays
+        an optional list of pre-allocated arrays to hold the exploded data. The
+        length of the list should be equal to the number of "arrays", and each
+        entry in array_out should have length cumulative_length[-1]. If not
+        provided, output arrays are allocated for the user.
+    """
+    cumulative_length = np.asarray(cumulative_length)
+    for ii in range(len(arrays)):
+        arrays[ii] = np.asarray(arrays[ii])
+    out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
+    if out_arrays is None:
+        out_arrays = []
+        for array in arrays:
+            out_arrays.append(np.empty(out_len, dtype=array.dtype))
+    for ii in range(len(arrays)):
+        explode(cumulative_length, arrays[ii], out_arrays[ii])
+    return out_arrays

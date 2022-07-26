@@ -36,5 +36,11 @@ from pygama.lgdo.lh5_store import LH5Store, load_dfs, load_nda, ls
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from pygama.lgdo.vectorofvectors import (
+    VectorOfVectors,
+    build_cl,
+    explode,
+    explode_arrays,
+    explode_cl,
+)
 from pygama.lgdo.waveform_table import WaveformTable

@@ -439,7 +439,7 @@ def plot_hist(hist, bins, var=None, show_stats=False, stats_hloc=0.75, stats_vlo
         dmean = stddev/np.sqrt(N)
 
         mean, dmean = pgu.get_formatted_stats(mean, dmean, 2)
-        stats = fr'$\mu={mean} \pm {dmean}$\n$\sigma={stddev:#.3g}$'
+        stats = f'$\\mu={mean} \\pm {dmean}$\n$\\sigma={stddev:#.3g}$'
         stats_fontsize = rcParams['legend.fontsize']
         plt.text(stats_hloc, stats_vloc, stats, transform=plt.gca().transAxes, fontsize = stats_fontsize)
 
