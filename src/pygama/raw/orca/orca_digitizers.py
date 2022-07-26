@@ -1,11 +1,14 @@
-import sys
-import numpy as np
 import copy
 import logging
+import sys
+
+import numpy as np
+
 from .orca_base import OrcaDecoder, get_ccc
+
 log = logging.getLogger(__name__)
 
-class ORSIS3302DecoderForEnergy(OrcaDecoder): 
+class ORSIS3302DecoderForEnergy(OrcaDecoder):
     """
     Decoder for Struck 3302 digitizer data written by ORCA
     """
@@ -26,16 +29,16 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                 'datatype': 'waveform',
                 'wf_len': 65532, # max value. override this before initializing buffers to save RAM
                 'dt': 10, # override if a different clock rate is used
-                'dt_units': 'ns', 
+                'dt_units': 'ns',
                 't0_units': 'ns', },
         }
-        self.decoded_values = {} 
+        self.decoded_values = {}
         super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
 
     def set_header(self, header):
         self.header = header
-        
+
         obj_info_dict = header.get_object_info('ORSIS3302Model')
         # Loop over crates, cards, build decoded values for enabled channels
         for crate in obj_info_dict:
@@ -83,7 +86,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         card               = (packet[1] >> 16) & 0x1F
         channel            = (packet[1] >> 8) & 0xFF
         ccc = get_ccc(crate, card, channel)
-        
+
         # get the table for this crate/card/channel
         if ccc not in evt_rbkd:
             if ccc not in self.skipped_channels:
@@ -94,10 +97,10 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
             return False
         tbl = evt_rbkd[ccc].lgdo
         ii = evt_rbkd[ccc].loc
-        
+
         # store packet id
         tbl['packet_id'].nda[ii] = packet_id
-        
+
         # read the rest of the record
         n_lost_msb = (packet[1] >> 25) & 0x7F
         n_lost_lsb = (packet[1] >> 2) & 0x7F
@@ -116,11 +119,11 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         tbl['energy'].nda[ii] = packet[-4]
         tbl['energy_first'].nda[ii] = packet[-3]
         extra_flags = packet[-2]
-        
+
         # interpret the raw event data into numpy array of 16 bit ints
         # does not copy data. p16 is read-only
         p16 = np.frombuffer(packet, dtype=np.uint16)
-        
+
         # compute expected and actual array dimensions
         wf_length16 = 2 * wf_length32
         orca_helper_length16 = 2
@@ -130,7 +133,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         footer_length16 = 8
         expected_wf_length = len(p16) - 2 - orca_helper_length16 - sis_header_length16 - \
             footer_length16 - ene_wf_length16
-            
+
         # error check: waveform size must match expectations
         if wf_length16 != expected_wf_length or last_word != 0xdeadbeef:
             print(len(p16), orca_helper_length16, sis_header_length16,
