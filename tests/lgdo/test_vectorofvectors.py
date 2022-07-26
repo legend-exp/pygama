@@ -64,3 +64,39 @@ def test_iter(lgdo_vov):
     for v in lgdo_vov:
         assert (v == desired[c]).all()
         c += 1
+
+
+def test_build_cl_and_explodes():
+    cl = np.array([3, 4], dtype=np.uint64)
+    exp = np.array([0, 0, 0, 1], dtype=np.uint64)
+    array = np.array([5, 7], dtype=np.uint64)
+    array_exp = np.array([5, 5, 5, 7], dtype=np.uint64)
+    # build_cl
+    assert (lgdo.build_cl(exp, cl)       == cl).all()
+    assert (lgdo.build_cl(exp)           == cl).all()
+    assert (lgdo.build_cl([0, 0, 0, 1])  == cl).all()
+    assert (lgdo.build_cl(array_exp, cl) == cl).all()
+    assert (lgdo.build_cl(array_exp)     == cl).all()
+    assert (lgdo.build_cl([5, 5, 5, 7])  == cl).all()
+    # explode_cl
+    assert (lgdo.explode_cl(cl, exp) == exp).all()
+    assert (lgdo.explode_cl(cl)      == exp).all()
+    assert (lgdo.explode_cl([3,4])   == exp).all()
+    # inverse functionality
+    assert (lgdo.build_cl(lgdo.explode_cl(cl)) == cl).all()
+    assert (lgdo.explode_cl(lgdo.build_cl(array_exp)) == exp).all()
+    # explode
+    assert (lgdo.explode(cl, array, array_exp) == array_exp).all()
+    assert (lgdo.explode(cl, array)            == array_exp).all()
+    assert (lgdo.explode([3, 4], [5, 7])       == array_exp).all()
+    assert (lgdo.explode(cl, range(len(cl)))   == exp).all()
+    # explode_arrays
+    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))])
+    assert len(out_arrays) == 2
+    assert (out_arrays[0] == array_exp).all()
+    assert (out_arrays[1] == exp).all()
+    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))], out_arrays=out_arrays)
+    assert len(out_arrays) == 2
+    assert (out_arrays[0] == array_exp).all()
+    assert (out_arrays[1] == exp).all()
+
