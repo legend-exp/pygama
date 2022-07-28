@@ -9,6 +9,7 @@ import numpy as np
 from pygama.raw.data_streamer import DataStreamer
 from pygama.raw.orca import orca_packet
 from pygama.raw.orca.orca_base import OrcaDecoder
+from pygama.raw.orca.orca_digitizers import ORSIS3302DecoderForEnergy
 from pygama.raw.orca.orca_flashcam import (
     ORFlashCamADCWaveformDecoder,
     ORFlashCamListenerConfigDecoder,

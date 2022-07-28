@@ -90,7 +90,7 @@ def build_raw(in_stream: int, in_stream_type: str = None,
             else:
                 raise RuntimeError(f'unknown file extension {ext}. Specify in_stream_type')
 
-    # procss out_spec and setup rb_lib if specified
+    # process out_spec and setup rb_lib if specified
     rb_lib = None
     if isinstance(out_spec, str) and out_spec.endswith('.json'):
         with open(out_spec) as json_file: out_spec = json.load(json_file)
