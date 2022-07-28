@@ -149,7 +149,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         # i_ene_start = i_wf_stop + 1
         # i_ene_stop = i_ene_start + ene_wf_length16
         if buffer_wrap:
-            # start somehwere in the middle of the record
+            # start somewhere in the middle of the record
             i_start_1 = packet[7] + header_length16 + 1
             i_stop_1 = i_wf_stop  # end of the wf record
             i_start_2 = i_wf_start  # beginning of the wf record
