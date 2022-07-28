@@ -102,78 +102,76 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         tbl['packet_id'].nda[ii] = packet_id
 
         # read the rest of the record
-        n_lost_msb = (packet[1] >> 25) & 0x7F
-        n_lost_lsb = (packet[1] >> 2) & 0x7F
-        n_lost_records = (n_lost_msb << 7) + n_lost_lsb
+        # n_lost_msb = (packet[1] >> 25) & 0x7F
+        # n_lost_lsb = (packet[1] >> 2) & 0x7F
+        # n_lost_records = (n_lost_msb << 7) + n_lost_lsb
         tbl['crate'].nda[ii] = crate
         tbl['card'].nda[ii] = card
         tbl['channel'].nda[ii] = channel
         buffer_wrap = packet[1] & 0x1
         wf_length32 = packet[2]
         ene_wf_length32 = packet[3]
-        evt_header_id = packet[4] & 0xFF
-        tbl['timestamp'].nda[ii] = packet[5] + ((packet[4] & 0xFFFF0000) << 16)
+        # evt_header_id = packet[4] & 0xFF
+        tbl['timestamp'].nda[ii] = packet[5] + ((packet[4] & 0xFFFF0000) << 16) # might need to convert to uint64
         last_word = packet[-1]
 
         # get the footer
         tbl['energy'].nda[ii] = packet[-4]
         tbl['energy_first'].nda[ii] = packet[-3]
-        extra_flags = packet[-2]
-
+        # extra_flags = packet[-2]
+        
         # interpret the raw event data into numpy array of 16 bit ints
         # does not copy data. p16 is read-only
         p16 = np.frombuffer(packet, dtype=np.uint16)
 
         # compute expected and actual array dimensions
         wf_length16 = 2 * wf_length32
-        orca_helper_length16 = 2
-        sis_header_length16 = 12 if buffer_wrap else 8
-        header_length16 = orca_helper_length16 + sis_header_length16
         ene_wf_length16 = 2 * ene_wf_length32
+        orca_header_length16 = 8
+        sis_header_length16 = 8 if buffer_wrap else 4
+        header_length16 = orca_header_length16 + sis_header_length16
         footer_length16 = 8
-        expected_wf_length = len(p16) - 2 - orca_helper_length16 - sis_header_length16 - \
-            footer_length16 - ene_wf_length16
-
-        # error check: waveform size must match expectations
-        if wf_length16 != expected_wf_length or last_word != 0xdeadbeef:
-            print(len(p16), orca_helper_length16, sis_header_length16,
-                  footer_length16)
+        expected_wf_length16 = len(p16) - header_length16 - footer_length16 - ene_wf_length16
+            
+        # error check: waveform size must match expectations       
+        if wf_length16 != expected_wf_length16 or last_word != 0xdeadbeef:
+            print(len(p16), orca_header_length16, sis_header_length16,
+                  footer_length16, ene_wf_length16)
             print("ERROR: Waveform size %d doesn't match expected size %d." %
-                  (wf_length16, expected_wf_length))
+                  (wf_length16, expected_wf_length16))
             print("       The Last Word (should be 0xdeadbeef):",
                   hex(last_word))
             exit()
 
-        # indexes of stuff (all referring to the 16 bit array)
+        # splitting waveform indices into two chunks (all referring to the 16 bit array) 
         i_wf_start = header_length16
         i_wf_stop = i_wf_start + wf_length16
-        i_ene_start = i_wf_stop + 1
-        i_ene_stop = i_ene_start + ene_wf_length16
+        # i_ene_start = i_wf_stop + 1
+        # i_ene_stop = i_ene_start + ene_wf_length16
         if buffer_wrap:
-            # start somewhere in the middle of the record
+            # start somehwere in the middle of the record
             i_start_1 = packet[7] + header_length16 + 1
             i_stop_1 = i_wf_stop  # end of the wf record
             i_start_2 = i_wf_start  # beginning of the wf record
             i_stop_2 = i_start_1
 
         # handle the waveform(s)
-        # energy_wf = np.zeros(ene_wf_length16)  # not used rn
         tbwf = tbl['waveform']['values'].nda[ii]
         if wf_length32 > 0:
             if not buffer_wrap:
-                if i_wf_stop - i_wf_start != expected_wf_length:
+                if i_wf_stop - i_wf_start != expected_wf_length16:
                     print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                        (expected_wf_length, i_wf_stop - i_wf_start))
-                tbwf[:expected_wf_length] = p16[i_wf_start:i_wf_stop]
+                        (expected_wf_length16, i_wf_stop - i_wf_start))
+                tbwf[:expected_wf_length16] = p16[i_wf_start:i_wf_stop]
             else:
                 len1 = i_stop_1-i_start_1
                 len2 = i_stop_2-i_start_2
-                if len1+len2 != expected_wf_length:
+                if len1+len2 != expected_wf_length16:
                     print("ERROR: event %d, we expected %d WF samples and only got %d" %
-                          (expected_wf_length, len1+len2))
+                          (expected_wf_length16, len1+len2))
                     exit()
                 tbwf[:len1] = p16[i_start_1:i_stop_1]
-                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]
-
+                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]             
+                
         evt_rbkd[ccc].loc += 1
         return evt_rbkd[ccc].is_full()
