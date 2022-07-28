@@ -119,7 +119,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         tbl['energy'].nda[ii] = packet[-4]
         tbl['energy_first'].nda[ii] = packet[-3]
         # extra_flags = packet[-2]
-        
+
         # interpret the raw event data into numpy array of 16 bit ints
         # does not copy data. p16 is read-only
         p16 = np.frombuffer(packet, dtype=np.uint16)
@@ -132,8 +132,8 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         header_length16 = orca_header_length16 + sis_header_length16
         footer_length16 = 8
         expected_wf_length16 = len(p16) - header_length16 - footer_length16 - ene_wf_length16
-            
-        # error check: waveform size must match expectations       
+
+        # error check: waveform size must match expectations
         if wf_length16 != expected_wf_length16 or last_word != 0xdeadbeef:
             print(len(p16), orca_header_length16, sis_header_length16,
                   footer_length16, ene_wf_length16)
@@ -143,7 +143,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                   hex(last_word))
             exit()
 
-        # splitting waveform indices into two chunks (all referring to the 16 bit array) 
+        # splitting waveform indices into two chunks (all referring to the 16 bit array)
         i_wf_start = header_length16
         i_wf_stop = i_wf_start + wf_length16
         # i_ene_start = i_wf_stop + 1
@@ -171,7 +171,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                           (expected_wf_length16, len1+len2))
                     exit()
                 tbwf[:len1] = p16[i_start_1:i_stop_1]
-                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]             
-                
+                tbwf[len1:len1+len2] = p16[i_start_2:i_stop_2]
+
         evt_rbkd[ccc].loc += 1
         return evt_rbkd[ccc].is_full()
