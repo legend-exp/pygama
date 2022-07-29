@@ -378,7 +378,7 @@ def gauss_mode(hist, bins, **kwargs):
     """
     pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
     if pars is None or cov is None: return None, None
-    return pars[0], np.sqrt(cov[0])
+    return pars[0], np.sqrt(cov[0,0])
 
 
 def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
