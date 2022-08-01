@@ -6,9 +6,16 @@ import pygama.evt.tcm as ptcm
 import pygama.lgdo as lgdo
 
 
-def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
-              coin_window:float=0, window_ref:str='last',
-              out_file:str=None, out_name:str='tcm', wo_mode:str='write_safe'):
+def build_tcm(
+    input_tables: list,
+    coin_col: str,
+    hash_func: str = r"\d+",
+    coin_window: float = 0,
+    window_ref: str = "last",
+    out_file: str = None,
+    out_name: str = "tcm",
+    wo_mode: str = "write_safe",
+):
     """
     Given a list of input tables, create an output table containing an entry
     list of coincidences among the inputs. Uses tcm.generate_tcm_cols().  For
@@ -59,17 +66,26 @@ def build_tcm(input_tables:list, coin_col:str, hash_func:str=r'\d+',
             if hash_func is not None:
                 if isinstance(hash_func, str):
                     array_id = int(re.search(hash_func, table).group())
-                else: raise NotImplementedError(f"hash_func of type {type(hash_func).__name__}")
-            else: array_id = len(all_tables)-1
-            table = table + '/' + coin_col
+                else:
+                    raise NotImplementedError(
+                        f"hash_func of type {type(hash_func).__name__}"
+                    )
+            else:
+                array_id = len(all_tables) - 1
+            table = table + "/" + coin_col
             coin_data.append(store.read_object(table, filename)[0].nda)
             array_ids.append(array_id)
 
-    tcm_cols = ptcm.generate_tcm_cols(coin_data, coin_window=coin_window,
-                                      window_ref=window_ref, array_ids=array_ids)
+    tcm_cols = ptcm.generate_tcm_cols(
+        coin_data, coin_window=coin_window, window_ref=window_ref, array_ids=array_ids
+    )
 
-    for key in tcm_cols: tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
-    tcm = lgdo.Struct(obj_dict=tcm_cols, attrs={ 'tables':str(all_tables), 'hash_func':str(hash_func) })
+    for key in tcm_cols:
+        tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
+    tcm = lgdo.Struct(
+        obj_dict=tcm_cols,
+        attrs={"tables": str(all_tables), "hash_func": str(hash_func)},
+    )
 
     if out_file is not None:
         store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
