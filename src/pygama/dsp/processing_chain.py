@@ -946,6 +946,9 @@ class ProcessorManager:
             and isinstance(params, list)
         )
 
+        if kw_params is None:
+            kw_params = {}
+
         # reference back to our processing chain
         self.proc_chain = proc_chain
         # callable function used to process data
@@ -953,7 +956,7 @@ class ProcessorManager:
         # list of parameters prior to converting to internal representation
         self.params = params
         # dict of keyword parameters prior to converting to internal rep
-        self.kw_params = {} if kw_params is None else kw_params
+        self.kw_params = kw_params
         # list of raw values and buffers from params; we will fill this soon
         self.args = []
         # dict of kws -> raw values and buffers from params; we will fill this soon
