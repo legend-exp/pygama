@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,31 +9,30 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
               "void(float64[:], int32, int32, float64[:])"],
              "(n),(),()->(n)", nopython=True, cache=True)
-def trap_filter(w_in, rise, flat, w_out):
-    """
-    Apply a symmetric trapezoidal filter to the waveform.
+def trap_filter(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
+    """Apply a symmetric trapezoidal filter to the waveform.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    rise : int
-        The number of samples averaged in the rise and fall sections
-    flat : int
-        The delay between the rise and fall sections
-    w_out : array-like
-        The filtered waveform
+    w_in
+        the input waveform.
+    rise
+        the number of samples averaged in the rise and fall sections.
+    flat
+        the delay between the rise and fall sections.
+    w_out
+        the filtered waveform.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_tf": {
             "function": "trap_filter",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "10*us", "3*us", "wf_tf"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC"
         }
     """
     w_out[:] = np.nan
@@ -58,35 +59,35 @@ def trap_filter(w_in, rise, flat, w_out):
     for i in range(2 * rise + flat, len(w_in), 1):
         w_out[i] = w_out[i-1] + w_in[i] - w_in[i-rise] - w_in[i-rise-flat] + w_in[i-2*rise-flat]
 
+
 @guvectorize(["void(float32[:], int32, int32, float32[:])",
               "void(float64[:], int32, int32, float64[:])"],
              "(n),(),()->(n)", nopython=True, cache=True)
-def trap_norm(w_in, rise, flat, w_out):
-    """
-    Apply a symmetric trapezoidal filter to the waveform, normalized
-    by the number of samples averaged in the rise and fall sections.
+def trap_norm(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
+    """Apply a symmetric trapezoidal filter to the waveform, normalized by the
+    number of samples averaged in the rise and fall sections.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    rise : int
-        The number of samples averaged in the rise and fall sections
-    flat : int
-        The delay between the rise and fall sections
-    w_out : array-like
-        The normalized, filtered waveform
+    w_in
+        the input waveform.
+    rise
+        the number of samples averaged in the rise and fall sections.
+    flat
+        the delay between the rise and fall sections.
+    w_out
+        the normalized, filtered waveform.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_tf": {
             "function": "trap_norm",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "10*us", "3*us", "wf_tf"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC"
         }
     """
     w_out[:] = np.nan
@@ -113,37 +114,38 @@ def trap_norm(w_in, rise, flat, w_out):
     for i in range(2 * rise + flat, len(w_in), 1):
         w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise] - w_in[i-rise-flat] + w_in[i-2*rise-flat]) / rise
 
+
 @guvectorize(["void(float32[:], int32, int32, int32, float32[:])",
               "void(float64[:], int32, int32, int32, float64[:])"],
              "(n),(),(),()->(n)", nopython=True, cache=True)
-def asym_trap_filter(w_in, rise, flat, fall, w_out):
-    """
-    Apply an asymmetric trapezoidal filter to the waveform, normalized
-    by the number of samples averaged in the rise and fall sections.
+def asym_trap_filter(w_in: np.ndarray, rise: int, flat: int,
+                     fall: int, w_out: np.ndarray) -> None:
+    """Apply an asymmetric trapezoidal filter to the waveform, normalized by
+    the number of samples averaged in the rise and fall sections.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    rise : int
-        The number of samples averaged in the rise section
-    flat : int
-        The delay between the rise and fall sections
-    fall : int
-        The number of samples averaged in the fall section
-    w_out : array-like
-        The normalized, filtered waveform
+    w_in
+        the input waveform.
+    rise
+        the number of samples averaged in the rise section.
+    flat
+        the delay between the rise and fall sections.
+    fall
+        the number of samples averaged in the fall section.
+    w_out
+        the normalized, filtered waveform.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_af": {
             "function": "asym_trap_filter",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "128*ns", "64*ns", "2*us", "wf_af"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC"
         }
     """
     w_out[:] = np.nan
@@ -173,38 +175,39 @@ def asym_trap_filter(w_in, rise, flat, fall, w_out):
     for i in range(rise + flat + fall, len(w_in), 1):
         w_out[i] = w_out[i-1] + (w_in[i] - w_in[i-rise]) / rise - (w_in[i-rise-flat] - w_in[i-rise-flat-fall]) / fall
 
+
 @guvectorize(["void(float32[:], int32, int32, float32, float32[:])",
               "void(float64[:], int32, int32, float64, float64[:])"],
              "(n),(),(),()->()", nopython=True, cache=True)
-def trap_pickoff(w_in, rise, flat, t_pickoff, a_out):
-    """
-    Pick off the value at the provided index of a symmetric trapezoidal
+def trap_pickoff(w_in: np.ndarray, rise: int, flat: int,
+                 t_pickoff: float, a_out: float) -> None:
+    """Pick off the value at the provided index of a symmetric trapezoidal
     filter to the input waveform, normalized by the number of samples averaged
     in the rise and fall sections.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    rise : int
-        The number of samples averaged in the rise and fall sections
-    flat : int
-        The delay between the rise and fall sections
-    t_pickoff : float
-        The waveform index to pick off
-    a_out : float
-        The output pick-off value of the filtered waveform
+    w_in
+        the input waveform.
+    rise
+        the number of samples averaged in the rise and fall sections.
+    flat
+        the delay between the rise and fall sections.
+    t_pickoff
+        the waveform index to pick off.
+    a_out
+        the output pick-off value of the filtered waveform.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "ct_corr": {
             "function": "trap_pickoff",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "1.5*us", 0, "tp_0", "ct_corr"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz", "tp_0"]
+            "unit": "ADC"
         }
     """
     a_out[0] = np.nan

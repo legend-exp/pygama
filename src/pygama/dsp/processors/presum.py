@@ -1,24 +1,24 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
-
-from pygama.dsp.errors import DSPFatal
 
 
 @guvectorize(["void(float32[:], float32[:])",
               "void(float64[:], float64[:])"],
              "(n),(m)", nopython=True, cache=True)
-def presum(w_in, w_out):
-    """
-    Presum the waveform.  Combine bins in chunks of len(w_in) / len(w_out),
-    which is hopefully an integer.  If it isn't, then some samples at the end
-    will be omitted.
+def presum(w_in: np.ndarray, w_out: np.ndarray) -> None:
+    """Presum the waveform.
+
+    Combine bins in chunks of ``len(w_in) / len(w_out)``, which is hopefully an
+    integer. If it isn't, then some samples at the end will be omitted.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    w_out : array-like
-        The output waveform
+    w_in
+        the input waveform.
+    w_out
+        the output waveform.
     """
     w_out[:] = np.nan
 

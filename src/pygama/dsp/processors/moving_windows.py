@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,38 +9,41 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),()->(n)", nopython=True, cache=True)
-def moving_window_left(w_in, length, w_out):
-    '''
-    Applies a moving average window to the waveform from the left, assumes that the baseline is at 0.
+def moving_window_left(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
+    """Applies a moving average window to the waveform.
+
+    Note
+    ----
+    Starts from the left and assumes that the baseline is at zero.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    length : float
-        Length of the moving window to be applied
-    w_out : array-like
-        Output waveform after moving window applied
+    w_in
+        the input waveform.
+    length
+        length of the moving window to be applied.
+    w_out
+        output waveform after moving window applied.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_mw": {
             "function": "moving_window_left",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "96*ns", "wf_mw"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC"
         }
-    '''
+    """
 
     w_out[:] = np.nan
 
     if (np.isnan(w_in).any()):
         return
 
-    if (not length >= 0 or not length< len(w_in)):
+    if (not length >= 0 or not length < len(w_in)):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
 
     w_out[0] = w_in[0]
@@ -51,42 +56,41 @@ def moving_window_left(w_in, length, w_out):
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),()->(n)", nopython=True, cache=True)
-def moving_window_right(w_in, length, w_out):
-    '''
-    Applies a moving average window to the waveform from the right.
+def moving_window_right(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
+    """Applies a moving average window to the waveform from the right.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    length : float
-        Length of the moving window to be applied
-    w_out : array-like
-        Output waveform after moving window applied
+    w_in
+        the input waveform.
+    length
+        length of the moving window to be applied.
+    w_out
+        output waveform after moving window applied.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_mw": {
             "function": "moving_window_right",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "96*ns", "wf_mw"],
-            "unit": "ADC",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC"
         }
-    '''
+    """
 
     w_out[:] = np.nan
 
     if (np.isnan(w_in).any()):
         return
 
-    if (not length >= 0 or not length< len(w_in)):
+    if (not length >= 0 or not length < len(w_in)):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
 
-    w_out[-1]= w_in[-1]
-    for i in range(1, int(length),1):
+    w_out[-1] = w_in[-1]
+    for i in range(1, int(length), 1):
         w_out[len(w_in)-1-i] = w_out[len(w_in)-i] + (w_in[len(w_in)-1-i]-w_out[-1])/length
     for i in range(int(length), len(w_in), 1):
         w_out[len(w_in)-1-i] = w_out[len(w_in)-i] + (w_in[len(w_in)-1-i] - w_in[len(w_in)-1-i+int(length)])/length
@@ -95,36 +99,36 @@ def moving_window_right(w_in, length, w_out):
 @guvectorize(["void(float32[:], float32, float32, int32, float32[:])",
               "void(float64[:], float64, float64, int32, float64[:])"],
              "(n),(),(),()->(n)", nopython=True, cache=True)
-def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
-    """
-    Apply a series of moving-average windows to the waveform, alternating
+def moving_window_multi(w_in: np.ndarray, length: float,
+                        num_mw: int, mw_type: int, w_out: np.ndarray) -> None:
+    """Apply a series of moving-average windows to the waveform, alternating
     its application between the left and the right.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    length : float
-        Length of the moving window to be applied
-    num_mw : int
-        The number of moving windows
-    mw_type : int
-        0 = alternate moving windows right and left
-        1 = only left
-        2 = only right
-    w_out : array-like
-        The windowed waveform
+    w_in
+        the input waveform.
+    length
+        length of the moving window to be applied.
+    num_mw
+        the number of moving windows.
+    mw_type
+        - ``0`` -- alternate moving windows right and left
+        - ``1`` -- only left
+        - ``2`` -- only right
+    w_out
+        the windowed waveform.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "curr_av": {
             "function": "moving_window_multi",
             "module": "pygama.dsp.processors",
             "args": ["curr", "96*ns", "3", "0", "curr_av"],
-            "unit": "ADC/sample",
-            "prereqs": ["curr"]
+            "unit": "ADC/sample"
         }
     """
     w_out[:] = np.nan
@@ -161,35 +165,31 @@ def moving_window_multi(w_in, length, num_mw, mw_type,w_out):
         w_buf = w_out.copy()
 
 
-
-
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),(),(m)", nopython=True, cache=True)
-def avg_current(w_in, length, w_out):
-    """
-    Calculate the derivative of a WF, averaged across n samples. Dimension of
-    deriv should be len(wf) - n
+def avg_current(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
+    """Calculate the derivative of a waveform, averaged across `length` samples.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    length : float
-        Length of the moving window to be applied
-    w_out : array-like
-        Output waveform after derivation
+    w_in
+        the input waveform.
+    length
+        length of the moving window to be applied.
+    w_out
+        output waveform after derivation.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "curr": {
             "function": "avg_current",
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", 1, "curr(len(wf_pz)-1, f)"],
-            "unit": "ADC/sample",
-            "prereqs": ["wf_pz"]
+            "unit": "ADC/sample"
         }
     """
 
@@ -198,9 +198,8 @@ def avg_current(w_in, length, w_out):
     if (np.isnan(w_in).any()):
         return
 
-    if (not length >= 0 or not length< len(w_in)):
+    if (not length >= 0 or not length < len(w_in)):
         raise DSPFatal('length is out of range, must be between 0 and the length of the waveform')
 
-
     w_out[:] = w_in[int(length):] - w_in[:-int(length)]
-    w_out/=length
+    w_out /= length

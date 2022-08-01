@@ -41,7 +41,7 @@ several advantages:
    vectorization on a vector-CPU. Modern CPUs typically have 256- or 512-bit
    wide processing units, which can accommodate multiple 32- or 64-bit numbers.
    Programming with these, however, is quite difficult and requires specialized
-   commands to be called.  Luckily for us, many NumPy :class`~numpy.ufunc`\ s
+   commands to be called.  Luckily for us, many NumPy :class:`~numpy.ufunc`\ s
    will automatically use these for us, speeding up our code!
 
 3. :class:`~numpy.ufunc`\ s are capable of calculating their output in place,
@@ -59,37 +59,32 @@ several advantages:
    to use functions that operate in place as much as possible!
 """
 
-from ._processors.bl_subtract import bl_subtract
-from ._processors.convolutions import cusp_filter, t0_filter, zac_filter
-from ._processors.fftw import dft, inv_dft, psd
-from ._processors.fixed_time_pickoff import fixed_time_pickoff
-from ._processors.gaussian_filter1d import gaussian_filter1d
-from ._processors.get_multi_local_extrema import get_multi_local_extrema
-from ._processors.linear_slope_fit import linear_slope_fit
-from ._processors.log_check import log_check
-from ._processors.min_max import min_max
-from ._processors.moving_windows import (
+from .bl_subtract import bl_subtract
+from .convolutions import cusp_filter, t0_filter, zac_filter
+from .fftw import dft, inv_dft, psd
+from .fixed_time_pickoff import fixed_time_pickoff
+from .gaussian_filter1d import gaussian_filter1d
+from .get_multi_local_extrema import get_multi_local_extrema
+from .linear_slope_fit import linear_slope_fit
+from .log_check import log_check
+from .min_max import min_max
+from .moving_windows import (
     avg_current,
     moving_window_left,
     moving_window_multi,
     moving_window_right,
 )
-from ._processors.multi_a_filter import multi_a_filter
-from ._processors.multi_t_filter import multi_t_filter, remove_duplicates
-from ._processors.optimize import optimize_1pz, optimize_2pz
-from ._processors.param_lookup import param_lookup
-from ._processors.pole_zero import double_pole_zero, pole_zero
-from ._processors.presum import presum
-from ._processors.pulse_injector import inject_exp_pulse, inject_sig_pulse
-from ._processors.saturation import saturation
-from ._processors.soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
-from ._processors.time_point_thresh import time_point_thresh
-from ._processors.trap_filters import (
-    asym_trap_filter,
-    trap_filter,
-    trap_norm,
-    trap_pickoff,
-)
-from ._processors.upsampler import upsampler
-from ._processors.wiener_filter import wiener_filter
-from ._processors.windower import windower
+from .multi_a_filter import multi_a_filter
+from .multi_t_filter import multi_t_filter, remove_duplicates
+from .optimize import optimize_1pz, optimize_2pz
+from .param_lookup import param_lookup
+from .pole_zero import double_pole_zero, pole_zero
+from .presum import presum
+from .pulse_injector import inject_exp_pulse, inject_sig_pulse
+from .saturation import saturation
+from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
+from .time_point_thresh import time_point_thresh
+from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
+from .upsampler import upsampler
+from .wiener_filter import wiener_filter
+from .windower import windower

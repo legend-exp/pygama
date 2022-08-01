@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,34 +9,34 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
               "void(float64[:], float64, float64, float64, float64[:])"],
              "(n),(),(),()->()", nopython=True, cache=True)
-def time_point_thresh(w_in, a_threshold, t_start, walk_forward, t_out):
-    """
-    Find the index where the waveform value crosses the threshold,
-    walking either forward or backward from the starting index.
+def time_point_thresh(w_in: np.ndarray, a_threshold: float, t_start: int,
+                      walk_forward: int, t_out: float) -> None:
+    """Find the index where the waveform value crosses the threshold, walking
+    either forward or backward from the starting index.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    a_threshold : float
-        The threshold value
-    t_start : int
-        The starting index
-    walk_forward : int
-        The backward (0) or forward (1) search direction
-    t_out : float
-        The index where the waveform value crosses the threshold
+    w_in
+        the input waveform.
+    a_threshold
+        the threshold value.
+    t_start
+        the starting index.
+    walk_forward
+        the backward (``0``) or forward (``1``) search direction.
+    t_out
+        the index where the waveform value crosses the threshold.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "tp_0": {
             "function": "time_point_thresh",
             "module": "pygama.dsp.processors",
             "args": ["wf_atrap", "bl_std", "tp_start", 0, "tp_0"],
-            "unit": "ns",
-            "prereqs": ["wf_atrap", "bl_std", "tp_start"]
+            "unit": "ns"
         }
     """
     t_out[0] = np.nan

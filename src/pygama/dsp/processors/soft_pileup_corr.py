@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,34 +9,33 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32, float32[:])",
               "void(float64[:], float64, float64, float64[:])"],
              "(n),(),()->(n)", nopython=True, cache=True)
-def soft_pileup_corr(w_in, n_in, tau_in, w_out):
-    """
-    Fit the baseline to an exponential with the provided time
-    constant and then subtract the best-fit function from the
-    entire waveform.
+def soft_pileup_corr(w_in: np.ndarray, n_in: int,
+                     tau_in: float, w_out: np.ndarray) -> None:
+    """Fit the baseline to an exponential with the provided time constant and
+    then subtract the best-fit function from the entire waveform.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    n_in : int
+    w_in
+        The input waveform.
+    n_in
         The number of samples at the beginning of the waveform
-        to fit to an exponential
-    tau_in : float
-        The fixed, exponential time constant
-    w_out : array-like
-        The output waveform with the exponential subtracted
+        to fit to an exponential.
+    tau_in
+        The fixed, exponential time constant.
+    w_out
+        The output waveform with the exponential subtracted.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_bl": {
             "function": "soft_pileup_corr",
             "module": "pygama.dsp.processors",
             "args": ["waveform", "1000", "500*us", "wf_bl"],
-            "unit": "ADC",
-            "prereqs": ["waveform"]
+            "unit": "ADC"
         }
     """
     w_out[:] = np.nan
@@ -67,39 +68,40 @@ def soft_pileup_corr(w_in, n_in, tau_in, w_out):
     for i in range(0, len(w_in), 1):
         w_out[i] = w_in[i] - (A * np.exp(-1.0 * i / tau_in) + B)
 
+
 @guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
               "void(float64[:], float64, float64, float64, float64[:])"],
              "(n),(),(),()->(n)", nopython=True, cache=True)
-def soft_pileup_corr_bl(w_in, n_in, tau_in, B_in, w_out):
-    """
-    Fit the baseline to an exponential with the provided time
+def soft_pileup_corr_bl(w_in: np.ndarray, n_in: int, tau_in: float,
+                        B_in: float, w_out: np.ndarray) -> None:
+    """Fit the baseline to an exponential with the provided time
     constant and then subtract the best-fit function from the
     entire waveform.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    n_in : int
-        The number of samples at the beginning of the waveform
-        to fit to an exponential
-    tau_in : float
-        The fixed, exponential time constant
-    B_in : float
-        The fixed, exponential constant
-    w_out : array-like
-        The output waveform with the exponential subtracted
+    w_in
+        the input waveform.
+    n_in
+        the number of samples at the beginning of the waveform
+        to fit to an exponential.
+    tau_in
+        the fixed, exponential time constant.
+    B_in
+        the fixed, exponential constant.
+    w_out
+        the output waveform with the exponential subtracted.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_bl": {
             "function": "soft_pileup_corr_bl",
             "module": "pygama.dsp.processors",
             "args": ["waveform", "1000", "500*us", "baseline", "wf_bl"],
-            "unit": "ADC",
-            "prereqs": ["waveform", "baseline"]
+            "unit": "ADC"
         }
     """
     w_out[:] = np.nan

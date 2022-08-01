@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,33 +9,31 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32[:], float32[:])",
               "void(float64[:], float64, float64[:], float64[:])"],
              "(n),()->(),()", nopython=True, cache=True)
-def saturation(w_in, bit_depth_in, n_lo_out, n_hi_out):
-    """
-    Count the number of samples in the waveform that are
-    saturated at the minimum and maximum possible values based
-    on the bit depth.
+def saturation(w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int) -> None:
+    """Count the number of samples in the waveform that are saturated at the
+    minimum and maximum possible values based on the bit depth.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    bit_depth_in : int
-        The bit depth of the analog-to-digital converter
-    n_lo_out : int
-        The output number of samples at the minimum
-    n_hi_out : int
-        The output number of samples at the maximum
+    w_in
+        the input waveform
+    bit_depth_in
+        the bit depth of the analog-to-digital converter
+    n_lo_out
+        the output number of samples at the minimum
+    n_hi_out
+        the output number of samples at the maximum
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "sat_lo, sat_hi": {
             "function": "saturation",
             "module": "pygama.dsp.processors",
             "args": ["waveform", "16", "sat_lo", "sat_hi"],
-            "unit": "ADC",
-            "prereqs": ["waveform"]
+            "unit": "ADC"
         }
     """
     n_lo_out[0] = np.nan

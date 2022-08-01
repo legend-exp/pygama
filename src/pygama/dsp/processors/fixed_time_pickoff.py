@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,30 +9,30 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),()->()", nopython=True, cache=True)
-def fixed_time_pickoff(w_in, t_in, a_out):
-    """
-    Pick off the waveform value at the provided index.  If the
-    provided index is out of range, return NaN.
+def fixed_time_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
+    """Pick off the waveform value at the provided index.
+
+    If the provided index `t_in` is out of range, return :any:`numpy.nan`.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    t_in : int
-        The waveform index to pick off
-    a_out : float
-        The output pick-off value
+    w_in
+        the input waveform
+    t_in
+        the waveform index to pick off
+    a_out
+        the output pick-off value
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "trapEftp": {
             "function": "fixed_time_pickoff",
             "module": "pygama.dsp.processors",
             "args": ["wf_trap", "tp_0+10*us", "trapEftp"],
-            "unit": "ADC",
-            "prereqs": ["wf_trap", "tp_0"]
+            "unit": "ADC"
         }
     """
     a_out[0] = np.nan

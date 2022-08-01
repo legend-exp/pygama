@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -7,20 +9,18 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(["void(float32[:], float32, float32[:])",
               "void(float64[:], float64, float64[:])"],
              "(n),(),(m)", nopython=True, cache=True)
-
-def upsampler(w_in, upsample, w_out):
-    """
-    Upsamples the waveform by the number specified,
-    a series of moving windows should be applied afterwards for smoothing
+def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
+    """Upsamples the waveform by the number specified, a series of moving
+    windows should be applied afterwards for smoothing.
 
     Parameters
     ----------
-    w_in : array-like
+    w_in
         waveform to upsample.
-    upsample : float
-        Number of samples to increase each sample to.
-    w_out : array-like
-        Output array for upsampled waveform
+    upsample
+        number of samples to increase each sample to.
+    w_out
+        output array for upsampled waveform.
     """
 
     w_out[:] = np.nan

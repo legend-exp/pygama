@@ -1,8 +1,9 @@
 import numpy as np
 from numba import guvectorize
 
-from pygama.dsp._processors.fixed_time_pickoff import fixed_time_pickoff
 from pygama.dsp.errors import DSPFatal
+
+from .fixed_time_pickoff import fixed_time_pickoff
 
 
 @guvectorize(["void(float32[:], float32[:], float32[:])",

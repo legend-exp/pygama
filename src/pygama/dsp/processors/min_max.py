@@ -1,41 +1,44 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
-
-from pygama.dsp.errors import DSPFatal
 
 
 @guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
               "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
              "(n)->(),(),(),()", nopython=True, cache=True)
-def min_max(w_in, t_min, t_max, a_min, a_max):
-    """
-    Find the value and index of the minimum and maximum values
-    in the waveform.  Note that the first instance of each extremum
-    in the waveform will be returned.
+def min_max(w_in: np.ndarray, t_min: int, t_max: int,
+            a_min: float, a_max: float) -> None:
+    """Find the value and index of the minimum and maximum values
+    in the waveform.
+
+    Note
+    ----
+    The first found instance of each extremum in the waveform will be returned.
 
     Parameters
     ----------
-    w_in : array-like
-        The input waveform
-    t_min : int
-        The index of the minimum value
-    t_max : int
-        The index of the maximum value
-    a_min : float
-        The minimum value
-    a_max : float
-        The maximum value
+    w_in
+        the input waveform
+    t_min
+        the index of the minimum value
+    t_max
+        the index of the maximum value
+    a_min
+        the minimum value
+    a_max
+        the maximum value
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "tp_min, tp_max, wf_min, wf_max": {
             "function": "min_max",
             "module": "pygama.dsp.processors",
             "args": ["waveform", "tp_min", "tp_max", "wf_min", "wf_max"],
-            "unit": ["ns", "ns", "ADC", "ADC"],
-            "prereqs": ["waveform"]
+            "unit": ["ns", "ns", "ADC", "ADC"]
         }
     """
     a_min[0] = np.nan

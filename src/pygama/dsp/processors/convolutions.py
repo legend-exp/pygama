@@ -1,28 +1,36 @@
+from __future__ import annotations
+
+from typing import Callable
+
 import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
 
 
-def cusp_filter(length, sigma, flat, decay):
-    """
-    Apply a CUSP filter to the waveform.  Note that it is composed of a
-    factory function that is called using the init_args argument and that
-    the function the waveforms are passed to using args.
+def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
+    """Apply a CUSP filter to the waveform.
+
+    Note
+    ----
+    This processor is composed of a factory function that is called using the
+    `init_args` argument. The input and output waveforms are passed using
+    `args`.
 
     Parameters
     ----------
-    length : int
-        The length of the filter to be convolved
-    sigma : float
-        The curvature of the rising and falling part of the kernel
-    flat : int
-        The length of the flat section
-    decay : int
-        The decay constant of the exponential to be convolved
+    length
+        the length of the filter to be convolved.
+    sigma
+        the curvature of the rising and falling part of the kernel.
+    flat
+        the length of the flat section.
+    decay
+        the decay constant of the exponential to be convolved.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_cusp": {
@@ -30,7 +38,6 @@ def cusp_filter(length, sigma, flat, decay):
             "module": "pygama.dsp.processors",
             "args": ["wf_bl", "wf_cusp(101,f)"],
             "unit": "ADC",
-            "prereqs": ["wf_bl"],
             "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"]
         }
     """
@@ -62,14 +69,14 @@ def cusp_filter(length, sigma, flat, decay):
     @guvectorize(["void(float32[:], float32[:])",
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
-    def cusp_out(w_in, w_out):
+    def cusp_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
         ----------
-        w_in : array-like
-            The input waveform
-        w_out : array-like
-            The filtered waveform
+        w_in
+            the input waveform.
+        w_out
+            the filtered waveform.
         """
         w_out[:] = np.nan
 
@@ -83,25 +90,30 @@ def cusp_filter(length, sigma, flat, decay):
 
     return cusp_out
 
-def zac_filter(length, sigma, flat, decay):
-    """
-    Apply a ZAC (Zero Area CUSP) filter to the waveform.  Note that it is
-    composed of a factory function that is called using the init_args
-    argument and that the function the waveforms are passed to using args.
+
+def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
+    """Apply a ZAC (Zero Area CUSP) filter to the waveform.
+
+    Note
+    ----
+    This processor is composed of a factory function that is called using the
+    `init_args` argument. The input and output waveforms are passed using
+    `args`.
 
     Parameters
     ----------
-    length : int
-        The length of the filter to be convolved
-    sigma : float
-        The curvature of the rising and falling part of the kernel
-    flat : int
-        The length of the flat section
-    decay : int
-        The decay constant of the exponential to be convolved
+    length
+        the length of the filter to be convolved.
+    sigma
+        the curvature of the rising and falling part of the kernel.
+    flat
+        the length of the flat section.
+    decay
+        the decay constant of the exponential to be convolved.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_zac": {
@@ -109,7 +121,6 @@ def zac_filter(length, sigma, flat, decay):
             "module": "pygama.dsp.processors",
             "args": ["wf_bl", "wf_zac(101,f)"],
             "unit": "ADC",
-            "prereqs": ["wf_bl"],
             "init_args": ["len(wf_bl)-100", "40*us", "3*us", "45*us"],
         }
     """
@@ -159,14 +170,14 @@ def zac_filter(length, sigma, flat, decay):
     @guvectorize(["void(float32[:], float32[:])",
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
-    def zac_out(w_in, w_out):
+    def zac_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
         ----------
-        w_in : array-like
-            The input waveform
-        w_out : array-like
-            The filtered waveform
+        w_in
+            the input waveform.
+        w_out
+            the filtered waveform.
         """
         w_out[:] = np.nan
 
@@ -180,24 +191,28 @@ def zac_filter(length, sigma, flat, decay):
 
     return zac_out
 
-def t0_filter(rise, fall):
 
-    """
-    Apply a modified, asymmetric trapezoidal filter to the waveform.  Note
-    that it is composed of a factory function that is called using the init_args
-    argument and that the function the waveforms are passed to using args.
+def t0_filter(rise: int, fall: int) -> Callable:
+    """Apply a modified, asymmetric trapezoidal filter to the waveform.
+
+    Note
+    ----
+    This processor is composed of a factory function that is called using the
+    `init_args` argument. The input and output waveforms are passed using
+    `args`.
 
     Parameters
     ----------
-    rise : int
-        The length of the rise section.  This is the linearly increasing
+    rise
+        the length of the rise section. This is the linearly increasing
         section of the filter that performs a weighted average.
-    fall : int
-        The length of the fall section.  This is the simple averaging part
+    fall
+        the length of the fall section. This is the simple averaging part
         of the filter.
 
-    Examples
-    --------
+    JSON Configuration Example
+    --------------------------
+
     .. code-block :: json
 
         "wf_t0_filter": {
@@ -205,7 +220,6 @@ def t0_filter(rise, fall):
             "module": "pygama.dsp.processors",
             "args": ["wf_pz", "wf_t0_filter(3748,f)"],
             "unit": "ADC",
-            "prereqs": ["wf_pz"],
             "init_args": ["128*ns", "2*us"]
         }
     """
@@ -221,13 +235,13 @@ def t0_filter(rise, fall):
     @guvectorize(["void(float32[:], float32[:])",
                   "void(float64[:], float64[:])"],
                  "(n),(m)", forceobj=True)
-    def t0_filter_out(w_in, w_out):
+    def t0_filter_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
         ----------
-        w_in : array-like
+        w_in
             The input waveform
-        w_out : array-like
+        w_out
             The filtered waveform
         """
         w_out[:] = np.nan

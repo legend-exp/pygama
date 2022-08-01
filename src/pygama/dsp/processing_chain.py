@@ -13,7 +13,7 @@ import re
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 import numpy as np
 from numba import vectorize
@@ -24,6 +24,8 @@ from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
 log = logging.getLogger(__name__)
+
+LGDO = Union[lgdo.Scalar, lgdo.Array, lgdo.VectorOfVectors, lgdo.Struct]
 
 # Filler value for variables to be automatically deduced later
 auto = 'auto'
@@ -99,25 +101,26 @@ class ProcChainVar:
     Members can be set to ``auto`` to attempt to deduce these when adding this
     variable to a processor for the first time.
     """
-    def __init__(self, proc_chain: ProcessingChain, name: str, shape: tuple = auto,
+    def __init__(self, proc_chain: ProcessingChain, name: str,
+                 shape: int | tuple[int, ...] = auto,
                  dtype: np.dtype = auto, grid: CoordinateGrid = auto,
                  unit: str | Unit = auto, is_coord: bool = auto) -> None:
         """
         Parameters
         ----------
-        proc_chain : ProcessingChain
+        proc_chain
             DOCME
-        name : str
+        name
             DOCME
-        shape : tuple, optional, default='auto'
+        shape
             DOCME
-        dtype : numpy.dtype or str, optional, default='auto'
+        dtype
             DOCME
-        grid : CoordinateGrid
+        grid
             DOCME
-        unit : str or pint.Unit, optional, default='auto'
+        unit
             DOCME
-        is_coord : bool, optional, default='auto'
+        is_coord
             DOCME
         """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
@@ -169,7 +172,7 @@ class ProcChainVar:
 
         super().__setattr__(name, value)
 
-    def get_buffer(self, unit: str | Unit = None) -> np.array:
+    def get_buffer(self, unit: str | Unit = None) -> np.ndarray:
         # If buffer needs to be created, do so now
         if self._buffer is None:
             if self.shape is auto:
@@ -225,18 +228,18 @@ class ProcChainVar:
     def offset(self):
         return self.grid.offset if self.grid else None
 
-    def description(self):
+    def description(self) -> str:
         return (f"{self.name}(shape: {self.shape}, "
                 f"dtype: {self.dtype}, grid: {self.grid}, "
                 f"unit: {self.unit}, is_coord: {self.is_coord})")
 
-    def update_auto(self, shape: tuple = auto, dtype: np.dtype = auto,
+    def update_auto(self, shape: int | tuple[int, ...] = auto,
+                    dtype: np.dtype = auto,
                     grid: CoordinateGrid = auto, unit: str | Unit = auto,
                     is_coord: bool = auto, period: period = None,
                     offset: offset = 0) -> None:
-        """
-        Update any variables set to auto; leave the others alone. Emit a message
-        only if anything was updated.
+        """Update any variables set to ``auto``; leave the others alone. Emit a
+        message only if anything was updated.
         """
         updated = False
 
@@ -299,9 +302,9 @@ class ProcessingChain:
         """
         Parameters
         ----------
-        block_width : int
+        block_width
             number of entries to simultaneously process.
-        buffer_len : int
+        buffer_len
             length of input and output buffers. Should be a multiple of
             `block_width`
         """
@@ -316,9 +319,15 @@ class ProcessingChain:
         self._block_width = block_width
         self._buffer_len = buffer_len
 
-    def add_variable(self, name: str, dtype: np.dtype | str = auto, shape: int | tuple = auto,
-                     grid: CoordinateGrid = auto, unit: str | Unit = auto, is_coord: bool = auto,
-                     period: CoordinateGrid.period = None, offset: CoordinateGrid.offset = 0) -> ProcChainVar:
+    def add_variable(self,
+                     name: str,
+                     dtype: np.dtype | str = auto,
+                     shape: int | tuple[int, ...] = auto,
+                     grid: CoordinateGrid = auto,
+                     unit: str | Unit = auto,
+                     is_coord: bool = auto,
+                     period: CoordinateGrid.period = None,
+                     offset: CoordinateGrid.offset = 0) -> ProcChainVar:
         """Add a named variable containing a block of values or arrays.
 
         Parameters
@@ -359,24 +368,26 @@ class ProcessingChain:
         self._vars_dict[name] = var
         return var
 
-    # TODO: type: numpy array or lgdo. need an lgdo type
-    def link_input_buffer(self, varname: str, buff=None):
-        """Link an input buffer to a variable
+    def link_input_buffer(self,
+                          varname: str,
+                          buff: np.ndarray | LGDO = None
+                          ) -> np.ndarray | LGDO:
+        """Link an input buffer to a variable.
 
         Parameters
         ----------
-        varname : str
+        varname
             name of internal variable to copy into buffer at the end
             of processor execution. If variable does not yet exist, it will
-            be created with a similar shape to the provided buffer
-        buff : numpy.array or lgdo class, optional, default=None
+            be created with a similar shape to the provided buffer.
+        buff
             object to use as input buffer. If ``None``, create a new buffer
-            with a similar shape to the variable
+            with a similar shape to the variable.
 
         Returns
         -------
-        buffer: numpy.array or lgdo class
-            buff or newly allocated input buffer
+        buffer
+            `buff` or newly allocated input buffer.
         """
         self._validate_name(varname, raise_exception=True)
         var = self.get_variable(varname, expr_only=True)
@@ -418,23 +429,26 @@ class ProcessingChain:
 
         return buff
 
-    def link_output_buffer(self, varname: str, buff=None):
+    def link_output_buffer(self,
+                           varname: str,
+                           buff: np.ndarray | LGDO = None
+                           ) -> np.ndarray | LGDO:
         """Link an output buffer to a variable.
 
         Parameters
         ----------
         varname
-            name of internal variable to copy into buffer at the end
-            of processor execution. If variable does not yet exist, it will
-            be created with a similar shape to the provided buffer
-        buff : numpy.array or lgdo class
-            object to use as output buffer. If None, create a new buffer with a
-            similar shape to the variable
+            name of internal variable to copy into buffer at the end of
+            processor execution. If variable does not yet exist, it will be
+            created with a similar shape to the provided buffer.
+        buff
+            object to use as output buffer. If ``None``, create a new buffer
+            with a similar shape to the variable
 
         Returns
         -------
-        numpy.array or lgdo object
-            buff or newly allocated output buffer
+        buffer
+            `buff` or newly allocated output buffer.
         """
         self._validate_name(varname, raise_exception=True)
         var = self.get_variable(varname, expr_only=True)
@@ -532,7 +546,7 @@ class ProcessingChain:
           - ``keyword = expr``: return a ``dict`` with a single element
             pointing from keyword to the parsed `expr`. This is used for
             `kwargs`. If `expr_only` is ``True``, raise an exception if we see
-            this
+            this.
 
         If `get_names_only` is set to ``True``, do not fetch or allocate new
         arrays, instead return a list of variable names found in the expression.
@@ -761,7 +775,7 @@ class ProcessingChain:
         for out_man in self._output_managers:
             out_man.write(begin, end)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return 'Input variables:\n  ' \
              + '\n  '.join([str(in_man) for in_man in self._input_managers]) \
              + '\nProcessors:\n  ' \
@@ -1054,7 +1068,7 @@ class IOManager(metaclass=ABCMeta):
 # Ok, this one's not LGDO
 class NumpyIOManager(IOManager):
     """IO Manager for buffers that are numpy arrays"""
-    def __init__(self, io_buf: np.array, var: ProcChainVar):
+    def __init__(self, io_buf: np.ndarray, var: ProcChainVar) -> None:
         assert isinstance(io_buf, np.ndarray) \
             and isinstance(var, ProcChainVar)
 
@@ -1180,7 +1194,7 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
 
 
 class LGDOWaveformIOManager(IOManager):
-    def __init__(self, wf_table: lgdo.WaveformTable, variable: ProcChainVar):
+    def __init__(self, wf_table: lgdo.WaveformTable, variable: ProcChainVar) -> None:
         assert isinstance(wf_table, lgdo.WaveformTable) \
             and isinstance(variable, ProcChainVar)
 
@@ -1249,20 +1263,24 @@ class LGDOWaveformIOManager(IOManager):
                 f"t0(shape={self.wf_table.t0.nda.shape}, dtype={self.wf_table.t0.nda.dtype}, attrs={self.wf_table.t0.attrs}))")
 
 
-def build_processing_chain(lh5_in: lgdo.Table, dsp_config: dict | str, db_dict: dict = None,
-                           outputs: list[str] = None, block_width: int = 16) -> tuple[ProcessingChain, list[str], lgdo.Table]:
+def build_processing_chain(lh5_in: lgdo.Table,
+                           dsp_config: dict | str,
+                           db_dict: dict = None,
+                           outputs: list[str] = None,
+                           block_width: int = 16
+                           ) -> tuple[ProcessingChain, list[str], lgdo.Table]:
     """Produces a :class:`ProcessingChain` object and an LH5
     :class:`~.lgdo.table.Table` for output parameters from an input LH5
     :class:`~.lgdo.table.Table` and a JSON recipe.
 
     Parameters
     ----------
-    lh5_in : lgdo.Table
+    lh5_in
         HDF5 table from which raw data is read. At least one row of entries
         should be read in prior to calling this!
 
-    dsp_config : dict or str
-        A dict or json filename containing the recipes for computing DSP
+    dsp_config
+        A dictionary or JSON filename containing the recipes for computing DSP
         parameter from raw parameters. The format is as follows:
 
         .. code-block:: json
@@ -1290,42 +1308,43 @@ def build_processing_chain(lh5_in: lgdo.Table, dsp_config: dict | str, db_dict: 
              names of parameters computed
 
               - ``function`` -- string, name of function to call.  Function
-                should implement the gufunc interface, a factory function
-                returning a gufunc, or an arbitrary function that can be
-                mapped onto a gufunc
+                should implement the :class:`numpy.gufunc` interface, a factory
+                function returning a ``gufunc``, or an arbitrary function that
+                can be mapped onto a ``gufunc``
               - ``module`` -- string, name of module containing function
               - ``args``-- list of strings or numerical values. Contains
                 list of names of computed and input parameters or
                 constant values used as inputs to function. Note that
                 outputs should be fed by reference as args! Arguments read
-                from the database are prepended with db.
+                from the database are prepended with ``db``.
               - ``kwargs`` -- dictionary. Keyword arguments for
                 :meth:`ProcesssingChain.add_processor`.
               - ``init_args`` --  list of strings or numerical values. List
                 of names of computed and input parameters or constant values
-                used to initialize a gufunc via a factory function
+                used to initialize a :class:`numpy.gufunc` via a factory
+                function
               - ``unit`` -- list of strings. Units for parameters
               - ``defaults`` -- dictionary. Default value to be used for
                 arguments read from the database
 
-    db_dict : dict, optional, default=None
-        A nested dict pointing to values for db args. e.g. if a processor
-        uses arg db.trap.risetime, it will look up db_dict['trap']['risetime']
-        and use the found value. If no value is found, use the default
-        defined in the config file.
+    db_dict
+        A nested :class:`dict` pointing to values for database arguments. As
+        instance, if a processor uses the argument ``db.trap.risetime``, it
+        will look up ``db_dict['trap']['risetime']`` and use the found value.
+        If no value is found, use the default defined in `dsp_config`.
 
-    outputs : list of str, optional, default=None
-        List of parameters to put in the output lh5 table. If None,
-        use the parameters in the 'outputs' list from config
+    outputs
+        List of parameters to put in the output LH5 table. If ``None``,
+        use the parameters in the ``"outputs"`` list from `dsp_config`.
 
-    block_width : int, optional, default=16
+    block_width
         number of entries to process at once. To optimize performance,
         a multiple of 16 is preferred, but if performance is not an issue
         any value can be used.
 
     Returns
     -------
-    (proc_chain, field_mask, lh5_out) : tuple
+    (proc_chain, field_mask, lh5_out)
         - `proc_chain` -- :class:`ProcessingChain` object that is executed
         - `field_mask` -- list of input fields that are used
         - `lh5_out` -- output :class:`~.lgdo.table.Table` containing processed
