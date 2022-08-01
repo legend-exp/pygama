@@ -4,11 +4,18 @@ import numpy as np
 from numba import guvectorize
 
 
-@guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
-              "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
-             "(n)->(),(),(),()", nopython=True, cache=True)
-def min_max(w_in: np.ndarray, t_min: int, t_max: int,
-            a_min: float, a_max: float) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64[:], float64[:], float64[:], float64[:])",
+    ],
+    "(n)->(),(),(),()",
+    nopython=True,
+    cache=True,
+)
+def min_max(
+    w_in: np.ndarray, t_min: int, t_max: int, a_min: float, a_max: float
+) -> None:
     """Find the value and index of the minimum and maximum values
     in the waveform.
 

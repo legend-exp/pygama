@@ -8,10 +8,18 @@ from pygama.dsp.errors import DSPFatal
 from .time_point_thresh import time_point_thresh
 
 
-@guvectorize(["void(float32[:],float32[:],float32[:])",
-              "void(float64[:],float64[:],float64[:])"],
-             "(n),(n) -> (n)", nopython=True, cache=True)
-def remove_duplicates(t_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray) -> None:
+@guvectorize(
+    [
+        "void(float32[:],float32[:],float32[:])",
+        "void(float64[:],float64[:],float64[:])",
+    ],
+    "(n),(n) -> (n)",
+    nopython=True,
+    cache=True,
+)
+def remove_duplicates(
+    t_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray
+) -> None:
     """Helper function to remove duplicate peak positions.
 
     :func:`.time_point_thresh` has issues with afterpulsing in waveforms that
@@ -42,33 +50,46 @@ def remove_duplicates(t_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray
     t_out[:] = np.nan
 
     # checks
-    if (np.isnan(t_in).all() and np.isnan(vt_min_in).all()): # we pad these with NaNs, so only return if there is nothing to analyze
+    if (
+        np.isnan(t_in).all() and np.isnan(vt_min_in).all()
+    ):  # we pad these with NaNs, so only return if there is nothing to analyze
         return
 
     # check if any later indexed values are equal to the earliest instance
-    k=0
+    k = 0
     for index1 in range(len(t_in)):
-        for index2 in range(len(t_in[index1+1:])):
-            if t_in[index1] == t_in[index2+index1+1]:
-                t_out[index2+index1+1] = vt_min_in[k]
-        k+=1 # this makes sure that the index of the misidentified afterpulse tp0 is replaced with the correct corresponding minimum
+        for index2 in range(len(t_in[index1 + 1 :])):
+            if t_in[index1] == t_in[index2 + index1 + 1]:
+                t_out[index2 + index1 + 1] = vt_min_in[k]
+        k += 1  # this makes sure that the index of the misidentified afterpulse tp0 is replaced with the correct corresponding minimum
 
     # Fill up the output with the rest of the values from the input that weren't repeats
     for index in range(len(t_in)):
-        if (np.isnan(t_out[index]) and not np.isnan(t_in[index])):
+        if np.isnan(t_out[index]) and not np.isnan(t_in[index]):
             t_out[index] = t_in[index]
 
     # makes sure that the first maximum found isn't the start of the waveform
     if not np.isnan(t_out[0]):
         if int(t_out[0]) == 0:
-            t_out[:] = np.append(t_out[1:],np.nan)
+            t_out[:] = np.append(t_out[1:], np.nan)
 
 
-@guvectorize(["void(float32[:], float32[:], float32[:], float32[:], float32[:])",
-              "void(float64[:], float64[:], float64[:], float64[:], float64[:])"],
-             "(n),(),(m),(m),(m)", forceobj=True, cache=True)
-def multi_t_filter(w_in: np.ndarray, a_threshold_in: float,
-                   vt_max_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64[:], float64[:], float64[:], float64[:])",
+    ],
+    "(n),(),(m),(m),(m)",
+    forceobj=True,
+    cache=True,
+)
+def multi_t_filter(
+    w_in: np.ndarray,
+    a_threshold_in: float,
+    vt_max_in: np.ndarray,
+    vt_min_in: np.ndarray,
+    t_out: np.ndarray,
+) -> None:
     """Gets list of indices of the start of leading edges of multiple peaks
     within a waveform.
 
@@ -103,12 +124,14 @@ def multi_t_filter(w_in: np.ndarray, a_threshold_in: float,
     t_out[:] = np.nan
 
     # checks
-    if (np.isnan(w_in).any() or np.isnan(a_threshold_in)):
+    if np.isnan(w_in).any() or np.isnan(a_threshold_in):
         return
-    if (np.isnan(vt_max_in).all() and np.isnan(vt_min_in).all()):
+    if np.isnan(vt_max_in).all() and np.isnan(vt_min_in).all():
         return
-    if (not len(t_out) <= len(w_in)):
-        raise DSPFatal('The length of your return array must be smaller than the length of your waveform')
+    if not len(t_out) <= len(w_in):
+        raise DSPFatal(
+            "The length of your return array must be smaller than the length of your waveform"
+        )
 
     # Initialize an intermediate array to hold the tp0 values before we remove duplicates from it
     intermediate_t_out = np.full_like(t_out, np.nan, dtype=np.float32)

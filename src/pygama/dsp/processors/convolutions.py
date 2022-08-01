@@ -42,20 +42,20 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
         }
     """
     if length <= 0:
-        raise DSPFatal('The length of the filter must be positive')
+        raise DSPFatal("The length of the filter must be positive")
 
     if sigma < 0:
-        raise DSPFatal('The curvature parameter must be positive')
+        raise DSPFatal("The curvature parameter must be positive")
 
     if flat < 0:
-        raise DSPFatal('The length of the flat section must be positive')
+        raise DSPFatal("The length of the flat section must be positive")
 
     if decay < 0:
-        raise DSPFatal('The decay constant must be positive')
+        raise DSPFatal("The decay constant must be positive")
 
-    lt       = int((length - flat) / 2)
+    lt = int((length - flat) / 2)
     flat_int = int(flat)
-    cusp     = np.zeros(length)
+    cusp = np.zeros(length)
     for ind in range(0, lt, 1):
         cusp[ind] = float(np.sinh(ind / sigma) / np.sinh(lt / sigma))
     for ind in range(lt, lt + flat_int + 1, 1):
@@ -63,12 +63,14 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     for ind in range(lt + flat_int + 1, length, 1):
         cusp[ind] = float(np.sinh((length - ind) / sigma) / np.sinh(lt / sigma))
 
-    den   = [1, -np.exp(-1 / decay)]
-    cuspd = np.convolve(cusp, den, 'same')
+    den = [1, -np.exp(-1 / decay)]
+    cuspd = np.convolve(cusp, den, "same")
 
-    @guvectorize(["void(float32[:], float32[:])",
-                  "void(float64[:], float64[:])"],
-                 "(n),(m)", forceobj=True)
+    @guvectorize(
+        ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
+        "(n),(m)",
+        forceobj=True,
+    )
     def cusp_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
@@ -84,9 +86,9 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
             return
 
         if len(cuspd) > len(w_in):
-            raise DSPFatal('The filter is longer than the input waveform')
+            raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = np.convolve(w_in, cuspd, 'valid')
+        w_out[:] = np.convolve(w_in, cuspd, "valid")
 
     return cusp_out
 
@@ -125,36 +127,36 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
         }
     """
     if length <= 0:
-        raise DSPFatal('The length of the filter must be positive')
+        raise DSPFatal("The length of the filter must be positive")
 
     if sigma < 0:
-        raise DSPFatal('The curvature parameter must be positive')
+        raise DSPFatal("The curvature parameter must be positive")
 
     if flat < 0:
-        raise DSPFatal('The length of the flat section must be positive')
+        raise DSPFatal("The length of the flat section must be positive")
 
     if decay < 0:
-        raise DSPFatal('The decay constant must be positive')
+        raise DSPFatal("The decay constant must be positive")
 
-    lt       = int((length - flat) / 2)
+    lt = int((length - flat) / 2)
     flat_int = int(flat)
 
     # calculate cusp filter and negative parables
     cusp = np.zeros(length)
-    par  = np.zeros(length)
+    par = np.zeros(length)
     for ind in range(0, lt, 1):
         cusp[ind] = float(np.sinh(ind / sigma) / np.sinh(lt / sigma))
-        par [ind] = np.power(ind - lt / 2, 2) - np.power(lt / 2, 2)
+        par[ind] = np.power(ind - lt / 2, 2) - np.power(lt / 2, 2)
     for ind in range(lt, lt + flat_int + 1, 1):
         cusp[ind] = 1
     for ind in range(lt + flat_int + 1, length, 1):
         cusp[ind] = float(np.sinh((length - ind) / sigma) / np.sinh(lt / sigma))
-        par [ind] = np.power(length - ind - lt / 2, 2) - np.power(lt / 2, 2)
+        par[ind] = np.power(length - ind - lt / 2, 2) - np.power(lt / 2, 2)
 
     # calculate area of cusp and parables
     areapar, areacusp = 0, 0
     for i in range(0, length, 1):
-        areapar  += par [i]
+        areapar += par[i]
         areacusp += cusp[i]
 
     # normalize parables area
@@ -164,12 +166,14 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     zac = cusp + par
 
     # deconvolve zac filter
-    den  = [1, -np.exp(-1 / decay)]
-    zacd = np.convolve(zac, den, 'same')
+    den = [1, -np.exp(-1 / decay)]
+    zacd = np.convolve(zac, den, "same")
 
-    @guvectorize(["void(float32[:], float32[:])",
-                  "void(float64[:], float64[:])"],
-                 "(n),(m)", forceobj=True)
+    @guvectorize(
+        ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
+        "(n),(m)",
+        forceobj=True,
+    )
     def zac_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
@@ -185,9 +189,9 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
             return
 
         if len(zacd) > len(w_in):
-            raise DSPFatal('The filter is longer than the input waveform')
+            raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = np.convolve(w_in, zacd, 'valid')
+        w_out[:] = np.convolve(w_in, zacd, "valid")
 
     return zac_out
 
@@ -224,17 +228,19 @@ def t0_filter(rise: int, fall: int) -> Callable:
         }
     """
     if rise < 0:
-        raise DSPFatal('The length of the rise section must be positive')
+        raise DSPFatal("The length of the rise section must be positive")
 
     if fall < 0:
-        raise DSPFatal('The length of the fall section must be positive')
+        raise DSPFatal("The length of the fall section must be positive")
 
-    t0_kern = np.arange(2 / float(rise), 0, -2 / (float(rise)**2))
+    t0_kern = np.arange(2 / float(rise), 0, -2 / (float(rise) ** 2))
     t0_kern = np.append(t0_kern, np.zeros(int(fall)) - (1 / float(fall)))
 
-    @guvectorize(["void(float32[:], float32[:])",
-                  "void(float64[:], float64[:])"],
-                 "(n),(m)", forceobj=True)
+    @guvectorize(
+        ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
+        "(n),(m)",
+        forceobj=True,
+    )
     def t0_filter_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
@@ -250,8 +256,8 @@ def t0_filter(rise: int, fall: int) -> Callable:
             return
 
         if len(t0_kern) > len(w_in):
-            raise DSPFatal('The filter is longer than the input waveform')
+            raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = np.convolve(w_in, t0_kern)[:len(w_in)]
+        w_out[:] = np.convolve(w_in, t0_kern)[: len(w_in)]
 
     return t0_filter_out

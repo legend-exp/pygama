@@ -6,9 +6,12 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32, float32[:])",
-              "void(float64[:], float64, float64[:])"],
-             "(n),()->(n)", nopython=True, cache=True)
+@guvectorize(
+    ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
+    "(n),()->(n)",
+    nopython=True,
+    cache=True,
+)
 def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
     """Apply a pole-zero cancellation using the provided time
     constant to the waveform.
@@ -42,14 +45,21 @@ def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
     const = np.exp(-1 / t_tau)
     w_out[0] = w_in[0]
     for i in range(1, len(w_in), 1):
-        w_out[i] = w_out[i-1] + w_in[i] - w_in[i-1] * const
+        w_out[i] = w_out[i - 1] + w_in[i] - w_in[i - 1] * const
 
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64, float64[:])"],
-             "(n),(),(),()->(n)", nopython=True, cache=True)
-def double_pole_zero(w_in: np.ndarray, t_tau1: float, t_tau2: float,
-                     frac: float, w_out: np.ndarray) -> np.ndarray:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32, float32, float32[:])",
+        "void(float64[:], float64, float64, float64, float64[:])",
+    ],
+    "(n),(),(),()->(n)",
+    nopython=True,
+    cache=True,
+)
+def double_pole_zero(
+    w_in: np.ndarray, t_tau1: float, t_tau2: float, frac: float, w_out: np.ndarray
+) -> np.ndarray:
     r"""
     Apply a double pole-zero cancellation using the provided time
     constants to the waveform.
@@ -112,21 +122,28 @@ def double_pole_zero(w_in: np.ndarray, t_tau1: float, t_tau2: float,
 
     if np.isnan(w_in).any() or np.isnan(t_tau1) or np.isnan(t_tau2) or np.isnan(frac):
         return
-    if (len(w_in) <= 3):
-        raise DSPFatal('The length of the waveform must be larger than 3 for the filter to work safely')
+    if len(w_in) <= 3:
+        raise DSPFatal(
+            "The length of the waveform must be larger than 3 for the filter to work safely"
+        )
 
     a = np.exp(-1 / t_tau1)
     b = np.exp(-1 / t_tau2)
 
-    transfer_denom_1 = (frac*b-frac*a-b-1)
-    transfer_denom_2 = -1*(frac*b-frac*a-b)
-    transfer_num_1 = -1*(a+b)
-    transfer_num_2 = a*b
+    transfer_denom_1 = frac * b - frac * a - b - 1
+    transfer_denom_2 = -1 * (frac * b - frac * a - b)
+    transfer_num_1 = -1 * (a + b)
+    transfer_num_2 = a * b
 
     w_out[0] = w_in[0]
     w_out[1] = w_in[1]
     w_out[2] = w_in[2]
 
     for i in range(2, len(w_in), 1):
-        w_out[i] = w_in[i] + transfer_num_1*w_in[i-1] + transfer_num_2*w_in[i-2]\
-            - transfer_denom_1*w_out[i-1] - transfer_denom_2*w_out[i-2]
+        w_out[i] = (
+            w_in[i]
+            + transfer_num_1 * w_in[i - 1]
+            + transfer_num_2 * w_in[i - 2]
+            - transfer_denom_1 * w_out[i - 1]
+            - transfer_denom_2 * w_out[i - 2]
+        )

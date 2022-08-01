@@ -6,12 +6,24 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
-              "void(float64[:], float64, float64[:], float64[:],float64[:], float64[:], float64[:])"],
-             "(n),(),(m),(m),(),(),()", nopython=True, cache=True)
-def get_multi_local_extrema(w_in: np.ndarray, a_delta_in: float,
-                            vt_max_out: np.ndarray, vt_min_out: np.ndarray,
-                            n_max_out: int, n_min_out: int, flag_out: int) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64, float64[:], float64[:],float64[:], float64[:], float64[:])",
+    ],
+    "(n),(),(m),(m),(),(),()",
+    nopython=True,
+    cache=True,
+)
+def get_multi_local_extrema(
+    w_in: np.ndarray,
+    a_delta_in: float,
+    vt_max_out: np.ndarray,
+    vt_min_out: np.ndarray,
+    n_max_out: int,
+    n_min_out: int,
+    flag_out: int,
+) -> None:
     """Get lists of indices of the local maxima and minima of data.
 
     The "local" extrema are those maxima (minima) that have heights (depths) of
@@ -36,7 +48,7 @@ def get_multi_local_extrema(w_in: np.ndarray, a_delta_in: float,
     """
 
     # prepare output
-    vt_max_out[:]= np.nan
+    vt_max_out[:] = np.nan
     vt_min_out[:] = np.nan
     n_max_out[0] = np.nan
     n_min_out[0] = np.nan
@@ -47,13 +59,15 @@ def get_multi_local_extrema(w_in: np.ndarray, a_delta_in: float,
     n_min_counter = 0
 
     # Checks
-    if (np.isnan(w_in).any() or np.isnan(a_delta_in)):
+    if np.isnan(w_in).any() or np.isnan(a_delta_in):
         return
 
-    if (not len(vt_max_out)<len(w_in) or not len(vt_min_out)<len(w_in)):
-        raise DSPFatal('The length of your return array must be smaller than the length of your waveform')
-    if (not a_delta_in >= 0):
-        raise DSPFatal('a_delta_in must be positive')
+    if not len(vt_max_out) < len(w_in) or not len(vt_min_out) < len(w_in):
+        raise DSPFatal(
+            "The length of your return array must be smaller than the length of your waveform"
+        )
+    if not a_delta_in >= 0:
+        raise DSPFatal("a_delta_in must be positive")
 
     # now loop over data
 
@@ -61,21 +75,27 @@ def get_multi_local_extrema(w_in: np.ndarray, a_delta_in: float,
     find_max = True
     for i in range(len(w_in)):
 
-        if w_in[i] > w_in[imax]: imax = i
-        if w_in[i] < w_in[imin]: imin = i
+        if w_in[i] > w_in[imax]:
+            imax = i
+        if w_in[i] < w_in[imin]:
+            imin = i
 
         if find_max:
             # if the sample is less than the current max by more than a_delta_in,
             # declare the previous one a maximum, then set this as the new "min"
-            if w_in[i] < w_in[imax] - a_delta_in and int(n_max_counter) < int(len(vt_max_out)):
-                vt_max_out[int(n_max_counter)]=imax
+            if w_in[i] < w_in[imax] - a_delta_in and int(n_max_counter) < int(
+                len(vt_max_out)
+            ):
+                vt_max_out[int(n_max_counter)] = imax
                 n_max_counter += 1
                 imin = i
                 find_max = False
         else:
             # if the sample is more than the current min by more than a_delta_in,
             # declare the previous one a minimum, then set this as the new "max"
-            if w_in[i] > w_in[imin] + a_delta_in and int(n_min_counter) < int(len(vt_min_out)):
+            if w_in[i] > w_in[imin] + a_delta_in and int(n_min_counter) < int(
+                len(vt_min_out)
+            ):
                 vt_min_out[int(n_min_counter)] = imin
                 n_min_counter += 1
                 imax = i

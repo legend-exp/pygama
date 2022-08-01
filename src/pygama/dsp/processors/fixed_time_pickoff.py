@@ -6,9 +6,12 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32, float32[:])",
-              "void(float64[:], float64, float64[:])"],
-             "(n),()->()", nopython=True, cache=True)
+@guvectorize(
+    ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
+    "(n),()->()",
+    nopython=True,
+    cache=True,
+)
 def fixed_time_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
     """Pick off the waveform value at the provided index.
 
@@ -41,7 +44,7 @@ def fixed_time_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
         return
 
     if np.floor(t_in) != t_in:
-        raise DSPFatal('The pick-off index must be an integer')
+        raise DSPFatal("The pick-off index must be an integer")
 
     if int(t_in) < 0 or int(t_in) >= len(w_in):
         return

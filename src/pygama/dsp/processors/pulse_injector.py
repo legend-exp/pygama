@@ -6,11 +6,18 @@ import numpy as np
 from numba import guvectorize
 
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64,float64,float64,float64[:])"],
-              "(n),(),(),(), ()->(n)", nopython=True, cache=True)
-def inject_sig_pulse(wf_in: np.ndarray, t0: int, rt: float,
-                     A: float, decay: float, wf_out: np.ndarray) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32, float32, float32, float32[:])",
+        "void(float64[:], float64, float64,float64,float64,float64[:])",
+    ],
+    "(n),(),(),(), ()->(n)",
+    nopython=True,
+    cache=True,
+)
+def inject_sig_pulse(
+    wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray
+) -> None:
     r"""Inject sigmoid pulse into existing waveform to simulate pileup.
 
     .. math::
@@ -25,7 +32,7 @@ def inject_sig_pulse(wf_in: np.ndarray, t0: int, rt: float,
         the position :math:`t_0` of the injected waveform.
     rt
         the rise time :math:`t_r` of the injected waveform.
-    A
+    a
         the amplitude :math:`A` of the injected waveform.
     decay
         the decay parameter :math:`\tau` of the injected waveform.
@@ -35,21 +42,36 @@ def inject_sig_pulse(wf_in: np.ndarray, t0: int, rt: float,
 
     wf_out[:] = np.nan
 
-    if np.isnan(wf_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
+    if (
+        np.isnan(wf_in).any()
+        or np.isnan(rt)
+        or np.isnan(t0)
+        or np.isnan(a)
+        or np.isnan(decay)
+    ):
         return
 
-    rise = 4*log(99)/rt
+    rise = 4 * log(99) / rt
 
     wf_out[:] = wf_in[:]
-    for T in range(len(wf_out)):
-        wf_out[T] = wf_out[T] + A/(1+exp(-rise*(T-(t0+rt/2))))*exp(-(1/decay)*(T-t0))
+    for t in range(len(wf_out)):
+        wf_out[t] = wf_out[t] + a / (1 + exp(-rise * (t - (t0 + rt / 2)))) * exp(
+            -(1 / decay) * (t - t0)
+        )
 
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64,float64,float64,float64[:])"],
-              "(n),(),(),(), ()->(n)", nopython=True, cache=True)
-def inject_exp_pulse(wf_in: np.ndarray, t0: int, rt: float, A: float,
-                     decay: float, wf_out: np.ndarray) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32, float32, float32, float32[:])",
+        "void(float64[:], float64, float64,float64,float64,float64[:])",
+    ],
+    "(n),(),(),(), ()->(n)",
+    nopython=True,
+    cache=True,
+)
+def inject_exp_pulse(
+    wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray
+) -> None:
     """Inject exponential pulse into existing waveform to simulate pileup.
 
     Parameters
@@ -60,7 +82,7 @@ def inject_exp_pulse(wf_in: np.ndarray, t0: int, rt: float, A: float,
         the position of the injected waveform.
     rt
         the rise time of the injected waveform.
-    A
+    a
         the amplitude of the injected waveform.
     decay
         the exponential decay constant of the injected waveform.
@@ -70,12 +92,18 @@ def inject_exp_pulse(wf_in: np.ndarray, t0: int, rt: float, A: float,
 
     wf_out[:] = np.nan
 
-    if np.isnan(wf_in).any() or np.isnan(rt) or np.isnan(t0) or np.isnan(A) or np.isnan(decay):
+    if (
+        np.isnan(wf_in).any()
+        or np.isnan(rt)
+        or np.isnan(t0)
+        or np.isnan(a)
+        or np.isnan(decay)
+    ):
         return
 
     wf_out[:] = wf_in[:]
-    for T in range(len(wf_out)):
-        if T <= t0 and T <= t0+rt:
-            wf_out[T] += (A*exp((T-t0-rt)/(rt))*exp(-(1/decay)*(T-t0)))
-        elif (T > t0 + rt):
-            wf_out[T] += (A*exp(-(1/decay)*(T-t0)))
+    for t in range(len(wf_out)):
+        if t <= t0 and t <= t0 + rt:
+            wf_out[t] += a * exp((t - t0 - rt) / (rt)) * exp(-(1 / decay) * (t - t0))
+        elif t > t0 + rt:
+            wf_out[t] += a * exp(-(1 / decay) * (t - t0))
