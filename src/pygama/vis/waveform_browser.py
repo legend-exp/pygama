@@ -26,27 +26,29 @@ class WaveformBrowser:
     with calculated parameters.
     """
 
-    def __init__(self,
-                 files_in: str | list[str],
-                 lh5_group: str,
-                 base_path: str = '',
-                 entry_list: list[int] | list[list[int]] = None,
-                 entry_mask: list[int] | list[list[int]] = None,
-                 dsp_config: str = None,
-                 database: str | dict = None,
-                 aux_values: pandas.DataFrame = None,
-                 lines: str | list[str] = 'waveform',
-                 styles: dict[str, list] | str = None,
-                 legend: str | list[str] = None,
-                 legend_opts: dict = None,
-                 n_drawn: int = 1,
-                 x_unit: pint.Unit | str = None,
-                 x_lim: tuple[float | str | pint.Quantity] = None,
-                 y_lim: tuple[float | str | pint.Quantity] = None,
-                 norm: str = None,
-                 align: str = None,
-                 buffer_len: int = 128,
-                 block_width: int = 8) -> None:
+    def __init__(
+        self,
+        files_in: str | list[str],
+        lh5_group: str,
+        base_path: str = "",
+        entry_list: list[int] | list[list[int]] = None,
+        entry_mask: list[int] | list[list[int]] = None,
+        dsp_config: str = None,
+        database: str | dict = None,
+        aux_values: pandas.DataFrame = None,
+        lines: str | list[str] = "waveform",
+        styles: dict[str, list] | str = None,
+        legend: str | list[str] = None,
+        legend_opts: dict = None,
+        n_drawn: int = 1,
+        x_unit: pint.Unit | str = None,
+        x_lim: tuple[float | str | pint.Quantity] = None,
+        y_lim: tuple[float | str | pint.Quantity] = None,
+        norm: str = None,
+        align: str = None,
+        buffer_len: int = 128,
+        block_width: int = 8,
+    ) -> None:
         """
         Parameters
         ----------
@@ -147,38 +149,42 @@ class WaveformBrowser:
         self.next_entry = 0
 
         # data i/o initialization
-        self.lh5_it = lh5.LH5Iterator(files_in,
-                                      lh5_group,
-                                      base_path=base_path,
-                                      entry_list=entry_list,
-                                      entry_mask=entry_mask,
-                                      buffer_len=buffer_len )
-
+        self.lh5_it = lh5.LH5Iterator(
+            files_in,
+            lh5_group,
+            base_path=base_path,
+            entry_list=entry_list,
+            entry_mask=entry_mask,
+            buffer_len=buffer_len,
+        )
 
         # Get the input buffer and read the first chunk
         self.lh5_in, _ = self.lh5_it.read(0)
 
         self.aux_vals = aux_values
         # Apply entry selection to aux_vals if needed
-        if self.aux_vals is not None and len(self.aux_vals)>len(self.lh5_it):
+        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it):
             entries = []
             for i, f_entries in enumerate(self.lh5_it.entry_list):
-                entry_offset = self.lh5_it.file_map[i-1] if i>0 else 0
-                entries += [ entry_offset + entry for entry in f_entries ]
+                entry_offset = self.lh5_it.file_map[i - 1] if i > 0 else 0
+                entries += [entry_offset + entry for entry in f_entries]
             self.aux_vals = self.aux_vals.iloc[entries].reset_index()
 
         # initialize objects to draw: dict from name to list of 2DLines
-        if isinstance(lines, str): self.lines = { lines:[] }
-        elif lines is None: self.lines = {}
-        else: self.lines = { l:[] for l in lines }
+        if isinstance(lines, str):
+            self.lines = {lines: []}
+        elif lines is None:
+            self.lines = {}
+        else:
+            self.lines = {line: [] for line in lines}
 
         # styles
         if isinstance(styles, (list, tuple)):
-            self.styles = [ None for _ in self.lines ]
+            self.styles = [None for _ in self.lines]
             for i, sty in enumerate(styles):
                 if isinstance(sty, str):
                     try:
-                        self.styles[i] = plt.style.library[sty]['axes.prop_cycle']
+                        self.styles[i] = plt.style.library[sty]["axes.prop_cycle"]
                     except KeyError:
                         self.styles[i] = itertools.repeat(None)
                 elif sty is None:
@@ -188,7 +194,7 @@ class WaveformBrowser:
         else:
             if isinstance(styles, str):
                 try:
-                    self.styles = plt.style.library[styles]['axes.prop_cycle']
+                    self.styles = plt.style.library[styles]["axes.prop_cycle"]
                 except KeyError:
                     self.styles = itertools.repeat(None)
             elif styles is None:
@@ -196,12 +202,13 @@ class WaveformBrowser:
             else:
                 self.styles = cycler(**styles)
 
-
-        self.legend_format = [] # list of formatter strings
+        self.legend_format = []  # list of formatter strings
         self.legend_vals = {}  # Set up dict from names to lists of values
 
-        if legend is None: legend = []
-        elif isinstance(legend, str): legend = [legend]
+        if legend is None:
+            legend = []
+        elif isinstance(legend, str):
+            legend = [legend]
 
         for entry in legend:
             legend_format = ""
@@ -211,13 +218,13 @@ class WaveformBrowser:
                     legend_format += st
                     break
 
-                if name=='':
-                    raise KeyError("Cannot use empty formatter in "+entry)
+                if name == "":
+                    raise KeyError("Cannot use empty formatter in " + entry)
                 self.legend_vals[name] = []
 
-                if form is None or form=='':
-                    form = '~0.3P'
-                cv = '' if cv is None or cv=='' else "!"+cv
+                if form is None or form == "":
+                    form = "~0.3P"
+                cv = "" if cv is None or cv == "" else "!" + cv
                 legend_format += f"{st}{{{name}:{form}{cv}}}"
             self.legend_format.append(legend_format)
 
@@ -225,21 +232,32 @@ class WaveformBrowser:
 
         # make processing chain and output buffer
         outputs = list(self.lines) + list(self.legend_vals)
-        if isinstance(self.norm_par, str): outputs += [self.norm_par]
-        if isinstance(self.align_par, str): outputs += [self.align_par]
-
+        if isinstance(self.norm_par, str):
+            outputs += [self.norm_par]
+        if isinstance(self.align_par, str):
+            outputs += [self.align_par]
 
         # Remove any values not found in aux_vals
         if self.aux_vals is not None:
-            outputs = [ o for o in outputs if o not in self.aux_vals ]
+            outputs = [o for o in outputs if o not in self.aux_vals]
 
-        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(self.lh5_in, dsp_config, db_dict=database, outputs=outputs, block_width=block_width)
+        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(
+            self.lh5_in,
+            dsp_config,
+            db_dict=database,
+            outputs=outputs,
+            block_width=block_width,
+        )
         self.proc_chain.execute()
 
         # Check if all of our outputs can be found
         for name in outputs:
-            if not name in self.lh5_out:
-                raise KeyError("Could not find "+name+" in input lh5 file, DSP config file, or aux values")
+            if name not in self.lh5_out:
+                raise KeyError(
+                    "Could not find "
+                    + name
+                    + " in input lh5 file, DSP config file, or aux values"
+                )
 
         self.x_unit = ureg(x_unit) if x_unit else None
         self.x_lim = x_lim
@@ -255,7 +273,7 @@ class WaveformBrowser:
                     self.x_lim[i] = ureg.Quantity(x_lim[i])
                 if isinstance(self.x_lim[i], ureg.Quantity):
                     if self.x_unit:
-                        self.x_lim[i] = float(self.x_lim[i]/self.x_unit)
+                        self.x_lim[i] = float(self.x_lim[i] / self.x_unit)
                     else:
                         self.x_unit = self.x_lim[i].u
                         self.x_lim[i] = self.x_lim[i].m
@@ -263,7 +281,8 @@ class WaveformBrowser:
         # If we still have no x_unit get it from the first waveform we can find
         if self.x_unit is None:
             for wf in self.lh5_out.values():
-                if not isinstance(wf, lh5.WaveformTable): continue
+                if not isinstance(wf, lh5.WaveformTable):
+                    continue
                 self.x_unit = ureg(wf.dt_units)
 
         self.fig = None
@@ -278,7 +297,9 @@ class WaveformBrowser:
         :func:`matplotlib.pyplot.savefig` for `args` and `kwargs`."""
         self.fig.savefig(f_out)
 
-    def set_figure(self, fig: WaveformBrowser | plt.Figure, ax: plt.Axes = None) -> None:
+    def set_figure(
+        self, fig: WaveformBrowser | plt.Figure, ax: plt.Axes = None
+    ) -> None:
         """Use an already existing figure and axis.
 
         Make sure to set ``clear=False`` when drawing if you don't want to
@@ -300,14 +321,17 @@ class WaveformBrowser:
 
     def clear_data(self) -> None:
         """Reset the currently stored data."""
-        for line_data in self.lines.values(): line_data.clear()
-        for leg_data in self.legend_vals.values(): leg_data.clear()
+        for line_data in self.lines.values():
+            line_data.clear()
+        for leg_data in self.legend_vals.values():
+            leg_data.clear()
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
         self.n_stored = 0
 
-    def find_entry(self, entry: int | list[int], append: bool = True,
-                   safe: bool = False) -> None:
+    def find_entry(
+        self, entry: int | list[int], append: bool = True, safe: bool = False
+    ) -> None:
         """Find the requested data associated with entry in input files and
         place store it internally without drawing it.
 
@@ -320,25 +344,29 @@ class WaveformBrowser:
         safe
             if ``False``, throw an exception for out of range entries.
         """
-        if not append: self.clear_data()
-        if hasattr(entry, '__iter__'):
-            for idx in entry: self.find_entry(idx)
+        if not append:
+            self.clear_data()
+        if hasattr(entry, "__iter__"):
+            for idx in entry:
+                self.find_entry(idx)
             return
 
         if entry > len(self.lh5_it):
-            if safe: raise IndexError
-            else: return
+            if safe:
+                raise IndexError
+            else:
+                return
 
         # Get our current position in the I/O buffers; update if needed
         i_tb = entry - self.lh5_it.current_entry
-        if not ( self.lh5_it.n_rows > i_tb >= 0 ):
+        if not (self.lh5_it.n_rows > i_tb >= 0):
             self.lh5_it.read(entry)
             self.proc_chain.execute()
             i_tb = 0
 
         # get scaling factor/time shift if used
         if self.norm_par is None:
-            norm = 1.
+            norm = 1.0
         elif isinstance(self.norm_par, str):
             norm = self.lh5_out[self.norm_par].nda[entry]
         else:
@@ -350,56 +378,60 @@ class WaveformBrowser:
             data = self.lh5_out.get(self.align_par, None)
             if isinstance(data, lh5.Array):
                 ref_time = data.nda[i_tb]
-                unit = data.attrs.get('units', None)
+                unit = data.attrs.get("units", None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
-                    ref_time *= float(ureg(unit)/self.x_unit)
+                    ref_time *= float(ureg(unit) / self.x_unit)
             elif data is None:
                 ref_time = self.aux_vals[self.align_par][entry]
             else:
                 raise
 
         # lines
-        lim = math.sqrt(sys.float_info.max) # limits for v/h lines
+        lim = math.sqrt(sys.float_info.max)  # limits for v/h lines
         for name, lines in self.lines.items():
             # Get the data; note this is implicitly copying it!
             data = self.lh5_out.get(name, None)
             if isinstance(data, lh5.WaveformTable):
-                y = data.values.nda[i_tb,:]/norm
-                dt = data.dt.nda[i_tb] * float(ureg(data.dt_units)/self.x_unit)
-                t0 = data.t0.nda[i_tb] * float(ureg(data.t0_units)/self.x_unit) - ref_time
-                x = np.linspace(t0, t0+dt*(data.wf_len-1), data.wf_len)
+                y = data.values.nda[i_tb, :] / norm
+                dt = data.dt.nda[i_tb] * float(ureg(data.dt_units) / self.x_unit)
+                t0 = (
+                    data.t0.nda[i_tb] * float(ureg(data.t0_units) / self.x_unit)
+                    - ref_time
+                )
+                x = np.linspace(t0, t0 + dt * (data.wf_len - 1), data.wf_len)
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
 
             elif isinstance(data, lh5.ArrayOfEqualSizedArrays):
-                y = data.nda[i_tb,:]/norm
-                x = np.arange(len(y), dtype='float')
+                y = data.nda[i_tb, :] / norm
+                x = np.arange(len(y), dtype="float")
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
 
             elif isinstance(data, lh5.Array):
                 val = data.nda[i_tb]
-                unit = data.attrs.get('units', None)
+                unit = data.attrs.get("units", None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
                     # Vertical line
-                    val = val*float(ureg(unit)/self.x_unit) - ref_time
-                    lines.append(Line2D([val]*2, [-lim, lim]))
+                    val = val * float(ureg(unit) / self.x_unit) - ref_time
+                    lines.append(Line2D([val] * 2, [-lim, lim]))
                     self._update_auto_limit(val, None)
                 else:
                     # Horizontal line
-                    lines.append(Line2D([-lim, lim], [val/norm]*2))
+                    lines.append(Line2D([-lim, lim], [val / norm] * 2))
                     self._update_auto_limit(None, val)
 
             elif data is None:
                 # Check for data in auxiliary table. It's unitless so I guess just do an hline...
-                val = self.aux_vals[name][entry]/norm
-                lines.append(Line2D([-lim, lim], [val]*2))
+                val = self.aux_vals[name][entry] / norm
+                lines.append(Line2D([-lim, lim], [val] * 2))
                 self._update_auto_limit(None, val)
 
             else:
                 raise TypeError(
                     f"Cannot draw '{name}'. WaveformBrowser does not support "
-                    f"drawing lines for data of type {data.__class__}")
+                    f"drawing lines for data of type {data.__class__}"
+                )
 
         # legend data
         for name, vals in self.legend_vals.items():
@@ -408,15 +440,16 @@ class WaveformBrowser:
             if not data:
                 data = ureg.Quantity(self.aux_vals[name][entry])
             elif isinstance(data, lh5.Array):
-                unit = data.attrs.get('units', None)
+                unit = data.attrs.get("units", None)
                 if unit and unit in ureg:
-                    data = data.nda[i_tb]*ureg(unit)
+                    data = data.nda[i_tb] * ureg(unit)
                 else:
                     data = ureg.Quantity(data.nda[i_tb])
             else:
                 raise TypeError(
                     "WaveformBrowser does not adding legend entries for data "
-                    f"of type {data.__class__}")
+                    f"of type {data.__class__}"
+                )
 
             vals.append(data)
 
@@ -424,8 +457,7 @@ class WaveformBrowser:
         self.next_entry = entry + 1
 
     def draw_current(self, clear: bool = True) -> None:
-        """Draw the waveforms and data currently held internally by this class.
-        """
+        """Draw the waveforms and data currently held internally by this class."""
         # Make figure/axis if needed
         if not (self.ax and self.fig and plt.fignum_exists(self.fig.number)):
             self.new_figure()
@@ -437,7 +469,10 @@ class WaveformBrowser:
         y_lim = self.y_lim
         if not y_lim:
             y_range = self.auto_y_lim[1] - self.auto_y_lim[0]
-            y_lim = [self.auto_y_lim[0] - 0.05*y_range, self.auto_y_lim[1] + 0.05*y_range]
+            y_lim = [
+                self.auto_y_lim[0] - 0.05 * y_range,
+                self.auto_y_lim[1] + 0.05 * y_range,
+            ]
         self.ax.set_xlim(*x_lim)
         self.ax.set_ylim(*y_lim)
 
@@ -454,8 +489,10 @@ class WaveformBrowser:
                 styles = cycler(plt.rcparams)
 
             for line, sty in zip(lines, styles):
-                if sty is not None: line.update(sty)
-                if line.get_figure() is not None: line.remove()
+                if sty is not None:
+                    line.update(sty)
+                if line.get_figure() is not None:
+                    line.remove()
                 line.set_transform(self.ax.transData)
                 self.ax.add_line(line)
 
@@ -478,22 +515,24 @@ class WaveformBrowser:
         self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
-        if len(leg_labels)>0:
+        if len(leg_labels) > 0:
             if not clear:
                 old_leg = self.ax.get_legend()
                 if old_leg:
                     leg_handles = old_leg.get_lines() + leg_handles
-                    leg_labels = [t.get_text() for t in old_leg.get_texts()] + leg_labels
+                    leg_labels = [
+                        t.get_text() for t in old_leg.get_texts()
+                    ] + leg_labels
             self.ax.legend(leg_handles, leg_labels, **self.legend_kwargs)
 
     def _update_auto_limit(self, x: np.ndarray, y: np.ndarray) -> None:
         # Helper to update the automatic limits
         y_where = {}
         if isinstance(y, np.ndarray) and self.y_lim is not None:
-            y_where['where'] = ((y>=self.y_lim[0]) & (y<=self.y_lim[1]))
+            y_where["where"] = (y >= self.y_lim[0]) & (y <= self.y_lim[1])
         x_where = {}
         if isinstance(x, np.ndarray) and self.x_lim is not None:
-            x_where['where'] = ((x>=self.x_lim[0]) & (x<=self.x_lim[1]))
+            x_where["where"] = (x >= self.x_lim[0]) & (x <= self.x_lim[1])
         if x is not None:
             self.auto_x_lim[0] = np.amin(x, **y_where, initial=self.auto_x_lim[0])
             self.auto_x_lim[1] = np.amax(x, **y_where, initial=self.auto_x_lim[1])
@@ -501,8 +540,13 @@ class WaveformBrowser:
             self.auto_y_lim[0] = np.amin(y, **y_where, initial=self.auto_y_lim[0])
             self.auto_y_lim[1] = np.amax(y, **y_where, initial=self.auto_y_lim[1])
 
-    def draw_entry(self, entry: int | list[int], append: bool = False,
-                   clear: bool = True, safe: bool = False) -> None:
+    def draw_entry(
+        self,
+        entry: int | list[int],
+        append: bool = False,
+        clear: bool = True,
+        safe: bool = False,
+    ) -> None:
         """Draw specified entry in the current figure/axes.
 
         Parameters
@@ -522,13 +566,15 @@ class WaveformBrowser:
     def find_next(self, n_wfs: int = None, append: bool = False) -> tuple[int, int]:
         """Find the next `n_wfs` waveforms (default `self.n_drawn`). See
         :meth:`find_entry`."""
-        if not n_wfs: n_wfs = self.n_drawn
-        entries = (self.next_entry, self.next_entry+n_wfs)
+        if not n_wfs:
+            n_wfs = self.n_drawn
+        entries = (self.next_entry, self.next_entry + n_wfs)
         self.find_entry(range(*entries), append, safe=True)
         return entries
 
-    def draw_next(self, n_wfs: int = None, append: bool = False,
-                  clear: bool = True) -> tuple[int, int]:
+    def draw_next(
+        self, n_wfs: int = None, append: bool = False, clear: bool = True
+    ) -> tuple[int, int]:
         """Draw the next `n_wfs` waveforms (default `self.n_drawn`). See
         :meth:`draw_next`."""
         entries = self.find_next(append)
