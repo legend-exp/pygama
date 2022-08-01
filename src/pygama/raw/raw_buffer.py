@@ -101,9 +101,13 @@ class RawBuffer:
         the name or identifier of the object in the output stream.
     """
 
-
-    def __init__(self, lgdo: LGDO = None, key_list: list[int | str] = None,
-                 out_stream: str = '', out_name: str = '') -> None:
+    def __init__(
+        self,
+        lgdo: LGDO = None,
+        key_list: list[int | str] = None,
+        out_stream: str = "",
+        out_name: str = "",
+    ) -> None:
         self.lgdo = lgdo
         self.key_list = [] if key_list is None else key_list
         self.out_stream = out_stream
@@ -112,8 +116,10 @@ class RawBuffer:
         self.fill_safety = 1
 
     def __len__(self) -> int:
-        if self.lgdo is None: return 0
-        if not hasattr(self.lgdo, '__len__'): return 1
+        if self.lgdo is None:
+            return 0
+        if not hasattr(self.lgdo, "__len__"):
+            return 1
         return len(self.lgdo)
 
     def is_full(self) -> bool:
@@ -130,6 +136,7 @@ class RawBufferList(list):
     r"""A :class:`.RawBufferList` holds a collection of :class:`.RawBuffer`\ s
     of identical structure (same format LGDO's with the same fields).
     """
+
     def __init__(self) -> None:
         self.keyed_dict = None
 
@@ -143,11 +150,13 @@ class RawBufferList(list):
         if self.keyed_dict is None:
             self.keyed_dict = {}
             for rb in self:
-                for key in rb.key_list: self.keyed_dict[key] = rb
+                for key in rb.key_list:
+                    self.keyed_dict[key] = rb
         return self.keyed_dict
 
-
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
+    def set_from_json_dict(
+        self, json_dict: dict, kw_dict: dict[str, str] = None
+    ) -> None:
         """Set up a :class:`.RawBufferList` from a dictionary written in JSON
         shorthand. See :meth:`.RawBufferLibrary.set_from_json_dict` for details.
 
@@ -158,13 +167,14 @@ class RawBufferList(list):
         expand_rblist_json_dict(json_dict, {} if kw_dict is None else kw_dict)
         for name in json_dict:
             rb = RawBuffer()
-            if 'key_list' in json_dict[name]:
-                rb.key_list = json_dict[name]['key_list']
-            if 'out_stream' in json_dict[name]:
-                rb.out_stream = json_dict[name]['out_stream']
-            if 'out_name' in json_dict[name]:
-                rb.out_name = json_dict[name]['out_name']
-            else: rb.out_name = name
+            if "key_list" in json_dict[name]:
+                rb.key_list = json_dict[name]["key_list"]
+            if "out_stream" in json_dict[name]:
+                rb.out_stream = json_dict[name]["out_stream"]
+            if "out_name" in json_dict[name]:
+                rb.out_name = json_dict[name]["out_name"]
+            else:
+                rb.out_name = name
             self.append(rb)
 
     def get_list_of(self, attribute: str) -> list:
@@ -186,14 +196,17 @@ class RawBufferList(list):
         """
         values = []
         for rb in self:
-            if not hasattr(rb, attribute): continue
+            if not hasattr(rb, attribute):
+                continue
             val = getattr(rb, attribute)
-            if val not in values: values.append(val)
+            if val not in values:
+                values.append(val)
         return values
 
     def clear_full(self) -> None:
         for rb in self:
-            if rb.is_full(): rb.loc = 0
+            if rb.is_full():
+                rb.loc = 0
 
 
 class RawBufferLibrary(dict):
@@ -202,11 +215,13 @@ class RawBufferLibrary(dict):
     write to them.
     """
 
-    def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = {}) -> None:
+    def __init__(self, json_dict: dict = None, kw_dict: dict[str, str] = None) -> None:
         if json_dict is not None:
             self.set_from_json_dict(json_dict, kw_dict)
 
-    def set_from_json_dict(self, json_dict: dict, kw_dict: dict[str, str] = {}) -> None:
+    def set_from_json_dict(
+        self, json_dict: dict, kw_dict: dict[str, str] = None
+    ) -> None:
         r"""Set up a :class:`.RawBufferLibrary` from a dictionary written in
         JSON shorthand.
 
@@ -260,8 +275,11 @@ class RawBufferLibrary(dict):
             ``out_stream`` and ``out_name`` fields.
         """
         for list_name in json_dict:
-            if list_name not in self: self[list_name] = RawBufferList()
-            self[list_name].set_from_json_dict(json_dict[list_name], kw_dict)
+            if list_name not in self:
+                self[list_name] = RawBufferList()
+            self[list_name].set_from_json_dict(
+                json_dict[list_name], {} if kw_dict is None else kw_dict
+            )
 
     def get_list_of(self, attribute: str, unique: bool = True) -> list:
         """Return a list of values of :class:`.RawBuffer` attributes.
@@ -285,11 +303,13 @@ class RawBufferLibrary(dict):
         values = []
         for rb_list in self.values():
             values += rb_list.get_list_of(attribute)
-        if unique: values = list(set(values))
+        if unique:
+            values = list(set(values))
         return values
 
     def clear_full(self) -> None:
-        for rb_list in self.values(): rb_list.clear_full()
+        for rb_list in self.values():
+            rb_list.clear_full()
 
 
 def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
@@ -308,12 +328,12 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
     # the dictionary during iteration
     buffer_names = list(json_dict.keys())
     for name in buffer_names:
-        if name == '':
+        if name == "":
             raise ValueError("buffer name can't be empty")
 
-        info = json_dict[name] # changes to info will change json_dict[name]
+        info = json_dict[name]  # changes to info will change json_dict[name]
         # make sure we have a key list
-        if 'key_list' not in info:
+        if "key_list" not in info:
             raise ValueError(f"'{name}' is missing key_list")
             continue
 
@@ -321,39 +341,43 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
         # do in a while loop with a controlled index since we are modifying
         # the length of the list inside the loop (be careful)
         i = 0
-        while i < len(info['key_list']):
-            key_range = info['key_list'][i]
+        while i < len(info["key_list"]):
+            key_range = info["key_list"][i]
             # expand any 2-int lists
             if isinstance(key_range, list) and len(key_range) == 2:
-                info['key_list'][i:i+1] = range(key_range[0], key_range[1]+1)
-                i += key_range[1]-key_range[0]
+                info["key_list"][i : i + 1] = range(key_range[0], key_range[1] + 1)
+                i += key_range[1] - key_range[0]
             i += 1
 
         # Expand list_names if name contains a key-based formatter
-        if '{key' in name:
-            if len(info['key_list']) == 1 and info['key_list'][0] == '*':
-                continue # will be handled later, once the key_list is known
-            for key in info['key_list']:
+        if "{key" in name:
+            if len(info["key_list"]) == 1 and info["key_list"][0] == "*":
+                continue  # will be handled later, once the key_list is known
+            for key in info["key_list"]:
                 expanded_name = name.format(key=key)
                 json_dict[expanded_name] = info.copy()
-                json_dict[expanded_name]['key_list'] = [key];
+                json_dict[expanded_name]["key_list"] = [key]
             json_dict.pop(name)
 
     # now re-iterate and expand out_paths
     for name, info in json_dict.items():
-        if len(info['key_list']) == 1 and info['key_list'][0] != "*":
-            kw_dict['key'] = info['key_list'][0]
-        if 'out_stream' in info:
-            if name != '*' and '{name' in info['out_stream']: kw_dict['name'] = name
+        if len(info["key_list"]) == 1 and info["key_list"][0] != "*":
+            kw_dict["key"] = info["key_list"][0]
+        if "out_stream" in info:
+            if name != "*" and "{name" in info["out_stream"]:
+                kw_dict["name"] = name
             try:
-                info['out_stream'] = info['out_stream'].format(**kw_dict)
+                info["out_stream"] = info["out_stream"].format(**kw_dict)
             except KeyError as msg:
-                raise KeyError(f"variable {msg} dereferenced in 'out_stream' not defined in kw_dict")
-            info['out_stream'] = os.path.expandvars(info['out_stream'])
+                raise KeyError(
+                    f"variable {msg} dereferenced in 'out_stream' not defined in kw_dict"
+                )
+            info["out_stream"] = os.path.expandvars(info["out_stream"])
 
 
-def write_to_lh5_and_clear(raw_buffers: list[RawBuffer], lh5_store: LH5Store = None,
-                           wo_mode: str = 'append') -> None:
+def write_to_lh5_and_clear(
+    raw_buffers: list[RawBuffer], lh5_store: LH5Store = None, wo_mode: str = "append"
+) -> None:
     r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
     them.
 
@@ -368,20 +392,29 @@ def write_to_lh5_and_clear(raw_buffers: list[RawBuffer], lh5_store: LH5Store = N
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
     """
-    if lh5_store is None: lh5_store = lgdo.LH5Store()
+    if lh5_store is None:
+        lh5_store = lgdo.LH5Store()
     for rb in raw_buffers:
-        if rb.lgdo is None or rb.loc == 0: continue # no data to write
-        ii = rb.out_stream.find(':')
+        if rb.lgdo is None or rb.loc == 0:
+            continue  # no data to write
+        ii = rb.out_stream.find(":")
         if ii == -1:
             filename = rb.out_stream
-            group = '/'
+            group = "/"
         else:
             filename = rb.out_stream[:ii]
-            group = rb.out_stream[ii+1:]
-            if len(group) == 0: group = '/' # in case out_stream ends with :
+            group = rb.out_stream[ii + 1 :]
+            if len(group) == 0:
+                group = "/"  # in case out_stream ends with :
         # write if requested...
-        if filename != '':
-            lh5_store.write_object(rb.lgdo, rb.out_name, filename, group=group,
-                                   n_rows=rb.loc, wo_mode=wo_mode)
+        if filename != "":
+            lh5_store.write_object(
+                rb.lgdo,
+                rb.out_name,
+                filename,
+                group=group,
+                n_rows=rb.loc,
+                wo_mode=wo_mode,
+            )
         # and clear
         rb.loc = 0
