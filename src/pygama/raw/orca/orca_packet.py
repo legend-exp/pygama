@@ -7,12 +7,12 @@ type :class:`numpy.uint32`.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 log = logging.getLogger(__name__)
-OrcaPacket = np.ndarray#[Any, np.dtype[np.uint32]]
+OrcaPacket = npt.NDArray[np.uint32]
 
 
 def is_short(packet: OrcaPacket) -> bool:
