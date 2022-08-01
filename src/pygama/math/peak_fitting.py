@@ -303,8 +303,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 
     Returns
     -------
-    pars : ndarray containing the parameters (mode, sigma, maximum) of the
-        gaussian fit
+    pars : ndarray containing the parameters (mode, sigma, maximum) of the gaussian fit
         - mode : the estimated x-position of the maximum
         - sigma : the estimated width of the peak. Equivalent to a gaussian
           width (sigma), but based only on the curvature within n_bins of
