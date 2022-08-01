@@ -102,3 +102,20 @@ def test_scipy_gauss_filter(geds_raw_tbl):
     }
     proc_chain, _, _ = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
+
+
+def test_processor_variable_array_output(spms_raw_tbl):
+    dsp_config = {
+        "outputs": ["wf_cum"],
+        "processors": {
+            "vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out": {
+                "function": "get_multi_local_extrema",
+                "module": "pygama.dsp.processors",
+                "args": ["curr", "3*bl_std", "vt_max_out(10)", "vt_min_out(10)", "n_max_out", "n_min_out", "flag_out"],
+                "unit": "ADC"
+            }
+        }
+    }
+
+    proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
+    proc_chain.execute(0, 1)
