@@ -22,10 +22,12 @@ class Struct(dict):
     After instantiation, add fields using :meth:`add_field` to keep the
     datatype updated, or call :meth:`update_datatype` after adding.
     """
+
     # TODO: overload setattr to require add_field for setting?
 
-    def __init__(self, obj_dict: dict[str, LGDO | Struct] = None,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self, obj_dict: dict[str, LGDO | Struct] = None, attrs: dict[str, Any] = None
+    ) -> None:
         """
         Parameters
         ----------
@@ -40,25 +42,26 @@ class Struct(dict):
 
         self.attrs = {} if attrs is None else dict(attrs)
 
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
+        if "datatype" in self.attrs:
+            if self.attrs["datatype"] != self.form_datatype():
                 raise ValueError(
                     "datatype does not match obj_dict! "
                     f"datatype: {self.attrs['datatype']}, "
                     f"obj_dict.keys(): {obj_dict.keys()}, "
-                    f"form_datatype(): {self.form_datatype()}")
+                    f"form_datatype(): {self.form_datatype()}"
+                )
         self.update_datatype()
 
     def datatype_name(self) -> str:
         """The name for this LGDO's datatype attribute."""
-        return 'struct'
+        return "struct"
 
     def form_datatype(self) -> str:
         """Return this LGDO's datatype attribute string."""
-        return self.datatype_name() + '{' + ','.join(self.keys()) + '}'
+        return self.datatype_name() + "{" + ",".join(self.keys()) + "}"
 
     def update_datatype(self) -> None:
-        self.attrs['datatype'] = self.form_datatype()
+        self.attrs["datatype"] = self.form_datatype()
 
     def add_field(self, name: str, obj: LGDO | Struct) -> None:
         self[name] = obj
@@ -71,11 +74,11 @@ class Struct(dict):
     def __str__(self) -> str:
         """Convert to string (e.g. for printing)."""
         tmp_attrs = self.attrs.copy()
-        datatype = tmp_attrs.pop('datatype')
+        datatype = tmp_attrs.pop("datatype")
         # __repr__ instead of __str__ to avoid infinite loop
         string = datatype + " = " + super().__repr__()
         if len(tmp_attrs) > 0:
-            string += '\nattrs = ' + str(tmp_attrs)
+            string += "\nattrs = " + str(tmp_attrs)
         return string
 
     def __repr__(self) -> str:

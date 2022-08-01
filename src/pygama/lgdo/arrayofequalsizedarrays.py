@@ -19,9 +19,15 @@ class ArrayOfEqualSizedArrays(Array):
     to application. Canonical example: array of same-length waveforms.
     """
 
-    def __init__(self, dims: tuple[int, ...] = None, nda: numpy.ndarray = None,
-                 shape: tuple[int, ...] = (), dtype: numpy.dtype = None,
-                 fill_val: int | float = None, attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self,
+        dims: tuple[int, ...] = None,
+        nda: numpy.ndarray = None,
+        shape: tuple[int, ...] = (),
+        dtype: numpy.dtype = None,
+        fill_val: int | float = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
         """
         Parameters
         ----------
@@ -55,20 +61,22 @@ class ArrayOfEqualSizedArrays(Array):
         :class:`.Array`
         """
         self.dims = dims
-        super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
+        super().__init__(
+            nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs
+        )
 
     def datatype_name(self) -> str:
         """Returns the name for this LGDO's datatype attribute."""
-        return 'array_of_equalsized_arrays'
+        return "array_of_equalsized_arrays"
 
     def form_datatype(self) -> str:
         """Return this LGDO's datatype attribute string."""
         dt = self.datatype_name()
-        nD = str(len(self.nda.shape))
+        nd = str(len(self.nda.shape))
         if self.dims is not None:
-            nD = ','.join([str(i) for i in self.dims])
+            nd = ",".join([str(i) for i in self.dims])
         et = get_element_type(self)
-        return dt + '<' + nD + '>{' + et + '}'
+        return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:
         return len(self.nda)

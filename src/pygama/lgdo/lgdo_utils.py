@@ -31,25 +31,27 @@ def get_element_type(obj: object) -> str:
 
     # special handling for strings
     if isinstance(obj, str):
-        return 'string'
+        return "string"
 
     # the rest use dtypes
-    dt = obj.dtype if hasattr(obj, 'dtype') else np.dtype(type(obj))
+    dt = obj.dtype if hasattr(obj, "dtype") else np.dtype(type(obj))
     kind = dt.kind
 
-    if kind == 'b':
-        return 'bool'
-    if kind == 'V':
-        return 'blob'
-    if kind in ['i', 'u', 'f']:
-        return 'real'
-    if kind == 'c':
-        return 'complex'
-    if kind in ['S', 'U']:
-        return 'string'
+    if kind == "b":
+        return "bool"
+    if kind == "V":
+        return "blob"
+    if kind in ["i", "u", "f"]:
+        return "real"
+    if kind == "c":
+        return "complex"
+    if kind in ["S", "U"]:
+        return "string"
 
     # couldn't figure it out
-    raise ValueError('cannot determine lgdo element_type for object of type', type(obj).__name__)
+    raise ValueError(
+        "cannot determine lgdo element_type for object of type", type(obj).__name__
+    )
 
 
 def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]]:
@@ -71,15 +73,16 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         numeric objects, the element type for struct-like  objects, the list of
         fields in the struct.
     """
-    if '{' not in datatype:
-        return 'scalar', None, datatype
+    if "{" not in datatype:
+        return "scalar", None, datatype
 
     # for other datatypes, need to parse the datatype string
     from parse import parse
-    datatype, element_description = parse('{}{{{}}}', datatype)
-    if datatype.endswith('>'):
-        datatype, dims = parse('{}<{}>', datatype)
-        dims = [int(i) for i in dims.split(',')]
+
+    datatype, element_description = parse("{}{{{}}}", datatype)
+    if datatype.endswith(">"):
+        datatype, dims = parse("{}<{}>", datatype)
+        dims = [int(i) for i in dims.split(",")]
         return datatype, tuple(dims), element_description
     else:
-        return datatype, None, element_description.split(',')
+        return datatype, None, element_description.split(",")

@@ -32,10 +32,15 @@ class Table(Struct):
     resize it before passing to data processing functions, as they will call
     :meth:`__len__` to access valid data, which returns the ``size`` attribute.
     """
+
     # TODO: overload getattr to allow access to fields as object attributes?
 
-    def __init__(self, size: int = None, col_dict: dict[str, LGDO] = None,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self,
+        size: int = None,
+        col_dict: dict[str, LGDO] = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
         r"""
         Parameters
         ----------
@@ -76,7 +81,7 @@ class Table(Struct):
 
     def datatype_name(self) -> str:
         """The name for this LGDO's datatype attribute."""
-        return 'table'
+        return "table"
 
     def __len__(self) -> int:
         """Provides ``__len__`` for this array-like class."""
@@ -89,8 +94,10 @@ class Table(Struct):
                 new_size = len(obj)
             elif len(obj) != new_size:
                 if do_warn:
-                    log.warning(f'warning: resizing field {field}',
-                                f'with size {len(obj)} != {new_size}')
+                    log.warning(
+                        f"warning: resizing field {field}",
+                        f"with size {len(obj)} != {new_size}",
+                    )
                 if isinstance(obj, Table):
                     obj.resize(new_size)
                 else:
@@ -106,8 +113,9 @@ class Table(Struct):
     def clear(self) -> None:
         self.loc = 0
 
-    def add_field(self, name: str, obj: LGDO,
-                  use_obj_size: bool = False, do_warn=True) -> None:
+    def add_field(
+        self, name: str, obj: LGDO, use_obj_size: bool = False, do_warn=True
+    ) -> None:
         """Add a field (column) to the table.
 
         Use the name "field" here to match the terminology used in
@@ -125,8 +133,8 @@ class Table(Struct):
             print or don't print useful info. Passed to :meth:`resize` when
             `use_obj_size` is ``True``.
         """
-        if not hasattr(obj, '__len__'):
-            raise TypeError('cannot add field of type', type(obj).__name__)
+        if not hasattr(obj, "__len__"):
+            raise TypeError("cannot add field of type", type(obj).__name__)
 
         super().add_field(name, obj)
 
@@ -135,13 +143,15 @@ class Table(Struct):
             new_size = len(obj) if use_obj_size else self.size
             self.resize(new_size=new_size)
 
-    def add_column(self, name: str, obj: LGDO, use_obj_size: bool = False,
-                   do_warn: bool = True) -> None:
+    def add_column(
+        self, name: str, obj: LGDO, use_obj_size: bool = False, do_warn: bool = True
+    ) -> None:
         """Alias for :meth:`.add_field` using table terminology 'column'."""
         self.add_field(name, obj, use_obj_size=use_obj_size, do_warn=do_warn)
 
-    def join(self, other_table: Table, cols: list[str] = None,
-             do_warn: bool = True) -> None:
+    def join(
+        self, other_table: Table, cols: list[str] = None, do_warn: bool = True
+    ) -> None:
         """Add the columns of another table to this table.
 
         Notes
@@ -169,8 +179,7 @@ class Table(Struct):
         for name in cols:
             self.add_column(name, other_table[name], do_warn=do_warn)
 
-    def get_dataframe(self, cols: list[str] = None,
-                      copy: bool = False) -> pd.DataFrame:
+    def get_dataframe(self, cols: list[str] = None, copy: bool = False) -> pd.DataFrame:
         """Get a :class:`pandas.DataFrame` from the data in the table.
 
         Notes
@@ -190,8 +199,8 @@ class Table(Struct):
         if cols is None:
             cols = self.keys()
         for col in cols:
-            if not hasattr(self[col], 'nda'):
-                raise ValueError(f'column {col} does not have an nda')
+            if not hasattr(self[col], "nda"):
+                raise ValueError(f"column {col} does not have an nda")
             else:
                 df[col] = self[col].nda
 
