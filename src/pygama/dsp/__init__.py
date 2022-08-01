@@ -19,3 +19,5 @@ main contents of this submodule are:
 
 from .build_dsp import build_dsp
 from .processing_chain import ProcessingChain, build_processing_chain
+
+__all__ = ["build_dsp", "ProcessingChain", "build_processing_chain"]
