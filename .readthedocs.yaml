@@ -1,0 +1,20 @@
+version: 2
+
+sphinx:
+  configuration: docs/source/conf.py
+  fail_on_warning: true
+
+build:
+  os: "ubuntu-22.04"
+  tools:
+    python: "3.10"
+  jobs:
+    pre_build:
+      - sphinx-apidoc --private --module-first --force --output-dir source/generated ../src/pygama $(cat source/.py_api_exclude)
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
