@@ -9,7 +9,14 @@ build:
     python: "3.10"
   jobs:
     pre_build:
-      - cd docs && make apidoc
+      - rm -rf docs/source/generated
+      - sphinx-apidoc
+        --private
+        --module-first
+        --force
+        --output-dir docs/source/generated
+        src/pygama
+        src/pygama/_version.py
 
 python:
   install:
