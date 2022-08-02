@@ -53,6 +53,8 @@ class FileDB():
 
             self.df = pd.DataFrame(columns=names)
 
+            self.columns = None
+
             if scan:
                 self.scan_files()
                 self.set_file_status()
@@ -245,29 +247,37 @@ class FileDB():
             
         return columns
 
-    def from_disk(self, cfg_name, df_name):
+    def from_disk(self, cfg_name, db_name):
         """
         Fills self.df and config with the information from a file created by to_lgdo()
         """
         with open(cfg_name, "r") as cfg:
             config = json.load(cfg)
         self.set_config(config)
-        self.df = pd.read_hdf(df_name, key="file_df")
+        self.df = pd.read_hdf(db_name, key="dataframe")
+        sto = LH5Store()
+        vov, _ = sto.read_object("columns", db_name)
+        # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
+        vov = list(vov)
+        columns = []
+        for ov in vov:
+            columns.append([v.decode('utf-8') for v in ov])
+        self.columns = columns
 
-    def to_disk(self, cfg_name, df_name):
+    def to_disk(self, cfg_name, db_name):
         """
         Writes config information to cfg_name and DataFrame to df_name
 
         cfg_name should be a JSON file
-        df_name should be an HDF5 file
+        db_name should be an LH5 file
 
         Parameters
         -----------
             cfg_name : string
             Path to output file for config
 
-            df_name : string
-            Path to output file for DataFrame
+            db_name : string
+            Path to output file for FileDB
         Returns
         -------
             None. 
@@ -275,7 +285,20 @@ class FileDB():
         with open(cfg_name, "w") as cfg:
             json.dump(self.config, cfg)
 
-        self.df.to_hdf(df_name, "file_df")
+        if self.columns is not None: 
+            flat = []
+            cum_l = [0]
+            for i in range(len(self.columns)):
+                flat += self.columns[i]
+                cum_l.append(cum_l[i]+len(self.columns[i]))
+            cum_l = cum_l[1:] 
+            # Must use type 'S' to play nice with HDF
+            col_vov = VectorOfVectors(flattened_data=Array(nda=np.array(flat).astype('S')), cumulative_length=Array(nda=np.array(cum_l)))
+            sto = LH5Store()
+            sto.write_object(col_vov, "columns", db_name, wo_mode="o") 
+
+        self.df.to_hdf(db_name, "dataframe")
+        
         
     def scan_daq_files(self, verbose=False):
         """
