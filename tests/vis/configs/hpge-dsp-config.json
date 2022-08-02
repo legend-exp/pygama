@@ -1,0 +1,29 @@
+{
+  "processors": {
+    "wf_blsub": {
+      "function": "bl_subtract",
+      "module": "pygama.dsp.processors",
+      "args": ["waveform", "baseline", "wf_blsub"],
+      "unit": "ADC"
+    },
+    "wf_pz": {
+      "function": "pole_zero",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_blsub", "150*us", "wf_pz"],
+      "unit": "ADC"
+    },
+    "wf_trap": {
+      "function": "trap_norm",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_pz", "10*us", "3.008*us", "wf_trap"],
+      "unit": "ADC"
+    },
+    "trapEmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_trap", 1, "trapEmax"],
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
+      "unit": "ADC"
+    }
+  }
+}

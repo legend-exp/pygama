@@ -5,14 +5,14 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
-To start developing *pygama*, clone the remote repository:
+To start developing :mod:`pygama`, clone the remote repository:
 
 .. code-block:: console
 
   $ git clone https://github.com/legend-exp/pygama
 
-All extra tools needed to develop *pygama* are listed as optional dependencies
-and can be installed via pip by running:
+All extra tools needed to develop :mod:`pygama` are listed as optional
+dependencies and can be installed via pip by running:
 
 .. code-block:: console
 
@@ -22,10 +22,41 @@ and can be installed via pip by running:
 Code style
 ----------
 
+* All functions and methods (arguments and return types) must be
+  `type-annotated <https://docs.python.org/3/library/typing.html>`_. Type
+  annotations for variables like class attributes are also highly appreciated.
+  Do not forget to
+
+  .. code-block:: python
+
+    from __future__ import annotations
+
+  at the top of a module implementation.
+* Messaging to the user is managed through the :mod:`logging` module. Do not
+  add :func:`print` statements. To make a logging object available in a module,
+  add this:
+
+  .. code-block:: python
+
+    import logging
+    log = logging.getLogger(__name__)
+
+  at the top. In general, try to keep the number of :func:`logging.debug` calls
+  low and use informative messages. :func:`logging.info` calls should be
+  reserved for messages from high-level routines (like
+  :func:`pygama.dsp.build_dsp`). Good code is never too verbose.
+* If an error condition leading to undefined behavior occurs, raise an
+  exception. try to find the most suitable between the `built-in exceptions
+  <https://docs.python.org/3/library/exceptions.html>`_, otherwise ``raise
+  RuntimeError("message")``. Do not raise ``Warning``\ s, use
+  :func:`logging.warning` for that and don't abort the execution.
+* Warning messages (emitted when a problem is encountered that does not lead to
+  undefined behavior) must be emitted through :func:`logging.warning` calls.
+
 A set of `pre-commit <https://pre-commit.com>`_ hooks is configured to make
-sure that *pygama* coherently follows standard coding style conventions. The
-pre-commit tool is able to identify common style problems and automatically fix
-them, wherever possible. Configured hooks are listed in the
+sure that :mod:`pygama` coherently follows standard coding style conventions.
+The pre-commit tool is able to identify common style problems and automatically
+fix them, wherever possible. Configured hooks are listed in the
 ``.pre-commit-config.yaml`` file at the project root folder. They are run
 remotely on the GitHub repository through the `pre-commit bot
 <https://pre-commit.ci>`_, but can also be run locally before submitting a
@@ -36,7 +67,7 @@ pull request (recommended):
   $ cd pygama
   $ pip install '.[test]'
   $ pre-commit run --all-files  # analyse the source code and fix it wherever possible
-  $ pre-commit install          # install a Git pre-commit hook (optional)
+  $ pre-commit install          # install a Git pre-commit hook (optional but recommended)
 
 For a more comprehensive guide, check out the `Scikit-HEP documentation about
 code style <https://scikit-hep.org/developer/style>`_.
@@ -44,20 +75,20 @@ code style <https://scikit-hep.org/developer/style>`_.
 Testing
 -------
 
-* The *pygama* test suite is available below ``tests/``. We use `pytest
+* The :mod:`pygama` test suite is available below ``tests/``. We use `pytest
   <https://docs.pytest.org>`_ to run tests and analyze their output. As
   a starting point to learn how to write good tests, reading of `the
   Scikit-HEP Intro to testing <https://scikit-hep.org/developer/pytest>`_ is
   recommended. Refer to `pytest's how-to guides
   <https://docs.pytest.org/en/stable/how-to/index.html>`_ for a complete
   overview.
-* *pygama* tests belong to three categories:
+* :mod:`pygama` tests belong to three categories:
 
   :unit tests: Should ensure the correct behaviour of each function
-      independently, possibly without relying on other *pygama* methods. The
-      existence of these micro-tests makes it possible to promptly identify and
-      fix the source of a bug. An example of this are tests for each single DSP
-      processor
+      independently, possibly without relying on other :mod:`pygama` methods.
+      The existence of these micro-tests makes it possible to promptly identify
+      and fix the source of a bug. An example of this are tests for each single
+      DSP processor
 
   :integration tests: Should ensure that independent parts of the code base
       work well together and are integrated in a cohesive framework. An example
@@ -93,8 +124,9 @@ Testing
 Documentation
 -------------
 
-We adopt best practices in writing and maintaining *pygama*'s documentation. When
-contributing to the project, make sure to implement the following:
+We adopt best practices in writing and maintaining :mod:`pygama`'s
+documentation. When contributing to the project, make sure to implement the
+following:
 
 * Documentation should be exclusively available on the Project website
   https://legend-exp.github.io/pygama. No READMEs, GitHub/LEGEND wiki pages
@@ -158,8 +190,8 @@ To build documentation for the current Git ref, run the following commands:
   $ make
 
 Documentation can be then displayed by opening ``build/html/index.html`` with a
-web browser.  To build documentation for all main *pygama* versions (development
-branch and stable releases), run
+web browser.  To build documentation for all main :mod:`pygama` versions
+(development branch and stable releases), run
 
 .. code-block:: console
 
@@ -169,7 +201,7 @@ branch and stable releases), run
   $ make allver
 
 and display the documentation by opening ``build/allver/html/index.html``. This
-documentation is also deployed to the *pygama* website.
+documentation is also deployed to the :mod:`pygama` website.
 
 Versioning
 ----------
@@ -186,11 +218,21 @@ new project version must implement the following procedures:
      the code at the intended stage is created
   2. The commit is tagged with a descriptive message: ``git tag vMAJOR.MINOR.0
      -m 'short descriptive message here'`` (note the ``v``)
-  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote:
+
+     .. code-block:: console
+
+       $ git push origin releases/vMAJOR.MINOR
+       $ git push origin refs/tags/vMAJOR.MINOR.0
 
 * To release a new **patch version**, the following procedure should be followed:
 
   1. A commit with the patch is created on the relevant release branch
      ``releases/vMAJOR.MINOR``
   2. The commit is tagged: ``git tag vMAJOR.MINOR.PATCH`` (note the ``v``)
-  3. Changes are pushed to the remote: ``git push --tags origin releases/vMAJOR.MINOR``
+  3. Changes are pushed to the remote:
+
+     .. code-block:: console
+
+       $ git push origin releases/vMAJOR.MINOR
+       $ git push origin refs/tags/vMAJOR.MINOR.PATCH

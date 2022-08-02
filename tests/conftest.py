@@ -5,5 +5,5 @@ from legend_testdata import LegendTestData
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout('5de1d80')
+    ldata.checkout("968c9ba")
     return ldata
