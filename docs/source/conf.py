@@ -2,23 +2,24 @@
 
 import sys
 from pathlib import Path
+
 from pkg_resources import get_distribution
 
 sys.path.insert(0, Path("../../src").resolve().as_posix())
 
-project = 'pygama'
-copyright = '2020, the LEGEND Collaboration'
+project = "pygama"
+copyright = "2020, the LEGEND Collaboration"
 version = get_distribution("pygama").version
 
 extensions = [
-    'sphinx.ext.githubpages',
-    'sphinx.ext.autodoc',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'sphinx_multiversion',
-    'sphinx_copybutton',
-    'myst_parser'
+    "sphinx.ext.githubpages",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+    "sphinx_multiversion",
+    "sphinx_copybutton",
+    "myst_parser",
 ]
 
 source_suffix = {
@@ -30,18 +31,15 @@ language = "python"
 # in _templates/ we have a custom layout.html to include the version menu
 # (adapted from sphinx-multiversion docs)
 templates_path = ["_templates"]
-pygments_style = "sphinx"
 
-# readthedocs.io Sphinx theme
-html_theme = 'sphinx_book_theme'
+# Furo theme
+html_theme = "furo"
 html_theme_options = {
-    'home_page_in_toc': True,
-    'repository_url': 'https://github.com/legend-exp/pygama',
-    'use_repository_button': True,
-    'use_issues_button': True,
-    'use_edit_page_button': True,
+    "source_repository": "https://github.com/legend-exp/pygama",
+    "source_branch": "main",
+    "source_directory": "docs/source",
 }
-html_title = f"pygama {version}"
+html_title = f"{project}"
 
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
@@ -95,7 +93,7 @@ intersphinx_mapping = {
 # Include __init__() docstring in class docstring
 autoclass_content = "both"
 autodoc_typehints = "both"
-autodoc_typehints_description_target = "documented_params"
+autodoc_typehints_description_target = "documented"
 autodoc_typehints_format = "short"
 
 # sphinx-multiversion
