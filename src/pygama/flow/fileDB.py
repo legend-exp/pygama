@@ -23,11 +23,8 @@ class FileDB():
             config : path to JSON file or dict
             Configuration file specifying data directories, tiers, and file name templates
 
-            file_df : pd.DataFrame
-            
-
-            lgdo_file : string 
-            Path to a file containing a LGDO.Table written out by FileDB.to_lgdo()
+            file_df : string
+            Path to LH5 file written by to_disk()
 
             scan : bool
             True by default, whether the fileDB should scan the DAQ directory to

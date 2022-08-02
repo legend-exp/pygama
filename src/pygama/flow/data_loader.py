@@ -38,7 +38,6 @@ class DataLoader:
                 1) An instance of FileDB
                 2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
                 3) config file with enough info for FileDB to perform a DAQ scan
-                4) pd.DataFrame with a config file
         fileDB_config : dict or filename of JSON config file
             Config file mentioned above for fileDB
         file_query : str
@@ -72,7 +71,7 @@ class DataLoader:
             else:
                 self.fileDB = FileDB(config=fileDB_config)
         else:
-            if isinstance(fileDB, pd.DataFrame) or isinstance(fileDB, str):
+            if isinstance(fileDB, str):
                 if fileDB_config is None:
                     print("Must provide a config file with a fileDB dataframe")
                     return
@@ -146,6 +145,9 @@ class DataLoader:
             self.file_list += inds
 
     def get_table_name(self, tier, tb):
+        '''
+        Helper function to get the table name for a tier given its table identifier
+        '''
         template = self.fileDB.table_format[tier]
         fm = string.Formatter()
         parse_arr = np.array(list(fm.parse(template)))
@@ -285,6 +287,7 @@ class DataLoader:
 
     def get_tiers_for_col(self, columns, merge_files=None):
         """
+        Helper function
         Get the tiers, and tables in that tier, that contain the columns given
 
         col_tiers = {
@@ -349,7 +352,7 @@ class DataLoader:
                         
         return col_tiers 
 
-    def gen_entry_list(self, tcm_level=None, tcm_table=None, chunk=False, mode='only', save_output_columns=False, in_mem=True, f_output=None): #TODO: mode, chunking, etc
+    def gen_entry_list(self, tcm_level=None, tcm_table=None, mode='only', save_output_columns=False, in_mem=True, f_output=None): #TODO: mode
         """
         This should apply cuts to the tables and files of interest
         but it does NOT load the column information into memory
@@ -366,11 +369,6 @@ class DataLoader:
         The identifier of the table inside this TCM level that you want to use
         If not specified, there must only be one table inside a TCM file in tcm_level
 
-
-        chunk : bool ?????????????????
-        If true, iterates through each file in file_list
-        If false, opens all files at once 
-
         mode : 'any' or 'only'
         'any' : returns every hit in the event if any hit in the event passes the cuts
         'only' : only returns hits that pass the cuts
@@ -380,16 +378,7 @@ class DataLoader:
 
         Returns
         -------
-        entries:  
-        -------------------------------
-        event   |   channel |   row 
-        -------------------------------
-        0           5           0
-        0           6           0
-        0           12          0
-        1           5           1
-        2           5           2
-        2           6           1
+        entries:  pd.DataFrame
 
         """
         if self.file_list is None:
@@ -596,6 +585,26 @@ class DataLoader:
             return entries
 
     def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit', tcm_level=None):
+        '''
+        Returns the requested columns in self.output_columns for the entries in the given entry_list
+
+        Parameters
+        ----------
+        entry_list : pd.DataFrame 
+        The output of gen_entry_list
+
+        in_mem : bool
+        If True, returns the loaded data in memory
+
+        f_output : string
+        If not None, writes the loaded data to the specified file
+        
+        rows : string, 'hit' or 'evt'
+        Specifies the orientation of the output table
+
+        tcm_level : string
+        Which TCM was used to create the entry_list
+        '''
         if entry_list is None:
             print("First run gen_entry_list and pass the output to load")
             return 
@@ -617,8 +626,7 @@ class DataLoader:
 
     def load_hits(self, entry_list=None, in_mem=False, f_output=None, tcm_level=None, tcm_table=None):
         """
-        Actually retrieve the information from the events in entry_list, and 
-        return it in the requested output format 
+        Called by load() when rows='hit'
         """
         if tcm_level is None:
             parent = self.levels[0]
@@ -710,6 +718,9 @@ class DataLoader:
                     return load_out
             
     def load_evts(self, entry_list=None, in_mem=False, f_output=None, tcm_level=None):
+        """
+        Called by load() when rows = 'evt'
+        """
         parent = self.tcms[tcm_level]["parent"]
         child = self.tcms[tcm_level]["child"]
         load_levels = [parent, child]
