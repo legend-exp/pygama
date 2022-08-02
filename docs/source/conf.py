@@ -38,7 +38,7 @@ html_theme_options = {
     "source_branch": "main",
     "source_directory": "docs/source",
 }
-html_title = f"{project}"
+html_title = f"{project} {version}"
 
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
