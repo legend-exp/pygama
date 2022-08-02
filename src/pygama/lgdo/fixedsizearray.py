@@ -22,16 +22,23 @@ class FixedSizeArray(Array):
     just an alias for :class:`~.Array`, but keeps track of the datatype name.
     """
 
-    def __init__(self, nda: numpy.ndarray = None, shape: tuple[int, ...] = (),
-                 dtype: numpy.dtype = None, fill_val: int | float = None,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self,
+        nda: numpy.ndarray = None,
+        shape: tuple[int, ...] = (),
+        dtype: numpy.dtype = None,
+        fill_val: int | float = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
         """
         See Also
         --------
         :class:`.Array`
         """
-        super().__init__(nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs)
+        super().__init__(
+            nda=nda, shape=shape, dtype=dtype, fill_val=fill_val, attrs=attrs
+        )
 
     def datatype_name(self) -> str:
         """The name for this object's HDF5 datatype attribute."""
-        return 'fixedsize_array'
+        return "fixedsize_array"

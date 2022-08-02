@@ -12,30 +12,44 @@ from .pole_zero import double_pole_zero, pole_zero
 
 
 class Model:
-    """A class representing the function to minimize.
-    """
+    """A class representing the function to minimize."""
+
     errordef = Minuit.LEAST_SQUARES
 
     # the constructor
-    def __init__(self, func: Callable, w_in: np.ndarray,
-                 baseline: float, beg: int, end: int) -> None:
+    def __init__(
+        self, func: Callable, w_in: np.ndarray, baseline: float, beg: int, end: int
+    ) -> None:
         self.func = func
-        self.x    = np.arange(beg, end)
-        self.y    = np.asarray(w_in, dtype=np.float64) - baseline
-        self.beg  = beg
-        self.end  = end
+        self.x = np.arange(beg, end)
+        self.y = np.asarray(w_in, dtype=np.float64) - baseline
+        self.beg = beg
+        self.end = end
 
     # the function to minimize
     def __call__(self, args) -> np.ndarray:
-        y_pz = self.func(self.y, *args)[self.beg:self.end]
-        return np.abs(np.sum(self.x) * np.sum(y_pz) - len(self.x) * np.sum(self.x * y_pz))
+        y_pz = self.func(self.y, *args)[self.beg : self.end]
+        return np.abs(
+            np.sum(self.x) * np.sum(y_pz) - len(self.x) * np.sum(self.x * y_pz)
+        )
 
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32, float32[:])",
-              "void(float64[:], float64, float64, float64, float64, float64[:])"],
-             "(n),(),(),(),()->()", forceobj=True)
-def optimize_1pz(w_in: np.ndarray, a_baseline_in: float, t_beg_in: int,
-                 t_end_in: int, p0_in: float, val0_out: float) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32, float32, float32, float32[:])",
+        "void(float64[:], float64, float64, float64, float64, float64[:])",
+    ],
+    "(n),(),(),(),()->()",
+    forceobj=True,
+)
+def optimize_1pz(
+    w_in: np.ndarray,
+    a_baseline_in: float,
+    t_beg_in: int,
+    t_end_in: int,
+    p0_in: float,
+    val0_out: float,
+) -> None:
     """Find the optimal, single pole-zero cancellation's parameter
     by minimizing the slope in the waveform's specified time range.
 
@@ -74,19 +88,29 @@ def optimize_1pz(w_in: np.ndarray, a_baseline_in: float, t_beg_in: int,
     """
     val0_out[0] = np.nan
 
-    if np.isnan(w_in).any() or np.isnan(a_baseline_in) or np.isnan(t_beg_in) or np.isnan(t_end_in) or\
-       np.isnan(p0_in):
+    if (
+        np.isnan(w_in).any()
+        or np.isnan(a_baseline_in)
+        or np.isnan(t_beg_in)
+        or np.isnan(t_end_in)
+        or np.isnan(p0_in)
+    ):
         return
 
-    if not np.floor(t_beg_in) == t_beg_in or\
-       not np.floor(t_end_in) == t_end_in:
-        raise DSPFatal('The waveform index is not an integer')
+    if not np.floor(t_beg_in) == t_beg_in or not np.floor(t_end_in) == t_end_in:
+        raise DSPFatal("The waveform index is not an integer")
 
-    if int(t_beg_in) < 0 or int(t_beg_in) > len(w_in) or\
-       int(t_end_in) < 0 or int(t_end_in) > len(w_in):
-        raise DSPFatal('The waveform index is out of range')
+    if (
+        int(t_beg_in) < 0
+        or int(t_beg_in) > len(w_in)
+        or int(t_end_in) < 0
+        or int(t_end_in) > len(w_in)
+    ):
+        raise DSPFatal("The waveform index is out of range")
 
-    m = Minuit(Model(pole_zero, w_in, a_baseline_in, int(t_beg_in), int(t_end_in)), [p0_in])
+    m = Minuit(
+        Model(pole_zero, w_in, a_baseline_in, int(t_beg_in), int(t_end_in)), [p0_in]
+    )
     m.print_level = -1
     m.strategy = 1
     m.errordef = Minuit.LEAST_SQUARES
@@ -94,12 +118,26 @@ def optimize_1pz(w_in: np.ndarray, a_baseline_in: float, t_beg_in: int,
     val0_out[0] = m.values[0]
 
 
-@guvectorize(["void(float32[:], float32, float32, float32, float32, float32, float32, float32[:], float32[:], float32[:])",
-              "void(float64[:], float64, float64, float64, float64, float64, float64, float64[:], float64[:], float64[:])"],
-             "(n),(),(),(),(),(),()->(),(),()", forceobj=True)
-def optimize_2pz(w_in: np.ndarray, a_baseline_in: float, t_beg_in: int,
-                 t_end_in: int, p0_in: float, p1_in: float, p2_in: float,
-                 val0_out: float, val1_out: float, val2_out: float) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32, float32, float32, float32, float32, float32[:], float32[:], float32[:])",
+        "void(float64[:], float64, float64, float64, float64, float64, float64, float64[:], float64[:], float64[:])",
+    ],
+    "(n),(),(),(),(),(),()->(),(),()",
+    forceobj=True,
+)
+def optimize_2pz(
+    w_in: np.ndarray,
+    a_baseline_in: float,
+    t_beg_in: int,
+    t_end_in: int,
+    p0_in: float,
+    p1_in: float,
+    p2_in: float,
+    val0_out: float,
+    val1_out: float,
+    val2_out: float,
+) -> None:
     """Find the optimal, double pole-zero cancellation's parameters by
     minimizing the slope in the waveform's specified time range.
 
@@ -147,19 +185,32 @@ def optimize_2pz(w_in: np.ndarray, a_baseline_in: float, t_beg_in: int,
     val1_out[0] = np.nan
     val2_out[0] = np.nan
 
-    if np.isnan(w_in).any() or np.isnan(a_baseline_in) or np.isnan(t_beg_in) or np.isnan(t_end_in) or\
-       np.isnan(p0_in) or np.isnan(p1_in) or np.isnan(p2_in):
+    if (
+        np.isnan(w_in).any()
+        or np.isnan(a_baseline_in)
+        or np.isnan(t_beg_in)
+        or np.isnan(t_end_in)
+        or np.isnan(p0_in)
+        or np.isnan(p1_in)
+        or np.isnan(p2_in)
+    ):
         return
 
-    if not np.floor(t_beg_in) == t_beg_in or\
-       not np.floor(t_end_in) == t_end_in:
-        raise DSPFatal('The waveform index is not an integer')
+    if not np.floor(t_beg_in) == t_beg_in or not np.floor(t_end_in) == t_end_in:
+        raise DSPFatal("The waveform index is not an integer")
 
-    if int(t_beg_in) < 0 or int(t_beg_in) > len(w_in) or\
-       int(t_end_in) < 0 or int(t_end_in) > len(w_in):
-        raise DSPFatal('The waveform index is out of range')
+    if (
+        int(t_beg_in) < 0
+        or int(t_beg_in) > len(w_in)
+        or int(t_end_in) < 0
+        or int(t_end_in) > len(w_in)
+    ):
+        raise DSPFatal("The waveform index is out of range")
 
-    m = Minuit(Model(double_pole_zero, w_in, a_baseline_in, int(t_beg_in), int(t_end_in)), [p0_in, p1_in, p2_in])
+    m = Minuit(
+        Model(double_pole_zero, w_in, a_baseline_in, int(t_beg_in), int(t_end_in)),
+        [p0_in, p1_in, p2_in],
+    )
     m.print_level = -1
     m.strategy = 1
     m.errordef = Minuit.LEAST_SQUARES

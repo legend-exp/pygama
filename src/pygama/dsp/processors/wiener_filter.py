@@ -44,38 +44,46 @@ def wiener_filter(file_name_array: list[str]) -> np.ndarray:
 
     # Check that the file is valid and the data is in the correct format
 
-    try: file_name_array[0]
-    except: raise DSPFatal('init_args must be an array with the filename')
+    try:
+        file_name_array[0]
+    except Exception:
+        raise DSPFatal("init_args must be an array with the filename")
 
     file_name = file_name_array[0]
 
-    try: f = sto.gimme_file(file_name, 'r')
-    except: raise DSPFatal('File must be a valid lh5 file')
+    try:
+        f = sto.gimme_file(file_name, "r")
+    except Exception:
+        raise DSPFatal("File must be a valid lh5 file")
 
-    if 'spms/processed/superpulse' not in f:
-        raise DSPFatal('lh5 file must have \'spms/processed/superpulse\' as a group')
+    if "spms/processed/superpulse" not in f:
+        raise DSPFatal("lh5 file must have 'spms/processed/superpulse' as a group")
 
-    if 'spms/processed/noise_wf' not in f:
-        raise DSPFatal('lh5 file must have \'spms/processed/noise_wf\' as a group')
+    if "spms/processed/noise_wf" not in f:
+        raise DSPFatal("lh5 file must have 'spms/processed/noise_wf' as a group")
 
     # Read in the data
 
-    superpulse, _ = sto.read_object('spms/processed/superpulse', file_name)
+    superpulse, _ = sto.read_object("spms/processed/superpulse", file_name)
     superpulse = superpulse.nda
 
-    noise_wf, _ = sto.read_object('spms/processed/noise_wf', file_name)
+    noise_wf, _ = sto.read_object("spms/processed/noise_wf", file_name)
     noise_wf = noise_wf.nda
 
     # Now check that the data are valid
 
     if len(superpulse) <= 0:
-        raise DSPFatal('The length of the filter must be positive')
+        raise DSPFatal("The length of the filter must be positive")
 
     if len(superpulse) != len(noise_wf):
-        raise DSPFatal('The length of the superpulse must be equal to the length of the noise waveform')
+        raise DSPFatal(
+            "The length of the superpulse must be equal to the length of the noise waveform"
+        )
 
     if np.argmax(superpulse) <= 0 or np.argmax(superpulse) > len(superpulse):
-        raise DSPFatal('The index of the maximum of the superpulse must occur within the waveform')
+        raise DSPFatal(
+            "The index of the maximum of the superpulse must occur within the waveform"
+        )
 
     # Transform these to the frequency domain to eventually create the wiener filter
 
@@ -84,27 +92,31 @@ def wiener_filter(file_name_array: list[str]) -> np.ndarray:
 
     # Create the point spread function for the detector's response
 
-    def PSF(superpulse, fft_superpulse):
+    def psf(superpulse, fft_superpulse):
 
         delta = np.zeros_like(superpulse)
         arg_max = np.argmax(superpulse)
         delta[arg_max] = np.amax(superpulse)
 
-        return fft_superpulse/np.fft.fft(delta)
+        return fft_superpulse / np.fft.fft(delta)
 
     # Now create the wiener filter in the frequency domain
 
-    fft_PSF = PSF(superpulse, fft_superpulse)
-    PSD_noise_wf = fft_noise_wf*np.conj(fft_noise_wf)
-    PSD_superpulse = fft_superpulse*np.conj(fft_superpulse)
+    fft_psf = psf(superpulse, fft_superpulse)
+    psd_noise_wf = fft_noise_wf * np.conj(fft_noise_wf)
+    psd_superpulse = fft_superpulse * np.conj(fft_superpulse)
 
-    w_filter = (np.conj(fft_PSF))/((fft_PSF*np.conj(fft_PSF))+(PSD_noise_wf/PSD_superpulse))
+    w_filter = (np.conj(fft_psf)) / (
+        (fft_psf * np.conj(fft_psf)) + (psd_noise_wf / psd_superpulse)
+    )
 
     # Create a factory function that performs the convolution with the wiener filter, the output is still in the frequency domain
 
-    @guvectorize(["void(complex64[:], complex64[:])",
-                  "void(complex128[:], complex128[:])"],
-                 "(n)->(n)", forceobj=True)
+    @guvectorize(
+        ["void(complex64[:], complex64[:])", "void(complex128[:], complex128[:])"],
+        "(n)->(n)",
+        forceobj=True,
+    )
     def wiener_out(fft_w_in: np.ndarray, fft_w_out: np.ndarray) -> None:
         """
         Parameters
@@ -120,7 +132,7 @@ def wiener_filter(file_name_array: list[str]) -> np.ndarray:
             return
 
         if len(w_filter) != len(fft_w_in):
-            raise DSPFatal('The filter is not the same length of the input waveform')
+            raise DSPFatal("The filter is not the same length of the input waveform")
 
         fft_w_out[:] = fft_w_in * w_filter
 

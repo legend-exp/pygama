@@ -12,9 +12,9 @@ def test_waveform_slicing(geds_raw_tbl):
                 "function": "bl_subtract",
                 "module": "pygama.dsp.processors",
                 "args": ["waveform[0:100]", "baseline", "wf_blsub"],
-                "unit": "ADC"
+                "unit": "ADC",
             },
-        }
+        },
     }
     proc_chain, _, tbl_out = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
@@ -33,9 +33,9 @@ def test_processor_none_arg(geds_raw_tbl):
                 "module": "numpy",
                 "args": ["waveform", 1, None, "wf_cum"],
                 "kwargs": {"signature": "(n),(),()->(n)", "types": ["fii->f"]},
-                "unit": "ADC"
+                "unit": "ADC",
             }
-        }
+        },
     }
     proc_chain, _, _ = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
@@ -54,9 +54,9 @@ def test_processor_kwarg_assignment(geds_raw_tbl):
                 "module": "numpy",
                 "args": ["waveform", "axis=1", "out=wf_cum"],
                 "kwargs": {"signature": "(n),()->(n)", "types": ["fi->f"]},
-                "unit": "ADC"
+                "unit": "ADC",
             }
-        }
+        },
     }
     proc_chain, _, _ = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
@@ -76,9 +76,9 @@ def test_processor_dtype_arg(geds_raw_tbl):
                 "module": "numpy",
                 "args": ["waveform", "axis=0", "dtype='int32'", "out=wf_cum"],
                 "kwargs": {"signature": "(n),(),()->(n)", "types": ["fiU->i"]},
-                "unit": "ADC"
+                "unit": "ADC",
             }
-        }
+        },
     }
     proc_chain, _, _ = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
@@ -92,13 +92,16 @@ def test_scipy_gauss_filter(geds_raw_tbl):
                 "function": "gaussian_filter1d",
                 "module": "scipy.ndimage",
                 "args": [
-                    "waveform", "0.1*us", "mode='reflect'", "truncate=3",
-                    "output=wf_gaus"
+                    "waveform",
+                    "0.1*us",
+                    "mode='reflect'",
+                    "truncate=3",
+                    "output=wf_gaus",
                 ],
                 "kwargs": {"signature": "(n),(),(),()->(n)", "types": ["ffUf->f"]},
-                "unit": "ADC"
+                "unit": "ADC",
             }
-        }
+        },
     }
     proc_chain, _, _ = build_processing_chain(geds_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
@@ -111,10 +114,18 @@ def test_processor_variable_array_output(spms_raw_tbl):
             "vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out": {
                 "function": "get_multi_local_extrema",
                 "module": "pygama.dsp.processors",
-                "args": ["curr", "3*bl_std", "vt_max_out(10)", "vt_min_out(10)", "n_max_out", "n_min_out", "flag_out"],
-                "unit": "ADC"
+                "args": [
+                    "curr",
+                    "3*bl_std",
+                    "vt_max_out(10)",
+                    "vt_min_out(10)",
+                    "n_max_out",
+                    "n_min_out",
+                    "flag_out",
+                ],
+                "unit": "ADC",
             }
-        }
+        },
     }
 
     proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)

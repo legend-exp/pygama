@@ -14,3 +14,5 @@ Currently we support the following hardware:
 """
 
 from pygama.raw.build_raw import build_raw
+
+__all__ = ["build_raw"]

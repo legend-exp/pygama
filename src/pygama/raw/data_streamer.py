@@ -33,9 +33,14 @@ class DataStreamer(ABC):
         self.any_full = False
         self.packet_id = 0
 
-    def open_stream(self, stream_name: str, rb_lib: RawBufferLibrary = None,
-                    buffer_size: int = 8192, chunk_mode: str = 'any_full',
-                    out_stream: str = '') -> tuple[list[RawBuffer], int]:
+    def open_stream(
+        self,
+        stream_name: str,
+        rb_lib: RawBufferLibrary = None,
+        buffer_size: int = 8192,
+        chunk_mode: str = "any_full",
+        out_stream: str = "",
+    ) -> tuple[list[RawBuffer], int]:
         r"""Open and initialize a data stream.
 
         Open the stream, read in the header, set up the buffers.
@@ -80,7 +85,8 @@ class DataStreamer(ABC):
         self.chunk_mode = chunk_mode
 
         # prepare rb_lib -- its lgdo's should still be uninitialized
-        if rb_lib is None: rb_lib = self.build_default_rb_lib(out_stream=out_stream)
+        if rb_lib is None:
+            rb_lib = self.build_default_rb_lib(out_stream=out_stream)
         self.rb_lib = rb_lib
 
         # now initialize lgdo's for raw buffers
@@ -91,14 +97,18 @@ class DataStreamer(ABC):
 
             # set up wildcard decoder buffers
             if dec_name not in rb_lib:
-                if '*' not in rb_lib: continue # user didn't want this decoder
+                if "*" not in rb_lib:
+                    continue  # user didn't want this decoder
                 rb_lib[dec_name] = RawBufferList()
                 dec_key = dec_name
-                if dec_key.endswith('Decoder'): dec_key = dec_key.removesuffix('Decoder')
-                out_name = rb_lib['*'][0].out_name.format(name=dec_key)
-                out_stream = rb_lib['*'][0].out_stream.format(name=dec_key)
+                if dec_key.endswith("Decoder"):
+                    dec_key = dec_key.removesuffix("Decoder")
+                out_name = rb_lib["*"][0].out_name.format(name=dec_key)
+                out_stream = rb_lib["*"][0].out_stream.format(name=dec_key)
                 key_list = decoder.get_key_list()
-                rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=out_name)
+                rb = RawBuffer(
+                    key_list=key_list, out_stream=out_stream, out_name=out_name
+                )
                 rb_lib[dec_name].append(rb)
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
@@ -111,13 +121,16 @@ class DataStreamer(ABC):
             keyed_name_rbs = []
             ii = 0
             while ii < len(rb_lib[dec_name]):
-                if '{key' in rb_lib[dec_name][ii].out_name:
+                if "{key" in rb_lib[dec_name][ii].out_name:
                     keyed_name_rbs.append(rb_lib[dec_name].pop(ii))
-                else: ii += 1
+                else:
+                    ii += 1
             for rb in keyed_name_rbs:
                 for key in rb.key_list:
                     expanded_name = rb.out_name.format(key=key)
-                    new_rb = RawBuffer(key_list=[key], out_stream=rb.out_stream, out_name=expanded_name)
+                    new_rb = RawBuffer(
+                        key_list=[key], out_stream=rb.out_stream, out_name=expanded_name
+                    )
                     rb_lib[dec_name].append(new_rb)
 
             for rb in rb_lib[dec_name]:
@@ -127,7 +140,8 @@ class DataStreamer(ABC):
 
         # make sure there were no entries in rb_lib that weren't among the
         # decoders. If so, just emit a warning and continue.
-        if '*' in rb_lib: rb_lib.pop('*')
+        if "*" in rb_lib:
+            rb_lib.pop("*")
         for dec_name in rb_lib.keys():
             if dec_name not in dec_names:
                 log.warning(f"no decoder named '{dec_name}' requested by rb_lib")
@@ -155,8 +169,12 @@ class DataStreamer(ABC):
         """
         return True
 
-    def read_chunk(self, chunk_mode_override: str = None, rp_max: int = 1000000,
-                   clear_full_buffers: bool = True) -> tuple[list[RawBuffer], int]:
+    def read_chunk(
+        self,
+        chunk_mode_override: str = None,
+        rp_max: int = 1000000,
+        clear_full_buffers: bool = True,
+    ) -> tuple[list[RawBuffer], int]:
         """Reads a chunk of data into raw buffers.
 
         Reads packets until at least one buffer is too full to perform another
@@ -197,32 +215,41 @@ class DataStreamer(ABC):
             not all have the same structure
         """
 
-        if clear_full_buffers: self.rb_lib.clear_full()
+        if clear_full_buffers:
+            self.rb_lib.clear_full()
         self.any_full = False
 
-        chunk_mode = self.chunk_mode if chunk_mode_override is None else chunk_mode_override
+        chunk_mode = (
+            self.chunk_mode if chunk_mode_override is None else chunk_mode_override
+        )
 
-        read_one_packet = (chunk_mode == 'single_packet')
-        only_full = (chunk_mode == 'only_full')
+        read_one_packet = chunk_mode == "single_packet"
+        only_full = chunk_mode == "only_full"
 
         n_packets = 0
         still_has_data = True
         while True:
             still_has_data = self.read_packet()
-            if not still_has_data: break
+            if not still_has_data:
+                break
             n_packets += 1
-            if read_one_packet or n_packets > rp_max: break
-            if self.any_full: break
+            if read_one_packet or n_packets > rp_max:
+                break
+            if self.any_full:
+                break
 
         # send back all rb's with data if we finished reading
-        if not still_has_data: only_full = False
+        if not still_has_data:
+            only_full = False
 
         list_of_rbs = []
         for rb_list in self.rb_lib.values():
             for rb in rb_list:
-                if not only_full: # any_full or read_one_packet
-                    if rb.loc > 0: list_of_rbs.append(rb)
-                elif rb.is_full(): list_of_rbs.append(rb)
+                if not only_full:  # any_full or read_one_packet
+                    if rb.loc > 0:
+                        list_of_rbs.append(rb)
+                elif rb.is_full():
+                    list_of_rbs.append(rb)
         return list_of_rbs
 
     def get_decoder_list(self) -> list:
@@ -234,7 +261,7 @@ class DataStreamer(ABC):
         """
         return []
 
-    def build_default_rb_lib(self, out_stream: str = '') -> RawBufferLibrary:
+    def build_default_rb_lib(self, out_stream: str = "") -> RawBufferLibrary:
         """Build the most basic :class:`~.RawBufferLibrary` that will work for
         this stream.
 
@@ -246,12 +273,15 @@ class DataStreamer(ABC):
         rb_lib = RawBufferLibrary()
         decoders = self.get_decoder_list()
         if len(decoders) == 0:
-            log.warning(f'no decoders returned by get_decoder_list() for {type(self).__name__}')
+            log.warning(
+                f"no decoders returned by get_decoder_list() for {type(self).__name__}"
+            )
             return rb_lib
         for decoder in decoders:
             dec_name = type(decoder).__name__
             dec_key = dec_name
-            if dec_key.endswith('Decoder'): dec_key = dec_key.removesuffix('Decoder')
+            if dec_key.endswith("Decoder"):
+                dec_key = dec_key.removesuffix("Decoder")
             key_list = decoder.get_key_list()
             rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=dec_key)
             rb_lib[dec_name] = RawBufferList()

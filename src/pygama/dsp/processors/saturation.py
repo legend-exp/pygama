@@ -6,10 +6,18 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32, float32[:], float32[:])",
-              "void(float64[:], float64, float64[:], float64[:])"],
-             "(n),()->(),()", nopython=True, cache=True)
-def saturation(w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int) -> None:
+@guvectorize(
+    [
+        "void(float32[:], float32, float32[:], float32[:])",
+        "void(float64[:], float64, float64[:], float64[:])",
+    ],
+    "(n),()->(),()",
+    nopython=True,
+    cache=True,
+)
+def saturation(
+    w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int
+) -> None:
     """Count the number of samples in the waveform that are saturated at the
     minimum and maximum possible values based on the bit depth.
 
@@ -43,10 +51,10 @@ def saturation(w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int
         return
 
     if not np.floor(bit_depth_in) == bit_depth_in:
-        raise DSPFatal('The bit depth is not an integer')
+        raise DSPFatal("The bit depth is not an integer")
 
     if bit_depth_in <= 0:
-        raise DSPFatal('The bit depth is not positive')
+        raise DSPFatal("The bit depth is not positive")
 
     n_lo_out[0] = 0
     n_hi_out[0] = 0

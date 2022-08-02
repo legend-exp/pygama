@@ -6,9 +6,12 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32, float32[:])",
-              "void(float64[:], float64, float64[:])"],
-             "(n),(),(m)", nopython=True, cache=True)
+@guvectorize(
+    ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
+    "(n),(),(m)",
+    nopython=True,
+    cache=True,
+)
 def windower(w_in: np.ndarray, t0_in: int, w_out: np.ndarray) -> None:
     """Return a shorter sample of the waveform, starting at the
     specified index.
@@ -35,15 +38,15 @@ def windower(w_in: np.ndarray, t0_in: int, w_out: np.ndarray) -> None:
         return
 
     if len(w_out) >= len(w_in):
-        raise DSPFatal('The windowed waveform must be smaller than the input waveform')
+        raise DSPFatal("The windowed waveform must be smaller than the input waveform")
 
     beg = min(int(t0_in), len(w_in))
     end = max(beg + len(w_out), 0)
     if beg < 0:
-        w_out[:len(w_out)-end] = np.nan
-        w_out[len(w_out)-end:] = w_in[:end]
+        w_out[: len(w_out) - end] = np.nan
+        w_out[len(w_out) - end :] = w_in[:end]
     elif end < len(w_in):
         w_out[:] = w_in[beg:end]
     else:
-        w_out[:len(w_in)-beg] = w_in[beg:len(w_in)]
-        w_out[len(w_in)-beg:] = np.nan
+        w_out[: len(w_in) - beg] = w_in[beg : len(w_in)]
+        w_out[len(w_in) - beg :] = np.nan

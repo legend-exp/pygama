@@ -10,6 +10,7 @@ class OrcaDecoder(DataDecoder):
     Mostly here to provide a standard interface for setting the header during
     initialization.
     """
+
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         super().__init__(**kwargs)
         self.header = None
@@ -23,7 +24,7 @@ class OrcaDecoder(DataDecoder):
 
 # define a standard hash for crate, card, channel <--> integer
 def get_ccc(crate: int, card: int, channel: int) -> int:
-    return (crate << 9) + ((card & 0x1f) << 4) + (channel & 0xf)
+    return (crate << 9) + ((card & 0x1F) << 4) + (channel & 0xF)
 
 
 def get_crate(ccc: int) -> int:
@@ -31,8 +32,8 @@ def get_crate(ccc: int) -> int:
 
 
 def get_card(ccc: int) -> int:
-    return (ccc >> 4) & 0x1f
+    return (ccc >> 4) & 0x1F
 
 
 def get_channel(ccc: int) -> int:
-    return ccc & 0xf
+    return ccc & 0xF

@@ -42,12 +42,14 @@ def dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     =============================== ========= =============================== =============
     """
     try:
-        dft_fun = FFTW(buf_in, buf_out, axes=(-1,), direction='FFTW_FORWARD')
+        dft_fun = FFTW(buf_in, buf_out, axes=(-1,), direction="FFTW_FORWARD")
     except ValueError:
-        raise ValueError("incompatible array types/shapes. See function documentation for allowed values")
+        raise ValueError(
+            "incompatible array types/shapes. See function documentation for allowed values"
+        )
 
-    typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
-    sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
+    typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
+    sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize([typesig], sizesig, forceobj=True)
     def dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
@@ -91,12 +93,14 @@ def inv_dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     =============================== ============= =============================== =========
     """
     try:
-        idft_fun = FFTW(buf_in, buf_out, axes=(-1,), direction='FFTW_BACKWARD')
+        idft_fun = FFTW(buf_in, buf_out, axes=(-1,), direction="FFTW_BACKWARD")
     except ValueError:
-        raise ValueError("incompatible array types/shapes. See function documentation for allowed values")
+        raise ValueError(
+            "incompatible array types/shapes. See function documentation for allowed values"
+        )
 
-    typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
-    sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
+    typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
+    sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize([typesig], sizesig, forceobj=True)
     def inv_dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
@@ -142,14 +146,18 @@ def psd(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     """
 
     # build intermediate array for the dft, which will be abs'd to get the PSD
-    buf_dft = np.ndarray(buf_out.shape, np.dtype('complex' + str(buf_out.dtype.itemsize * 16)))
+    buf_dft = np.ndarray(
+        buf_out.shape, np.dtype("complex" + str(buf_out.dtype.itemsize * 16))
+    )
     try:
-        dft_fun = FFTW(buf_in, buf_dft, axes=(-1,), direction='FFTW_FORWARD')
+        dft_fun = FFTW(buf_in, buf_dft, axes=(-1,), direction="FFTW_FORWARD")
     except ValueError:
-        raise ValueError("incompatible array types/shapes. See function documentation for allowed values")
+        raise ValueError(
+            "incompatible array types/shapes. See function documentation for allowed values"
+        )
 
-    typesig = 'void(' + str(buf_in.dtype) + '[:, :], ' + str(buf_out.dtype) + '[:, :])'
-    sizesig = '(m, n)->(m, n)' if buf_in.shape == buf_out.shape else '(m, n),(m, l)'
+    typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
+    sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize([typesig], sizesig, forceobj=True)
     def psd(wf_in: np.ndarray, psd_out: np.ndarray) -> None:

@@ -41,17 +41,19 @@ class WaveformTable(Table):
     routine is used.
     """
 
-    def __init__(self,
-                 size: int = None,
-                 t0: float | Array | np.ndarray = 0,
-                 t0_units: str = None,
-                 dt: float | Array | np.ndarray = 1,
-                 dt_units: str = None,
-                 values: ArrayOfEqualSizedArrays | VectorOfVectors | np.ndarray = None,
-                 values_units: str = None,
-                 wf_len: int = None,
-                 dtype: np.dtype = None,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self,
+        size: int = None,
+        t0: float | Array | np.ndarray = 0,
+        t0_units: str = None,
+        dt: float | Array | np.ndarray = 1,
+        dt_units: str = None,
+        values: ArrayOfEqualSizedArrays | VectorOfVectors | np.ndarray = None,
+        values_units: str = None,
+        wf_len: int = None,
+        dtype: np.dtype = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
         r"""
         Parameters
         ----------
@@ -94,37 +96,53 @@ class WaveformTable(Table):
         """
 
         if size is None:
-            if hasattr(t0, '__len__'): size = len(t0)
-            elif hasattr(dt, '__len__'): size = len(dt)
-            elif hasattr(values, '__len__'): size = len(values)
-            if size is None: size = 1024
+            if hasattr(t0, "__len__"):
+                size = len(t0)
+            elif hasattr(dt, "__len__"):
+                size = len(dt)
+            elif hasattr(values, "__len__"):
+                size = len(values)
+            if size is None:
+                size = 1024
 
         if not isinstance(t0, Array):
             shape = (size,)
-            t0_dtype = t0.dtype if hasattr(t0, 'dtype') else np.float32
-            nda = t0 if isinstance(t0, np.ndarray) else np.full(shape, t0, dtype=t0_dtype)
-            if nda.shape != shape: nda.resize(shape, refcheck=True)
+            t0_dtype = t0.dtype if hasattr(t0, "dtype") else np.float32
+            nda = (
+                t0 if isinstance(t0, np.ndarray) else np.full(shape, t0, dtype=t0_dtype)
+            )
+            if nda.shape != shape:
+                nda.resize(shape, refcheck=True)
             t0 = Array(nda=nda)
-        if t0_units is not None: t0.attrs['units'] = f'{t0_units}'
+        if t0_units is not None:
+            t0.attrs["units"] = f"{t0_units}"
 
         if not isinstance(dt, Array):
             shape = (size,)
-            dt_dtype = dt.dtype if hasattr(dt, 'dtype') else np.float32
-            nda = dt if isinstance(dt, np.ndarray) else np.full(shape, dt, dtype=dt_dtype)
-            if nda.shape != shape: nda.resize(shape, refcheck=True)
+            dt_dtype = dt.dtype if hasattr(dt, "dtype") else np.float32
+            nda = (
+                dt if isinstance(dt, np.ndarray) else np.full(shape, dt, dtype=dt_dtype)
+            )
+            if nda.shape != shape:
+                nda.resize(shape, refcheck=True)
             dt = Array(nda=nda)
-        if dt_units is not None: dt.attrs['units'] = f'{dt_units}'
+        if dt_units is not None:
+            dt.attrs["units"] = f"{dt_units}"
 
-        if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(values, VectorOfVectors):
+        if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(
+            values, VectorOfVectors
+        ):
             if isinstance(values, np.ndarray):
                 try:
                     wf_len = values.shape[1]
                 except Exception:
                     wf_len = None
-            if wf_len is None: # VectorOfVectors
+            if wf_len is None:  # VectorOfVectors
                 shape_guess = (size, 100)
-                if dtype is None: dtype = np.dtype(np.float64)
-                if values is None: values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
+                if dtype is None:
+                    dtype = np.dtype(np.float64)
+                if values is None:
+                    values = VectorOfVectors(shape_guess=shape_guess, dtype=dtype)
                 else:
                     flattened_data = np.concatenate(values)
                     length = 0
@@ -132,33 +150,47 @@ class WaveformTable(Table):
                     for i in range(size):
                         length += len(values[i])
                         cumulative_length.append(length)
-                    values = VectorOfVectors(flattened_data=flattened_data, cumulative_length=cumulative_length, dtype=dtype)
-            else: # ArrayOfEqualSizedArrays
+                    values = VectorOfVectors(
+                        flattened_data=flattened_data,
+                        cumulative_length=cumulative_length,
+                        dtype=dtype,
+                    )
+            else:  # ArrayOfEqualSizedArrays
                 shape = (size, wf_len)
                 if dtype is None:
-                    dtype = values.dtype if hasattr(values, 'dtype') else np.dtype(np.float64)
-                nda = values if isinstance(values, np.ndarray) else np.zeros(shape, dtype=dtype)
-                if nda.shape != shape: nda.resize(shape, refcheck=True)
-                values = ArrayOfEqualSizedArrays(dims=(1,1), nda=nda)
-        if values_units is not None: values.attrs['units'] = f'{values_units}'
+                    dtype = (
+                        values.dtype
+                        if hasattr(values, "dtype")
+                        else np.dtype(np.float64)
+                    )
+                nda = (
+                    values
+                    if isinstance(values, np.ndarray)
+                    else np.zeros(shape, dtype=dtype)
+                )
+                if nda.shape != shape:
+                    nda.resize(shape, refcheck=True)
+                values = ArrayOfEqualSizedArrays(dims=(1, 1), nda=nda)
+        if values_units is not None:
+            values.attrs["units"] = f"{values_units}"
 
         col_dict = {}
-        col_dict['t0'] = t0
-        col_dict['dt'] = dt
-        col_dict['values'] = values
+        col_dict["t0"] = t0
+        col_dict["dt"] = dt
+        col_dict["values"] = values
         super().__init__(size=size, col_dict=col_dict, attrs=attrs)
 
     @property
     def values(self) -> ArrayOfEqualSizedArrays | VectorOfVectors:
-        return self['values']
+        return self["values"]
 
     @property
     def values_units(self) -> str:
-        return self.values.attrs.get('units', None)
+        return self.values.attrs.get("units", None)
 
     @values_units.setter
     def values_units(self, units) -> None:
-        self.values.attrs['units'] = f'{units}'
+        self.values.attrs["units"] = f"{units}"
 
     @property
     def wf_len(self) -> int:
@@ -182,24 +214,24 @@ class WaveformTable(Table):
 
     @property
     def t0(self) -> Array:
-        return self['t0']
+        return self["t0"]
 
     @property
     def t0_units(self) -> str:
-        return self.t0.attrs.get('units', None)
+        return self.t0.attrs.get("units", None)
 
     @t0_units.setter
     def t0_units(self, units: str) -> None:
-        self.t0.attrs['units'] = f'{units}'
+        self.t0.attrs["units"] = f"{units}"
 
     @property
     def dt(self) -> Array:
-        return self['dt']
+        return self["dt"]
 
     @property
     def dt_units(self) -> str:
-        return self.dt.attrs.get('units', None)
+        return self.dt.attrs.get("units", None)
 
     @dt_units.setter
     def dt_units(self, units: str) -> None:
-        self.dt.attrs['units'] = f'{units}'
+        self.dt.attrs["units"] = f"{units}"

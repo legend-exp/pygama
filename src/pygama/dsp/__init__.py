@@ -17,5 +17,7 @@ main contents of this submodule are:
   file and writes into an output file, using the LH5 file format
 """
 
-from .build_dsp import build_dsp
-from .processing_chain import ProcessingChain, build_processing_chain
+from pygama.dsp.build_dsp import build_dsp
+from pygama.dsp.processing_chain import ProcessingChain, build_processing_chain
+
+__all__ = ["build_dsp", "ProcessingChain", "build_processing_chain"]
