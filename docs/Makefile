@@ -17,7 +17,7 @@ allver:
 	sphinx-multiversion "$(SOURCEDIR)" "$(BUILDDIRALL)"
 	branch=`cut -d. -f 1 <<< $(LATESTVER)`.`cut -d. -f 2 <<< $(LATESTVER)` && \
     ln -fs "releases/$${branch}/index.html" "$(BUILDDIRALL)/index.html"
-	@if [ ! -f `readlink -f "$(BUILDDIRALL)/index.html"` ]; then \
+	@if [ -z `readlink -f "$(BUILDDIRALL)/index.html"` ]; then \
         echo "ERROR: could not determine valid documentation for the latest version"; \
         exit 1; \
     fi
