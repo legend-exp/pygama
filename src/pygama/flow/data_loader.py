@@ -595,7 +595,7 @@ class DataLoader:
         if in_mem:
             return entries
 
-    def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit', tcm_level=None): #TODO
+    def load(self, entry_list=None, in_mem=False, f_output=None, rows='hit', tcm_level=None):
         if entry_list is None:
             print("First run gen_entry_list and pass the output to load")
             return 
@@ -663,11 +663,24 @@ class DataLoader:
                                     table_name = self.get_table_name(tier, tb)
                                     tier_table, _ = sto.read_object(table_name, tier_path, idx=idx_mask, field_mask=field_mask)
                                     for col in tier_table.keys():
-                                        # Allocate memory for column for all channels
-                                        if col not in col_dict.keys():
-                                            col_dict[col] = np.empty(table_length, dtype=tier_table[col].dtype)
                                         if isinstance(tier_table[col], Array):
+                                            # Allocate memory for column for all channels
+                                            if col not in col_dict.keys():
+                                                col_dict[col] = np.empty(table_length, dtype=tier_table[col].dtype)
                                             col_dict[col][tcm_idx] = tier_table[col].nda 
+                                        elif isinstance(tier_table[col], WaveformTable):
+                                            wf_table = tier_table[col]
+                                            if isinstance(wf_table["values"], ArrayOfEqualSizedArrays):
+                                                # Allocate memory for columns for all channels
+                                                if 'wf_dt' not in col_dict.keys():
+                                                    col_dict['wf_t0'] = np.empty(table_length, dtype=wf_table['t0'].dtype)
+                                                    col_dict['wf_dt'] = np.empty(table_length, dtype=wf_table['dt'].dtype)
+                                                    col_dict['wf_values'] = np.empty((table_length, wf_table['values'].nda.shape[1]), dtype=wf_table['values'].dtype)
+                                                col_dict['wf_t0'][tcm_idx] = wf_table['t0'].nda 
+                                                col_dict['wf_dt'][tcm_idx] = wf_table['dt'].nda 
+                                                col_dict['wf_values'][tcm_idx] = wf_table['values'].nda 
+                                            else: # wf_values is a VectorOfVectors
+                                                print(f"Not sure how to handle waveforms with values of type {type(tier_table[col]['values'])} yet")
                                         else:
                                             print(f"Not sure how to handle columns of type {type(tier_table[col])} yet")
                     # end tb loop
@@ -866,8 +879,8 @@ if __name__=='__main__':
     # print()
 
     # print("Save output columns to entry list: ")
-    cols = ["daqenergy", "trapEmax", "channel"]
-    dl.set_output(fmt="pd.DataFrame", merge_files=False, columns=cols)
+    cols = ["daqenergy", "trapEmax", "channel", "waveform"]
+    dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
     # dl.set_cuts({"hit": "daqenergy > 100"})
     # print("Energy cut, no arguments")
     # hit_cut_el = dl.gen_entry_list(save_output_columns=True)
@@ -880,5 +893,4 @@ if __name__=='__main__':
     print("Load data, no merge: ")
     lout = dl.load(tcm_el, in_mem=True, rows="hit", tcm_level="tcm")
     pprint(lout)
-    print(lout[545])
     print('-------------------------------------------------------')
