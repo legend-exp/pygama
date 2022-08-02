@@ -10,12 +10,7 @@ build:
     python: "3.10"
   jobs:
     pre_build:
-      - sphinx-apidoc
-        --private
-        --module-first
-        --force
-        --output-dir docs/source/generated
-        src/pygama $(cat docs/source/.py_api_exclude)
+      - cd docs && make apidoc
 
 python:
   install:
