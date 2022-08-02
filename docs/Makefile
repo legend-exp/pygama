@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 SOURCEDIR = source
 BUILDDIR = build
 LATESTVER = $(shell git describe --tags --abbrev=0)
