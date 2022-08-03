@@ -11,7 +11,7 @@ build:
     python: "3.10"
   jobs:
     pre_install:
-      - python -m pip install --upgrade pip wheel setuptools numpy GitPython sphinx sphinx-rtd-theme myst-parser
+      - python -m pip install --upgrade pip wheel setuptools numpy GitPython sphinx sphinx-rtd-theme myst-parser furo
     pre_build:
       - rm -rf docs/source/generated
       - sphinx-apidoc
