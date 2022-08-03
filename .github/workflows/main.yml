@@ -60,7 +60,7 @@ jobs:
         run: |
           git fetch --prune --no-recurse-submodules --depth=1 origin
           .github/workflows/get-dependencies.sh
-          pip install sphinx sphinx-rtd-theme myst-parser
+          pip install furo sphinx sphinx-rtd-theme myst-parser
           pip install git+https://github.com/samtygier-stfc/sphinx-multiversion.git@prebuild_command
       - name: Build docs for current ref
         run: |
