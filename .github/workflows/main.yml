@@ -47,8 +47,8 @@ jobs:
         pip install .
         pytest test
 
-  deploy-docs:
-    name: Deploy documentation on legend-exp.github.io/pygama
+  test-docs:
+    name: Build documentation
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
@@ -67,15 +67,3 @@ jobs:
           cd docs
           make clean
           make
-      - name: Build docs for selected versions (GitHub pages)
-        run: |
-          cd docs
-          make clean
-          make allver-info
-          make allver
-      - if: ${{ github.event_name == 'push' }}
-        name: Deploy to GitHub pages
-        uses: JamesIves/github-pages-deploy-action@v4.2.2
-        with:
-          branch: gh-pages
-          folder: docs/build/allver/html
