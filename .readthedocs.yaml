@@ -19,8 +19,7 @@ build:
         --module-first
         --force
         --output-dir docs/source/generated
-        src/pygama
-        src/pygama/_version.py
+        pygama
 
 python:
   install:
