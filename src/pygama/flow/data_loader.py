@@ -670,6 +670,12 @@ class DataLoader:
                                 if os.path.exists(tier_path):
                                     table_name = self.get_table_name(tier, tb)
                                     tier_table, _ = sto.read_object(table_name, tier_path, idx=idx_mask, field_mask=field_mask)
+                                    if level == child:
+                                        # Explode columns from "evt"-style levels, untested 
+                                        # Will only work if column has an "nda" attribute
+                                        cum_length = build_cl(f_entries[f"{child}_idx"]) 
+                                        exp_cols = explode_arrays(cum_length, [a.nda for a in tier_table.values()])
+                                        tier_table.update(zip(tier_table.keys(), exp_cols))
                                     for col in tier_table.keys():
                                         if isinstance(tier_table[col], Array):
                                             # Allocate memory for column for all channels
