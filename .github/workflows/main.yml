@@ -35,18 +35,6 @@ jobs:
     - name: Run unit tests
       run: pytest test
 
-  test-in-legend-container:
-    name: Test pygama in LEGEND container
-    runs-on: ubuntu-latest
-    container: docker://legendexp/legend-base:latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install and run unit tests
-      run: |
-        pip install .
-        pytest test
-
   test-docs:
     name: Build documentation
     needs: build-and-test
