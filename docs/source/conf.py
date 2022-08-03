@@ -12,7 +12,6 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
-    'sphinx_multiversion',
     'myst_parser'
 ]
 
