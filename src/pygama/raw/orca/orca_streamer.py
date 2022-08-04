@@ -9,13 +9,12 @@ import numpy as np
 from pygama.raw.data_streamer import DataStreamer
 from pygama.raw.orca import orca_packet
 from pygama.raw.orca.orca_base import OrcaDecoder
-from pygama.raw.orca.orca_digitizers import ORSIS3302DecoderForEnergy
-from pygama.raw.orca.orca_SIS3316 import ORSIS3316WaveformDecoder  # noqa: F401
 from pygama.raw.orca.orca_flashcam import (  # noqa: F401
     ORFlashCamADCWaveformDecoder,
     ORFlashCamListenerConfigDecoder,
 )
 from pygama.raw.orca.orca_header_decoder import OrcaHeaderDecoder
+from pygama.raw.orca.orca_SIS3316 import ORSIS3316WaveformDecoder  # noqa: F401
 from pygama.raw.raw_buffer import RawBuffer, RawBufferLibrary
 
 log = logging.getLogger(__name__)
