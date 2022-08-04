@@ -163,7 +163,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         #        "The timestamp info for this event was not provided in the packet header."
         #    )
 
-        #ene_wf_length = packet[5]
+        # ene_wf_length = packet[5]
 
         orca_helper_length16 = 54
         header_length16 = orca_helper_length16
