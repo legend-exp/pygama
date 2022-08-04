@@ -1,4 +1,3 @@
-import copy
 import logging
 import sys
 from typing import Any
@@ -154,11 +153,11 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         try:
             tbl["channel"].nda[ii] = channel
         except:
+            tbl["channel"].nda[ii] = 33
             logging.warning("channel info not available for this packet.")
             logging.info(
                 "The channel info for this event was not provided in the packet header."
             )
-            tbl["channel"].nda[ii] = 33
 
         try:
             tbl["timestamp"].nda[ii] = packet[11] + ((packet[10] & 0xFFFF0000) << 16)
@@ -173,8 +172,8 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         orca_helper_length16 = 54
         header_length16 = orca_helper_length16
-        ene_wf_length16 = 2 * ene_wf_length
-        footer_length16 = 0
+        #ene_wf_length16 = 2 * ene_wf_length
+        #footer_length16 = 0
 
         # expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)
         expected_wf_length = len(evt_data_16) - header_length16  # - ene_wf_length16)
@@ -183,7 +182,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         i_wf_start = header_length16
         # i_wf_stop = i_wf_start + wf_length16
         i_wf_stop = i_wf_start + expected_wf_length
-        i_ene_start = i_wf_stop + 1
+        #i_ene_start = i_wf_stop + 1
         # i_ene_stop = i_ene_start + ene_wf_length16
 
         # tbwf = tbl["waveform"]["values"].nda[ii]
