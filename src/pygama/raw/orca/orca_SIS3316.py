@@ -1,5 +1,4 @@
 import logging
-import sys
 from typing import Any
 
 import numpy as np
@@ -16,9 +15,7 @@ log = logging.getLogger(__name__)
 class ORSIS3316WaveformDecoder(OrcaDecoder):
     """Decoder for SIS3316 ADC data written by ORCA."""
 
-
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
-
 
         # store an entry for every event
         self.decoded_values_template = {
@@ -89,7 +86,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         self.decoded_values["waveform"]["wf_len"] = trace_length
 
-
     def get_key_list(self) -> list[int]:
         key_list = []
         for key in self.decoded_values.keys():
@@ -118,7 +114,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         evt_data_16 = np.frombuffer(packet, dtype=np.uint16)
 
-
         crate = (packet[1] >> 21) & 0xF
         card = (packet[1] >> 16) & 0x1F
         channel = (packet[1] >> 8) & 0xFF
@@ -143,26 +138,22 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         else:
             tbl["timestamp"].nda[ii] = 0
 
-
         orca_helper_length16 = 54
         header_length16 = orca_helper_length16
 
-
         expected_wf_length = len(evt_data_16) - header_length16
-
 
         i_wf_start = header_length16
 
         i_wf_stop = i_wf_start + expected_wf_length
-
 
         if expected_wf_length > 0:
 
             if expected_wf_length == len(tbl["waveform"]["values"].nda[ii]):
                 tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
             else:
-                #this is else is to collected data that is doubled.
-                #sometimes two events come in the same packet from ORCA.
+                # this is else is to collected data that is doubled.
+                # sometimes two events come in the same packet from ORCA.
                 i_wf_stop = i_wf_start + len(tbl["waveform"]["values"].nda[ii])
                 tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
 
@@ -184,7 +175,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                     tbl["waveform"]["values"].nda[ii] = evt_data_16[
                         i_wf_start:i_wf_stop
                     ]
-
 
         evt_rbkd[ccc].loc += 1
 
