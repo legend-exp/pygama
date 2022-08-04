@@ -1,10 +1,11 @@
 import copy
 import logging
+import sys
 from typing import Any
 
 import numpy as np
 
-from pygama.raw.orca.orca_base import OrcaDecoder
+from .orca_base import OrcaDecoder, get_ccc
 from pygama.raw.orca.orca_header import OrcaHeader
 from pygama.raw.orca.orca_packet import OrcaPacket
 from pygama.raw.raw_buffer import RawBufferLibrary
@@ -12,31 +13,16 @@ from pygama.raw.raw_buffer import RawBufferLibrary
 log = logging.getLogger(__name__)
 
 
-def get_key(card, ch: int) -> int:
-    return card
-
-
-def get_fcid(key: int) -> int:
-    return int(np.floor(key / 1000)) + 1
-
-
-def get_ch(key: int) -> int:
-    return key % 1000
-
-
 class ORSIS3316WaveformDecoder(OrcaDecoder):
     """Decoder for FlashCam ADC data written by ORCA."""
 
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
-        self.decoder_name = "ORSIS3316WaveformDecoder"
-        self.orca_class_name = "ORSIS3316Model"
+        #self.decoder_name = "ORSIS3316WaveformDecoder"
+        #self.orca_class_name = "ORSIS3316Model"
 
         # store an entry for every event
         self.decoded_values_template = {
             "packet_id": {
-                "dtype": "uint32",
-            },
-            "ievt": {
                 "dtype": "uint32",
             },
             "energy": {
@@ -72,7 +58,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         # self.event_header_length = 1 #?
         self.decoded_values = {}
         self.skipped_channels = {}
-        self.ievt = 0
         super().__init__(
             header=header, **kwargs
         )  # also initializes the garbage df (whatever that means...)
@@ -88,21 +73,23 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         for card_dict in self.header["ObjectInfo"]["Crates"][0]["Cards"]:
             if card_dict["Class Name"] == "ORSIS3316Model":
                 card = card_dict["Card"]
+                crate = 0
                 for channel in range(0, 16):
+                    ccc = get_ccc(crate, card, channel)
                     trace_length = card_dict["rawDataBufferLen"]
-                    id = card * 16 + channel
-                    self.decoded_values[id] = copy.deepcopy(
+                    self.decoded_values[ccc] = copy.deepcopy(
                         self.decoded_values_template
-                    )
+                        )
 
                     if trace_length <= 0 or trace_length > 2**16:
-                        print(
-                            "SIS3316ORCADecoder Error: invalid trace_length",
+                        raise Exception(
+                        "SIS3316ORCADecoder Error: invalid trace_length",
                             trace_length,
-                        )
+                            )
                         sys.exit()
 
-                    self.decoded_values[id]["waveform"]["wf_len"] = trace_length
+                    self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
+
 
         self.decoded_values["waveform"]["wf_len"] = trace_length
         # print("crate", crate)
@@ -111,66 +98,78 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
     def get_key_list(self) -> list[int]:
         key_list = []
+        for key in self.decoded_values.keys():
+            key_list += [key]
+        return key_list
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
             dec_vals_list = self.decoded_values
             if len(dec_vals_list) == 0:
-                print("ORSIS3302Model: Error: decoded_values not built yet!")
+                raise Exception("ORSIS3316Model: Error: decoded_values not built yet!")
                 return None
             return dec_vals_list  # Get first thing we find
 
         if key in self.decoded_values:
             dec_vals_list = self.decoded_values[key]
             return dec_vals_list
-        print("ORSIS3316Model: Error: No decoded values for channel", channel)
+        raise Exception("ORSIS3316Model: Error: No decoded values for key", key)
         return None
-
-    def assert_nsamples(self, nsamples: int, fcid: int) -> None:
-        orca_nsamples = self.decoded_values[fcid]["waveform"]["wf_len"]
-        if orca_nsamples != nsamples:
-            log.warning(
-                f"orca miscalculated nsamples = {orca_nsamples} for fcid {fcid}, updating to {nsamples}"
-            )
-            self.decoded_values[fcid]["waveform"]["wf_len"] = nsamples
 
     def decode_packet(
         self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary
     ) -> bool:
         """Decode the ORCA FlashCam ADC packet."""
         evt_rbkd = rbl.get_keyed_dict()
-        evt_data_32 = np.fromstring(packet, dtype=np.uint32)
-        evt_data_16 = np.fromstring(packet, dtype=np.uint16)
-        # print(rbl[0])
-        rb = rbl[0]
-        tbl = rb.lgdo
-        ii = rb.loc
 
-        NumLongs = packet[3]
-        record_length = packet[0] & 0x3FFFF
-        fcio_header_length = (packet[1] & 0x0FC00000) >> 22
-        wf_samples = (packet[1] & 0x003FFFC0) >> 6
-        crate = (packet[2] >> 21) & 0xF
+
+        evt_data_16 = np.frombuffer(packet, dtype=np.uint16)
+
+        # get the table for this crate/card/channel
+
+        crate = (packet[1] >> 21) & 0xF
         card = (packet[1] >> 16) & 0x1F
         channel = (packet[1] >> 8) & 0xFF
+        ccc = get_ccc(crate, card, channel)
 
-        tbl["crate"].nda[ii] = (evt_data_32[1] >> 21) & 0xF
-        tbl["card"].nda[ii] = (evt_data_32[1] >> 16) & 0x1
+        if ccc not in evt_rbkd:
+            if ccc not in self.skipped_channels:
+                self.skipped_channels[ccc] = 0
+                log.debug(f"Skipping channel: {ccc}")
+                log.debug(f"evt_rbkd: {evt_rbkd.keys()}")
+            self.skipped_channels[ccc] += 1
+            return False
+        tbl = evt_rbkd[ccc].lgdo
+        ii = evt_rbkd[ccc].loc
+
+
+        #NumLongs = packet[3]
+        #record_length = packet[0] & 0x3FFFF
+        #fcio_header_length = (packet[1] & 0x0FC00000) >> 22
+        #wf_samples = (packet[1] & 0x003FFFC0) >> 6
+        #crate = (packet[2] >> 21) & 0xF
+        #card = (packet[1] >> 16) & 0x1F
+        #channel = (packet[1] >> 8) & 0xFF
+
+        tbl["crate"].nda[ii] = crate
+        tbl["card"].nda[ii] = card
         try:
-            tbl["channel"].nda[ii] = (evt_data_32[1] >> 8) & 0xFF
+            tbl["channel"].nda[ii] = channel
         except:
-            print("Something went wrong")
+            logging.warning("channel info not available for this packet.")
+            logging.info("The channel info for this event was not provided in the packet header.")
             tbl["channel"].nda[ii] = 33
 
         try:
-            tbl["timestamp"].nda[ii] = evt_data_32[11] + (
-                (evt_data_32[10] & 0xFFFF0000) << 16
+            tbl["timestamp"].nda[ii] = packet[11] + (
+                (packet[10] & 0xFFFF0000) << 16
             )
         except:
-            print("something went wrong here too")
             tbl["timestamp"].nda[ii] = 0
+            logging.warning("timestamp info not available for this packet.")
+            logging.info("The timestamp info for this event was not provided in the packet header.")
 
-        ene_wf_length = evt_data_32[5]
+        ene_wf_length = packet[5]
 
         orca_helper_length16 = 54
         header_length16 = orca_helper_length16
@@ -179,15 +178,15 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         # expected_wf_length = (len(evt_data_16) - header_length16 - ene_wf_length16)
         expected_wf_length = len(evt_data_16) - header_length16  # - ene_wf_length16)
-        rb_wf_len = tbl["waveform"]["values"].nda.shape[1]
+        #rb_wf_len = tbl["waveform"]["values"].nda.shape[1]
 
         i_wf_start = header_length16
         # i_wf_stop = i_wf_start + wf_length16
         i_wf_stop = i_wf_start + expected_wf_length
         i_ene_start = i_wf_stop + 1
-        i_ene_stop = i_ene_start + ene_wf_length16
+        #i_ene_stop = i_ene_start + ene_wf_length16
 
-        tbwf = tbl["waveform"]["values"].nda[ii]
+        #tbwf = tbl["waveform"]["values"].nda[ii]
         # handle the waveform(s)
         # if wf_length16 > 0:
 
@@ -201,29 +200,28 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
 
                 if ii != 8191:
-                    rb.loc += 1
+                    evt_rbkd[ccc].loc += 1
 
-                    ii = rb.loc
+                    ii = evt_rbkd[ccc].loc
                     offset = 5025
 
-                    tbl["crate"].nda[ii] = (evt_data_32[offset + 1] >> 21) & 0xF
-                    tbl["card"].nda[ii] = (evt_data_32[offset + 2] >> 16) & 0x1
+                    tbl["crate"].nda[ii] = (packet[offset + 1] >> 21) & 0xF
+                    tbl["card"].nda[ii] = (packet[offset + 2] >> 16) & 0x1
                     tbl["channel"].nda[ii] = 33
                     # tbl['channel'].nda[ii] = (evt_data_32[offset + 1] >> 8) & 0xFF
-                    tbl["timestamp"].nda[ii] = evt_data_32[offset + 11] + (
-                        (evt_data_32[offset + 10] & 0xFFFF0000) << 16
+                    tbl["timestamp"].nda[ii] = packet[offset + 11] + (
+                        (packet[offset + 10] & 0xFFFF0000) << 16
                     )
 
                     i_wf_start = len(tbl["waveform"]["values"].nda[ii]) + 54
                     i_wf_stop = i_wf_start + len(tbl["waveform"]["values"].nda[ii])
-                    try:
-                        tbl["waveform"]["values"].nda[ii] = evt_data_16[
+                    tbl["waveform"]["values"].nda[ii] = evt_data_16[
                             i_wf_start:i_wf_stop
                         ]
-                    except:
-                        "hello"
-                else:
-                    "wow"
+
+
+
+
 
             # try:
             #    tbl['waveform']['values'].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
@@ -236,6 +234,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
             # print(evt_data_32[i_wf_start:i_wf_stop])
             # print('  expected: ',rb_wf_len)
 
-        rb.loc += 1
+        evt_rbkd[ccc].loc += 1
 
-        return rb.is_full()
+        return evt_rbkd[ccc].is_full()
