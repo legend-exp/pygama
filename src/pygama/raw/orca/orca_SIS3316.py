@@ -150,23 +150,18 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         tbl["crate"].nda[ii] = crate
         tbl["card"].nda[ii] = card
-        try:
-            tbl["channel"].nda[ii] = channel
-        except:
-            tbl["channel"].nda[ii] = 33
-            logging.warning("channel info not available for this packet.")
-            logging.info(
-                "The channel info for this event was not provided in the packet header."
-            )
+        tbl["channel"].nda[ii] = channel
 
-        try:
+        if len(packet) > 10:
             tbl["timestamp"].nda[ii] = packet[11] + ((packet[10] & 0xFFFF0000) << 16)
-        except:
+        else:
             tbl["timestamp"].nda[ii] = 0
-            logging.warning("timestamp info not available for this packet.")
-            logging.info(
-                "The timestamp info for this event was not provided in the packet header."
-            )
+        #    print(len(packet))
+        #    tbl["timestamp"].nda[ii] = 0
+        #    logging.warning("timestamp info not available for this packet.")
+        #    logging.info(
+        #        "The timestamp info for this event was not provided in the packet header."
+        #    )
 
         ene_wf_length = packet[5]
 
