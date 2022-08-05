@@ -1,0 +1,847 @@
+import numpy as np
+import os, json
+import logging
+import pathlib
+
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib.colors import LogNorm
+import matplotlib.colors as mcolors
+import matplotlib.cm as cmx
+from matplotlib.backends.backend_pdf import PdfPages
+
+from iminuit import cost, Minuit, util
+
+import pygama.pargen.energy_cal as pgc
+import pygama.math.peak_fitting as pgf
+import pygama.math.histogram as pgh
+import pygama.lgdo.lh5_store as lh5
+from pygama.pargen.ecal_th import apply_ctc
+
+
+log = logging.getLogger(__name__)
+
+def load_aoe(files, lh5_path,cal_dict, energy_param, cal_energy_param): 
+
+    """
+    Loads in the A/E parameters needed and applies calibration constants to energy
+    """
+    
+    params = ['A_max', 'tp_0_est', 'tp_99', energy_param, 'dt_eff']
+    alpha=None
+    for key in cal_dict:
+        if cal_energy_param in cal_dict[key]["outputs"]:
+            for entry in cal_dict[key]["inputs"]:
+                if entry not in params:
+                    params.append(entry)
+            alpha= cal_dict[key]['pars']['a']
+
+    cal_pars = [cal_dict[f'Energy_cal_{cal_energy_param}']['pars']["a"],cal_dict[f'Energy_cal_{cal_energy_param}']['pars']["b"]]
+    log.info(f'{len(files)} files found')
+    log.info('Loading and applying quality cuts')
+    log.debug(f'Loading: {params}')
+    uncal_pass = lh5.load_nda(files,params,lh5_path)
+    log.info("Done")
+    if alpha is not None:
+        uncal_pass[cal_energy_param]=apply_ctc(uncal_pass[params[-2]],uncal_pass[params[-1]],alpha)
+    else:
+        uncal_pass[cal_energy_param]= uncal_pass[energy_param]
+    
+    Npass = len(uncal_pass[cal_energy_param])
+    ecal_pass = pgf.poly(uncal_pass[cal_energy_param], cal_pars)
+    curr = uncal_pass['A_max']
+    aoe = np.divide(curr,pgf.poly(uncal_pass[energy_param], cal_pars))
+    full_dt = uncal_pass['tp_99']-uncal_pass['tp_0_est']
+    return aoe, ecal_pass, uncal_pass['dt_eff'], full_dt
+
+def PDF_AoE(x, lambda_s, lambda_b, mu,sigma,tau, 
+            lower_range=np.inf , upper_range=np.inf, components=False):
+    """
+    PDF for A/E consists of a gaussian signal with gaussian tail background
+    """
+    try:
+        sig = lambda_s *  pgf.gauss_norm(x, mu,sigma)
+        bkg = lambda_b * pgf.gauss_tail_norm(x,mu,sigma,tau, lower_range , upper_range)
+    except:
+        sig= np.full_like(x, np.nan)
+        bkg= np.full_like(x, np.nan)
+        
+    if components == False:
+            pdf = sig+bkg
+            return lambda_s+lambda_b, pdf
+    else:
+        return lambda_s+lambda_b, sig,bkg 
+
+def unbinned_aoe_fit(aoe, display=0, verbose=False):
+
+    """
+    Fitting function for A/E, first fits just a gaussian before using the full pdf to fit
+    if fails will return NaN values
+    """
+    
+    hist, bins,var = pgh.get_hist(aoe,bins=500)
+    bin_centers = (bins[:-1]+bins[1:])/2
+    
+    pars, cov = pgf.gauss_mode_max(hist, bins, var)
+    mu = bin_centers[np.argmax(hist)]
+    _,sigma,_ = pgh.get_gaussian_guess(hist, bins)
+    ls_guess = 2*np.sum(hist[(bin_centers>mu)&(bin_centers<(mu+2.5*sigma))])
+    c1_min= mu-2*sigma 
+    c1_max= mu+5*sigma
+    
+
+    #Initial fit just using Gaussian
+    c1 = cost.UnbinnedNLL(aoe[(aoe<c1_max)&(aoe>c1_min)], pgf.gauss_pdf)
+    m1 = Minuit(c1, mu,sigma,ls_guess)
+    m1.limits = [(mu*0.8, mu*1.2),(0.8*sigma,sigma*1.2),(0, len(aoe[(aoe<c1_max)&(aoe>c1_min)]))]
+    m1.migrad()
+    mu,sigma,ls_guess = m1.values
+    if verbose:print(m1)
+
+    #Range to fit over, below this tail behaviour more exponential, few events above
+    fmin=  mu-15*sigma
+    fmax = mu+5*sigma
+
+    bg_guess = len(aoe[(aoe<fmax)&(aoe>fmin)])-ls_guess
+    x0 = [ls_guess,bg_guess,mu,sigma,0.01, fmin, fmax,0]
+    if verbose:print(x0)
+        
+    #Full fit using gaussian signal with gaussian tail background    
+    c = cost.ExtendedUnbinnedNLL(aoe[(aoe<fmax)&(aoe>fmin)], PDF_AoE)
+    m = Minuit(c, *x0)
+    m.fixed[5:] = True
+    m.simplex().migrad()
+    m.hesse()
+    if verbose:print(m)
+
+    valid = m.valid & m.accurate
+    if valid ==False:
+        return np.full_like(x0,np.nan), np.full_like(x0,np.nan)
+        
+    if display>1:
+        plt.figure()
+        xs = np.linspace(fmin,fmax,1000)
+        counts, bins, bars = plt.hist(aoe[(aoe<fmax)&(aoe>fmin)], bins=400, histtype='step', label='Data')
+        dx = np.diff(bins)
+        plt.plot(xs, PDF_AoE(xs,*m.values)[1]* dx[0], label='Full fit')
+        n_events, sig, bkg = PDF_AoE(xs,*m.values[:-1], True)
+        plt.plot(xs , sig* dx[0], label='Signal')
+        plt.plot(xs , bkg*dx[0], label='Background')
+        plt.plot(xs, pgf.gauss_pdf(xs, *m1.values)* dx[0], label='Initial Gaussian')
+        plt.legend(loc='upper left')
+        plt.show()
+        
+        plt.figure()
+        bin_centers= (bins[1:]+bins[:-1])/2
+        res = (PDF_AoE(bin_centers,*m.values)[1]* dx[0]) - counts
+        plt.plot(bin_centers, [re/count if count != 0 else re for re,count in zip(res,counts)], 
+                 label='Normalised Residuals')
+        plt.legend(loc='upper left')
+        plt.show()
+        return m.values, m.errors
+    
+    else: return m.values, m.errors
+
+def pol1(x,a,b):
+    """Basic Polynomial for fitting A/E centroid against energy"""
+    return a * x + b
+
+def sigma_fit(x, a,b):
+    """Function definition for fitting A/E sigma against energy"""
+    return np.sqrt(a+(b/x)**2)
+
+def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
+
+    """
+    Calculates the corrections needed for the energy dependence of the A/E.
+    Does this by fitting the compton continuum in slices and then applies fits to the centroid and variance.
+    """
+
+    comptBands_width = 20;
+    comptBands = np.array([940,960,980,1000,1020,1040,1130,1150,1170,1190,1210,1250,1270,1290,
+                         1310,1330,1370,1390,1420,1520,1540,1650,1700,1780,1810,1850,1870,1890,1910,1930,1950,
+                         1970,1990,2010,2030,2050,2150,2170,2190,2210,2230,2250,2270,2290, 2310,2330,2350])
+
+    comptBands = comptBands[::-1]  #Flip so color gets darker when plotting
+    #peaks = np.array([1080,1094,1459,1512, 1552, 1592,1620, 1650, 1670,1830,2105]) 
+    compt_aoe = np.zeros(len(comptBands))
+    aoe_sigmas = np.zeros(len(comptBands))
+    compt_aoe_err = np.zeros(len(comptBands))
+    aoe_sigmas_err = np.zeros(len(comptBands))
+    ratio = np.zeros(len(comptBands))
+    ratio_err = np.zeros(len(comptBands))
+    
+    copper = cm = plt.get_cmap('copper') 
+    cNorm  = mcolors.Normalize(vmin=0, vmax=len(comptBands))
+    scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=copper)
+    
+    if display>0 or pdf_path is not None:
+        plt.figure()
+    
+    #Fit each compton band
+    for i, band in enumerate(comptBands):
+        aoe_tmp = aoe[(e>band) & (e<band+comptBands_width) & (aoe>0)]#[:20000]
+        pars,errs = unbinned_aoe_fit(aoe_tmp, display=display)
+        compt_aoe[i] = pars[2]
+        aoe_sigmas[i] = pars[3]
+        compt_aoe_err[i] = errs[2]
+        aoe_sigmas_err[i] = errs[3]
+        ratio[i] = pars[0]/pars[1]
+        ratio_err[i] = ratio[i]*np.sqrt((errs[0]/pars[0])**2 + (errs[1]/pars[1])**2)
+        
+        if display>0 or pdf_path is not None:
+            if np.isnan(errs[2])|np.isnan(errs[3])|(errs[2]==0)|(errs[3]==0): pass
+            else:
+                xs = np.arange(pars[2]-4*pars[3], pars[2]+3*pars[3], pars[3]/10)
+                colorVal = scalarMap.to_rgba(i)
+                plt.plot(xs,PDF_AoE(xs, *pars)[1], color = colorVal)
+    
+    if display>0 or pdf_path is not None:
+        plt.xlabel('A/E')
+        plt.ylabel("Expected Counts")
+        plt.title("Compton Band Fits")
+        cbar = plt.colorbar(cmx.ScalarMappable(norm=cNorm, cmap=plt.get_cmap('copper_r')), 
+                            orientation='horizontal', label='Compton Band Energy', ticks=[0,16,32,len(comptBands)])#cax=ax,
+        cbar.ax.set_xticklabels([comptBands[::-1][0],comptBands[::-1][16],comptBands[::-1][32],comptBands[::-1][-1]])
+        if pdf_path is not None:
+            pdf_path.savefig()   
+        if display>0:
+            plt.show()
+        else:
+            plt.close()
+    
+    ids = np.isnan(compt_aoe_err)|np.isnan(aoe_sigmas_err)|(aoe_sigmas_err==0)|(compt_aoe_err==0)
+
+    #Fit mus against energy
+    p0_mu = [-1e-06,  5e-01]
+    c_mu = cost.LeastSquares(comptBands[~ids],compt_aoe[~ids], compt_aoe_err[~ids], pol1)
+    c_mu.loss = "soft_l1"
+    m_mu = Minuit(c_sig, *p0_mu)
+    m_mu.simplex()
+    m_mu.migrad()
+    m_mu.hesse()
+    
+    pars = m_mu.values
+    errs = m_mu.errors
+    
+    #Fit sigma against energy
+    p0_sig = [np.mean(aoe_sigmas[~ids]),2] #, 2
+    c_sig = cost.LeastSquares(comptBands[~ids],aoe_sigmas[~ids], aoe_sigmas_err[~ids], sigma_fit)
+    c_sig.loss = "soft_l1"
+    m_sig = Minuit(c_sig, *p0_sig)
+    m_sig.simplex()
+    m_sig.migrad()
+    m_sig.hesse()
+
+    sig_pars = m_sig.values
+    sig_errs = m_sig.errors
+
+    model = pol1(comptBands,*pars)
+    sig_model = sigma_fit(comptBands,*sig_pars)
+
+    #Get DEP fit
+    sigma = np.sqrt(eres[0]+1592*eres[1])/2.355
+    n_sigma = 4
+    peak = 1592
+    emin           = peak - n_sigma*sigma
+    emax           = peak + n_sigma*sigma
+    dep_pars, dep_err = unbinned_aoe_fit(aoe[(e>emin) & (e<emax) & (aoe>0)][:10000])
+
+    if display>0 or pdf_path is not None:
+        fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+        ax1.errorbar(comptBands[~ids]+10,compt_aoe[~ids],
+                        yerr=compt_aoe_err[~ids], 
+                        xerr=10,
+                        label='data', linestyle= ' ')
+        ax1.plot(comptBands[~ids]+10,model[~ids],label='linear model')
+        ax1.errorbar(1592, dep_pars[2], xerr = n_sigma*sigma, yerr = dep_err[2], 
+                        label='DEP', color='green', linestyle= ' ')
+            
+        ax1.legend(title='A/E mu energy dependence', frameon=False)
+            
+        ax1.set_ylabel("raw A/E (a.u.)", ha='right', y=1)
+        ax2.scatter(comptBands[~ids]+10,100*(compt_aoe[~ids]-model[~ids])/compt_aoe_err[~ids], lw=1, c='b')
+        ax2.scatter(1592,100*(dep_pars[2]-pol1(1592,*pars))/dep_err[2], lw=1, c='g')
+        ax2.set_ylabel("Residuals %", ha='right', y=1)
+        ax2.set_xlabel("Energy (keV)", ha='right', x=1)
+        if pdf_path is not None:
+            pdf_path.savefig()   
+        if display>0:
+            plt.show()
+        else:
+            plt.close()
+
+    if display>0 or pdf_path is not None:
+        fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+        ax1.errorbar(comptBands[~ids]+10, aoe_sigmas[~ids],
+                    yerr= aoe_sigmas_err[~ids],
+                    xerr = 10, label='data', linestyle= ' ')
+        ax1.plot(comptBands[~ids],sig_model[~ids],label=f'sqrt model: sqrt({sig_pars[0]:1.4f}+({sig_pars[1]:1.1f}/E)^2)')#{sig_pars[2]:1.1f}
+        ax1.errorbar(1592, dep_pars[3], xerr = n_sigma*sigma,yerr = dep_err[3], label='DEP', color='green')
+        ax1.set_ylabel("A/E stdev (a.u.)", ha='right', y=1)
+        ax1.legend(title='A/E stdev energy dependence', frameon=False)
+        ax2.scatter(comptBands[~ids]+10,100*(aoe_sigmas[~ids]-sig_model[~ids])/aoe_sigmas_err[~ids], lw=1, c='b')
+        ax2.scatter(1592,100*(dep_pars[3]-sigma_fit(1592,*sig_pars))/dep_err[3], lw=1, c='g')
+        ax2.set_ylabel("Residuals", ha='right', y=1)
+        ax2.set_xlabel("Energy (keV)", ha='right', x=1)
+        if pdf_path is not None:
+            pdf_path.savefig()   
+        if display>0:
+            plt.show()
+        else:
+            plt.close()
+
+    return pars, sig_pars
+
+def plot_compt_bands_overlayed(aoe,energy,eranges, aoe_range=None):
+    
+    """
+    Function to plot various compton bands to check energy dependence and corrections
+    """
+
+    for erange in eranges:
+        hist, bins,var = pgh.get_hist(aoe[(energy>erange-10) &(energy<erange+10)&(~np.isnan(aoe))],bins=500)
+        bin_cs = (bins[1:]+bins[:-1])/2
+        mu = bin_cs[np.argmax(hist)]
+        if aoe_range is None:
+            aoe_range = [mu*0.97, mu*1.02]
+        idxs = (energy>erange-10) &(energy<erange+10)&(aoe>aoe_range[0])&(aoe<aoe_range[1])
+        plt.hist(aoe[idxs], bins=50, histtype='step', label=f'{erange-10}-{erange+10}')
+
+def plot_dt_dep(aoe, energy,dt, erange,title):
+
+    """
+    Function to produce 2d histograms of A/E agaisnt drift time to check dependencies
+    """
+    
+    hist, bins,var = pgh.get_hist(aoe[(energy>erange[0]) &(energy<erange[1])&(~np.isnan(aoe))],bins=500)
+    bin_cs = (bins[1:]+bins[:-1])/2
+    mu = bin_cs[np.argmax(hist)]
+    aoe_range = [mu*0.9, mu*1.1]
+    
+    idxs = (energy>erange[0]) &(energy<erange[1])&(aoe>aoe_range[0])&(aoe<aoe_range[1])&(dt<2000)
+    
+    plt.hist2d(aoe[idxs], dt[idxs], bins=[200,100], norm=LogNorm())
+    plt.ylabel('Drift Time (ns)')
+    plt.xlabel('A/E')
+    plt.title(title)
+
+def unbinned_energy_fit(energy, peak):
+
+    """
+    Fitting function for energy peaks used to calculate survival fractions
+    """
+
+    energy_len = len(energy)
+    hist, bins,var = pgh.get_hist(energy,dx=0.1, range= (np.nanmin(energy), np.nanmax(energy)))
+    x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
+    if len(x0)==0:
+        return [np.nan], [np.nan]
+    fixed,mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
+    bounds=get_hpge_E_bounds(pgf.extended_radford_pdf)
+
+    pars, errs, cov = pgf.fit_unbinned(pgf.extended_radford_pdf, energy, guess=x0,
+             Extended=True, cost_func = 'LL',simplex=True, fixed=fixed, bounds=bounds)
+
+    return pars,errs
+
+def get_peak_label(peak):
+    if peak == 2039: 
+        return 'CC @'
+    elif peak == 1592.5:
+        return 'Tl DEP @'
+    elif peak == 1620.5:
+        return 'Bi FEP @'
+    elif peak == 2103.53:
+        return 'Tl SEP @'
+    elif peak == 2614.5:
+        return 'Tl FEP @'
+
+def get_aoe_cut_fit(energy,aoe,peak,ranges,dep_acc, display=1):
+
+    """
+    Determines A/E cut by sweeping through values and for each one fitting the DEP to determine how many events survive.
+    Then interpolates to get cut value at desired DEP survival fraction (typically 90%)
+    """
+
+    min_range, max_range = ranges
+    
+    peak_energy = energy[(energy>peak-min_range)&(energy<peak+max_range)][:20000]
+    peak_aoe = aoe[(energy>peak-min_range)&(energy<peak+max_range)][:20000]
+    cut_vals = np.arange(-5,-0.5, 0.1)
+    pars, errors = unbinned_energy_fit(peak_energy, peak)
+    pc_n = pars[0]
+    pc_err = errors[0]
+    sfs = []
+    sf_errs=[]
+    for cut_val in cut_vals:
+        idxs = peak_aoe>cut_val
+        cut_pars,ct_errs = unbinned_energy_fit(peak_energy[idxs],  peak)
+        ct_n = cut_pars[0]
+        ct_err = ct_errs[0]
+        sf = (ct_n/pc_n)*100
+        sfs.append(sf)
+        err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
+        sf_errs.append(err)
+    #return cut_vals, sfs, sf_errs
+    ids =  (sf_errs<(1.5*np.nanpercentile(sf_errs,50)))&(~np.isnan(sf_errs))
+    fit = np.polynomial.polynomial.polyfit( cut_vals[ids], np.array(sfs)[ids],w=1/np.array(sf_errs)[ids], deg=4)  
+
+    xs = np.arange(-5,-0.5,0.01)
+    p = np.polynomial.polynomial.polyval(xs, fit)
+    cut_val = xs[np.argmin(np.abs(p-(100*dep_acc)))]
+
+    return cut_val
+
+def get_sf(energy,aoe,peak,fit_width,aoe_cut_val, display=1):
+
+    """
+    Calculates survival fraction for gamma lines using fitting method as in cut determination
+    """
+
+    #fwhm = np.sqrt(eres[0]+peak*eres[1])
+    min_range = peak-fit_width[0]
+    max_range = peak+fit_width[1]
+    if peak == "1592.5":
+        peak_energy = energy[(energy>min_range)&(energy<max_range)][:20000]
+        peak_aoe = aoe[(energy>min_range)&(energy<max_range)][:20000]
+    else:
+        peak_energy = energy[(energy>min_range)&(energy<max_range)][:50000]
+        peak_aoe = aoe[(energy>min_range)&(energy<max_range)][:50000]
+    pars, errors = unbinned_energy_fit(peak_energy, peak)
+    pc_n = pars[0]
+    pc_err = errors[0]
+    sfs = []
+    sf_errs=[]
+    
+    cut_vals = np.arange(-5,5,0.2)
+    #cut_vals = np.append(cut_vals, aoe_cut_val)
+    final_cut_vals = []
+    for cut_val in cut_vals:
+        idxs = peak_aoe>cut_val
+        try:
+            cut_pars,ct_errs = unbinned_energy_fit(peak_energy[idxs],  peak)
+            ct_n = cut_pars[0]
+            ct_err = ct_errs[0]
+            sf = (ct_n/pc_n)*100
+            err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
+        except:
+            sf = np.nan
+            err=np.nan
+        sfs.append(sf)
+        
+        sf_errs.append(err)
+        final_cut_vals.append(cut_val)
+    ids =  (sf_errs<(5*np.nanpercentile(sf_errs,50)))&(~np.isnan(sf_errs))&(np.array(sfs)<100)
+    idxs = peak_aoe>aoe_cut_val
+    cut_pars,ct_errs = unbinned_energy_fit(peak_energy[idxs],  peak)
+    ct_n = cut_pars[0]
+    ct_err = ct_errs[0]
+    sf = (ct_n/pc_n)*100
+    sf_err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
+    return np.array(final_cut_vals)[ids], np.array(sfs)[ids],np.array(sf_errs)[ids], sf, sf_err
+
+def compton_sf(energy,aoe,cut, peak,eres,display=1):
+
+    """
+    Determines survival fraction for compton continuum by basic counting
+    """
+
+    fwhm = np.sqrt(eres[0]+peak*eres[1])
+
+    emin           = peak - 2*fwhm
+    emax           = peak + 2*fwhm
+    sfs = []
+    aoe = aoe[(energy>emin) & (energy<emax)]
+    cut_vals = np.arange(-5,5,0.1)
+    for cut_val in cut_vals:
+        sfs.append(100*len(aoe[(aoe>cut_val)])/len(aoe))
+    sf = 100*len(aoe[(aoe>cut)])/len(aoe)
+    return sf, cut_vals,sfs
+
+def get_sf_no_sweep(energy,aoe,peak,fit_width,aoe_low_cut_val, aoe_high_cut_val=None, display=1):
+
+    """
+    Calculates survival fraction for gamma line without sweeping through values
+    """
+
+    min_range = peak-fit_width[0]
+    max_range = peak+fit_width[1]
+    if peak == "1592.5":
+        peak_energy = energy[(energy>min_range)&(energy<max_range)][:20000]
+        peak_aoe = aoe[(energy>min_range)&(energy<max_range)][:20000]
+    else:
+        peak_energy = energy[(energy>min_range)&(energy<max_range)][:50000]
+        peak_aoe = aoe[(energy>min_range)&(energy<max_range)][:50000]
+    pars, errors = unbinned_energy_fit(peak_energy, peak)
+    pc_n = pars[0]
+    pc_err = errors[0]
+    if aoe_high_cut_val is None:
+        idxs = peak_aoe>aoe_low_cut_val
+    else:
+        idxs = (peak_aoe>aoe_low_cut_val) & (peak_aoe<aoe_high_cut_val)
+    cut_pars,ct_errs = unbinned_energy_fit(peak_energy[idxs],  peak)
+    ct_n = cut_pars[0]
+    ct_err = ct_errs[0]
+    sf = (ct_n/pc_n)*100
+    sf_err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
+    return sf, sf_err
+
+def compton_sf_no_sweep(energy,aoe, peak,eres, aoe_low_cut_val, aoe_high_cut_val=None, display=1):
+
+    """
+    Calculates survival fraction for compton contiuum without sweeping through values
+    """
+
+    fwhm = np.sqrt(eres[0]+peak*eres[1])
+
+    emin           = peak - 2*fwhm
+    emax           = peak + 2*fwhm
+    sfs = []
+    aoe = aoe[(energy>emin) & (energy<emax)]
+    cut_vals = np.arange(-5,5,0.1)
+    if aoe_high_cut_val is None:
+        sf = 100*len(aoe[(aoe>aoe_low_cut_val)])/len(aoe)
+    else:
+        sf = 100*len(aoe[(aoe>aoe_low_cut_val)&(aoe<aoe_high_cut_val)])/len(aoe)
+    return sf
+
+def get_classifier(aoe, energy, mu_pars, sigma_pars):
+
+    """
+    Applies correction to A/E energy dependence
+    """
+
+    classifier = aoe/(mu_pars[0]*energy + mu_pars[1])
+    classifier = (classifier - 1)/ sigma_fit(energy, *sigma_pars)
+    return classifier
+
+def get_dt_guess(hist, bins, var):
+    """
+    Guess for fitting dt spectrum
+    """
+
+    mu, sigma, amp = pgh.get_gaussian_guess(hist,bins)
+    i_0 = np.argmax(hist)
+    bg = np.mean(hist[-10:])
+    step = (bg - np.mean(hist[:10]))
+    hstep = step /(bg + np.mean(hist[:10]))
+    dx = np.diff(bins)[0]
+    n_bins_range = int((3*sigma)//dx)
+    nsig_guess = np.sum(hist[i_0-n_bins_range:i_0+n_bins_range])
+    nbkg_guess = np.sum(hist)-nsig_guess
+    return [nsig_guess*np.diff(bins)[0], mu, sigma, nbkg_guess*np.diff(bins)[0], hstep,np.inf,np.inf,0]
+
+def apply_dtcorr(aoe, dt, alpha):
+    """Aligns dt regions"""
+    return (aoe* (1+alpha*dt))
+
+def drift_time_correction(aoe, energy, dt, display=0,pdf_path=None):
+    """
+    Calculates the correction needed to align the two drift time regions for ICPC detectors
+    """
+    hist, bins,var = pgh.get_hist(aoe[(energy>1582) &(energy<1602)],bins=500)
+    bin_cs = (bins[1:]+bins[:-1])/2
+    mu = bin_cs[np.argmax(hist)]
+    aoe_range = [mu*0.9, mu*1.1]
+    
+    idxs = (energy>1582) &(energy<1602)&(aoe>aoe_range[0])&(aoe<aoe_range[1])
+    
+    mask = (idxs)&(dt<np.nanpercentile(dt[idxs],55))&(dt>np.nanpercentile(dt[idxs],1))
+    
+    hist, bins,var = pgh.get_hist(dt[mask],dx=10, range=(np.nanmin(dt[mask]),np.nanmax(dt[mask])))
+    
+    gpars = get_dt_guess(hist,bins,var)
+    dt_pars, dt_errs, dt_cov = pgf.fit_binned(pgf.gauss_step_pdf, hist, bins, 
+                                             guess=gpars,
+                                              fixed=[-3,-2,-1],cost_func = 'Least Squares')
+    
+    
+    aoe_mask = (idxs)&(dt>dt_pars[1]-2*dt_pars[2])&(dt<dt_pars[1]+2*dt_pars[2])
+    aoe_tmp = aoe[aoe_mask]
+    aoe_pars,aoe_errs = unbinned_aoe_fit(aoe_tmp, display=display)
+    
+    mask2 = (idxs)&(dt>np.nanpercentile(dt[idxs],50))&(dt<np.nanpercentile(dt[idxs],99))
+    hist2, bins2,var2 = pgh.get_hist(dt[mask2],dx=10, range=(np.nanmin(dt[mask2]),np.nanmax(dt[mask2])))
+    gpars2 = get_dt_guess(hist2,bins2,var2)
+    
+    dt_pars2, dt_errs2, dt_cov2 = pgf.fit_binned(pgf.gauss_step_pdf, hist2, bins2, 
+                                                guess=gpars2,
+                                                fixed=[-3,-2,-1],cost_func = 'Least Squares')
+    
+    aoe_mask2 = (idxs)&(dt>dt_pars2[1]-2*dt_pars2[2])&(dt<dt_pars2[1]+2*dt_pars2[2])
+    aoe_tmp2 = aoe[aoe_mask2]
+    aoe_pars2,aoe_errs2 = unbinned_aoe_fit(aoe_tmp2, display=display)
+    
+    
+    alpha = (aoe_pars[2]-aoe_pars2[2]) /(dt_pars2[1]*aoe_pars2[2]-dt_pars[1]*aoe_pars[2])
+    aoe_corrected = apply_dtcorr(aoe, dt, alpha)
+    
+    if display>0 or pdf_path is not None:
+        plt.figure()
+        plt.subplot(3,2,1)
+        plt.step( pgh.get_bin_centers(bins),hist,label='Data')
+        plt.plot(pgh.get_bin_centers(bins), pgf.gauss_step_pdf(pgh.get_bin_centers(bins), *gpars), label='Guess')
+        plt.plot(pgh.get_bin_centers(bins), pgf.gauss_step_pdf(pgh.get_bin_centers(bins), *dt_pars), label='Fit')
+        plt.xlabel('Drift Time (ns)')
+        plt.ylabel('Counts')
+        plt.legend(loc="upper left")
+        
+        plt.subplot(3,2,2)
+        plt.step( pgh.get_bin_centers(bins2),hist2,label='Data')
+        plt.plot(pgh.get_bin_centers(bins2), pgf.gauss_step_pdf(pgh.get_bin_centers(bins2), *gpars2), label='Guess')
+        plt.plot(pgh.get_bin_centers(bins2), pgf.gauss_step_pdf(pgh.get_bin_centers(bins2), *dt_pars2), label='Fit')
+        plt.xlabel('Drift Time (ns)')
+        plt.ylabel('Counts')
+        plt.legend(loc="upper left")
+        
+        plt.subplot(3,2,3)
+        xs = np.linspace(aoe_pars[-3],aoe_pars[-2],1000)
+        counts, aoe_bins, bars = plt.hist(aoe[(aoe<aoe_pars[-2])&(aoe>aoe_pars[-3])&aoe_mask], bins=400, histtype='step', label='Data')
+        dx = np.diff(aoe_bins)
+        plt.plot(xs, PDF_AoE(xs,*aoe_pars)[1]* dx[0], label='Full fit')
+        #plt.yscale('log')
+        n_events, sig, bkg = PDF_AoE(xs,*aoe_pars[:-1], True)
+        plt.plot(xs , sig* dx[0], label='Peak fit')
+        plt.plot(xs , bkg*dx[0], label='Bkg fit')
+        plt.legend(loc="upper left")
+        plt.xlabel('A/E')
+        plt.ylabel('Counts')
+        
+        plt.subplot(3,2,4)
+        xs = np.linspace(aoe_pars2[-3],aoe_pars2[-2],1000)
+        counts, aoe_bins2, bars = plt.hist(aoe[(aoe<aoe_pars2[-2])&(aoe>aoe_pars2[-3])&aoe_mask2], bins=400, histtype='step', label='Data')
+        dx = np.diff(aoe_bins2)
+        plt.plot(xs, PDF_AoE(xs,*aoe_pars2)[1]* dx[0], label='Full fit')
+        #plt.yscale('log')
+        n_events, sig, bkg = PDF_AoE(xs,*aoe_pars2[:-1], True)
+        plt.plot(xs , sig* dx[0], label='Peak fit')
+        plt.plot(xs , bkg*dx[0], label='Bkg fit')
+        plt.legend(loc="upper left")
+        plt.xlabel('A/E')
+        plt.ylabel('Counts')
+        
+        plt.subplot(3,2,5)
+        counts, bins,bars = plt.hist( aoe[idxs], bins=200, histtype='step', label='Uncorrected')
+        plt.hist( aoe_corrected[idxs], bins=bins, histtype='step', label='Corrected')
+        plt.xlabel('A/E')
+        plt.ylabel('Counts')
+        plt.legend(loc="upper left")
+        plt.tight_layout()
+        plt.xlim([aoe_pars[-3],aoe_pars[-2]*1.01])
+        if pdf_path is not None:
+            pdf_path.savefig()
+        if display>0:
+            plt.show()
+        else:
+            plt.close()
+    return aoe_corrected, alpha
+
+
+def cal_aoe(files:list, lh5_path,cal_dict:dict, energy_param:str, cal_energy_param:str, eres_pars:list,
+            dt_corr:bool=False, cut_parameters:dict = {"bl_mean":4, "bl_std":4,"pz_std":4}, 
+            plot_savepath:str=None) -> dict:
+    """
+    Main function for running the a/e correction and cut determination. 
+    """
+
+    aoe_uncorr, energy, dt, full_dt = load_aoe(files, lh5_path,cal_dict, energy_param, cal_energy_param) #, cut_parameters = cut_parameters
+    
+    if dt_corr ==True:
+        aoe,alpha = drift_time_correction(aoe_uncorr, energy, dt)
+    else:
+        aoe = aoe_uncorr
+    
+    log.info("Starting A/E correction")
+    mu_pars,sigma_pars = AoEcorrection(energy,aoe,eres_pars)
+    log.info("Finished A/E correction")
+    
+    classifier = get_classifier(aoe, energy, mu_pars, sigma_pars)
+
+    cut = get_aoe_cut_fit(energy,classifier,1592,(40,20), 0.9, display=0)
+    log.info("  Compute low side survival fractions: ")
+
+    peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
+    sf = np.zeros(len(peaks_of_interest))
+    sferr = np.zeros(len(peaks_of_interest))
+    fit_widths = [(40,25),(25,40), (0,0),(25,40), (50,50)]
+    full_sfs =[]
+    full_sf_errs =[]
+    full_cut_vals =[]
+    
+
+    for i,peak in enumerate(peaks_of_interest):
+        if peak == 2039:
+            sf[i], cut_vals,sfs = compton_sf(energy,classifier,cut, peak,eres_pars)
+            sferr[i] =0
+            
+            full_cut_vals.append(cut_vals)
+            full_sfs.append(sfs)
+            full_sf_errs.append(None)
+        else:
+            cut_vals, sfs,sf_errs, sf[i], sferr[i] = get_sf(energy,classifier, peak,fit_widths[i],cut)
+            full_cut_vals.append(cut_vals)
+            full_sfs.append(sfs)
+            full_sf_errs.append(sf_errs)
+            
+
+        log.info(f'{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %')
+
+    sf_2side = np.zeros(len(peaks_of_interest))
+    sferr_2side = np.zeros(len(peaks_of_interest))
+    log.info("Calculating 2 sided cut sfs")
+    for i,peak in enumerate(peaks_of_interest):
+        if peak == 2039:
+            sf_2side[i] = compton_sf_no_sweep(energy,classifier, peak,eres_pars, cut,aoe_high_cut_val=4)#upper_cut=upper_cut
+            sferr_2side[i] =0
+        else:
+            sf_2side[i], sferr_2side[i] = get_sf_no_sweep(energy,classifier, peak,fit_widths[i],cut,aoe_high_cut_val=4)
+
+        log.info(f'{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %')
+    log.info("Done")
+
+    if plot_savepath is not None:
+        mpl.use('pdf')
+        pathlib.Path(os.path.dirname(plot_savepath)).mkdir(parents=True, exist_ok=True)
+        with PdfPages(plot_savepath) as pdf:
+            
+            plt.rcParams['figure.figsize'] = (12, 8)
+            plt.rcParams['font.size'] = 16
+
+            plt.figure()
+            plt.subplot(3,2,1)
+            plot_dt_dep(aoe, energy, dt, [1582,1602], f'Tl DEP')
+            plt.subplot(3,2,2)
+            plot_dt_dep(aoe, energy, dt, [1510,1630], f'Bi FEP')
+            plt.subplot(3,2,3)
+            plot_dt_dep(aoe, energy,dt,[2030,2050], 'Qbb')
+            plt.subplot(3,2,4)
+            plot_dt_dep(aoe, energy, dt, [2080,2120], f'Tl SEP')
+            plt.subplot(3,2,5)
+            plot_dt_dep(aoe, energy, dt, [2584,2638], f'Tl FEP')
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
+
+            plt.figure()
+            plot_compt_bands_overlayed(aoe,energy,[950,1250,1460,1660,1860,2060])
+            plt.ylabel('Counts')
+            plt.xlabel('Raw A/E')
+            plt.title(f'Compton Bands before Correction')
+            plt.legend(loc='upper left')
+            pdf.savefig()
+            plt.close()
+
+            if dt_corr ==True:
+                _ = drift_time_correction(aoe_uncorr, energy, dt, pdf_path=pdf)
+            
+            mu_pars,sigma_pars = AoEcorrection(energy,aoe,eres_pars, pdf)
+
+
+            plt.figure()
+            plot_compt_bands_overlayed(classifier,energy,[950,1250,1460,1660,1860,2060], [-5,5])
+            plt.ylabel('Counts')
+            plt.xlabel('Corrected A/E')
+            plt.title(f'Compton Bands after Correction')
+            plt.legend(loc='upper left')
+            pdf.savefig()
+            plt.close()
+
+            plt.figure()
+            plt.vlines(cut,0,100, label=f'Cut Value: {cut:1.2f}', color='black')
+            
+            for i, peak in enumerate(peaks_of_interest):
+                if peak == 2039:
+                    plt.plot(full_cut_vals[i], full_sfs[i], label = f'{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %')
+                else:
+                    plt.errorbar(full_cut_vals[i], full_sfs[i], yerr=full_sf_errs[i], 
+                        label = f'{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %')
+            
+                
+            handles, labels = plt.gca().get_legend_handles_labels()
+            order = [1,2,3,0,4,5]
+            plt.legend([handles[idx] for idx in order],[labels[idx] for idx in order], loc='upper right') 
+            plt.xlabel('Cut Value')
+            plt.ylabel('Survival Fraction %')
+            pdf.savefig()
+            plt.close()
+
+            fig,ax = plt.subplots()
+            bins = np.linspace(1000,3000,2000)
+            ax.hist(energy, bins=bins, histtype='step', label='Before PSD')
+            ax.hist(energy[classifier>cut], bins=bins, histtype='step', label="Low side PSD cut")
+            ax.hist(energy[(classifier>cut)&(classifier<4)], bins=bins, histtype='step', label="Double sided PSD cut")
+            ax.hist(energy[(classifier<cut)|(classifier>4)], bins=bins, histtype='step', label="Rejected by PSD cut")
+
+            axins = ax.inset_axes([0.25, 0.1, 0.3, 0.3])
+            bins = np.linspace(1580,1640,200)
+            axins.hist(energy, bins=bins, histtype='step')
+            axins.hist(energy[classifier>cut], bins=bins, histtype='step')
+            axins.hist(energy[(classifier>cut)&(classifier<4)], bins=bins, histtype='step')
+            axins.hist(energy[(classifier<cut)|(classifier>4)], bins=bins, histtype='step')
+            axins.set_xlabel("Energy (keV)")
+            axins.set_ylabel("Counts")
+            ax.set_xlim([1000,3000])
+            ax.set_yscale('log')
+            plt.xlabel("Energy (keV)")
+            plt.ylabel("Counts")
+            plt.legend()
+            pdf.savefig()
+            plt.close()
+
+            plt.figure()
+            bins = np.linspace(1000,3000,2000)
+            counts_pass, bins_pass, _ = pgh.get_hist(energy[(classifier>cut)&(classifier<4)], bins =bins)
+            counts, bins, _ = pgh.get_hist(energy, bins =bins)
+            sf = counts_pass/(counts)
+
+            plt.step(pgh.get_bin_centers(bins_pass),sf)
+            plt.xlabel("Energy (keV)")
+            plt.ylabel("Survival Fraction")
+            plt.ylim([0,1])
+            pdf.savefig()
+            plt.close()
+
+    def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
+        out_dict = {}
+        for i,peak in enumerate(peaks_of_interest):
+            out_dict[str(peak)] = {'sf':f"{sfs[i]:2f}", 'sf_err':f"{sf_errs[i]:2f}"}
+        return out_dict
+
+    cal_dict.update({"AoE_Classifier":{
+                              "inputs":["A_max", f'{energy_param}', f'{cal_energy_param}'],
+                              "outputs":["AoE_Classifier"],
+                              "function": f'(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)/(sqrt(c+(d/{cal_energy_param})**2))',
+                              "pars":{"a":mu_pars[0] ,'b':mu_pars[1], 'c':sigma_pars[0], 'd':sigma_pars[1],}}
+    })
+
+    cal_dict.update({"AoE_Low_Cut":{
+                              "inputs":["AoE_Classifier"],
+                              "outputs":["AoE_Cut_Pass"],
+                              "function": "AoE_Classifier>a",
+                              "pars":{"a":cut}}})
+
+    cal_dict.update({"AoE_Double_Sided_Cut":{
+                              "inputs":["AoE_Classifier"],
+                              "outputs":["AoE_Cut_Pass"],
+                              "function": "b>AoE_Classifier>a",
+                              "pars":{"a":cut, "b":4}}
+    })
+
+    out_dict = {'A/E_Energy_param': 'cuspEmax', 
+        'Cal_energy_param': 'cuspEmax_ctc' ,
+        'dt_param':'dt_eff',
+        'rt_correction':False,
+        'Mean_pars':list(mu_pars),
+        'Sigma_pars':list(sigma_pars),
+        'Low_cut': cut,
+        'High_cut':4,
+        'Low_side_sfs':convert_sfs_to_dict(peaks_of_interest, sf, sferr),
+        '2_side_sfs':convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side)
+        }
+    
+    if dt_corr ==True:
+        out_dict["Alpha"]=alpha
+
+    log.info(f'Results are {out_dict}')
+    return cal_dict, out_dict

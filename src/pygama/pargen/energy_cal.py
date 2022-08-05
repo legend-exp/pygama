@@ -6,6 +6,7 @@
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
 import sys
+import logging
 
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.math.utils as pgu
 
+log = logging.getLogger(__name__)
 
 def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=None, var_zero=1, verbose=False):
     """Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
@@ -55,8 +57,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     """
     # clean up var if necessary
     if np.any(var == 0):
-        if verbose:
-            print(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
+        log.debug(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
         var[np.where(var == 0)] = var_zero
     peaks_keV = np.asarray(peaks_keV)
 
@@ -69,15 +70,15 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     if Etol_keV is None:
         #estimate Etol_keV
         pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
-        if sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
+        if sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == 0: log.debug('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
         Etol_keV = 5. * (med_sigma_ratio / 0.003)
     pars, ixtup, iytup = poly_match(detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV)
 
-    if verbose and len(ixtup) != len(peaks_keV):
-        print(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
+    if len(ixtup) != len(peaks_keV):
+        log.warning(f'hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks')
     return detected_max_locs[ixtup], peaks_keV[iytup], pars
 
 
@@ -115,8 +116,7 @@ def hpge_get_E_peaks(hist, bins, var, cal_pars, peaks_keV, n_sigma=3, Etol_keV=5
     """
     # clean up var if necessary
     if np.any(var == 0):
-        if verbose:
-            print(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
+        log.debug(f'hpge_find_E_peaks: replacing var zeros with {var_zero}')
         var[np.where(var == 0)] = var_zero
     peaks_keV = np.asarray(peaks_keV)
 
@@ -211,7 +211,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
-            print("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
+            log.warning("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
             i_0 = np.argmax(hist)
             mu = bin_centres[i_0]
             height = hist[i_0]
@@ -231,7 +231,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         except:
             sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg-step/2, method='fit_slopes')[0]
             if sigma == 0:
-                print("get_hpge_E_peak_par_guess: sigma estimation failed")
+                log.warning("get_hpge_E_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None:
                     sigma = sigma_guess
                 else:
@@ -250,7 +250,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
-            print("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
+            log.warning("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
             sigma_guess=None
 
         else:
@@ -272,7 +272,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         except:
             sigma = pgh.get_fwfm(0.6065, hist, bins, var, mx=height, bl=bg0+step/2, method='fit_slopes')[0]
             if sigma == 0:
-                print("get_hpge_E_peak_par_guess: sigma estimation failed")
+                log.warning("get_hpge_E_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None:
                     sigma = sigma_guess
                 else:
@@ -293,7 +293,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         return parguess
 
     else:
-        print(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
+        log.error(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
         return []
 
 
@@ -311,13 +311,13 @@ def get_hpge_E_fixed( func):
         return [7,8,9], np.array([True, True, True,True,True,True,True,False,False,False])
 
     else:
-        print(f'get_hpge_E_fixed not implemented for {func.__name__}')
+        log.error(f'get_hpge_E_fixed not implemented for {func.__name__}')
         return None
     return None
 
 def get_hpge_E_bounds(func):
     if  func == pgf.radford_cdf or func == pgf.radford_pdf or func == pgf.extended_radford_pdf:
-        return [(0,None), (None,None), (None,None), (0,1),(None,None),(0,None), (None,None)
+        return [(0,None), (None,None), (None,None), (0,1),(0, None),(0,None), (None,None)
                 ,(None,None),(None,None),(None,None)]
 
     elif  func ==  pgf.gauss_step_cdf or func ==  pgf.gauss_step_pdf or func == pgf.extended_gauss_step_pdf :
@@ -325,7 +325,7 @@ def get_hpge_E_bounds(func):
                 ,(None,None),(None,None)]
 
     else:
-        print(f'get_hpge_E_bounds not implemented for {func.__name__}')
+        log.error(f'get_hpge_E_bounds not implemented for {func.__name__}')
         return []
 
 def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_step_cdf,
@@ -423,19 +423,19 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgf.gauss_
             if (sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf or
                 sum(sum(c) if c is not None else 0 for c in cov_i) == 0 or
                 np.isnan(sum(sum(c) if c is not None else 0 for c in cov_i))) :
-                print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
+                log.debug(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif (np.abs(errs_i/pars_i) < 1e-7).any():
-                print(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low')
+                log.debug(f'hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif np.abs(total_events[0] -np.sum(hist))/np.sum(hist)>0.1:
-                print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit')
+                log.debug(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif p_val<allowed_p_val:
-                print(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}')
+                log.debug(f'hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}')
                 pars_i, errs_i, cov_i, p_val = None, None, None, None
 
         except: pars_i, errs_i, cov_i, p_val = None, None, None, None
@@ -608,10 +608,10 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     peaks_keV = np.asarray(peaks_keV) #peaks_keV = np.sort(peaks_keV)
     deg = int(deg)
     if guess_keV <= 0:
-        print(f'hpge_E_cal warning: invalid guess_keV = {guess_keV}')
+        log.error(f'hpge_E_cal warning: invalid guess_keV = {guess_keV}')
         return None, None, results
     if deg < 0:
-        print(f'hpge_E_cal warning: invalid deg = {deg}')
+        log.error(f'hpge_E_cal warning: invalid deg = {deg}')
         return None, None, results
 
     # bin the histogram in ~1 keV bins for the initial rough peak search
@@ -624,11 +624,10 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
 
     # Run the initial rough peak search
     detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=deg)
-    if verbose:
-        print(f"{len(detected_peaks_locs)} peaks found:")
-        print(f'\t   Energy   | Position  ')
-        for i, (Li, Ei) in enumerate(zip(detected_peaks_locs, detected_peaks_keV)):
-            print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
+    log.info(f"{len(detected_peaks_locs)} peaks found:")
+    log.info(f'\t   Energy   | Position  ')
+    for i, (Li, Ei) in enumerate(zip(detected_peaks_locs, detected_peaks_keV)):
+        log.info(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
     Euc_min, Euc_max = ((np.poly1d(roughpars)-i).roots for i in (peaks_keV[0]*.9, peaks_keV[-1]*1.1))
@@ -644,11 +643,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     got_peaks_locs, got_peaks_keV, roughpars = hpge_get_E_peaks(hist, bins, var, roughpars, peaks_keV, n_sigma=3)
     results['got_peaks_locs'] = got_peaks_locs
     results['got_peaks_keV'] = got_peaks_keV
-    if verbose:
-        print(f"{len(got_peaks_locs)} peaks obtained:")
-        print(f'\t   Energy   | Position  ')
-        for i, (Li, Ei) in enumerate(zip(got_peaks_locs, got_peaks_keV)):
-            print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
+
+    log.info(f"{len(got_peaks_locs)} peaks obtained:")
+    log.info(f'\t   Energy   | Position  ')
+    for i, (Li, Ei) in enumerate(zip(got_peaks_locs, got_peaks_keV)):
+        log.info(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {Li:g}'.ljust(5))
 
     # Drop non-gotten peaks
     idx = [i for i, E in enumerate(peaks_keV) if E in got_peaks_keV]
@@ -712,20 +711,19 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     pk_binws = results['pk_binws'] = np.asarray(pk_binws)[fitidx]
     pk_ranges = results['pk_ranges'] = np.asarray(pk_ranges)[fitidx]
     pk_pvals = results['pk_pvals'] = np.asarray(pk_pvals)[fitidx]
-    if verbose:
-        print(f"{sum(fitidx)} peaks fitted:")
-        for i, (Ei, parsi, errorsi, covsi) in enumerate(zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs)):
-            func_i = funcs[i] if hasattr(funcs, '__len__') else funcs
-            varnames = func_i.__code__.co_varnames[1:len(pk_pars[-1])+1]
-            parsi = np.asarray(parsi, dtype=float)
-            errorsi = np.asarray(errorsi, dtype=float)
-            covsi = np.asarray(covsi, dtype=float)
-            #parsigsi = np.sqrt(covsi.diagonal())
-            print(f'\tEnergy: {str(Ei)}')
-            print(f'\t\tParameter  |    Value +/- Sigma  ')
-            for (vari, pari, errorsi) in zip(varnames, parsi, errorsi):
-                print(f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}')
-                #fwhm??
+    log.info(f"{sum(fitidx)} peaks fitted:")
+    for i, (Ei, parsi, errorsi, covsi) in enumerate(zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs)):
+        func_i = funcs[i] if hasattr(funcs, '__len__') else funcs
+        varnames = func_i.__code__.co_varnames[1:len(pk_pars[-1])+1]
+        parsi = np.asarray(parsi, dtype=float)
+        errorsi = np.asarray(errorsi, dtype=float)
+        covsi = np.asarray(covsi, dtype=float)
+        #parsigsi = np.sqrt(covsi.diagonal())
+        log.info(f'\tEnergy: {str(Ei)}')
+        log.info(f'\t\tParameter  |    Value +/- Sigma  ')
+        for (vari, pari, errorsi) in zip(varnames, parsi, errorsi):
+            log.info(f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}')
+            #fwhm??
 
     # Do a second calibration to the results of the full peak fits
     mus = [pgf.get_mu_func(func_i, pars_i, errors=errors_i) for func_i, pars_i, errors_i in zip(funcs, pk_pars, pk_errors)]
@@ -738,7 +736,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
         results['pk_cal_pars'] = pars
         results['pk_cal_cov'] = cov
     except ValueError:
-        print("Failed to fit enough peaks to get accurate calibration")
+        log.error("Failed to fit enough peaks to get accurate calibration")
         return None, None, results
 
     # Invert the E scale fit to get a calibration function
@@ -756,11 +754,11 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     cal_fwhms_errs = uncal_fwhm_errs*der
     results['pk_fwhms'] = np.asarray([(u*d, e*d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)])
 
-    if verbose:
-        print(f"{len(cal_fwhms)} FWHMs found:")
-        print(f'\t   Energy   | FWHM  ')
-        for i, (Ei, fwhm, fwhme) in enumerate(zip(fitted_peaks_keV, cal_fwhms, cal_fwhms_errs)):
-            print(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {fwhm:.2f}+-{fwhme:.2f} keV'.ljust(5))
+
+    log.info(f"{len(cal_fwhms)} FWHMs found:")
+    log.info(f'\t   Energy   | FWHM  ')
+    for i, (Ei, fwhm, fwhme) in enumerate(zip(fitted_peaks_keV, cal_fwhms, cal_fwhms_errs)):
+        log.info(f'\t{i}'.ljust(4) + str(Ei).ljust(9) + f'| {fwhm:.2f}+-{fwhme:.2f} keV'.ljust(5))
 
     return   pars, cov, results
 
@@ -812,11 +810,11 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 #        return None, 0
     deg = int(deg)
     if deg < -1:
-        print(f"poly_match error: got bad deg = {deg}")
+        log.error(f"poly_match error: got bad deg = {deg}")
         return None, 0
     req_ylen = max(2, deg+2)
     if len(yy) < req_ylen:
-        print(f"poly_match error: len(yy) must be at least {req_ylen} for deg={deg}, got {len(yy)}")
+        log.error(f"poly_match error: len(yy) must be at least {req_ylen} for deg={deg}, got {len(yy)}")
         return None, 0
 
     maxoverlap = min(len(xx), len(yy))
@@ -943,10 +941,10 @@ def get_i_local_extrema(data, delta):
     # sanity checks
     data = np.asarray(data)
     if not np.isscalar(delta):
-        print("get_i_local_extrema: Input argument delta must be a scalar")
+        log.error("get_i_local_extrema: Input argument delta must be a scalar")
         return np.array(imaxes), np.array(imins)
     if delta <= 0:
-        print(f"get_i_local_extrema: delta ({delta}) must be positive")
+        log.error(f"get_i_local_extrema: delta ({delta}) must be positive")
         return np.array(imaxes), np.array(imins)
 
     # now loop over data
