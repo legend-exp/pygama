@@ -152,6 +152,15 @@ class VectorOfVectors:
     def __repr__(self) -> str:
         return str(self)
 
+    def to_aoesa()
+        """Convert to ArrayOfEqualSizedArrays, padding with NaNs"""
+        ind_lengths = np.diff(self.cumulative_length, prepend=0)
+        arr_len = np.max(ind_lengths)
+        nda = np.empty((len(cumulative_length), arr_len))
+        nda.fill(np.nan)
+        for i in range(len(cumulative_length)):
+            nda[i, :ind_lengths[i]] = self[i]
+        return ArrayOfEqualSizedArrays(nda=nda)
 
 def build_cl(sorted_array_in : Array, cumulative_length_out : np.ndarray = None) -> np.ndarray:
     """ build a cumulative_length array from an array of sorted data
