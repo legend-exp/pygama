@@ -82,7 +82,7 @@ def unbinned_aoe_fit(aoe, display=0, verbose=False):
     hist, bins,var = pgh.get_hist(aoe,bins=500)
     bin_centers = (bins[:-1]+bins[1:])/2
     
-    pars, cov = pgf.gauss_mode_max(hist, bins, var)
+    pars, cov = pgf.gauss_mode_max(hist, bins)
     mu = bin_centers[np.argmax(hist)]
     _,sigma,_ = pgh.get_gaussian_guess(hist, bins)
     ls_guess = 2*np.sum(hist[(bin_centers>mu)&(bin_centers<(mu+2.5*sigma))])
@@ -216,7 +216,7 @@ def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
     p0_mu = [-1e-06,  5e-01]
     c_mu = cost.LeastSquares(comptBands[~ids],compt_aoe[~ids], compt_aoe_err[~ids], pol1)
     c_mu.loss = "soft_l1"
-    m_mu = Minuit(c_sig, *p0_mu)
+    m_mu = Minuit(c_mu, *p0_mu)
     m_mu.simplex()
     m_mu.migrad()
     m_mu.hesse()
@@ -338,7 +338,7 @@ def unbinned_energy_fit(energy, peak):
     if len(x0)==0:
         return [np.nan], [np.nan]
     fixed,mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
-    bounds=get_hpge_E_bounds(pgf.extended_radford_pdf)
+    bounds=pgc.get_hpge_E_bounds(pgf.extended_radford_pdf)
 
     pars, errs, cov = pgf.fit_unbinned(pgf.extended_radford_pdf, energy, guess=x0,
              Extended=True, cost_func = 'LL',simplex=True, fixed=fixed, bounds=bounds)
@@ -793,9 +793,9 @@ def cal_aoe(files:list, lh5_path,cal_dict:dict, energy_param:str, cal_energy_par
             bins = np.linspace(1000,3000,2000)
             counts_pass, bins_pass, _ = pgh.get_hist(energy[(classifier>cut)&(classifier<4)], bins =bins)
             counts, bins, _ = pgh.get_hist(energy, bins =bins)
-            sf = counts_pass/(counts)
+            survival_fracs = counts_pass/(counts)
 
-            plt.step(pgh.get_bin_centers(bins_pass),sf)
+            plt.step(pgh.get_bin_centers(bins_pass),survival_fracs)
             plt.xlabel("Energy (keV)")
             plt.ylabel("Survival Fraction")
             plt.ylim([0,1])
