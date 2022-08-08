@@ -193,6 +193,6 @@ class Table(Struct):
             if not hasattr(self[col], 'nda'):
                 raise ValueError(f'column {col} does not have an nda')
             else:
-                df[col] = self[col].nda
+                df[col] = self[col].nda.tolist()
 
         return df
