@@ -39,6 +39,8 @@ Writing custom processors
 
     # 1) Import Python modules
     #
+    from __future__ import annotations
+
     import numpy as np
     from numba import guvectorize
 
@@ -67,14 +69,46 @@ Writing custom processors
     # - Use "w_" for waveforms, "t_" for indexes, "a_" for amplitudes
     # - Use underscore casing for the name of the processor and variables, e.g.,
     #   "a_trap_energy_in" or "t_trigger_in"
+    # - use type annotations
     #
-    def the_processor_template(w_in, t_in, a_in, w_out, t_out):
+    def the_processor_template(w_in: np.ndarray,
+                               t_in: float,
+                               a_in: float,
+                               w_out: np.ndarray,
+                               t_out: float) -> None:
 
         # 4) Document the algorithm
         #
-        """
-        Add here a complete description of what the processor does, including the
-        meaning of input and output variables.
+        """One-liner description of the processor.
+
+        Add here a more detailed description of what the processor does.
+        Document input parameters in the "Parameters" section. Add a JSON
+        example for ProcessingChain configuration in the last section.
+
+        Parameters
+        ----------
+        w_in
+            the input waveform.
+        t_in
+            a scalar parameter in the time domain
+        a_in
+            a scalar parameter in the amplitude domain
+        w_out
+            the output waveform
+        t_out
+            an output scalar value in the time domain
+
+        JSON Configuration Example
+        --------------------------
+
+        .. code-block :: json
+
+            "wf_bl": {
+                "function": "the_processor_template",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", "t_a", "a_b", "wf_filtered", "t_result"],
+                "unit": "ADC"
+            }
         """
 
         # 5) Initialize output parameters
