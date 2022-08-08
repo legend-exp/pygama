@@ -27,9 +27,6 @@ source_suffix = {
 }
 master_doc = "index"
 language = "python"
-# in _templates/ we have a custom layout.html to include the version menu
-# (adapted from sphinx-multiversion docs)
-templates_path = ["_templates"]
 
 # Furo theme
 html_theme = "furo"
