@@ -249,19 +249,22 @@ class Table(Struct):
         -------
         Blocks in `expr_config` must be ordered according to mutual dependency.
         """
-        # don't want to modify input
+        # we don't want to modify the input table, let's make a shallow copy
         df = self.get_dataframe().copy()
         out_tbl = Table(size=self.size)
 
+        # evaluate expressions one-by-one (in order) to make sure expression
+        # dependencies are satisfied
         for out_var, spec in expr_config.items():
             df.eval(
                 f"{out_var} = {spec['expression']}",
                 parser="pandas",
-                engine="numexpr",
+                engine="numexpr",  # this should be faster than Python's native eval() for n_rows > 1E4, see Pandas docs
                 local_dict=spec["parameters"] if "parameters" in spec else None,
                 inplace=True,
             )
 
+            # add column to output LGDO Table
             out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
 
         return out_tbl
