@@ -84,22 +84,19 @@ def add_build_raw_parser(subparsers):
     parser_d2r.add_argument(
         "in_stream",
         nargs="+",
-        help="""Input stream. Can be a single file, a list
-                            of files or any other input type supported by the
-                            selected streamer""",
+        help="""Input stream. Can be a single file, a list of files or any
+                other input type supported by the selected streamer""",
     )
     parser_d2r.add_argument(
         "--stream-type",
         "-t",
-        help="""Input stream type name. Use this if the
-                            stream type cannot be automatically deduced by
-                            pygama""",
+        help="""Input stream type name. Use this if the stream type cannot be
+                automatically deduced by pygama""",
     )
     parser_d2r.add_argument(
         "--out-spec",
         "-o",
-        help="""Specification for the output stream. HDF5
-                            or JSON file name""",
+        help="""Specification for the output stream. HDF5 or JSON file name""",
     )
     parser_d2r.add_argument(
         "--buffer_size", "-b", type=int, default=8192, help="""Set buffer size"""
@@ -109,8 +106,8 @@ def add_build_raw_parser(subparsers):
         "-n",
         type=int,
         default=np.inf,
-        help="""Maximum number of rows of data to process
-                            from the input file""",
+        help="""Maximum number of rows of data to process from the input
+                file""",
     )
     parser_d2r.add_argument(
         "--overwrite", "-w", action="store_true", help="""Overwrite output files"""
@@ -146,72 +143,68 @@ def add_build_dsp_parser(subparsers):
     parser_r2d.add_argument(
         "raw_lh5_file",
         nargs="+",
-        help="""Input raw LH5 file. Can be a single file or
-                            a list of them""",
+        help="""Input raw LH5 file. Can be a single file or a list of them""",
     )
     parser_r2d.add_argument(
         "--config",
         "-c",
         required=True,
-        help=""""JSON file holding configuration of signal
-                            processing routines""",
+        help=""""JSON file holding configuration of signal processing
+                 routines""",
     )
     parser_r2d.add_argument(
         "--hdf5-groups",
         "-g",
         nargs="*",
         default=None,
-        help="""Name of group in the LH5 file. By default
-                            process all base groups. Supports wildcards""",
+        help="""Name of group in the LH5 file. By default process all base
+                groups. Supports wildcards""",
     )
     parser_r2d.add_argument(
         "--output",
         "-o",
         default=None,
-        help="""Name of output file, if only one is
-                            supplied. By default, output to
-                            <input-filename>_dsp.lh5""",
+        help="""Name of output file, if only one is supplied. By default,
+                output to <input-filename>_dsp.lh5""",
     )
     parser_r2d.add_argument(
         "--database",
         "-d",
         default=None,
-        help="""JSON file to read database parameters from.
-                            Should be nested dict with channel at the top
-                            level, and parameters below that""",
+        help="""JSON file to read database parameters from.  Should be nested
+                dict with channel at the top level, and parameters below that""",
     )
     parser_r2d.add_argument(
         "--output-pars",
         "-p",
         nargs="*",
         default=None,
-        help="""List of additional output DSP parameters
-                            written to file. By default use the "outputs" list
-                            defined in in the JSON configuration file""",
+        help="""List of additional output DSP parameters written to file. By
+                default use the "outputs" list defined in in the JSON
+                configuration file""",
     )
     parser_r2d.add_argument(
         "--max-rows",
         "-n",
         default=None,
         type=int,
-        help="""Number of rows to process. By default
-                            do the whole file""",
+        help="""Number of rows to process. By default do the whole file""",
     )
     parser_r2d.add_argument(
         "--block",
         "-b",
         default=16,
         type=int,
-        help="""Number of waveforms to process
-                            simultaneously. Default is 16""",
+        help="""Number of waveforms to process simultaneously. Default is
+                16""",
     )
     parser_r2d.add_argument(
         "--chunk",
         "-k",
         default=3200,
         type=int,
-        help="""Number of waveforms to read from disk at a
-                            time. Default is 3200""",
+        help="""Number of waveforms to read from disk at a time. Default is
+                3200""",
     )
 
     group = parser_r2d.add_mutually_exclusive_group()
@@ -222,8 +215,7 @@ def add_build_dsp_parser(subparsers):
         const="r",
         dest="writemode",
         default="r",
-        help="""Overwrite file if it already exists. Default
-                       option""",
+        help="""Overwrite file if it already exists. Default option""",
     )
     group.add_argument(
         "--update",
@@ -231,8 +223,8 @@ def add_build_dsp_parser(subparsers):
         action="store_const",
         const="u",
         dest="writemode",
-        help="""Update existing file with new
-                       values. Useful with the --outpar option""",
+        help="""Update existing file with new values. Useful with the --output-pars
+                option""",
     )
     group.add_argument(
         "--append",
@@ -240,8 +232,7 @@ def add_build_dsp_parser(subparsers):
         action="store_const",
         const="a",
         dest="writemode",
-        help="""Append values to existing
-                       file""",
+        help="""Append values to existing file""",
     )
 
     parser_r2d.set_defaults(func=build_dsp_cli)
@@ -287,14 +278,13 @@ def add_build_hit_parser(subparsers):
 
     parser_r2d = subparsers.add_parser(
         "build-hit",
-        description="""Process LH5 dsp files and produce a
-        hit file using a JSON configuration""",
+        description="""Process LH5 dsp files and produce a hit file using a
+                       JSON configuration""",
     )
     parser_r2d.add_argument(
         "dsp_lh5_file",
         nargs="+",
-        help="""Input dsp LH5 file. Can be a single file or
-                            a list of them""",
+        help="""Input dsp LH5 file. Can be a single file or a list of them""",
     )
     parser_r2d.add_argument(
         "--config",
@@ -307,32 +297,30 @@ def add_build_hit_parser(subparsers):
         "-g",
         nargs="*",
         default=None,
-        help="""Name of group in the LH5 file. By default
-                            process all base groups. Supports wildcards""",
+        help="""Name of group in the LH5 file. By default process all base
+                groups. Supports wildcards""",
     )
     parser_r2d.add_argument(
         "--output",
         "-o",
         default=None,
-        help="""Name of output file, if only one is
-                            supplied. By default, output to
-                            <input-filename>_hit.lh5""",
+        help="""Name of output file, if only one is supplied. By default,
+                output to <input-filename>_hit.lh5""",
     )
     parser_r2d.add_argument(
         "--max-rows",
         "-n",
         default=None,
         type=int,
-        help="""Number of rows to process. By default
-                            do the whole file""",
+        help="""Number of rows to process. By default do the whole file""",
     )
     parser_r2d.add_argument(
         "--chunk",
         "-k",
         default=3200,
         type=int,
-        help="""Number of waveforms to read from disk at a
-                            time. Default is 3200""",
+        help="""Number of waveforms to read from disk at a time. Default is
+                3200""",
     )
 
     group = parser_r2d.add_mutually_exclusive_group()
@@ -343,8 +331,7 @@ def add_build_hit_parser(subparsers):
         const="of",
         dest="writemode",
         default="w",
-        help="""Overwrite file if it already exists. Default
-                       option""",
+        help="""Overwrite file if it already exists. Default option""",
     )
     group.add_argument(
         "--update",
@@ -360,8 +347,7 @@ def add_build_hit_parser(subparsers):
         action="store_const",
         const="a",
         dest="writemode",
-        help="""Append values to existing
-                       file""",
+        help="""Append values to existing file""",
     )
 
     parser_r2d.set_defaults(func=build_hit_cli)
