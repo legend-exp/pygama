@@ -21,7 +21,7 @@ def build_hit(
     outfile: str = None,
     lh5_tables: list[str] = None,
     n_max: int = np.inf,
-    wo_mode: str = None,
+    wo_mode: str = "write_safe",
     buffer_len: int = 3200,
 ) -> None:
     """
@@ -45,19 +45,19 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        - ``None`` -- create new output file if it does not exist
-        - `'r'` -- delete existing output file with same name before writing
-        - `'a'` -- append to end of existing output file
-        - `'u'` -- update values in existing output file
+        forwarded to :meth:`~.lgdo.lh5_store.write_object`.
     """
     store = LH5Store()
 
     if lh5_tables is None:
+        lh5_tables = []
         if "dsp" in ls(infile):
             lh5_tables.append("dsp")
         for el in ls(infile):
-            if "dsp" in ls(infile, el):
+            if f"{el}/dsp" in ls(infile, f"{el}/"):
                 lh5_tables.append(f"{el}/dsp")
+
+    log.debug(f"found candidate tables: {lh5_tables}")
 
     if outfile is None:
         outfile = os.path.splitext(os.path.basename(infile))[0]
@@ -71,9 +71,6 @@ def build_hit(
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
         tot_n_rows = store.read_n_rows(tbl, infile)
         write_offset = 0
-        store.gimme_file(outfile, "a")
-        if wo_mode == "a" and ls(infile, tbl):
-            write_offset = store.read_n_rows(tbl, outfile)
 
         log.info(f"Processing table '{tbl}' in file {infile}")
 
@@ -84,7 +81,7 @@ def build_hit(
 
             store.write_object(
                 obj=outtbl_obj,
-                name=tbl,
+                name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
                 n_rows=n_rows,
                 wo_mode=wo_mode,
