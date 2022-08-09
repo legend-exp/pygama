@@ -43,6 +43,15 @@ def test_resize(lgdo_vov):
     lgdo_vov.resize(3)
     assert len(lgdo_vov.cumulative_length) == 3
 
+def test_aoesa(lgdo_vov):
+    arr = lgdo_vov.to_aoesa()
+    desired = np.array([[1, 2, np.nan, np.nan],
+        [3, 4, 5, np.nan],
+        [2, np.nan, np.nan, np.nan],
+        [4, 8, 9, 7],
+        [5, 3, 1, np.nan]])
+    assert isinstance(arr, lgdo.ArrayOfEqualSizedArrays)
+    assert np.array_equal(arr.nda, desired, True)
 
 def test_set_vector(lgdo_vov):
     lgdo_vov.set_vector(0, np.zeros(2))
