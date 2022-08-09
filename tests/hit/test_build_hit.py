@@ -10,7 +10,7 @@ def test_build_hit_basic(dsp_test_file):
     build_hit(
         dsp_test_file,
         f"{config_dir}/basic-hit-config.json",
-        outfile="/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+        outfile="/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5",
     )
 
     assert os.path.exists("/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5")

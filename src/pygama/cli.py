@@ -9,8 +9,8 @@ import sys
 import numpy as np
 
 import pygama
-from pygama.hit import build_hit
 from pygama.dsp import build_dsp
+from pygama.hit import build_hit
 from pygama.raw import build_raw
 
 
