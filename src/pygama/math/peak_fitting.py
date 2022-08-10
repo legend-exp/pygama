@@ -103,7 +103,8 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
         if len(bins) == len(hist)+1:
             bin_centres = pgh.get_bin_centers(bins)
-
+        else:
+             bin_centres = bins
         # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
         zeros = (hist == 0)
