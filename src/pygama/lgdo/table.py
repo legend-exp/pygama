@@ -249,8 +249,7 @@ class Table(Struct):
         -------
         Blocks in `expr_config` must be ordered according to mutual dependency.
         """
-        # we don't want to modify the input table, let's make a shallow copy
-        df = self.get_dataframe().copy()
+        df = self.get_dataframe()
         out_tbl = Table(size=self.size)
 
         # evaluate expressions one-by-one (in order) to make sure expression
