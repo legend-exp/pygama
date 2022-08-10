@@ -225,7 +225,7 @@ def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
     errs = m_mu.errors
     
     #Fit sigma against energy
-    p0_sig = [np.mean(aoe_sigmas[~ids]),2] #, 2
+    p0_sig = [np.nanpercentile(aoe_sigmas[~ids],50),2] #, 2
     c_sig = cost.LeastSquares(comptBands[~ids],aoe_sigmas[~ids], aoe_sigmas_err[~ids], sigma_fit)
     c_sig.loss = "soft_l1"
     m_sig = Minuit(c_sig, *p0_sig)
@@ -333,17 +333,32 @@ def unbinned_energy_fit(energy, peak):
     """
 
     energy_len = len(energy)
-    hist, bins,var = pgh.get_hist(energy,dx=0.1, range= (np.nanmin(energy), np.nanmax(energy)))
+    hist, bins,var = pgh.get_hist(energy,dx=0.5, range= (np.nanmin(energy), np.nanmax(energy)))
     x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
     if len(x0)==0:
         return [np.nan], [np.nan]
     fixed,mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
-    bounds=pgc.get_hpge_E_bounds(pgf.extended_radford_pdf)
+    #bounds=pgc.get_hpge_E_bounds(pgf.extended_radford_pdf)
 
-    pars, errs, cov = pgf.fit_unbinned(pgf.extended_radford_pdf, energy, guess=x0,
-             Extended=True, cost_func = 'LL',simplex=True, fixed=fixed, bounds=bounds)
+    c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
+    m = Minuit(c, *x0)
+    m.limits = [(0, energy_len), (None, None), (None, None), (0, 1), (0, None), 
+                (0, energy_len), (None, None), (None, None), (None, None), (None, None)]
+    for fix in fixed:
+        m.fixed[fix] = True
+    m.simplex().migrad()
+    m.hesse()
+    if verbose:print(m)
 
-    return pars,errs
+    valid = m.valid #& m.accurate
+
+    #pars, errs, cov = pgf.fit_unbinned(pgf.extended_radford_pdf, energy, guess=x0,
+    #         Extended=True, cost_func = 'LL',simplex=True, fixed=fixed, bounds=bounds)
+
+    if valid ==True:
+        return m.values,m.errors
+    else:
+        return np.full_like(x0, np.nan), np.full_like(x0, np.nan)
 
 def get_peak_label(peak):
     if peak == 2039: 
@@ -368,7 +383,7 @@ def get_aoe_cut_fit(energy,aoe,peak,ranges,dep_acc, display=1):
     
     peak_energy = energy[(energy>peak-min_range)&(energy<peak+max_range)][:20000]
     peak_aoe = aoe[(energy>peak-min_range)&(energy<peak+max_range)][:20000]
-    cut_vals = np.arange(-5,-0.5, 0.1)
+    cut_vals = np.arange(-8,-0.4, 0.2)
     pars, errors = unbinned_energy_fit(peak_energy, peak)
     pc_n = pars[0]
     pc_err = errors[0]
@@ -387,7 +402,7 @@ def get_aoe_cut_fit(energy,aoe,peak,ranges,dep_acc, display=1):
     ids =  (sf_errs<(1.5*np.nanpercentile(sf_errs,50)))&(~np.isnan(sf_errs))
     fit = np.polynomial.polynomial.polyfit( cut_vals[ids], np.array(sfs)[ids],w=1/np.array(sf_errs)[ids], deg=4)  
 
-    xs = np.arange(-5,-0.5,0.01)
+    xs = np.arange(-8,-0.4,0.01)
     p = np.polynomial.polynomial.polyval(xs, fit)
     cut_val = xs[np.argmin(np.abs(p-(100*dep_acc)))]
 
@@ -790,7 +805,7 @@ def cal_aoe(files:list, lh5_path,cal_dict:dict, energy_param:str, cal_energy_par
             plt.close()
 
             plt.figure()
-            bins = np.linspace(1000,3000,2000)
+            bins = np.linspace(1000,3000,1000)
             counts_pass, bins_pass, _ = pgh.get_hist(energy[(classifier>cut)&(classifier<4)], bins =bins)
             counts, bins, _ = pgh.get_hist(energy, bins =bins)
             survival_fracs = counts_pass/(counts)
