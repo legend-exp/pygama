@@ -17,4 +17,4 @@
 * optimizing DSP routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
-Check out the [online documentation](https://legend-exp.github.io/pygama).
+Check out the [online documentation](https://pygama.readthedocs.io).
