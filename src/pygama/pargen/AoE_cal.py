@@ -1,3 +1,9 @@
+"""
+This module provides functions for correcting the a/e energy dependence, determining the cut level and calculating survival fractions.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import os, json
 import logging
@@ -18,10 +24,10 @@ import pygama.math.histogram as pgh
 import pygama.lgdo.lh5_store as lh5
 from pygama.pargen.ecal_th import apply_ctc
 
-
 log = logging.getLogger(__name__)
 
-def load_aoe(files, lh5_path,cal_dict, energy_param, cal_energy_param): 
+
+def load_aoe( files: list, lh5_path: str, cal_dict: dict, energy_param: str, cal_energy_param:str) -> tuple(np.array, np.array, np.array, np.array): 
 
     """
     Loads in the A/E parameters needed and applies calibration constants to energy
@@ -54,8 +60,8 @@ def load_aoe(files, lh5_path,cal_dict, energy_param, cal_energy_param):
     full_dt = uncal_pass['tp_99']-uncal_pass['tp_0_est']
     return aoe, ecal_pass, uncal_pass['dt_eff'], full_dt
 
-def PDF_AoE(x, lambda_s, lambda_b, mu,sigma,tau, 
-            lower_range=np.inf , upper_range=np.inf, components=False):
+def PDF_AoE(x:np.array, lambda_s:float, lambda_b:float, mu:float,sigma:float,tau:float, 
+            lower_range:float=np.inf , upper_range:float=np.inf, components:bool=False)->tuple(float, np.array):
     """
     PDF for A/E consists of a gaussian signal with gaussian tail background
     """
@@ -72,7 +78,7 @@ def PDF_AoE(x, lambda_s, lambda_b, mu,sigma,tau,
     else:
         return lambda_s+lambda_b, sig,bkg 
 
-def unbinned_aoe_fit(aoe, display=0, verbose=False):
+def unbinned_aoe_fit(aoe:np.array, display:int=0, verbose:bool=False)->tuple(np.array, np.array):
 
     """
     Fitting function for A/E, first fits just a gaussian before using the full pdf to fit
@@ -142,15 +148,15 @@ def unbinned_aoe_fit(aoe, display=0, verbose=False):
     
     else: return m.values, m.errors
 
-def pol1(x,a,b):
+def pol1(x:np.array,a:float,b:float)->np.array:
     """Basic Polynomial for fitting A/E centroid against energy"""
     return a * x + b
 
-def sigma_fit(x, a,b):
+def sigma_fit(x:np.array,a:float,b:float)->np.array:
     """Function definition for fitting A/E sigma against energy"""
     return np.sqrt(a+(b/x)**2)
 
-def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
+def AoEcorrection(energy:np.array,aoe:np.array,eres:list, pdf_path:str=None, display:int=0)->tuple(np.array,np.array):
 
     """
     Calculates the corrections needed for the energy dependence of the A/E.
@@ -180,7 +186,7 @@ def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
     
     #Fit each compton band
     for i, band in enumerate(comptBands):
-        aoe_tmp = aoe[(e>band) & (e<band+comptBands_width) & (aoe>0)]#[:20000]
+        aoe_tmp = aoe[(energy>band) & (energy<band+comptBands_width) & (aoe>0)]#[:20000]
         pars,errs = unbinned_aoe_fit(aoe_tmp, display=display)
         compt_aoe[i] = pars[2]
         aoe_sigmas[i] = pars[3]
@@ -245,7 +251,7 @@ def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
     peak = 1592
     emin           = peak - n_sigma*sigma
     emax           = peak + n_sigma*sigma
-    dep_pars, dep_err = unbinned_aoe_fit(aoe[(e>emin) & (e<emax) & (aoe>0)][:10000])
+    dep_pars, dep_err = unbinned_aoe_fit(aoe[(energy>emin) & (energy<emax) & (aoe>0)][:10000])
 
     if display>0 or pdf_path is not None:
         fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
@@ -293,7 +299,7 @@ def AoEcorrection(e,aoe,eres, pdf_path=None, display=0, plot_all=False):
 
     return pars, sig_pars
 
-def plot_compt_bands_overlayed(aoe,energy,eranges, aoe_range=None):
+def plot_compt_bands_overlayed(aoe:np.array,energy:np.array,eranges:list[tuple], aoe_range:list[float]=None)->None:
     
     """
     Function to plot various compton bands to check energy dependence and corrections
@@ -308,7 +314,7 @@ def plot_compt_bands_overlayed(aoe,energy,eranges, aoe_range=None):
         idxs = (energy>erange-10) &(energy<erange+10)&(aoe>aoe_range[0])&(aoe<aoe_range[1])
         plt.hist(aoe[idxs], bins=50, histtype='step', label=f'{erange-10}-{erange+10}')
 
-def plot_dt_dep(aoe, energy,dt, erange,title):
+def plot_dt_dep(aoe:np.array, energy:np.array,dt:np.array, erange:list[tuple],title:str)->None:
 
     """
     Function to produce 2d histograms of A/E agaisnt drift time to check dependencies
@@ -326,7 +332,7 @@ def plot_dt_dep(aoe, energy,dt, erange,title):
     plt.xlabel('A/E')
     plt.title(title)
 
-def unbinned_energy_fit(energy, peak):
+def unbinned_energy_fit(energy:np.array, peak:float, verbose:bool=False)->tuple(np.array,np.array):
 
     """
     Fitting function for energy peaks used to calculate survival fractions
@@ -338,7 +344,6 @@ def unbinned_energy_fit(energy, peak):
     if len(x0)==0:
         return [np.nan], [np.nan]
     fixed,mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
-    #bounds=pgc.get_hpge_E_bounds(pgf.extended_radford_pdf)
 
     c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
     m = Minuit(c, *x0)
@@ -350,17 +355,27 @@ def unbinned_energy_fit(energy, peak):
     m.hesse()
     if verbose:print(m)
 
-    valid = m.valid #& m.accurate
+    valid = m.valid
 
-    #pars, errs, cov = pgf.fit_unbinned(pgf.extended_radford_pdf, energy, guess=x0,
-    #         Extended=True, cost_func = 'LL',simplex=True, fixed=fixed, bounds=bounds)
-
-    if valid ==True:
+    if valid ==True and not np.isnan(m.errors[:-3]).all():
         return m.values,m.errors
     else:
-        return np.full_like(x0, np.nan), np.full_like(x0, np.nan)
+        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
+        m = Minuit(c, *x0)
+        m.limits = [(0, energy_len), (None, None), (None, None), (0, 1), (0, None), 
+                    (0, energy_len), (None, None), (None, None), (None, None), (None, None)]
+        for fix in fixed:
+            m.fixed[fix] = True
+        m.migrad()
+        m.hesse()
+        valid = m.valid
+        if verbose:print(m)
+        if valid ==True:
+            return m.values,m.errors
+        else:
+            return np.full_like(x0, np.nan), np.full_like(x0, np.nan)
 
-def get_peak_label(peak):
+def get_peak_label(peak:float)->str:
     if peak == 2039: 
         return 'CC @'
     elif peak == 1592.5:
@@ -372,7 +387,7 @@ def get_peak_label(peak):
     elif peak == 2614.5:
         return 'Tl FEP @'
 
-def get_aoe_cut_fit(energy,aoe,peak,ranges,dep_acc, display=1):
+def get_aoe_cut_fit(energy:np.array,aoe:np.array,peak:float,ranges:tuple(int,int),dep_acc:float, display:int=1)->float:
 
     """
     Determines A/E cut by sweeping through values and for each one fitting the DEP to determine how many events survive.
@@ -408,7 +423,7 @@ def get_aoe_cut_fit(energy,aoe,peak,ranges,dep_acc, display=1):
 
     return cut_val
 
-def get_sf(energy,aoe,peak,fit_width,aoe_cut_val, display=1):
+def get_sf(energy:np.array,aoe:np.array,peak:float,fit_width:tuple(int, int),aoe_cut_val:float, display:int=1)->tuple(np.array, np.array,np.array,float, float):
 
     """
     Calculates survival fraction for gamma lines using fitting method as in cut determination
@@ -456,7 +471,7 @@ def get_sf(energy,aoe,peak,fit_width,aoe_cut_val, display=1):
     sf_err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
     return np.array(final_cut_vals)[ids], np.array(sfs)[ids],np.array(sf_errs)[ids], sf, sf_err
 
-def compton_sf(energy,aoe,cut, peak,eres,display=1):
+def compton_sf(energy:np.array,aoe:np.array,cut:float, peak:float,eres:list[float,float],display:int=1)->tuple(float,np.array, list):
 
     """
     Determines survival fraction for compton continuum by basic counting
@@ -474,7 +489,7 @@ def compton_sf(energy,aoe,cut, peak,eres,display=1):
     sf = 100*len(aoe[(aoe>cut)])/len(aoe)
     return sf, cut_vals,sfs
 
-def get_sf_no_sweep(energy,aoe,peak,fit_width,aoe_low_cut_val, aoe_high_cut_val=None, display=1):
+def get_sf_no_sweep(energy:np.array,aoe:np.array,peak:float,fit_width:tuple(int,int),aoe_low_cut_val:float, aoe_high_cut_val:float=None, display:int=1)->tuple(float,float):
 
     """
     Calculates survival fraction for gamma line without sweeping through values
@@ -502,7 +517,7 @@ def get_sf_no_sweep(energy,aoe,peak,fit_width,aoe_low_cut_val, aoe_high_cut_val=
     sf_err = sf*np.sqrt((pc_err/pc_n)**2 + (ct_err/ct_n)**2)
     return sf, sf_err
 
-def compton_sf_no_sweep(energy,aoe, peak,eres, aoe_low_cut_val, aoe_high_cut_val=None, display=1):
+def compton_sf_no_sweep(energy:np.array,aoe:np.array, peak:float,eres:list[float,float], aoe_low_cut_val:float, aoe_high_cut_val:float=None, display:int=1)->float:
 
     """
     Calculates survival fraction for compton contiuum without sweeping through values
@@ -521,7 +536,7 @@ def compton_sf_no_sweep(energy,aoe, peak,eres, aoe_low_cut_val, aoe_high_cut_val
         sf = 100*len(aoe[(aoe>aoe_low_cut_val)&(aoe<aoe_high_cut_val)])/len(aoe)
     return sf
 
-def get_classifier(aoe, energy, mu_pars, sigma_pars):
+def get_classifier(aoe:np.array, energy:np.array, mu_pars:list[float, float], sigma_pars:list[float, float])->np.array:
 
     """
     Applies correction to A/E energy dependence
@@ -531,7 +546,7 @@ def get_classifier(aoe, energy, mu_pars, sigma_pars):
     classifier = (classifier - 1)/ sigma_fit(energy, *sigma_pars)
     return classifier
 
-def get_dt_guess(hist, bins, var):
+def get_dt_guess(hist:np.array, bins:np.array, var:np.array)->list:
     """
     Guess for fitting dt spectrum
     """
@@ -547,11 +562,11 @@ def get_dt_guess(hist, bins, var):
     nbkg_guess = np.sum(hist)-nsig_guess
     return [nsig_guess*np.diff(bins)[0], mu, sigma, nbkg_guess*np.diff(bins)[0], hstep,np.inf,np.inf,0]
 
-def apply_dtcorr(aoe, dt, alpha):
+def apply_dtcorr(aoe:np.array, dt:np.array, alpha:float)->np.array:
     """Aligns dt regions"""
     return (aoe* (1+alpha*dt))
 
-def drift_time_correction(aoe, energy, dt, display=0,pdf_path=None):
+def drift_time_correction(aoe:np.array, energy:np.array, dt:np.array, display:int=0,pdf_path:str=None)->tuple(np.array, float):
     """
     Calculates the correction needed to align the two drift time regions for ICPC detectors
     """
@@ -655,7 +670,7 @@ def drift_time_correction(aoe, energy, dt, display=0,pdf_path=None):
 
 def cal_aoe(files:list, lh5_path,cal_dict:dict, energy_param:str, cal_energy_param:str, eres_pars:list,
             dt_corr:bool=False, cut_parameters:dict = {"bl_mean":4, "bl_std":4,"pz_std":4}, 
-            plot_savepath:str=None) -> dict:
+            plot_savepath:str=None) -> tuple(dict, dict):
     """
     Main function for running the a/e correction and cut determination. 
     """
