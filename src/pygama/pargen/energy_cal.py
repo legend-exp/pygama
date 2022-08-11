@@ -70,7 +70,7 @@ def hpge_find_E_peaks(hist, bins, var, peaks_keV, n_sigma=5, deg=0, Etol_keV=Non
     if Etol_keV is None:
         #estimate Etol_keV
         pt_pars, pt_covs = hpge_fit_E_peak_tops(hist, bins, var, detected_max_locs, n_to_fit=15)
-        if sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if c is not None else 0 for c in pt_covs)) == 0: log.debug('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
+        if sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == np.inf or sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == 0: print('hpge_find_E_peaks: can safely ignore previous covariance warning, not used')
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
         med_sigma_ratio = np.median(np.stack(pt_pars)[:,1]/np.stack(pt_pars)[:,0])
 
