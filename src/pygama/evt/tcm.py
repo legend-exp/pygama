@@ -6,8 +6,14 @@ import pandas as pd
 # later on we might want a tcm class, or interface / inherit from an entry list
 # class. For now we just need the key clustering functionality
 
-def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last',
-                      array_ids:list=None, array_idxs:list=None):
+
+def generate_tcm_cols(
+    coin_data: list,
+    coin_window: float = 0,
+    window_ref: str = "last",
+    array_ids: list = None,
+    array_idxs: list = None,
+):
     """
     Generate the columns of a time coincidence map from a list of arrays of
     coincidence data (e.g. hit times from different channels). Returns 3
@@ -60,25 +66,34 @@ def generate_tcm_cols(coin_data:list, coin_window:float=0, window_ref:str='last'
         array = np.array(array)
         array_id = array_ids[ii] if array_ids is not None else ii
         array_id = np.full_like(array, array_id)
-        col_dict = {'array_id':array_id, 'coin_data':array}
-        if array_idxs is not None: col_dict['array_idx'] = array_idxs[ii]
+        col_dict = {"array_id": array_id, "coin_data": array}
+        if array_idxs is not None:
+            col_dict["array_idx"] = array_idxs[ii]
         dfs.append(pd.DataFrame(col_dict, copy=False))
 
     # concat and sort
-    tcm = pd.concat(dfs).sort_values(['coin_data', 'array_id'])
+    tcm = pd.concat(dfs).sort_values(["coin_data", "array_id"])
 
     # compute coin_data diffs
-    tcm['dcoin'] = tcm['coin_data'].diff()
+    tcm["dcoin"] = tcm["coin_data"].diff()
 
     # window into coincidences
-    if window_ref == 'last':
+    if window_ref == "last":
         # create the event column by comparing the time since last event to the coincindence window
-        tcm['coin_idx'] = (tcm.dcoin > coin_window).cumsum()
+        tcm["coin_idx"] = (tcm.dcoin > coin_window).cumsum()
     else:
-        raise NotImplementedError(f'window_ref {window_ref}')
+        raise NotImplementedError(f"window_ref {window_ref}")
 
     # now build the outputs
-    coin_idx = tcm.coin_idx.to_numpy()
+    cumulative_length = np.where(tcm.coin_idx.diff().to_numpy() != 0)[0]
+    cumulative_length[:-1] = cumulative_length[1:]
+    cumulative_length[-1] = len(tcm.coin_idx)
     array_id = tcm.array_id.to_numpy()
-    array_idx = tcm.array_idx.to_numpy() if 'array_idx' in tcm else tcm.index.to_numpy() # beautiful!
-    return { 'coin_idx':coin_idx, 'array_id':array_id, 'array_idx':array_idx }
+    array_idx = (
+        tcm.array_idx.to_numpy() if "array_idx" in tcm else tcm.index.to_numpy()
+    )  # beautiful!
+    return {
+        "cumulative_length": cumulative_length,
+        "array_id": array_id,
+        "array_idx": array_idx,
+    }

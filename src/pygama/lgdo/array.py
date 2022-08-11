@@ -31,9 +31,14 @@ class Array:
 
     """
 
-    def __init__(self, nda: np.ndarray = None, shape: tuple[int, ...] = (),
-                 dtype: np.dtype = None, fill_val: float | int = None,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(
+        self,
+        nda: np.ndarray = None,
+        shape: tuple[int, ...] = (),
+        dtype: np.dtype = None,
+        fill_val: float | int = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
         """
         Parameters
         ----------
@@ -56,33 +61,38 @@ class Array:
             A set of user attributes to be carried along with this LGDO.
         """
         if nda is None:
-            if fill_val is None: nda = np.empty(shape, dtype=dtype)
-            elif fill_val == 0: nda = np.zeros(shape, dtype=dtype)
-            else: nda = np.full(shape, fill_val, dtype=dtype)
+            if fill_val is None:
+                nda = np.empty(shape, dtype=dtype)
+            elif fill_val == 0:
+                nda = np.zeros(shape, dtype=dtype)
+            else:
+                nda = np.full(shape, fill_val, dtype=dtype)
         self.nda = nda
         self.dtype = self.nda.dtype
 
         self.attrs = {} if attrs is None else dict(attrs)
 
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
-                raise RuntimeError('datatype does not match nda! '
-                                   f'datatype: {self.attrs["datatype"]} '
-                                   f'form_datatype(): {self.form_datatype()} '
-                                   f'dtype: {self.dtype}')
+        if "datatype" in self.attrs:
+            if self.attrs["datatype"] != self.form_datatype():
+                raise RuntimeError(
+                    "datatype does not match nda! "
+                    f'datatype: {self.attrs["datatype"]} '
+                    f"form_datatype(): {self.form_datatype()} "
+                    f"dtype: {self.dtype}"
+                )
         else:
-            self.attrs['datatype'] = self.form_datatype()
+            self.attrs["datatype"] = self.form_datatype()
 
     def datatype_name(self) -> str:
         """The name for this LGDO's datatype attribute."""
-        return 'array'
+        return "array"
 
     def form_datatype(self) -> str:
         """Return this LGDO's datatype attribute string."""
         dt = self.datatype_name()
-        nD = str(len(self.nda.shape))
+        nd = str(len(self.nda.shape))
         et = get_element_type(self)
-        return dt + '<' + nD + '>{' + et + '}'
+        return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:
         return len(self.nda)
@@ -94,10 +104,10 @@ class Array:
 
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()
-        datatype = tmp_attrs.pop('datatype')
+        datatype = tmp_attrs.pop("datatype")
         string = datatype + " = " + str(self.nda)
         if len(tmp_attrs) > 0:
-            string += '\n attrs = ' + str(tmp_attrs)
+            string += "\n attrs = " + str(tmp_attrs)
         return string
 
     def __repr__(self) -> str:
