@@ -170,8 +170,9 @@ class VectorOfVectors:
         nda = np.empty((len(self.cumulative_length), arr_len))
         nda.fill(np.nan)
         for i in range(len(self.cumulative_length)):
-            nda[i, :ind_lengths[i]] = self[i]
+            nda[i, : ind_lengths[i]] = self[i]
         return ArrayOfEqualSizedArrays(nda=nda)
+
 
 def build_cl(
     sorted_array_in: Array, cumulative_length_out: np.ndarray = None

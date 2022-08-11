@@ -203,7 +203,7 @@ class Table(Struct):
                 column = self[col].to_aoesa()
             else:
                 column = self[col]
-                
+
             if not hasattr(column, "nda"):
                 raise ValueError(f"column {col} does not have an nda")
             else:
