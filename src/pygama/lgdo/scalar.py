@@ -14,10 +14,10 @@ log = logging.getLogger(__name__)
 
 class Scalar:
     """Holds just a scalar value and some attributes (datatype, units, ...)."""
+
     # TODO: do scalars need proper numpy dtypes?
 
-    def __init__(self, value: int | float,
-                 attrs: dict[str, Any] = None) -> None:
+    def __init__(self, value: int | float, attrs: dict[str, Any] = None) -> None:
         """
         Parameters
         ----------
@@ -27,22 +27,23 @@ class Scalar:
             a set of user attributes to be carried along with this LGDO.
         """
         if not np.isscalar(value):
-            raise ValueError('cannot instantiate a Scalar with a non-scalar value')
+            raise ValueError("cannot instantiate a Scalar with a non-scalar value")
 
         self.value = value
         self.attrs = {} if attrs is None else dict(attrs)
 
-        if 'datatype' in self.attrs:
-            if self.attrs['datatype'] != self.form_datatype():
+        if "datatype" in self.attrs:
+            if self.attrs["datatype"] != self.form_datatype():
                 raise ValueError(
                     f"datatype ({self.attrs['datatype']}) does "
-                    f"not match value type ({type(value).__name__})!")
+                    f"not match value type ({type(value).__name__})!"
+                )
         else:
-            self.attrs['datatype'] = get_element_type(self.value)
+            self.attrs["datatype"] = get_element_type(self.value)
 
     def datatype_name(self) -> str:
         """Returns the name for this LGDO's datatype attribute."""
-        if hasattr(self.value, 'datatype_name'):
+        if hasattr(self.value, "datatype_name"):
             return self.value.datatype_name
         else:
             return get_element_type(self.value)
@@ -55,9 +56,9 @@ class Scalar:
         """Convert to string (e.g. for printing)."""
         string = str(self.value)
         tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop('datatype')
+        tmp_attrs.pop("datatype")
         if len(tmp_attrs) > 0:
-            string += '\n' + str(tmp_attrs)
+            string += "\n" + str(tmp_attrs)
         return string
 
     def __repr__(self) -> str:

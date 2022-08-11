@@ -211,8 +211,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 
     Returns
     -------
-    pars : 3-tuple containing the parameters (mode, sigma, maximum) of the
-        gaussian fit
+    pars : ndarray containing the parameters (mode, sigma, maximum) of the gaussian fit
 
         - mode : the estimated x-position of the maximum
         - sigma : the estimated width of the peak. Equivalent to a gaussian
@@ -221,7 +220,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
           underlying function in the vicinity of the max is given by max /
           sigma^2
         - maximum : the estimated maximum value of the peak
-    cov : 3x3 matrix of floats
+    cov : 3x3 ndarray of floats
         The covariance matrix for the 3 parameters in pars
     """
     bin_centers = pgh.get_bin_centers(bins)
@@ -235,19 +234,15 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     width_guess = (bin_centers[i_n] - bin_centers[i_0])
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
-    try:
-        pars, errors, cov = fit_binned(nb_gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv,
-                         guess=guess, cost_func=cost_func)
-    except:
-        raise RuntimeError("fit binned failed to work")
+    pars, errors, cov = fit_binned(nb_gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv, guess=guess, cost_func=cost_func)
     if pars[1] < 0: pars[1] = -pars[1]
     if inflate_errors:
         chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars)
         if chi2 > dof: cov *= chi2/dof
-    return pars, cov
+    return np.asarray([pars['mu'], pars['sigma'], pars['a']]), np.asarray(cov)
 
 
-def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False, inflate_errors=False, gof_method='var'):
+def gauss_mode_max(hist, bins, **kwargs):
     """Alias for gauss_mode_width_max that just returns the max and mode
 
     See Also
@@ -256,24 +251,40 @@ def gauss_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=Fa
 
     Returns
     -------
-    pars : 2-tuple with the parameters (mode, maximum) of the gaussian fit
+    pars : ndarray with the parameters (mode, maximum) of the gaussian fit
         mode : the estimated x-position of the maximum
         maximum : the estimated maximum value of the peak
-    cov : 2x2 matrix of floats
+    cov : 2x2 ndarray of floats
         The covariance matrix for the 2 parameters in pars
 
     Examples
     --------
-    >>> import pygama.analysis.histograms as pgh
+    >>> import pygama.math.histograms as pgh
     >>> from numpy.random import normal
-    >>> import pygama.analysis.peak_fitting as pgf
+    >>> import pygama.math.peak_fitting as pgf
     >>> hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5,5))
-    >>> pgf.gauss_mode_max(hist, bins, var, n_bins=20)
+    >>> pgf.gauss_mode_max(hist, bins, var=var, n_bins=20)
     """
-    pars, cov = gauss_mode_width_max(hist, bins, var, mode_guess, n_bins, poissonLL)
+    pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
     if pars is None or cov is None:
         raise RuntimeError("fit binned failed to work")
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
+
+
+def gauss_mode(hist, bins, **kwargs):
+    """Alias for gauss_mode_max that just returns the mode (position) of a peak
+    See Also
+    --------
+    gauss_mode_max
+    gauss_mode_width_max
+    Returns
+    -------
+    mode : the estimated x-position of the maximum
+    dmode : the uncertainty in the mode
+    """
+    pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
+    if pars is None or cov is None: return None, None
+    return pars[0], np.sqrt(cov[0, 0])
 
 
 def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
