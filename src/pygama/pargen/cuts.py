@@ -1,15 +1,24 @@
+"""
+This module provides routines for calculating and applying quality cuts
+"""
+
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import os
 import json
 import glob
+import logging
 
 import pygama.math.peak_fitting as pgf
 import pygama.math.histogram as pgh
 import pygama.lgdo.lh5_store as lh5
 
+log = logging.getLogger(__name__)
 
-def generate_cuts(data, parameters, verbose=False):
+
+def generate_cuts(data:dict[str, np.ndarray], parameters:list[str])->dict:
     """
     Finds double sided cut boundaries for a file for the parameters specified 
     
@@ -88,7 +97,7 @@ def generate_cuts(data, parameters, verbose=False):
         output_dict[par] ={'Mean Value': mean, 'Sigmas Cut': num_sigmas, 'Upper Boundary' : upper, 'Lower Boundary': lower}
     return output_dict
 
-def get_cut_indexes(all_data, cut_dict, energy_param = 'trapEmax', verbose=False):
+def get_cut_indexes(all_data:dict[str, np.ndarray], cut_dict:dict, energy_param:str = 'trapTmax')->list[int]:
 
     """
     Returns a mask of the data, for a single file, that passes cuts based on dictionary of cuts 
@@ -128,7 +137,7 @@ def get_cut_indexes(all_data, cut_dict, energy_param = 'trapEmax', verbose=False
             
         else:
             indexes = idxs
-        if verbose: print(cut, ' loaded')
+        log.debug(f'{cut} loaded')
 
     return indexes
 

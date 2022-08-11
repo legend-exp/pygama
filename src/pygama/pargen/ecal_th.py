@@ -1,3 +1,9 @@
+"""
+This module provides a routine for running the energy calibration on Th data
+"""
+
+from __future__ import annotations
+
 import json
 import math
 import os
@@ -16,22 +22,21 @@ import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as cal
 import pygama.lgdo.lh5_store as lh5
 
-
 log = logging.getLogger(__name__)
 
 
-def fwhm_slope(x, m0, m1):
+def fwhm_slope(x:np.array, m0:float, m1:float)->np.array:
     """
     Fit the energy resolution curve
     """
     return np.sqrt(m0 + m1*x)
 
-def apply_ctc(energy, dt, alpha):
+def apply_ctc(energy:np.array, dt:np.array, alpha:float)->np.array:
     correction = np.multiply(np.multiply(alpha,dt, dtype='float64'),energy, dtype='float64')
     ctc_energy = np.add(correction, energy)
     return ctc_energy
 
-def load_data(files, lh5_path, energy_params, hit_dict={}, cut_parameters={'bl_mean':4,'bl_std':4, 'pz_std':4}):
+def load_data(files:list[str], lh5_path:str, energy_params:list[str], hit_dict:dict={}, cut_parameters:dict[str,int]={'bl_mean':4,'bl_std':4, 'pz_std':4})->dict[str, np.ndarray]:
     if len(hit_dict.keys()) == 0:
         try:
             energy_dict = lh5.load_nda(files, energy_params,lh5_path)  
@@ -53,9 +58,9 @@ def load_data(files, lh5_path, energy_params, hit_dict={}, cut_parameters={'bl_m
             energy_dict[energy_param]=apply_ctc(data[all_params[0]],data[all_params[1]],alpha)
     return energy_dict
 
-def energy_cal_th(files, energy_params, hit_dict={}, save_path=None, plot_path=None, 
-                  cut_parameters={'bl_mean':4,'bl_std':4, 'pz_std':4} ,
-                  lh5_path='dsp',threshold=0, p_val = 0.05, n_events=15000):
+def energy_cal_th(files:list[str], energy_params:list[str], hit_dict:dict={}, save_path:str=None, plot_path:str=None, 
+                  cut_parameters:dict[str,int]={'bl_mean':4,'bl_std':4, 'pz_std':4} ,
+                  lh5_path:str='dsp',threshold:int=0, p_val :float= 0.05, n_events:int=15000)->tuple(dict, dict):
 
 
     """
@@ -325,7 +330,7 @@ def energy_cal_th(files, energy_params, hit_dict={}, save_path=None, plot_path=N
     log.info(f'Finished : {hit_dict}')
     return hit_dict, output_dict
 
-def get_peak_labels(labels, pars):
+def get_peak_labels(labels:list[str], pars:list[float])->tuple(list[float],list[float]):
     out = []
     out_labels = []
     for i,label in enumerate(labels):
@@ -336,7 +341,7 @@ def get_peak_labels(labels, pars):
             out_labels.append(label)
     return out_labels, out
 
-def get_peak_label(peak):
+def get_peak_label(peak:float)->str:
     if peak == 583.191: 
         return 'Tl 583'
     elif peak == 727.33:

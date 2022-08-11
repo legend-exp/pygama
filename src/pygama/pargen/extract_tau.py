@@ -1,23 +1,31 @@
+"""
+This module is for extracting a single pole zero constant from the decay tail
+"""
+
+from __future__ import annotations
+
 import json
 import os
-
 import numpy as np
 from collections import OrderedDict
 import pathlib
-
-import pygama
-import pygama.lgdo.lh5_store as lh5
-
-import pygama.math.histogram as pgh
-from pygama.pargen.cuts import generate_cuts, get_cut_indexes
-from pygama.pargen.dsp_optimize import run_one_dsp
+import logging
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pickle as pkl
 
+import pygama
+import pygama.lgdo.lh5_store as lh5
+import pygama.lgdo as lgdo
+import pygama.math.histogram as pgh
+from pygama.pargen.cuts import generate_cuts, get_cut_indexes
+from pygama.pargen.dsp_optimize import run_one_dsp
 
-def run_tau(raw_file, config, channel, n_events=30000, threshold=3000):
+log = logging.getLogger(__name__)
+
+
+def run_tau(raw_file:list[str], config:dict, channel:str, n_events:int=30000, threshold:int=3000)->lgdo.Table:
     sto =lh5.LH5Store()
     daq_energies = lh5.load_nda(raw_file, ['daqenergy'], f'{channel}/raw')['daqenergy']
     cuts = np.where(daq_energies>threshold)[0]
@@ -27,7 +35,7 @@ def run_tau(raw_file, config, channel, n_events=30000, threshold=3000):
     tb_data = lh5.Table(col_dict = { 'waveform' : waveforms, 'baseline':baseline } )
     return run_one_dsp(tb_data, config)
 
-def get_decay_constant(slopes, wfs, plot_path = None):
+def get_decay_constant(slopes:np.array, wfs:np.array, plot_path:str = None)->dict:
     
     """
     Finds the decay constant from the modal value of the tail slope after cuts
@@ -90,7 +98,7 @@ def get_decay_constant(slopes, wfs, plot_path = None):
         plt.close()
         return tau_dict
 
-def dsp_preprocess_decay_const(raw_files, dsp_config, channel, plot_path = None, verbose=0):
+def dsp_preprocess_decay_const(raw_files:list[str], dsp_config:dict, channel:str, plot_path:str = None)->dict:
     """
     This function calculates the pole zero constant for the input data
     f_raw : str 
@@ -102,12 +110,13 @@ def dsp_preprocess_decay_const(raw_files, dsp_config, channel, plot_path = None,
     """
 
     tb_out = run_tau(raw_files, dsp_config, channel)
-    if verbose>0: print("Processed Data")
+    log.debug("Processed Data")
     cut_dict = generate_cuts(tb_out, parameters = {'bl_mean':4, 'bl_std':4,'bl_slope':4})
-    if verbose>0: 
-        print("Generated Cuts:", cut_dict)
+    log.debug("Generated Cuts:", cut_dict)
     idxs = get_cut_indexes(tb_out,cut_dict, verbose=False)
+    log.debug("Applied cuts")
     slopes = tb_out['tail_slope'].nda
     wfs = tb_out['wf_blsub']['values'].nda
+    log.debug("Calculating pz constant")
     tau_dict = get_decay_constant(slopes[idxs], wfs[idxs], plot_path=plot_path)
     return tau_dict
