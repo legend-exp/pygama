@@ -8,7 +8,7 @@
 ![GitHub issues](https://img.shields.io/github/issues/legend-exp/pygama?logo=github)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/legend-exp/pygama?logo=github)
 ![License](https://img.shields.io/github/license/legend-exp/pygama)
-[![Documentation](https://img.shields.io/badge/documentation-online-purple?logo=readthedocs)](https://legend-exp.github.io/pygama)
+[![Read the Docs](https://img.shields.io/readthedocs/pygama?logo=readthedocs)](https://pygama.readthedocs.io)
 
 *pygama* is a Python package for:
 
