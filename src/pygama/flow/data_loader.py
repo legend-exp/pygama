@@ -17,7 +17,7 @@ from pygama.lgdo import (
     Table,
     WaveformTable,
 )
-from pygama.lgdo.VectorOfVectors import build_cl, explode_arrays, explode_cl
+from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
 log = logging.getLogger(__name__)
 
@@ -495,7 +495,6 @@ class DataLoader:
                 )
                 if not os.path.exists(tcm_path):
                     raise FileNotFoundError(f"Can't find TCM file for {tcm_level}")
-                    return
                 tcm_table_name = self.get_table_name(tcm_tier, tcm_tb)
                 tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
                 # Have to do some hacky stuff until I get a get_dataframe() method
@@ -871,6 +870,7 @@ class DataLoader:
         """
         Called by load() when rows = 'evt'
         """
+        raise NotImplementedError
         parent = self.tcms[tcm_level]["parent"]
         child = self.tcms[tcm_level]["child"]
         load_levels = [parent, child]
@@ -951,13 +951,13 @@ class DataLoader:
         column names, and potentially calibration/dsp parameters relevant to one
         single detector.
         """
-        pass
+        raise NotImplementedError
 
     def load_settings(self):  # TODO
         """
         get metadata stored in raw files, usually from a DAQ machine.
         """
-        pass
+        raise NotImplementedError
 
     def load_dsp_pars(self, query):  # TODO
         """
@@ -965,29 +965,25 @@ class DataLoader:
         some kind of query to retrieve parameters of interest for our file list,
         and return some tables.
         """
-        pass
+        raise NotImplementedError
 
     def load_cal_pars(self, query):  # TODO
         """
         access the cal_pars parameter database, run a query, and return some tables.
         """
-        pass
+        raise NotImplementedError
 
     def skim_waveforms(self, mode: str = "hit", hit_list=None, evt_list=None):  # TODO
         """
         handle this one separately because waveforms can easily fill up memory.
         """
-        if mode == "hit":
-            pass
-        elif mode == "evt":
-            pass
-        pass
+        raise NotImplementedError
 
     def browse(self, query, dsp_config=None):  # TODO
         """
         Interface between DataLoader and WaveformBrowser.
         """
-        pass
+        raise NotImplementedError
 
     def reset(self):
         self.file_list = None
