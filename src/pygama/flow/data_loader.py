@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import logging
 import os
@@ -34,30 +35,30 @@ class DataLoader:
     """
 
     def __init__(
-        self, 
-        config: str | dict = None, 
-        filedb: str | FileDB = None, 
-        filedb_config: str | dict = None, 
-        file_query: str = None
+        self,
+        config: str | dict = None,
+        filedb: str | FileDB = None,
+        filedb_config: str | dict = None,
+        file_query: str = None,
     ):
         """
-        DataLoader init function.  
-        
-        No hit-level data is loaded in memory at this point.  
+        DataLoader init function.
+
+        No hit-level data is loaded in memory at this point.
         User should specify a config file containing DAQ filename format specifiers, etc.
 
         Parameters
         ----------
-        config : 
+        config :
             Configuration file for the DataLoader
-        filedb : 
+        filedb :
             A fileDB must be specified, either with
                 1) An instance of FileDB
                 2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
                 3) config file with enough info for FileDB to perform a DAQ scan
-        filedb_config : 
+        filedb_config :
             Config file mentioned above for fileDB
-        file_query : 
+        file_query :
             String query that should operate on columns of a fileDB.
 
         Returns
@@ -147,7 +148,7 @@ class DataLoader:
 
         Parameters
         ----------
-        query : 
+        query :
             The file level cuts on the files of interest
             Can be a cut on any of the columns in FileDB
         """
@@ -181,9 +182,7 @@ class DataLoader:
         return table_name
 
     def set_datastreams(
-        self, 
-        ds: list | tuple | np.ndarray , 
-        word: str
+        self, ds: list | tuple | np.ndarray, word: str
     ):  # TODO Make this able to handle more complicated requests
         """
         Set self.table_list to the datastreams (detectors) of interest
@@ -232,7 +231,7 @@ class DataLoader:
 
         Parameters
         ----------
-        cut 
+        cut
             The cuts on the columns of the data table, e.g. "trapEftp_cal > 1000"
             If passing a dictionary, the dictionary should be structured as dict[level] = cut
             If passing a list, each item in the array should be able to be applied on one level of tables
@@ -256,10 +255,9 @@ class DataLoader:
             self.cuts = {}
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
-    def set_output(self, 
-        fmt: str = None,
-        merge_files: bool = None, 
-        columns: list = None):
+    def set_output(
+        self, fmt: str = None, merge_files: bool = None, columns: list = None
+    ):
         """
         Set the parameters for the output format of load
 
@@ -281,7 +279,7 @@ class DataLoader:
         if columns is not None:
             self.output_columns = columns
 
-    def show_file_list(self, columns : list = None):
+    def show_file_list(self, columns: list = None):
         """
         Logs the current file list
 
@@ -302,7 +300,9 @@ class DataLoader:
         """
         self.fileDB.show(columns)
 
-    def get_tiers_for_col(self, columns : list | np.ndarray, merge_files : bool = None) -> dict:
+    def get_tiers_for_col(
+        self, columns: list | np.ndarray, merge_files: bool = None
+    ) -> dict:
         """
         For each column given, get the tiers and tables in that tier where that column can be found
 
@@ -317,7 +317,7 @@ class DataLoader:
 
         Returns
         -------
-            col_tiers, the tables and tiers that need to be loaded for each column 
+            col_tiers, the tables and tiers that need to be loaded for each column
         """
         col_tiers = {}
 
@@ -586,10 +586,10 @@ class DataLoader:
             return entries
 
     def gen_hit_entries(
-        self, 
+        self,
         save_output_columns: bool = False,
         in_mem: bool = True,
-        f_output: str = None
+        f_output: str = None,
     ):
         """
         Called by gen_entry_list() to handle the case when tcm_level is None
@@ -695,12 +695,12 @@ class DataLoader:
             return entries
 
     def load(
-        self, 
+        self,
         entry_list: pd.DataFrame = None,
         in_mem: bool = False,
         f_output: str = None,
         rows: str = "hit",
-        tcm_level: str = None
+        tcm_level: str = None,
     ) -> None | Table | pd.DataFrame:
         """
         Returns the requested columns in self.output_columns for the entries in the given entry_list
@@ -718,7 +718,7 @@ class DataLoader:
             If not None, writes the loaded data to the specified file
 
         rows
-            'hit' or 'evt' 
+            'hit' or 'evt'
             Specifies the orientation of the output table
 
         tcm_level
@@ -746,7 +746,7 @@ class DataLoader:
         entry_list: pd.DataFrame = None,
         in_mem: bool = False,
         f_output: str = None,
-        tcm_level: str = None
+        tcm_level: str = None,
     ):
         """
         Called by load() when rows='hit'
@@ -898,7 +898,7 @@ class DataLoader:
         entry_list: pd.DataFrame = None,
         in_mem: bool = False,
         f_output: str = None,
-        tcm_level: str = None
+        tcm_level: str = None,
     ):  # TODO
         """
         Called by load() when rows = 'evt'

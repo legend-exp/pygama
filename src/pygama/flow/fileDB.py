@@ -23,12 +23,7 @@ class FileDB:
     read/write to disk in an LGDO format
     """
 
-    def __init__(
-            self,
-            config: str | dict,
-            file_df: str = None,
-            scan: bool = True
-        ):
+    def __init__(self, config: str | dict, file_df: str = None, scan: bool = True):
         """
         Parameters
         ----------
