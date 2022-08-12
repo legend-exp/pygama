@@ -3,10 +3,13 @@
 import sys
 from pathlib import Path
 
+from pkg_resources import get_distribution
+
 sys.path.insert(0, Path("../../src").resolve().as_posix())
 
 project = "pygama"
-copyright = "2022, the LEGEND Collaboration"
+copyright = "2020, the LEGEND Collaboration"
+version = get_distribution("pygama").version
 
 extensions = [
     "sphinx.ext.githubpages",
@@ -14,8 +17,6 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
-    "sphinx_rtd_theme",
-    "sphinx_multiversion",
     "sphinx_copybutton",
     "myst_parser",
 ]
@@ -26,13 +27,15 @@ source_suffix = {
 }
 master_doc = "index"
 language = "python"
-# in _templates/ we have a custom layout.html to include the version menu
-# (adapted from sphinx-multiversion docs)
-templates_path = ["_templates"]
-pygments_style = "sphinx"
 
-# readthedocs.io Sphinx theme
-html_theme = "sphinx_rtd_theme"
+# Furo theme
+html_theme = "furo"
+html_theme_options = {
+    "source_repository": "https://github.com/legend-exp/pygama",
+    "source_branch": "main",
+    "source_directory": "docs/source",
+}
+html_title = f"{project} {version}"
 
 # list here pygama dependencies that are not required for building docs and
 # could be unmet at build time
@@ -88,25 +91,3 @@ autoclass_content = "both"
 autodoc_typehints = "both"
 autodoc_typehints_description_target = "documented_params"
 autodoc_typehints_format = "short"
-
-# sphinx-multiversion
-
-# For now, we include only (certain) branches when building docs.
-# To add a specific release to the list of versions for which docs should be build,
-# one must create a new branch named `releases/...`
-smv_branch_whitelist = r"^(main|refactor|releases/.*)$"
-smv_tag_whitelist = "^$"
-smv_released_pattern = "^$"
-smv_outputdir_format = "{ref.name}"
-smv_prefer_remote_refs = False
-
-# HACK: we need to regenerate the API documentation before the actual build,
-# but it's not possible with the current sphinx-multiversion. Changes have been
-# proposed in this PR: https://github.com/Holzhaus/sphinx-multiversion/pull/62
-# but there's no timeline for merging yet. For the following option to be considered,
-# one needs to install the sphinx-multiversion-pre-post-build fork from PyPI
-smv_prebuild_command = "make -ik apidoc"
-
-# The right way to find all docs versions is to look for matching branches on
-# the default remote
-smv_remote_whitelist = r"^origin$"

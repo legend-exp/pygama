@@ -129,8 +129,8 @@ documentation. When contributing to the project, make sure to implement the
 following:
 
 * Documentation should be exclusively available on the Project website
-  https://legend-exp.github.io/pygama. No READMEs, GitHub/LEGEND wiki pages
-  should be written.
+  `pygama.readthedocs.io <https://pygama.readthedocs.io>`_. No READMEs,
+  GitHub/LEGEND wiki pages should be written.
 * Pull request authors are required to provide sufficient documentation for
   every proposed change or addition.
 * Documentation for functions, classes, modules and packages should be provided
@@ -181,7 +181,7 @@ required. You can get all the needed dependencies by running:
   $ cd pygama
   $ pip install '.[docs]'
 
-To build documentation for the current Git ref, run the following commands:
+To build documentation, run the following commands:
 
 .. code-block:: console
 
@@ -190,18 +190,8 @@ To build documentation for the current Git ref, run the following commands:
   $ make
 
 Documentation can be then displayed by opening ``build/html/index.html`` with a
-web browser.  To build documentation for all main :mod:`pygama` versions
-(development branch and stable releases), run
-
-.. code-block:: console
-
-  $ git fetch --prune origin
-  $ cd docs
-  $ make clean
-  $ make allver
-
-and display the documentation by opening ``build/allver/html/index.html``. This
-documentation is also deployed to the :mod:`pygama` website.
+web browser. Documentation for the :mod:`pygama` website is built and deployed by
+`Read the Docs <https://readthedocs.org/projects/pygama>`_.
 
 Versioning
 ----------
