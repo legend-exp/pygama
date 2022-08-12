@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import logging
 import os
@@ -33,25 +34,30 @@ class DataLoader:
     """
 
     def __init__(
-        self, config=None, filedb=None, filedb_config=None, file_query: str = None
+        self, 
+        config: str | dict = None, 
+        filedb: str | FileDB = None, 
+        filedb_config: str | dict = None, 
+        file_query: str = None
     ):
         """
-        DataLoader init function.  No hit-level data is loaded in memory at
-        this point.  User should specify a config file containing DAQ filename
-        format specifiers, etc.
+        DataLoader init function.  
+        
+        No hit-level data is loaded in memory at this point.  
+        User should specify a config file containing DAQ filename format specifiers, etc.
 
         Parameters
         ----------
-        config : dict or filename of JSON config file
-            add description here
-        filedb : pd.DataFrame, FileDB, or filename of existing fileDB
+        config : 
+            Configuration file for the DataLoader
+        filedb : 
             A fileDB must be specified, either with
                 1) An instance of FileDB
                 2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
                 3) config file with enough info for FileDB to perform a DAQ scan
-        filedb_config : dict or filename of JSON config file
+        filedb_config : 
             Config file mentioned above for fileDB
-        file_query : str
+        file_query : 
             String query that should operate on columns of a fileDB.
 
         Returns
@@ -84,7 +90,7 @@ class DataLoader:
             if isinstance(filedb, str):
                 if filedb_config is None:
                     raise ValueError("Must provide a config file with a fileDB on disk")
-                self.filedb = FileDB(config=filedb_config, file_df=filedb)
+                self.fileDB = FileDB(config=filedb_config, file_df=filedb)
             elif isinstance(filedb, FileDB):
                 self.fileDB = filedb
             else:
@@ -96,7 +102,7 @@ class DataLoader:
 
     def set_config(self, config: dict):
         """
-        load JSON config file
+        Load configiguration file
         """
         self.config = config
         self.data_dir = config["data_dir"]
@@ -136,17 +142,14 @@ class DataLoader:
     def set_files(self, query: str):
         """
         Set the files of interest, do this before any other operations
+
         self.file_list is a list of indices corresponding to the row in FileDB
 
         Parameters
         ----------
-        query : string
+        query : 
             The file level cuts on the files of interest
             Can be a cut on any of the columns in FileDB
-
-        Returns
-        -------
-        None.
         """
         inds = list(self.fileDB.df.query(query, inplace=False).index)
         if self.file_list is None:
@@ -154,9 +157,16 @@ class DataLoader:
         else:
             self.file_list += inds
 
-    def get_table_name(self, tier, tb):
+    def get_table_name(self, tier: str, tb: str) -> str:
         """
         Helper function to get the table name for a tier given its table identifier
+
+        Parameters
+        ----------
+        tier
+            Specify the tier whose table format will be used
+        tb
+            The table identifier that will be passed to the table format
         """
         template = self.fileDB.table_format[tier]
         fm = string.Formatter()
@@ -171,28 +181,23 @@ class DataLoader:
         return table_name
 
     def set_datastreams(
-        self, ds, word
+        self, 
+        ds: list | tuple | np.ndarray , 
+        word: str
     ):  # TODO Make this able to handle more complicated requests
         """
-        Set the datastreams (detectors) of interest
+        Set self.table_list to the datastreams (detectors) of interest
 
         Parameters
         -----------
-            ds : array-like
+        ds
             Identifies the detectors of interest
             Can be a list of detectorID, serialno, or channels
             or a list of subsystems of interest e.g. "ged"
 
-            word : string
+        word
             The type of identifier used in ds
             Should be a key in the given channel map or a word in the config file
-
-        table_list = {
-            "hit": [0, 1, 2]
-            "evt": []
-        }
-
-        We want to be able to handle things more generally, but for now let's just support setting "channel".
         """
         if self.table_list is None:
             self.table_list = {}
@@ -221,31 +226,17 @@ class DataLoader:
             # look for word in channel map
             pass
 
-    def set_cuts(self, cuts):
+    def set_cuts(self, cuts: dict | list):
         """
-        Set the hit- or event-level cuts
+        Set the cuts for each level
 
         Parameters
         ----------
-        cut : dictionary or list of strings
-        The cuts on the columns of the data table, e.g. "trapEftp_cal > 1000"
-        If passing a dictionary, the dictionary should be structured the way that cuts
-        will be stored in memory
-        If passing a list, each item in the array should be able to be applied on one level of tables,
-        in the order specified in config['levels'],
-        The cuts at different levels will be joined with an "and"
-
-        e.g. if the full cut is "trapEmax > 1000 and lar_veto == False and dcr < 2"
-        list: ["lar_veto == False", "trapEmax > 1000 and dcr < 2"] (order matters)
-        dictionary:
-        cuts:{
-            "hit": "trapEmax > 1000 and dcr < 2",
-            "evt": "lar_veto == False"
-        }
-
-        Returns
-        -------
-        None.
+        cut 
+            The cuts on the columns of the data table, e.g. "trapEftp_cal > 1000"
+            If passing a dictionary, the dictionary should be structured as dict[level] = cut
+            If passing a list, each item in the array should be able to be applied on one level of tables
+            The cuts at different levels will be joined with an "and"
         """
         if self.cuts is None:
             self.cuts = {}
@@ -256,32 +247,32 @@ class DataLoader:
                     raise ValueError(
                         r"cuts dictionary must be in the format \{ level: string \}"
                     )
-                    return
                 if key in self.cuts.keys():
                     self.cuts[key] += " and " + value
                 else:
                     self.cuts[key] = value
         elif isinstance(cuts, list):
+            raise NotImplementedError
             self.cuts = {}
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
-    def set_output(self, fmt=None, merge_files=None, columns=None):
+    def set_output(self, 
+        fmt: str = None,
+        merge_files: bool = None, 
+        columns: list = None):
         """
+        Set the parameters for the output format of load
+
         Parameters
         ----------
-        fmt : string
-        'lgdo.Table', 'pd.DataFrame', or TBD
-        Defaults to lgdo.Table
+        fmt
+            'lgdo.Table', 'pd.DataFrame', or TBD
 
-        merge_files : bool
-        If true, information from multiple files will be merged into one table
+        merge_files
+            If true, information from multiple files will be merged into one table
 
-        columns : array-like of strings
-        The columns that should be copied into the output
-
-        Returns
-        -------
-        None.
+        columns
+            The columns that should be copied into the output
         """
         if fmt is not None:
             self.output_format = fmt
@@ -290,36 +281,43 @@ class DataLoader:
         if columns is not None:
             self.output_columns = columns
 
-    def show_file_list(self, columns=None):
+    def show_file_list(self, columns : list = None):
+        """
+        Logs the current file list
+
+        Parameters
+        ----------
+        columns
+            The columns that should be displayed
+            If None, shows all columns
+        """
         if columns is None:
             log.info(self.fileDB.df.iloc[self.file_list])
         else:
-            log.info(self.fileDB.df[columns].iloc[self.file_list])
+            log.info(self.fileDB.df.loc[self.file_list, columns])
 
     def show_filedb(self, columns=None):
+        """
+        Wrapper to log the loaded FileDB
+        """
         self.fileDB.show(columns)
 
-    def get_tiers_for_col(self, columns, merge_files=None):
+    def get_tiers_for_col(self, columns : list | np.ndarray, merge_files : bool = None) -> dict:
         """
-        Helper function
-        Get the tiers, and tables in that tier, that contain the columns given
+        For each column given, get the tiers and tables in that tier where that column can be found
 
-        col_tiers = {
-            file: {
-                "tables": {
-                    "raw": [0, 1, 2, 3],
-                    "dsp": [0, 1, 2, 3],
-                    "tcm": [""]
-                },
-                "columns": {
-                    "daqenergy": "raw",
-                    "trapEmax": "dsp",
-                    .
-                    .
-                    .
-                }
-            }
-        }
+        Parameters
+        ----------
+        columns
+            The columns to look for
+
+        merge_files
+            Whether or not to combine the results for all files
+            If None, uses self.merge_files
+
+        Returns
+        -------
+            col_tiers, the tables and tiers that need to be loaded for each column 
         """
         col_tiers = {}
 
@@ -376,39 +374,47 @@ class DataLoader:
 
     def gen_entry_list(
         self,
-        tcm_level=None,
-        tcm_table=None,
-        mode="only",
-        save_output_columns=False,
-        in_mem=True,
-        f_output=None,
-    ):  # TODO: mode
+        tcm_level: str = None,
+        tcm_table: int | str = None,
+        mode: str = "only",
+        save_output_columns: bool = False,
+        in_mem: bool = True,
+        f_output: str = None,
+    ) -> pd.DataFrame | None:  # TODO: mode
         """
-        This should apply cuts to the tables and files of interest
-        but it does NOT load the column information into memory
+        Applies cuts to the tables and files of interest
+        Does NOT load the column information into memory
 
         Can only load up to two levels, those joined by tcm_level
 
         Parameters
         ----------
-        tcm_level : string
-        The type of tcm to be used
-        If None, will only return information from lowest level
+        tcm_level
+            The type of tcm to be used
+            If None, will only return information from lowest level
 
-        tcm_table : int or string
-        The identifier of the table inside this TCM level that you want to use
-        If not specified, there must only be one table inside a TCM file in tcm_level
+        tcm_table
+            The identifier of the table inside this TCM level that you want to use
+            If not specified, there must only be one table inside a TCM file in tcm_level
 
-        mode : 'any' or 'only'
-        'any' : returns every hit in the event if any hit in the event passes the cuts
-        'only' : only returns hits that pass the cuts
+        mode
+            'any' : returns every hit in the event if any hit in the event passes the cuts
+            'only' : only returns hits that pass the cuts
 
-        save_output_columns : bool
-        If true, saves any columns needed for both the cut and the output to the entry_list
+        save_output_columns
+            If true, saves any columns needed for both the cut and the output to the entry_list
+
+        in_mem
+            If true, returns the generated entry list in memory
+
+        f_output
+            HDF5 file location to write the entry list to disk
 
         Returns
         -------
-        entries:  pd.DataFrame
+        entries
+            The entry list containing columns for parent_idx, parent_table, child_idx and output columns if applicable
+            Only returned if in_mem is True
 
         """
         if self.file_list is None:
@@ -579,10 +585,26 @@ class DataLoader:
         if in_mem:
             return entries
 
-    def gen_hit_entries(self, save_output_columns=False, in_mem=True, f_output=None):
+    def gen_hit_entries(
+        self, 
+        save_output_columns: bool = False,
+        in_mem: bool = True,
+        f_output: str = None
+    ):
         """
         Called by gen_entry_list() to handle the case when tcm_level is None
         Ignores any cuts set on levels above lowest level
+
+        Parameters
+        ----------
+        save_output_columns
+            If true, saves any columns needed for both the cut and the output to the entry_list
+
+        in_mem
+            If true, returns the generated entry list in memory
+
+        f_output
+            HDF5 file location to write the entry list to disk
         """
         low_level = self.levels[0]
         if in_mem:
@@ -673,27 +695,34 @@ class DataLoader:
             return entries
 
     def load(
-        self, entry_list=None, in_mem=False, f_output=None, rows="hit", tcm_level=None
-    ):
+        self, 
+        entry_list: pd.DataFrame = None,
+        in_mem: bool = False,
+        f_output: str = None,
+        rows: str = "hit",
+        tcm_level: str = None
+    ) -> None | Table | pd.DataFrame:
         """
         Returns the requested columns in self.output_columns for the entries in the given entry_list
 
         Parameters
         ----------
-        entry_list : pd.DataFrame
-        The output of gen_entry_list
+        entry_list
+            The output of gen_entry_list
+            # TODO : support chunked reading of entry_list from disk
 
-        in_mem : bool
-        If True, returns the loaded data in memory
+        in_mem
+            If True, returns the loaded data in memory
 
-        f_output : string
-        If not None, writes the loaded data to the specified file
+        f_output
+            If not None, writes the loaded data to the specified file
 
-        rows : string, 'hit' or 'evt'
-        Specifies the orientation of the output table
+        rows
+            'hit' or 'evt' 
+            Specifies the orientation of the output table
 
-        tcm_level : string
-        Which TCM was used to create the entry_list
+        tcm_level
+            Which TCM was used to create the entry_list
         """
         if entry_list is None:
             raise ValueError("First run gen_entry_list and pass the output to load")
@@ -702,7 +731,7 @@ class DataLoader:
             raise ValueError("If in_mem is False, need to specify an output file")
 
         if rows == "hit":
-            return self.load_hits(entry_list, in_mem, f_output)
+            return self.load_hits(entry_list, in_mem, f_output, tcm_level)
         elif rows == "evt":
             if tcm_level is None:
                 raise ValueError(
@@ -714,17 +743,17 @@ class DataLoader:
 
     def load_hits(
         self,
-        entry_list=None,
-        in_mem=False,
-        f_output=None,
-        tcm_level=None,
-        tcm_table=None,
+        entry_list: pd.DataFrame = None,
+        in_mem: bool = False,
+        f_output: str = None,
+        tcm_level: str = None
     ):
         """
         Called by load() when rows='hit'
         """
         if tcm_level is None:
             parent = self.levels[0]
+            child = None
             load_levels = [parent]
         else:
             parent = self.tcms[tcm_level]["parent"]
@@ -865,7 +894,11 @@ class DataLoader:
                     return load_out
 
     def load_evts(
-        self, entry_list=None, in_mem=False, f_output=None, tcm_level=None
+        self,
+        entry_list: pd.DataFrame = None,
+        in_mem: bool = False,
+        f_output: str = None,
+        tcm_level: str = None
     ):  # TODO
         """
         Called by load() when rows = 'evt'
@@ -986,6 +1019,9 @@ class DataLoader:
         raise NotImplementedError
 
     def reset(self):
+        """
+        Resets all fields to their default values, as if this is a newly created DataLoader
+        """
         self.file_list = None
         self.table_list = None
         self.cuts = None
@@ -1005,8 +1041,8 @@ if __name__ == "__main__":
 
     dl = DataLoader(
         config="../../../../loader_config.json",
-        fileDB_config="fileDB_cfg.json",
-        fileDB="fileDB.lh5",
+        filedb_config="fileDB_cfg.json",
+        filedb="fileDB.lh5",
     )
     dl.show_filedb()
 

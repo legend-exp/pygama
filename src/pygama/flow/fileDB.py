@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -21,19 +23,24 @@ class FileDB:
     read/write to disk in an LGDO format
     """
 
-    def __init__(self, config, file_df=None, scan=True):
+    def __init__(
+            self,
+            config: str | dict,
+            file_df: str = None,
+            scan: bool = True
+        ):
         """
         Parameters
         ----------
-            config : path to JSON file or dict
-            Configuration file specifying data directories, tiers, and file name templates
+        config
+            Dict or path to JSON file specifying data directories, tiers, and file name templates
 
-            file_df : string
+        file_df
             Path to LH5 file written by to_disk()
 
-            scan : bool
+        scan
             True by default, whether the fileDB should scan the DAQ directory to
-            fill its rows with file information
+            fill its rows with file keys
         """
         if file_df is None:
             self.df = None
@@ -64,7 +71,10 @@ class FileDB:
         else:
             self.from_disk(config, file_df)
 
-    def set_config(self, config):
+    def set_config(self, config: dict):
+        """
+        Helper function called by __init__()
+        """
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
@@ -119,9 +129,11 @@ class FileDB:
     def set_file_status(self):
         """
         Add a column to the dataframe with a bit corresponding to whether each tier's file exists
-        e.g. if we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
-                    file_status
-        file1       0b100
+
+        Example
+        -------
+        If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
+        file_status would be 0b100
         """
 
         def check_status(row):
@@ -150,23 +162,23 @@ class FileDB:
 
     def show(self, col_names: list = None):
         """
-        show the existing fileDB as a DataFrame, optionally specifying columns
+        Show the existing fileDB as a DataFrame, optionally specifying columns
         """
         if col_names is None:
             log.info(self.df)
         else:
             log.info(self.df[col_names])
 
-    def get_tables_columns(self, col_output=None):
+    def get_tables_columns(self, col_output: str = None):
         """
-        Adds the available channels in each tier as a column in fileDB
-        by searching for key names that match the provided table_format
+        Opens found files to save available tables and columns
+
+        Adds the available tables in each tier as a column in fileDB
+        by searching for group names that match the provided table_format
         and saving the associated keyword values
-                "raw_tables"            "evt_tables"
-        file1   [0, 1, ...]     ["tcm", "grp_name", ...]
 
         Returns a table with each unique list of columns found in each table
-        Adds a column to the FileDB dataframe df['column_type'] that maps to the column table
+        Adds a column to the FileDB dataframe df['{tier}_col_idx'] that maps to the column table
 
         Optionally write the column table to LH5 file as a VectorOfVectors
         """
@@ -257,7 +269,7 @@ class FileDB:
 
         return columns
 
-    def from_disk(self, cfg_name, db_name):
+    def from_disk(self, cfg_name: str, db_name: str):
         """
         Fills self.df and config with the information from a file created by to_lgdo()
         """
@@ -274,23 +286,17 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
-    def to_disk(self, cfg_name, db_name):
+    def to_disk(self, cfg_name: str, db_name: str):
         """
         Writes config information to cfg_name and DataFrame to df_name
 
-        cfg_name should be a JSON file
-        db_name should be an LH5 file
-
         Parameters
         -----------
-            cfg_name : string
-            Path to output file for config
+        cfg_name
+            Path to output JSON file for config
 
-            db_name : string
-            Path to output file for FileDB
-        Returns
-        -------
-            None.
+        db_name
+            Path to output LH5 file for FileDB
         """
         with open(cfg_name, "w") as cfg:
             json.dump(self.config, cfg)
@@ -312,7 +318,7 @@ class FileDB:
 
         self.df.to_hdf(db_name, "dataframe")
 
-    def scan_daq_files(self, verbose=False):
+    def scan_daq_files(self, verbose: bool = False):
         """
         Does the exact same thing as scan_files but with extra config arguments for a DAQ directory and template
         instead of using the lowest (raw) tier
