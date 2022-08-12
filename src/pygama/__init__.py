@@ -1,6 +1,6 @@
 """
 Pygama: decoding and processing digitizer data.
-Check out the `online documentation <https://legend-exp.github.io/pygama>`_
+Check out the `online documentation <https://pygama.readthedocs.io>`_
 """
 
 from pygama._version import version as __version__
