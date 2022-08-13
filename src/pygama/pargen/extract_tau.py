@@ -40,14 +40,19 @@ def get_decay_constant(slopes:np.array, wfs:np.array, plot_path:str = None)->dic
     """
     Finds the decay constant from the modal value of the tail slope after cuts
     and saves it to the specified json.
+    
     Parameters
     ----------
     slopes : array
-             tail slope array
+        tail slope array
     
-    dict_file ; str
-                path to json file to save decay constant value to. 
-                It will be saved as a dictionary of form {'pz': {'tau': decay_constant}}
+    dict_file : str
+        path to json file to save decay constant value to. 
+        It will be saved as a dictionary of form {'pz': {'tau': decay_constant}}
+    
+    Returns
+    -------
+    tau_dict : dict
     """
     tau_dict = {}
 
@@ -101,12 +106,19 @@ def get_decay_constant(slopes:np.array, wfs:np.array, plot_path:str = None)->dic
 def dsp_preprocess_decay_const(raw_files:list[str], dsp_config:dict, channel:str, plot_path:str = None)->dict:
     """
     This function calculates the pole zero constant for the input data
+    
+    Parameters
+    ----------
     f_raw : str 
-            The raw file to run the macro on
+        The raw file to run the macro on
     dsp_config: str
-            Path to the dsp config file, this is a stripped down version which just includes cuts and slope of decay tail
+        Path to the dsp config file, this is a stripped down version which just includes cuts and slope of decay tail
     channel:  str
-            Name of channel to process, should be name of lh5 group in raw files
+        Name of channel to process, should be name of lh5 group in raw files
+    
+    Returns
+    -------
+    tau_dict : dict
     """
 
     tb_out = run_tau(raw_files, dsp_config, channel)
