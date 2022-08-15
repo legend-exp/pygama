@@ -124,6 +124,7 @@ def build_hit(
 
         log.info(f"Processing table '{tbl}' in file {infile}")
 
+        first_done = False
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
@@ -149,6 +150,8 @@ def build_hit(
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
                 n_rows=n_rows,
-                wo_mode=wo_mode,
+                wo_mode=wo_mode if first_done is False else "append",
                 write_start=write_offset + start_row,
             )
+
+            first_done = True
