@@ -233,8 +233,11 @@ def t0_filter(rise: int, fall: int) -> Callable:
     if fall < 0:
         raise DSPFatal("The length of the fall section must be positive")
 
-    t0_kern = np.arange(2 / float(rise), 0, -2 / (float(rise) ** 2))
-    t0_kern = np.append(t0_kern, np.zeros(int(fall)) - (1 / float(fall)))
+    t0_kern = np.zeros(int(rise) + int(fall))
+    for i in range(int(rise)):
+        t0_kern[i] = 2 * (int(rise) - i) / (rise**2)
+    for i in range(int(rise), len(t0_kern), 1):
+        t0_kern[i] = -1 / fall
 
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
