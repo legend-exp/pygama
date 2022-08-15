@@ -29,7 +29,7 @@ from scipy.stats import norm
 from scipy.optimize import minimize
 
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import *
+from sklearn.gaussian_process.kernels import ConstantKernel, RBF
 
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib as mpl
@@ -777,7 +777,9 @@ class BayesianOptimizer():
     
     lambda_param = 0.01
     eta_param = 0
-    kernel=ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1, length_scale_bounds="fixed") #+ WhiteKernel(noise_level=0.0111)
+    kernel = None
+    # FIXME: the following throws a TypeError
+    # kernel=ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1, length_scale_bounds="fixed") #+ WhiteKernel(noise_level=0.0111)
       
     def __init__(self, acq_func, batch_size):
         
