@@ -39,7 +39,26 @@ def build_hit(
         name of the output LH5 file. If ``None``, create a file in the same
         directory and append `_hit` to its name.
     hit_config
-        dictionary or name of JSON file defining column transformations.
+        dictionary or name of JSON file defining column transformations. Must
+        contain an ``outputs`` and an ``operations`` keys. For example:
+
+        .. code-block:: json
+
+            {
+                "outputs": ["calE", "AoE"],
+                "operations": {
+                    "calE": {
+                        "expression": "sqrt(@a + @b * trapEmax**2)",
+                        "parameters": {"a": "1.23", "b": "42.69"},
+                    },
+                    "AoE": {"expression": "A_max/calE"},
+                }
+            }
+
+        The ``outputs`` array lists columns that will be effectively written in
+        the output LH5 file. Add here columns that will be simply forwarded as
+        they are from the DSP tier.
+
     lh5_tables
         tables to consider in the input file. if ``None``, tables with name
         `dsp` will be searched for in the file, even nested by one level.
@@ -108,7 +127,22 @@ def build_hit(
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
-            outtbl_obj = tbl_obj.eval(cfg)
+            outtbl_obj = tbl_obj.eval(cfg["operations"])
+
+            # remove or add columns according to "outputs" in the configuration
+            # dictionary
+            if "outputs" in cfg:
+                if isinstance(cfg["outputs"], list):
+                    # add missing columns (forwarding)
+                    for out in cfg["outputs"]:
+                        if out not in outtbl_obj.keys():
+                            outtbl_obj.add_column(out, tbl_obj[out])
+
+                    # remove non-required columns
+                    existing_cols = list(outtbl_obj.keys())
+                    for col in existing_cols:
+                        if col not in cfg["outputs"]:
+                            outtbl_obj.remove_column(col, delete=True)
 
             store.write_object(
                 obj=outtbl_obj,

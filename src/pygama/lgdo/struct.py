@@ -64,7 +64,24 @@ class Struct(dict):
         self.attrs["datatype"] = self.form_datatype()
 
     def add_field(self, name: str, obj: LGDO | Struct) -> None:
+        """Add a field to the table."""
         self[name] = obj
+        self.update_datatype()
+
+    def remove_field(self, name: str, delete=False) -> None:
+        """Remove a field to the table.
+
+        Parameters
+        ----------
+        name
+            name of the field to be removed
+        delete
+            if ``True``, delete the field object by calling :any:`del`.
+        """
+        if delete:
+            del self[name]
+        else:
+            self.pop(name)
         self.update_datatype()
 
     def __len__(self) -> int:

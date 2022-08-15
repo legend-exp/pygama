@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pygama.hit import build_hit
-from pygama.lgdo import ls
+from pygama.lgdo import LH5Store, ls
 
 config_dir = Path(__file__).parent / "configs"
 
@@ -42,7 +42,7 @@ def test_illegal_arguments(dsp_test_file):
         )
 
 
-def test_build_hit_table_configs(dsp_test_file):
+def test_lh5_table_configs(dsp_test_file):
     outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
     lh5_tables_config = {"/geds/dsp": f"{config_dir}/basic-hit-config.json"}
@@ -59,11 +59,14 @@ def test_build_hit_table_configs(dsp_test_file):
 
     lh5_tables_config = {
         "/geds/dsp": {
-            "calE": {
-                "expression": "sqrt(@a + @b * trapEmax**2)",
-                "parameters": {"a": "1.23", "b": "42.69"},
+            "outputs": ["calE", "AoE"],
+            "operations": {
+                "calE": {
+                    "expression": "sqrt(@a + @b * trapEmax**2)",
+                    "parameters": {"a": "1.23", "b": "42.69"},
+                },
+                "AoE": {"expression": "A_max/calE"},
             },
-            "AoE": {"expression": "A_max/calE"},
         }
     }
 
@@ -76,3 +79,18 @@ def test_build_hit_table_configs(dsp_test_file):
 
     assert os.path.exists(outfile)
     assert ls(outfile, "/geds/") == ["geds/hit"]
+
+
+def test_outputs_specification(dsp_test_file):
+    outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+
+    build_hit(
+        dsp_test_file,
+        outfile=outfile,
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    store = LH5Store()
+    obj, _ = store.read_object("/geds/hit", outfile)
+    assert list(obj.keys()) == ["calE", "AoE", "A_max"]
