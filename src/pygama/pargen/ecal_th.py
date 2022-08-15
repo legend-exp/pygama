@@ -31,15 +31,6 @@ def fwhm_slope(x: np.array, m0: float, m1: float) -> np.array:
     """
     return np.sqrt(m0 + m1 * x)
 
-
-def apply_ctc(energy: np.array, dt: np.array, alpha: float) -> np.array:
-    correction = np.multiply(
-        np.multiply(alpha, dt, dtype="float64"), energy, dtype="float64"
-    )
-    ctc_energy = np.add(correction, energy)
-    return ctc_energy
-
-
 def load_data(
     files: list[str],
     lh5_path: str,
@@ -49,27 +40,21 @@ def load_data(
 ) -> dict[str, np.ndarray]:
     if len(hit_dict.keys()) == 0:
         try:
-            energy_dict = lh5.load_nda(files, energy_params, lh5_path)
+            energy_dict = lh5.load_nda(files, energy_params,lh5_path)  
         except RuntimeError:
-            energy_params = [
-                energy_param.split("_")[0] for energy_param in energy_params
-            ]
-            energy_dict = lh5.load_nda(files, energy_params, lh5_path)
-    else:
-        log.debug(f"Found hit dict: {hit_dict}")
-        energy_dict = {}
-        for energy_param in energy_params:
-            all_params = []
-            for key in hit_dict:
-                if energy_param in hit_dict[key]["outputs"]:
-                    for entry in hit_dict[key]["inputs"]:
-                        all_params.append(entry)
-                    alpha = hit_dict[key]["pars"]["a"]
-            log.debug(f"Loading: {all_params}")
-            data = lh5.load_nda(files, all_params, lh5_path)
-            energy_dict[energy_param] = apply_ctc(
-                data[all_params[0]], data[all_params[1]], alpha
-            )
+            energy_params = [energy_param.split("_")[0] for energy_param in energy_params]
+            energy_dict = lh5.load_nda(files, energy_params,lh5_path)  
+    else:      
+        sto=lh5.LH5Store()
+
+        table = sto.read_object(lh5_path, files)[0]
+        df = table.eval(hit_dict).get_dataframe()
+        energy_dict ={}
+        for param in energy_params:
+            if param in df:
+                energy_dict[param]=df[param].to_numpy()
+            else:
+                energy_dict.update(lh5.load_nda(files, [param], lh5_path))
     return energy_dict
 
 
@@ -434,11 +419,9 @@ def energy_cal_th(
             fep_fwhm = np.nan
             fep_dwhm = np.nan
 
-        hit_dict[f"Energy_cal_{energy_param}"] = {
-            "inputs": [f"{energy_param}"],
-            "outputs": [f"{energy_param}_cal"],
-            "function": f"a*{energy_param}+b",
-            "pars": {"a": pars[0], "b": pars[1]},
+        hit_dict[f"{energy_param}_cal"] = {
+            "expression": f"@a*{energy_param}+@b",
+            "parameters": {"a": pars[0], "b": pars[1]},
         }
 
         output_dict[energy_param] = {
