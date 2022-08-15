@@ -224,7 +224,7 @@ class DataLoader:
 
         if not found:
             # look for word in channel map
-            pass
+            raise NotImplementedError
 
     def set_cuts(self, cuts: dict | list):
         """
@@ -763,7 +763,7 @@ class DataLoader:
         sto = LH5Store()
 
         if self.merge_files:  # Try to load all information at once
-            pass
+            raise NotImplementedError
         else:  # Not merge_files
             if in_mem:
                 load_out = {}
@@ -911,7 +911,7 @@ class DataLoader:
         sto = LH5Store()
 
         if self.merge_files:  # Try to load all information at once
-            pass
+            raise NotImplementedError
         else:  # Not merge_files
             if in_mem:
                 load_out = {}
