@@ -145,7 +145,7 @@ def dsp_preprocess_decay_const(
         tb_out, parameters={"bl_mean": 4, "bl_std": 4, "bl_slope": 4}
     )
     log.debug("Generated Cuts:", cut_dict)
-    idxs = get_cut_indexes(tb_out, cut_dict, verbose=False)
+    idxs = get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
     slopes = tb_out["tail_slope"].nda
     wfs = tb_out["wf_blsub"]["values"].nda
