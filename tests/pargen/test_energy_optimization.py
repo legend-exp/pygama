@@ -1,5 +1,6 @@
-from pygama.pargen import energy_optimisation  # noqa: F401
 import scipy
+
+from pygama.pargen import energy_optimisation  # noqa: F401
 
 
 def test_import():
