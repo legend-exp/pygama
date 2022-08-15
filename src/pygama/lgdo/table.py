@@ -95,8 +95,8 @@ class Table(Struct):
             elif len(obj) != new_size:
                 if do_warn:
                     log.warning(
-                        f"warning: resizing field {field}",
-                        f"with size {len(obj)} != {new_size}",
+                        f"warning: resizing field {field}"
+                        f"with size {len(obj)} != {new_size}"
                     )
                 if isinstance(obj, Table):
                     obj.resize(new_size)
@@ -205,3 +205,65 @@ class Table(Struct):
                 df[col] = self[col].nda
 
         return df
+
+    def eval(self, expr_config: dict) -> Table:
+        """Apply column operations to the table and return a new table holding
+        the resulting columns.
+
+        Currently defers all the job to :meth:`pandas.DataFrame.eval`. This
+        might change in the future.
+
+        Parameters
+        ----------
+        expr_config
+            dictionary that configures expressions according the following
+            specification:
+
+            .. code-block:: js
+
+                {
+                    "O1": {
+                        "expression": "@p1 + @p2 * a**2",
+                        "parameters": {
+                            "p1": "2",
+                            "p2": "3"
+                        }
+                    },
+                    "O2": {
+                        "expression": "O1 - b"
+                    }
+                    // ...
+                }
+
+            where:
+
+            - ``expression`` is an expression string supported by
+              :meth:`pandas.DataFrame.eval` (see also `here
+              <https://pandas.pydata.org/pandas-docs/stable/user_guide/enhancingperf.html#expression-evaluation-via-eval>`_
+              for documentation).
+            - ``parameters`` is a dictionary of function parameters. Passed to
+              :meth:`pandas.DataFrame.eval` as `local_dict` argument.
+
+
+        Warning
+        -------
+        Blocks in `expr_config` must be ordered according to mutual dependency.
+        """
+        df = self.get_dataframe()
+        out_tbl = Table(size=self.size)
+
+        # evaluate expressions one-by-one (in order) to make sure expression
+        # dependencies are satisfied
+        for out_var, spec in expr_config.items():
+            df.eval(
+                f"{out_var} = {spec['expression']}",
+                parser="pandas",
+                engine="numexpr",  # this should be faster than Python's native eval() for n_rows > 1E4, see Pandas docs
+                local_dict=spec["parameters"] if "parameters" in spec else None,
+                inplace=True,
+            )
+
+            # add column to output LGDO Table
+            out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
+
+        return out_tbl
