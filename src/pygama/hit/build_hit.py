@@ -58,8 +58,12 @@ def build_hit(
     if lh5_tables_config is None and hit_config is None:
         raise ValueError("either lh5_tables_config or hit_config must be specified")
 
-    if lh5_tables_config is not None and (hit_config is not None or lh5_tables is not None):
-        raise ValueError("lh5_tables_config and hit_config/lh5_tables options are mutually exclusive")
+    if lh5_tables_config is not None and (
+        hit_config is not None or lh5_tables is not None
+    ):
+        raise ValueError(
+            "lh5_tables_config and hit_config/lh5_tables options are mutually exclusive"
+        )
 
     if lh5_tables_config is not None:
         tbl_cfg = lh5_tables_config

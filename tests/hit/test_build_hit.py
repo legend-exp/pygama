@@ -1,7 +1,7 @@
-import pytest
-
 import os
 from pathlib import Path
+
+import pytest
 
 from pygama.hit import build_hit
 from pygama.lgdo import ls
@@ -45,9 +45,7 @@ def test_illegal_arguments(dsp_test_file):
 def test_build_hit_table_configs(dsp_test_file):
     outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
-    lh5_tables_config = {
-        "/geds/dsp": f"{config_dir}/basic-hit-config.json"
-    }
+    lh5_tables_config = {"/geds/dsp": f"{config_dir}/basic-hit-config.json"}
 
     build_hit(
         dsp_test_file,
@@ -63,9 +61,9 @@ def test_build_hit_table_configs(dsp_test_file):
         "/geds/dsp": {
             "calE": {
                 "expression": "sqrt(@a + @b * trapEmax**2)",
-                "parameters": {"a": "1.23", "b": "42.69"}
+                "parameters": {"a": "1.23", "b": "42.69"},
             },
-            "AoE": {"expression": "A_max/calE"}
+            "AoE": {"expression": "A_max/calE"},
         }
     }
 
