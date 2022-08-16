@@ -1,3 +1,8 @@
+"""
+Decoder for ORCA ORSIS3316
+Written by James Browning 8/16/2022
+"""
+
 import logging
 from typing import Any
 
