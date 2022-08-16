@@ -13,6 +13,46 @@ from .orca_base import OrcaDecoder, get_ccc
 log = logging.getLogger(__name__)
 
 
+"""
+Data Format for SIS3316 Digitizer
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+-----------------------------------^^^^- Format bits (from header)
+--------------------^^^^ ^^^^ ^^^^------ Channel ID
+^^^^ ^^^^ ^^^^ ^^^^--------------------- Timestamp[47:32]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Timestamp[31:0]
+if Format bit 0 = 1 add
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+--------------------^^^^ ^^^^ ^^^^ ^^^^- Peakhigh value
+^^^^ ^^^^ ^^^^ ^^^^--------------------- Index of Peakhigh value
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+----------^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- Accumulator sum of Gate 1 [23:0]
+^^^^ ^^^^------------------------------- Information byte
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 2 [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 3 [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 4 [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 5 [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 6 [27:0]
+If Format bit 1 = 1 add
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 7 [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 8 [27:0]
+If Format bit 2 = 1 add
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Maximum value [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value before Trigger [27:0]
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value after/with Trigger [27:0]
+If Format bit 3 = 1 add
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Start Energy Value (in Trigger Gate)
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Max Energy Value (in Trigger Gate)
+Regardless of format bit
+xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+-------^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- number of raw samples divided by 2
+------^--------------------------------- status Flag
+-----^---------------------------------- MAW Test Flag
+Followed by N ADC Raw Samples (2 Samples per 32 bit word)
+Followed by MAW Test data
+
+"""
+
+
 class ORSIS3316WaveformDecoder(OrcaDecoder):
     """Decoder for SIS3316 ADC data written by ORCA."""
 
@@ -113,17 +153,38 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
     def decode_packet(
         self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary
     ) -> bool:
-        """Decode the ORCA FlashCam ADC packet."""
+        """Decode the ORCA SIS3316 ADC packet."""
+        """
+        The packet is formatted as
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+         ^^^^ ^^^^ ^^^^ ^^----------------------- Data ID (from header)
+         -----------------^^ ^^^^ ^^^^ ^^^^ ^^^^- length
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+         --------^-^^^--------------------------- Crate number
+         -------------^-^^^^--------------------- Card number
+         --------------------^^^^ ^^^^----------- Chan number
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Num Events in this packet
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Num longs in each record
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Num of Records that were in the FIFO
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Num of longs in data header -- can get from the raw data also
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
+         xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
+         N Data Events follow with format described in manual (NOTE THE FORMAT BITS)
+         Also described at the top
+        """
         evt_rbkd = rbl.get_keyed_dict()
 
         evt_data_16 = np.frombuffer(packet, dtype=np.uint16)
 
-
+        #First grab the crate, card, and channel to calculate ccc
         crate = (packet[1] >> 21) & 0xF
         card = (packet[1] >> 16) & 0x1F
         channel = (packet[1] >> 8) & 0xFF
         ccc = get_ccc(crate, card, channel)
 
+        #Check if this ccc should be recorded.
         if ccc not in evt_rbkd:
             if ccc not in self.skipped_channels:
                 self.skipped_channels[ccc] = 0
@@ -131,61 +192,58 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 log.debug(f"evt_rbkd: {evt_rbkd.keys()}")
             self.skipped_channels[ccc] += 1
             return False
+
+        orca_header_length = 10
+        #Find the number of Events that is in this packet.
+        num_of_Events = packet[2]
+        num_of_longs = packet[3]
+        data_header_length = packet[5]
+
+
+        #Creating the first table and finding the index.
         tbl = evt_rbkd[ccc].lgdo
-        ii = evt_rbkd[ccc].loc
-
-        tbl["crate"].nda[ii] = crate
-        tbl["card"].nda[ii] = card
-        tbl["channel"].nda[ii] = channel
-
-        if len(packet) > 10:
-            tbl["timestamp"].nda[ii] = packet[11] + ((packet[10] & 0xFFFF0000) << 16)
-        else:
-            tbl["timestamp"].nda[ii] = 0
 
 
-        orca_helper_length16 = 54
-        header_length16 = orca_helper_length16
+        for i in range(0, num_of_Events):
+            #will crash if at the end of buffer.
+            ii = evt_rbkd[ccc].loc
+            if ii <= 8191:
+                #save the crate, card, and channel number which does not change
+                tbl["crate"].nda[ii] = crate
+                tbl["card"].nda[ii] = card
+                tbl["channel"].nda[ii] = channel
 
 
-        expected_wf_length = len(evt_data_16) - header_length16
+
+                """
+                calculates where to start indexing based on the num_of_longs
+                for each event offset by the orca_header_length.
+                """
+                event_start = orca_header_length + num_of_longs*i
+
+                if len(packet) > 10:
+                    tbl["timestamp"].nda[ii] = packet[event_start + 1] + ((packet[event_start] & 0xFFFF0000) << 16)
+                else:
+                    tbl["timestamp"].nda[ii] = 0
+
+                information = (packet[event_start+3] & 0xFF000000)
 
 
-        i_wf_start = header_length16
-
-        i_wf_stop = i_wf_start + expected_wf_length
+                data_header_length16 = data_header_length*2
 
 
-        if expected_wf_length > 0:
-
-            if expected_wf_length == len(tbl["waveform"]["values"].nda[ii]):
-                tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
-            else:
-                #this is else is to collected data that is doubled.
-                #sometimes two events come in the same packet from ORCA.
-                i_wf_stop = i_wf_start + len(tbl["waveform"]["values"].nda[ii])
-                tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
-
-                if ii != 8191:
-                    evt_rbkd[ccc].loc += 1
-
-                    ii = evt_rbkd[ccc].loc
-                    offset = 5027
-
-                    tbl["crate"].nda[ii] = (packet[offset + 1] >> 21) & 0xF
-                    tbl["card"].nda[ii] = (packet[offset + 2] >> 16) & 0x1
-                    tbl["channel"].nda[ii] = 33
-                    tbl["timestamp"].nda[ii] = packet[offset + 11] + (
-                        (packet[offset + 10] & 0xFFFF0000) << 16
-                    )
-
-                    i_wf_start = len(tbl["waveform"]["values"].nda[ii]) + 54
-                    i_wf_stop = i_wf_start + len(tbl["waveform"]["values"].nda[ii])
-                    tbl["waveform"]["values"].nda[ii] = evt_data_16[
-                        i_wf_start:i_wf_stop
-                    ]
+                expected_wf_length = num_of_longs*2 - data_header_length16
 
 
-        evt_rbkd[ccc].loc += 1
+                i_wf_start = data_header_length16 + event_start*2
+
+                i_wf_stop = i_wf_start + expected_wf_length
+
+
+                if expected_wf_length > 0:
+                    tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
+
+                #move to the next index for the next event.
+                evt_rbkd[ccc].loc += 1
 
         return evt_rbkd[ccc].is_full()
