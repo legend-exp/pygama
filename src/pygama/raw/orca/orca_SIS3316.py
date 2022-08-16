@@ -1,5 +1,4 @@
 import logging
-import sys
 from typing import Any
 
 import numpy as np
@@ -56,9 +55,7 @@ Followed by MAW Test data
 class ORSIS3316WaveformDecoder(OrcaDecoder):
     """Decoder for SIS3316 ADC data written by ORCA."""
 
-
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
-
 
         # store an entry for every event
         self.decoded_values_template = {
@@ -128,7 +125,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                     self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
 
         self.decoded_values["waveform"]["wf_len"] = trace_length
-
 
     def get_key_list(self) -> list[int]:
         key_list = []

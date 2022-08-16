@@ -457,7 +457,7 @@ def get_gaussian_guess(hist, bins):
     guess_amp = hist[max_idx]
 
     # find 50% amp bounds on both sides for a FWHM guess
-    guess_sigma = get_fwhm(hist, bins) / 2.355  # FWHM to sigma
+    guess_sigma = get_fwhm(hist, bins)[0] / 2.355  # FWHM to sigma
     guess_area = guess_amp * guess_sigma * np.sqrt(2 * np.pi)
 
     return (guess_e, guess_sigma, guess_area)
