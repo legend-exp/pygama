@@ -191,7 +191,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         orca_header_length = 10
         #Find the number of Events that is in this packet.
-        num_of_Events = packet[2]
+        num_of_events = packet[2]
         num_of_longs = packet[3]
         data_header_length = packet[5]
 
@@ -200,7 +200,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         tbl = evt_rbkd[ccc].lgdo
 
 
-        for i in range(0, num_of_Events):
+        for i in range(0, num_of_events):
             #will crash if at the end of buffer.
             ii = evt_rbkd[ccc].loc
             if ii <= 8191:
@@ -222,7 +222,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 else:
                     tbl["timestamp"].nda[ii] = 0
 
-                information = (packet[event_start+3] & 0xFF000000)
 
 
                 data_header_length16 = data_header_length*2
