@@ -17,46 +17,6 @@ from .orca_base import OrcaDecoder, get_ccc
 log = logging.getLogger(__name__)
 
 
-"""
-Data Format for SIS3316 Digitizer
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
------------------------------------^^^^- Format bits (from header)
---------------------^^^^ ^^^^ ^^^^------ Channel ID
-^^^^ ^^^^ ^^^^ ^^^^--------------------- Timestamp[47:32]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Timestamp[31:0]
-if Format bit 0 = 1 add
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
---------------------^^^^ ^^^^ ^^^^ ^^^^- Peakhigh value
-^^^^ ^^^^ ^^^^ ^^^^--------------------- Index of Peakhigh value
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
-----------^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- Accumulator sum of Gate 1 [23:0]
-^^^^ ^^^^------------------------------- Information byte
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 2 [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 3 [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 4 [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 5 [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 6 [27:0]
-If Format bit 1 = 1 add
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 7 [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 8 [27:0]
-If Format bit 2 = 1 add
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Maximum value [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value before Trigger [27:0]
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value after/with Trigger [27:0]
-If Format bit 3 = 1 add
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Start Energy Value (in Trigger Gate)
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Max Energy Value (in Trigger Gate)
-Regardless of format bit
-xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
--------^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- number of raw samples divided by 2
-------^--------------------------------- status Flag
------^---------------------------------- MAW Test Flag
-Followed by N ADC Raw Samples (2 Samples per 32 bit word)
-Followed by MAW Test data
-
-"""
-
-
 class ORSIS3316WaveformDecoder(OrcaDecoder):
     """Decoder for SIS3316 ADC data written by ORCA."""
 
@@ -87,17 +47,17 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
             "channel": {
                 "dtype": "uint8",
             },
+            # waveform data
             "waveform": {
                 "dtype": "uint16",
                 "datatype": "waveform",
-                "wf_len": 65532,  # max value. override this before initalizing buffers to save RAM
-                "dt": 8,  # override if a different clock rate is use
+                "wf_len": 65532,  # max value. override this before initializing buffers to save RAM
+                "dt": 8,  # override if a different clock rate is used
                 "dt_units": "ns",
                 "t0_units": "ns",
             },
         }
 
-        # self.event_header_length = 1 #?
         self.decoded_values = {}
         self.skipped_channels = {}
         super().__init__(
@@ -172,9 +132,48 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
          xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
          xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
          xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Spare
-         N Data Events follow with format described in manual (NOTE THE FORMAT BITS)
-         Also described at the top
+         N Data Events follow with format described in below (NOTE THE FORMAT BITS)
         """
+
+        """
+        Data Format for SIS3316 Digitizer
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        -----------------------------------^^^^- Format bits (from header)
+        --------------------^^^^ ^^^^ ^^^^------ Channel ID
+        ^^^^ ^^^^ ^^^^ ^^^^--------------------- Timestamp[47:32]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx  Timestamp[31:0]
+        if Format bit 0 = 1 add
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        --------------------^^^^ ^^^^ ^^^^ ^^^^- Peakhigh value
+        ^^^^ ^^^^ ^^^^ ^^^^--------------------- Index of Peakhigh value
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        ----------^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- Accumulator sum of Gate 1 [23:0]
+        ^^^^ ^^^^------------------------------- Information byte
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 2 [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 3 [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 4 [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 5 [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 6 [27:0]
+        If Format bit 1 = 1 add
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 7 [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Accumulator sum of Gate 8 [27:0]
+        If Format bit 2 = 1 add
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Maximum value [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value before Trigger [27:0]
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx MAW Value after/with Trigger [27:0]
+        If Format bit 3 = 1 add
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Start Energy Value (in Trigger Gate)
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx Max Energy Value (in Trigger Gate)
+        Regardless of format bit
+        xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+        -------^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^ ^^^^- number of raw samples divided by 2
+        ------^--------------------------------- status Flag
+        -----^---------------------------------- MAW Test Flag
+        Followed by N ADC Raw Samples (2 Samples per 32 bit word)
+        Followed by MAW Test data
+
+        """
+
         evt_rbkd = rbl.get_keyed_dict()
 
         evt_data_16 = np.frombuffer(packet, dtype=np.uint16)
