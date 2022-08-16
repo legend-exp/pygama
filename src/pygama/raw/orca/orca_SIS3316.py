@@ -174,13 +174,13 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
         evt_data_16 = np.frombuffer(packet, dtype=np.uint16)
 
-        #First grab the crate, card, and channel to calculate ccc
+        # First grab the crate, card, and channel to calculate ccc
         crate = (packet[1] >> 21) & 0xF
         card = (packet[1] >> 16) & 0x1F
         channel = (packet[1] >> 8) & 0xFF
         ccc = get_ccc(crate, card, channel)
 
-        #Check if this ccc should be recorded.
+        # Check if this ccc should be recorded.
         if ccc not in evt_rbkd:
             if ccc not in self.skipped_channels:
                 self.skipped_channels[ccc] = 0
@@ -195,8 +195,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
         num_of_longs = packet[3]
         data_header_length = packet[5]
 
-
-        #Creating the first table and finding the index.
+        # Creating the first table and finding the index.
         tbl = evt_rbkd[ccc].lgdo
 
 
@@ -204,41 +203,39 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
             #will crash if at the end of buffer.
             ii = evt_rbkd[ccc].loc
             if ii <= 8191:
-                #save the crate, card, and channel number which does not change
+                # save the crate, card, and channel number which does not change
                 tbl["crate"].nda[ii] = crate
                 tbl["card"].nda[ii] = card
                 tbl["channel"].nda[ii] = channel
-
-
 
                 """
                 calculates where to start indexing based on the num_of_longs
                 for each event offset by the orca_header_length.
                 """
-                event_start = orca_header_length + num_of_longs*i
+                event_start = orca_header_length + num_of_longs * i
 
                 if len(packet) > 10:
-                    tbl["timestamp"].nda[ii] = packet[event_start + 1] + ((packet[event_start] & 0xFFFF0000) << 16)
+                    tbl["timestamp"].nda[ii] = packet[event_start + 1] + (
+                        (packet[event_start] & 0xFFFF0000) << 16
+                    )
                 else:
                     tbl["timestamp"].nda[ii] = 0
 
 
+                data_header_length16 = data_header_length * 2
 
-                data_header_length16 = data_header_length*2
+                expected_wf_length = num_of_longs * 2 - data_header_length16
 
-
-                expected_wf_length = num_of_longs*2 - data_header_length16
-
-
-                i_wf_start = data_header_length16 + event_start*2
+                i_wf_start = data_header_length16 + event_start * 2
 
                 i_wf_stop = i_wf_start + expected_wf_length
 
-
                 if expected_wf_length > 0:
-                    tbl["waveform"]["values"].nda[ii] = evt_data_16[i_wf_start:i_wf_stop]
+                    tbl["waveform"]["values"].nda[ii] = evt_data_16[
+                        i_wf_start:i_wf_stop
+                    ]
 
-                #move to the next index for the next event.
+                # move to the next index for the next event.
                 evt_rbkd[ccc].loc += 1
 
         return evt_rbkd[ccc].is_full()
