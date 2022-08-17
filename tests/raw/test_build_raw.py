@@ -142,7 +142,7 @@ def test_build_raw_overwrite(lgnd_test_data):
         )
 
 
-def test_build_raw_orca_sis3316_out_spec(lgnd_test_data):
+def test_build_raw_orca_sis3316(lgnd_test_data):
     out_file = "/tmp/coherent-run1141-bkg.lh5"
     out_spec = {
         "ORSIS3316WaveformDecoder": {
@@ -156,3 +156,5 @@ def test_build_raw_orca_sis3316_out_spec(lgnd_test_data):
         n_max=10,
         overwrite=True,
     )
+
+    assert os.path.exists(out_file)
