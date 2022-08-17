@@ -103,7 +103,8 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
         if len(bins) == len(hist)+1:
             bin_centres = pgh.get_bin_centers(bins)
-
+        else:
+             bin_centres = bins
         # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
         zeros = (hist == 0)
@@ -169,7 +170,7 @@ def fit_unbinned(func, data, guess=None,
     m.hesse()
     return m.values, m.errors, m.covariance
 
-def goodness_of_fit(hist, bins, var, func, pars, method='var'):
+def goodness_of_fit(hist, bins, var, func, pars, method='var', scale_bins=False):
     """Compute chisq and dof of fit
 
     Parameters
@@ -207,7 +208,9 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
 
 
     # compute expected values
-    yy = func(pgh.get_bin_centers(bins), *pars) * pgh.get_bin_widths(bins)
+    yy = func(pgh.get_bin_centers(bins), *pars) 
+    if scale_bins ==True:
+        yy*= pgh.get_bin_widths(bins)
 
     if method == 'LR':
         log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (yy+1.e-99)), yy-hist))
@@ -811,7 +814,7 @@ def radford_fwhm(sigma, htail, tau,  cov = None):
         return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
 
     if htail<0 or htail>1:
-        print("htail outside allowed limits of 0 and 1")
+        #print("htail outside allowed limits of 0 and 1")
         raise ValueError
 
     res = minimize_scalar( neg_radford_peak_bgfree,
