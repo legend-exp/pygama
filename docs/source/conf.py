@@ -46,6 +46,7 @@ autodoc_mock_imports = [
     "matplotlib",
     "mplhep",
     "scipy",
+    "sklearn",
     "numba",
     "pytest",
     "pyhf",
