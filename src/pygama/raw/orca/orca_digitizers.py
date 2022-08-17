@@ -89,9 +89,7 @@ class ORSIS3302WaveformDecoder(OrcaDecoder):
                         int(channel / 2)
                     ]
                     if trace_length <= 0 or trace_length > 2**16:
-                        raise RuntimeError(
-                            f"invalid trace_length {trace_length}"
-                        )
+                        raise RuntimeError(f"invalid trace_length {trace_length}")
                         sys.exit()
                     self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
 
