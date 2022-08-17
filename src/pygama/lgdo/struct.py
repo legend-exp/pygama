@@ -69,7 +69,7 @@ class Struct(dict):
         self.update_datatype()
 
     def remove_field(self, name: str, delete: bool = False) -> None:
-        """Remove a field to the table.
+        """Remove a field from the table.
 
         Parameters
         ----------
