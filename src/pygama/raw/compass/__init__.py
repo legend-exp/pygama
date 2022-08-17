@@ -1,5 +1,4 @@
 """
 This subpackage overloads decoding utilities defined in :mod:`pygama.raw` to
-read files produced by the `ORCA <http://orca.physics.unc.edu/orca>`
-acquisition system.
+read files produced by the `CoMPASS` software.
 """

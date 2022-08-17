@@ -101,7 +101,7 @@ class CompassHeaderDecoder(DataDecoder):
                 [num_samples] = np.frombuffer(header_in_bytes[19:23], dtype=np.uint32)
 
             # sacrifice the first waveform so that load_packet() will work correctly, there are 2 bytes per sample
-            wf = in_stream.read(2 * num_samples)
+            in_stream.read(2 * num_samples)
 
             # add the wf_len to the config
             self.config.add_field("wf_len", lgdo.Scalar(num_samples))
