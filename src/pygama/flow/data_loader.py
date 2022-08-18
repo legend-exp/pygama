@@ -378,8 +378,8 @@ class DataLoader:
         tcm_table: int | str = None,
         mode: str = "only",
         save_output_columns: bool = False,
-        in_mem: bool = True,
-        f_output: str = None,
+        in_memory: bool = True,
+        output_file: str = None,
     ) -> pd.DataFrame | None:  # TODO: mode
         """
         Applies cuts to the tables and files of interest
@@ -404,31 +404,31 @@ class DataLoader:
         save_output_columns
             If true, saves any columns needed for both the cut and the output to the entry_list
 
-        in_mem
+        in_memory
             If true, returns the generated entry list in memory
 
-        f_output
+        output_file
             HDF5 file location to write the entry list to disk
 
         Returns
         -------
         entries
             The entry list containing columns for parent_idx, parent_table, child_idx and output columns if applicable
-            Only returned if in_mem is True
+            Only returned if in_memory is True
 
         """
         if self.file_list is None:
             raise ValueError("You need to make a query on fileDB, use set_file_list")
 
-        if not in_mem and f_output is None:
-            raise ValueError("If in_mem is False, need to specify an output file")
+        if not in_memory and output_file is None:
+            raise ValueError("If in_memory is False, need to specify an output file")
 
-        if in_mem:
+        if in_memory:
             entries = {}
 
         # Default columns in the entry_list
         if tcm_level is None:
-            return self.gen_hit_entries(save_output_columns, in_mem, f_output)
+            return self.gen_hit_entries(save_output_columns, in_memory, output_file)
         else:
             # Assumes only one tier in a TCM level
             parent = self.tcms[tcm_level]["parent"]
@@ -574,22 +574,22 @@ class DataLoader:
                         # end for each table loop
                     # end for each level loop
                 f_entries.reset_index(inplace=True, drop=True)
-                if in_mem:
+                if in_memory:
                     entries[file] = f_entries
-                if f_output:
+                if output_file:
                     # Convert f_entries DataFrame to Struct
                     f_dict = f_entries.to_dict("list")
                     f_struct = Struct(f_dict)
-                    sto.write_object(f_struct, f"entries/{file}", f_output, wo_mode="o")
+                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
                 # end for each file loop
-        if in_mem:
+        if in_memory:
             return entries
 
     def gen_hit_entries(
         self, 
         save_output_columns: bool = False,
-        in_mem: bool = True,
-        f_output: str = None
+        in_memory: bool = True,
+        output_file: str = None
     ):
         """
         Called by gen_entry_list() to handle the case when tcm_level is None
@@ -600,14 +600,14 @@ class DataLoader:
         save_output_columns
             If true, saves any columns needed for both the cut and the output to the entry_list
 
-        in_mem
+        in_memory
             If true, returns the generated entry list in memory
 
-        f_output
+        output_file
             HDF5 file location to write the entry list to disk
         """
         low_level = self.levels[0]
-        if in_mem:
+        if in_memory:
             entries = {}
         entry_cols = [f"{low_level}_table", f"{low_level}_idx"]
 
@@ -684,22 +684,22 @@ class DataLoader:
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
-            if in_mem:
+            if in_memory:
                 entries[file] = f_entries
-            if f_output:
+            if output_file:
                 # Convert f_entries DataFrame to Struct
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
-                sto.write_object(f_struct, f"entries/{file}", f_output, wo_mode="o")
-        if in_mem:
+                sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+        if in_memory:
             return entries
 
     def load(
         self, 
         entry_list: pd.DataFrame = None,
-        in_mem: bool = False,
-        f_output: str = None,
-        rows: str = "hit",
+        in_memory: bool = False,
+        output_file: str = None,
+        orientation: str = "hit",
         tcm_level: str = None
     ) -> None | Table | pd.DataFrame:
         """
@@ -711,13 +711,13 @@ class DataLoader:
             The output of gen_entry_list
             # TODO : support chunked reading of entry_list from disk
 
-        in_mem
+        in_memory
             If True, returns the loaded data in memory
 
-        f_output
+        output_file
             If not None, writes the loaded data to the specified file
 
-        rows
+        orientation
             'hit' or 'evt' 
             Specifies the orientation of the output table
 
@@ -727,29 +727,29 @@ class DataLoader:
         if entry_list is None:
             raise ValueError("First run gen_entry_list and pass the output to load")
 
-        if not in_mem and f_output is None:
-            raise ValueError("If in_mem is False, need to specify an output file")
+        if not in_memory and output_file is None:
+            raise ValueError("If in_memory is False, need to specify an output file")
 
-        if rows == "hit":
-            return self.load_hits(entry_list, in_mem, f_output, tcm_level)
-        elif rows == "evt":
+        if orientation == "hit":
+            return self.load_hits(entry_list, in_memory, output_file, tcm_level)
+        elif orientation == "evt":
             if tcm_level is None:
                 raise ValueError(
                     "Need to specify which coincidence map to use to return event-oriented data"
                 )
-            return self.load_evts(entry_list, in_mem, f_output, tcm_level)
+            return self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
-            raise ValueError(f"I don't understand what rows={rows} means!")
+            raise ValueError(f"I don't understand what orientation={orientation} means!")
 
     def load_hits(
         self,
-        entry_list: pd.DataFrame = None,
-        in_mem: bool = False,
-        f_output: str = None,
+        entry_list: pd.DataFrame,
+        in_memory: bool = False,
+        output_file: str = None,
         tcm_level: str = None
     ):
         """
-        Called by load() when rows='hit'
+        Called by load() when orientation='hit'
         """
         if tcm_level is None:
             parent = self.levels[0]
@@ -765,7 +765,7 @@ class DataLoader:
         if self.merge_files:  # Try to load all information at once
             raise NotImplementedError
         else:  # Not merge_files
-            if in_mem:
+            if in_memory:
                 load_out = {}
             for file, f_entries in entry_list.items():
                 field_mask = []
@@ -871,14 +871,13 @@ class DataLoader:
                     col_dict[col] = Array(nda=nda)
                 f_table = Table(col_dict=col_dict)
 
-                if in_mem:
+                if in_memory:
                     load_out[file] = f_table
-                if f_output:
-                    fname = f_output
-                    sto.write_object(f_table, f"file{file}", fname, wo_mode="o")
+                if output_file:
+                    sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
 
-            if in_mem:
+            if in_memory:
                 if self.output_format == "lgdo.Table":
                     return load_out
                 elif self.output_format == "pd.DataFrame":
@@ -896,12 +895,12 @@ class DataLoader:
     def load_evts(
         self,
         entry_list: pd.DataFrame = None,
-        in_mem: bool = False,
-        f_output: str = None,
+        in_memory: bool = False,
+        output_file: str = None,
         tcm_level: str = None
     ):  # TODO
         """
-        Called by load() when rows = 'evt'
+        Called by load() when orientation = 'evt'
         """
         raise NotImplementedError
         parent = self.tcms[tcm_level]["parent"]
@@ -913,7 +912,7 @@ class DataLoader:
         if self.merge_files:  # Try to load all information at once
             raise NotImplementedError
         else:  # Not merge_files
-            if in_mem:
+            if in_memory:
                 load_out = {}
             for file, f_entries in entry_list.items():
                 field_mask = []
@@ -956,14 +955,13 @@ class DataLoader:
                                             col
                                         ].tolist()
                     # end tb loop
-                if in_mem:
+                if in_memory:
                     load_out[file] = f_table
-                if f_output:
-                    fname = f_output
-                    sto.write_object(f_table, f"file{file}", fname, wo_mode="o")
+                if output_file:
+                    sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
 
-            if in_mem:
+            if in_memory:
                 if self.output_format == "lgdo.Table":
                     return load_out
                 elif self.output_format == "pd.DataFrame":
@@ -1089,4 +1087,4 @@ if __name__ == "__main__":
 
     tcm_el = dl.gen_entry_list(tcm_level="tcm", save_output_columns=True)
 
-    lout = dl.load(tcm_el, in_mem=True, rows="hit", tcm_level="tcm")
+    lout = dl.load(tcm_el, in_memory=True, orientation="hit", tcm_level="tcm")
