@@ -257,9 +257,10 @@ class DataLoader:
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
     def set_output(self, 
-        fmt: str = None,
+        fmt: str,
         merge_files: bool = None, 
-        columns: list = None):
+        columns: list = None
+    ):
         """
         Set the parameters for the output format of load
 
@@ -274,8 +275,7 @@ class DataLoader:
         columns
             The columns that should be copied into the output
         """
-        if fmt is not None:
-            self.output_format = fmt
+        self.output_format = fmt
         if merge_files is not None:
             self.merge_files = merge_files
         if columns is not None:
