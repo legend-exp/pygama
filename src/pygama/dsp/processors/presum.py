@@ -8,7 +8,7 @@ from numba import guvectorize
     ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
     "(n),(m)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def presum(w_in: np.ndarray, w_out: np.ndarray) -> None:
     """Presum the waveform.

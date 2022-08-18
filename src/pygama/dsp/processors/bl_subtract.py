@@ -8,7 +8,8 @@ from numba import guvectorize
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
+    boundscheck=True,
 )
 def bl_subtract(w_in: np.ndarray, a_baseline: float, w_out: np.ndarray) -> None:
     """Subtract the constant baseline from the entire waveform.

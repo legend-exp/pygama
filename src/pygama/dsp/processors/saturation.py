@@ -13,7 +13,7 @@ from pygama.dsp.errors import DSPFatal
     ],
     "(n),()->(),()",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def saturation(
     w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int

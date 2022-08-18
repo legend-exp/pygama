@@ -10,7 +10,7 @@ from pygama.dsp.errors import DSPFatal
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def moving_window_left(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
     """Applies a moving average window to the waveform.
@@ -62,7 +62,7 @@ def moving_window_left(w_in: np.ndarray, length: float, w_out: np.ndarray) -> No
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def moving_window_right(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
     """Applies a moving average window to the waveform from the right.
@@ -118,7 +118,7 @@ def moving_window_right(w_in: np.ndarray, length: float, w_out: np.ndarray) -> N
     ],
     "(n),(),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def moving_window_multi(
     w_in: np.ndarray, length: float, num_mw: int, mw_type: int, w_out: np.ndarray
@@ -201,7 +201,7 @@ def moving_window_multi(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),(),(m)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def avg_current(w_in: np.ndarray, length: float, w_out: np.ndarray) -> None:
     """Calculate the derivative of a waveform, averaged across `length` samples.

@@ -10,7 +10,8 @@ from pygama.dsp.errors import DSPFatal
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->()",
     nopython=True,
-    cache=True,
+    cache=False,
+    boundscheck=True,
 )
 def fixed_time_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
     """Pick off the waveform value at the provided index.

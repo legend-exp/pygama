@@ -13,7 +13,7 @@ from numba import guvectorize
     ],
     "(n),(),(),(), ()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def inject_sig_pulse(
     wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray
@@ -67,7 +67,7 @@ def inject_sig_pulse(
     ],
     "(n),(),(),(), ()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def inject_exp_pulse(
     wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray

@@ -13,7 +13,7 @@ from pygama.dsp.errors import DSPFatal
     ],
     "(n),(),(),()->()",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def time_point_thresh(
     w_in: np.ndarray, a_threshold: float, t_start: int, walk_forward: int, t_out: float

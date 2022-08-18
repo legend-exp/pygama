@@ -13,7 +13,7 @@ from pygama.dsp.errors import DSPFatal
     ],
     "(n),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def trap_filter(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
     """Apply a symmetric trapezoidal filter to the waveform.
@@ -79,7 +79,7 @@ def trap_filter(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> No
     ],
     "(n),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def trap_norm(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
     """Apply a symmetric trapezoidal filter to the waveform, normalized by the
@@ -151,7 +151,7 @@ def trap_norm(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None
     ],
     "(n),(),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def asym_trap_filter(
     w_in: np.ndarray, rise: int, flat: int, fall: int, w_out: np.ndarray
@@ -227,7 +227,7 @@ def asym_trap_filter(
     ],
     "(n),(),(),()->()",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def trap_pickoff(
     w_in: np.ndarray, rise: int, flat: int, t_pickoff: float, a_out: float

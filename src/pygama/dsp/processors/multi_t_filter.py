@@ -15,7 +15,7 @@ from .time_point_thresh import time_point_thresh
     ],
     "(n),(n) -> (n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def remove_duplicates(
     t_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray
@@ -81,7 +81,7 @@ def remove_duplicates(
     ],
     "(n),(),(m),(m),(m)",
     forceobj=True,
-    cache=True,
+    cache=False,
 )
 def multi_t_filter(
     w_in: np.ndarray,

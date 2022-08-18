@@ -11,7 +11,8 @@ from numba import guvectorize
     ],
     "(n)->(),(),(),()",
     nopython=True,
-    cache=True,
+    cache=False,
+    boundscheck=True,
 )
 def min_max(
     w_in: np.ndarray, t_min: int, t_max: int, a_min: float, a_max: float

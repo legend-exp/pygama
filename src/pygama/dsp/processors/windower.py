@@ -10,7 +10,7 @@ from pygama.dsp.errors import DSPFatal
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),(),(m)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def windower(w_in: np.ndarray, t0_in: int, w_out: np.ndarray) -> None:
     """Return a shorter sample of the waveform, starting at the

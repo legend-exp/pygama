@@ -90,6 +90,8 @@ def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
         ],
         "(n),(m)",
         forceobj=True,
+        cache=False,
+        boundscheck=True,
     )
     def gaussian_filter1d_out(wf_in, wf_out):
 

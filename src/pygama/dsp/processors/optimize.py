@@ -41,6 +41,8 @@ class Model:
     ],
     "(n),(),(),(),()->()",
     forceobj=True,
+    cache=False,
+    boundscheck=True,
 )
 def optimize_1pz(
     w_in: np.ndarray,

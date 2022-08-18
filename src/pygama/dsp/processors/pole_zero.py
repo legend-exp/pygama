@@ -10,7 +10,7 @@ from pygama.dsp.errors import DSPFatal
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
     """Apply a pole-zero cancellation using the provided time
@@ -55,7 +55,7 @@ def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
     ],
     "(n),(),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def double_pole_zero(
     w_in: np.ndarray, t_tau1: float, t_tau2: float, frac: float, w_out: np.ndarray

@@ -13,7 +13,8 @@ from pygama.dsp.errors import DSPFatal
     ],
     "(n),(),(m),(m),(),(),()",
     nopython=True,
-    cache=True,
+    cache=False,
+    boundscheck=True,
 )
 def get_multi_local_extrema(
     w_in: np.ndarray,

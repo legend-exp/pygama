@@ -13,7 +13,7 @@ from pygama.dsp.errors import DSPFatal
     ],
     "(n),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def soft_pileup_corr(
     w_in: np.ndarray, n_in: int, tau_in: float, w_out: np.ndarray
@@ -83,7 +83,7 @@ def soft_pileup_corr(
     ],
     "(n),(),(),()->(n)",
     nopython=True,
-    cache=True,
+    cache=False,
 )
 def soft_pileup_corr_bl(
     w_in: np.ndarray, n_in: int, tau_in: float, b_in: float, w_out: np.ndarray

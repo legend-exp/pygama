@@ -13,7 +13,7 @@ from .fixed_time_pickoff import fixed_time_pickoff
     ],
     "(n),(m),(m)",
     forceobj=True,
-    cache=True,
+    cache=False,
 )
 def multi_a_filter(w_in, vt_maxs_in, va_max_out):
     """
