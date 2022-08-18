@@ -52,11 +52,11 @@ def dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize(
-         [typesig], 
-         sizesig, 
-         forceobj=True, 
-         cache=False, 
-         boundscheck=True,
+        [typesig],
+        sizesig,
+        forceobj=True,
+        cache=False,
+        boundscheck=True,
     )
     def dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
         dft_fun(wf_in, dft_out)
@@ -109,11 +109,11 @@ def inv_dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize(
-         [typesig], 
-         sizesig, 
-         forceobj=True, 
-         cache=False, 
-         boundscheck=True,
+        [typesig],
+        sizesig,
+        forceobj=True,
+        cache=False,
+        boundscheck=True,
     )
     def inv_dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
         idft_fun(wf_in, dft_out)
@@ -172,11 +172,11 @@ def psd(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
     @guvectorize(
-         [typesig], 
-         sizesig, 
-         forceobj=True, 
-         cache=False, 
-         boundscheck=True,
+        [typesig],
+        sizesig,
+        forceobj=True,
+        cache=False,
+        boundscheck=True,
     )
     def psd(wf_in: np.ndarray, psd_out: np.ndarray) -> None:
         dft_fun(wf_in, buf_dft)

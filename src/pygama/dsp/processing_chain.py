@@ -1194,7 +1194,7 @@ class ProcessorManager:
 class UnitConversionManager(ProcessorManager):
     """A special processor manager for handling converting variables between unit systems."""
 
-    @vectorize(nopython=True, cache=False,boundscheck=True)
+    @vectorize(nopython=True, cache=False, boundscheck=True)
     def convert(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
         return (buf_in - offset_in) * period_ratio + offset_out
 
