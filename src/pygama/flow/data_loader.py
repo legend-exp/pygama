@@ -9,7 +9,7 @@ from keyword import iskeyword
 import numpy as np
 import pandas as pd
 
-from pygama.flow.fileDB import FileDB
+from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
     Array,
     ArrayOfEqualSizedArrays,
