@@ -851,10 +851,21 @@ def event_selection(
     runs a dsp on them and selects events around the peak that pass cuts.
     """
     sto = lh5.LH5Store()
-    daq_energy = lh5.load_nda(raw_file, ["daqenergy"], lh5_path)["daqenergy"]
+    df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
+    
+    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+    if len(pulser_props)>0:
+        out_df = cts.tag_pulsers(df,
+                         pulser_props, 
+                             window=0.001)
+        ids = (out_df.isPulser==1)
+        log.debug(f"pulser found: {pulser_props}")
+    else:
+        log.debug("no_pulser")
+        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
     # Get events around peak using raw file values
-    initial_mask = daq_energy > threshold
-    rough_energy = daq_energy[initial_mask]
+    initial_mask = (df.daqenergy.values > threshold)&(~ids)
+    rough_energy = df.daqenergy.values[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
     peak = peaks_keV[peak_idx]
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
