@@ -20,7 +20,9 @@ def param_lookup(
     param_dict = {types.uint32(k): out_type(v) for k, v in param_dict.items()}
     default_val = out_type(default_val)
 
-    @guvectorize(["void(uint32, " + out_type.name + "[:])"], "()->()", **nb_kwargs, forceobj=True)
+    @guvectorize(
+        ["void(uint32, " + out_type.name + "[:])"], "()->()", **nb_kwargs, forceobj=True
+    )
     def lookup(channel: int, val: np.ndarray) -> None:
         """Look up a value for the provided channel from a dictionary provided
         at compile time.

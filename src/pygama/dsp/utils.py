@@ -1,5 +1,6 @@
-class NumbaDefaults():
+class NumbaDefaults:
     """Bare-bones class to store some Numba default options."""
+
     def __init__(self) -> None:
         self.cache: bool = True
         self.boundscheck: bool = False

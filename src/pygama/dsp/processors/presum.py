@@ -9,7 +9,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 @guvectorize(
     ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
     "(n),(m)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def presum(w_in: np.ndarray, w_out: np.ndarray) -> None:
     """Presum the waveform.

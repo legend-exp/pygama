@@ -4,7 +4,6 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
-
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
@@ -14,7 +13,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
         "void(float64[:], int32, int32, float64[:])",
     ],
     "(n),(),()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def trap_filter(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
     """Apply a symmetric trapezoidal filter to the waveform.
@@ -79,7 +78,7 @@ def trap_filter(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> No
         "void(float64[:], int32, int32, float64[:])",
     ],
     "(n),(),()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def trap_norm(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None:
     """Apply a symmetric trapezoidal filter to the waveform, normalized by the
@@ -150,7 +149,7 @@ def trap_norm(w_in: np.ndarray, rise: int, flat: int, w_out: np.ndarray) -> None
         "void(float64[:], int32, int32, int32, float64[:])",
     ],
     "(n),(),(),()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def asym_trap_filter(
     w_in: np.ndarray, rise: int, flat: int, fall: int, w_out: np.ndarray
@@ -225,7 +224,7 @@ def asym_trap_filter(
         "void(float64[:], int32, int32, float64, float64[:])",
     ],
     "(n),(),(),()->()",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def trap_pickoff(
     w_in: np.ndarray, rise: int, flat: int, t_pickoff: float, a_out: float

@@ -12,7 +12,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
         "void(float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
     "(n)->(),(),(),()",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def linear_slope_fit(
     w_in: np.ndarray, mean: float, stdev: float, slope: float, intercept: float

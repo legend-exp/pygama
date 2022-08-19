@@ -9,7 +9,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 @guvectorize(
     ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
     "(n)->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def log_check(w_in: np.ndarray, w_log: np.ndarray) -> None:
     """

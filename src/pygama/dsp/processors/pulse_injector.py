@@ -14,7 +14,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
         "void(float64[:], float64, float64,float64,float64,float64[:])",
     ],
     "(n),(),(),(), ()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def inject_sig_pulse(
     wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray
@@ -67,7 +67,7 @@ def inject_sig_pulse(
         "void(float64[:], float64, float64,float64,float64,float64[:])",
     ],
     "(n),(),(),(), ()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def inject_exp_pulse(
     wf_in: np.ndarray, t0: int, rt: float, a: float, decay: float, wf_out: np.ndarray

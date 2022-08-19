@@ -10,7 +10,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 @guvectorize(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->()",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def fixed_time_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
     """Pick off the waveform value at the provided index.

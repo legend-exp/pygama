@@ -9,7 +9,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 @guvectorize(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
-    **nb_kwargs
+    **nb_kwargs,
 )
 def bl_subtract(w_in: np.ndarray, a_baseline: float, w_out: np.ndarray) -> None:
     """Subtract the constant baseline from the entire waveform.

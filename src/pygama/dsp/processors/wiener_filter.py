@@ -5,7 +5,6 @@ from numba import guvectorize
 
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
-
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 

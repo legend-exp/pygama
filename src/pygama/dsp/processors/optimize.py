@@ -7,9 +7,9 @@ from iminuit import Minuit
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 from .pole_zero import double_pole_zero, pole_zero
-from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 class Model:
