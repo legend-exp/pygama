@@ -59,8 +59,8 @@ def dwt(wave_type: str, level: int) -> Callable:
            The input waveform
         wf_out
            The approximate coefficients. The dimension of this array can be calculated
-           by out_dim = wf_length/(filter_length^level), where filter_length can be
-           obtained via pywt.Wavelet(wave_type).dec_len
+           by ``out_dim = wf_length/(filter_length^level)``, where ``filter_length`` can be
+           obtained via ``pywt.Wavelet(wave_type).dec_len``.
         """
         wf_out[:] = np.nan
 
