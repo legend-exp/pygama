@@ -17,8 +17,8 @@ def dwt(wave_type: str, level: int) -> Callable:
     Note
     ----
     This processor is composed of a factory function that is called using the
-    'init_args' argument. The input and output waveforms are passed using
-    'args'. The output waveform dimension must be specified.
+    ``init_args`` argument. The input and output waveforms are passed using
+    ``args``. The output waveform dimension must be specified.
 
 
     Parameters
