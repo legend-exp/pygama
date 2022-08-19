@@ -40,6 +40,9 @@ def load_aoe(
     
     table = sto.read_object(lh5_path, files)[0]
     df = table.eval(cal_dict).get_dataframe()
+
+    
+
     param_dict ={}
     for param in params:
         #add cuts in here
@@ -47,8 +50,9 @@ def load_aoe(
             param_dict[param]=df[param].to_numpy()
         else:
             param_dict.update(lh5.load_nda(files, [param], lh5_path))
-    
-    Npass = len(param_dict[cal_energy_param])
+    if 'Quality_cuts' in df.keys():
+        for entry in param_dict:
+            param_dict[entry] = param_dict[entry][df['Quality_cuts'].to_numpy()]
     
     aoe = np.divide(param_dict['A_max'],param_dict[energy_param])
     full_dt = param_dict['tp_99']-param_dict['tp_0_est']
@@ -1230,7 +1234,7 @@ def cal_aoe(
 
     cal_dict.update(
         {
-            "AoE_Classifier": {"expression": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)/(sqrt(c+(d/{cal_energy_param})**2))",
+            "AoE_Classifier": {"expression": f"(((A_max/{energy_param})/(@a*{cal_energy_param} +@b))-1)/(sqrt(@c+(@d/{cal_energy_param})**2))",
                 "parameters": {
                     "a": mu_pars[0],
                     "b": mu_pars[1],
@@ -1244,7 +1248,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Low_Cut": {
-                "expression": "AoE_Classifier>a",
+                "expression": "AoE_Classifier>@a",
                 "parameters": {"a": cut},
             }
         }
@@ -1253,7 +1257,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Double_Sided_Cut": {
-                "expression": "b>AoE_Classifier>a",
+                "expression": "@b>AoE_Classifier>@a",
                 "parameters": {"a": cut, "b": 4},
             }
         }
