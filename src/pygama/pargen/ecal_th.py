@@ -20,8 +20,8 @@ from scipy.optimize import curve_fit
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
-import pygama.pargen.energy_cal as cal
 import pygama.pargen.cuts as cts
+import pygama.pargen.energy_cal as cal
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ def fwhm_slope(x: np.array, m0: float, m1: float) -> np.array:
     """
     return np.sqrt(m0 + m1 * x)
 
+
 def load_data(
     files: list[str],
     lh5_path: str,
@@ -41,30 +42,32 @@ def load_data(
 ) -> dict[str, np.ndarray]:
     if len(hit_dict.keys()) == 0:
         try:
-            energy_dict = lh5.load_nda(files, energy_params,lh5_path)  
+            energy_dict = lh5.load_nda(files, energy_params, lh5_path)
         except RuntimeError:
-            energy_params = [energy_param.split("_")[0] for energy_param in energy_params]
-            energy_dict = lh5.load_nda(files, energy_params,lh5_path)  
-    else:      
-        sto=lh5.LH5Store()
+            energy_params = [
+                energy_param.split("_")[0] for energy_param in energy_params
+            ]
+            energy_dict = lh5.load_nda(files, energy_params, lh5_path)
+    else:
+        sto = lh5.LH5Store()
 
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(hit_dict).get_dataframe()
-    
-        energy_dict ={}
+
+        energy_dict = {}
         for param in energy_params:
             if param in df:
-                energy_dict[param]=df[param].to_numpy()
+                energy_dict[param] = df[param].to_numpy()
             else:
                 dat = lh5.load_nda(files, [param], lh5_path)[param]
-                energy_dict.update({param:dat})
+                energy_dict.update({param: dat})
         if cut_parameters is not None:
             for param in cut_parameters:
                 if param in df:
-                    energy_dict[param]=df[param].to_numpy()
+                    energy_dict[param] = df[param].to_numpy()
                 else:
                     dat = lh5.load_nda(files, [param], lh5_path)[param]
-                    energy_dict.update({param:dat})
+                    energy_dict.update({param: dat})
     return energy_dict
 
 
@@ -96,16 +99,19 @@ def energy_cal_th(
     log.debug(f"{len(files)} files found")
     log.debug("Loading and applying charge trapping corr...")
     uncal_pass = load_data(
-        files, lh5_path, energy_params, hit_dict, 
-        cut_parameters=list(cut_parameters)if cut_parameters is not None else None
+        files,
+        lh5_path,
+        energy_params,
+        hit_dict,
+        cut_parameters=list(cut_parameters) if cut_parameters is not None else None,
     )
-    
+
     total_events = len(uncal_pass[energy_params[0]])
     log.debug("Done")
     if cut_parameters is not None:
         cut_dict = cts.generate_cuts(uncal_pass, cut_parameters)
         hit_dict.update(cts.cut_dict_to_hit_dict(cut_dict))
-        mask = cts.get_cut_indexes(uncal_pass,cut_dict)
+        mask = cts.get_cut_indexes(uncal_pass, cut_dict)
         uncal_fail = {}
         for param in uncal_pass:
             uncal_fail[param] = uncal_pass[param][~mask]
@@ -407,7 +413,12 @@ def energy_cal_th(
                     label=f"{len(ecal_pass)} events passed quality cuts",
                 )
                 if cut_parameters is not None:
-                    plt.hist(ecal_fail, bins=bins, histtype='step', label=f'{len(ecal_fail)} events failed quality cuts')
+                    plt.hist(
+                        ecal_fail,
+                        bins=bins,
+                        histtype="step",
+                        label=f"{len(ecal_fail)} events failed quality cuts",
+                    )
                 plt.yscale("log")
                 plt.xlabel("Energy (keV)")
                 plt.ylabel("Counts")
@@ -418,17 +429,20 @@ def energy_cal_th(
                 if cut_parameters is not None:
                     plt.figure()
                     n_bins = 500
-                    counts_pass, bins_pass, _ = pgh.get_hist(ecal_pass, bins =n_bins, range=(0,3000))
-                    counts_fail, bins_fail, _ = pgh.get_hist(ecal_fail, bins =n_bins, range=(0,3000))
-                    sf = 100*counts_pass/(counts_pass+counts_fail)
+                    counts_pass, bins_pass, _ = pgh.get_hist(
+                        ecal_pass, bins=n_bins, range=(0, 3000)
+                    )
+                    counts_fail, bins_fail, _ = pgh.get_hist(
+                        ecal_fail, bins=n_bins, range=(0, 3000)
+                    )
+                    sf = 100 * counts_pass / (counts_pass + counts_fail)
 
-                    plt.step(pgh.get_bin_centers(bins_pass),sf)
+                    plt.step(pgh.get_bin_centers(bins_pass), sf)
                     plt.xlabel("Energy (keV)")
                     plt.ylabel("Survival Fraction (%)")
-                    plt.ylim([0,1])
+                    plt.ylim([0, 1])
                     pdf.savefig()
                     plt.close()
-                
 
         if fitted_peaks[-1] == 2614.50:
             fep_fwhm = round(fwhms[-1], 2)
