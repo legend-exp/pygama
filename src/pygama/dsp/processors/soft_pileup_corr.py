@@ -5,6 +5,8 @@ from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -12,8 +14,7 @@ from pygama.dsp.errors import DSPFatal
         "void(float64[:], float64, float64, float64[:])",
     ],
     "(n),(),()->(n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def soft_pileup_corr(
     w_in: np.ndarray, n_in: int, tau_in: float, w_out: np.ndarray
@@ -82,8 +83,7 @@ def soft_pileup_corr(
         "void(float64[:], float64, float64, float64, float64[:])",
     ],
     "(n),(),(),()->(n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def soft_pileup_corr_bl(
     w_in: np.ndarray, n_in: int, tau_in: float, b_in: float, w_out: np.ndarray

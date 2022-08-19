@@ -5,6 +5,8 @@ from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -12,8 +14,7 @@ from pygama.dsp.errors import DSPFatal
         "void(float64[:], float64, float64[:], float64[:],float64[:], float64[:], float64[:])",
     ],
     "(n),(),(m),(m),(),(),()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def get_multi_local_extrema(
     w_in: np.ndarray,

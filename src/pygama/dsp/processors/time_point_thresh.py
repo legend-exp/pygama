@@ -5,6 +5,8 @@ from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -12,8 +14,7 @@ from pygama.dsp.errors import DSPFatal
         "void(float64[:], float64, float64, float64, float64[:])",
     ],
     "(n),(),(),()->()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def time_point_thresh(
     w_in: np.ndarray, a_threshold: float, t_start: int, walk_forward: int, t_out: float

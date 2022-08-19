@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 from numba import from_dtype, guvectorize, types
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 def param_lookup(
     param_dict: dict[int, float], default_val: float, dtype: str | np.dtype
@@ -18,7 +20,7 @@ def param_lookup(
     param_dict = {types.uint32(k): out_type(v) for k, v in param_dict.items()}
     default_val = out_type(default_val)
 
-    @guvectorize(["void(uint32, " + out_type.name + "[:])"], "()->()", forceobj=True)
+    @guvectorize(["void(uint32, " + out_type.name + "[:])"], "()->()", **nb_kwargs, forceobj=True)
     def lookup(channel: int, val: np.ndarray) -> None:
         """Look up a value for the provided channel from a dictionary provided
         at compile time.

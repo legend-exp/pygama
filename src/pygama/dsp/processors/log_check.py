@@ -3,12 +3,13 @@ from __future__ import annotations
 import numpy as np
 from numba import guvectorize
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
     "(n)->(n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def log_check(w_in: np.ndarray, w_log: np.ndarray) -> None:
     """

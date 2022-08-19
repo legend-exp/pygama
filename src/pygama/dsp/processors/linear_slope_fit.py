@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 from numba import guvectorize
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -10,8 +12,7 @@ from numba import guvectorize
         "void(float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
     "(n)->(),(),(),()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def linear_slope_fit(
     w_in: np.ndarray, mean: float, stdev: float, slope: float, intercept: float

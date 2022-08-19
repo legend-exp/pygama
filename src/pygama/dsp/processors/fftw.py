@@ -6,6 +6,8 @@ import numpy as np
 from numba import guvectorize
 from pyfftw import FFTW
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 def dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     """Perform discrete Fourier transforms using the FFTW library.
@@ -51,7 +53,7 @@ def dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
-    @guvectorize([typesig], sizesig, forceobj=True)
+    @guvectorize([typesig], sizesig, **nb_kwargs, forceobj=True)
     def dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
         dft_fun(wf_in, dft_out)
 
@@ -102,7 +104,7 @@ def inv_dft(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
-    @guvectorize([typesig], sizesig, forceobj=True)
+    @guvectorize([typesig], sizesig, **nb_kwargs, forceobj=True)
     def inv_dft(wf_in: np.ndarray, dft_out: np.ndarray) -> None:
         idft_fun(wf_in, dft_out)
 
@@ -159,7 +161,7 @@ def psd(buf_in: np.ndarray, buf_out: np.ndarray) -> Callable:
     typesig = "void(" + str(buf_in.dtype) + "[:, :], " + str(buf_out.dtype) + "[:, :])"
     sizesig = "(m, n)->(m, n)" if buf_in.shape == buf_out.shape else "(m, n),(m, l)"
 
-    @guvectorize([typesig], sizesig, forceobj=True)
+    @guvectorize([typesig], sizesig, **nb_kwargs, forceobj=True)
     def psd(wf_in: np.ndarray, psd_out: np.ndarray) -> None:
         dft_fun(wf_in, buf_dft)
         np.abs(buf_dft, psd_out)

@@ -9,6 +9,7 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 from .pole_zero import double_pole_zero, pole_zero
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 class Model:
@@ -40,6 +41,7 @@ class Model:
         "void(float64[:], float64, float64, float64, float64, float64[:])",
     ],
     "(n),(),(),(),()->()",
+    **nb_kwargs,
     forceobj=True,
 )
 def optimize_1pz(
@@ -124,6 +126,7 @@ def optimize_1pz(
         "void(float64[:], float64, float64, float64, float64, float64, float64, float64[:], float64[:], float64[:])",
     ],
     "(n),(),(),(),(),(),()->(),(),()",
+    **nb_kwargs,
     forceobj=True,
 )
 def optimize_2pz(

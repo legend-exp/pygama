@@ -6,6 +6,8 @@ from numba import guvectorize
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 def wiener_filter(file_name_array: list[str]) -> np.ndarray:
     """Apply a Wiener filter to the waveform.
@@ -115,6 +117,7 @@ def wiener_filter(file_name_array: list[str]) -> np.ndarray:
     @guvectorize(
         ["void(complex64[:], complex64[:])", "void(complex128[:], complex128[:])"],
         "(n)->(n)",
+        **nb_kwargs,
         forceobj=True,
     )
     def wiener_out(fft_w_in: np.ndarray, fft_w_out: np.ndarray) -> None:

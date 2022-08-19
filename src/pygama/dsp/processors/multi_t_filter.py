@@ -6,6 +6,7 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 
 from .time_point_thresh import time_point_thresh
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 @guvectorize(
@@ -14,8 +15,8 @@ from .time_point_thresh import time_point_thresh
         "void(float64[:],float64[:],float64[:])",
     ],
     "(n),(n) -> (n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
+    forceobj=True
 )
 def remove_duplicates(
     t_in: np.ndarray, vt_min_in: np.ndarray, t_out: np.ndarray
@@ -80,8 +81,8 @@ def remove_duplicates(
         "void(float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
     "(n),(),(m),(m),(m)",
-    forceobj=True,
-    cache=True,
+    **nb_kwargs,
+    forceobj=True
 )
 def multi_t_filter(
     w_in: np.ndarray,

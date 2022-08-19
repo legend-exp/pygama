@@ -5,12 +5,13 @@ from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),(),(m)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs
 )
 def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
     """Upsamples the waveform by the number specified, a series of moving
