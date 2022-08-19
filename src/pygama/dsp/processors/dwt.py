@@ -24,9 +24,9 @@ def dwt(wave_type: str, level: int) -> Callable:
     Parameters
     ----------
     wave_type
-       The wavelet type for discrete convolution ('haar', 'db1', ...)
+       The wavelet type for discrete convolution ``('haar', 'db1', ...)``
     level
-       The level of decompositions to be performed (1, 2, ...)
+       The level of decompositions to be performed ``(1, 2, ...)``
 
 
     JSON Configuration Example
