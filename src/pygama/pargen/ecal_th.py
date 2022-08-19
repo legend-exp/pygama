@@ -76,6 +76,7 @@ def energy_cal_th(
     plot_path: str = None,
     cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     lh5_path: str = "dsp",
+    guess_keV: float = None,
     threshold: int = 0,
     p_val: float = 0.05,
     n_events: int = 15000,
@@ -152,9 +153,10 @@ def energy_cal_th(
     for energy_param in energy_params:
 
         kev_ranges = range_keV.copy()
-        guess_keV = 2620 / np.nanpercentile(
-            uncal_pass[energy_param][uncal_pass[energy_param] > threshold], 99
-        )
+        if guess_keV is None:
+            guess_keV = 2620 / np.nanpercentile(
+                uncal_pass[energy_param][uncal_pass[energy_param] > threshold], 99
+            )
         log.debug(f"Find peaks and compute calibration curve for {energy_param}")
 
         pars, cov, results = cal.hpge_E_calibration(
