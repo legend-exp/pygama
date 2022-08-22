@@ -160,15 +160,6 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def show(self, col_names: list = None):
-        """
-        Show the existing fileDB as a DataFrame, optionally specifying columns
-        """
-        if col_names is None:
-            log.info(self.df)
-        else:
-            log.info(self.df[col_names])
-
     def get_tables_columns(self, col_output: str = None):
         """
         Opens found files to save available tables and columns
@@ -361,3 +352,8 @@ class FileDB:
 
         if verbose:
             log.info(self)
+
+    def __repr__(self):
+        string = "Columns: " + self.columns + \n 
+        string += str(self.df)
+        return string

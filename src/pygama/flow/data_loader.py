@@ -281,26 +281,19 @@ class DataLoader:
         if columns is not None:
             self.output_columns = columns
 
-    def show_file_list(self, columns : list = None):
+    def get_file_list(self):
         """
-        Logs the current file list
+        Returns a copy of FileDB with the dataframe pared down to the current file list
+        """
+        file_list = self.fileDB 
+        file_list.df = file_list.df[self.file_list] 
+        return file_list
 
-        Parameters
-        ----------
-        columns
-            The columns that should be displayed
-            If None, shows all columns
+    def get_filedb(self, columns=None):
         """
-        if columns is None:
-            log.info(self.fileDB.df.iloc[self.file_list])
-        else:
-            log.info(self.fileDB.df.loc[self.file_list, columns])
-
-    def show_filedb(self, columns=None):
+        Accessor method
         """
-        Wrapper to log the loaded FileDB
-        """
-        self.fileDB.show(columns)
+        return self.fileDB
 
     def get_tiers_for_col(self, columns : list | np.ndarray, merge_files : bool = None) -> dict:
         """
