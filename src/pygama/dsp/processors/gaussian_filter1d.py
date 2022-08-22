@@ -38,6 +38,8 @@ from __future__ import annotations
 import numpy
 from numba import guvectorize
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
     """1-D Gaussian filter.
@@ -89,6 +91,7 @@ def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
             "void(int64[:], int64[:])",
         ],
         "(n),(m)",
+        **nb_kwargs,
         forceobj=True,
     )
     def gaussian_filter1d_out(wf_in, wf_out):
