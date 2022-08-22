@@ -22,7 +22,6 @@ import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
-from pygama.pargen.ecal_th import apply_ctc
 
 log = logging.getLogger(__name__)
 
@@ -35,37 +34,27 @@ def load_aoe(
     Loads in the A/E parameters needed and applies calibration constants to energy
     """
 
-    params = ["A_max", "tp_0_est", "tp_99", energy_param, "dt_eff"]
-    alpha = None
-    for key in cal_dict:
-        if cal_energy_param in cal_dict[key]["outputs"]:
-            for entry in cal_dict[key]["inputs"]:
-                if entry not in params:
-                    params.append(entry)
-            alpha = cal_dict[key]["pars"]["a"]
+    sto = lh5.LH5Store()
 
-    cal_pars = [
-        cal_dict[f"Energy_cal_{cal_energy_param}"]["pars"]["a"],
-        cal_dict[f"Energy_cal_{cal_energy_param}"]["pars"]["b"],
-    ]
-    log.info(f"{len(files)} files found")
-    log.info("Loading and applying quality cuts")
-    log.debug(f"Loading: {params}")
-    uncal_pass = lh5.load_nda(files, params, lh5_path)
-    log.info("Done")
-    if alpha is not None:
-        uncal_pass[cal_energy_param] = apply_ctc(
-            uncal_pass[params[-2]], uncal_pass[params[-1]], alpha
-        )
-    else:
-        uncal_pass[cal_energy_param] = uncal_pass[energy_param]
+    params = ["A_max", "tp_0_est", "tp_99", "dt_eff", energy_param, cal_energy_param]
 
-    Npass = len(uncal_pass[cal_energy_param])
-    ecal_pass = pgf.poly(uncal_pass[cal_energy_param], cal_pars)
-    curr = uncal_pass["A_max"]
-    aoe = np.divide(curr, pgf.poly(uncal_pass[energy_param], cal_pars))
-    full_dt = uncal_pass["tp_99"] - uncal_pass["tp_0_est"]
-    return aoe, ecal_pass, uncal_pass["dt_eff"], full_dt
+    table = sto.read_object(lh5_path, files)[0]
+    df = table.eval(cal_dict).get_dataframe()
+
+    param_dict = {}
+    for param in params:
+        # add cuts in here
+        if param in df:
+            param_dict[param] = df[param].to_numpy()
+        else:
+            param_dict.update(lh5.load_nda(files, [param], lh5_path))
+    if "Quality_cuts" in df.keys():
+        for entry in param_dict:
+            param_dict[entry] = param_dict[entry][df["Quality_cuts"].to_numpy()]
+
+    aoe = np.divide(param_dict["A_max"], param_dict[energy_param])
+    full_dt = param_dict["tp_99"] - param_dict["tp_0_est"]
+    return aoe, param_dict[cal_energy_param], param_dict["dt_eff"], full_dt
 
 
 def PDF_AoE(
@@ -1244,10 +1233,8 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Classifier": {
-                "inputs": ["A_max", f"{energy_param}", f"{cal_energy_param}"],
-                "outputs": ["AoE_Classifier"],
-                "function": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)/(sqrt(c+(d/{cal_energy_param})**2))",
-                "pars": {
+                "expression": f"(((A_max/{energy_param})/(@a*{cal_energy_param} +@b))-1)/(sqrt(@c+(@d/{cal_energy_param})**2))",
+                "parameters": {
                     "a": mu_pars[0],
                     "b": mu_pars[1],
                     "c": sigma_pars[0],
@@ -1260,10 +1247,8 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Low_Cut": {
-                "inputs": ["AoE_Classifier"],
-                "outputs": ["AoE_Cut_Pass"],
-                "function": "AoE_Classifier>a",
-                "pars": {"a": cut},
+                "expression": "AoE_Classifier>@a",
+                "parameters": {"a": cut},
             }
         }
     )
@@ -1271,10 +1256,8 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Double_Sided_Cut": {
-                "inputs": ["AoE_Classifier"],
-                "outputs": ["AoE_Cut_Pass"],
-                "function": "b>AoE_Classifier>a",
-                "pars": {"a": cut, "b": 4},
+                "expression": "@b>AoE_Classifier>@a",
+                "parameters": {"a": cut, "b": 4},
             }
         }
     )
