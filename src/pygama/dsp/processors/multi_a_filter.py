@@ -2,6 +2,7 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 from .fixed_time_pickoff import fixed_time_pickoff
 
@@ -12,8 +13,8 @@ from .fixed_time_pickoff import fixed_time_pickoff
         "void(float64[:], float64[:], float64[:])",
     ],
     "(n),(m),(m)",
-    forceobj=True,
-    cache=True,
+    **nb_kwargs,
+    forceobj=True
 )
 def multi_a_filter(w_in, vt_maxs_in, va_max_out):
     """
