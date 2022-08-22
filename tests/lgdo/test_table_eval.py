@@ -12,14 +12,14 @@ def test_eval_dependency():
     )
 
     expr_config = {
-        "O1": {"expression": "@p1 + @p2 * a**2", "parameters": {"p1": "2", "p2": "3"}},
+        "O1": {"expression": "@p1 + @p2 * a**2", "parameters": {"p1": 2, "p2": 3}},
         "O2": {"expression": "O1 - b"},
     }
 
     out_tbl = obj.eval(expr_config)
     assert list(out_tbl.keys()) == ["O1", "O2"]
-    assert (out_tbl["O1"].nda == [5, 14, 29, 50]).all()
-    assert (out_tbl["O2"].nda == [0, 8, 22, 42]).all()
+    assert np.array_equal(out_tbl["O1"].nda, [5, 14, 29, 50])
+    assert np.array_equal(out_tbl["O2"].nda, [0, 8, 22, 42])
 
 
 def test_eval_math_functions():
@@ -38,4 +38,4 @@ def test_eval_math_functions():
 
     out_tbl = obj.eval(expr_config)
     assert list(out_tbl.keys()) == ["O1"]
-    assert (out_tbl["O1"].nda == [1, 2, 3, 4]).all()
+    assert np.allclose(out_tbl["O1"].nda, [1, 2, 3, 4])
