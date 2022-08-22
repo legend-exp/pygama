@@ -6,6 +6,7 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
@@ -69,6 +70,7 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
+        **nb_kwargs,
         forceobj=True,
     )
     def cusp_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
@@ -172,6 +174,7 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
+        **nb_kwargs,
         forceobj=True,
     )
     def zac_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
@@ -242,6 +245,7 @@ def t0_filter(rise: int, fall: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
+        **nb_kwargs,
         forceobj=True,
     )
     def t0_filter_out(w_in: np.ndarray, w_out: np.ndarray) -> None:

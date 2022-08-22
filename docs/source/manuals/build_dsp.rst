@@ -45,7 +45,7 @@ Writing custom processors
     from numba import guvectorize
 
     from pygama.dsp.errors import DSPFatal
-
+    from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
     # 2) Provide instructions to Numba
     #
@@ -53,14 +53,17 @@ Writing custom processors
     # https://numba.pydata.org/numba-doc/latest/user/vectorize.html#the-guvectorize-decorator
     #
     # Notes:
-    # - Use "nopython=True, cache=True"
+    # - Set default Numba arguments by expanding dsp.utils.numba_defaults_kwargs (see below)
+    # - If you need to customize the value of one default argument do it, and
+    #   use numba_defaults from dsp.utils to set up the remaining arguments:
+    #       @guvectorize(..., cache=numba_defaults.cache, boundscheck=True)
     # - Use two declarations, one for 32-bit variables and one for 64-bit variables
     # - Do not use "int" as it does not support an NaN value
     # - Use [:] for all output parameters
     #
     @guvectorize(["void(float32[:], float32, float32, float32[:])",
                   "void(float64[:], float64, float64, float64[:])"],
-                  "(n),(),()->()", nopython=True, cache=True)
+                  "(n),(),()->()", **nb_kwargs)
 
     # 3) Define the processor interface
     #
