@@ -41,9 +41,8 @@ def load_data(
     cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"],
 ) -> dict[str, np.ndarray]:
 
-    df = lh5.load_dfs([file.replace("dsp", "raw") for file in files], ["timestamp", "daqenergy"], lh5_path.replace("dsp", "raw"))
-    df["trapTmax"] = lh5.load_nda(files, ["trapTmax"], lh5_path)["trapTmax"]
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+    df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
+    pulser_props = cts.find_pulser_properties(df, energy="trapTmax")
     if len(pulser_props) > 0:
         out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
         ids = ~(out_df.isPulser == 1)
