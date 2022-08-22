@@ -170,7 +170,7 @@ def cut_dict_to_hit_dict(cut_dict):
 def find_pulser_properties(df, energy="daqenergy"):
 
     hist, bins, var = pgh.get_hist(
-        df["daqenergy"], dx=1, range=(100, np.nanmax(df["daqenergy"]))
+        df[energy], dx=1, range=(100, np.nanmax(df[energy]))
     )
     if np.any(var == 0):
         var[np.where(var == 0)] = 1
@@ -186,39 +186,39 @@ def find_pulser_properties(df, energy="daqenergy"):
         if peak_e_err[i] > 200:
             continue
         else:
-            # try:
-            e_cut = (df[energy] > e - peak_e_err[i]) & (df[energy] < e + peak_e_err[i])
-            df_peak = df[e_cut]
+            try:
+                e_cut = (df[energy] > e - peak_e_err[i]) & (df[energy] < e + peak_e_err[i])
+                df_peak = df[e_cut]
 
-            time_since_last = (
-                df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
-            )
+                time_since_last = (
+                    df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
+                )
 
-            tsl = time_since_last[
-                (time_since_last >= 0)
-                & (time_since_last < np.percentile(time_since_last, 99.9))
-            ]
+                tsl = time_since_last[
+                    (time_since_last >= 0)
+                    & (time_since_last < np.percentile(time_since_last, 99.9))
+                ]
 
-            bins = np.arange(0.1, 5, 0.0001)
-            bcs = pgh.get_bin_centers(bins)
-            hist, bins, var = pgh.get_hist(tsl, bins=bins)
+                bins = np.arange(0.1, 5, 0.0001)
+                bcs = pgh.get_bin_centers(bins)
+                hist, bins, var = pgh.get_hist(tsl, bins=bins)
 
-            maxs = pgc.get_i_local_maxima(hist, 40)
-            if len(maxs) < 2:
-                continue
-            else:
-
-                max_locs = bcs[np.array(maxs)]
-
-                if (np.abs(np.diff(np.diff(max_locs))) >= 0.001).any():
+                maxs = pgc.get_i_local_maxima(hist, 40)
+                if len(maxs) < 2:
                     continue
                 else:
-                    pulser_e = e
-                    period = stats.mode(tsl).mode[0]
 
-                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
-            # except:
-            #    continue
+                    max_locs = bcs[np.array(maxs)]
+
+                    if (np.abs(np.diff(np.diff(max_locs))) >= 0.001).any():
+                        continue
+                    else:
+                        pulser_e = e
+                        period = stats.mode(tsl).mode[0]
+
+                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+            except:
+                continue
     return out_pulsers
 
 
