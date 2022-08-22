@@ -169,9 +169,7 @@ def cut_dict_to_hit_dict(cut_dict):
 
 def find_pulser_properties(df, energy="daqenergy"):
 
-    hist, bins, var = pgh.get_hist(
-        df[energy], dx=1, range=(100, np.nanmax(df[energy]))
-    )
+    hist, bins, var = pgh.get_hist(df[energy], dx=1, range=(100, np.nanmax(df[energy])))
     if np.any(var == 0):
         var[np.where(var == 0)] = 1
     imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 5)
@@ -187,7 +185,9 @@ def find_pulser_properties(df, energy="daqenergy"):
             continue
         else:
             try:
-                e_cut = (df[energy] > e - peak_e_err[i]) & (df[energy] < e + peak_e_err[i])
+                e_cut = (df[energy] > e - peak_e_err[i]) & (
+                    df[energy] < e + peak_e_err[i]
+                )
                 df_peak = df[e_cut]
 
                 time_since_last = (

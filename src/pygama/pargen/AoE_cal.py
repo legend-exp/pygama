@@ -1086,7 +1086,9 @@ def cal_aoe(
 
         for i, peak in enumerate(peaks_of_interest):
             if peak == 2039:
-                sf[i], cut_vals, sfs = compton_sf(energy, classifier, cut, peak, eres_pars)
+                sf[i], cut_vals, sfs = compton_sf(
+                    energy, classifier, cut, peak, eres_pars
+                )
                 sferr[i] = 0
 
                 full_cut_vals.append(cut_vals)
@@ -1121,7 +1123,9 @@ def cal_aoe(
 
         if plot_savepath is not None:
             mpl.use("pdf")
-            pathlib.Path(os.path.dirname(plot_savepath)).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(os.path.dirname(plot_savepath)).mkdir(
+                parents=True, exist_ok=True
+            )
             with PdfPages(plot_savepath) as pdf:
 
                 plt.rcParams["figure.figsize"] = (12, 8)
@@ -1143,7 +1147,9 @@ def cal_aoe(
                 plt.close()
 
                 plt.figure()
-                plot_compt_bands_overlayed(aoe, energy, [950, 1250, 1460, 1660, 1860, 2060])
+                plot_compt_bands_overlayed(
+                    aoe, energy, [950, 1250, 1460, 1660, 1860, 2060]
+                )
                 plt.ylabel("Counts")
                 plt.xlabel("Raw A/E")
                 plt.title(f"Compton Bands before Correction")
@@ -1261,9 +1267,11 @@ def cal_aoe(
         def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
             out_dict = {}
             for i, peak in enumerate(peaks_of_interest):
-                out_dict[str(peak)] = {"sf": f"{sfs[i]:2f}", "sf_err": f"{sf_errs[i]:2f}"}
+                out_dict[str(peak)] = {
+                    "sf": f"{sfs[i]:2f}",
+                    "sf_err": f"{sf_errs[i]:2f}",
+                }
             return out_dict
-
 
         out_dict = {
             "A/E_Energy_param": "cuspEmax",
@@ -1287,7 +1295,7 @@ def cal_aoe(
             "Mean_pars": list(mu_pars),
             "Sigma_pars": list(sigma_pars),
             "Low_cut": cut,
-            "High_cut": 4
+            "High_cut": 4,
         }
 
     if dt_corr == True:

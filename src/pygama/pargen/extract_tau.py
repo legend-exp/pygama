@@ -44,7 +44,7 @@ def run_tau(
         log.debug("no_pulser")
         ids = np.zeros(len(df.daqenergy.values), dtype=bool)
 
-    cuts = np.where((df.daqenergy.values > threshold) & (ids))[0] 
+    cuts = np.where((df.daqenergy.values > threshold) & (ids))[0]
 
     waveforms = sto.read_object(
         f"{lh5_path}/waveform", raw_file, idx=cuts, n_rows=n_events

@@ -50,7 +50,7 @@ def load_data(
     else:
         ids = np.zeros(len(df), dtype=bool)
         log.debug(f"no pulser found")
-    
+
     if len(hit_dict.keys()) == 0:
         try:
             energy_dict = lh5.load_nda(files, energy_params, lh5_path)
