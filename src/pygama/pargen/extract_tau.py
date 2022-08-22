@@ -19,7 +19,7 @@ import pygama
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
-from pygama.pargen.cuts import generate_cuts, get_cut_indexes
+import pygama.pargen.cuts as cts
 from pygama.pargen.dsp_optimize import run_one_dsp
 
 log = logging.getLogger(__name__)
@@ -28,19 +28,29 @@ log = logging.getLogger(__name__)
 def run_tau(
     raw_file: list[str],
     config: dict,
-    channel: str,
+    lh5_path: str,
     n_events: int = 30000,
     threshold: int = 3000,
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
-    daq_energies = lh5.load_nda(raw_file, ["daqenergy"], f"{channel}/raw")["daqenergy"]
-    cuts = np.where(daq_energies > threshold)[0]
+    df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
+
+    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+    if len(pulser_props) > 0:
+        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
+        ids = ~(out_df.isPulser == 1)
+        log.debug(f"pulser found: {pulser_props}")
+    else:
+        log.debug("no_pulser")
+        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+
+    cuts = np.where((df.daqenergy.values > threshold) & (ids))[0] 
 
     waveforms = sto.read_object(
-        f"{channel}/raw/waveform", raw_file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/waveform", raw_file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(
-        f"{channel}/raw/baseline", raw_file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
     )[0]
     tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
     return run_one_dsp(tb_data, config)
@@ -120,7 +130,7 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
 
 
 def dsp_preprocess_decay_const(
-    raw_files: list[str], dsp_config: dict, channel: str, plot_path: str = None
+    raw_files: list[str], dsp_config: dict, lh5_path: str, plot_path: str = None
 ) -> dict:
     """
     This function calculates the pole zero constant for the input data
@@ -139,13 +149,13 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_out = run_tau(raw_files, dsp_config, channel)
+    tb_out = run_tau(raw_files, dsp_config, lh5_path)
     log.debug("Processed Data")
-    cut_dict = generate_cuts(
+    cut_dict = cts.generate_cuts(
         tb_out, parameters={"bl_mean": 4, "bl_std": 4, "bl_slope": 4}
     )
     log.debug("Generated Cuts:", cut_dict)
-    idxs = get_cut_indexes(tb_out, cut_dict)
+    idxs = cts.get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
     slopes = tb_out["tail_slope"].nda
     wfs = tb_out["wf_blsub"]["values"].nda
