@@ -7,6 +7,7 @@ from numba import guvectorize
 from pywt import downcoef
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 def dwt(wave_type: str, level: int) -> Callable:
@@ -49,24 +50,25 @@ def dwt(wave_type: str, level: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
-        forceobj=True,
+        **nb_kwargs,
+        forceobj=True
     )
-    def dwt_out(wf_in: np.ndarray, wf_out: np.ndarray) -> None:
+    def dwt_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
         Parameters
         ----------
-        wf_in
+        w_in
            The input waveform
-        wf_out
+        w_out
            The approximate coefficients. The dimension of this array can be calculated
-           by ``out_dim = wf_length/(filter_length^level)``, where ``filter_length`` can be
-           obtained via ``pywt.Wavelet(wave_type).dec_len``.
+           by ``out_dim = wf_length/(filter_length^level)``, where ``filter_length`` 
+           can be obtained via ``pywt.Wavelet(wave_type).dec_len``.
         """
-        wf_out[:] = np.nan
+        w_out[:] = np.nan
 
-        if np.isnan(wf_in).any():
+        if np.isnan(w_in).any():
             return
 
-        wf_out[:] = downcoef("a", wf_in, wave_type, level=level)
+        w_out[:] = downcoef("a", w_in, wave_type, level=level)
 
     return dwt_out
