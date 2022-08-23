@@ -12,6 +12,7 @@ import pandas as pd
 from parse import parse
 
 from pygama.lgdo import Array, LH5Store, VectorOfVectors
+from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,29 @@ class FileDB:
     A class containing a pandas DataFrame that has additional functions to scan the data directory,
     fill the dataframe's columns with information about each file, and
     read/write to disk in an LGDO format
+
+    Columns
+    -------
+        file keys: 
+        The fields specified in the configuration file's "file_format" that are required to generate a file name
+        e.g. "run", "type", "timestamp"
+
+        {tier}_file:
+        Generated file name for tier
+
+        {tier}_size:
+        Size of file on disk, if applicable
+
+        file_status:
+        Contains a bit corresponding to whether or not a file for each tier exists for a given cycle
+        e.g. If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
+        file_status would be 0b100
+
+        {tier}_tables:
+        Available channels in tier
+
+        {tier}_col_idx:
+        file_db.columns[{tier}_col_idx] will return the list of columns available in tier's file
     """
 
     def __init__(
@@ -58,7 +82,7 @@ class FileDB:
             names = list(np.unique(names))
             names += [f"{tier}_file" for tier in self.tiers]  # the generated file names
             names += [f"{tier}_size" for tier in self.tiers]  # file sizes
-            names += ["file_status", "runtime"]  # bonus columns
+            names += ["file_status"]  # bonus columns
 
             self.df = pd.DataFrame(columns=names)
 
@@ -92,6 +116,7 @@ class FileDB:
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
         scan_dir = self.data_dir + self.tier_dirs[low_tier]
+
 
         for path, _folders, files in os.walk(scan_dir):
             n_files += len(files)
@@ -129,11 +154,6 @@ class FileDB:
     def set_file_status(self):
         """
         Add a column to the dataframe with a bit corresponding to whether each tier's file exists
-
-        Example
-        -------
-        If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
-        file_status would be 0b100
         """
 
         def check_status(row):
@@ -202,8 +222,8 @@ class FileDB:
                     + "*"
                     + template[braces[1].span()[1] :]
                 )
-
-                groups = LH5Store.ls(f, wildcard)
+                
+                groups = ls(f, wildcard)
                 tier_tables = [
                     list(parse(template, g).named.values())[0] for g in groups
                 ]
@@ -223,7 +243,7 @@ class FileDB:
                 else:
                     table_name = template
 
-                col = LH5Store.ls(f[table_name])
+                col = ls(f[table_name])
                 if col not in columns:
                     columns.append(col)
                     col_idx.append(len(columns) - 1)
@@ -354,6 +374,6 @@ class FileDB:
             log.info(self)
 
     def __repr__(self):
-        string = "Columns: " + self.columns + \n 
+        string = "Columns: " + str(self.columns) + "\n" 
         string += str(self.df)
         return string
