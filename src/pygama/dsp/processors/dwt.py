@@ -51,7 +51,7 @@ def dwt(wave_type: str, level: int) -> Callable:
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
         **nb_kwargs,
-        forceobj=True
+        forceobj=True,
     )
     def dwt_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
@@ -61,7 +61,7 @@ def dwt(wave_type: str, level: int) -> Callable:
            The input waveform
         w_out
            The approximate coefficients. The dimension of this array can be calculated
-           by ``out_dim = wf_length/(filter_length^level)``, where ``filter_length`` 
+           by ``out_dim = wf_length/(filter_length^level)``, where ``filter_length``
            can be obtained via ``pywt.Wavelet(wave_type).dec_len``.
         """
         w_out[:] = np.nan
