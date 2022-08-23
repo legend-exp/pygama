@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import logging
 import os
@@ -34,30 +35,30 @@ class DataLoader:
     """
 
     def __init__(
-        self, 
-        config: str | dict = None, 
-        filedb: str | FileDB = None, 
-        filedb_config: str | dict = None, 
-        file_query: str = None
+        self,
+        config: str | dict = None,
+        filedb: str | FileDB = None,
+        filedb_config: str | dict = None,
+        file_query: str = None,
     ):
         """
-        DataLoader init function.  
-        
-        No hit-level data is loaded in memory at this point.  
+        DataLoader init function.
+
+        No hit-level data is loaded in memory at this point.
         User should specify a config file containing DAQ filename format specifiers, etc.
 
         Parameters
         ----------
-        config : 
+        config :
             Configuration file for the DataLoader
-        filedb : 
+        filedb :
             A fileDB must be specified, either with
                 1) An instance of FileDB
                 2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
                 3) config file with enough info for FileDB to perform a DAQ scan
-        filedb_config : 
+        filedb_config :
             Config file mentioned above for fileDB
-        file_query : 
+        file_query :
             String query that should operate on columns of a fileDB.
 
         Returns
@@ -147,7 +148,7 @@ class DataLoader:
 
         Parameters
         ----------
-        query : 
+        query :
             The file level cuts on the files of interest
             Can be a cut on any of the columns in FileDB
         """
@@ -181,9 +182,7 @@ class DataLoader:
         return table_name
 
     def set_datastreams(
-        self, 
-        ds: list | tuple | np.ndarray , 
-        word: str
+        self, ds: list | tuple | np.ndarray, word: str
     ):  # TODO Make this able to handle more complicated requests
         """
         Set self.table_list to the datastreams (detectors) of interest
@@ -232,7 +231,7 @@ class DataLoader:
 
         Parameters
         ----------
-        cut 
+        cut
             The cuts on the columns of the data table, e.g. "trapEftp_cal > 1000"
             If passing a dictionary, the dictionary should be structured as dict[level] = cut
             If passing a list, each item in the array should be able to be applied on one level of tables
@@ -256,11 +255,7 @@ class DataLoader:
             self.cuts = {}
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
-    def set_output(self, 
-        fmt: str,
-        merge_files: bool = None, 
-        columns: list = None
-    ):
+    def set_output(self, fmt: str, merge_files: bool = None, columns: list = None):
         """
         Set the parameters for the output format of load
 
@@ -281,12 +276,11 @@ class DataLoader:
         if columns is not None:
             self.output_columns = columns
 
-    def get_file_list(self):
+    def get_file_list(self) -> pd.DataFrame:
         """
         Returns a copy of FileDB with the dataframe pared down to the current file list
         """
-        file_list = self.fileDB 
-        file_list.df = file_list.df[self.file_list] 
+        file_list = self.fileDB.df.iloc[self.file_list]
         return file_list
 
     def get_filedb(self, columns=None):
@@ -295,7 +289,9 @@ class DataLoader:
         """
         return self.fileDB
 
-    def get_tiers_for_col(self, columns : list | np.ndarray, merge_files : bool = None) -> dict:
+    def get_tiers_for_col(
+        self, columns: list | np.ndarray, merge_files: bool = None
+    ) -> dict:
         """
         For each column given, get the tiers and tables in that tier where that column can be found
 
@@ -310,7 +306,7 @@ class DataLoader:
 
         Returns
         -------
-            col_tiers, the tables and tiers that need to be loaded for each column 
+            col_tiers, the tables and tiers that need to be loaded for each column
         """
         col_tiers = {}
 
@@ -519,6 +515,7 @@ class DataLoader:
                     col_tiers = self.get_tiers_for_col(
                         cut_cols[level], merge_files=False
                     )
+
                     # Tables in first tier of event should be the same for all tiers in one level
                     tables = self.fileDB.df.loc[file, f"{self.tiers[level][0]}_tables"]
                     if self.table_list is not None:
@@ -551,6 +548,8 @@ class DataLoader:
                                         tb_table = tier_table
                                     else:
                                         tb_table.join(tier_table)
+                        if tb_table is None:
+                            continue
                         tb_df = tb_table.get_dataframe()
                         tb_df.query(cut, inplace=True)
                         keep_idx = f_entries.query(
@@ -573,16 +572,18 @@ class DataLoader:
                     # Convert f_entries DataFrame to Struct
                     f_dict = f_entries.to_dict("list")
                     f_struct = Struct(f_dict)
-                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+                    sto.write_object(
+                        f_struct, f"entries/{file}", output_file, wo_mode="o"
+                    )
                 # end for each file loop
         if in_memory:
             return entries
 
     def gen_hit_entries(
-        self, 
+        self,
         save_output_columns: bool = False,
         in_memory: bool = True,
-        output_file: str = None
+        output_file: str = None,
     ):
         """
         Called by gen_entry_list() to handle the case when tcm_level is None
@@ -688,13 +689,13 @@ class DataLoader:
             return entries
 
     def load(
-        self, 
+        self,
         entry_list: pd.DataFrame = None,
         in_memory: bool = False,
         output_file: str = None,
         orientation: str = "hit",
-        tcm_level: str = None
-    ) -> None | Table | pd.DataFrame:
+        tcm_level: str = None,
+    ) -> None | Table | Struct | pd.DataFrame:
         """
         Returns the requested columns in self.output_columns for the entries in the given entry_list
 
@@ -711,14 +712,16 @@ class DataLoader:
             If not None, writes the loaded data to the specified file
 
         orientation
-            'hit' or 'evt' 
+            'hit' or 'evt'
             Specifies the orientation of the output table
 
         tcm_level
             Which TCM was used to create the entry_list
         """
         if entry_list is None:
-            raise ValueError("First run gen_entry_list and pass the output to load")
+            entry_list = self.gen_entry_list(
+                tcm_level=tcm_level, save_output_columns=True
+            )
 
         if not in_memory and output_file is None:
             raise ValueError("If in_memory is False, need to specify an output file")
@@ -727,19 +730,24 @@ class DataLoader:
             return self.load_hits(entry_list, in_memory, output_file, tcm_level)
         elif orientation == "evt":
             if tcm_level is None:
-                raise ValueError(
-                    "Need to specify which coincidence map to use to return event-oriented data"
-                )
+                if len(self.tcms) == 1:
+                    tcm_level = list(self.tcms.keys())[0]
+                else:
+                    raise ValueError(
+                        "Need to specify which coincidence map to use to return event-oriented data"
+                    )
             return self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
-            raise ValueError(f"I don't understand what orientation={orientation} means!")
+            raise ValueError(
+                f"I don't understand what orientation={orientation} means!"
+            )
 
     def load_hits(
         self,
         entry_list: pd.DataFrame,
         in_memory: bool = False,
         output_file: str = None,
-        tcm_level: str = None
+        tcm_level: str = None,
     ):
         """
         Called by load() when orientation='hit'
@@ -890,7 +898,7 @@ class DataLoader:
         entry_list: pd.DataFrame = None,
         in_memory: bool = False,
         output_file: str = None,
-        tcm_level: str = None
+        tcm_level: str = None,
     ):  # TODO
         """
         Called by load() when orientation = 'evt'
@@ -1030,49 +1038,53 @@ if __name__ == "__main__":
     separate script.
     """
 
+    # dl = DataLoader(
+    #     config="../../../../loader_config.json",
+    #     filedb_config="fileDB_cfg.json",
+    #     filedb="fileDB.lh5"
+    # )
+    # print(dl.get_filedb())
+
     dl = DataLoader(
-        config="../../../../loader_config.json",
-        filedb_config="fileDB_cfg.json",
-        filedb="fileDB.lh5",
+        config="../../../../test_loader_config.json",
+        filedb_config="../../../../test_fileDB_config.json",
     )
-    dl.show_filedb()
+    # print(dl.get_filedb())
 
-    # dl = DataLoader(config="../../../../loader_config.json",
-    #                 fileDB_config="../../../../fileDB_config_copy.json")
-    # dl.show_fileDB()
-
-    # pd.set_option('display.max_colwidth', 10)
-    # dl.fileDB.get_tables_columns()
-    # dl.show_fileDB()
+    pd.set_option("display.max_colwidth", 10)
+    dl.fileDB.get_tables_columns()
+    # print(dl.get_filedb().df.columns)
 
     # dl.fileDB.to_disk("fileDB_cfg.json", "fileDB.lh5")
     # dl2 = DataLoader(config="../../../../loader_config.json", fileDB_config="fileDB_cfg.json", fileDB="fileDB.lh5")
     # dl2.show_fileDB()
 
-    dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
-    dl.show_file_list(
-        [
-            "period",
-            "run",
-            "type",
-            "raw_tables",
-            "dsp_tables",
-            "tcm_tables",
-            "file_status",
-        ]
-    )
+    dl.set_files("timestamp == '20220716T104550Z'")
+    # print(
+    #     dl.get_file_list()[
+    #         [
+    #             "period",
+    #             "run",
+    #             "type",
+    #             "raw_tables",
+    #             "dsp_tables",
+    #             "tcm_tables",
+    #             "file_status",
+    #         ]
+    #     ]
+    # )
 
-    dl.set_datastreams(np.arange(45), "ch")
+    dl.set_datastreams(np.arange(10), "ch")
 
     # hit_el = dl.gen_entry_list()
 
-    dl.set_cuts({"hit": "trapEmax > 1000"})
+    dl.set_cuts({"hit": "timestamp > 1000"})
 
     # hit_cut_el = dl.gen_entry_list()
 
     # tcm_el = dl.gen_entry_list(tcm_level="tcm")
 
-    cols = ["daqenergy", "trapEmax", "channel", "waveform"]
+    cols = ["daqenergy", "bl_mean", "channel"]
     dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
     # dl.set_cuts({"hit": "daqenergy > 100"})
 
@@ -1081,3 +1093,4 @@ if __name__ == "__main__":
     tcm_el = dl.gen_entry_list(tcm_level="tcm", save_output_columns=True)
 
     lout = dl.load(tcm_el, in_memory=True, orientation="hit", tcm_level="tcm")
+    # print(lout)
