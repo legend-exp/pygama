@@ -1,7 +1,33 @@
 Digital Signal Processing
 =========================
 
-*Under construction...*
+Global Numba options
+--------------------
+
+Pygama offers the possibility to change the value of some default Numba options
+at runtime. One typical use case is to enable `caching the result of
+compilation <https://numba.readthedocs.io/en/stable/user/jit.html?#cache>`_,
+which significantly reduces loading times. Numba options globally set by pygama
+are defined as attributes of the :class:`~.dsp.utils.NumbaDefaults` class. Have
+a look to the documentation for :func:`numba.jit` and :func:`numba.guvectorize`
+to learn about their meaning.
+
+.. note::
+   Some special processors override default option values.
+
+Here's an example of how global option customization can achieved in user
+scripts:
+
+.. code-block:: python
+
+    from pygama.dsp.utils import numba_defaults
+    from pygama.dsp import build_dsp
+
+    # must set options before explicitly importing pygama.dsp.processors!
+    numba_defaults.cache = True
+
+    # processors imports happen here, if not explicitly done before
+    build_dsp(...)
 
 Command line interface
 ----------------------
