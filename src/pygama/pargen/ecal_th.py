@@ -40,6 +40,17 @@ def load_data(
     hit_dict: dict = {},
     cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"],
 ) -> dict[str, np.ndarray]:
+
+    df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
+    pulser_props = cts.find_pulser_properties(df, energy="trapTmax")
+    if len(pulser_props) > 0:
+        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
+        ids = ~(out_df.isPulser == 1)
+        log.debug(f"pulser found: {pulser_props}")
+    else:
+        ids = np.zeros(len(df), dtype=bool)
+        log.debug(f"no pulser found")
+
     if len(hit_dict.keys()) == 0:
         try:
             energy_dict = lh5.load_nda(files, energy_params, lh5_path)
@@ -57,17 +68,17 @@ def load_data(
         energy_dict = {}
         for param in energy_params:
             if param in df:
-                energy_dict[param] = df[param].to_numpy()
+                energy_dict[param] = df[param][ids].to_numpy()
             else:
                 dat = lh5.load_nda(files, [param], lh5_path)[param]
-                energy_dict.update({param: dat})
+                energy_dict.update({param: dat[ids]})
         if cut_parameters is not None:
             for param in cut_parameters:
                 if param in df:
-                    energy_dict[param] = df[param].to_numpy()
+                    energy_dict[param] = df[param][ids].to_numpy()
                 else:
                     dat = lh5.load_nda(files, [param], lh5_path)[param]
-                    energy_dict.update({param: dat})
+                    energy_dict.update({param: dat[ids]})
     return energy_dict
 
 
@@ -214,6 +225,10 @@ def energy_cal_th(
             log.info("Calibration failed")
             continue
         log.info(f"Calibration pars are {pars}")
+        hit_dict[f"{energy_param}_cal"] = {
+            "expression": f"@a*{energy_param}+@b",
+            "parameters": {"a": pars[0], "b": pars[1]},
+        }
         fitted_peaks = results["fitted_keV"]
         fitted_funcs = []
         fitted_gof_funcs = []
@@ -450,11 +465,6 @@ def energy_cal_th(
         else:
             fep_fwhm = np.nan
             fep_dwhm = np.nan
-
-        hit_dict[f"{energy_param}_cal"] = {
-            "expression": f"@a*{energy_param}+@b",
-            "parameters": {"a": pars[0], "b": pars[1]},
-        }
 
         output_dict[f"{energy_param}_cal"] = {
             "Qbb_fwhm": round(fit_qbb, 2),
