@@ -22,7 +22,6 @@ import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
-from pygama.pargen.ecal_th import apply_ctc
 
 log = logging.getLogger(__name__)
 
@@ -35,37 +34,27 @@ def load_aoe(
     Loads in the A/E parameters needed and applies calibration constants to energy
     """
 
-    params = ["A_max", "tp_0_est", "tp_99", energy_param, "dt_eff"]
-    alpha = None
-    for key in cal_dict:
-        if cal_energy_param in cal_dict[key]["outputs"]:
-            for entry in cal_dict[key]["inputs"]:
-                if entry not in params:
-                    params.append(entry)
-            alpha = cal_dict[key]["pars"]["a"]
+    sto = lh5.LH5Store()
 
-    cal_pars = [
-        cal_dict[f"Energy_cal_{cal_energy_param}"]["pars"]["a"],
-        cal_dict[f"Energy_cal_{cal_energy_param}"]["pars"]["b"],
-    ]
-    log.info(f"{len(files)} files found")
-    log.info("Loading and applying quality cuts")
-    log.debug(f"Loading: {params}")
-    uncal_pass = lh5.load_nda(files, params, lh5_path)
-    log.info("Done")
-    if alpha is not None:
-        uncal_pass[cal_energy_param] = apply_ctc(
-            uncal_pass[params[-2]], uncal_pass[params[-1]], alpha
-        )
-    else:
-        uncal_pass[cal_energy_param] = uncal_pass[energy_param]
+    params = ["A_max", "tp_0_est", "tp_99", "dt_eff", energy_param, cal_energy_param]
 
-    Npass = len(uncal_pass[cal_energy_param])
-    ecal_pass = pgf.poly(uncal_pass[cal_energy_param], cal_pars)
-    curr = uncal_pass["A_max"]
-    aoe = np.divide(curr, pgf.poly(uncal_pass[energy_param], cal_pars))
-    full_dt = uncal_pass["tp_99"] - uncal_pass["tp_0_est"]
-    return aoe, ecal_pass, uncal_pass["dt_eff"], full_dt
+    table = sto.read_object(lh5_path, files)[0]
+    df = table.eval(cal_dict).get_dataframe()
+
+    param_dict = {}
+    for param in params:
+        # add cuts in here
+        if param in df:
+            param_dict[param] = df[param].to_numpy()
+        else:
+            param_dict.update(lh5.load_nda(files, [param], lh5_path))
+    if "Quality_cuts" in df.keys():
+        for entry in param_dict:
+            param_dict[entry] = param_dict[entry][df["Quality_cuts"].to_numpy()]
+
+    aoe = np.divide(param_dict["A_max"], param_dict[energy_param])
+    full_dt = param_dict["tp_99"] - param_dict["tp_0_est"]
+    return aoe, param_dict[cal_energy_param], param_dict["dt_eff"], full_dt
 
 
 def PDF_AoE(
@@ -1051,203 +1040,12 @@ def cal_aoe(
     classifier = get_classifier(aoe, energy, mu_pars, sigma_pars)
 
     cut = get_aoe_cut_fit(energy, classifier, 1592, (40, 20), 0.9, display=0)
-    log.info("  Compute low side survival fractions: ")
-
-    peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
-    sf = np.zeros(len(peaks_of_interest))
-    sferr = np.zeros(len(peaks_of_interest))
-    fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
-    full_sfs = []
-    full_sf_errs = []
-    full_cut_vals = []
-
-    for i, peak in enumerate(peaks_of_interest):
-        if peak == 2039:
-            sf[i], cut_vals, sfs = compton_sf(energy, classifier, cut, peak, eres_pars)
-            sferr[i] = 0
-
-            full_cut_vals.append(cut_vals)
-            full_sfs.append(sfs)
-            full_sf_errs.append(None)
-        else:
-            cut_vals, sfs, sf_errs, sf[i], sferr[i] = get_sf(
-                energy, classifier, peak, fit_widths[i], cut
-            )
-            full_cut_vals.append(cut_vals)
-            full_sfs.append(sfs)
-            full_sf_errs.append(sf_errs)
-
-        log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
-
-    sf_2side = np.zeros(len(peaks_of_interest))
-    sferr_2side = np.zeros(len(peaks_of_interest))
-    log.info("Calculating 2 sided cut sfs")
-    for i, peak in enumerate(peaks_of_interest):
-        if peak == 2039:
-            sf_2side[i] = compton_sf_no_sweep(
-                energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=4
-            )  # upper_cut=upper_cut
-            sferr_2side[i] = 0
-        else:
-            sf_2side[i], sferr_2side[i] = get_sf_no_sweep(
-                energy, classifier, peak, fit_widths[i], cut, aoe_high_cut_val=4
-            )
-
-        log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
-    log.info("Done")
-
-    if plot_savepath is not None:
-        mpl.use("pdf")
-        pathlib.Path(os.path.dirname(plot_savepath)).mkdir(parents=True, exist_ok=True)
-        with PdfPages(plot_savepath) as pdf:
-
-            plt.rcParams["figure.figsize"] = (12, 8)
-            plt.rcParams["font.size"] = 16
-
-            plt.figure()
-            plt.subplot(3, 2, 1)
-            plot_dt_dep(aoe, energy, dt, [1582, 1602], f"Tl DEP")
-            plt.subplot(3, 2, 2)
-            plot_dt_dep(aoe, energy, dt, [1510, 1630], f"Bi FEP")
-            plt.subplot(3, 2, 3)
-            plot_dt_dep(aoe, energy, dt, [2030, 2050], "Qbb")
-            plt.subplot(3, 2, 4)
-            plot_dt_dep(aoe, energy, dt, [2080, 2120], f"Tl SEP")
-            plt.subplot(3, 2, 5)
-            plot_dt_dep(aoe, energy, dt, [2584, 2638], f"Tl FEP")
-            plt.tight_layout()
-            pdf.savefig()
-            plt.close()
-
-            plt.figure()
-            plot_compt_bands_overlayed(aoe, energy, [950, 1250, 1460, 1660, 1860, 2060])
-            plt.ylabel("Counts")
-            plt.xlabel("Raw A/E")
-            plt.title(f"Compton Bands before Correction")
-            plt.legend(loc="upper left")
-            pdf.savefig()
-            plt.close()
-
-            if dt_corr == True:
-                _ = drift_time_correction(aoe_uncorr, energy, dt, pdf_path=pdf)
-
-            mu_pars, sigma_pars = AoEcorrection(energy, aoe, eres_pars, pdf)
-
-            plt.figure()
-            plot_compt_bands_overlayed(
-                classifier, energy, [950, 1250, 1460, 1660, 1860, 2060], [-5, 5]
-            )
-            plt.ylabel("Counts")
-            plt.xlabel("Corrected A/E")
-            plt.title(f"Compton Bands after Correction")
-            plt.legend(loc="upper left")
-            pdf.savefig()
-            plt.close()
-
-            plt.figure()
-            plt.vlines(cut, 0, 100, label=f"Cut Value: {cut:1.2f}", color="black")
-
-            for i, peak in enumerate(peaks_of_interest):
-                if peak == 2039:
-                    plt.plot(
-                        full_cut_vals[i],
-                        full_sfs[i],
-                        label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
-                    )
-                else:
-                    plt.errorbar(
-                        full_cut_vals[i],
-                        full_sfs[i],
-                        yerr=full_sf_errs[i],
-                        label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
-                    )
-
-            handles, labels = plt.gca().get_legend_handles_labels()
-            order = [1, 2, 3, 0, 4, 5]
-            plt.legend(
-                [handles[idx] for idx in order],
-                [labels[idx] for idx in order],
-                loc="upper right",
-            )
-            plt.xlabel("Cut Value")
-            plt.ylabel("Survival Fraction %")
-            pdf.savefig()
-            plt.close()
-
-            fig, ax = plt.subplots()
-            bins = np.linspace(1000, 3000, 2000)
-            ax.hist(energy, bins=bins, histtype="step", label="Before PSD")
-            ax.hist(
-                energy[classifier > cut],
-                bins=bins,
-                histtype="step",
-                label="Low side PSD cut",
-            )
-            ax.hist(
-                energy[(classifier > cut) & (classifier < 4)],
-                bins=bins,
-                histtype="step",
-                label="Double sided PSD cut",
-            )
-            ax.hist(
-                energy[(classifier < cut) | (classifier > 4)],
-                bins=bins,
-                histtype="step",
-                label="Rejected by PSD cut",
-            )
-
-            axins = ax.inset_axes([0.25, 0.1, 0.3, 0.3])
-            bins = np.linspace(1580, 1640, 200)
-            axins.hist(energy, bins=bins, histtype="step")
-            axins.hist(energy[classifier > cut], bins=bins, histtype="step")
-            axins.hist(
-                energy[(classifier > cut) & (classifier < 4)],
-                bins=bins,
-                histtype="step",
-            )
-            axins.hist(
-                energy[(classifier < cut) | (classifier > 4)],
-                bins=bins,
-                histtype="step",
-            )
-            axins.set_xlabel("Energy (keV)")
-            axins.set_ylabel("Counts")
-            ax.set_xlim([1000, 3000])
-            ax.set_yscale("log")
-            plt.xlabel("Energy (keV)")
-            plt.ylabel("Counts")
-            plt.legend()
-            pdf.savefig()
-            plt.close()
-
-            plt.figure()
-            bins = np.linspace(1000, 3000, 1000)
-            counts_pass, bins_pass, _ = pgh.get_hist(
-                energy[(classifier > cut) & (classifier < 4)], bins=bins
-            )
-            counts, bins, _ = pgh.get_hist(energy, bins=bins)
-            survival_fracs = counts_pass / (counts)
-
-            plt.step(pgh.get_bin_centers(bins_pass), survival_fracs)
-            plt.xlabel("Energy (keV)")
-            plt.ylabel("Survival Fraction")
-            plt.ylim([0, 1])
-            pdf.savefig()
-            plt.close()
-
-    def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
-        out_dict = {}
-        for i, peak in enumerate(peaks_of_interest):
-            out_dict[str(peak)] = {"sf": f"{sfs[i]:2f}", "sf_err": f"{sf_errs[i]:2f}"}
-        return out_dict
 
     cal_dict.update(
         {
             "AoE_Classifier": {
-                "inputs": ["A_max", f"{energy_param}", f"{cal_energy_param}"],
-                "outputs": ["AoE_Classifier"],
-                "function": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)/(sqrt(c+(d/{cal_energy_param})**2))",
-                "pars": {
+                "expression": f"(((A_max/{energy_param})/(@a*{cal_energy_param} +@b))-1)/(sqrt(@c+(@d/{cal_energy_param})**2))",
+                "parameters": {
                     "a": mu_pars[0],
                     "b": mu_pars[1],
                     "c": sigma_pars[0],
@@ -1260,10 +1058,8 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Low_Cut": {
-                "inputs": ["AoE_Classifier"],
-                "outputs": ["AoE_Cut_Pass"],
-                "function": "AoE_Classifier>a",
-                "pars": {"a": cut},
+                "expression": "AoE_Classifier>@a",
+                "parameters": {"a": cut},
             }
         }
     )
@@ -1271,26 +1067,236 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Double_Sided_Cut": {
-                "inputs": ["AoE_Classifier"],
-                "outputs": ["AoE_Cut_Pass"],
-                "function": "b>AoE_Classifier>a",
-                "pars": {"a": cut, "b": 4},
+                "expression": "@b>AoE_Classifier>@a",
+                "parameters": {"a": cut, "b": 4},
             }
         }
     )
 
-    out_dict = {
-        "A/E_Energy_param": "cuspEmax",
-        "Cal_energy_param": "cuspEmax_ctc",
-        "dt_param": "dt_eff",
-        "rt_correction": False,
-        "Mean_pars": list(mu_pars),
-        "Sigma_pars": list(sigma_pars),
-        "Low_cut": cut,
-        "High_cut": 4,
-        "Low_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf, sferr),
-        "2_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side),
-    }
+    try:
+        log.info("  Compute low side survival fractions: ")
+
+        peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
+        sf = np.zeros(len(peaks_of_interest))
+        sferr = np.zeros(len(peaks_of_interest))
+        fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
+        full_sfs = []
+        full_sf_errs = []
+        full_cut_vals = []
+
+        for i, peak in enumerate(peaks_of_interest):
+            if peak == 2039:
+                sf[i], cut_vals, sfs = compton_sf(
+                    energy, classifier, cut, peak, eres_pars
+                )
+                sferr[i] = 0
+
+                full_cut_vals.append(cut_vals)
+                full_sfs.append(sfs)
+                full_sf_errs.append(None)
+            else:
+                cut_vals, sfs, sf_errs, sf[i], sferr[i] = get_sf(
+                    energy, classifier, peak, fit_widths[i], cut
+                )
+                full_cut_vals.append(cut_vals)
+                full_sfs.append(sfs)
+                full_sf_errs.append(sf_errs)
+
+            log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
+
+        sf_2side = np.zeros(len(peaks_of_interest))
+        sferr_2side = np.zeros(len(peaks_of_interest))
+        log.info("Calculating 2 sided cut sfs")
+        for i, peak in enumerate(peaks_of_interest):
+            if peak == 2039:
+                sf_2side[i] = compton_sf_no_sweep(
+                    energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=4
+                )  # upper_cut=upper_cut
+                sferr_2side[i] = 0
+            else:
+                sf_2side[i], sferr_2side[i] = get_sf_no_sweep(
+                    energy, classifier, peak, fit_widths[i], cut, aoe_high_cut_val=4
+                )
+
+            log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
+        log.info("Done")
+
+        if plot_savepath is not None:
+            mpl.use("pdf")
+            pathlib.Path(os.path.dirname(plot_savepath)).mkdir(
+                parents=True, exist_ok=True
+            )
+            with PdfPages(plot_savepath) as pdf:
+
+                plt.rcParams["figure.figsize"] = (12, 8)
+                plt.rcParams["font.size"] = 16
+
+                plt.figure()
+                plt.subplot(3, 2, 1)
+                plot_dt_dep(aoe, energy, dt, [1582, 1602], f"Tl DEP")
+                plt.subplot(3, 2, 2)
+                plot_dt_dep(aoe, energy, dt, [1510, 1630], f"Bi FEP")
+                plt.subplot(3, 2, 3)
+                plot_dt_dep(aoe, energy, dt, [2030, 2050], "Qbb")
+                plt.subplot(3, 2, 4)
+                plot_dt_dep(aoe, energy, dt, [2080, 2120], f"Tl SEP")
+                plt.subplot(3, 2, 5)
+                plot_dt_dep(aoe, energy, dt, [2584, 2638], f"Tl FEP")
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close()
+
+                plt.figure()
+                plot_compt_bands_overlayed(
+                    aoe, energy, [950, 1250, 1460, 1660, 1860, 2060]
+                )
+                plt.ylabel("Counts")
+                plt.xlabel("Raw A/E")
+                plt.title(f"Compton Bands before Correction")
+                plt.legend(loc="upper left")
+                pdf.savefig()
+                plt.close()
+
+                if dt_corr == True:
+                    _ = drift_time_correction(aoe_uncorr, energy, dt, pdf_path=pdf)
+
+                mu_pars, sigma_pars = AoEcorrection(energy, aoe, eres_pars, pdf)
+
+                plt.figure()
+                plot_compt_bands_overlayed(
+                    classifier, energy, [950, 1250, 1460, 1660, 1860, 2060], [-5, 5]
+                )
+                plt.ylabel("Counts")
+                plt.xlabel("Corrected A/E")
+                plt.title(f"Compton Bands after Correction")
+                plt.legend(loc="upper left")
+                pdf.savefig()
+                plt.close()
+
+                plt.figure()
+                plt.vlines(cut, 0, 100, label=f"Cut Value: {cut:1.2f}", color="black")
+
+                for i, peak in enumerate(peaks_of_interest):
+                    if peak == 2039:
+                        plt.plot(
+                            full_cut_vals[i],
+                            full_sfs[i],
+                            label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
+                        )
+                    else:
+                        plt.errorbar(
+                            full_cut_vals[i],
+                            full_sfs[i],
+                            yerr=full_sf_errs[i],
+                            label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
+                        )
+
+                handles, labels = plt.gca().get_legend_handles_labels()
+                order = [1, 2, 3, 0, 4, 5]
+                plt.legend(
+                    [handles[idx] for idx in order],
+                    [labels[idx] for idx in order],
+                    loc="upper right",
+                )
+                plt.xlabel("Cut Value")
+                plt.ylabel("Survival Fraction %")
+                pdf.savefig()
+                plt.close()
+
+                fig, ax = plt.subplots()
+                bins = np.linspace(1000, 3000, 2000)
+                ax.hist(energy, bins=bins, histtype="step", label="Before PSD")
+                ax.hist(
+                    energy[classifier > cut],
+                    bins=bins,
+                    histtype="step",
+                    label="Low side PSD cut",
+                )
+                ax.hist(
+                    energy[(classifier > cut) & (classifier < 4)],
+                    bins=bins,
+                    histtype="step",
+                    label="Double sided PSD cut",
+                )
+                ax.hist(
+                    energy[(classifier < cut) | (classifier > 4)],
+                    bins=bins,
+                    histtype="step",
+                    label="Rejected by PSD cut",
+                )
+
+                axins = ax.inset_axes([0.25, 0.1, 0.3, 0.3])
+                bins = np.linspace(1580, 1640, 200)
+                axins.hist(energy, bins=bins, histtype="step")
+                axins.hist(energy[classifier > cut], bins=bins, histtype="step")
+                axins.hist(
+                    energy[(classifier > cut) & (classifier < 4)],
+                    bins=bins,
+                    histtype="step",
+                )
+                axins.hist(
+                    energy[(classifier < cut) | (classifier > 4)],
+                    bins=bins,
+                    histtype="step",
+                )
+                axins.set_xlabel("Energy (keV)")
+                axins.set_ylabel("Counts")
+                ax.set_xlim([1000, 3000])
+                ax.set_yscale("log")
+                plt.xlabel("Energy (keV)")
+                plt.ylabel("Counts")
+                plt.legend()
+                pdf.savefig()
+                plt.close()
+
+                plt.figure()
+                bins = np.linspace(1000, 3000, 1000)
+                counts_pass, bins_pass, _ = pgh.get_hist(
+                    energy[(classifier > cut) & (classifier < 4)], bins=bins
+                )
+                counts, bins, _ = pgh.get_hist(energy, bins=bins)
+                survival_fracs = counts_pass / (counts)
+
+                plt.step(pgh.get_bin_centers(bins_pass), survival_fracs)
+                plt.xlabel("Energy (keV)")
+                plt.ylabel("Survival Fraction")
+                plt.ylim([0, 1])
+                pdf.savefig()
+                plt.close()
+
+        def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
+            out_dict = {}
+            for i, peak in enumerate(peaks_of_interest):
+                out_dict[str(peak)] = {
+                    "sf": f"{sfs[i]:2f}",
+                    "sf_err": f"{sf_errs[i]:2f}",
+                }
+            return out_dict
+
+        out_dict = {
+            "A/E_Energy_param": "cuspEmax",
+            "Cal_energy_param": "cuspEmax_ctc",
+            "dt_param": "dt_eff",
+            "rt_correction": False,
+            "Mean_pars": list(mu_pars),
+            "Sigma_pars": list(sigma_pars),
+            "Low_cut": cut,
+            "High_cut": 4,
+            "Low_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf, sferr),
+            "2_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side),
+        }
+    except:
+        log.error("survival fraction determination failed")
+        out_dict = {
+            "A/E_Energy_param": "cuspEmax",
+            "Cal_energy_param": "cuspEmax_ctc",
+            "dt_param": "dt_eff",
+            "rt_correction": False,
+            "Mean_pars": list(mu_pars),
+            "Sigma_pars": list(sigma_pars),
+            "Low_cut": cut,
+            "High_cut": 4,
+        }
 
     if dt_corr == True:
         out_dict["Alpha"] = alpha
