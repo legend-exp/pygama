@@ -370,9 +370,9 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
     def __repr__(self):
-        string = "<< Columns >>\n" + \
-                 self.columns.__repr__() + "\n" \
-                 "\n" \
-                 "<< DataFrame >>\n" + \
-                 self.df.__repr__()
+        string = (
+            "<< Columns >>\n" + self.columns.__repr__() + "\n"
+            "\n"
+            "<< DataFrame >>\n" + self.df.__repr__()
+        )
         return string
