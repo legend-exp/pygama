@@ -23,28 +23,27 @@ class FileDB:
     fill the dataframe's columns with information about each file, and
     read/write to disk in an LGDO format
 
-    Columns
-    -------
-        file keys:
-        The fields specified in the configuration file's "file_format" that are required to generate a file name
-        e.g. "run", "type", "timestamp"
+    Columns:
+    file keys:
+    The fields specified in the configuration file's "file_format" that are required to generate a file name
+    e.g. "run", "type", "timestamp"
 
-        {tier}_file:
-        Generated file name for tier
+    {tier}_file:
+    Generated file name for tier
 
-        {tier}_size:
-        Size of file on disk, if applicable
+    {tier}_size:
+    Size of file on disk, if applicable
 
-        file_status:
-        Contains a bit corresponding to whether or not a file for each tier exists for a given cycle
-        e.g. If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
-        file_status would be 0b100
+    file_status:
+    Contains a bit corresponding to whether or not a file for each tier exists for a given cycle
+    e.g. If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
+    file_status would be 0b100
 
-        {tier}_tables:
-        Available channels in tier
+    {tier}_tables:
+    Available channels in tier
 
-        {tier}_col_idx:
-        file_db.columns[{tier}_col_idx] will return the list of columns available in tier's file
+    {tier}_col_idx:
+    file_db.columns[{tier}_col_idx] will return the list of columns available in tier's file
     """
 
     def __init__(self, config: str | dict, file_df: str = None, scan: bool = True):
