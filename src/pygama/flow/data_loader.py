@@ -89,9 +89,7 @@ class DataLoader:
                 self.fileDB = FileDB(config=filedb_config)
         else:
             if isinstance(filedb, str):
-                if filedb_config is None:
-                    raise ValueError("Must provide a config file with a fileDB on disk")
-                self.fileDB = FileDB(config=filedb_config, file_df=filedb)
+                self.fileDB = FileDB(from_disk=filedb)
             elif isinstance(filedb, FileDB):
                 self.fileDB = filedb
             else:

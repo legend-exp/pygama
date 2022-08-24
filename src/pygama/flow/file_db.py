@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from parse import parse
 
-from pygama.lgdo import Array, LH5Store, VectorOfVectors
+from pygama.lgdo import Array, LH5Store, Scalar, VectorOfVectors
 from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
@@ -40,7 +40,9 @@ class FileDB:
       list of columns available in the tier's file.
     """
 
-    def __init__(self, config: str | dict, from_disk: str = None, scan: bool = True):
+    def __init__(
+        self, config: str | dict = None, from_disk: str = None, scan: bool = True
+    ):
         """
         Parameters
         ----------
@@ -80,8 +82,12 @@ class FileDB:
                 self.scan_files()
                 self.set_file_status()
                 self.set_file_sizes()
+        elif config is None:
+            self.from_disk(from_disk)
         else:
-            self.from_disk(config, from_disk)
+            raise ValueError(
+                "You must specify either a configuration or an LH5 file name"
+            )
 
     def set_config(self, config: dict):
         """Helper function called during initialization."""
@@ -277,17 +283,19 @@ class FileDB:
 
         return columns
 
-    def from_disk(self, cfg_name: str, db_name: str):
+    def from_disk(self, filename: str):
         """
         Fills the dataframe (and configuration dictionary) with the information
         from a file created by :meth:`to_disk`.
         """
-        with open(cfg_name) as cfg:
-            config = json.load(cfg)
-        self.set_config(config)
-        self.df = pd.read_hdf(db_name, key="dataframe")
+
         sto = LH5Store()
-        vov, _ = sto.read_object("columns", db_name)
+        cfg, _ = sto.read_object("config", filename)
+        self.set_config(json.loads(cfg.value.decode()))
+
+        self.df = pd.read_hdf(filename, key="dataframe")
+
+        vov, _ = sto.read_object("columns", filename)
         # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
         vov = list(vov)
         columns = []
@@ -295,20 +303,25 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
-    def to_disk(self, cfg_name: str, db_name: str):
-        """Writes config information to cfg_name and dataframe to df_name.
+    def to_disk(self, filename: str, wo_mode="write_safe"):
+        """Serializes database to disk.
 
         Parameters
         -----------
-        cfg_name
-            Path to output JSON file for config
-        db_name
-            Path to output LH5 file for FileDB
+        filename
+            output LH5 file name.
+        wo_mode
+            passed to :meth:`~.lgdo.lh5_store.write_object`.
         """
-        log.debug(f"Writing database to {db_name}")
+        log.debug(f"Writing database to {filename}")
 
-        with open(cfg_name, "w") as cfg:
-            json.dump(self.config, cfg)
+        sto = LH5Store()
+        sto.write_object(
+            Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
+        )
+
+        if wo_mode in ["write_safe", "w", "overwrite_file", "of"]:
+            wo_mode = "a"
 
         if self.columns is not None:
             flat = []
@@ -322,10 +335,9 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto = LH5Store()
-            sto.write_object(col_vov, "columns", db_name, wo_mode="o")
+            sto.write_object(col_vov, "columns", filename, wo_mode="a")
 
-        self.df.to_hdf(db_name, "dataframe")
+        self.df.to_hdf(filename, "dataframe", mode="a")
 
     def scan_daq_files(self):
         """
