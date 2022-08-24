@@ -859,7 +859,10 @@ def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
         list all objects inside that group.
     """
 
-    log.debug(f"Listing objects in '{lh5_file}'" + ("" if lh5_group == "" else f" (and group {lh5_group})"))
+    log.debug(
+        f"Listing objects in '{lh5_file}'"
+        + ("" if lh5_group == "" else f" (and group {lh5_group})")
+    )
 
     lh5_st = LH5Store()
     # To use recursively, make lh5_file a h5group instead of a string
