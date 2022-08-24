@@ -25,7 +25,7 @@ class FileDB:
 
     Columns
     -------
-        file keys: 
+        file keys:
         The fields specified in the configuration file's "file_format" that are required to generate a file name
         e.g. "run", "type", "timestamp"
 
@@ -47,12 +47,7 @@ class FileDB:
         file_db.columns[{tier}_col_idx] will return the list of columns available in tier's file
     """
 
-    def __init__(
-            self,
-            config: str | dict,
-            file_df: str = None,
-            scan: bool = True
-        ):
+    def __init__(self, config: str | dict, file_df: str = None, scan: bool = True):
         """
         Parameters
         ----------
@@ -116,7 +111,6 @@ class FileDB:
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
         scan_dir = self.data_dir + self.tier_dirs[low_tier]
-
 
         for path, _folders, files in os.walk(scan_dir):
             n_files += len(files)
@@ -222,7 +216,7 @@ class FileDB:
                     + "*"
                     + template[braces[1].span()[1] :]
                 )
-                
+
                 groups = ls(f, wildcard)
                 tier_tables = [
                     list(parse(template, g).named.values())[0] for g in groups
@@ -374,6 +368,6 @@ class FileDB:
             log.info(self)
 
     def __repr__(self):
-        string = "Columns: " + str(self.columns) + "\n" 
+        string = "Columns: " + str(self.columns) + "\n"
         string += str(self.df)
         return string
