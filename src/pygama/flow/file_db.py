@@ -11,56 +11,52 @@ import numpy as np
 import pandas as pd
 from parse import parse
 
-from pygama.lgdo import Array, LH5Store, VectorOfVectors
+from pygama.lgdo import Array, LH5Store, Scalar, VectorOfVectors
 from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
 
 
 class FileDB:
-    """
-    A class containing a pandas DataFrame that has additional functions to scan the data directory,
-    fill the dataframe's columns with information about each file, and
-    read/write to disk in an LGDO format
+    """LH5 file database.
 
-    Columns:
-    file keys:
-    The fields specified in the configuration file's "file_format" that are required to generate a file name
-    e.g. "run", "type", "timestamp"
+    A class containing a :class:`pandas.DataFrame` that has additional
+    functions to scan the data directory, fill the dataframe's columns with
+    information about each file, and read or write to disk in an LGDO format.
 
-    {tier}_file:
-    Generated file name for tier
+    The dataframe contains the following columns:
 
-    {tier}_size:
-    Size of file on disk, if applicable
-
-    file_status:
-    Contains a bit corresponding to whether or not a file for each tier exists for a given cycle
-    e.g. If we have tiers "raw", "dsp", and "hit", but only the "raw" file has been made
-    file_status would be 0b100
-
-    {tier}_tables:
-    Available channels in tier
-
-    {tier}_col_idx:
-    file_db.columns[{tier}_col_idx] will return the list of columns available in tier's file
+    - file keys: the fields specified in the configuration file's
+      ``file_format`` that are required to generate a file name e.g. ``run``,
+      ``type``, ``timestamp`` etc.
+    - ``{tier}_file``: generated file name for the tier.
+    - ``{tier}_size``: size of file on disk, if applicable.
+    - ``file_status``: contains a bit corresponding to whether or not a file
+      for each tier exists for a given cycle e.g. If we have tiers `raw`,
+      `dsp`, and `hit`, but only the `raw` file has been produced,
+      ``file_status`` would be ``0b100``.
+    - ``{tier}_tables``: available data streams (channels) in the tier.
+    - ``{tier}_col_idx``: ``file_db.columns[{tier}_col_idx]`` will return the
+      list of columns available in the tier's file.
     """
 
-    def __init__(self, config: str | dict, file_df: str = None, scan: bool = True):
+    def __init__(
+        self, config: str | dict = None, from_disk: str = None, scan: bool = True
+    ):
         """
         Parameters
         ----------
         config
-            Dict or path to JSON file specifying data directories, tiers, and file name templates
-
-        file_df
-            Path to LH5 file written by to_disk()
-
+            dictionary or path to JSON file specifying data directories, tiers,
+            and file name templates.
+        from_disk
+            path to existing LH5 file containing :class:`FileDB` object
+            serialized by :meth:`.to_disk()`.
         scan
-            True by default, whether the fileDB should scan the DAQ directory to
-            fill its rows with file keys
+            whether the file database should scan the directory containing
+            `raw` files to fill its rows with file keys.
         """
-        if file_df is None:
+        if from_disk is None:
             self.df = None
             if isinstance(config, str):
                 with open(config) as f:
@@ -86,13 +82,15 @@ class FileDB:
                 self.scan_files()
                 self.set_file_status()
                 self.set_file_sizes()
+        elif config is None:
+            self.from_disk(from_disk)
         else:
-            self.from_disk(config, file_df)
+            raise ValueError(
+                "You must specify either a configuration or an LH5 file name"
+            )
 
     def set_config(self, config: dict):
-        """
-        Helper function called by __init__()
-        """
+        """Helper function called during initialization."""
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
@@ -101,9 +99,9 @@ class FileDB:
         self.table_format = self.config["table_format"]
 
     def scan_files(self):
-        """
-        Scan the raw directory and fill the DataFrame
-        Only fills columns that can be populated with just the DAQ file
+        """Scan the directory containing `raw` files and fill the dataframe.
+
+        Only fills columns that can be populated with just the `raw` files.
         """
         file_keys = []
         n_files = 0
@@ -111,7 +109,10 @@ class FileDB:
         template = self.file_format[low_tier]
         scan_dir = self.data_dir + self.tier_dirs[low_tier]
 
+        log.info(f"Scanning {scan_dir} with template {template}")
+
         for path, _folders, files in os.walk(scan_dir):
+            log.debug(f"Scanning {path}")
             n_files += len(files)
 
             for f in files:
@@ -146,7 +147,8 @@ class FileDB:
 
     def set_file_status(self):
         """
-        Add a column to the dataframe with a bit corresponding to whether each tier's file exists
+        Add a column to the dataframe with a bit corresponding to whether each
+        tier's file exists.
         """
 
         def check_status(row):
@@ -173,22 +175,28 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def get_tables_columns(self, col_output: str = None):
-        """
-        Opens found files to save available tables and columns
+    def get_tables_columns(self, to_file: str = None):
+        """Open files in the database to read (and store) available tables and
+        column names.
 
-        Adds the available tables in each tier as a column in fileDB
-        by searching for group names that match the provided table_format
-        and saving the associated keyword values
+        Adds the available table names in each tier as a column in the
+        dataframe by searching for group names that match the provided
+        ``table_format`` and saving the associated keyword values.
 
         Returns a table with each unique list of columns found in each table
-        Adds a column to the FileDB dataframe df['{tier}_col_idx'] that maps to the column table
+        and adds a column ``{tier}_col_idx`` to the dataframe that maps to the
+        column table.
 
-        Optionally write the column table to LH5 file as a VectorOfVectors
+        Optionally write the column table to and LH5 file (as a
+        :class:`~.lgdo.vectorofvectors.VectorOfVectors`) specified by
+        `to_file`.
         """
+        log.info("Getting table column names")
 
         def update_tables_cols(row, tier):
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+
+            log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
             if os.path.exists(fpath):
                 f = h5py.File(fpath)
@@ -216,6 +224,7 @@ class FileDB:
                     + template[braces[1].span()[1] :]
                 )
 
+                # TODO this call here is really expensive!
                 groups = ls(f, wildcard)
                 tier_tables = [
                     list(parse(template, g).named.values())[0] for g in groups
@@ -255,7 +264,8 @@ class FileDB:
 
         self.columns = columns
 
-        if col_output is not None:
+        if to_file is not None:
+            log.debug(f"Writing column names to '{to_file}'")
             flattened = []
             length = []
             for i, col in enumerate(columns):
@@ -269,20 +279,23 @@ class FileDB:
                 flattened_data=flattened, cumulative_length=length
             )
             sto = LH5Store()
-            sto.write_object(columns_vov, "unique_columns", col_output)
+            sto.write_object(columns_vov, "unique_columns", to_file)
 
         return columns
 
-    def from_disk(self, cfg_name: str, db_name: str):
+    def from_disk(self, filename: str):
         """
-        Fills self.df and config with the information from a file created by to_lgdo()
+        Fills the dataframe (and configuration dictionary) with the information
+        from a file created by :meth:`to_disk`.
         """
-        with open(cfg_name) as cfg:
-            config = json.load(cfg)
-        self.set_config(config)
-        self.df = pd.read_hdf(db_name, key="dataframe")
+
         sto = LH5Store()
-        vov, _ = sto.read_object("columns", db_name)
+        cfg, _ = sto.read_object("config", filename)
+        self.set_config(json.loads(cfg.value.decode()))
+
+        self.df = pd.read_hdf(filename, key="dataframe")
+
+        vov, _ = sto.read_object("columns", filename)
         # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
         vov = list(vov)
         columns = []
@@ -290,20 +303,25 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
-    def to_disk(self, cfg_name: str, db_name: str):
-        """
-        Writes config information to cfg_name and DataFrame to df_name
+    def to_disk(self, filename: str, wo_mode="write_safe"):
+        """Serializes database to disk.
 
         Parameters
         -----------
-        cfg_name
-            Path to output JSON file for config
-
-        db_name
-            Path to output LH5 file for FileDB
+        filename
+            output LH5 file name.
+        wo_mode
+            passed to :meth:`~.lgdo.lh5_store.write_object`.
         """
-        with open(cfg_name, "w") as cfg:
-            json.dump(self.config, cfg)
+        log.debug(f"Writing database to {filename}")
+
+        sto = LH5Store()
+        sto.write_object(
+            Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
+        )
+
+        if wo_mode in ["write_safe", "w", "overwrite_file", "of"]:
+            wo_mode = "a"
 
         if self.columns is not None:
             flat = []
@@ -317,15 +335,15 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto = LH5Store()
-            sto.write_object(col_vov, "columns", db_name, wo_mode="o")
+            sto.write_object(col_vov, "columns", filename, wo_mode="a")
 
-        self.df.to_hdf(db_name, "dataframe")
+        self.df.to_hdf(filename, "dataframe", mode="a")
 
-    def scan_daq_files(self, verbose: bool = False):
+    def scan_daq_files(self):
         """
-        Does the exact same thing as scan_files but with extra config arguments for a DAQ directory and template
-        instead of using the lowest (raw) tier
+        Does the exact same thing as :meth:`.scan_files` but with extra
+        configuration arguments for a DAQ directory and template instead of
+        using the lowest `raw` tier.
         """
         file_keys = []
         n_files = 0
@@ -363,10 +381,10 @@ class FileDB:
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
-        if verbose:
-            log.info(self)
-
     def __repr__(self):
-        string = "Columns: " + str(self.columns) + "\n"
-        string += str(self.df)
+        string = (
+            "<< Columns >>\n" + self.columns.__repr__() + "\n"
+            "\n"
+            "<< DataFrame >>\n" + self.df.__repr__()
+        )
         return string
