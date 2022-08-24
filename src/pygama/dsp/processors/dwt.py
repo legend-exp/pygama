@@ -10,7 +10,7 @@ from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
-def dwt(wave_type: str, level: int) -> Callable:
+def discrete_wavelet_transform(wave_type: str, level: int) -> Callable:
     """
     Apply a discrete wavelet transform to the waveform and return only
     the approximate coefficients.
