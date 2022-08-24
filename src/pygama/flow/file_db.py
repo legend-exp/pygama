@@ -102,8 +102,7 @@ class FileDB:
         self.table_format = self.config["table_format"]
 
     def scan_files(self):
-        """
-        Scan the raw directory and fill the DataFrame
+        """Scan the raw directory and fill the DataFrame
         Only fills columns that can be populated with just the DAQ file
         """
         file_keys = []
@@ -112,7 +111,10 @@ class FileDB:
         template = self.file_format[low_tier]
         scan_dir = self.data_dir + self.tier_dirs[low_tier]
 
+        log.info(f"Scanning {scan_dir} with template {template}")
+
         for path, _folders, files in os.walk(scan_dir):
+            log.debug(f"Scanning {path}")
             n_files += len(files)
 
             for f in files:
@@ -187,9 +189,12 @@ class FileDB:
 
         Optionally write the column table to LH5 file as a VectorOfVectors
         """
+        log.info("Getting table column names")
 
         def update_tables_cols(row, tier):
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+
+            log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
             if os.path.exists(fpath):
                 f = h5py.File(fpath)
@@ -217,6 +222,7 @@ class FileDB:
                     + template[braces[1].span()[1] :]
                 )
 
+                # TODO this call here is really expensive!
                 groups = ls(f, wildcard)
                 tier_tables = [
                     list(parse(template, g).named.values())[0] for g in groups
@@ -257,6 +263,7 @@ class FileDB:
         self.columns = columns
 
         if col_output is not None:
+            log.debug(f"Writing column names to '{col_output}'")
             flattened = []
             length = []
             for i, col in enumerate(columns):
@@ -303,6 +310,8 @@ class FileDB:
         db_name
             Path to output LH5 file for FileDB
         """
+        log.debug(f"Writing database to {db_name}")
+
         with open(cfg_name, "w") as cfg:
             json.dump(self.config, cfg)
 
@@ -323,7 +332,7 @@ class FileDB:
 
         self.df.to_hdf(db_name, "dataframe")
 
-    def scan_daq_files(self, verbose: bool = False):
+    def scan_daq_files(self):
         """
         Does the exact same thing as scan_files but with extra config arguments for a DAQ directory and template
         instead of using the lowest (raw) tier
@@ -363,9 +372,6 @@ class FileDB:
         # convert cols to numeric dtypes where possible
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
-
-        if verbose:
-            log.info(self)
 
     def __repr__(self):
         string = "Columns: " + str(self.columns) + "\n"

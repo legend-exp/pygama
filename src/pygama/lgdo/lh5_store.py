@@ -846,7 +846,7 @@ class LH5Store:
         raise RuntimeError(f"don't know how to read datatype '{datatype}'")
 
 
-def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
+def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
     """Return a list of LH5 groups in the input file and group, similar
     to ``ls`` or ``h5ls``. Supports wildcards in group names.
 
@@ -858,6 +858,8 @@ def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
         group to search. add a ``/`` to the end of the group name if you want to
         list all objects inside that group.
     """
+
+    log.debug(f"Listing objects in '{lh5_file}'" + ("" if lh5_group == "" else f" (and group {lh5_group})"))
 
     lh5_st = LH5Store()
     # To use recursively, make lh5_file a h5group instead of a string
