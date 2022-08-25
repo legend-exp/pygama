@@ -66,6 +66,7 @@ from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
+from .get_multi_time_pickoff import get_multi_time_pickoff
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
@@ -83,7 +84,9 @@ from .pole_zero import double_pole_zero, pole_zero
 from .presum import presum
 from .pulse_injector import inject_exp_pulse, inject_sig_pulse
 from .saturation import saturation
+from .sipm_noise_regulation import sipm_noise_regulation
 from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
+from .sum_at_positions import sum_at_positions
 from .time_point_thresh import time_point_thresh
 from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import upsampler
@@ -103,6 +106,7 @@ __all__ = [
     "fixed_time_pickoff",
     "gaussian_filter1d",
     "get_multi_local_extrema",
+    "get_mutli_time_pickoff",
     "linear_slope_fit",
     "log_check",
     "min_max",
@@ -122,8 +126,10 @@ __all__ = [
     "inject_exp_pulse",
     "inject_sig_pulse",
     "saturation",
+    "sipm_noise_regulation",
     "soft_pileup_corr",
     "soft_pileup_corr_bl",
+    "sum_at_positions",
     "time_point_thresh",
     "asym_trap_filter",
     "trap_filter",
