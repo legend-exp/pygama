@@ -1,6 +1,7 @@
 import numpy as np
 from numba import guvectorize
 
+
 @guvectorize(
     [
         "void(float32[:], float32, float32[:], float32[:])",
@@ -10,7 +11,6 @@ from numba import guvectorize
     nopython=True,
     cache=True,
 )
-
 def sum_at_positions(w_in, thresh_in, pos_in, sum_out):
 
     # 4) Document the algorithm

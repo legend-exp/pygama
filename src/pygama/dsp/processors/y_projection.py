@@ -1,7 +1,10 @@
 from math import floor
+
 import numpy as np
 from numba import guvectorize
+
 from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(
     [
@@ -12,7 +15,6 @@ from pygama.dsp.errors import DSPFatal
     nopython=True,
     cache=True,
 )
-
 def y_projection(w_in, bin_in, proj_out, borders_out):
 
     """

@@ -1,6 +1,7 @@
 import numpy as np
 from numba import guvectorize
 
+
 @guvectorize(
     [
         "void(float32[:], float32[:], float32[:], float32[:],float32[:])",
@@ -10,7 +11,6 @@ from numba import guvectorize
     nopython=True,
     cache=True,
 )
-
 def bl_from_y_projection(proj_in, border_in, mean_out, std_out, idx_out):
 
     """
