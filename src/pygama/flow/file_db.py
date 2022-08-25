@@ -335,9 +335,9 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto.write_object(col_vov, "columns", filename, wo_mode="a")
+            sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
 
-        self.df.to_hdf(filename, "dataframe", mode="a")
+        self.df.to_hdf(filename, "dataframe", mode="r+")
 
     def scan_daq_files(self):
         """
