@@ -59,6 +59,7 @@ several advantages:
    to use functions that operate in place as much as possible!
 """
 
+from .bl_from_y_projection import bl_from_y_projection
 from .bl_subtract import bl_subtract
 from .convolutions import cusp_filter, t0_filter, zac_filter
 from .fftw import dft, inv_dft, psd
@@ -88,8 +89,10 @@ from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import upsampler
 from .wiener_filter import wiener_filter
 from .windower import windower
+from .y_projection import y_projection
 
 __all__ = [
+    "bl_from_y_projection",
     "bl_subtract",
     "cusp_filter",
     "t0_filter",
@@ -129,4 +132,5 @@ __all__ = [
     "upsampler",
     "wiener_filter",
     "windower",
+    "y_projection",
 ]
