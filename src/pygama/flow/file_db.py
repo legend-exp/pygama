@@ -230,6 +230,7 @@ class FileDB:
         corresponding file size in bytes as reported by
         :func:`os.path.getsize`.
         """
+
         def get_size(row, tier):
             size = 0
             path_name = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
