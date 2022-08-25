@@ -1,11 +1,5 @@
-# 1) Import Python modules
-
-
 import numpy as np
 from numba import guvectorize
-
-# 2) Provide instructions to Numba
-
 
 @guvectorize(
     [
@@ -17,12 +11,7 @@ from numba import guvectorize
     cache=True,
 )
 
-# 3) Define the processor interface
-
-
 def bl_from_y_projection(proj_in, border_in, mean_out, std_out, idx_out):
-
-    # 4) Document the algorithm
 
     """
     Provided a projection of a waveform onto the y axis, the baseline is reconstructed by taking the maximum of the projection and the stddev from it.

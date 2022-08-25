@@ -20,7 +20,7 @@ def sipm_noise_regulation(w_in, idx_in, ratio_in, width_in, idx_out):
     idx_in : array-like
         The array of indicies of possible signal candidates
     ratio_in :  float
-        noise cancle sensitivity
+        noise cancel sensitivity
     width_in: int
         width about index to analyse for noise
     idx_out,  array-like

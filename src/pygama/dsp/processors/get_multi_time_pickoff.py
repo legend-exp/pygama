@@ -18,7 +18,7 @@ def get_multi_time_pickoff(w_in, t_in, a_out):
     w_in : array-like
         The array of data within which extrema will be found
     t_in :  array-like
-        the waveform indecies to pick off
+        the waveform indciies to pick off
     a_out,  array-like
         the output pick-off value
     """

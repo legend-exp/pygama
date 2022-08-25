@@ -1,14 +1,7 @@
-# 1) Import Python modules
-
 from math import floor
-
 import numpy as np
 from numba import guvectorize
-
 from pygama.dsp.errors import DSPFatal
-
-# 2) Provide instructions to Numba
-
 
 @guvectorize(
     [
@@ -20,12 +13,7 @@ from pygama.dsp.errors import DSPFatal
     cache=True,
 )
 
-# 3) Define the processor interface
-
-
 def y_projection(w_in, bin_in, proj_out, borders_out):
-
-    # 4) Document the algorithm
 
     """
     Produces and returns a binned projection onto the y-axis from a provided waveform
@@ -71,4 +59,3 @@ def y_projection(w_in, bin_in, proj_out, borders_out):
         if j >= len(borders_out):
             j = len(borders_out) - 1
         proj_out[j] += 1
-    # h, b= np.histogram(w_in, np.linspace(0,bin_in,1))

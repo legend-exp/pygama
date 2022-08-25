@@ -1,10 +1,5 @@
-# 1) Import Python modules
-
 import numpy as np
 from numba import guvectorize
-
-# 2) Provide instructions to Numba
-
 
 @guvectorize(
     [
@@ -15,9 +10,6 @@ from numba import guvectorize
     nopython=True,
     cache=True,
 )
-
-# 3) Define the processor interface
-
 
 def sum_at_positions(w_in, thresh_in, pos_in, sum_out):
 
