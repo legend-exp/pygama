@@ -24,7 +24,7 @@ def bl_from_y_projection(proj_in, border_in, mean_out, std_out,idx_out):
     ----------
     proj_in : array-like
         The array which depicts the projection (binned!)
-     border_in : array-like
+    border_in : array-like
         The bin borders of the projection
     mean_out : scalar
         Returns the maximum of the projection (this should be the baseline)
