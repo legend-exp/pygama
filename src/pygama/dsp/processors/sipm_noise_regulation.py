@@ -1,12 +1,17 @@
 import numpy as np
 from numba import guvectorize
 
-from pygama.dsp.errors import DSPFatal
 
 
-@guvectorize(["void(float32[:], float32[:], float32, float32, float32[:])",
-              "void(float64[:], float64[:], float64, float64, float64[:])"],
-             "(n),(m),(),()->(m)", nopython=True, cache=True)
+@guvectorize(
+    [
+        "void(float32[:], float32[:], float32, float32, float32[:])",
+        "void(float64[:], float64[:], float64, float64, float64[:])",
+    ],
+    "(n),(m),(),()->(m)",
+    nopython=True,
+    cache=True,
+)
 def sipm_noise_regulation(w_in, idx_in, ratio_in, width_in, idx_out):
     """
     Parameters
@@ -25,17 +30,20 @@ def sipm_noise_regulation(w_in, idx_in, ratio_in, width_in, idx_out):
 
     # prepare output
 
-    idx_out[:]= np.nan
-    
+    idx_out[:] = np.nan
+
     # fill output
     for i in range(len(idx_in)):
         if not np.isnan(idx_in[i]):
-            a=int(idx_in[i]) - int(width_in)
-            b=int(idx_in[i]) + int(width_in)
-            if a <0: a=0
-            if b>=len(w_in): b=len(w_in)-1
+            a = int(idx_in[i]) - int(width_in)
+            b = int(idx_in[i]) + int(width_in)
+            if a < 0:
+                a = 0
+            if b >= len(w_in):
+                b = len(w_in) - 1
             min_index = a
-            for j in range(a,b, 1):
+            for j in range(a, b, 1):
                 if w_in[j] < w_in[min_index]:
                     min_index = j
-            if np.absolute(w_in[min_index]/w_in[int(idx_in[i])]) < ratio_in: idx_out[i]=idx_in[i]
+            if np.absolute(w_in[min_index] / w_in[int(idx_in[i])]) < ratio_in:
+                idx_out[i] = idx_in[i]
