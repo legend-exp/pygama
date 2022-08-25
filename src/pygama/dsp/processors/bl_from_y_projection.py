@@ -4,7 +4,6 @@
 import numpy as np
 from numba import guvectorize
 
-
 # 2) Provide instructions to Numba
 
 
