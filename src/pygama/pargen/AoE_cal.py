@@ -1287,6 +1287,7 @@ def cal_aoe(
         }
     except:
         log.error("survival fraction determination failed")
+        pathlib.Path(plot_savepath).touch()
         out_dict = {
             "A/E_Energy_param": "cuspEmax",
             "Cal_energy_param": "cuspEmax_ctc",
