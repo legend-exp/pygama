@@ -58,11 +58,17 @@ def bl_from_y_projection(proj_in, border_in, mean_out, std_out,idx_out):
             max_index = i
     idx_out[0] = max_index
     mean_out[0] = border_in[max_index]
-
+    
     #and the approx standarddev
-    for i in range(max_index,len(proj_in),1):
+    for i in range(max_index,len(proj_in)-1,1):
         if proj_in[i] <= 0.5*proj_in[max_index] and proj_in[i] != 0:
             std_out[0] = abs(mean_out[0]-border_in[i])*2/2.355
+            break
+    #look also into the other direction
+    for i in range(1,max_index,1):
+        if proj_in[i] >= 0.5*proj_in[max_index] and proj_in[i] != 0:
+            if std_out[0] < abs(mean_out[0]-border_in[i])*2/2.355:
+                std_out[0] = abs(mean_out[0]-border_in[i])*2/2.355
             break
 
 
