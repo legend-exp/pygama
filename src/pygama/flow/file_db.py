@@ -1,3 +1,6 @@
+"""
+Utilities for LH5 file inventory.
+"""
 from __future__ import annotations
 
 import json
@@ -24,7 +27,7 @@ class FileDB:
     functions to scan the data directory, fill the dataframe's columns with
     information about each file, and read or write to disk in an LGDO format.
 
-    The dataframe contains the following columns:
+    The database contains the following columns:
 
     - file keys: the fields specified in the configuration file's
       ``file_format`` that are required to generate a file name e.g. ``run``,
@@ -38,20 +41,72 @@ class FileDB:
     - ``{tier}_tables``: available data streams (channels) in the tier.
     - ``{tier}_col_idx``: ``file_db.columns[{tier}_col_idx]`` will return the
       list of columns available in the tier's file.
+
+    The database must be configured by a JSON file (or corresponding
+    dictionary), which defines the data file names, paths and LH5 layout. For
+    example:
+
+    .. code-block:: json
+
+        {
+            "data_dir": "/home/gipert/kindergarten/pygama/prod-ref-l200/generated/tier",
+            "tier_dirs": {
+                "raw": "/raw",
+                "dsp": "/dsp",
+                "hit": "/hit",
+                "tcm": "/tcm",
+                "evt": "/evt"
+            },
+            "file_format": {
+                "raw": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_raw.lh5",
+                "dsp": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_dsp.lh5",
+                "hit": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_hit.lh5",
+                "evt": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_evt.lh5",
+                "tcm": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_tcm.lh5"
+            },
+            "table_format": {
+                "raw": "ch{ch:03d}/raw",
+                "dsp": "ch{ch:03d}/dsp",
+                "hit": "{ch}/hit",
+                "evt": "{grp}/evt",
+                "tcm": "hardware_tcm"
+            },
+            "table_keyword": {
+                "hit": "ch",
+                "evt": "grp"
+            }
+        }
+
+    :class:`FileDB` objects can be also stored on disk and read-in at later
+    times.
+
+    Examples
+    --------
+    >>> from pygama.flow import FileDB
+    >>> db = FileDB(config="filedb_config.json")
+    >>> db.get_tables_columns()  # read in also table columns names
+    >>> print(db)
+    << Columns >>
+    [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['array_id', 'array_idx', 'cumulative_length']]
+    << DataFrame >>
+       exp period   run         timestamp type  ... hit_col_idx tcm_tables tcm_col_idx evt_tables evt_col_idx
+    0  l60    p01  r014  20220716T105236Z  cal  ...        None         []         [2]       None        None
+    1  l60    p01  r014  20220716T104550Z  cal  ...        None         []         [2]       None        None
+    >>> db.to_disk("file_db.lh5")
     """
 
     def __init__(
         self, config: str | dict = None, from_disk: str = None, scan: bool = True
-    ):
+    ) -> None:
         """
         Parameters
         ----------
         config
             dictionary or path to JSON file specifying data directories, tiers,
-            and file name templates.
+            and file name templates. Mutually exclusive with `from_disk`.
         from_disk
             path to existing LH5 file containing :class:`FileDB` object
-            serialized by :meth:`.to_disk()`.
+            serialized by :meth:`.to_disk()`. Mutually exclusive with `config`.
         scan
             whether the file database should scan the directory containing
             `raw` files to fill its rows with file keys.
@@ -89,8 +144,8 @@ class FileDB:
                 "You must specify either a configuration or an LH5 file name"
             )
 
-    def set_config(self, config: dict):
-        """Helper function called during initialization."""
+    def set_config(self, config: dict) -> None:
+        """Read in the configuration dictionary."""
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
@@ -98,9 +153,11 @@ class FileDB:
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
 
-    def scan_files(self):
-        """Scan the directory containing `raw` files and fill the dataframe.
+    def scan_files(self) -> None:
+        """Scan the directory containing files from the lower tier and fill the
+        dataframe.
 
+        The lower tier is defined as the first element of the `tiers` array.
         Only fills columns that can be populated with just the `raw` files.
         """
         file_keys = []
@@ -145,10 +202,13 @@ class FileDB:
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
-    def set_file_status(self):
+    def set_file_status(self) -> None:
         """
         Add a column to the dataframe with a bit corresponding to whether each
         tier's file exists.
+
+        For example, if we have tiers `raw`, `dsp`, and `hit`, but only the
+        `raw` file has been produced, ``file_status`` would be ``0b100``.
         """
 
         def check_status(row):
@@ -164,7 +224,12 @@ class FileDB:
 
         self.df["file_status"] = self.df.apply(check_status, axis=1)
 
-    def set_file_sizes(self):
+    def set_file_sizes(self) -> None:
+        """
+        Add columns (for each tier) to the database containing the
+        corresponding file size in bytes as reported by
+        :func:`os.path.getsize`.
+        """
         def get_size(row, tier):
             size = 0
             path_name = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
@@ -175,15 +240,15 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def get_tables_columns(self, to_file: str = None):
-        """Open files in the database to read (and store) available tables and
-        column names.
+    def get_tables_columns(self, to_file: str = None) -> list[str]:
+        """Open files in the database to read (and store) available tables (and
+        columns therein) names.
 
         Adds the available table names in each tier as a column in the
-        dataframe by searching for group names that match the provided
+        dataframe by searching for group names that match the configured
         ``table_format`` and saving the associated keyword values.
 
-        Returns a table with each unique list of columns found in each table
+        Returns a list with each unique list of columns found in each table
         and adds a column ``{tier}_col_idx`` to the dataframe that maps to the
         column table.
 
@@ -193,7 +258,7 @@ class FileDB:
         """
         log.info("Getting table column names")
 
-        def update_tables_cols(row, tier):
+        def update_tables_cols(row, tier: str) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
@@ -283,12 +348,11 @@ class FileDB:
 
         return columns
 
-    def from_disk(self, filename: str):
+    def from_disk(self, filename: str) -> None:
         """
         Fills the dataframe (and configuration dictionary) with the information
         from a file created by :meth:`to_disk`.
         """
-
         sto = LH5Store()
         cfg, _ = sto.read_object("config", filename)
         self.set_config(json.loads(cfg.value.decode()))
@@ -303,7 +367,7 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
-    def to_disk(self, filename: str, wo_mode="write_safe"):
+    def to_disk(self, filename: str, wo_mode="write_safe") -> None:
         """Serializes database to disk.
 
         Parameters
@@ -339,11 +403,11 @@ class FileDB:
 
         self.df.to_hdf(filename, "dataframe", mode="r+")
 
-    def scan_daq_files(self):
+    def scan_daq_files(self) -> None:
         """
         Does the exact same thing as :meth:`.scan_files` but with extra
         configuration arguments for a DAQ directory and template instead of
-        using the lowest `raw` tier.
+        using the lowest tier.
         """
         file_keys = []
         n_files = 0
@@ -367,10 +431,10 @@ class FileDB:
                     finfo[f"{tier}_file"] = self.file_format[tier].format(**finfo)
 
         if n_files == 0:
-            raise FileNotFoundError("No daq files found")
+            raise FileNotFoundError("No DAQ files found")
 
         if len(file_keys) == 0:
-            raise FileNotFoundError("No daq files matched pattern ", self.daq_template)
+            raise FileNotFoundError("No DAQ files matched pattern ", self.daq_template)
 
         temp_df = pd.DataFrame(file_keys)
 
@@ -381,7 +445,7 @@ class FileDB:
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         string = (
             "<< Columns >>\n" + self.columns.__repr__() + "\n"
             "\n"
