@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-
-import xmltodict
+import plistlib
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +58,7 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
     if compass_config_file is not None:
 
         with open(compass_config_file) as xml_file:
-            data_dict = xmltodict.parse(xml_file.read())
+            data_dict = plistlib.loads(xml_file, fmt=plistlib.FMT_XML)
 
         # Initialize a dictionary to hold the config data
         config_dict = {}
