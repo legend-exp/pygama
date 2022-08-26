@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 
 import numpy as np
@@ -16,7 +17,7 @@ log = logging.getLogger(__name__)
 class CompassStreamer(DataStreamer):
     """Data streamer for CoMPASS data streams."""
 
-    def __init__(self, config_file) -> None:
+    def __init__(self, compass_config_file=None) -> None:
         super().__init__()
         self.in_stream = None
         self.header = None
@@ -24,17 +25,16 @@ class CompassStreamer(DataStreamer):
             1024, dtype="bytes"
         )  # create a buffer that is around 4 kB
         self.header_decoder = CompassHeaderDecoder()
-        self.event_decoder = CompassEventDecoder()
-        self.config_file = (
-            config_file  # optional config file to be passed when calling build_raw
-        )
+        self.decoder_id_dict = {}  # dict of data_id to decoder object
+        self.decoder_name_dict = {}  # dict of name to decoder object
+        self.compass_config_file = compass_config_file  # optional config file to be passed when calling build_raw
         self.event_rbkd = None
 
     def get_decoder_list(self) -> list[DataDecoder]:
         dec_list = []
         dec_list.append(self.header_decoder)
         dec_list.append(self.event_decoder)
-        return dec_list
+        return list(dec_list)
 
     def open_stream(
         self,
@@ -72,42 +72,41 @@ class CompassStreamer(DataStreamer):
         CoMPASS files have a header that is only 2 bytes long and only appears at the top of the file.
         So, we must read this header once, and then proceed to read packets in.
         """
+        # If a config file is not present, the wf_len can be determined by opening the first few bytes of the in_stream
+        wf_len = None
+        if self.compass_config_file is None:
+            self.set_in_stream(stream_name)
+
+            first_bytes = self.in_stream.read(27)
+
+            energy_short = str(
+                bin(int.from_bytes(first_bytes[:2], byteorder="little"))
+            )[::-1][2]
+
+            if int(energy_short) == 1:
+                [wf_len] = np.frombuffer(first_bytes[23:27], dtype=np.uint32)
+            else:
+                [wf_len] = np.frombuffer(first_bytes[21:25], dtype=np.uint32)
+
+            self.close_stream()
+
         # set the in_stream
         self.set_in_stream(stream_name)
         self.n_bytes_read = 0
 
-        # read in and decode the file header info if the config file is present
-        if self.config_file is not None:
-            self.header = self.header_decoder.decode_header(
-                self.in_stream, self.config_file
-            )  # returns an lgdo.Struct
-            self.n_bytes_read += (
-                2  # there are 2 bytes in the header, for a 16 bit number to read out
-            )
+        # read in and decode the file header info, passing the compass_config_file, if present
+        self.header = self.header_decoder.decode_header(
+            self.in_stream, self.compass_config_file, wf_len
+        )  # returns an lgdo.Struct
+        self.n_bytes_read += (
+            2  # there are 2 bytes in the header, for a 16 bit number to read out
+        )
 
-            # set up data loop variables
-            self.packet_id = 0
+        # set up data loop variables
+        self.packet_id = 0
 
-        # read in the header and get the wf_len by sacrificing the first packet if the config_file is not present
-        # also set the keys to the maximum number of channels available to a CAEN digitizer
-        else:
-            self.header = self.header_decoder.decode_header(
-                self.in_stream, self.config_file
-            )  # returns an lgdo.Struct
-
-            # set up data loop variables
-            self.packet_id = 1
-
-            # the number of bytes read is different if the energy_short is present in the header
-            if self.header["energy_short"].value == 1:
-                self.n_bytes_read += (
-                    2 + 25 + 2 * self.header["wf_len"].value
-                )  # there are 2 bytes in the header, 25 in packet metadata, and 2*num_samples in bytes
-            else:
-                self.n_bytes_read += 2 + 23 + 2 * self.header["wf_len"].value
-
-        # The wf_len from the config_file or from the first packet is then used to initialize raw_buffers to the correct size
-        self.event_decoder.set_file_config(self.header)
+        # instantiate the event decoder and pass the header
+        self.event_decoder = CompassEventDecoder(self.header)
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(
@@ -120,13 +119,13 @@ class CompassStreamer(DataStreamer):
         if rb_lib is None:
             rb_lib = self.rb_lib
 
-        # set up the event data raw buffers
         self.event_rbkd = (
             rb_lib["CompassEventDecoder"].get_keyed_dict()
             if "CompassEventDecoder" in rb_lib
             else None
         )
 
+        # set up the header raw buffer
         if "CompassHeaderDecoder" in rb_lib:
             header_rb_list = rb_lib["CompassHeaderDecoder"]
             if len(header_rb_list) != 1:
@@ -135,7 +134,10 @@ class CompassStreamer(DataStreamer):
                 )
             rb = header_rb_list[0]
         else:
-            rb = RawBuffer(lgdo=self.header)
+            rb = RawBuffer(lgdo=self.header_decoder.make_lgdo())
+        rb.lgdo.value = json.dumps(
+            self.header
+        )  # dump our header dictionary into the raw buffer
         rb.loc = 1  # we have filled this buffer
         return [rb]
 
@@ -157,7 +159,6 @@ class CompassStreamer(DataStreamer):
         self.in_stream.close()
         self.in_stream = None
 
-    # TODO: add a config file that allows users to specify if "ADC Channels" or "Calibrated" or "Both" options were enabled, as well as Vpp
     def load_packet(self) -> np.uint32 | None:
         """Loads the next packet into the internal buffer.
 
@@ -180,7 +181,7 @@ class CompassStreamer(DataStreamer):
             )
 
         # packets have metadata of variable lengths, depending on if the header shows that energy_short is present in the metadata
-        if self.header["energy_short"].value == 1:
+        if int(self.header["energy_short"]) == 1:
             header_length = 25  # if the energy short is present, then there are an extra 2 bytes in the metadata
         else:
             header_length = 23  # the normal packet metadata is 23 bytes long

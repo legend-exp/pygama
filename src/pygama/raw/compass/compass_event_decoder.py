@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import logging
-from typing import Any
 
 import numpy as np
 
@@ -10,6 +9,14 @@ from pygama import lgdo
 from pygama.raw.data_decoder import DataDecoder
 
 log = logging.getLogger(__name__)
+
+
+def get_bc(board: int, channel: int) -> int:
+    """
+    Create a standard hash for the board and channel of a CoMPASS file
+    """
+    return (board << 9) + (channel & 0xF)
+
 
 compass_decoded_values = {
     # packet index in file
@@ -62,38 +69,45 @@ class CompassEventDecoder(DataDecoder):
     Decode CAEN digitizer event data.
     """
 
-    def __init__(self, *args, **kwargs) -> None:
-        self.decoded_values = copy.deepcopy(compass_decoded_values)
+    def __init__(self, header=None, *args, **kwargs) -> None:
+        self.decoded_values = {}
         super().__init__(*args, **kwargs)
         self.skipped_channels = {}
+        if header is not None:
+            self.set_header(header)
 
-    def get_key_list(self) -> list[int | str]:
-        """
-        Get a unique key for each channel present in the CoMPASS file.
-
-        Notes
-        -----
-        The config file needs the number of channels enabled, because it
-        is read into the header and then used here to create the keys.
-        If no config file is present, the maximum 8 channels of a
-        CAEN digitizer is used, but all events raw_buffers might
-        not be filled in that case.
-        """
-        return range(self.header["num_enabled_channels"].value)
-
-    def set_file_config(self, header: lgdo.Struct) -> None:
-        """Access ``header`` members once when each file is opened.
-        Parameters
-        ----------
-        header
-            extracted via :meth:`~.compass_header_decoder.CompassHeaderDecoder.decode_header`.
-        """
+    # set the decoded_values for each board/channel combination because they could have different settings
+    def set_header(self, header):
         self.header = header
-        self.decoded_values["waveform"]["wf_len"] = self.header["wf_len"].value
 
-    def get_decoded_values(self, channel: int = None) -> dict[str, dict[str, Any]]:
-        # CoMPASS uses the same values for all channels
-        return self.decoded_values
+        # Loop over crates, cards, build decoded values for enabled channels
+        for board in self.header["boards"].keys():
+            for channel in self.header["boards"][board]["channels"].keys():
+
+                bc = get_bc(int(board), int(channel))
+
+                self.decoded_values[bc] = copy.deepcopy(compass_decoded_values)
+
+                # get trace length(s). Should all be the same
+                self.decoded_values[bc]["waveform"]["wf_len"] = int(
+                    float(self.header["boards"][board]["wf_len"])
+                )
+
+    def get_key_list(self):
+        key_list = []
+        for key in self.decoded_values.keys():
+            key_list += [key]
+        return key_list
+
+    def get_decoded_values(self, key=None):
+        if key is None:
+            dec_vals_list = self.decoded_values.values()
+            if len(dec_vals_list) >= 0:
+                return list(dec_vals_list)[0]
+            raise RuntimeError("decoded_values not built")
+        if key in self.decoded_values:
+            return self.decoded_values[key]
+        raise KeyError(f"no decoded values for key {key}")
 
     def decode_packet(
         self,
@@ -128,16 +142,18 @@ class CompassEventDecoder(DataDecoder):
         board = np.frombuffer(packet[0:2], dtype=np.uint16)[0]
         channel = np.frombuffer(packet[2:4], dtype=np.uint16)[0]
 
+        bc = get_bc(board, channel)
+
         # get the table for this channel
-        if channel not in evt_rbkd:
-            if channel not in self.skipped_channels:
-                self.skipped_channels[channel] = 0
+        if bc not in evt_rbkd:
+            if bc not in self.skipped_channels:
+                self.skipped_channels[bc] = 0
                 log.debug(f"Skipping channel: {channel}")
                 log.debug(f"evt_rbkd: {evt_rbkd.keys()}")
-            self.skipped_channels[channel] += 1
+            self.skipped_channels[bc] += 1
             return False
-        tbl = evt_rbkd[channel].lgdo
-        ii = evt_rbkd[channel].loc
+        tbl = evt_rbkd[bc].lgdo
+        ii = evt_rbkd[bc].loc
 
         # store packet id
         tbl["packet_id"].nda[ii] = packet_id
@@ -150,7 +166,7 @@ class CompassEventDecoder(DataDecoder):
         tbl["timestamp"].nda[ii] = np.frombuffer(packet[4:12], dtype=np.uint64)[0]
 
         # get the rest of the values depending on if there is an energy_short present
-        if header["energy_short"].value == 1:
+        if int(header["energy_short"]) == 1:
             tbl["energy"].nda[ii] = np.frombuffer(packet[12:14], dtype=np.uint16)[0]
             tbl["energy_short"].nda[ii] = np.frombuffer(packet[14:16], dtype=np.uint16)[
                 0
@@ -161,10 +177,11 @@ class CompassEventDecoder(DataDecoder):
             ]
 
             if (
-                tbl["num_samples"].nda[ii] != self.decoded_values["waveform"]["wf_len"]
+                tbl["num_samples"].nda[ii]
+                != self.decoded_values[bc]["waveform"]["wf_len"]
             ):  # make sure that the waveform we read in is the same length as in the config
                 raise RuntimeError(
-                    f"Waveform size {tbl['num_samples'].nda[ii]} doesn't match expected size {self.decoded_values['waveform']['wf_len']}. "
+                    f"Waveform size {tbl['num_samples'].nda[ii]} doesn't match expected size {self.decoded_values[bc]['waveform']['wf_len']}. "
                     "Skipping packet"
                 )
 
@@ -181,10 +198,11 @@ class CompassEventDecoder(DataDecoder):
             ]
 
             if (
-                tbl["num_samples"].nda[ii] != self.decoded_values["waveform"]["wf_len"]
+                tbl["num_samples"].nda[ii]
+                != self.decoded_values[bc]["waveform"]["wf_len"]
             ):  # make sure that the waveform we read in is the same length as in the config
                 raise RuntimeError(
-                    f"Waveform size {tbl['num_samples'].nda[ii]} doesn't match expected size {self.decoded_values['waveform']['wf_len']}. "
+                    f"Waveform size {tbl['num_samples'].nda[ii]} doesn't match expected size {self.decoded_values[bc]['waveform']['wf_len']}. "
                     "Skipping packet"
                 )
 
@@ -192,5 +210,5 @@ class CompassEventDecoder(DataDecoder):
                 packet[23:], dtype=np.uint16
             )
 
-        evt_rbkd[channel].loc += 1
-        return evt_rbkd[channel].is_full()
+        evt_rbkd[bc].loc += 1
+        return evt_rbkd[bc].is_full()

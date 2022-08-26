@@ -28,7 +28,7 @@ def build_raw(
     buffer_size: int = 8192,
     n_max: int = np.inf,
     overwrite: bool = False,
-    config_file: str = None,
+    compass_config_file: str = None,
     **kwargs,
 ) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
@@ -68,10 +68,10 @@ def build_raw(
     overwrite
         sets whether to overwrite the output file(s) if it (they) already exist.
 
-    config_file
+    compass_config_file
         Specification of config file, used for decoding CoMPASS files
 
-        - if None, CompassDecoder will eat the first packet to determine waveform length
+        - if None, CompassDecoder will sacrifice the first packet to determine waveform length
         - if a str ending in ``.json``, interpreted as a filename containing
           json-shorthand for the output specification (see :mod:`.compass.compass_event_decoder`).
 
@@ -173,7 +173,7 @@ def build_raw(
     elif in_stream_type == "FlashCam":
         streamer = FCStreamer()
     elif in_stream_type == "Compass":
-        streamer = CompassStreamer(config_file)
+        streamer = CompassStreamer(compass_config_file)
     elif in_stream_type == "LlamaDaq":
         raise NotImplementedError("LlamaDaq streaming not yet implemented")
     elif in_stream_type == "MGDO":
