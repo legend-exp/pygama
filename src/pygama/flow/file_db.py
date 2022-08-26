@@ -83,7 +83,7 @@ class FileDB:
     Examples
     --------
     >>> from pygama.flow import FileDB
-    >>> db = FileDB(config="filedb_config.json")
+    >>> db = FileDB("./filedb_config.json")
     >>> db.get_tables_columns()  # read in also table columns names
     >>> print(db)
     << Columns >>
@@ -96,53 +96,51 @@ class FileDB:
     """
 
     def __init__(
-        self, config: str | dict = None, from_disk: str = None, scan: bool = True
+        self, config: str | dict, scan: bool = True
     ) -> None:
         """
         Parameters
         ----------
         config
             dictionary or path to JSON file specifying data directories, tiers,
-            and file name templates. Mutually exclusive with `from_disk`.
-        from_disk
-            path to existing LH5 file containing :class:`FileDB` object
-            serialized by :meth:`.to_disk()`. Mutually exclusive with `config`.
+            and file name templates. Can also be path to existing LH5 file
+            containing :class:`FileDB` object serialized by :meth:`.to_disk()`.
         scan
             whether the file database should scan the directory containing
             `raw` files to fill its rows with file keys.
         """
-        if from_disk is None:
-            self.df = None
-            if isinstance(config, str):
+
+        if isinstance(config, str):
+            if h5py.is_hdf5(config):
+                self.from_disk(config)
+                return
+            else:
                 with open(config) as f:
                     config = json.load(f)
 
-            self.set_config(config)
+        if not isinstance(config, dict):
+            raise ValueError("Bad FileDB configuration value")
 
-            # Set up column names
-            fm = string.Formatter()
-            parse_arr = np.array(list(fm.parse(self.file_format[self.tiers[0]])))
-            names = list(parse_arr[:, 1])  # fields required to generate file name
-            names = [n for n in names if n]  # Remove none values
-            names = list(np.unique(names))
-            names += [f"{tier}_file" for tier in self.tiers]  # the generated file names
-            names += [f"{tier}_size" for tier in self.tiers]  # file sizes
-            names += ["file_status"]  # bonus columns
+        self.set_config(config)
 
-            self.df = pd.DataFrame(columns=names)
+        # Set up column names
+        fm = string.Formatter()
+        parse_arr = np.array(list(fm.parse(self.file_format[self.tiers[0]])))
+        names = list(parse_arr[:, 1])  # fields required to generate file name
+        names = [n for n in names if n]  # Remove none values
+        names = list(np.unique(names))
+        names += [f"{tier}_file" for tier in self.tiers]  # the generated file names
+        names += [f"{tier}_size" for tier in self.tiers]  # file sizes
+        names += ["file_status"]  # bonus columns
 
-            self.columns = None
+        self.df = pd.DataFrame(columns=names)
 
-            if scan:
-                self.scan_files()
-                self.set_file_status()
-                self.set_file_sizes()
-        elif config is None:
-            self.from_disk(from_disk)
-        else:
-            raise ValueError(
-                "You must specify either a configuration or an LH5 file name"
-            )
+        self.columns = None
+
+        if scan:
+            self.scan_files()
+            self.set_file_status()
+            self.set_file_sizes()
 
     def set_config(self, config: dict) -> None:
         """Read in the configuration dictionary."""

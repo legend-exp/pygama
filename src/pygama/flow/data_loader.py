@@ -12,6 +12,7 @@ from keyword import iskeyword
 
 import numpy as np
 import pandas as pd
+import h5py
 
 from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
@@ -21,7 +22,6 @@ from pygama.lgdo import (
     Struct,
     Table,
     WaveformTable,
-    ls,
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
@@ -108,17 +108,10 @@ class DataLoader:
                     config = json.load(f)
             self.set_config(config)
 
-        if isinstance(filedb, str):
-            try:
-                ls(filedb)
-            except OSError:
-                self.filedb = FileDB(filedb)
-            else:
-                self.filedb = FileDB(from_disk=filedb)
-        elif isinstance(filedb, FileDB):
+        if isinstance(filedb, FileDB):
             self.filedb = filedb
         else:
-            raise ValueError("Unsupported file database format")
+            self.filedb = FileDB(filedb)
 
         # set the file_list
         if file_query is not None:
