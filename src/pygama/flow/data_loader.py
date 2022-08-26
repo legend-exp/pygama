@@ -120,9 +120,12 @@ class DataLoader:
         else:
             raise ValueError("Unsupported file database format")
 
+        # set the file_list
         if file_query is not None:
-            # set the file_list
             self.file_list = list(self.filedb.df.query(file_query).index)
+        else:
+            self.file_list = list(self.filedb.df.index)
+
 
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
@@ -541,7 +544,7 @@ class DataLoader:
 
                 # Perform cuts specified for child or parent level, in that order
                 for level in [child, parent]:
-                    if level not in self.cuts.keys():
+                    if self.cuts is None or level not in self.cuts.keys():
                         continue
                     cut = self.cuts[level]
                     col_tiers = self.get_tiers_for_col(
