@@ -48,7 +48,7 @@ def bl_from_y_projection_at_mean(proj_in, border_in, mean_in, std_out, mean_idx_
     # find mean index
     mean_idx = 0
     for i in range(0, len(proj_in), 1):
-        if  abs(mean_in-border_in[i]) < abs(mean_in-border_in[mean_idx]):
+        if abs(mean_in - border_in[i]) < abs(mean_in - border_in[mean_idx]):
             mean_idx = i
     mean_idx_out[0] = mean_idx
     # and the approx standarddev
