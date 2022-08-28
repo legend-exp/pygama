@@ -209,11 +209,15 @@ def find_pulser_properties(df, energy="daqenergy"):
                 else:
 
                     max_locs = bcs[np.array(maxs)]
-                    if len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0])>1 or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all():
+                    if (
+                        len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0])
+                        > 1
+                        or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
+                    ):
                         pulser_e = e
                         period = stats.mode(tsl).mode[0]
                         out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
-                        
+
                     else:
                         continue
             except:
