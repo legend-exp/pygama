@@ -42,7 +42,7 @@ def run_tau(
         log.debug(f"pulser found: {pulser_props}")
     else:
         log.debug("no_pulser")
-        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+        ids = np.ones(len(df.daqenergy.values), dtype=bool)
 
     cuts = np.where((df.daqenergy.values > threshold) & (ids))[0]
 
