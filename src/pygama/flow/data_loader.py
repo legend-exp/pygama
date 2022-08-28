@@ -119,7 +119,6 @@ class DataLoader:
         else:
             self.file_list = list(self.filedb.df.index)
 
-
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
 
