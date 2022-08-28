@@ -96,9 +96,7 @@ class FileDB:
     >>> db.to_disk("file_db.lh5")
     """
 
-    def __init__(
-        self, config: str | dict, scan: bool = True
-    ) -> None:
+    def __init__(self, config: str | dict, scan: bool = True) -> None:
         """
         Parameters
         ----------
@@ -408,8 +406,8 @@ class FileDB:
         #     PyTables will pickle object types that it cannot map directly to c-types
         #
         # not sure how to fix this so we ignore the warning for the moment
-        warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
-        self.df.to_hdf(filename, key="dataframe", format='fixed', mode="r+")
+        warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+        self.df.to_hdf(filename, key="dataframe", format="fixed", mode="r+")
 
     def scan_daq_files(self, daq_dir: str, daq_template: str) -> None:
         """

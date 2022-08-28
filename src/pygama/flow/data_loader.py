@@ -12,7 +12,6 @@ from keyword import iskeyword
 
 import numpy as np
 import pandas as pd
-import h5py
 
 from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
