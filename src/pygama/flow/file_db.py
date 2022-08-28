@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import string
+import warnings
 
 import h5py
 import numpy as np
@@ -206,7 +207,8 @@ class FileDB:
         tier's file exists.
 
         For example, if we have tiers `raw`, `dsp`, and `hit`, but only the
-        `raw` file has been produced, ``file_status`` would be ``0b100``.
+        `raw` file has been produced, ``file_status`` would be 4 (``0b100`` in
+        binary representation).
         """
 
         def check_status(row):
@@ -400,9 +402,16 @@ class FileDB:
             )
             sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
 
-        self.df.to_hdf(filename, "dataframe", mode="r+")
+        # FIXME: to_hdf() throws this:
+        #
+        #     pandas.errors.PerformanceWarning: your performance may suffer as
+        #     PyTables will pickle object types that it cannot map directly to c-types
+        #
+        # not sure how to fix this so we ignore the warning for the moment
+        warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+        self.df.to_hdf(filename, key="dataframe", format='fixed', mode="r+")
 
-    def scan_daq_files(self) -> None:
+    def scan_daq_files(self, daq_dir: str, daq_template: str) -> None:
         """
         Does the exact same thing as :meth:`.scan_files` but with extra
         configuration arguments for a DAQ directory and template instead of
@@ -411,18 +420,18 @@ class FileDB:
         file_keys = []
         n_files = 0
 
-        for path, _folders, files in os.walk(self.daq_dir):
+        for path, _folders, files in os.walk(daq_dir):
             n_files += len(files)
 
             for f in files:
 
                 # in some cases, we need information from the path name
-                if "/" in self.daq_template:
-                    f_tmp = path.replace(self.daq_dir, "") + "/" + f
+                if "/" in daq_template:
+                    f_tmp = path.replace(daq_dir, "") + "/" + f
                 else:
                     f_tmp = f
 
-                finfo = parse(self.daq_template, f_tmp)
+                finfo = parse(daq_template, f_tmp)
                 if finfo is not None:
                     finfo = finfo.named
                     file_keys.append(finfo)
@@ -433,7 +442,7 @@ class FileDB:
             raise FileNotFoundError("No DAQ files found")
 
         if len(file_keys) == 0:
-            raise FileNotFoundError("No DAQ files matched pattern ", self.daq_template)
+            raise FileNotFoundError("No DAQ files matched pattern ", daq_template)
 
         temp_df = pd.DataFrame(file_keys)
 
