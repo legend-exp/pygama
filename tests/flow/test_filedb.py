@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
+
 import pytest
 from pandas.testing import assert_frame_equal
-from datetime import datetime, timezone
 
 from pygama.flow import FileDB
 from pygama.flow.file_db import to_datetime, to_unixtime
@@ -159,7 +160,9 @@ def test_serialization(test_filedb):
 
 
 def test_ket_to_datetime():
-    assert to_datetime("20220716T105236Z") == datetime(2022, 7, 16, 10, 52, 36, tzinfo=timezone.utc)
+    assert to_datetime("20220716T105236Z") == datetime(
+        2022, 7, 16, 10, 52, 36, tzinfo=timezone.utc
+    )
 
 
 def test_ket_to_unixtime():

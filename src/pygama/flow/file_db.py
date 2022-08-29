@@ -3,13 +3,13 @@ Utilities for LH5 file inventory.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import logging
 import os
 import re
 import string
 import warnings
+from datetime import datetime, timezone
 
 import h5py
 import numpy as np
