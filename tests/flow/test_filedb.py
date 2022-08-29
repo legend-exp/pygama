@@ -1,7 +1,9 @@
 import pytest
 from pandas.testing import assert_frame_equal
+from datetime import datetime, timezone
 
 from pygama.flow import FileDB
+from pygama.flow.file_db import to_datetime, to_unixtime
 
 
 def test_filedb_basics(test_filedb):
@@ -154,3 +156,11 @@ def test_serialization(test_filedb):
 
     db2 = FileDB("/tmp/filedb.lh5")
     assert_frame_equal(db.df, db2.df)
+
+
+def test_ket_to_datetime():
+    assert to_datetime("20220716T105236Z") == datetime(2022, 7, 16, 10, 52, 36, tzinfo=timezone.utc)
+
+
+def test_ket_to_unixtime():
+    assert to_unixtime("20220716T105236Z") == 1657968756

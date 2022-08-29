@@ -3,6 +3,7 @@ Utilities for LH5 file inventory.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import logging
 import os
@@ -19,6 +20,24 @@ from pygama.lgdo import Array, LH5Store, Scalar, VectorOfVectors
 from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
+
+
+def to_datetime(key: str) -> datetime:
+    """Convert LEGEND cycle key to :class:`~datetime.datetime`.
+
+    Assumes `key` is formatted as ``YYYYMMDDTHHMMSSZ`` (UTC).
+    """
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$", key)
+    if m is None:
+        raise ValueError(f"Could not parse '{key}' as a datetime object")
+    else:
+        g = [int(el) for el in m.groups()]
+        return datetime(*g, tzinfo=timezone.utc)
+
+
+def to_unixtime(key: str) -> int:
+    """Convert LEGEND cycle key to `POSIX timestamp <https://en.wikipedia.org/wiki/Unix_time>`_."""
+    return int(to_datetime(key).timestamp())
 
 
 class FileDB:
