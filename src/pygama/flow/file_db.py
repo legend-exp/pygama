@@ -218,6 +218,12 @@ class FileDB:
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
+        # sort rows according to timestamps
+        log.debug("Sorting database entries according to timestamp")
+        self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
+        self.df.sort_values("_datetime", ignore_index=True, inplace=True)
+        self.df.drop("_datetime", axis=1, inplace=True)
+
     def set_file_status(self) -> None:
         """
         Add a column to the dataframe with a bit corresponding to whether each
