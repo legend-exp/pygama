@@ -115,8 +115,6 @@ class DataLoader:
         # set the file_list
         if file_query is not None:
             self.file_list = list(self.filedb.df.query(file_query).index)
-        else:
-            self.file_list = list(self.filedb.df.index)
 
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
@@ -165,22 +163,30 @@ class DataLoader:
         Sets `self.file_list`, which is a list of indices corresponding to the
         rows in the file database.
 
+        Note
+        ----
+        Call this function before any other operation. A second call to
+        :meth:`set_files` does not replace the current file list, which gets
+        instead integrated with the new list. Use :meth:`reset` to reset the
+        file query.
+
         Parameters
         ----------
         query
             operation string on the file database columns supported by
-            :meth:`pandas.DataFrame.query`.
+            :meth:`pandas.DataFrame.query`. In addition, the ``all`` keyword is
+            supported to select all files in the database.
 
         Example
         -------
         >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
-
-        Note
-        ----
-        Do this before any other operation. Why?
         """
 
-        inds = list(self.filedb.df.query(query, inplace=False).index)
+        if query.replace(" ", "") == "all":
+            inds = list(self.filedb.df.index)
+        else:
+            inds = list(self.filedb.df.query(query, inplace=False).index)
+
         if self.file_list is None:
             self.file_list = inds
         else:
@@ -437,7 +443,7 @@ class DataLoader:
         :meth:`.load`.
         """
         if self.file_list is None:
-            raise ValueError("You need to make a query on filedb, use set_file_list")
+            raise ValueError("You need to make a query on filedb, use set_files()")
 
         if not in_memory and output_file is None:
             raise ValueError("If in_memory is False, need to specify an output file")
@@ -727,7 +733,7 @@ class DataLoader:
     def load(
         self,
         entry_list: pd.DataFrame = None,
-        in_memory: bool = False,
+        in_memory: bool = True,
         output_file: str = None,
         orientation: str = "hit",
         tcm_level: str = None,
