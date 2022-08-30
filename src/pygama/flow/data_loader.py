@@ -61,6 +61,15 @@ class DataLoader:
             "channel_map": {}
         }
 
+    Examples
+    --------
+    >>> from pygama.flow import DataLoader
+    >>> dl = DataLoader("loader-config.json", "filedb-config.json")
+    >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
+    >>> dl.set_datastreams([3, 6, 8], "ch")
+    >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
+    >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
+    >>> data = dl.load()
     """
 
     def __init__(
@@ -304,7 +313,7 @@ class DataLoader:
         Set the parameters for the output format of load
 
         Parameters
-        ----------
+        ---------
         fmt
             ``lgdo.Table`` or ``pd.DataFrame``.
         merge_files
