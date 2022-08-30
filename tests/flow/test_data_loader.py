@@ -1,12 +1,11 @@
-import pytest
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pandas as pd
+import pytest
 
-
-from pygama.flow import DataLoader
 from pygama import lgdo
+from pygama.flow import DataLoader
 
 config_dir = Path(__file__).parent / "configs"
 
