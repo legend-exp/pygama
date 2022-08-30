@@ -65,8 +65,8 @@ class DataLoader:
 
     def __init__(
         self,
-        filedb: str | dict | FileDB,
         config: str | dict,
+        filedb: str | dict | FileDB,
         file_query: str = None,
     ) -> None:
         """
@@ -120,6 +120,9 @@ class DataLoader:
 
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
+
+        if not os.path.isdir(config["data_dir"]):
+            raise FileNotFoundError(f"{config['data_dir']} is not a valid data_dir name")
 
         self.config = config
         self.data_dir = config["data_dir"]
@@ -176,6 +179,7 @@ class DataLoader:
         ----
         Do this before any other operation. Why?
         """
+
         inds = list(self.filedb.df.query(query, inplace=False).index)
         if self.file_list is None:
             self.file_list = inds
@@ -335,6 +339,9 @@ class DataLoader:
         """
         col_tiers = {}
 
+        if self.filedb.columns is None:
+            self.filedb.get_tables_columns()
+
         if merge_files is None:
             merge_files = self.merge_files
 
@@ -352,10 +359,7 @@ class DataLoader:
                             for i in range(
                                 len(self.filedb.df.loc[file, f"{tier}_col_idx"])
                             ):
-                                if (
-                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                                    in col_inds
-                                ):
+                                if self.filedb.df.loc[file, f"{tier}_col_idx"][i] in col_inds:
                                     col_tiers[tier].add(
                                         self.filedb.df.loc[file, f"{tier}_tables"][i]
                                     )
@@ -395,7 +399,7 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ) -> pd.DataFrame | None:
+    ) -> dict[int, pd.DataFrame] | None:
         """Applies cuts to the tables and files of interest.
 
         Can only load up to two levels, those joined by `tcm_level`.
@@ -610,7 +614,7 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ) -> pd.DataFrame | None:
+    ) -> dict[int, pd.DataFrame] | None:
         """Called by :meth:`.gen_entry_list` to handle the case when
         `tcm_level` is unspecified.
 
@@ -663,7 +667,7 @@ class DataLoader:
 
             for tb in tables:
                 tb_table = None
-                if not cut:
+                if cut == "":
                     tier = self.tiers[low_level][0]
                     tier_path = (
                         self.data_dir
@@ -680,6 +684,8 @@ class DataLoader:
                                 f"{low_level}_table": tb,
                             }
                         )
+                    else:
+                        raise FileNotFoundError(tier_path)
                 else:
                     for tier in self.tiers[low_level]:
                         if tier in col_tiers[file]["tables"].keys():
@@ -703,7 +709,9 @@ class DataLoader:
                     tb_df.query(cut, inplace=True)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
+
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
+
             if in_memory:
                 entries[file] = f_entries
             if output_file:
@@ -711,6 +719,7 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+
         if in_memory:
             return entries
 
