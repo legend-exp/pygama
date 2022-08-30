@@ -159,11 +159,11 @@ def test_serialization(test_filedb):
     assert_frame_equal(db.df, db2.df)
 
 
-def test_ket_to_datetime():
+def test_key_to_datetime():
     assert to_datetime("20220716T105236Z") == datetime(
         2022, 7, 16, 10, 52, 36, tzinfo=timezone.utc
     )
 
 
-def test_ket_to_unixtime():
+def test_key_to_unixtime():
     assert to_unixtime("20220716T105236Z") == 1657968756

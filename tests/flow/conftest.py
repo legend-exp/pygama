@@ -8,7 +8,7 @@ from pygama.flow import FileDB
 config_dir = Path(__file__).parent / "configs"
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_filedb(lgnd_test_data):
     with open(config_dir / "filedb-config.json") as f:
         config = json.load(f)

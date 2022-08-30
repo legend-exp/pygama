@@ -120,7 +120,9 @@ class DataLoader:
         """Load configuration dictionary."""
 
         if not os.path.isdir(config["data_dir"]):
-            raise FileNotFoundError(f"{config['data_dir']} is not a valid data_dir name")
+            raise FileNotFoundError(
+                f"{config['data_dir']} is not a valid data_dir name"
+            )
 
         self.config = config
         self.data_dir = config["data_dir"]
@@ -365,7 +367,10 @@ class DataLoader:
                             for i in range(
                                 len(self.filedb.df.loc[file, f"{tier}_col_idx"])
                             ):
-                                if self.filedb.df.loc[file, f"{tier}_col_idx"][i] in col_inds:
+                                if (
+                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                                    in col_inds
+                                ):
                                     col_tiers[tier].add(
                                         self.filedb.df.loc[file, f"{tier}_tables"][i]
                                     )
