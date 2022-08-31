@@ -332,7 +332,7 @@ def AoEcorrection(
     errs = m_mu.errors
 
     # Fit sigma against energy
-    p0_sig = [np.nanpercentile(aoe_sigmas[~ids], 50), 2]  # , 2
+    p0_sig = [np.nanpercentile(aoe_sigmas[~ids], 50)**2, 2]
     c_sig = cost.LeastSquares(
         comptBands[~ids], aoe_sigmas[~ids], aoe_sigmas_err[~ids], sigma_fit
     )
