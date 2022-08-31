@@ -12,16 +12,12 @@ config_dir = Path(__file__).parent / "configs"
 
 @pytest.fixture(scope="function")
 def test_dl(lgnd_test_data):
-    with open(config_dir / "data-loader-config.json") as f:
-        dl_config = json.load(f)
-
     with open(config_dir / "filedb-config.json") as f:
         db_config = json.load(f)
 
-    dl_config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
-    db_config["data_dir"] = dl_config["data_dir"]
+    db_config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
 
-    return DataLoader(dl_config, db_config)
+    return DataLoader(f"{config_dir}/data-loader-config.json", db_config)
 
 
 def test_init(test_filedb):

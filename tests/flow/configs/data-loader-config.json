@@ -1,5 +1,4 @@
 {
-  "data_dir": "generated/tier",
   "levels": {
     "hit": {
       "tiers": ["raw", "dsp", "hit"]
