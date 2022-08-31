@@ -886,7 +886,7 @@ class DataLoader:
 
             if log.level <= logging.INFO:
                 progress_bar = tqdm(
-                    desc=f"Loading data",
+                    desc="Loading data",
                     total=len(entry_list),
                     delay=2,
                     unit=" keys",
