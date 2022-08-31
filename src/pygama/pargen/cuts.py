@@ -177,10 +177,10 @@ def find_pulser_properties(df, energy="daqenergy"):
     pt_pars, pt_covs = pgc.hpge_fit_E_peak_tops(
         hist, bins, var, peak_energies, n_to_fit=15
     )
-    peak_e_err = pt_pars[:, 1] * 5
+    peak_e_err = pt_pars[:, 1] * 4
 
     out_pulsers = []
-    for i, e in enumerate(peak_energies):  # [:2]
+    for i, e in enumerate(peak_energies): 
         if peak_e_err[i] > 200:
             continue
         else:
@@ -208,7 +208,8 @@ def find_pulser_properties(df, energy="daqenergy"):
                     continue
                 else:
 
-                    max_locs = bcs[np.array(maxs)]
+                    max_locs= np.array([0.0])
+                    max_locs = np.append(max_locs,bcs[np.array(maxs)])
                     if (
                         len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0])
                         > 1
