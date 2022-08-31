@@ -48,7 +48,7 @@ def load_data(
         ids = ~(out_df.isPulser == 1)
         log.debug(f"pulser found: {pulser_props}")
     else:
-        ids = np.zeros(len(df), dtype=bool)
+        ids = np.ones(len(df), dtype=bool)
         log.debug(f"no pulser found")
 
     if len(hit_dict.keys()) == 0:
