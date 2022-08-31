@@ -168,7 +168,7 @@ class DataLoader:
         else:
             log.warning("Channel map must be dict or path to JSON file")
 
-    def set_files(self, query: str) -> None:
+    def set_files(self, query: str | list[str]) -> None:
         """Apply a file selection.
 
         Sets `self.file_list`, which is a list of indices corresponding to the
@@ -184,19 +184,26 @@ class DataLoader:
         Parameters
         ----------
         query
-            operation string on the file database columns supported by
-            :meth:`pandas.DataFrame.query`. In addition, the ``all`` keyword is
-            supported to select all files in the database.
+            if single string, defines an operation on the file database columns
+            supported by :meth:`pandas.DataFrame.query`. In addition, the
+            ``all`` keyword is supported to select all files in the database.
+            If list of strings, will be interpreted as key (cycle timestamp) list.
 
         Example
         -------
         >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
         """
 
-        if query.replace(" ", "") == "all":
-            inds = list(self.filedb.df.index)
+        if isinstance(query, list) and query:
+            query = " and ".join([f"timestamp == '{key}'" for key in query])
+
+        if isinstance(query, str):
+            if query.replace(" ", "") == "all":
+                inds = list(self.filedb.df.index)
+            else:
+                inds = list(self.filedb.df.query(query, inplace=False).index)
         else:
-            inds = list(self.filedb.df.query(query, inplace=False).index)
+            raise ValueError("bad query format")
 
         if self.file_list is None:
             self.file_list = inds

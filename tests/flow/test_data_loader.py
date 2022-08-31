@@ -54,6 +54,14 @@ def test_set_files(test_dl):
     assert len(data) == 1
 
 
+def test_set_keylist(test_dl):
+    test_dl.set_files(["20220716T104550Z", "20220716T104550Z"])
+    test_dl.set_output(columns=["timestamp"])
+    data = test_dl.load()
+
+    assert len(data) == 1
+
+
 def test_set_datastreams(test_dl):
     test_dl.set_files("all")
     test_dl.set_datastreams([1, 3, 8], "ch")
