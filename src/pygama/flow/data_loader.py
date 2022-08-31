@@ -195,7 +195,7 @@ class DataLoader:
         """
 
         if isinstance(query, list) and query:
-            query = " and ".join([f"timestamp == '{key}'" for key in query])
+            query = " or ".join([f"timestamp == '{key}'" for key in query])
 
         if isinstance(query, str):
             if query.replace(" ", "") == "all":
@@ -204,6 +204,9 @@ class DataLoader:
                 inds = list(self.filedb.df.query(query, inplace=False).index)
         else:
             raise ValueError("bad query format")
+
+        if not inds:
+            log.warning("no files matching selection found")
 
         if self.file_list is None:
             self.file_list = inds
