@@ -194,7 +194,7 @@ class DataLoader:
         >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
         """
 
-        if isinstance(query, list) and query:
+        if isinstance(query, (list, tuple)) and query:
             query = " or ".join([f"timestamp == '{key}'" for key in query])
 
         if isinstance(query, str):
@@ -336,6 +336,9 @@ class DataLoader:
         -------
         >>> dl.set_output(fmt="pd.DataFrame", merge_files=False, columns=["daqenergy", "trapEmax", "channel"])
         """
+        if fmt not in ["lgdo.Table", "pd.DataFrame", None]:
+            raise ValueError(f"'{fmt}' output format not supported")
+
         if fmt is not None:
             self.output_format = fmt
         if merge_files is not None:
@@ -364,9 +367,6 @@ class DataLoader:
             whether or not to combine the results for all files
             If ``None``, uses `self.merge_files`.
         """
-        log.debug(
-            f"Getting tiers (and tables therein) where {columns} columns can be found"
-        )
 
         col_tiers = {}
 
@@ -482,7 +482,7 @@ class DataLoader:
         if in_memory:
             entries = {}
 
-        log.debug("Generating entry list determined by cuts")
+        log.debug("generating entry list determined by cuts")
 
         # Default columns in the entry_list
         if tcm_level is None:
@@ -675,7 +675,7 @@ class DataLoader:
         entry_cols = [f"{low_level}_table", f"{low_level}_idx"]
 
         log.debug(
-            f"Generating (hit-oriented) entry list corresponding to cuts on the {low_level} tier"
+            f"generating (hit-oriented) entry list corresponding to cuts on the {low_level} level"
         )
 
         # find out which columns are needed for the cut
@@ -698,13 +698,15 @@ class DataLoader:
                         ):
                             entry_cols.append(term)
 
-        log.debug(f"Need to load {cut_cols} columns for applying cuts")
+        log.debug(f"need to load {cut_cols} columns for applying cuts")
         col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
 
         sto = LH5Store()
 
         # now we loop over the files in our list
         for file in self.file_list:
+
+            log.debug(f"building entry list for cycle {self.filedb.df.iloc[file][f'timestamp']}")
 
             # this dataframe will be associated with the file and will contain
             # the columns needed for the cut as well as the columns requested
@@ -812,13 +814,14 @@ class DataLoader:
         tcm_level
             which TCM was used to create the ``entry_list``.
         """
+        # set save_output_columns=True to avoid wasting time
         if entry_list is None:
             entry_list = self.gen_entry_list(
                 tcm_level=tcm_level, save_output_columns=True
             )
 
         if not in_memory and output_file is None:
-            raise ValueError("If in_memory is False, need to specify an output file")
+            raise ValueError("if in_memory is False, need to specify an output file")
 
         if orientation == "hit":
             return self.load_hits(entry_list, in_memory, output_file, tcm_level)
@@ -828,7 +831,7 @@ class DataLoader:
                     tcm_level = list(self.tcms.keys())[0]
                 else:
                     raise ValueError(
-                        "Need to specify which coincidence map to use to return event-oriented data"
+                        "need to specify which coincidence map to use to return event-oriented data"
                     )
             return self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
@@ -865,12 +868,13 @@ class DataLoader:
 
             # now loop over the output of gen_entry_list()
             for file, f_entries in entry_list.items():
+                log.debug(f"loading data for cycle key {self.filedb.df.iloc[file][f'timestamp']}")
+
                 field_mask = []
 
                 if self.output_columns is None or not self.output_columns:
-                    raise ValueError("Need to set output columns to load data")
+                    raise ValueError("need to set output columns to load data")
 
-                # pre-allocate memory for output columns
                 for col in self.output_columns:
                     if col not in f_entries.columns:
                         field_mask.append(col)
@@ -890,8 +894,11 @@ class DataLoader:
 
                     # loop over tiers in the level
                     for tier in self.tiers[level]:
+
                         if tb not in col_tiers[file]["tables"][tier]:
                             continue
+
+                        log.debug(f"...for stream '{self.get_table_name(tier, tb)}' (at {level} level)")
 
                         # path to tier file
                         tier_path = os.path.join(
@@ -960,12 +967,12 @@ class DataLoader:
                                     ].nda
                                 else:  # wf_values is a VectorOfVectors
                                     log.warning(
-                                        "Not sure how to handle waveforms with values "
+                                        "not sure how to handle waveforms with values "
                                         f"of type {type(tier_table[col]['values'])} yet"
                                     )
                             else:
                                 log.warning(
-                                    f"Not sure how to handle column {col} "
+                                    f"not sure how to handle column {col} "
                                     f"of type {type(tier_table[col])} yet"
                                 )
 
@@ -988,12 +995,7 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    log.warning(
-                        "I don't know how to output "
-                        + self.output_format
-                        + ", here is a lgdo.Table"
-                    )
-                    return load_out
+                    raise ValueError(f"'{self.output_format}' output format not supported")
 
     def load_evts(
         self,
@@ -1072,12 +1074,7 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    log.warning(
-                        "I don't know how to output "
-                        + self.output_format
-                        + ", here is a lgdo.Table"
-                    )
-                    return load_out
+                    raise ValueError(f"'{self.output_format}' output format not supported")
 
     def load_detector(self, det_id):
         """

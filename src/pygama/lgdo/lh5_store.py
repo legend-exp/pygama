@@ -257,7 +257,7 @@ class LH5Store:
             return obj_buf, n_rows_read
 
         # start read from single file. fail if the object is not found
-        log.debug(f"reading '{name}' from {lh5_file}")
+        log.debug(f"reading '{name}' from {lh5_file}" + (" with field mask {field_mask}") if field_mask else "")
 
         # get the file from the store
         h5f = self.gimme_file(lh5_file, "r")
