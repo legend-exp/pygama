@@ -139,17 +139,14 @@ def build_raw(
         log.info(f"maximum number of events: {n_max}")
     if log.level <= logging.INFO:
         if n_max < np.inf:
-            progress_bar = tqdm(
-                desc="Processing", total=n_max, delay=2, unit="rows", file=sys.stdout
-            )
+            progress_bar = tqdm(desc="Decoding", total=n_max, delay=2, unit=" rows")
         else:
             progress_bar = tqdm(
-                desc="Processing",
+                desc="Decoding",
                 total=in_stream_size,
                 delay=2,
-                unit="B",
+                unit=" B",
                 unit_scale=True,
-                file=sys.stdout,
             )
 
     # start a timer and a byte counter

@@ -13,6 +13,7 @@ from keyword import iskeyword
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
@@ -703,10 +704,24 @@ class DataLoader:
 
         sto = LH5Store()
 
+        if log.level <= logging.INFO:
+            progress_bar = tqdm(
+                desc="Building entry list",
+                total=len(self.file_list),
+                delay=2,
+                unit=" keys",
+            )
+
         # now we loop over the files in our list
         for file in self.file_list:
 
-            log.debug(f"building entry list for cycle {self.filedb.df.iloc[file][f'timestamp']}")
+            if log.level <= logging.INFO:
+                progress_bar.update()
+                progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+
+            log.debug(
+                f"building entry list for cycle {self.filedb.df.iloc[file]['timestamp']}"
+            )
 
             # this dataframe will be associated with the file and will contain
             # the columns needed for the cut as well as the columns requested
@@ -784,6 +799,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+
+        if log.level <= logging.INFO:
+            progress_bar.close()
 
         if in_memory:
             return entries
@@ -866,9 +884,24 @@ class DataLoader:
             if in_memory:
                 load_out = {}
 
+            if log.level <= logging.INFO:
+                progress_bar = tqdm(
+                    desc=f"Loading data",
+                    total=len(entry_list),
+                    delay=2,
+                    unit=" keys",
+                )
+
             # now loop over the output of gen_entry_list()
             for file, f_entries in entry_list.items():
-                log.debug(f"loading data for cycle key {self.filedb.df.iloc[file][f'timestamp']}")
+
+                if log.level <= logging.INFO:
+                    progress_bar.update()
+                    progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+
+                log.debug(
+                    f"loading data for cycle key {self.filedb.df.iloc[file]['timestamp']}"
+                )
 
                 field_mask = []
 
@@ -898,7 +931,9 @@ class DataLoader:
                         if tb not in col_tiers[file]["tables"][tier]:
                             continue
 
-                        log.debug(f"...for stream '{self.get_table_name(tier, tb)}' (at {level} level)")
+                        log.debug(
+                            f"...for stream '{self.get_table_name(tier, tb)}' (at {level} level)"
+                        )
 
                         # path to tier file
                         tier_path = os.path.join(
@@ -987,6 +1022,9 @@ class DataLoader:
                 if output_file:
                     sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
 
+            if log.level <= logging.INFO:
+                progress_bar.close()
+
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return load_out
@@ -995,7 +1033,9 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    raise ValueError(f"'{self.output_format}' output format not supported")
+                    raise ValueError(
+                        f"'{self.output_format}' output format not supported"
+                    )
 
     def load_evts(
         self,
@@ -1074,7 +1114,9 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    raise ValueError(f"'{self.output_format}' output format not supported")
+                    raise ValueError(
+                        f"'{self.output_format}' output format not supported"
+                    )
 
     def load_detector(self, det_id):
         """

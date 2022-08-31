@@ -191,8 +191,7 @@ def build_dsp(
                         desc=f"Processing table {tb}",
                         total=tot_n_rows,
                         delay=2,
-                        unit="rows",
-                        file=sys.stdout,
+                        unit=" rows",
                     )
 
             n_rows = min(tot_n_rows - start_row, n_rows)
