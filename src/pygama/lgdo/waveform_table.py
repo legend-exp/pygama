@@ -235,3 +235,27 @@ class WaveformTable(Table):
     @dt_units.setter
     def dt_units(self, units: str) -> None:
         self.dt.attrs["units"] = f"{units}"
+
+    def __str__(self):
+        npopt = np.get_printoptions()
+        np.set_printoptions(threshold=100)
+
+        string = ""
+
+        for i in range(self.size):
+            if isinstance(self.values, VectorOfVectors):
+                string += f"{self.values.get_vector(i)}"
+            else:
+                string += f"{self.values.nda[i]}"
+
+            string += f", dt={self.dt.nda[i]}"
+            if self.dt_units:
+                string += f" {self.dt_units}"
+            string += f", t0={self.t0.nda[i]}"
+            if self.t0_units:
+                string += f" {self.t0_units}"
+            if i < self.size-1:
+                string += "\n"
+
+        np.set_printoptions(**npopt)
+        return string

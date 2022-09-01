@@ -53,13 +53,9 @@ class Scalar:
         return self.datatype_name()
 
     def __str__(self) -> str:
-        """Convert to string (e.g. for printing)."""
-        string = str(self.value)
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop("datatype")
-        if len(tmp_attrs) > 0:
-            string += "\n" + str(tmp_attrs)
-        return string
+        return self.value.__str__() + f" with attrs={tmp_attrs.__repr__()}"
 
     def __repr__(self) -> str:
-        return str(self)
+        return "Scalar(value=" + self.value.__repr__() + ", attrs=" + self.attrs.__repr__() + ")"

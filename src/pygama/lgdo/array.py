@@ -104,11 +104,13 @@ class Array:
 
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()
-        datatype = tmp_attrs.pop("datatype")
-        string = datatype + " = " + str(self.nda)
+        tmp_attrs.pop("datatype")
+        string = self.nda.__str__()
         if len(tmp_attrs) > 0:
-            string += "\n attrs = " + str(tmp_attrs)
+            string += f" with attrs={tmp_attrs}"
         return string
 
     def __repr__(self) -> str:
-        return str(self)
+        return self.__class__.__name__ + \
+               "(" + np.array2string(self.nda, prefix=self.__class__.__name__+" ") + \
+               f", attrs={self.attrs.__repr__()})"

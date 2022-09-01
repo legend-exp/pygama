@@ -7,6 +7,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Union
 
+import numpy as np
+
 from pygama.lgdo.array import Array
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.vectorofvectors import VectorOfVectors
@@ -90,13 +92,28 @@ class Struct(dict):
 
     def __str__(self) -> str:
         """Convert to string (e.g. for printing)."""
+
+        thr_orig = np.get_printoptions()["threshold"]
+        np.set_printoptions(threshold=8)
+
+        string = "{\n"
+        for k, v in self.items():
+            string += f" {k.__repr__()}: {v}\n"
+        string += "}"
+
         tmp_attrs = self.attrs.copy()
-        datatype = tmp_attrs.pop("datatype")
-        # __repr__ instead of __str__ to avoid infinite loop
-        string = datatype + " = " + super().__repr__()
-        if len(tmp_attrs) > 0:
-            string += "\nattrs = " + str(tmp_attrs)
+        tmp_attrs.pop("datatype")
+        if tmp_attrs:
+            string += f" with attrs={tmp_attrs}"
+
+        np.set_printoptions(threshold=thr_orig)
+
         return string
 
     def __repr__(self) -> str:
-        return str(self)
+        npopt = np.get_printoptions()
+        np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
+        out = self.__class__.__name__ + "(dict=" + dict.__repr__(self) + \
+            ", attrs={" + self.attrs.__repr__() + "})"
+        np.set_printoptions(**npopt)
+        return " ".join(out.replace("\n", " ").split())
