@@ -13,7 +13,7 @@ from pygama.raw.raw_buffer import RawBufferLibrary
 log = logging.getLogger(__name__)
 
 
-class ORSIS3302WaveformDecoder(OrcaDecoder):
+class ORSIS3302DecoderForEnergy(OrcaDecoder):
     """Decoder for `Struck SIS3302 <https://www.struck.de/sis3302.htm>`_ digitizer
     data written by ORCA.
     """
