@@ -98,7 +98,11 @@ class Struct(dict):
 
         string = "{\n"
         for k, v in self.items():
-            string += f" {k.__repr__()}: {v}\n"
+            if "\n" in str(v):
+                rv = str(v).replace("\n", "\n    ")
+                string += f" '{k}':\n    {rv},\n"
+            else:
+                string += f" '{k}': {v},\n"
         string += "}"
 
         tmp_attrs = self.attrs.copy()
@@ -114,6 +118,6 @@ class Struct(dict):
         npopt = np.get_printoptions()
         np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
         out = self.__class__.__name__ + "(dict=" + dict.__repr__(self) + \
-            ", attrs={" + self.attrs.__repr__() + "})"
+            f", attrs={repr(self.attrs)})"
         np.set_printoptions(**npopt)
         return " ".join(out.replace("\n", " ").split())

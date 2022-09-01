@@ -105,7 +105,7 @@ class Array:
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop("datatype")
-        string = self.nda.__str__()
+        string = str(self.nda)
         if len(tmp_attrs) > 0:
             string += f" with attrs={tmp_attrs}"
         return string
@@ -113,4 +113,4 @@ class Array:
     def __repr__(self) -> str:
         return self.__class__.__name__ + \
                "(" + np.array2string(self.nda, prefix=self.__class__.__name__+" ") + \
-               f", attrs={self.attrs.__repr__()})"
+               f", attrs={repr(self.attrs)})"

@@ -55,7 +55,7 @@ class Scalar:
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop("datatype")
-        return self.value.__str__() + f" with attrs={tmp_attrs.__repr__()}"
+        return f"{str(self.value)} with attrs={repr(tmp_attrs)}"
 
     def __repr__(self) -> str:
-        return "Scalar(value=" + self.value.__repr__() + ", attrs=" + self.attrs.__repr__() + ")"
+        return self.__class__.__name__ + f"(value={repr(self.value)}, attrs={repr(self.attrs)})"
