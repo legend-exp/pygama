@@ -150,8 +150,8 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
         tbl["energy"].nda[ii] = packet[-4]
         tbl["energy_first"].nda[ii] = packet[-3]
 
-        # interpret the raw event data into numpy array of 16 bit ints does not
-        # copy data. p16 is read-only
+        # Interpret the raw event data into numpy array of 16 bit ints.
+        # Does not copy data. p16 is read-only
         p16 = np.frombuffer(packet, dtype=np.uint16)
 
         # compute expected and actual array dimensions
