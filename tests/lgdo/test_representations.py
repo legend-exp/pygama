@@ -54,9 +54,9 @@ def test_representations():
     }
 
     for k, it in objs.items():
-        print(f">>> {k}")
-        print(repr(it))
-        print()
-        print(f">>> print({k})")
-        print(it)
-        print()
+        print(f">>> {k}")  # noqa: T201
+        print(repr(it))  # noqa: T201
+        print()  # noqa: T201
+        print(f">>> print({k})")  # noqa: T201
+        print(it)  # noqa: T201
+        print()  # noqa: T201
