@@ -195,9 +195,15 @@ class VectorOfVectors:
     def __repr__(self) -> str:
         npopt = np.get_printoptions()
         np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
-        out = "VectorOfVectors(flattened_data=" + repr(self.flattened_data) + \
-              ", cumulative_length=" + repr(self.cumulative_length) + \
-              ", attrs=" + repr(self.attrs) + ")"
+        out = (
+            "VectorOfVectors(flattened_data="
+            + repr(self.flattened_data)
+            + ", cumulative_length="
+            + repr(self.cumulative_length)
+            + ", attrs="
+            + repr(self.attrs)
+            + ")"
+        )
         np.set_printoptions(**npopt)
         return out
 

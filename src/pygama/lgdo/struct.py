@@ -117,7 +117,11 @@ class Struct(dict):
     def __repr__(self) -> str:
         npopt = np.get_printoptions()
         np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
-        out = self.__class__.__name__ + "(dict=" + dict.__repr__(self) + \
-            f", attrs={repr(self.attrs)})"
+        out = (
+            self.__class__.__name__
+            + "(dict="
+            + dict.__repr__(self)
+            + f", attrs={repr(self.attrs)})"
+        )
         np.set_printoptions(**npopt)
         return " ".join(out.replace("\n", " ").split())

@@ -111,6 +111,9 @@ class Array:
         return string
 
     def __repr__(self) -> str:
-        return self.__class__.__name__ + \
-               "(" + np.array2string(self.nda, prefix=self.__class__.__name__+" ") + \
-               f", attrs={repr(self.attrs)})"
+        return (
+            self.__class__.__name__
+            + "("
+            + np.array2string(self.nda, prefix=self.__class__.__name__ + " ")
+            + f", attrs={repr(self.attrs)})"
+        )

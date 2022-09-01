@@ -58,4 +58,7 @@ class Scalar:
         return f"{str(self.value)} with attrs={repr(tmp_attrs)}"
 
     def __repr__(self) -> str:
-        return self.__class__.__name__ + f"(value={repr(self.value)}, attrs={repr(self.attrs)})"
+        return (
+            self.__class__.__name__
+            + f"(value={repr(self.value)}, attrs={repr(self.attrs)})"
+        )

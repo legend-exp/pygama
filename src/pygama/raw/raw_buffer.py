@@ -129,12 +129,21 @@ class RawBuffer:
         return repr(self)
 
     def __repr__(self) -> str:
-        return "RawBuffer(lgdo=" + repr(self.lgdo) + \
-               ", key_list=" + repr(self.key_list) + \
-               ", out_stream=" + repr(self.out_stream) +\
-               ", out_name=" + repr(self.out_name) + \
-               ", loc=" + repr(self.loc) + \
-               ", fill_safety=" + repr(self.fill_safety) + ")"
+        return (
+            "RawBuffer(lgdo="
+            + repr(self.lgdo)
+            + ", key_list="
+            + repr(self.key_list)
+            + ", out_stream="
+            + repr(self.out_stream)
+            + ", out_name="
+            + repr(self.out_name)
+            + ", loc="
+            + repr(self.loc)
+            + ", fill_safety="
+            + repr(self.fill_safety)
+            + ")"
+        )
 
 
 class RawBufferList(list):

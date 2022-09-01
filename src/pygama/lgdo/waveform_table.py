@@ -254,7 +254,7 @@ class WaveformTable(Table):
             string += f", t0={self.t0.nda[i]}"
             if self.t0_units:
                 string += f" {self.t0_units}"
-            if i < self.size-1:
+            if i < self.size - 1:
                 string += "\n"
 
         np.set_printoptions(**npopt)
