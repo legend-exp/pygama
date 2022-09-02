@@ -8,6 +8,7 @@ import logging
 from typing import Any, Union
 
 import pandas as pd
+from pandas.io.formats import format as fmt
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.scalar import Scalar
@@ -271,3 +272,27 @@ class Table(Struct):
             out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
 
         return out_tbl
+
+    def __str__(self):
+        opts = fmt.get_dataframe_repr_params()
+        opts["show_dimensions"] = False
+        opts["index"] = False
+
+        try:
+            string = self.get_dataframe().to_string(**opts)
+        except ValueError:
+            string = "Cannot print Table with VectorOfVectors yet!"
+
+        string += "\n"
+        for k, v in self.items():
+            tmp_attrs = v.attrs.copy()
+            tmp_attrs.pop("datatype")
+            if tmp_attrs:
+                string += f"\nwith attrs['{k}']={tmp_attrs}"
+
+        tmp_attrs = self.attrs.copy()
+        tmp_attrs.pop("datatype")
+        if tmp_attrs:
+            string += f"\nwith attrs={tmp_attrs}"
+
+        return string
