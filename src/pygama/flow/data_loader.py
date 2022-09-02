@@ -921,12 +921,13 @@ class DataLoader:
                 col_dict = f_entries.to_dict("list")
                 table_length = len(f_entries)
 
+                log.debug(f"will load new columns {field_mask}")
+
                 # loop through each table in entry list and
                 # loop through each level we're asked to load from
                 for tb, level in product(
                     f_entries[f"{parent}_table"].unique(), load_levels
                 ):
-
                     tcm_idx = f_entries.query(f"{parent}_table == {tb}").index
                     idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"].tolist()
 
@@ -1173,3 +1174,4 @@ class DataLoader:
         self.merge_files = False
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.data = None
