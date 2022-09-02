@@ -1154,11 +1154,14 @@ class ProcessorManager:
                 # Convert string into integer buffer if appropriate
                 if np.issubdtype(dtype, np.integer):
                     try:
-                        param = np.frombuffer(param.encode('ascii'), dtype).reshape(shape)
-                    except(ValueError):
+                        param = np.frombuffer(param.encode("ascii"), dtype).reshape(
+                            shape
+                        )
+                    except (ValueError):
                         raise ProcessingChainError(
                             f"could not convert string '{param}' into"
-                            f"byte-array of type {dtype} and shape {shape}")
+                            f"byte-array of type {dtype} and shape {shape}"
+                        )
 
             elif param is not None:
                 # Convert scalar to right type, including units
@@ -1707,7 +1710,7 @@ def build_processing_chain(
             module = importlib.import_module(recipe["module"])
             func = getattr(module, recipe["function"])
             args = recipe["args"]
-            
+
             # Initialize the new variables, if needed
             if "unit" in recipe:
                 new_vars = [k for k in re.split(",| ", proc_par) if k != ""]
@@ -1771,9 +1774,9 @@ def build_processing_chain(
             proc_chain.add_processor(func, *args, **kwargs)
         except Exception as e:
             raise ProcessingChainError(
-                "Exception raised while attempting to add processor:\n" + \
-                json.dumps(recipe, indent=2)
-                ) from e
+                "Exception raised while attempting to add processor:\n"
+                + json.dumps(recipe, indent=2)
+            ) from e
 
     # build the output buffers
     lh5_out = lgdo.Table(size=proc_chain._buffer_len)
