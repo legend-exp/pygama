@@ -175,13 +175,6 @@ class DataLoader:
         Sets `self.file_list`, which is a list of indices corresponding to the
         rows in the file database.
 
-        Note
-        ----
-        Call this function before any other operation. A second call to
-        :meth:`set_files` does not replace the current file list, which gets
-        instead integrated with the new list. Use :meth:`reset` to reset the
-        file query.
-
         Parameters
         ----------
         query
@@ -189,6 +182,13 @@ class DataLoader:
             supported by :meth:`pandas.DataFrame.query`. In addition, the
             ``all`` keyword is supported to select all files in the database.
             If list of strings, will be interpreted as key (cycle timestamp) list.
+
+        Note
+        ----
+        Call this function before any other operation. A second call to
+        :meth:`set_files` does not replace the current file list, which gets
+        instead integrated with the new list. Use :meth:`reset` to reset the
+        file query.
 
         Example
         -------
@@ -202,7 +202,9 @@ class DataLoader:
             if query.replace(" ", "") == "all":
                 inds = list(self.filedb.df.index)
             else:
-                inds = list(self.filedb.df.query(query, inplace=False).index)
+                inds = list(
+                    self.filedb.df.query(query, engine="python", inplace=False).index
+                )
         else:
             raise ValueError("bad query format")
 
