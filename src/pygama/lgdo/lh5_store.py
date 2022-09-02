@@ -258,8 +258,8 @@ class LH5Store:
 
         # start read from single file. fail if the object is not found
         log.debug(
-            f"reading '{name}' from {lh5_file}" + (
-                f" with field mask {field_mask}" if field_mask else "")
+            f"reading '{name}' from {lh5_file}"
+            + (f" with field mask {field_mask}" if field_mask else "")
         )
 
         # get the file from the store
