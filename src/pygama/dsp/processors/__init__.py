@@ -62,7 +62,7 @@ several advantages:
 from .bl_subtract import bl_subtract
 from .convolutions import cusp_filter, t0_filter, zac_filter
 from .fftw import dft, inv_dft, psd
-from .fixed_time_pickoff import fixed_time_pickoff
+from .fixed_time_pickoff import fixed_sample_pickoff, fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
 from .linear_slope_fit import linear_slope_fit
@@ -97,6 +97,7 @@ __all__ = [
     "dft",
     "inv_dft",
     "psd",
+    "fixed_sample_pickoff",
     "fixed_time_pickoff",
     "gaussian_filter1d",
     "get_multi_local_extrema",
