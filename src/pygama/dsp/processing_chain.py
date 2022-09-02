@@ -1150,6 +1150,16 @@ class ProcessorManager:
                         arshape.insert(len(arshape) + idim + 1, 1)
                 param = param.reshape(tuple(arshape))
 
+            elif isinstance(param, str):
+                # Convert string into integer buffer if appropriate
+                if np.issubdtype(dtype, np.integer):
+                    try:
+                        param = np.frombuffer(param.encode('ascii'), dtype).reshape(shape)
+                    except(ValueError):
+                        raise ProcessingChainError(
+                            f"could not convert string '{param}' into"
+                            f"byte-array of type {dtype} and shape {shape}")
+
             elif param is not None:
                 # Convert scalar to right type, including units
                 if isinstance(param, (Quantity, Unit)):
