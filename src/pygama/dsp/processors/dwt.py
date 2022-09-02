@@ -34,10 +34,10 @@ def discrete_wavelet_transform(wave_type: str, level: int) -> Callable:
     --------------------------
     .. code-block :: json
 
-        "dwt_haar":{
-            "function": "dwt",
+        "dwt":{
+            "function": "discrete_wavelet_transform",
             "module": "pygama.dsp.processors",
-            "args": ["wf_blsub", "dwt_haar(250)"],
+            "args": ["wf_blsub", "dwt(250)"],
             "unit": "ADC",
             "prereqs": ["wf_blsub"],
             "init_args": ["'haar'", "3",]
