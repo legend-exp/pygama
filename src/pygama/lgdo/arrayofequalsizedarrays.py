@@ -35,15 +35,16 @@ class ArrayOfEqualSizedArrays(Array):
             specifies the dimensions required for building the
             :class:`ArrayOfEqualSizedArrays`' `datatype` attribute.
         nda
-            An ndarray to be used for this object's internal array. Note: the
-            array is used directly, not copied. If not supplied, internal memory
-            is newly allocated based on the shape and dtype arguments.
+            An :class:`numpy.ndarray` to be used for this object's internal
+            array. Note: the array is used directly, not copied. If not
+            supplied, internal memory is newly allocated based on the `shape`
+            and `dtype` arguments.
         shape
-            A numpy-format shape specification for shape of the internal
-            ndarray. Required if nda is None, otherwise unused.
+            A NumPy-format shape specification for shape of the internal
+            array. Required if `nda` is ``None``, otherwise unused.
         dtype
-            Specifies the type of the data in the array. Required if nda is
-            None, otherwise unused.
+            Specifies the type of the data in the array. Required if `nda` is
+            ``None``, otherwise unused.
         fill_val
             If ``None``, memory is allocated without initialization. Otherwise,
             the array is allocated with all elements set to the corresponding
