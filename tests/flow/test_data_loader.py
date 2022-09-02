@@ -37,13 +37,22 @@ def test_simple_load(test_dl):
 
 def test_outputs(test_dl):
     test_dl.set_files("all")
-    test_dl.set_output(fmt="pd.DataFrame", columns=["timestamp", "channel"])
+    test_dl.set_output(
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "bl_mean", "hit_par1"]
+    )
     data = test_dl.load()
 
     assert isinstance(data, dict)
     assert isinstance(data[0], pd.DataFrame)
     assert len(data) == 2
-    assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp", "channel"]
+    assert list(data[0].keys()) == [
+        "hit_table",
+        "hit_idx",
+        "timestamp",
+        "channel",
+        "bl_mean",
+        "hit_par1",
+    ]
 
 
 def test_set_files(test_dl):

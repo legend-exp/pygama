@@ -42,11 +42,11 @@ def test_filedb_basics(test_filedb):
             "/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_tcm.lh5",
             "/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_evt.lh5",
             2141080,
-            2060344,
-            0,
+            292032,
+            280040,
             15728,
             0,
-            int("0b11010", 2),
+            int("0b11110", 2),
         ],
         [
             "l60",
@@ -60,11 +60,11 @@ def test_filedb_basics(test_filedb):
             "/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_tcm.lh5",
             "/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_evt.lh5",
             2141080,
-            1371544,
-            0,
+            292032,
+            280040,
             15728,
             0,
-            int("0b11010", 2),
+            int("0b11110", 2),
         ],
     ]
 
@@ -136,14 +136,10 @@ def test_get_tables_columns(test_filedb):
             "waveform",
         ],
         [
-            "bl_intercept",
             "bl_mean",
-            "bl_slope",
             "bl_std",
-            "tail_slope",
-            "tail_std",
-            "wf_blsub",
         ],
+        ["hit_par1", "hit_par2"],
         ["array_id", "array_idx", "cumulative_length"],
     ]
 
