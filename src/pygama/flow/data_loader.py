@@ -109,6 +109,7 @@ class DataLoader:
         self.merge_files = False
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.data = None
 
         if isinstance(filedb, FileDB):
             self.filedb = filedb
@@ -706,7 +707,7 @@ class DataLoader:
 
         sto = LH5Store()
 
-        if log.level <= logging.INFO:
+        if log.getEffectiveLevel() >= logging.INFO:
             progress_bar = tqdm(
                 desc="Building entry list",
                 total=len(self.file_list),
@@ -717,7 +718,7 @@ class DataLoader:
         # now we loop over the files in our list
         for file in self.file_list:
 
-            if log.level <= logging.INFO:
+            if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update()
                 progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
 
@@ -802,7 +803,7 @@ class DataLoader:
                 f_struct = Struct(f_dict)
                 sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
 
-        if log.level <= logging.INFO:
+        if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
 
         if in_memory:
@@ -844,7 +845,7 @@ class DataLoader:
             raise ValueError("if in_memory is False, need to specify an output file")
 
         if orientation == "hit":
-            return self.load_hits(entry_list, in_memory, output_file, tcm_level)
+            self.data = self.load_hits(entry_list, in_memory, output_file, tcm_level)
         elif orientation == "evt":
             if tcm_level is None:
                 if len(self.tcms) == 1:
@@ -853,11 +854,13 @@ class DataLoader:
                     raise ValueError(
                         "need to specify which coincidence map to use to return event-oriented data"
                     )
-            return self.load_evts(entry_list, in_memory, output_file, tcm_level)
+            self.data = self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
             raise ValueError(
                 f"I don't understand what orientation={orientation} means!"
             )
+
+        return self.data
 
     def load_hits(
         self,
@@ -886,7 +889,7 @@ class DataLoader:
             if in_memory:
                 load_out = {}
 
-            if log.level <= logging.INFO:
+            if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
                     desc="Loading data",
                     total=len(entry_list),
@@ -897,7 +900,7 @@ class DataLoader:
             # now loop over the output of gen_entry_list()
             for file, f_entries in entry_list.items():
 
-                if log.level <= logging.INFO:
+                if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar.update()
                     progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
 
@@ -1024,7 +1027,7 @@ class DataLoader:
                 if output_file:
                     sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
 
-            if log.level <= logging.INFO:
+            if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.close()
 
             if in_memory:
