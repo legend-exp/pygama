@@ -35,10 +35,10 @@ def get_multi_local_extrema(
     a_delta_in
         the absolute level by which data must vary (in one direction) about an
         extremum in order for it to be tagged.
-    a_abs_max_in : scalar
+    a_abs_max_in
         The absolute level by which data must vary (in one direction) about 0
         in order for a maximum to be tagged
-    a_abs_min_in : scalar
+    a_abs_min_in
         The absolute level by which data must vary (in one direction) about 0
         in order for a maximum to be tagged
     vt_max_out, vt_min_out
