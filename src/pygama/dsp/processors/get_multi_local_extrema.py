@@ -25,11 +25,11 @@ def get_multi_local_extrema(
     flag_out: int,
 ) -> None:
     """Get lists of indices of the local maxima and minima of data.
-    
+
     The "local" extrema are those maxima (minima) that have heights (depths) of
     at least `a_delta_in`.  Converted from a `MATLAB script
     <http://billauer.co.il/peakdet.html>`_ by E. Billauer.
-    
+
     Parameters
     ----------
     w_in
