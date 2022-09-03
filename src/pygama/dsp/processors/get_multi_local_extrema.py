@@ -14,41 +14,41 @@ from pygama.dsp.errors import DSPFatal
     cache=True,
 )
 def get_multi_local_extrema(
-    w_in,
-    a_delta_in,
-    a_abs_max_in,
-    a_abs_min_in,
-    vt_max_out,
-    vt_min_out,
-    n_max_out,
-    n_min_out,
-    flag_out,
-):
-    """
-    Get lists of indices of the local maxima and minima of data
-    The "local" extrema are those maxima / minima that have heights / depths of
-    at least a_delta_in.
-    Converted from MATLAB script at: http://billauer.co.il/peakdet.html
-
+    w_in: np.ndarray,
+    a_delta_in: float,
+    a_abs_max_in: float,
+    a_abs_min_in: float,
+    vt_max_out: np.ndarray,
+    vt_min_out: np.ndarray,
+    n_max_out: int,
+    n_min_out: int,
+    flag_out: int,
+) -> None:
+    """Get lists of indices of the local maxima and minima of data.
+    The "local" extrema are those maxima (minima) that have heights (depths) of
+    at least `a_delta_in`.  Converted from a `MATLAB script
+    <http://billauer.co.il/peakdet.html>`_ by E. Billauer.
     Parameters
     ----------
-    w_in : array-like
-        The array of data within which extrema will be found
-    a_delta_in : scalar
-        The absolute level by which data must vary (in one direction) about an
-        extremum in order for it to be tagged
+    w_in
+        the array of data within which extrema will be found.
+    a_delta_in
+        the absolute level by which data must vary (in one direction) about an
+        extremum in order for it to be tagged.
     a_abs_max_in : scalar
-        The absolute amplitude of a maximum in order for it to be tagged
+        The absolute level by which data must vary (in one direction) about 0
+        in order for a maximum to be tagged
     a_abs_min_in : scalar
-        The absolute amplitude of a minimum in order for it to be tagged
-    vt_max_out, vt_min_out : array-like, array-like
-        Arrays of fixed length (padded with nans) that hold the indices of
-        the identified local maxima and minima
-    n_max_out, n_min_out : scalar, scalar
-        The number of maxima and minima found in a waveform
-    flag_out : scalar
-        Returns 1 if there is only one maximum and it is a simple waveform,
-        Returns 0 if there are no peaks, or multiple peaks in a waveform
+        The absolute level by which data must vary (in one direction) about 0
+        in order for a maximum to be tagged
+    vt_max_out, vt_min_out
+        arrays of fixed length (padded with :any:`numpy.nan`) that hold the
+        indices of the identified local maxima and minima.
+    n_max_out, n_min_out
+        the number of maxima and minima found in a waveform.
+    flag_out
+        returns ``1`` if there is only one maximum and it is a simple waveform,
+        returns ``0`` if there are no peaks, or multiple peaks in a waveform.
     """
 
     # prepare output
