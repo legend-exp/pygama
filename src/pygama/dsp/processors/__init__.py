@@ -86,7 +86,6 @@ from .pulse_injector import inject_exp_pulse, inject_sig_pulse
 from .saturation import saturation
 from .sipm_noise_regulation import sipm_noise_regulation
 from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
-from .sum_at_positions import sum_at_positions
 from .time_point_thresh import time_point_thresh
 from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import upsampler
@@ -107,7 +106,6 @@ __all__ = [
     "fixed_time_pickoff",
     "gaussian_filter1d",
     "get_multi_local_extrema",
-    "get_mutli_time_pickoff",
     "linear_slope_fit",
     "log_check",
     "min_max",
@@ -130,7 +128,6 @@ __all__ = [
     "sipm_noise_regulation",
     "soft_pileup_corr",
     "soft_pileup_corr_bl",
-    "sum_at_positions",
     "time_point_thresh",
     "asym_trap_filter",
     "trap_filter",
