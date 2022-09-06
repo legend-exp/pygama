@@ -1,3 +1,6 @@
+"""
+Routines for high-level data loading and skimming.
+"""
 from __future__ import annotations
 
 import json
@@ -5,10 +8,12 @@ import logging
 import os
 import re
 import string
+from itertools import product
 from keyword import iskeyword
 
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
@@ -25,55 +30,91 @@ log = logging.getLogger(__name__)
 
 
 class DataLoader:
-    """
-    Class to facilitate analysis of pygama-processed data across several tiers,
-    daq->raw->dsp->hit->evt.  Where possible, we use a SQL-style database of
-    cycle files so that a user can quickly select a subset of cycle files for
-    interest, and access information at each processing tier.
-    Includes methods to build a fileDB, scan available parameter names in each
-    file, and available tables (detectors).
+    """Facilitate loading of processed data across several tiers.
+
+    Where possible, uses a :class:`FileDB` object so that a user can quickly
+    select a subset of cycle files for interest, and access information at each
+    processing tier.
+
+    Example JSON configuration file:
+
+    .. code-block:: json
+
+        {
+            "levels": {
+                "hit": {
+                    "tiers": ["raw", "dsp", "hit"]
+                },
+                "tcm": {
+                    "tiers": ["tcm"],
+                    "parent": "hit",
+                    "child": "evt",
+                    "tcm_cols": {
+                        "child_idx": "coin_idx",
+                        "parent_tb": "array_id",
+                        "parent_idx": "array_idx"
+                    }
+                },
+                "evt": {
+                    "tiers": ["evt"]
+                }
+            },
+            "channel_map": {}
+        }
+
+    Examples
+    --------
+    >>> from pygama.flow import DataLoader
+    >>> dl = DataLoader("loader-config.json", "filedb-config.json")
+    >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
+    >>> dl.set_datastreams([3, 6, 8], "ch")
+    >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
+    >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
+    >>> data = dl.load()
     """
 
     def __init__(
         self,
-        config: str | dict = None,
-        filedb: str | FileDB = None,
-        filedb_config: str | dict = None,
+        config: str | dict,
+        filedb: str | dict | FileDB,
         file_query: str = None,
-    ):
+    ) -> None:
         """
-        DataLoader init function.
-
-        No hit-level data is loaded in memory at this point.
-        User should specify a config file containing DAQ filename format specifiers, etc.
-
         Parameters
         ----------
-        config :
-            Configuration file for the DataLoader
-        filedb :
-            A fileDB must be specified, either with
-                1) An instance of FileDB
-                2) files written by FileDB.to_disk() (both fileDB and fileDB_config)
-                3) config file with enough info for FileDB to perform a DAQ scan
-        filedb_config :
-            Config file mentioned above for fileDB
-        file_query :
-            String query that should operate on columns of a fileDB.
+        config
+            configuration dictionary or JSON file, see above for specifications.
 
-        Returns
-        -------
-        None.
+        filedb
+            the loader needs a file database. It can be specified in multiple ways:
+
+            - an instance of :class:`.FileDB`.
+            - an LH5 file containing a :class:`.FileDB` (see also
+              :meth:`.FileDB.to_disk`).
+            - a :class:`.FileDB` configuration dictionary or JSON file.
+
+        file_query
+            string query that should operate on columns of a :class:`.FileDB`.
+
+        Note
+        ----
+        No data is loaded in memory at this point.
         """
         # declare all member variables
-        self.config = None  # dict
-        self.fileDB = None  # pygama FileDB
-        self.file_list = None  # list
+        self.config: dict = None
+        self.filedb: FileDB = None
+        self.file_list: list = None
         self.table_list = None
         self.cuts = None
         self.merge_files = False
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.data = None
+
+        if isinstance(filedb, FileDB):
+            self.filedb = filedb
+        else:
+            self.filedb = FileDB(filedb)
 
         # load things if available
         if config is not None:
@@ -82,29 +123,20 @@ class DataLoader:
                     config = json.load(f)
             self.set_config(config)
 
-        if filedb is None:
-            if filedb_config is None:
-                raise ValueError("Either filedb or filedb_config is required!")
-            else:
-                self.fileDB = FileDB(config=filedb_config)
-        else:
-            if isinstance(filedb, str):
-                self.fileDB = FileDB(from_disk=filedb)
-            elif isinstance(filedb, FileDB):
-                self.fileDB = filedb
-            else:
-                raise ValueError("filedb must be a string or instance of FileDB ")
-
+        # set the file_list
         if file_query is not None:
-            # set the file_list
-            self.file_list = list(self.fileDB.df.query(file_query).index)
+            self.file_list = list(self.filedb.df.query(file_query).index)
 
-    def set_config(self, config: dict):
-        """
-        Load configiguration file
-        """
+    def set_config(self, config: dict) -> None:
+        """Load configuration dictionary."""
+
+        if not os.path.isdir(self.filedb.data_dir):
+            raise FileNotFoundError(
+                f"{self.filedb.data_dir} (path to data root directory in FileDB) does not exist"
+            )
+
         self.config = config
-        self.data_dir = config["data_dir"]
+        self.data_dir = self.filedb.data_dir
         self.levels = list(config["levels"].keys())
         self.tiers = {}
         self.cut_priority = {}
@@ -138,36 +170,64 @@ class DataLoader:
         else:
             log.warning("Channel map must be dict or path to JSON file")
 
-    def set_files(self, query: str):
-        """
-        Set the files of interest, do this before any other operations
+    def set_files(self, query: str | list[str]) -> None:
+        """Apply a file selection.
 
-        self.file_list is a list of indices corresponding to the row in FileDB
+        Sets `self.file_list`, which is a list of indices corresponding to the
+        rows in the file database.
 
         Parameters
         ----------
-        query :
-            The file level cuts on the files of interest
-            Can be a cut on any of the columns in FileDB
+        query
+            if single string, defines an operation on the file database columns
+            supported by :meth:`pandas.DataFrame.query`. In addition, the
+            ``all`` keyword is supported to select all files in the database.
+            If list of strings, will be interpreted as key (cycle timestamp) list.
+
+        Note
+        ----
+        Call this function before any other operation. A second call to
+        :meth:`set_files` does not replace the current file list, which gets
+        instead integrated with the new list. Use :meth:`reset` to reset the
+        file query.
+
+        Example
+        -------
+        >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
         """
-        inds = list(self.fileDB.df.query(query, inplace=False).index)
+
+        if isinstance(query, (list, tuple)) and query:
+            query = " or ".join([f"timestamp == '{key}'" for key in query])
+
+        if isinstance(query, str):
+            if query.replace(" ", "") == "all":
+                inds = list(self.filedb.df.index)
+            else:
+                inds = list(
+                    self.filedb.df.query(query, engine="python", inplace=False).index
+                )
+        else:
+            raise ValueError("bad query format")
+
+        if not inds:
+            log.warning("no files matching selection found")
+
         if self.file_list is None:
             self.file_list = inds
         else:
             self.file_list += inds
 
     def get_table_name(self, tier: str, tb: str) -> str:
-        """
-        Helper function to get the table name for a tier given its table identifier
+        """Get the table name for a tier given its table identifier.
 
         Parameters
         ----------
         tier
-            Specify the tier whose table format will be used
+            specify the tier whose table format will be used.
         tb
-            The table identifier that will be passed to the table format
+            the table identifier that will be passed to the table format.
         """
-        template = self.fileDB.table_format[tier]
+        template = self.filedb.table_format[tier]
         fm = string.Formatter()
         parse_arr = np.array(list(fm.parse(template)))
         names = list(parse_arr[:, 1])
@@ -179,22 +239,25 @@ class DataLoader:
             table_name = template
         return table_name
 
-    def set_datastreams(
-        self, ds: list | tuple | np.ndarray, word: str
-    ):  # TODO Make this able to handle more complicated requests
-        """
-        Set self.table_list to the datastreams (detectors) of interest
+    # TODO Make this able to handle more complicated requests
+    def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
+        """Apply selection on data streams (or channels).
+
+        Sets `self.table_list`.
 
         Parameters
-        -----------
+        ----------
         ds
-            Identifies the detectors of interest
-            Can be a list of detectorID, serialno, or channels
-            or a list of subsystems of interest e.g. "ged"
-
+            identifies the detectors of interest. Can be a list of detector
+            names, serial numbers, or channels or a list of subsystems of
+            interest e.g.  ``ged``.
         word
-            The type of identifier used in ds
-            Should be a key in the given channel map or a word in the config file
+            the type of identifier used in ds. Should be a key in the given
+            channel map or a word defined in the configuration file.
+
+        Example
+        -------
+        >>> dl.set_datastreams(np.arange(40, 45), "ch")
         """
         if self.table_list is None:
             self.table_list = {}
@@ -205,7 +268,7 @@ class DataLoader:
         for level in self.levels:
             tier = self.tiers[level][0]
 
-            template = self.fileDB.table_format[tier]
+            template = self.filedb.table_format[tier]
             fm = string.Formatter()
             parse_arr = np.array(list(fm.parse(template)))
             names = list(parse_arr[:, 1])  # fields required to generate file name
@@ -223,17 +286,21 @@ class DataLoader:
             # look for word in channel map
             raise NotImplementedError
 
-    def set_cuts(self, cuts: dict | list):
-        """
-        Set the cuts for each level
+    def set_cuts(self, cuts: dict | list) -> None:
+        """Apply a selection on columns in the data tables.
 
         Parameters
         ----------
         cut
-            The cuts on the columns of the data table, e.g. "trapEftp_cal > 1000"
-            If passing a dictionary, the dictionary should be structured as dict[level] = cut
-            If passing a list, each item in the array should be able to be applied on one level of tables
-            The cuts at different levels will be joined with an "and"
+            the cuts on the columns of the data table, e.g. ``trapEftp_cal >
+            1000``.  If passing a dictionary, the dictionary should be
+            structured as ``dict[tier] = cut_expr``. If passing a list, each
+            item in the array should be able to be applied on one level of
+            tables. The cuts at different levels will be joined with an AND.
+
+        Example
+        -------
+        >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
         """
         if self.cuts is None:
             self.cuts = {}
@@ -253,22 +320,31 @@ class DataLoader:
             self.cuts = {}
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
-    def set_output(self, fmt: str, merge_files: bool = None, columns: list = None):
+    def set_output(
+        self, fmt: str = None, merge_files: bool = None, columns: list = None
+    ) -> None:
         """
         Set the parameters for the output format of load
 
         Parameters
-        ----------
+        ---------
         fmt
-            'lgdo.Table', 'pd.DataFrame', or TBD
-
+            ``lgdo.Table`` or ``pd.DataFrame``.
         merge_files
-            If true, information from multiple files will be merged into one table
-
+            If ``True``, information from multiple files will be merged into
+            one table.
         columns
-            The columns that should be copied into the output
+            The columns that should be copied into the output.
+
+        Example
+        -------
+        >>> dl.set_output(fmt="pd.DataFrame", merge_files=False, columns=["daqenergy", "trapEmax", "channel"])
         """
-        self.output_format = fmt
+        if fmt not in ["lgdo.Table", "pd.DataFrame", None]:
+            raise ValueError(f"'{fmt}' output format not supported")
+
+        if fmt is not None:
+            self.output_format = fmt
         if merge_files is not None:
             self.merge_files = merge_files
         if columns is not None:
@@ -276,37 +352,31 @@ class DataLoader:
 
     def get_file_list(self) -> pd.DataFrame:
         """
-        Returns a copy of FileDB with the dataframe pared down to the current file list
+        Returns a copy of the file database with its dataframe pared down to
+        the current file list.
         """
-        file_list = self.fileDB.df.iloc[self.file_list]
-        return file_list
-
-    def get_filedb(self, columns=None):
-        """
-        Accessor method
-        """
-        return self.fileDB
+        return self.filedb.df.iloc[self.file_list]
 
     def get_tiers_for_col(
         self, columns: list | np.ndarray, merge_files: bool = None
     ) -> dict:
-        """
-        For each column given, get the tiers and tables in that tier where that column can be found
+        """For each column given, get the tiers and tables in that tier where
+        that column can be found.
 
         Parameters
         ----------
         columns
-            The columns to look for
-
+            the columns to look for.
         merge_files
-            Whether or not to combine the results for all files
-            If None, uses self.merge_files
-
-        Returns
-        -------
-            col_tiers, the tables and tiers that need to be loaded for each column
+            whether or not to combine the results for all files
+            If ``None``, uses `self.merge_files`.
         """
+
         col_tiers = {}
+
+        # filedb.columns is needed, generate it now if not available
+        if self.filedb.columns is None:
+            self.filedb.get_tables_columns()
 
         if merge_files is None:
             merge_files = self.merge_files
@@ -314,51 +384,54 @@ class DataLoader:
         if merge_files:
             for file in self.file_list:
                 col_inds = set()
-                for i, col_list in enumerate(self.fileDB.columns):
+                for i, col_list in enumerate(self.filedb.columns):
                     if not set(col_list).isdisjoint(columns):
                         col_inds.add(i)
 
                 for level in self.levels:
                     for tier in self.tiers[level]:
                         col_tiers[tier] = set()
-                        if self.fileDB.df.loc[file, f"{tier}_col_idx"] is not None:
+                        if self.filedb.df.loc[file, f"{tier}_col_idx"] is not None:
                             for i in range(
-                                len(self.fileDB.df.loc[file, f"{tier}_col_idx"])
+                                len(self.filedb.df.loc[file, f"{tier}_col_idx"])
                             ):
                                 if (
-                                    self.fileDB.df.loc[file, f"{tier}_col_idx"][i]
+                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
                                     in col_inds
                                 ):
                                     col_tiers[tier].add(
-                                        self.fileDB.df.loc[file, f"{tier}_tables"][i]
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
                                     )
         else:
+            # loop over selected files (db entries)
             for file in self.file_list:
+                # this is the output object
                 col_tiers[file] = {"tables": {}, "columns": {}}
                 col_inds = set()
-                for i, col_list in enumerate(self.fileDB.columns):
+                for i, col_list in enumerate(self.filedb.columns):
                     if not set(list(col_list)).isdisjoint(columns):
                         col_inds.add(i)
 
                 for level in self.levels:
                     for tier in self.tiers[level]:
                         col_tiers[file]["tables"][tier] = []
-                        tier_col_idx = self.fileDB.df.loc[file, f"{tier}_col_idx"]
+                        tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
                         if tier_col_idx is not None:
                             for i in range(len(tier_col_idx)):
-                                col_idx = self.fileDB.df.loc[file, f"{tier}_col_idx"][i]
+                                col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
                                 if col_idx in col_inds:
                                     col_tiers[file]["tables"][tier].append(
-                                        self.fileDB.df.loc[file, f"{tier}_tables"][i]
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
                                     )
                                     col_in_tier = set.intersection(
-                                        set(self.fileDB.columns[col_idx]), set(columns)
+                                        set(self.filedb.columns[col_idx]), set(columns)
                                     )
                                     for c in col_in_tier:
                                         col_tiers[file]["columns"][c] = tier
 
         return col_tiers
 
+    # TODO: mode
     def gen_entry_list(
         self,
         tcm_level: str = None,
@@ -367,51 +440,53 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ) -> pd.DataFrame | None:  # TODO: mode
-        """
-        Applies cuts to the tables and files of interest
-        Does NOT load the column information into memory
+    ) -> dict[int, pd.DataFrame] | None:
+        """Applies cuts to the tables and files of interest.
 
-        Can only load up to two levels, those joined by tcm_level
+        Can only load up to two levels, those joined by `tcm_level`.
 
         Parameters
         ----------
         tcm_level
-            The type of tcm to be used
-            If None, will only return information from lowest level
-
+            the type of TCM to be used. If ``None``, will only return
+            information from lowest level.
         tcm_table
-            The identifier of the table inside this TCM level that you want to use
-            If not specified, there must only be one table inside a TCM file in tcm_level
-
+            the identifier of the table inside this TCM level that you want to
+            use.  If unspecified, there must only be one table inside a TCM
+            file in `tcm_level`.
         mode
-            'any' : returns every hit in the event if any hit in the event passes the cuts
-            'only' : only returns hits that pass the cuts
-
+            if ``any``, returns every hit in the event if any hit in the event
+            passes the cuts. If ``only``, only returns hits that pass the cuts.
         save_output_columns
-            If true, saves any columns needed for both the cut and the output to the entry_list
-
+            if ``True``, saves any columns needed for both the cut and the
+            output to the `self.entry_list`.
         in_memory
-            If true, returns the generated entry list in memory
-
+            if ``True``, returns the generated entry list in memory.
         output_file
-            HDF5 file location to write the entry list to disk
+            HDF5 file name to write the entry list to.
 
         Returns
         -------
         entries
-            The entry list containing columns for parent_idx, parent_table, child_idx and output columns if applicable
-            Only returned if in_memory is True
+            the entry list containing columns for ``{parent}_idx``,
+            ``{parent}_table``, ``{child}_idx`` and output columns if
+            applicable.  Only returned if `in_memory` is ``True``.
 
+        Note
+        ----
+        Does *not* load the column information into memory. This is done by
+        :meth:`.load`.
         """
         if self.file_list is None:
-            raise ValueError("You need to make a query on fileDB, use set_file_list")
+            raise ValueError("You need to make a query on filedb, use set_files()")
 
         if not in_memory and output_file is None:
             raise ValueError("If in_memory is False, need to specify an output file")
 
         if in_memory:
             entries = {}
+
+        log.debug("generating entry list determined by cuts")
 
         # Default columns in the entry_list
         if tcm_level is None:
@@ -439,13 +514,11 @@ class DataLoader:
                 else:
                     cut = ""
                 # String parsing to determine which columns need to be loaded
-                terms = re.findall(
-                    r"[^\W0-9]\w*", cut
-                )  # Matches any valid python variable name
+                # Matches any valid python variable name
+                terms = re.findall(r"[^\W0-9]\w*", cut)
                 for term in terms:
-                    if term.isidentifier() and not iskeyword(
-                        term
-                    ):  # Assumes that column names are valid python variable names
+                    # Assumes that column names are valid python variable names
+                    if term.isidentifier() and not iskeyword(term):
                         cut_cols[level].append(term)
                         # Add column to entry_cols if they are needed for both the cut and the output
                         if self.output_columns is not None:
@@ -455,17 +528,18 @@ class DataLoader:
                                 and save_output_columns
                             ):
                                 for_output.append(term)
+
             if save_output_columns:
                 entry_cols += for_output
+
             sto = LH5Store()
 
             # Make the entry list for each file
             for file in self.file_list:
                 # Get the TCM specified
-                tcm_tier = self.tiers[tcm_level][
-                    0
-                ]  # Assumes that each TCM level only has one tier
-                tcm_tables = self.fileDB.df.loc[file, f"{tcm_tier}_tables"]
+                # Assumes that each TCM level only has one tier
+                tcm_tier = self.tiers[tcm_level][0]
+                tcm_tables = self.filedb.df.loc[file, f"{tcm_tier}_tables"]
                 if len(tcm_tables) > 1 and tcm_table is None:
                     raise ValueError(
                         f"There are {len(tcm_tables)} TCM tables, need to specify which to use"
@@ -480,14 +554,16 @@ class DataLoader:
                             )
                     else:
                         tcm_tb = tcm_tables[0]
-                tcm_path = (
-                    self.data_dir
-                    + self.fileDB.tier_dirs[tcm_tier]
-                    + "/"
-                    + self.fileDB.df.iloc[file][f"{tcm_tier}_file"]
+
+                tcm_path = os.path.join(
+                    self.data_dir,
+                    self.filedb.tier_dirs[tcm_tier].lstrip("/"),
+                    self.filedb.df.iloc[file][f"{tcm_tier}_file"].lstrip("/"),
                 )
+
                 if not os.path.exists(tcm_path):
                     raise FileNotFoundError(f"Can't find TCM file for {tcm_level}")
+
                 tcm_table_name = self.get_table_name(tcm_tier, tcm_tb)
                 tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
                 # Have to do some hacky stuff until I get a get_dataframe() method
@@ -507,7 +583,7 @@ class DataLoader:
 
                 # Perform cuts specified for child or parent level, in that order
                 for level in [child, parent]:
-                    if level not in self.cuts.keys():
+                    if self.cuts is None or level not in self.cuts.keys():
                         continue
                     cut = self.cuts[level]
                     col_tiers = self.get_tiers_for_col(
@@ -515,7 +591,7 @@ class DataLoader:
                     )
 
                     # Tables in first tier of event should be the same for all tiers in one level
-                    tables = self.fileDB.df.loc[file, f"{self.tiers[level][0]}_tables"]
+                    tables = self.filedb.df.loc[file, f"{self.tiers[level][0]}_tables"]
                     if self.table_list is not None:
                         if level in self.table_list.keys():
                             tables = self.table_list[level]
@@ -527,11 +603,10 @@ class DataLoader:
                         tcm_idx = f_entries.query(f"{level}_table == {tb}").index
                         idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
                         for tier in self.tiers[level]:
-                            tier_path = (
-                                self.data_dir
-                                + self.fileDB.tier_dirs[tier]
-                                + "/"
-                                + self.fileDB.df.loc[file, f"{tier}_file"]
+                            tier_path = os.path.join(
+                                self.data_dir,
+                                self.filedb.tier_dirs[tier].lstrip("/"),
+                                self.filedb.df.loc[file, f"{tier}_file"].lstrip("/"),
                             )
                             if tier in col_tiers[file]["tables"].keys():
                                 if tb in col_tiers[file]["tables"][tier]:
@@ -582,36 +657,39 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ):
-        """
-        Called by gen_entry_list() to handle the case when tcm_level is None
-        Ignores any cuts set on levels above lowest level
+    ) -> dict[int, pd.DataFrame] | None:
+        """Called by :meth:`.gen_entry_list` to handle the case when
+        `tcm_level` is unspecified.
+
+        Ignores any cuts set on levels above lowest level.
 
         Parameters
         ----------
         save_output_columns
-            If true, saves any columns needed for both the cut and the output to the entry_list
-
+            If ``True``, saves any columns needed for both the cut and the
+            output to the entry list.
         in_memory
-            If true, returns the generated entry list in memory
-
+            If ``True``, returns the generated entry list in memory.
         output_file
-            HDF5 file location to write the entry list to disk
+            HDF5 file name to write the entry list to.
         """
         low_level = self.levels[0]
         if in_memory:
             entries = {}
         entry_cols = [f"{low_level}_table", f"{low_level}_idx"]
 
-        # Find out which columns are needed for the cut
+        log.debug(
+            f"generating (hit-oriented) entry list corresponding to cuts on the {low_level} level"
+        )
+
+        # find out which columns are needed for the cut
         cut_cols = []
         cut = ""
         if self.cuts is not None and low_level in self.cuts.keys():
             cut = self.cuts[low_level]
-            # String parsing to determine which columns need to be loaded
-            terms = re.findall(
-                r"[^\W0-9]\w*", cut
-            )  # Matches any valid python variable name
+            # do cut expression string parsing to determine which columns need to be loaded
+            # this matches any valid python variable name
+            terms = re.findall(r"[^\W0-9]\w*", cut)
             for term in terms:
                 if not iskeyword(term):
                     cut_cols.append(term)
@@ -623,59 +701,100 @@ class DataLoader:
                             and save_output_columns
                         ):
                             entry_cols.append(term)
+
+        log.debug(f"need to load {cut_cols} columns for applying cuts")
         col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
+
         sto = LH5Store()
+
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar = tqdm(
+                desc="Building entry list",
+                total=len(self.file_list),
+                delay=2,
+                unit=" keys",
+            )
+
+        # now we loop over the files in our list
         for file in self.file_list:
+
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.update()
+                progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+
+            log.debug(
+                f"building entry list for cycle {self.filedb.df.iloc[file]['timestamp']}"
+            )
+
+            # this dataframe will be associated with the file and will contain
+            # the columns needed for the cut as well as the columns requested
+            # for the output
             f_entries = pd.DataFrame(columns=entry_cols)
+
+            # check if we were asked to consider only certain data streams
             if self.table_list is not None:
                 if low_level in self.table_list.keys():
                     tables = self.table_list[low_level]
             else:
-                tables = self.fileDB.df.loc[file, f"{self.tiers[low_level][0]}_tables"]
+                tables = self.filedb.df.loc[file, f"{self.tiers[low_level][0]}_tables"]
 
+            # now loop over these data streams
             for tb in tables:
                 tb_table = None
-                if not cut:
+
+                # no cut is set, let's include all indices for the data stream
+                if cut == "":
                     tier = self.tiers[low_level][0]
-                    tier_path = (
-                        self.data_dir
-                        + self.fileDB.tier_dirs[tier]
-                        + "/"
-                        + self.fileDB.df.iloc[file][f"{tier}_file"]
+                    # reconstruct absolute path to tier file
+                    tier_path = os.path.join(
+                        self.data_dir,
+                        self.filedb.tier_dirs[tier].lstrip("/"),
+                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
                     )
-                    if os.path.exists(tier_path):
-                        table_name = self.get_table_name(tier, tb)
-                        n_rows = sto.read_n_rows(table_name, tier_path)
-                        tb_df = pd.DataFrame(
-                            {
-                                f"{low_level}_idx": np.arange(n_rows),
-                                f"{low_level}_table": tb,
-                            }
-                        )
+                    # now read how many rows are there in the file
+                    table_name = self.get_table_name(tier, tb)
+                    n_rows = sto.read_n_rows(table_name, tier_path)
+                    tb_df = pd.DataFrame(
+                        {
+                            f"{low_level}_idx": np.arange(n_rows),
+                            f"{low_level}_table": tb,
+                        }
+                    )
                 else:
+                    # loop over tiers in the lowest level
                     for tier in self.tiers[low_level]:
-                        if tier in col_tiers[file]["tables"].keys():
-                            tier_path = (
-                                self.data_dir
-                                + self.fileDB.tier_dirs[tier]
-                                + "/"
-                                + self.fileDB.df.iloc[file][f"{tier}_file"]
+                        # is the tier involved, considered the columns on which cuts are applied?
+                        if (
+                            tier in col_tiers[file]["tables"].keys()
+                            and tb in col_tiers[file]["tables"][tier]
+                        ):
+                            # reconstruct absolute path to tier file
+                            tier_path = os.path.join(
+                                self.data_dir,
+                                self.filedb.tier_dirs[tier].lstrip("/"),
+                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
                             )
-                            if tier in col_tiers[file]["tables"].keys():
-                                if tb in col_tiers[file]["tables"][tier]:
-                                    table_name = self.get_table_name(tier, tb)
-                                    tier_tb, _ = sto.read_object(
-                                        table_name, tier_path, field_mask=cut_cols
-                                    )
-                                    if tb_table is None:
-                                        tb_table = tier_tb
-                                    else:
-                                        tb_table.join(tier_tb)
+
+                            # load the data from the tier file, just the columns needed for the cut
+                            table_name = self.get_table_name(tier, tb)
+                            tier_tb, _ = sto.read_object(
+                                table_name, tier_path, field_mask=cut_cols
+                            )
+                            # join eveything in one table
+                            if tb_table is None:
+                                tb_table = tier_tb
+                            else:
+                                tb_table.join(tier_tb)
+
+                    # convert to DataFrame and apply cuts
                     tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
+
+                # final DataFrame
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
+
             if in_memory:
                 entries[file] = f_entries
             if output_file:
@@ -683,62 +802,65 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar.close()
+
         if in_memory:
             return entries
 
+    # TODO : support chunked reading of entry_list from disk
     def load(
         self,
         entry_list: pd.DataFrame = None,
-        in_memory: bool = False,
+        in_memory: bool = True,
         output_file: str = None,
         orientation: str = "hit",
         tcm_level: str = None,
     ) -> None | Table | Struct | pd.DataFrame:
-        """
-        Returns the requested columns in self.output_columns for the entries in the given entry_list
+        """Loads the requested columns in `self.output_columns` for the entries
+        in the given `entry_list`.
 
         Parameters
         ----------
         entry_list
-            The output of gen_entry_list
-            # TODO : support chunked reading of entry_list from disk
-
+            the output of :meth:`.gen_entry_list`.
         in_memory
-            If True, returns the loaded data in memory
-
+            if ``True``, returns the loaded data in memory.
         output_file
-            If not None, writes the loaded data to the specified file
-
+            if not ``None``, writes the loaded data to the specified file.
         orientation
-            'hit' or 'evt'
-            Specifies the orientation of the output table
-
+            specifies the orientation of the output table. Can be ``hit`` or
+            ``evt``.
         tcm_level
-            Which TCM was used to create the entry_list
+            which TCM was used to create the ``entry_list``.
         """
+        # set save_output_columns=True to avoid wasting time
         if entry_list is None:
             entry_list = self.gen_entry_list(
                 tcm_level=tcm_level, save_output_columns=True
             )
 
         if not in_memory and output_file is None:
-            raise ValueError("If in_memory is False, need to specify an output file")
+            raise ValueError("if in_memory is False, need to specify an output file")
 
         if orientation == "hit":
-            return self.load_hits(entry_list, in_memory, output_file, tcm_level)
+            self.data = self.load_hits(entry_list, in_memory, output_file, tcm_level)
         elif orientation == "evt":
             if tcm_level is None:
                 if len(self.tcms) == 1:
                     tcm_level = list(self.tcms.keys())[0]
                 else:
                     raise ValueError(
-                        "Need to specify which coincidence map to use to return event-oriented data"
+                        "need to specify which coincidence map to use to return event-oriented data"
                     )
-            return self.load_evts(entry_list, in_memory, output_file, tcm_level)
+            self.data = self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
             raise ValueError(
                 f"I don't understand what orientation={orientation} means!"
             )
+
+        return self.data
 
     def load_hits(
         self,
@@ -746,10 +868,9 @@ class DataLoader:
         in_memory: bool = False,
         output_file: str = None,
         tcm_level: str = None,
-    ):
-        """
-        Called by load() when orientation='hit'
-        """
+    ) -> None | Table | Struct | pd.DataFrame:
+        """Called by :meth:`.load` when orientation is ``hit``."""
+
         if tcm_level is None:
             parent = self.levels[0]
             child = None
@@ -761,108 +882,140 @@ class DataLoader:
 
         sto = LH5Store()
 
-        if self.merge_files:  # Try to load all information at once
-            raise NotImplementedError
-        else:  # Not merge_files
+        if self.merge_files:
+            raise NotImplementedError("merge_file option not implemented yet")
+
+        else:
             if in_memory:
                 load_out = {}
+
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar = tqdm(
+                    desc="Loading data",
+                    total=len(entry_list),
+                    delay=2,
+                    unit=" keys",
+                )
+
+            # now loop over the output of gen_entry_list()
             for file, f_entries in entry_list.items():
+
+                if log.getEffectiveLevel() >= logging.INFO:
+                    progress_bar.update()
+                    progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+
+                log.debug(
+                    f"loading data for cycle key {self.filedb.df.iloc[file]['timestamp']}"
+                )
+
                 field_mask = []
-                # Pre-allocate memory for output columns
+
                 if self.output_columns is None or not self.output_columns:
-                    raise ValueError("Need to set output columns to load data")
+                    raise ValueError("need to set output columns to load data")
+
                 for col in self.output_columns:
                     if col not in f_entries.columns:
                         field_mask.append(col)
+
                 col_tiers = self.get_tiers_for_col(field_mask)
                 col_dict = f_entries.to_dict("list")
                 table_length = len(f_entries)
 
-                # Loop through each table in entry list
-                for tb in f_entries[f"{parent}_table"].unique():
-                    tcm_idx = f_entries.query(f"{parent}_table == {tb}").index
-                    for level in load_levels:
-                        idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"].tolist()
+                log.debug(f"will load new columns {field_mask}")
 
-                        for tier in self.tiers[level]:
-                            if tb in col_tiers[file]["tables"][tier]:
-                                tier_path = (
-                                    self.data_dir
-                                    + self.fileDB.tier_dirs[tier]
-                                    + "/"
-                                    + self.fileDB.df.iloc[file][f"{tier}_file"]
-                                )
-                                if os.path.exists(tier_path):
-                                    table_name = self.get_table_name(tier, tb)
-                                    tier_table, _ = sto.read_object(
-                                        table_name,
-                                        tier_path,
-                                        idx=idx_mask,
-                                        field_mask=field_mask,
+                # loop through each table in entry list and
+                # loop through each level we're asked to load from
+                for tb, level in product(
+                    f_entries[f"{parent}_table"].unique(), load_levels
+                ):
+                    tcm_idx = f_entries.query(f"{parent}_table == {tb}").index
+                    idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"].tolist()
+
+                    # loop over tiers in the level
+                    for tier in self.tiers[level]:
+
+                        if tb not in col_tiers[file]["tables"][tier]:
+                            continue
+
+                        log.debug(
+                            f"...for stream '{self.get_table_name(tier, tb)}' (at {level} level)"
+                        )
+
+                        # path to tier file
+                        tier_path = os.path.join(
+                            self.data_dir,
+                            self.filedb.tier_dirs[tier].lstrip("/"),
+                            self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                        )
+                        # this should not happen
+                        if not os.path.exists(tier_path):
+                            raise FileNotFoundError(tier_path)
+
+                        table_name = self.get_table_name(tier, tb)
+                        tier_table, _ = sto.read_object(
+                            table_name,
+                            tier_path,
+                            idx=idx_mask,
+                            field_mask=field_mask,
+                        )
+                        if level == child:
+                            # Explode columns from "evt"-style levels, untested
+                            # Will only work if column has an "nda" attribute
+                            cum_length = build_cl(f_entries[f"{child}_idx"])
+                            exp_cols = explode_arrays(
+                                cum_length,
+                                [a.nda for a in tier_table.values()],
+                            )
+                            tier_table.update(zip(tier_table.keys(), exp_cols))
+
+                        for col in tier_table.keys():
+                            if isinstance(tier_table[col], Array):
+                                # Allocate memory for column for all channels
+                                if col not in col_dict.keys():
+                                    col_dict[col] = np.empty(
+                                        table_length,
+                                        dtype=tier_table[col].dtype,
                                     )
-                                    if level == child:
-                                        # Explode columns from "evt"-style levels, untested
-                                        # Will only work if column has an "nda" attribute
-                                        cum_length = build_cl(f_entries[f"{child}_idx"])
-                                        exp_cols = explode_arrays(
-                                            cum_length,
-                                            [a.nda for a in tier_table.values()],
+                                col_dict[col][tcm_idx] = tier_table[col].nda
+
+                            elif isinstance(tier_table[col], WaveformTable):
+                                wf_table = tier_table[col]
+                                if isinstance(
+                                    wf_table["values"],
+                                    ArrayOfEqualSizedArrays,
+                                ):
+                                    # Allocate memory for columns for all channels
+                                    if "wf_dt" not in col_dict.keys():
+                                        col_dict["wf_t0"] = np.empty(
+                                            table_length,
+                                            dtype=wf_table["t0"].dtype,
                                         )
-                                        tier_table.update(
-                                            zip(tier_table.keys(), exp_cols)
+                                        col_dict["wf_dt"] = np.empty(
+                                            table_length,
+                                            dtype=wf_table["dt"].dtype,
                                         )
-                                    for col in tier_table.keys():
-                                        if isinstance(tier_table[col], Array):
-                                            # Allocate memory for column for all channels
-                                            if col not in col_dict.keys():
-                                                col_dict[col] = np.empty(
-                                                    table_length,
-                                                    dtype=tier_table[col].dtype,
-                                                )
-                                            col_dict[col][tcm_idx] = tier_table[col].nda
-                                        elif isinstance(tier_table[col], WaveformTable):
-                                            wf_table = tier_table[col]
-                                            if isinstance(
-                                                wf_table["values"],
-                                                ArrayOfEqualSizedArrays,
-                                            ):
-                                                # Allocate memory for columns for all channels
-                                                if "wf_dt" not in col_dict.keys():
-                                                    col_dict["wf_t0"] = np.empty(
-                                                        table_length,
-                                                        dtype=wf_table["t0"].dtype,
-                                                    )
-                                                    col_dict["wf_dt"] = np.empty(
-                                                        table_length,
-                                                        dtype=wf_table["dt"].dtype,
-                                                    )
-                                                    col_dict["wf_values"] = np.empty(
-                                                        (
-                                                            table_length,
-                                                            wf_table[
-                                                                "values"
-                                                            ].nda.shape[1],
-                                                        ),
-                                                        dtype=wf_table["values"].dtype,
-                                                    )
-                                                col_dict["wf_t0"][tcm_idx] = wf_table[
-                                                    "t0"
-                                                ].nda
-                                                col_dict["wf_dt"][tcm_idx] = wf_table[
-                                                    "dt"
-                                                ].nda
-                                                col_dict["wf_values"][
-                                                    tcm_idx
-                                                ] = wf_table["values"].nda
-                                            else:  # wf_values is a VectorOfVectors
-                                                log.warning(
-                                                    f"Not sure how to handle waveforms with values of type {type(tier_table[col]['values'])} yet"
-                                                )
-                                        else:
-                                            log.warning(
-                                                f"Not sure how to handle column {col} of type {type(tier_table[col])} yet"
-                                            )
-                    # end tb loop
+                                        col_dict["wf_values"] = np.empty(
+                                            (
+                                                table_length,
+                                                wf_table["values"].nda.shape[1],
+                                            ),
+                                            dtype=wf_table["values"].dtype,
+                                        )
+                                    col_dict["wf_t0"][tcm_idx] = wf_table["t0"].nda
+                                    col_dict["wf_dt"][tcm_idx] = wf_table["dt"].nda
+                                    col_dict["wf_values"][tcm_idx] = wf_table[
+                                        "values"
+                                    ].nda
+                                else:  # wf_values is a VectorOfVectors
+                                    log.warning(
+                                        "not sure how to handle waveforms with values "
+                                        f"of type {type(tier_table[col]['values'])} yet"
+                                    )
+                            else:
+                                log.warning(
+                                    f"not sure how to handle column {col} "
+                                    f"of type {type(tier_table[col])} yet"
+                                )
 
                 # Convert col_dict to lgdo.Table
                 for col in col_dict.keys():
@@ -874,7 +1027,9 @@ class DataLoader:
                     load_out[file] = f_table
                 if output_file:
                     sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
-                # end file loop
+
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.close()
 
             if in_memory:
                 if self.output_format == "lgdo.Table":
@@ -884,12 +1039,9 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    log.warning(
-                        "I don't know how to output "
-                        + self.output_format
-                        + ", here is a lgdo.Table"
+                    raise ValueError(
+                        f"'{self.output_format}' output format not supported"
                     )
-                    return load_out
 
     def load_evts(
         self,
@@ -897,11 +1049,10 @@ class DataLoader:
         in_memory: bool = False,
         output_file: str = None,
         tcm_level: str = None,
-    ):  # TODO
-        """
-        Called by load() when orientation = 'evt'
-        """
+    ) -> None | Table | Struct | pd.DataFrame:
+        """Called by :meth:`load` when orientation is ``evt``."""
         raise NotImplementedError
+
         parent = self.tcms[tcm_level]["parent"]
         child = self.tcms[tcm_level]["child"]
         load_levels = [parent, child]
@@ -935,11 +1086,12 @@ class DataLoader:
 
                         for tier in self.tiers[level]:
                             if tb in col_tiers["tables"][tier]:
-                                tier_path = (
-                                    self.data_dir
-                                    + self.fileDB.tier_dirs[tier]
-                                    + "/"
-                                    + self.fileDB.df.iloc[file][f"{tier}_file"]
+                                tier_path = os.path.join(
+                                    self.data_dir,
+                                    self.filedb.tier_dirs[tier].lstrip("/"),
+                                    self.filedb.df.iloc[file][f"{tier}_file"].lstrip(
+                                        "/"
+                                    ),
                                 )
                                 if os.path.exists(tier_path):
                                     table_name = self.get_table_name(tier, tb)
@@ -968,14 +1120,11 @@ class DataLoader:
                         load_out[file] = load_out[file].get_dataframe()
                     return load_out
                 else:
-                    log.warning(
-                        "I don't know how to output "
-                        + self.output_format
-                        + ", here is a lgdo.Table"
+                    raise ValueError(
+                        f"'{self.output_format}' output format not supported"
                     )
-                    return load_out
 
-    def load_detector(self, det_id):  # TODO
+    def load_detector(self, det_id):
         """
         special version of `load` designed to retrieve all file files, tables,
         column names, and potentially calibration/dsp parameters relevant to one
@@ -983,13 +1132,13 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    def load_settings(self):  # TODO
+    def load_settings(self):
         """
         get metadata stored in raw files, usually from a DAQ machine.
         """
         raise NotImplementedError
 
-    def load_dsp_pars(self, query):  # TODO
+    def load_dsp_pars(self, query):
         """
         access the dsp_pars parameter database (probably JSON format) and do
         some kind of query to retrieve parameters of interest for our file list,
@@ -997,27 +1146,27 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    def load_cal_pars(self, query):  # TODO
+    def load_cal_pars(self, query):
         """
         access the cal_pars parameter database, run a query, and return some tables.
         """
         raise NotImplementedError
 
-    def skim_waveforms(self, mode: str = "hit", hit_list=None, evt_list=None):  # TODO
+    def skim_waveforms(self, mode: str = "hit", hit_list=None, evt_list=None):
         """
         handle this one separately because waveforms can easily fill up memory.
         """
         raise NotImplementedError
 
-    def browse(self, query, dsp_config=None):  # TODO
+    def browse(self, query, dsp_config=None):
         """
         Interface between DataLoader and WaveformBrowser.
         """
         raise NotImplementedError
 
     def reset(self):
-        """
-        Resets all fields to their default values, as if this is a newly created DataLoader
+        """Resets all fields to their default values, as if this is a newly
+        created data loader.
         """
         self.file_list = None
         self.table_list = None
@@ -1025,70 +1174,4 @@ class DataLoader:
         self.merge_files = False
         self.output_format = "lgdo.Table"
         self.output_columns = None
-
-
-if __name__ == "__main__":
-    doc = """
-    Demonstrate usage of the `DataLoader` class.
-    This could be what we initially run at LNGS - it would try to do the `os.walk`
-    method over the existing files, and e.g. scan for existence of various files
-    in different stages.  More advanced tests would be moved to a notebook or
-    separate script.
-    """
-
-    # dl = DataLoader(
-    #     config="../../../../loader_config.json",
-    #     filedb_config="fileDB_cfg.json",
-    #     filedb="fileDB.lh5"
-    # )
-    # print(dl.get_filedb())
-
-    dl = DataLoader(
-        config="../../../../test_loader_config.json",
-        filedb_config="../../../../test_fileDB_config.json",
-    )
-    # print(dl.get_filedb())
-
-    pd.set_option("display.max_colwidth", 10)
-    dl.fileDB.get_tables_columns()
-    # print(dl.get_filedb().df.columns)
-
-    # dl.fileDB.to_disk("fileDB_cfg.json", "fileDB.lh5")
-    # dl2 = DataLoader(config="../../../../loader_config.json", fileDB_config="fileDB_cfg.json", fileDB="fileDB.lh5")
-    # dl2.show_fileDB()
-
-    dl.set_files("timestamp == '20220716T104550Z'")
-    # print(
-    #     dl.get_file_list()[
-    #         [
-    #             "period",
-    #             "run",
-    #             "type",
-    #             "raw_tables",
-    #             "dsp_tables",
-    #             "tcm_tables",
-    #             "file_status",
-    #         ]
-    #     ]
-    # )
-
-    dl.set_datastreams(np.arange(10), "ch")
-
-    # hit_el = dl.gen_entry_list()
-
-    dl.set_cuts({"hit": "timestamp > 1000"})
-
-    # hit_cut_el = dl.gen_entry_list()
-
-    # tcm_el = dl.gen_entry_list(tcm_level="tcm")
-
-    cols = ["daqenergy", "bl_mean", "channel"]
-    dl.set_output(fmt="lgdo.Table", merge_files=False, columns=cols)
-    # dl.set_cuts({"hit": "daqenergy > 100"})
-
-    # hit_cut_el = dl.gen_entry_list(save_output_columns=True)
-
-    tcm_el = dl.gen_entry_list(tcm_level="tcm", save_output_columns=True)
-
-    lout = dl.load(tcm_el, in_memory=True, orientation="hit", tcm_level="tcm")
-    # print(lout)
+        self.data = None

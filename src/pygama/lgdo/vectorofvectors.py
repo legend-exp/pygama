@@ -63,7 +63,10 @@ class VectorOfVectors:
                 shape=(shape_guess[0],), dtype="uint32", fill_val=0
             )
         else:
-            self.cumulative_length = cumulative_length
+            if isinstance(cumulative_length, Array):
+                self.cumulative_length = cumulative_length
+            else:
+                self.cumulative_length = Array(cumulative_length)
         if flattened_data is None:
             length = np.prod(shape_guess)
             if dtype is None:
@@ -72,7 +75,10 @@ class VectorOfVectors:
                 self.flattened_data = Array(shape=(length,), dtype=dtype)
                 self.dtype = np.dtype(dtype)
         else:
-            self.flattened_data = flattened_data
+            if isinstance(flattened_data, Array):
+                self.flattened_data = flattened_data
+            else:
+                self.flattened_data = Array(flattened_data)
             if dtype is None:
                 self.dtype = self.flattened_data.dtype
             else:
@@ -129,6 +135,20 @@ class VectorOfVectors:
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
 
+    def get_vector(self, i_vec: int) -> np.ndarray:
+        """Get vector at index `i_vec`."""
+        if i_vec >= len(self.cumulative_length) or i_vec < 0:
+            raise IndexError
+
+        if i_vec == 0:
+            start = 0
+            end = self.cumulative_length.nda[0]
+        else:
+            start = self.cumulative_length.nda[i_vec - 1]
+            end = self.cumulative_length.nda[i_vec]
+
+        return self.flattened_data.nda[start:end]
+
     def __iter__(self) -> VectorOfVectors:
         self.index = 0
         return self
@@ -151,17 +171,42 @@ class VectorOfVectors:
         return list(self)[index]
 
     def __str__(self) -> str:
-        """Convert to string (e.g. for printing)."""
-        nda = list(self)
-        string = str(nda)
+        string = ""
+        pos = 0
+        for vec in self:
+            if pos != 0:
+                string += " "
+
+            string += np.array2string(vec, prefix=" ")
+
+            if pos < len(self.cumulative_length):
+                string += ",\n"
+
+            pos += 1
+
+        string = f"[{string}]"
+
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop("datatype")
         if len(tmp_attrs) > 0:
-            string += "\n" + str(tmp_attrs)
+            string += f" with attrs={tmp_attrs}"
+
         return string
 
     def __repr__(self) -> str:
-        return str(self)
+        npopt = np.get_printoptions()
+        np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
+        out = (
+            "VectorOfVectors(flattened_data="
+            + repr(self.flattened_data)
+            + ", cumulative_length="
+            + repr(self.cumulative_length)
+            + ", attrs="
+            + repr(self.attrs)
+            + ")"
+        )
+        np.set_printoptions(**npopt)
+        return out
 
     def to_aoesa(self) -> ArrayOfEqualSizedArrays:
         """Convert to ArrayOfEqualSizedArrays, padding with NaNs"""
