@@ -128,7 +128,7 @@ def build_hit(
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
-            outtbl_obj = tbl_obj.eval(cfg["operations"])
+            outtbl_obj = tbl_obj.eval(cfg["operations"],usepdeval=False)
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary

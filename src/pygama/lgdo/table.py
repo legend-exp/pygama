@@ -10,7 +10,11 @@ from typing import Any, Union
 import pandas as pd
 from pandas.io.formats import format as fmt
 
+import numexpr as ne
+
 from pygama.lgdo.array import Array
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from pygama.lgdo.fixedsizearray import FixedSizeArray
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
@@ -211,7 +215,7 @@ class Table(Struct):
 
         return df
 
-    def eval(self, expr_config: dict) -> Table:
+    def eval(self, expr_config: dict,usepdeval=True) -> Table:
         """Apply column operations to the table and return a new table holding
         the resulting columns.
 
@@ -254,23 +258,52 @@ class Table(Struct):
         -------
         Blocks in `expr_config` must be ordered according to mutual dependency.
         """
-        df = self.get_dataframe()
         out_tbl = Table(size=self.size)
+        if usepdeval:
+            df = self.get_dataframe()
 
-        # evaluate expressions one-by-one (in order) to make sure expression
-        # dependencies are satisfied
-        for out_var, spec in expr_config.items():
-            df.eval(
-                f"{out_var} = {spec['expression']}",
-                parser="pandas",
-                engine="numexpr",  # this should be faster than Python's native eval() for n_rows > 1E4, see Pandas docs
-                local_dict=spec["parameters"] if "parameters" in spec else None,
-                inplace=True,
-            )
+            # evaluate expressions one-by-one (in order) to make sure expression
+            # dependencies are satisfied
+            for out_var, spec in expr_config.items():
+                df.eval(
+                    f"{out_var} = {spec['expression']}",
+                    parser="pandas",
+                    engine="numexpr",  # this should be faster than Python's native eval() for n_rows > 1E4, see Pandas docs
+                    local_dict=spec["parameters"] if "parameters" in spec else None,
+                    inplace=True,
+                )
 
-            # add column to output LGDO Table
-            out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
+                # add column to output LGDO Table
+                out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
 
+        #I don't see why converting to pandas, then using the same engine and then converting back to a table is necessary? Converting to a pandas df makes it impossible to apply expressions to arrays of arrays.
+        else:
+            for out_var, spec in expr_config.items():
+                in_vars = {}
+                in_dtype = None #in_vars must have the same type and shape anyhow otherwise it will not work.
+                for elem in spec['variables']:
+                    in_vars[elem]=self[elem]
+                    in_dtype = in_vars[elem].__class__.__name__ 
+                    attrs=None
+                    if isinstance(in_vars[elem], Array): 
+                        attrs = in_vars[elem].attrs
+                        in_vars[elem]=in_vars[elem].nda
+                        
+                spec['expression']=spec['expression'].translate(str.maketrans('', '', '@'))
+                out_data = ne.evaluate(f"{spec['expression']}",
+                                       local_dict=dict(in_vars, **spec["parameters"]) if "parameters" in spec else in_vars,
+                                       global_dict=None,
+                                       optimization='aggressive',
+                                       truediv='auto')
+
+                if in_dtype == 'ArrayOfEqualSizedArrays':
+                    out_data = ArrayOfEqualSizedArrays(nda=out_data,attrs=attrs)
+                elif in_dtype == 'FixedSizeArray':
+                    out_data = FixedSizeArray(nda=out_data,attrs=attrs)
+
+
+                out_tbl.add_column(out_var, out_data)
+    
         return out_tbl
 
     def __str__(self):
