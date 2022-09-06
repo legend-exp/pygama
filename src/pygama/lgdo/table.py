@@ -261,8 +261,7 @@ class Table(Struct):
         out_tbl = Table(size=self.size)
         for out_var, spec in expr_config.items():
             in_vars = {}
-            print(spec)
-            # Find all vaild python variables in expression (e.g "a*b+sin(Cool)" --> ['a','b','sin','Cool'])
+            # Find all valid python variables in expression (e.g "a*b+sin(Cool)" --> ['a','b','sin','Cool'])
             for elem in re.findall(r"\s*[A-Za-z_]\w*\s*", spec["expression"]):
                 elem = elem.strip()
                 if elem in self:  # check if the variable comes from dsp
@@ -279,11 +278,8 @@ class Table(Struct):
                     in_vars[elem] = in_vars[elem].nda
                 # No vector of vectors support yet
                 elif isinstance(in_vars[elem], VectorOfVectors):
-                    raise TypeError(f"Data of type VectorOfVectors not supported (yet)")
+                    raise TypeError("Data of type VectorOfVectors not supported (yet)")
 
-            loc_dic = (
-                dict(in_vars, **spec["parameters"]) if "parameters" in spec else in_vars
-            )
             out_data = ne.evaluate(
                 f"{spec['expression']}",
                 local_dict=dict(in_vars, **spec["parameters"])
@@ -292,7 +288,7 @@ class Table(Struct):
                 global_dict=None,
                 optimization="moderate",  # Slow, but calculation is accurate (alternative "aggressive")
                 truediv="auto",
-            )  # Division is choosen by __future__.division in the interpreter
+            )  # Division is chosen by __future__.division in the interpreter
 
             # smart way to find right LGDO data type:
 
