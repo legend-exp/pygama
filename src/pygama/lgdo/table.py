@@ -5,18 +5,16 @@ equal length and corresponding utilities.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Union
-
-import pandas as pd
-from pandas.io.formats import format as fmt
 
 import numexpr as ne
 import numpy as np
-import re
+import pandas as pd
+from pandas.io.formats import format as fmt
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.fixedsizearray import FixedSizeArray
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
@@ -248,7 +246,7 @@ class Table(Struct):
 
             where:
 
-            - ``expression`` is an expression string supported by 
+            - ``expression`` is an expression string supported by
               :meth:`numexpr.evaluate` (see also `here
               <https://numexpr.readthedocs.io/projects/NumExpr3/en/latest/index.html>`_
               for documentation). Note: because of internal limitations, reduction operations must appear the last in the stack.
@@ -264,43 +262,60 @@ class Table(Struct):
         for out_var, spec in expr_config.items():
             in_vars = {}
             print(spec)
-            #Find all vaild python variables in expression (e.g "a*b+sin(Cool)" --> ['a','b','sin','Cool'])
-            for elem in re.findall(r'\s*[A-Za-z_]\w*\s*',spec['expression']):
+            # Find all vaild python variables in expression (e.g "a*b+sin(Cool)" --> ['a','b','sin','Cool'])
+            for elem in re.findall(r"\s*[A-Za-z_]\w*\s*", spec["expression"]):
                 elem = elem.strip()
-                if elem in self:                #check if the variable comes from dsp
-                    in_vars[elem]=self[elem]
-                elif elem in out_tbl.keys():           #if not try from previously processed data, else ignore since it is e.g sin func
-                    in_vars[elem]=out_tbl[elem]
-                
-                else: continue
-                #get the nda if it is an Array instance
-                if isinstance(in_vars[elem], Array): in_vars[elem]=in_vars[elem].nda
-                #No vector of vectors support yet
-                elif isinstance(in_vars[elem], VectorOfVectors): raise TypeError(f"Data of type VectorOfVectors not supported (yet)")
+                if elem in self:  # check if the variable comes from dsp
+                    in_vars[elem] = self[elem]
+                elif (
+                    elem in out_tbl.keys()
+                ):  # if not try from previously processed data, else ignore since it is e.g sin func
+                    in_vars[elem] = out_tbl[elem]
 
-            loc_dic=dict(in_vars, **spec["parameters"]) if "parameters" in spec else in_vars
-            out_data = ne.evaluate(f"{spec['expression']}",
-                local_dict=dict(in_vars, **spec["parameters"]) if "parameters" in spec else in_vars,
+                else:
+                    continue
+                # get the nda if it is an Array instance
+                if isinstance(in_vars[elem], Array):
+                    in_vars[elem] = in_vars[elem].nda
+                # No vector of vectors support yet
+                elif isinstance(in_vars[elem], VectorOfVectors):
+                    raise TypeError(f"Data of type VectorOfVectors not supported (yet)")
+
+            loc_dic = (
+                dict(in_vars, **spec["parameters"]) if "parameters" in spec else in_vars
+            )
+            out_data = ne.evaluate(
+                f"{spec['expression']}",
+                local_dict=dict(in_vars, **spec["parameters"])
+                if "parameters" in spec
+                else in_vars,
                 global_dict=None,
-                optimization='moderate', #Slow, but calculation is accurate (alternative "aggressive")
-                truediv='auto')            #Division is choosen by __future__.division in the interpreter
+                optimization="moderate",  # Slow, but calculation is accurate (alternative "aggressive")
+                truediv="auto",
+            )  # Division is choosen by __future__.division in the interpreter
 
-            #smart way to find right LGDO data type:
+            # smart way to find right LGDO data type:
 
-            #out_data has one row and this row has a scalar (eg scalar product of two rows)
-            if len(np.shape(out_data)) == 0: out_data = Array(nda=out_data)
-            
-            #out_data has scalar in each row
-            elif len(np.shape(out_data)) == 1: out_data = Array(nda=out_data)
+            # out_data has one row and this row has a scalar (eg scalar product of two rows)
+            if len(np.shape(out_data)) == 0:
+                out_data = Array(nda=out_data)
 
-            #out_data is  like
-            elif len(np.shape(out_data)) == 2: out_data = ArrayOfEqualSizedArrays(nda=out_data)
+            # out_data has scalar in each row
+            elif len(np.shape(out_data)) == 1:
+                out_data = Array(nda=out_data)
 
-            #higher order data (eg matrix product of ArrayOfEqualSizedArrays) not supported yet
-            else: ValueError(f"Calculation resulted in {len(np.shape(out_data))-1}-D row which is not supported yet")
+            # out_data is  like
+            elif len(np.shape(out_data)) == 2:
+                out_data = ArrayOfEqualSizedArrays(nda=out_data)
+
+            # higher order data (eg matrix product of ArrayOfEqualSizedArrays) not supported yet
+            else:
+                ValueError(
+                    f"Calculation resulted in {len(np.shape(out_data))-1}-D row which is not supported yet"
+                )
 
             out_tbl.add_column(out_var, out_data)
-    
+
         return out_tbl
 
     def __str__(self):
