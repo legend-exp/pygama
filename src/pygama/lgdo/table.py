@@ -282,11 +282,13 @@ class Table(Struct):
                 in_vars = {}
                 in_dtype = None #in_vars must have the same type and shape anyhow otherwise it will not work.
                 for elem in spec['variables']:
-                    in_vars[elem]=self[elem]
+                    if elem in self:                #check if the variable comes from dsp
+                        in_vars[elem]=self[elem]
+                    else:                           #if not try from previously processed data, else fail
+                        in_vars[elem]=out_tbl[elem]
                     in_dtype = in_vars[elem].__class__.__name__ 
-                    attrs=None
+
                     if isinstance(in_vars[elem], Array): 
-                        attrs = in_vars[elem].attrs
                         in_vars[elem]=in_vars[elem].nda
                         
                 spec['expression']=spec['expression'].translate(str.maketrans('', '', '@'))
@@ -297,10 +299,9 @@ class Table(Struct):
                                        truediv='auto')
 
                 if in_dtype == 'ArrayOfEqualSizedArrays':
-                    out_data = ArrayOfEqualSizedArrays(nda=out_data,attrs=attrs)
+                    out_data = ArrayOfEqualSizedArrays(nda=out_data)
                 elif in_dtype == 'FixedSizeArray':
-                    out_data = FixedSizeArray(nda=out_data,attrs=attrs)
-
+                    out_data = FixedSizeArray(nda=out_data)
 
                 out_tbl.add_column(out_var, out_data)
     
