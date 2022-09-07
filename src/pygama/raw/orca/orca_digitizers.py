@@ -221,6 +221,69 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 "dtype": "uint32",
                 "units": "adc",
             },
+            "peakHighValue": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "peakHighIndex": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum1": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "information": {
+                "dtype": "uint32",
+            },
+            "accSum2": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum3": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum4": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum5": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum6": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum7": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "accSum8": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "mawMax": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "mawBefore": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "mawAfter": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "startEnergy": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
+            "maxEnergy": {
+                "dtype": "uint32",
+                "units": "adc",
+            },
             "energy_first": {
                 "dtype": "uint32",
             },
@@ -257,28 +320,29 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
     def set_header(self, header: OrcaHeader) -> None:
         self.header = header
 
-        self.decoded_values = copy.deepcopy(self.decoded_values_template)
-
         for card_dict in self.header["ObjectInfo"]["Crates"][0]["Cards"]:
             if card_dict["Class Name"] == "ORSIS3316Model":
+                channel_list = [int(d) for d in str(bin(card_dict["enabledMask"]))[2:]]
                 card = card_dict["Card"]
                 crate = 0
-                for channel in range(0, 16):
-                    ccc = get_ccc(crate, card, channel)
-                    trace_length = card_dict["rawDataBufferLen"]
-                    self.decoded_values[ccc] = copy.deepcopy(
-                        self.decoded_values_template
-                    )
-
-                    if trace_length <= 0 or trace_length > 2**16:
-                        raise RuntimeError(
-                            "invalid trace_length: ",
-                            trace_length,
+                for i in range(0, len(channel_list)):
+                    if int(channel_list[i]) == 1:
+                        channel = i
+                        ccc = get_ccc(crate, card, channel)
+                        trace_length = card_dict["rawDataBufferLen"]
+                        self.decoded_values[ccc] = copy.deepcopy(
+                            self.decoded_values_template
                         )
 
-                    self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
+                        if trace_length <= 0 or trace_length > 2**16:
+                            raise RuntimeError(
+                                "invalid trace_length: ",
+                                trace_length,
+                            )
 
-        self.decoded_values["waveform"]["wf_len"] = trace_length
+                        self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
+                    else:
+                        continue
 
     def get_key_list(self) -> list[int]:
         key_list = []
@@ -288,13 +352,12 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
-            dec_vals_list = self.decoded_values
+            dec_vals_list = self.decoded_values.values()
             if len(dec_vals_list) == 0:
                 raise RuntimeError("decoded_values not built yet!")
 
             return dec_vals_list  # Get first thing we find
-
-        if key in self.decoded_values:
+        else:
             dec_vals_list = self.decoded_values[key]
             return dec_vals_list
         raise RuntimeError("no decoded values for key", key)
@@ -411,6 +474,63 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                     )
                 else:
                     tbl["timestamp"].nda[ii] = 0
+
+                index = event_start + 2
+                if (packet[event_start] & 0x1) == 1:
+                    tbl["peakHighValue"].nda[ii] = packet[index] & 0xFFFF
+                    tbl["peakHighIndex"].nda[ii] = (packet[index] >> 16) & 0xFFFF
+                    index += 1
+                    tbl["accSum1"].nda[ii] = packet[index] & 0xFFFFFF
+                    tbl["information"].nda[ii] = (packet[index] >> 24) & 0xFF
+                    index += 1
+                    tbl["accSum2"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["accSum3"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["accSum4"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["accSum5"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["accSum6"].nda[ii] = packet[index]
+                else:
+                    tbl["peakHighValue"].nda[ii] = -1
+                    tbl["peakHighIndex"].nda[ii] = -1
+                    tbl["accSum1"].nda[ii] = -1
+                    tbl["accSum2"].nda[ii] = -1
+                    tbl["accSum3"].nda[ii]
+                    tbl["accSum4"].nda[ii]
+                    tbl["accSum5"].nda[ii] = -1
+                    tbl["accSum6"].nda[ii] = -1
+
+                if ((packet[event_start] >> 1) & 0x1) == 1:
+                    tbl["accSum7"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["accSum8"].nda[ii] = packet[index]
+                    index += 1
+                else:
+                    tbl["accSum7"].nda[ii] = -1
+                    tbl["accSum8"].nda[ii] = -1
+
+                if ((packet[event_start] >> 2) & 0x1) == 1:
+                    tbl["mawMax"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["mawBefore"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["mawAfter"].nda[ii] = packet[index]
+                    index += 1
+                else:
+                    tbl["mawMax"].nda[ii] = -1
+                    tbl["mawBefore"].nda[ii] = -1
+                    tbl["mawAfter"].nda[ii] = -1
+
+                if ((packet[event_start] >> 3) & 0x1) == 1:
+                    tbl["startEnergy"].nda[ii] = packet[index]
+                    index += 1
+                    tbl["maxEnergy"].nda[ii] = packet[index]
+                    index += 1
+                else:
+                    tbl["startEnergy"].nda[ii] = -1
+                    tbl["maxEnergy"].nda[ii] = -1
 
                 data_header_length16 = data_header_length * 2
 
