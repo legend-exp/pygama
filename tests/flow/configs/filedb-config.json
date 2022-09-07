@@ -17,7 +17,7 @@
   "table_format": {
     "raw": "ch{ch:03d}/raw",
     "dsp": "ch{ch:03d}/dsp",
-    "hit": "{ch}/hit",
+    "hit": "ch{ch:03d}/hit",
     "evt": "{grp}/evt",
     "tcm": "hardware_tcm"
   },
