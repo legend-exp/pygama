@@ -1123,6 +1123,7 @@ class ProcessorManager:
                 is_coord = False
                 if param.is_coord is True and grid is not None:
                     unit = str(grid.period.u)
+                    this_grid = grid
                 elif (
                     isinstance(param.unit, str)
                     and param.unit in ureg
@@ -1130,6 +1131,7 @@ class ProcessorManager:
                     and ureg.is_compatible_with(grid.period, param.unit)
                 ):
                     is_coord = True
+                    this_grid = grid
 
                 param.update_auto(
                     shape=shape,
