@@ -138,6 +138,7 @@
       "args": [
         "wf_etrap",
         "tp_0_est+db.etrap.rise+db.etrap.flat*db.etrap.sample",
+        "'l'",
         "trapEftp"
       ],
       "unit": "ADC",
@@ -172,7 +173,7 @@
       "unit": "ADC"
     },
     "cuspEftp": {
-      "function": "fixed_time_pickoff",
+      "function": "fixed_sample_pickoff",
       "module": "pygama.dsp.processors",
       "args": ["wf_cusp", "db.cusp.sample", "cuspEftp"],
       "unit": "ADC",
@@ -203,7 +204,7 @@
       "unit": "ADC"
     },
     "zacEftp": {
-      "function": "fixed_time_pickoff",
+      "function": "fixed_sample_pickoff",
       "module": "pygama.dsp.processors",
       "args": ["wf_zac", "db.zac.sample", "zacEftp"],
       "defaults": { "db.zac.sample": "50" },
@@ -272,7 +273,7 @@
     "trapQftp": {
       "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
-      "args": ["wf_trap2", "tp_0_est + 8.096*us", "trapQftp"],
+      "args": ["wf_trap2", "tp_0_est + 8.096*us", "'l'", "trapQftp"],
       "unit": "ADC"
     },
     "QDrift": {
