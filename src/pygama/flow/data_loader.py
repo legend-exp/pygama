@@ -68,9 +68,27 @@ class DataLoader:
     >>> dl = DataLoader("loader-config.json", "filedb-config.json")
     >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
     >>> dl.set_datastreams([3, 6, 8], "ch")
-    >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
+    >>> dl.set_cuts({"hit": "daqenergy > 1000 and AoE > 3", "evt": "muon_veto == False"})
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load()
+
+    Advanced usage
+    --------------
+    >>> from pygama.flow import DataLoader
+    >>> dl = DataLoader("loader-config.json", "filedb-config.json")
+    >>> dl.set_files("all")
+    >>> dl.set_datastreams([0], "ch")
+    >>> dl.set_cuts({"hit": "wf_max > 30000"})
+    >>> el = dl.gen_entry_list(tcm_level="tcm")
+    >>> dl.reset()
+    >>> dl.set_files("all")
+    >>> dl.set_datastreams([20], "ch")
+    >>> dl.set_cuts({"tcm": "coin_idx in {el["coin_idx"]}"})
+    >>> el = dl.gen_entry_list(tcm_level="tcm")
+    
+    >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
+    >>> data = dl.load()
+
     """
 
     def __init__(
@@ -595,12 +613,16 @@ class DataLoader:
                     if self.table_list is not None:
                         if level in self.table_list.keys():
                             tables = self.table_list[level]
-                    # Cut any rows of TCM not relating to requested tables
-                    f_entries.query(f"{level}_table in {tables}", inplace=True)
+                    # Cut any rows of TCM not relating to requested tables 
+                    if level == parent:
+                        f_entries.query(f"{level}_table in {tables}", inplace=True)
 
                     for tb in tables:
                         tb_table = None
-                        tcm_idx = f_entries.query(f"{level}_table == {tb}").index
+                        if level == parent:
+                            tcm_idx = f_entries.query(f"{level}_table == {tb}").index
+                        else:
+                            tcm_idx = f_entries.index
                         idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
                         for tier in self.tiers[level]:
                             tier_path = os.path.join(
@@ -625,12 +647,25 @@ class DataLoader:
                             continue
                         tb_df = tb_table.get_dataframe()
                         tb_df.query(cut, inplace=True)
-                        keep_idx = f_entries.query(
-                            f"{level}_table == {tb} and {level}_idx in {list(tb_df.index)}"
-                        ).index
-                        drop_idx = set.symmetric_difference(
-                            set(tcm_idx), list(keep_idx)
+                        idx_match = f_entries.query(
+                            f"{level}_idx in {list(tb_df.index)}"
                         )
+                        if level == parent:
+                            idx_match = idx_match.query(f"{level}_table == {tb}")
+                        if mode == "only":
+                            keep_idx = idx_match.index
+                            drop_idx = set.symmetric_difference(
+                                set(tcm_idx), list(keep_idx)
+                            )
+                        elif mode == "any":
+                            evts = idx_match[f"{child}_idx"].unique()
+                            keep_idx = f_entries.query(f"{child}_idx in {evts}").index
+                            drop_idx = set.symmetric_difference(
+                                set(f_entries.index), list(keep_idx)
+                            )
+                        else:
+                            raise ValueError("mode must be either 'any' or 'only'")
+                        
                         f_entries.drop(drop_idx, inplace=True)
                         if save_output_columns:
                             for col in tb_df.columns:
@@ -1175,3 +1210,18 @@ class DataLoader:
         self.output_format = "lgdo.Table"
         self.output_columns = None
         self.data = None
+
+def __main__():
+    dl = DataLoader("loader-config.json", "filedb-config.json")
+    dl.set_files("all")
+    dl.set_datastreams([0], "ch")
+    dl.set_cuts({"hit": "wf_max > 30000"})
+    el = dl.gen_entry_list(tcm_level="tcm")
+    dl.reset()
+    dl.set_files("all")
+    dl.set_datastreams([20], "ch")
+    dl.set_cuts({"tcm": "coin_idx in {el["coin_idx"]}"})
+    el = dl.gen_entry_list(tcm_level="tcm")
+    
+    dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
+    data = dl.load()
