@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, Union
 
 import numpy as np
+import numexpr as ne
 from numba import vectorize
 
 import pygama.lgdo as lgdo
@@ -1569,6 +1570,8 @@ def build_processing_chain(
     # prepare the processor list
     multi_out_procs = {}
     db_parser = re.compile(r"db.[\w_.]+")
+    np_parser = re.compile(r"np.[\w_]+")
+    np_arithmetic=re.compile(r"^(([-+/*\)\(]|\d+(\.\d+)?)*|(np.[\w_]+)| ?)*$")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k != ""]
@@ -1603,6 +1606,38 @@ def build_processing_chain(
                 else:
                     arg = arg.replace(db_var, str(db_node))
             args[i] = arg
+
+            #assuming it is just one numpy constant (e.g. np.nan) remove white space and return
+            if re.match(r"^ *(np.[\w_]+) *$",arg): 
+                args[i] = np.__dict__[arg.split(".")[1].strip()]
+
+            #if it is just a arithmetic of np constants we can do this
+            elif np_arithmetic.match(arg):
+                np_dict={}
+                for np_var in np_parser.findall(arg):
+                    _,np_val =np_var.split(".")
+                    np_dict[np_val]=np.__dict__[np_val]
+                    arg=arg.replace(np_var,np_val)
+                try:
+
+                    arg=ne.evaluate(
+                        ex=arg,
+                        local_dict=np_dict
+                    )
+                    args[i] = float(arg)
+                except(KeyError, SyntaxError):
+                    raise ProcessingChainError(
+                            f"""Arithmetic conversion of {arg} failed"""
+                        )
+            
+            #what is left numpy constant times a variable --> convert numpy constant to string
+            else:    
+                for np_var in np_parser.findall(arg):
+                    _,np_val =np_var.split(".")
+                    arg = arg.replace(np_var,"{:.50f}".format(np.__dict__[np_val]))
+                args[i]=arg
+
+            
 
         # parse the arguments list for prereqs, if not included explicitly
         if "prereqs" not in node:
