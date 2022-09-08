@@ -79,15 +79,10 @@ class DataLoader:
     >>> dl.set_files("all")
     >>> dl.set_datastreams([0], "ch")
     >>> dl.set_cuts({"hit": "wf_max > 30000"})
-    >>> el = dl.gen_entry_list(tcm_level="tcm")
-    >>> dl.reset()
-    >>> dl.set_files("all")
-    >>> dl.set_datastreams([20], "ch")
-    >>> dl.set_cuts({"tcm": "coin_idx in {el["coin_idx"]}"})
-    >>> el = dl.gen_entry_list(tcm_level="tcm")
-
+    >>> el = dl.gen_entry_list(tcm_level="tcm", mode="any")
+    >>> el.query("hit_table == 20", inplace=True)
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
-    >>> data = dl.load()
+    >>> data = dl.load(el)
 
     """
 
