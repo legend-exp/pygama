@@ -18,7 +18,8 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
     **nb_kwargs,
 )
 def fixed_sample_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None:
-    """Pick off the waveform value at the provided index. If t_in is non-
+    """
+    Pick off the waveform value at the provided index. If t_in is non-
     integral, raise an exception. If non-integral t_in is required, use
     fixed_time_pickoff to interpolate between samples.
 
@@ -45,6 +46,7 @@ def fixed_sample_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None
             "unit": "ADC"
         }
     """
+
     a_out[0] = np.nan
 
     if np.isnan(w_in).any() or np.isnan(t_in):
