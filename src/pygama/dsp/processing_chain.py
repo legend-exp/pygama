@@ -1204,9 +1204,7 @@ class UnitConversionManager(ProcessorManager):
     """A special processor manager for handling converting variables between unit systems."""
 
     @vectorize(nopython=True, cache=True)
-    def convert(
-        buf_in: np.ndarray, offset_in: np.ndarray, offset_out: np.ndarray, period_ratio
-    ):  # noqa: N805
+    def convert(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
         return (buf_in - offset_in) * period_ratio + offset_out
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
