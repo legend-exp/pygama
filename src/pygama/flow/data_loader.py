@@ -37,7 +37,7 @@ class DataLoader:
     processing tier.
 
     Example JSON configuration file:
-    
+
     .. code-block:: json
 
         {
