@@ -1204,7 +1204,9 @@ class UnitConversionManager(ProcessorManager):
     """A special processor manager for handling converting variables between unit systems."""
 
     @vectorize(nopython=True, cache=True)
-    def convert(buf_in: np.ndarray, offset_in: np.ndarray, offset_out: np.ndarray, period_ratio):  # noqa: N805
+    def convert(
+        buf_in: np.ndarray, offset_in: np.ndarray, offset_out: np.ndarray, period_ratio
+    ):  # noqa: N805
         return (buf_in - offset_in) * period_ratio + offset_out
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
@@ -1218,7 +1220,7 @@ class UnitConversionManager(ProcessorManager):
 
         from_buffer, from_grid = var._buffer[0]
         period_ratio = from_grid.get_period(unit.period)
-        self.out_buffer = np.zeros_like(from_buffer, dtype='float64')
+        self.out_buffer = np.zeros_like(from_buffer, dtype="float64")
         self.args = [
             from_buffer,
             from_grid.get_offset(),
@@ -1316,8 +1318,10 @@ class LGDOArrayIOManager(IOManager):
         self.var = var
         self.raw_var = var.get_buffer(unit)
 
-        if self.var.shape != self.io_array.nda.shape[1:] or \
-           self.raw_var.dtype != self.io_array.dtype:
+        if (
+            self.var.shape != self.io_array.nda.shape[1:]
+            or self.raw_var.dtype != self.io_array.dtype
+        ):
             raise ProcessingChainError(
                 f"LGDO object "
                 f"{self.io_buf.form_datatype()} is "
@@ -1368,8 +1372,10 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
         self.var = var
         self.raw_var = var.get_buffer(unit)
 
-        if self.var.shape != self.io_array.nda.shape[1:] or \
-           self.raw_var.dtype != self.io_array.dtype:
+        if (
+            self.var.shape != self.io_array.nda.shape[1:]
+            or self.raw_var.dtype != self.io_array.dtype
+        ):
             raise ProcessingChainError(
                 f"LGDO object "
                 f"{self.io_buf.form_datatype()} is "
