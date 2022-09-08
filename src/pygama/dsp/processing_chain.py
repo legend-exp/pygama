@@ -128,19 +128,22 @@ class ProcChainVar:
         Parameters
         ----------
         proc_chain
-            DOCME
+            ProcessingChain that contains this variable
         name
-            DOCME
+            Name of variable used to look it up
         shape
-            DOCME
+            Shape of variable, without buffer_len dimension
         dtype
-            DOCME
+            Data type of variable
         grid
-            DOCME
+            Coordinate grid associated with variable. This contains the
+            period and offset of the variable. For variables where
+            is_coord is True, use this to perform unit conversions
         unit
-            DOCME
+            Unit associated with variable during I/O.
         is_coord
-            DOCME
+            If True, variable represents an array index and can be converted
+            into a unitted number using grid
         """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
         self.proc_chain = proc_chain
@@ -379,7 +382,7 @@ class ProcessingChain:
         grid : CoordinateGrid
             for variable, containing period and offset
         unit
-            DOCME
+            unit of variable
         period
             unit with period of waveform associated with object. Do not use if
             `grid` is provided
