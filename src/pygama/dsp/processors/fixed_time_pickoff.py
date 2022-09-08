@@ -11,7 +11,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
     [
         "void(float32[:], float32, float32[:])",
         "void(float64[:], float64, float64[:])",
-        "void(float32[:], int32, float32[:])",
+        "void(float32[:], int64, float32[:])",
         "void(float64[:], int64, float64[:])",
     ],
     "(n),()->()",
