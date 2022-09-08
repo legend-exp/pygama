@@ -7,7 +7,7 @@ from pygama.dsp.errors import DSPFatal
 @guvectorize(
     [
         "void(float32[:], float32, float32, float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
-        "void(float64[:], float64, float64, float64, float64[:], float64[:],float64[:], float64[:], float64[:])",
+        "void(float64[:], float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
     "(n),(),(),(),(m),(m),(),(),()",
     nopython=True,

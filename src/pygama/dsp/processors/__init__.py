@@ -59,14 +59,13 @@ several advantages:
    to use functions that operate in place as much as possible!
 """
 
-from .bl_from_y_projection import bl_from_y_projection
-from .bl_from_y_projection_at_mean import bl_from_y_projection_at_mean
 from .bl_subtract import bl_subtract
 from .convolutions import cusp_filter, t0_filter, zac_filter
 from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
+from .histogram import histogram, histogram_stats
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
@@ -91,11 +90,8 @@ from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import upsampler
 from .wiener_filter import wiener_filter
 from .windower import windower
-from .y_projection import y_projection
 
 __all__ = [
-    "bl_from_y_projection_at_mean",
-    "bl_from_y_projection",
     "bl_subtract",
     "cusp_filter",
     "t0_filter",
@@ -106,6 +102,8 @@ __all__ = [
     "fixed_time_pickoff",
     "gaussian_filter1d",
     "get_multi_local_extrema",
+    "histogram",
+    "histogram_stats",
     "linear_slope_fit",
     "log_check",
     "min_max",
@@ -136,5 +134,4 @@ __all__ = [
     "upsampler",
     "wiener_filter",
     "windower",
-    "y_projection",
 ]
