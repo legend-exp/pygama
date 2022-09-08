@@ -140,7 +140,7 @@ def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: np.int8, a_out: f
     elif chr(mode_in) == "f":  # Floor
         a_out[0] = w_in[i_in]
     elif chr(mode_in) == "c":  # Ceiling
-        a_out[0] = w_in[i_in+1]
+        a_out[0] = w_in[i_in + 1]
     elif chr(mode_in) == "l":  # linear
         a_out[0] = t1 * w_in[i_in] + t0 * w_in[i_in + 1]
     elif chr(mode_in) == "h":  # Cubic hermite
