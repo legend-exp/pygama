@@ -443,22 +443,24 @@ class ProcessingChain:
 
         # Create input buffer that will be linked and returned if none exists
         if buff is None:
+            dtype = var.get_buffer().dtype
+
             if var is None:
                 raise ProcessingChainError(
                     f"{varname} does not exist and no buffer was provided"
                 )
             elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
                 buff = lgdo.WaveformTable(
-                    size=self._buffer_len, wf_len=var.shape[0], dtype=var.dtype
+                    size=self._buffer_len, wf_len=var.shape[0], dtype=dtype
                 )
             elif len(var.shape) == 0:
-                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=dtype)
             elif len(var.shape) > 0:
                 buff = lgdo.ArrayOfEqualSizedArrays(
-                    shape=(self._buffer_len, *var.shape), dtype=var.dtype
+                    shape=(self._buffer_len, *var.shape), dtype=dtype
                 )
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, dtype)
 
         # Add the buffer to the input buffers list
         if isinstance(buff, np.ndarray):
@@ -511,22 +513,24 @@ class ProcessingChain:
 
         # Create output buffer that will be linked and returned if none exists
         if buff is None:
+            dtype = var.get_buffer().dtype
+
             if var is None:
                 raise ProcessingChainError(
                     varname + " does not exist and no buffer was provided"
                 )
             elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
                 buff = lgdo.WaveformTable(
-                    size=self._buffer_len, wf_len=var.shape[0], dtype=var.dtype
+                    size=self._buffer_len, wf_len=var.shape[0], dtype=dtype
                 )
             elif len(var.shape) == 0:
-                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=dtype)
             elif len(var.shape) > 0:
                 buff = lgdo.ArrayOfEqualSizedArrays(
-                    shape=(self._buffer_len, *var.shape), dtype=var.dtype
+                    shape=(self._buffer_len, *var.shape), dtype=dtype
                 )
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, dtype)
 
         # Add the buffer to the output buffers list
         if isinstance(buff, np.ndarray):
@@ -1197,7 +1201,7 @@ class UnitConversionManager(ProcessorManager):
     """A special processor manager for handling converting variables between unit systems."""
 
     @vectorize(nopython=True, cache=True)
-    def convert(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
+    def convert(buf_in: np.ndarray, offset_in: np.ndarray, offset_out: np.ndarray, period_ratio):  # noqa: N805
         return (buf_in - offset_in) * period_ratio + offset_out
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
@@ -1211,7 +1215,7 @@ class UnitConversionManager(ProcessorManager):
 
         from_buffer, from_grid = var._buffer[0]
         period_ratio = from_grid.get_period(unit.period)
-        self.out_buffer = np.zeros_like(from_buffer)
+        self.out_buffer = np.zeros_like(from_buffer, dtype='float64')
         self.args = [
             from_buffer,
             from_grid.get_offset(),
@@ -1290,13 +1294,6 @@ class LGDOArrayIOManager(IOManager):
         unit = io_array.attrs.get("units", None)
         var.update_auto(dtype=io_array.dtype, shape=io_array.nda.shape[1:], unit=unit)
 
-        if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError(
-                f"LGDO object "
-                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
-                f"incompatible with {str(self.var)}"
-            )
-
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
                 unit = var.unit.period.u
@@ -1315,6 +1312,14 @@ class LGDOArrayIOManager(IOManager):
         self.raw_buf = io_array.nda
         self.var = var
         self.raw_var = var.get_buffer(unit)
+
+        if self.var.shape != self.io_array.nda.shape[1:] or \
+           self.raw_var.dtype != self.io_array.dtype:
+            raise ProcessingChainError(
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()} is "
+                f"incompatible with {str(self.var)}"
+            )
 
     def read(self, start: int, end: int) -> None:
         np.copyto(
@@ -1341,13 +1346,6 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
         unit = io_array.attrs.get("units", None)
         var.update_auto(dtype=io_array.dtype, shape=io_array.nda.shape[1:], unit=unit)
 
-        if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError(
-                f"LGDO object "
-                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
-                f"incompatible with {str(self.var)}"
-            )
-
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
                 unit = var.unit.period.u
@@ -1366,6 +1364,14 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
         self.raw_buf = io_array.nda
         self.var = var
         self.raw_var = var.get_buffer(unit)
+
+        if self.var.shape != self.io_array.nda.shape[1:] or \
+           self.raw_var.dtype != self.io_array.dtype:
+            raise ProcessingChainError(
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()} is "
+                f"incompatible with {str(self.var)}"
+            )
 
     def read(self, start: int, end: int) -> None:
         np.copyto(
