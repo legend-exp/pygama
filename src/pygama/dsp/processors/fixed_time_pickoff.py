@@ -92,6 +92,10 @@ def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: np.int8, a_out: f
         * 'i': integer t_in; equivalent to fixed_sample_pickoff
         * 'n': nearest-neighbor interpolation; defined at all values,
           but not continuous
+        * 'f': floor, or value at previous neighbor; defined at all
+          values but not continuous
+        * 'c': ceiling, or value at next neighbor; defined at all values,
+          but not continuous
         * 'l': linear interpolation; continuous at all values, but not
           differentiable
         * 'h': hermite cubic spline interpolation; continuous and
@@ -133,6 +137,10 @@ def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: np.int8, a_out: f
         raise DSPFatal("fixed_time_pickoff requires integer t_in when using mode 'i'")
     elif chr(mode_in) == "n":  # Nearest-neighbor
         a_out[0] = w_in[i_in] if t0 < 0.5 else w_in[i_in + 1]
+    elif chr(mode_in) == "f":  # Floor
+        a_out[0] = w_in[i_in]
+    elif chr(mode_in) == "c":  # Ceiling
+        a_out[0] = w_in[i_in+1]
     elif chr(mode_in) == "l":  # linear
         a_out[0] = t1 * w_in[i_in] + t0 * w_in[i_in + 1]
     elif chr(mode_in) == "h":  # Cubic hermite
