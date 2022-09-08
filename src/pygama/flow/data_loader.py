@@ -37,7 +37,7 @@ class DataLoader:
     processing tier.
 
     Example JSON configuration file:
-
+    
     .. code-block:: json
 
         {
@@ -62,8 +62,10 @@ class DataLoader:
             "channel_map": {}
         }
 
+
     Examples
     --------
+
     >>> from pygama.flow import DataLoader
     >>> dl = DataLoader("loader-config.json", "filedb-config.json")
     >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
@@ -72,8 +74,9 @@ class DataLoader:
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load()
 
-    Advanced usage
-    --------------
+
+    Advanced Usage:
+
     >>> from pygama.flow import DataLoader
     >>> dl = DataLoader("loader-config.json", "filedb-config.json")
     >>> dl.set_files("all")
@@ -83,7 +86,6 @@ class DataLoader:
     >>> el.query("hit_table == 20", inplace=True)
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load(el)
-
     """
 
     def __init__(
