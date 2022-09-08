@@ -85,7 +85,7 @@ class DataLoader:
     >>> dl.set_datastreams([20], "ch")
     >>> dl.set_cuts({"tcm": "coin_idx in {el["coin_idx"]}"})
     >>> el = dl.gen_entry_list(tcm_level="tcm")
-    
+
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load()
 
@@ -613,7 +613,7 @@ class DataLoader:
                     if self.table_list is not None:
                         if level in self.table_list.keys():
                             tables = self.table_list[level]
-                    # Cut any rows of TCM not relating to requested tables 
+                    # Cut any rows of TCM not relating to requested tables
                     if level == parent:
                         f_entries.query(f"{level}_table in {tables}", inplace=True)
 
@@ -665,7 +665,7 @@ class DataLoader:
                             )
                         else:
                             raise ValueError("mode must be either 'any' or 'only'")
-                        
+
                         f_entries.drop(drop_idx, inplace=True)
                         if save_output_columns:
                             for col in tb_df.columns:
@@ -1210,18 +1210,3 @@ class DataLoader:
         self.output_format = "lgdo.Table"
         self.output_columns = None
         self.data = None
-
-def __main__():
-    dl = DataLoader("loader-config.json", "filedb-config.json")
-    dl.set_files("all")
-    dl.set_datastreams([0], "ch")
-    dl.set_cuts({"hit": "wf_max > 30000"})
-    el = dl.gen_entry_list(tcm_level="tcm")
-    dl.reset()
-    dl.set_files("all")
-    dl.set_datastreams([20], "ch")
-    dl.set_cuts({"tcm": "coin_idx in {el["coin_idx"]}"})
-    el = dl.gen_entry_list(tcm_level="tcm")
-    
-    dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
-    data = dl.load()
