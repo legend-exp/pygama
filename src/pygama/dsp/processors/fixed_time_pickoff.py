@@ -70,7 +70,7 @@ def fixed_sample_pickoff(w_in: np.ndarray, t_in: int, a_out: np.ndarray) -> None
     nopython=True,
     cache=True,
 )
-def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: char, a_out: float):
+def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: np.int8, a_out: float):
     """
     Pick off the waveform value at the provided time.  If the
     provided index is out of range, return NaN. For non-integral
@@ -86,17 +86,19 @@ def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: char, a_out: floa
     t_in
         The waveform index to pick off
     mode_in
-        Character selecting which interpolation method to use. Options:
-        'i': integer t_in; equivalent to fixed_sample_pickoff
-        'n': nearest-neighbor interpolation; defined at all values,
-             but not continuous
-        'l': linear interpolation; continuous at all values, but not
-             differentiable
-        'h': hermite cubic spline interpolation; continuous and
-             differentiable at all values but not twice-differentiable
-        's': natural cubic spline interpolation; continuous and twice-
-             differentiable at all values. This method is much slower
-             than the others because it utilizes the entire input waveform!
+        Character selecting which interpolation method to use. Note this
+        must be passed as a int8, e.g. ``ord('i')``. Options:
+
+        * 'i': integer t_in; equivalent to fixed_sample_pickoff
+        * 'n': nearest-neighbor interpolation; defined at all values,
+          but not continuous
+        * 'l': linear interpolation; continuous at all values, but not
+          differentiable
+        * 'h': hermite cubic spline interpolation; continuous and
+          differentiable at all values but not twice-differentiable
+        * 's': natural cubic spline interpolation; continuous and twice-
+          differentiable at all values. This method is much slower
+          than the others because it utilizes the entire input waveform!
     a_out
         The output pick-off value
 
