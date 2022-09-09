@@ -1,6 +1,6 @@
 { 
     "outputs": [
-        "timestamp","calc1","calc2","calc3","calc4","calc5","calc6"
+        "timestamp","calc1","calc2","calc3","calc4","calc5","calc6","calc7","calc8"
     ],
     "processors":{   
         "calc1":{
@@ -32,6 +32,16 @@
             "function": "subtract",
             "module": "numpy",
             "args": ["timestamp-timestamp", "np.nan*timestamp", "calc6"]
+        },
+        "calc7":{
+            "function": "subtract",
+            "module": "numpy",
+            "args": ["timestamp-timestamp", "-1*np.inf-5*np.inf", "calc7"]
+        },
+        "calc8":{
+            "function": "subtract",
+            "module": "numpy",
+            "args": ["timestamp-timestamp", "np.inf+5*np.inf + timestamp", "calc8"]
         }
     }
 }
