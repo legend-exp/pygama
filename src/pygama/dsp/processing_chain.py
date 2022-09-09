@@ -5,6 +5,7 @@ chains on waveform data.
 from __future__ import annotations
 
 import ast
+from cmath import isnan
 import importlib
 import itertools as it
 import json
@@ -1634,9 +1635,13 @@ def build_processing_chain(
             else:    
                 for np_var in np_parser.findall(arg):
                     _,np_val =np_var.split(".")
-                    vl = np.__dict__[np_val]
-                    if np.isinf(vl) or np.isnan(vl):raise ProcessingChainError(f"""Expression {arg} can't be evaluated""")
-                    arg = arg.replace(np_var,"{:.50f}".format(vl))
+                    if np.isinf(np.__dict__[np_val]):raise ProcessingChainError(f"""Expression {arg} can't be evaluated""")
+                    #if there is anywhere a nan return nan (e.g "5*bar+np.nan" --> np.nan)
+                    elif np.isnan(np.__dict__[np_val]): 
+                        arg=np.__dict__[np_val]
+                        break
+                    else:
+                        arg = arg.replace(np_var,"{:.50f}".format(np.__dict__[np_val]))
                 args[i]=arg
 
             
