@@ -1634,7 +1634,9 @@ def build_processing_chain(
             else:    
                 for np_var in np_parser.findall(arg):
                     _,np_val =np_var.split(".")
-                    arg = arg.replace(np_var,"{:.50f}".format(np.__dict__[np_val]))
+                    vl = np.__dict__[np_val]
+                    if np.isinf(vl) or np.isnan(vl):raise ProcessingChainError(f"""Expression {arg} can't be evaluated""")
+                    arg = arg.replace(np_var,"{:.50f}".format(vl))
                 args[i]=arg
 
             
