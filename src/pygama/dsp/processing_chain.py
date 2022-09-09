@@ -1571,7 +1571,7 @@ def build_processing_chain(
     multi_out_procs = {}
     db_parser = re.compile(r"db.[\w_.]+")
     np_parser = re.compile(r"np.[\w_]+")
-    np_arithmetic=re.compile(r"^(([-+/*\)\(]|\d+(\.\d+)?)*|(np.[\w_]+)| ?)*$")
+    np_arithmetic=re.compile(r"^((([-+/*\)\(]|\d+(\.\d+)?)*| ?)*(np.[\w_]+)| ?)+$")
     for key, node in processors.items():
         # if we have multiple outputs, add each to the processesors list
         keys = [k for k in re.split(",| ", key) if k != ""]
