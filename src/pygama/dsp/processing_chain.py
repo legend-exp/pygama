@@ -1649,7 +1649,7 @@ def build_processing_chain(
                 continue
 
             # what is left includes a variable
-            # ok, somebody put infinty and a variable into the argument. Why would you do this?
+            # ok, somebody put infinity and a variable into the argument. Why would you do this?
             elif "np.inf" in arg:
                 # we have at least one var*np.inf or np.inf*var
                 # at this stage we don't know if the variable is pos or neg which would result in +inf or -inf
