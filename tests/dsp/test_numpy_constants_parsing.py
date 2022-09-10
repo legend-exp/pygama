@@ -40,11 +40,9 @@ def test_numpy_math_constants_dsp():
 
 def test_numpy_infinity_and_nan_dsp():
     df = store.load_nda(
-        dsp_file, ["calc4", "calc5", "calc6", "calc7", "calc8"], "geds/dsp/"
+        dsp_file, ["calc4", "calc5", "calc6"], "geds/dsp/"
     )
 
     assert (np.isnan(df["calc4"])).all()
     assert (np.isneginf(df["calc5"])).all()
     assert (np.isnan(df["calc6"])).all()
-    assert (np.isposinf(df["calc7"])).all()
-    assert (np.isneginf(df["calc8"])).all()

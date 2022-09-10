@@ -6,9 +6,7 @@
     "calc3",
     "calc4",
     "calc5",
-    "calc6",
-    "calc7",
-    "calc8"
+    "calc6"
   ],
   "processors": {
     "calc1": {
@@ -40,16 +38,6 @@
       "function": "subtract",
       "module": "numpy",
       "args": ["timestamp-timestamp", "np.nan*timestamp", "calc6"]
-    },
-    "calc7": {
-      "function": "subtract",
-      "module": "numpy",
-      "args": ["timestamp-timestamp", "-1*np.inf-5*np.inf", "calc7"]
-    },
-    "calc8": {
-      "function": "subtract",
-      "module": "numpy",
-      "args": ["timestamp-timestamp", "np.inf+5*np.inf + timestamp", "calc8"]
     }
   }
 }
