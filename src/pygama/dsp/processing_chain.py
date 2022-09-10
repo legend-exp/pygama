@@ -15,7 +15,6 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Union
 
-import numexpr as ne
 import numpy as np
 from numba import vectorize
 
@@ -818,6 +817,18 @@ class ProcessingChain:
 
         # for name.attribute
         elif isinstance(node, ast.Attribute):
+            # If we are looking for an attribute of a module (e.g. np.pi)
+            if node.value.id in self.module_list:
+                mod = self.module_list[node.value.id]
+                attr = getattr(mod, node.attr)
+                if not isinstance(attr, (int, float)):
+                    raise ProcessingChainError(
+                        f"Attribute {node.attr} from {node.value} is not"
+                        f"an int or float..."
+                    )
+                return attr
+
+            # Otherwise this is probably a ProcChainVar
             val = self._parse_expr(node.value, expr, dry_run, var_name_list)
             if val is None:
                 return None
@@ -861,6 +872,7 @@ class ProcessingChain:
             re.match(r"\A\w+$", name)
             and name not in self.func_list
             and name not in ureg
+            and name not in self.module_list
         )
         if raise_exception and not isgood:
             raise ProcessingChainError(f"{name} is not a valid variable name")
@@ -921,6 +933,7 @@ class ProcessingChain:
 
     # dict of functions that can be parsed by get_variable
     func_list = {"len": _length, "round": _round}
+    module_list = {"np": np, "numpy": np}
 
 
 class ProcessorManager:
@@ -1604,97 +1617,6 @@ def build_processing_chain(
                 else:
                     arg = arg.replace(db_var, str(db_node))
             args[i] = arg
-
-            if not isinstance(arg, str):
-                continue
-            # Parse numpy constants. Supported are:
-            # np.nan 	--> NAN
-            # np.inf 		--> infinity
-            # np.e		--> Euler constant
-            # n.euler_gamma -> Euler-Mscheroni_constant
-            # np.pi		--> Pi
-
-            np_parser = re.compile(r"np\.[\w\.]+")
-            np_arithmetic = re.compile(
-                r"^([\-\+\/\*]?[\)\(]?(\d+(\.\d+)?)?(np\.[\w]+)?)*$"
-            )
-            # Get ride of all the whitespace, makes regex life easier
-            arg = arg.strip()
-            # if there is np.nan in there return np.nan
-            if "np.nan" in arg:
-                args[i] = np.nan
-                continue
-
-            # assuming it is just one numpy constant (e.g. np.pi)
-            elif re.match(r"^(np\.[\w]+)$", arg):
-                args[i] = np.__dict__[arg.split(".")[1]]
-                continue
-
-            # if it is just a arithmetic of np constants and numbers we can do this
-            elif np_arithmetic.match(arg):
-                np_dict = {}
-                for np_var in np_parser.findall(arg):
-                    _, np_val = np_var.split(".")
-                    np_dict[np_val] = np.__dict__[np_val]
-                    arg = arg.replace(np_var, np_val)
-                try:
-
-                    arg = ne.evaluate(ex=arg, local_dict=np_dict)
-                    args[i] = float(arg)
-
-                except (KeyError, SyntaxError):
-                    raise ProcessingChainError(
-                        f"""Arithmetic conversion of {arg} failed"""
-                    )
-                continue
-
-            # what is left includes a variable
-            # ok, somebody put infinity and a variable into the argument. Why would you do this?
-            elif "np.inf" in arg:
-                # we have at least one var*np.inf or np.inf*var
-                # at this stage we don't know if the variable is pos or neg which would result in +inf or -inf
-                # and who would multiply a input variable with infinity anyhow?
-                if (
-                    len(
-                        re.findall(
-                            r"([a-zA-Z_]+\d*\*np.inf.*)|(np.inf\*[a-zA-Z_]+)", arg
-                        )
-                    )
-                    > 0
-                ):
-                    raise ProcessingChainError(
-                        f"""Expression {arg} can't be evaluated: Don't mulitply variables with infinity!"""
-                    )
-
-                # In all other cases we can calculate one of the 3 (+-np.inf and np.nan) possible output cases (assuming variable is not np.inf or np.nan)
-                else:
-                    np_dict = {}
-                    for np_var in np_parser.findall(arg):
-                        _, np_val = np_var.split(".")
-                        np_dict[np_val] = np.__dict__[np_val]
-                        arg = arg.replace(np_var, np_val)
-
-                    # Since the result can only be +-inf or nan set all variabels to 1
-                    for par in re.findall(r"[a-zA-Z_]+\d*", arg):
-                        if par not in np_dict:
-                            arg = arg.replace(par, "1")
-
-                    # and now its just a numexpr evaluation
-                    try:
-                        arg = ne.evaluate(ex=arg, local_dict=np_dict)
-                        args[i] = float(arg)
-                        continue
-                    except (KeyError, SyntaxError):
-                        raise ProcessingChainError(
-                            f"""Arithmetic conversion of {arg} failed"""
-                        )
-
-            # all other numpy constants can be converted to string
-            else:
-                for np_var in np_parser.findall(arg):
-                    _, np_val = np_var.split(".")
-                    arg = arg.replace(np_var, f"{np.__dict__[np_val]:.50f}")
-                args[i] = arg
 
         # parse the arguments list for prereqs, if not included explicitly
         if "prereqs" not in node:
