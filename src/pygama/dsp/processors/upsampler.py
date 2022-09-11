@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from math import ceil, floor
+
 import numpy as np
 from numba import guvectorize
 
@@ -45,10 +46,13 @@ def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
 
 @guvectorize(
     ["void(float32[:], char, float32[:])", "void(float64[:], char, float64[:])"],
-    "(n),(),(m)", nopython=True,
+    "(n),(),(m)",
+    nopython=True,
     **nb_kwargs,
 )
-def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarray) -> None:
+def interpolating_upsampler(
+    w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarray
+) -> None:
     """Upsamples the waveform; resampling ratio is set by size of w_out
     and w_in. Using the interpolation technique specified by mode_in to
     fill newly added samples
@@ -97,20 +101,22 @@ def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarra
     if np.isnan(w_in).any():
         return
 
-    upsample = len(w_out)/len(w_in)
-    
+    upsample = len(w_out) / len(w_in)
+
     if mode_in == ord("i"):  # Index
         if upsample != int(upsample):
-            raise DSPFatal("interpolating_upsampler requires len(w_out) to be an integer multiple of len(w_in) for mode 'i'")
+            raise DSPFatal(
+                "interpolating_upsampler requires len(w_out) to be an integer multiple of len(w_in) for mode 'i'"
+            )
         for i_in, a in enumerate(w_in):
-            i_out = int(upsample*i_in)
+            i_out = int(upsample * i_in)
             w_out[i_out] = a
-            w_out[i_out+1:i_out+upsample] = 0
+            w_out[i_out + 1 : i_out + upsample] = 0
 
     elif mode_in == ord("n"):  # Nearest-neighbor
         i_last = 0
         for i_in, a in enumerate(w_in):
-            i_next = ceil(upsample*(i_in+0.5))
+            i_next = ceil(upsample * (i_in + 0.5))
             w_out[i_last:i_next] = a
             i_last = i_next
         w_out[i_last:] = w_in[-1]
@@ -118,14 +124,14 @@ def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarra
     elif mode_in == ord("f"):  # Floor
         i_last = 0
         for i_in, a in enumerate(w_in):
-            i_next = ceil(upsample*(i_in+1))
+            i_next = ceil(upsample * (i_in + 1))
             w_out[i_last:i_next] = a
             i_last = i_next
 
     elif mode_in == ord("c"):  # Ceiling
         i_last = 0
         for i_in, a in enumerate(w_in):
-            i_next = floor(upsample*(i_in))+1
+            i_next = floor(upsample * (i_in)) + 1
             w_out[i_last:i_next] = a
             i_last = i_next
         w_out[i_last:] = w_in[-1]
@@ -133,21 +139,29 @@ def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarra
     elif mode_in == ord("l"):  # linear
         i_last = 0
         for i_in, a in enumerate(w_in):
-            i_next = ceil(upsample*(i_in+1))
-            a_next = w_in[i_in+1] if i_in<len(w_in)-1 else w_in[-1]
+            i_next = ceil(upsample * (i_in + 1))
+            a_next = w_in[i_in + 1] if i_in < len(w_in) - 1 else w_in[-1]
             for i_out in range(i_last, i_next):
-                t = i_out/upsample - i_in
+                t = i_out / upsample - i_in
                 w_out[i_out] = a + t * (a_next - a)
             i_last = i_next
 
     elif mode_in == ord("h"):  # Cubic hermite
         i_last = 0
-        for i_in in range(len(w_in)-1):
-            i_next = ceil(upsample*(i_in+1))
-            m0 = w_in[1] - w_in[0] if i_in == 0 else (w_in[i_in + 1] - w_in[i_in - 1]) / 2
-            m1 = w_in[-1] - w_in[-2] if i_in == len(w_in) - 2 else (w_in[i_in + 2] - w_in[i_in]) / 2
+        for i_in in range(len(w_in) - 1):
+            i_next = ceil(upsample * (i_in + 1))
+            m0 = (
+                w_in[1] - w_in[0]
+                if i_in == 0
+                else (w_in[i_in + 1] - w_in[i_in - 1]) / 2
+            )
+            m1 = (
+                w_in[-1] - w_in[-2]
+                if i_in == len(w_in) - 2
+                else (w_in[i_in + 2] - w_in[i_in]) / 2
+            )
             for i_out in range(i_last, i_next):
-                t0 = i_out/upsample - i_in
+                t0 = i_out / upsample - i_in
                 t1 = 1 - t0
                 w_out[i_out] = (
                     (-2 * t1**3 + 3 * t1**2) * w_in[i_in]
@@ -158,7 +172,7 @@ def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarra
             i_last = i_next
 
         for i_out in range(i_last, len(w_out)):
-            t0 = i_out/upsample - i_in
+            t0 = i_out / upsample - i_in
             t1 = 1 - t0
             w_out[i_out] = (
                 (-2 * t1**3 + 3 * t1**2) * w_in[i_in]
@@ -180,10 +194,10 @@ def interpolating_upsampler(w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarra
         i_last = len(w_out)
         for i_in in range(len(w_in) - 2, -1, -1):
             w2[i_in] = w2[i_in] * w2[i_in + 1] + u[i_in]
-            i_next = ceil(upsample*(i_in))
+            i_next = ceil(upsample * (i_in))
 
-            for i_out in range(i_last, i_next-1, -1):
-                t0 = i_out/upsample - i_in
+            for i_out in range(i_last, i_next - 1, -1):
+                t0 = i_out / upsample - i_in
                 t1 = 1 - t0
                 w_out[i_out] = (
                     t1 * w_in[i_in]
