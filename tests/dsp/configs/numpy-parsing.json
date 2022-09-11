@@ -1,0 +1,43 @@
+{
+  "outputs": [
+    "timestamp",
+    "calc1",
+    "calc2",
+    "calc3",
+    "calc4",
+    "calc5",
+    "calc6"
+  ],
+  "processors": {
+    "calc1": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.pi*timestamp", "calc1"]
+    },
+    "calc2": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.pi", "calc2"]
+    },
+    "calc3": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.pi*np.e", "calc3"]
+    },
+    "calc4": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.nan", "calc4"]
+    },
+    "calc5": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.inf", "calc5"]
+    },
+    "calc6": {
+      "function": "subtract",
+      "module": "numpy",
+      "args": ["timestamp-timestamp", "np.nan*timestamp", "calc6"]
+    }
+  }
+}
