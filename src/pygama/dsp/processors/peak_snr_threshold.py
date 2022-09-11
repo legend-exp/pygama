@@ -22,7 +22,7 @@ def peak_snr_threshold(
     n_idx_out: int,
 ) -> None:
     """
-    Searches for lokal minima in a window consisting of +- the given witdth around the provided indices. If a minima is found it is checked if the amplitude of the minima  divided by the amplitude of the waveform at index is smaller then the given ratio. If this is the case the index is passed to the output.
+    Searches for local minima in a window consisting of +- the given witdth around the provided indices. If a minima is found it is checked if the amplitude of the minima  divided by the amplitude of the waveform at index is smaller then the given ratio. If this is the case the index is passed to the output.
 
     Parameters
     ----------
