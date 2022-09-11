@@ -11,13 +11,13 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 @guvectorize(
     [
-        "void(float32[:], float32, float32[:], float32[:])",
-        "void(float64[:], float64, float64[:], float64[:])",
+        "void(float32[:], float32[:], float32[:])",
+        "void(float64[:], float64[:], float64[:])",
     ],
-    "(n),(),(m),(m)",
+    "(n),(m),(m)",
     **nb_kwargs
 )
-def histogram(w_in: np.ndarray, bin_in: int, weights_out: np.ndarray, borders_out: np.ndarray) -> None:
+def histogram(w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray) -> None:
 
     """
     Produces and returns a binned histogram from a provided waveform
@@ -30,9 +30,6 @@ def histogram(w_in: np.ndarray, bin_in: int, weights_out: np.ndarray, borders_ou
     ----------
     w_in : array-like
         The array of data within which should be projected
-
-    bin_in : int
-        The number of bins
 
     weights_out : array-like
         Returns the histogram weights of the input waveform
@@ -48,13 +45,11 @@ def histogram(w_in: np.ndarray, bin_in: int, weights_out: np.ndarray, borders_ou
 
     # 6) Check inputs
 
-    if np.isnan(w_in).any() or np.isnan(bin_in):
+    if np.isnan(w_in).any():
         return
 
-    if bin_in < 1:
-        raise DSPFatal("Bin size must be >=1")
-
     # 7) Algorithm
+    bin_in=len(weights_out)
 
     # define our bin edges
     delta = (max(w_in) - min(w_in)) / (bin_in - 1)
