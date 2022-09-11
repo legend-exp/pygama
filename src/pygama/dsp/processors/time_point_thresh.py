@@ -86,7 +86,12 @@ def time_point_thresh(
     **nb_kwargs,
 )
 def interpolated_time_point_thresh(
-        w_in: np.ndarray, a_threshold: float, t_start: int, walk_forward: int, mode_in: np.int8, t_out: float
+    w_in: np.ndarray,
+    a_threshold: float,
+    t_start: int,
+    walk_forward: int,
+    mode_in: np.int8,
+    t_out: float,
 ) -> None:
     """Find the time where the waveform value crosses the threshold, walking
     either forward or backward from the starting index. Use interpolation to
@@ -152,19 +157,22 @@ def interpolated_time_point_thresh(
     else:
         for i in range(int(t_start), 1, -1):
             if w_in[i - 1] < a_threshold <= w_in[i]:
-                i_cross = i-1
+                i_cross = i - 1
 
-    if i_cross==-1: return
+    if i_cross == -1:
+        return
 
-    if mode_in==ord('i'): # return index before crossing
+    if mode_in == ord("i"):  # return index before crossing
         t_out[0] = i_cross
-    elif mode_in==ord('f'): # return index before crossing
+    elif mode_in == ord("f"):  # return index before crossing
         t_out[0] = i_cross + 1
-    elif mode_in==ord('c'): # return index before crossing
+    elif mode_in == ord("c"):  # return index before crossing
         t_out[0] = i_cross
-    elif mode_in==ord('n'): # nearest-neighbor; return half-way between samps
+    elif mode_in == ord("n"):  # nearest-neighbor; return half-way between samps
         t_out[0] = i_cross + 0.5
-    elif mode_in==ord('l'): # linear
-        t_out[0] = i_cross + (a_threshold - w_in[i_cross])/(w_in[i_cross+1] - w_in[i_cross])
+    elif mode_in == ord("l"):  # linear
+        t_out[0] = i_cross + (a_threshold - w_in[i_cross]) / (
+            w_in[i_cross + 1] - w_in[i_cross]
+        )
     else:
         raise DSPFatal("Unrecognized interpolation mode")
