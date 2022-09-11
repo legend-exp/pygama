@@ -83,7 +83,7 @@ from .pole_zero import double_pole_zero, pole_zero
 from .presum import presum
 from .pulse_injector import inject_exp_pulse, inject_sig_pulse
 from .saturation import saturation
-from .sipm_noise_regulation import sipm_noise_regulation
+from .peak_snr_threshold import peak_snr_threshold
 from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
 from .time_point_thresh import time_point_thresh
 from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
@@ -123,7 +123,7 @@ __all__ = [
     "inject_exp_pulse",
     "inject_sig_pulse",
     "saturation",
-    "sipm_noise_regulation",
+    "peak_snr_threshold",
     "soft_pileup_corr",
     "soft_pileup_corr_bl",
     "time_point_thresh",
