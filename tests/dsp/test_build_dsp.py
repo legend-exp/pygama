@@ -69,9 +69,10 @@ def test_build_dsp_channelwise(multich_raw_file):
 
     assert ls(out_file) == ["ch0", "ch1", "ch2", "dsp_info"]
     assert ls(out_file, "ch0/") == ["ch0/dsp"]
-    assert ls(out_file, "ch0/dsp/") == ["ch0/dsp/bl_mean", "ch0/dsp/bl_std"]
+    assert ls(out_file, "ch0/dsp/") == ["ch0/dsp/energies", "ch0/dsp/trigger_pos"]
 
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/ch0/dsp/bl_mean", out_file)
-    assert isinstance(lh5_obj, lgdo.Array)
+    lh5_obj, n_rows = store.read_object("/ch0/dsp/energies", out_file)
+    assert isinstance(lh5_obj, lgdo.ArrayOfEqualSizedArrays)
     assert len(lh5_obj) == 5
+    assert len(lh5_obj.nda[0]) == 20
