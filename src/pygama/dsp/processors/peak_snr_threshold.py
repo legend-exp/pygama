@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
@@ -12,9 +13,16 @@ from numba import guvectorize
     nopython=True,
     cache=True,
 )
-def peak_snr_threshold(w_in:np.ndarray, idx_in:np.ndarray, ratio_in: float, width_in: int, idx_out:np.ndarray, n_idx_out:int) -> None:
+def peak_snr_threshold(
+    w_in: np.ndarray,
+    idx_in: np.ndarray,
+    ratio_in: float,
+    width_in: int,
+    idx_out: np.ndarray,
+    n_idx_out: int,
+) -> None:
     """
-    Searches for lokal minima in a window consisting of +- the given witdth around the provided indices. If a minima is found it is checked if the amplitude of the minima  divided by the amplitude of the waveform at index is smaller then the given ratio. If this is the case the index is passed to the output. 
+    Searches for lokal minima in a window consisting of +- the given witdth around the provided indices. If a minima is found it is checked if the amplitude of the minima  divided by the amplitude of the waveform at index is smaller then the given ratio. If this is the case the index is passed to the output.
 
     Parameters
     ----------
@@ -38,7 +46,7 @@ def peak_snr_threshold(w_in:np.ndarray, idx_in:np.ndarray, ratio_in: float, widt
     n_idx_out[0] = 0
 
     # fill output
-    k=0
+    k = 0
     for i in range(len(idx_in)):
         if not np.isnan(idx_in[i]):
             a = int(idx_in[i]) - int(width_in)
@@ -53,5 +61,5 @@ def peak_snr_threshold(w_in:np.ndarray, idx_in:np.ndarray, ratio_in: float, widt
                     min_index = j
             if np.absolute(w_in[min_index] / w_in[int(idx_in[i])]) < ratio_in:
                 idx_out[k] = idx_in[i]
-                k=k+1
+                k = k + 1
     n_idx_out[0] = k

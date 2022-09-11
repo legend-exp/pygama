@@ -1,13 +1,12 @@
 from __future__ import annotations
-from cmath import isnan
 
 from math import floor
 
 import numpy as np
 from numba import guvectorize
 
-from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -15,16 +14,18 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
         "void(float64[:], float64[:], float64[:])",
     ],
     "(n),(m),(m)",
-    **nb_kwargs
+    **nb_kwargs,
 )
-def histogram(w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray) -> None:
+def histogram(
+    w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
+) -> None:
 
     """
     Produces and returns a binned histogram from a provided waveform
 
     Note
     ----
-    Faster then wrapping numpy.histogram(). 
+    Faster then wrapping numpy.histogram().
 
     Parameters
     ----------
@@ -49,7 +50,7 @@ def histogram(w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
         return
 
     # 7) Algorithm
-    bin_in=len(weights_out)
+    bin_in = len(weights_out)
 
     # define our bin edges
     delta = (max(w_in) - min(w_in)) / (bin_in - 1)
@@ -66,15 +67,23 @@ def histogram(w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
             j = len(borders_out) - 1
         weights_out[j] += 1
 
+
 @guvectorize(
     [
         "void(float32[:], float32[:], float32[:], float32[:],float32[:],float32)",
         "void(float64[:], float64[:], float64[:], float64[:],float64[:],float64)",
     ],
     "(n),(n),(),(),(),()",
-        **nb_kwargs
+    **nb_kwargs,
 )
-def histogram_stats(weights_in: np.ndarray, edges_in: np.ndarray, mode_out: int, max_out: float, fwhm_out: float, max_in:float) -> None:
+def histogram_stats(
+    weights_in: np.ndarray,
+    edges_in: np.ndarray,
+    mode_out: int,
+    max_out: float,
+    fwhm_out: float,
+    max_in: float,
+) -> None:
 
     """
     Provided a projection of a waveform onto the y axis, the baseline is reconstructed by assuming mean of 0 of the projection and the stddev from it.
@@ -92,19 +101,19 @@ def histogram_stats(weights_in: np.ndarray, edges_in: np.ndarray, mode_out: int,
 
     mode_out : int
         Returns the index of the maximum of the histogram. If max_in is passed the closest index to the input maximum is returned.
-    
+
     max_out : float
         Returns the the maximum of the histogram.
 
     fwhm_out : float
-        Returns the FWHM of the the histogram. 
+        Returns the FWHM of the the histogram.
     """
 
     # 5) Initialize output parameters
 
     fwhm_out[0] = np.nan
     mode_out[0] = np.nan
-    max_out[0]  = np.nan
+    max_out[0] = np.nan
 
     # 6) Check inputs
 
@@ -118,14 +127,14 @@ def histogram_stats(weights_in: np.ndarray, edges_in: np.ndarray, mode_out: int,
     if np.isnan(max_in):
         for i in range(0, len(weights_in), 1):
             if weights_in[i] > weights_in[max_index]:
-                max_index = i       
+                max_index = i
 
     # is user specifies mean justfind mean index
     else:
         for i in range(0, len(weights_in), 1):
             if abs(max_in - edges_in[i]) < abs(max_in - edges_in[max_index]):
                 max_index = i
-    
+
     mode_out[0] = max_index
     max_out[0] = edges_in[max_index]
 
