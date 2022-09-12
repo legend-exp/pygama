@@ -285,9 +285,6 @@ class Table(Struct):
                 local_dict=dict(in_vars, **spec["parameters"])
                 if "parameters" in spec
                 else in_vars,
-                global_dict=None,
-                optimization="moderate",  # Slow, but calculation is accurate (alternative "aggressive")
-                truediv="auto",
             )  # Division is chosen by __future__.division in the interpreter
 
             # smart way to find right LGDO data type:
