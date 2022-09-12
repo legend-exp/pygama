@@ -62,8 +62,8 @@ def test_lh5_table_configs(dsp_test_file):
             "outputs": ["calE", "AoE"],
             "operations": {
                 "calE": {
-                    "expression": "sqrt(@a + @b * trapEmax**2)",
-                    "parameters": {"a": "1.23", "b": "42.69"},
+                    "expression": "sqrt(a + b * trapEmax**2)",
+                    "parameters": {"a": 1.23, "b": 42.69},
                 },
                 "AoE": {"expression": "A_max/calE"},
             },

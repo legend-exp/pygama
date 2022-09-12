@@ -5,10 +5,10 @@
       "expression": "2 * trapEmax"
     },
     "calE": {
-      "expression": "sqrt(@a + @b * twice_trap_e_max**2)",
+      "expression": "sqrt(a + b * twice_trap_e_max**2)",
       "parameters": {
-        "a": "1.23",
-        "b": "42.69"
+        "a": 1.23,
+        "b": 42.69
       }
     },
     "AoE": {
