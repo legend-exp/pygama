@@ -5,12 +5,16 @@ equal length and corresponding utilities.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Union
 
+import numexpr as ne
+import numpy as np
 import pandas as pd
 from pandas.io.formats import format as fmt
 
 from pygama.lgdo.array import Array
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
@@ -215,7 +219,7 @@ class Table(Struct):
         """Apply column operations to the table and return a new table holding
         the resulting columns.
 
-        Currently defers all the job to :meth:`pandas.DataFrame.eval`. This
+        Currently defers all the job to :meth:`numexpr.evaluate`. This
         might change in the future.
 
         Parameters
@@ -228,7 +232,7 @@ class Table(Struct):
 
                 {
                     "O1": {
-                        "expression": "@p1 + @p2 * a**2",
+                        "expression": "p1 + p2 * a**2",
                         "parameters": {
                             "p1": "2",
                             "p2": "3"
@@ -243,33 +247,67 @@ class Table(Struct):
             where:
 
             - ``expression`` is an expression string supported by
-              :meth:`pandas.DataFrame.eval` (see also `here
-              <https://pandas.pydata.org/pandas-docs/stable/user_guide/enhancingperf.html#expression-evaluation-via-eval>`_
-              for documentation).
+              :meth:`numexpr.evaluate` (see also `here
+              <https://numexpr.readthedocs.io/projects/NumExpr3/en/latest/index.html>`_
+              for documentation). Note: because of internal limitations, reduction operations must appear the last in the stack.
             - ``parameters`` is a dictionary of function parameters. Passed to
-              :meth:`pandas.DataFrame.eval` as `local_dict` argument.
+              :meth:`numexpr.evaluate`` as `local_dict` argument.
 
 
         Warning
         -------
         Blocks in `expr_config` must be ordered according to mutual dependency.
         """
-        df = self.get_dataframe()
         out_tbl = Table(size=self.size)
-
-        # evaluate expressions one-by-one (in order) to make sure expression
-        # dependencies are satisfied
         for out_var, spec in expr_config.items():
-            df.eval(
-                f"{out_var} = {spec['expression']}",
-                parser="pandas",
-                engine="numexpr",  # this should be faster than Python's native eval() for n_rows > 1E4, see Pandas docs
-                local_dict=spec["parameters"] if "parameters" in spec else None,
-                inplace=True,
-            )
+            in_vars = {}
+            # Find all valid python variables in expression (e.g "a*b+sin(Cool)" --> ['a','b','sin','Cool'])
+            for elem in re.findall(r"\s*[A-Za-z_]\w*\s*", spec["expression"]):
+                elem = elem.strip()
+                if elem in self:  # check if the variable comes from dsp
+                    in_vars[elem] = self[elem]
+                elif (
+                    elem in out_tbl.keys()
+                ):  # if not try from previously processed data, else ignore since it is e.g sin func
+                    in_vars[elem] = out_tbl[elem]
 
-            # add column to output LGDO Table
-            out_tbl.add_column(out_var, Array(df[out_var].to_numpy()))
+                else:
+                    continue
+                # get the nda if it is an Array instance
+                if isinstance(in_vars[elem], Array):
+                    in_vars[elem] = in_vars[elem].nda
+                # No vector of vectors support yet
+                elif isinstance(in_vars[elem], VectorOfVectors):
+                    raise TypeError("Data of type VectorOfVectors not supported (yet)")
+
+            out_data = ne.evaluate(
+                f"{spec['expression']}",
+                local_dict=dict(in_vars, **spec["parameters"])
+                if "parameters" in spec
+                else in_vars,
+            )  # Division is chosen by __future__.division in the interpreter
+
+            # smart way to find right LGDO data type:
+
+            # out_data has one row and this row has a scalar (eg scalar product of two rows)
+            if len(np.shape(out_data)) == 0:
+                out_data = Array(nda=out_data)
+
+            # out_data has scalar in each row
+            elif len(np.shape(out_data)) == 1:
+                out_data = Array(nda=out_data)
+
+            # out_data is  like
+            elif len(np.shape(out_data)) == 2:
+                out_data = ArrayOfEqualSizedArrays(nda=out_data)
+
+            # higher order data (eg matrix product of ArrayOfEqualSizedArrays) not supported yet
+            else:
+                ValueError(
+                    f"Calculation resulted in {len(np.shape(out_data))-1}-D row which is not supported yet"
+                )
+
+            out_tbl.add_column(out_var, out_data)
 
         return out_tbl
 
