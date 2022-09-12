@@ -126,10 +126,24 @@ class RawBuffer:
         return (len(self) - self.loc) < self.fill_safety
 
     def __str__(self) -> str:
-        return f'RawBuffer {"{"} lgdo={self.lgdo}, key_list={self.key_list}, out_stream={self.out_stream}, out_name={self.out_name}, loc={self.loc}, fill_safety={self.fill_safety} {"}"}'
+        return repr(self)
 
     def __repr__(self) -> str:
-        return str(self)
+        return (
+            "RawBuffer(lgdo="
+            + repr(self.lgdo)
+            + ", key_list="
+            + repr(self.key_list)
+            + ", out_stream="
+            + repr(self.out_stream)
+            + ", out_name="
+            + repr(self.out_name)
+            + ", loc="
+            + repr(self.loc)
+            + ", fill_safety="
+            + repr(self.fill_safety)
+            + ")"
+        )
 
 
 class RawBufferList(list):

@@ -64,3 +64,7 @@ __all__ = [
     "explode_arrays",
     "explode_cl",
 ]
+
+import numpy as np
+
+np.set_printoptions(threshold=10)
