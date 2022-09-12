@@ -65,6 +65,7 @@ from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
+from .invert_polarity import invert_polarity
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
@@ -83,6 +84,7 @@ from .presum import presum
 from .pulse_injector import inject_exp_pulse, inject_sig_pulse
 from .saturation import saturation
 from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
+from .time_over_threshold import time_over_threshold
 from .time_point_thresh import time_point_thresh
 from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import upsampler
