@@ -12,6 +12,23 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
     **nb_kwargs,
 )
 def invert_polarity(w_in: np.ndarray, w_out: np.ndarray) -> None:
+    """Inverts the polarity of the waveform.
+    Parameters
+    ----------
+    w_in
+        the input waveform.
+    w_out
+        the output inverted waveform.
+    JSON Configuration Example
+    --------------------------
+    .. code-block :: json
+        "wf_inv": {
+            "function": "invert_polarity",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_pz", "wf_inv"],
+            "unit": "ADC"
+        }
+    """
     w_out[:] = np.nan
     if np.isnan(w_in).any():
         return
