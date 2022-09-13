@@ -12,7 +12,7 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
     **nb_kwargs,
 )
 def time_over_threshold(w_in: np.ndarray, a_threshold: float, n_samples: float) -> None:
-    """Calculates the number of samples in the input waveform over a_threshold 
+    """Calculates the number of samples in the input waveform over a_threshold
     Parameters
     ----------
     w_in
