@@ -817,6 +817,18 @@ class ProcessingChain:
 
         # for name.attribute
         elif isinstance(node, ast.Attribute):
+            # If we are looking for an attribute of a module (e.g. np.pi)
+            if node.value.id in self.module_list:
+                mod = self.module_list[node.value.id]
+                attr = getattr(mod, node.attr)
+                if not isinstance(attr, (int, float)):
+                    raise ProcessingChainError(
+                        f"Attribute {node.attr} from {node.value} is not"
+                        f"an int or float..."
+                    )
+                return attr
+
+            # Otherwise this is probably a ProcChainVar
             val = self._parse_expr(node.value, expr, dry_run, var_name_list)
             if val is None:
                 return None
@@ -860,6 +872,7 @@ class ProcessingChain:
             re.match(r"\A\w+$", name)
             and name not in self.func_list
             and name not in ureg
+            and name not in self.module_list
         )
         if raise_exception and not isgood:
             raise ProcessingChainError(f"{name} is not a valid variable name")
@@ -920,6 +933,7 @@ class ProcessingChain:
 
     # dict of functions that can be parsed by get_variable
     func_list = {"len": _length, "round": _round}
+    module_list = {"np": np, "numpy": np}
 
 
 class ProcessorManager:
