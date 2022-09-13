@@ -96,6 +96,8 @@ def build_hit(
                 with open(v) as f:
                     # order in hit configs is important (dependencies)
                     tbl_cfg[k] = json.load(f, object_pairs_hook=OrderedDict)
+        lh5_tables_config = tbl_cfg
+
     else:
         if isinstance(hit_config, str):
             # sanitize config
