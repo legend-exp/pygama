@@ -23,7 +23,7 @@ def invert_polarity(w_in: np.ndarray, w_out: np.ndarray) -> None:
 
     JSON Configuration Example
     --------------------------
-    
+
     .. code-block :: json
         "wf_inv": {
             "function": "invert_polarity",

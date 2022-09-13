@@ -25,7 +25,7 @@ def time_over_threshold(w_in: np.ndarray, a_threshold: float, n_samples: float) 
 
     JSON Configuration Example
     --------------------------
-    
+
     .. code-block :: json
         "t_sat": {
             "function": "invert_polarity",
