@@ -112,6 +112,8 @@ def build_hit(
                 if f"{el}/dsp" in ls(infile, f"{el}/"):
                     log.debug(f"found candidate table /{el}/dsp")
                     lh5_tables_config[f"{el}/dsp"] = hit_config
+                    
+            lh5_tables_config = tbl_cfg
 
     if outfile is None:
         outfile = os.path.splitext(os.path.basename(infile))[0]
