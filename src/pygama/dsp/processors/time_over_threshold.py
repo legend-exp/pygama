@@ -19,7 +19,7 @@ def time_over_threshold(w_in: np.ndarray, a_threshold: float, n_samples: float) 
     w_in
         the input waveform.
     a_threshold
-        the threshold value
+        the threshold value.
     n_samples
         the number of samples over the threshold.
 
@@ -29,10 +29,10 @@ def time_over_threshold(w_in: np.ndarray, a_threshold: float, n_samples: float) 
     .. code-block :: json
 
         "t_sat": {
-            "function": "invert_polarity",
+            "function": "time_over_threshold",
             "module": "pygama.dsp.processors",
-            "args": ["wf_pz", "a_threshold, "t_sat"],
-            "unit": "ADC"
+            "args": ["wf_pz", "a_threshold", "t_sat"],
+            "unit": "ns"
         }
     """
     if np.isnan(w_in).any() or np.isnan(a_threshold):
