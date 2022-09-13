@@ -96,6 +96,8 @@ def build_hit(
                 with open(v) as f:
                     # order in hit configs is important (dependencies)
                     tbl_cfg[k] = json.load(f, object_pairs_hook=OrderedDict)
+        lh5_tables_config = tbl_cfg
+        
     else:
         if isinstance(hit_config, str):
             # sanitize config
@@ -112,8 +114,6 @@ def build_hit(
                 if f"{el}/dsp" in ls(infile, f"{el}/"):
                     log.debug(f"found candidate table /{el}/dsp")
                     lh5_tables_config[f"{el}/dsp"] = hit_config
-
-            lh5_tables_config = tbl_cfg
 
     if outfile is None:
         outfile = os.path.splitext(os.path.basename(infile))[0]
