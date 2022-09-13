@@ -27,7 +27,7 @@ def time_over_threshold(w_in: np.ndarray, a_threshold: float, n_samples: float) 
     --------------------------
 
     .. code-block :: json
-    
+
         "t_sat": {
             "function": "invert_polarity",
             "module": "pygama.dsp.processors",

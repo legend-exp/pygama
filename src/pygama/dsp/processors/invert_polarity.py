@@ -25,7 +25,7 @@ def invert_polarity(w_in: np.ndarray, w_out: np.ndarray) -> None:
     --------------------------
 
     .. code-block :: json
-    
+
         "wf_inv": {
             "function": "invert_polarity",
             "module": "pygama.dsp.processors",
