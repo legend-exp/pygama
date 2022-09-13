@@ -119,6 +119,7 @@ def build_hit(
         outfile = os.path.splitext(os.path.basename(infile))[0]
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
 
+    first_done = False
     for (tbl, cfg) in lh5_tables_config.items():
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
         tot_n_rows = store.read_n_rows(tbl, infile)
@@ -126,7 +127,6 @@ def build_hit(
 
         log.info(f"Processing table '{tbl}' in file {infile}")
 
-        first_done = False
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
