@@ -31,6 +31,7 @@ def dsp_test_file(lgnd_test_data):
 
     return out_name
 
+
 @pytest.fixture(scope="session")
 def multich_raw_file(lgnd_test_data):
     out_file = "/tmp/L200-comm-20211130-phy-spms.lh5"
@@ -50,8 +51,9 @@ def multich_raw_file(lgnd_test_data):
         overwrite=True,
     )
     assert os.path.exists(out_file)
-    
+
     return out_file
+
 
 @pytest.fixture(scope="session")
 def dsp_test_file_spm(multich_raw_file):

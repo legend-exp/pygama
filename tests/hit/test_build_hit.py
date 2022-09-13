@@ -1,13 +1,12 @@
 import os
 from pathlib import Path
 
+import numpy as np
 import pytest
 
+import pygama.lgdo.lh5_store as store
 from pygama.hit import build_hit
 from pygama.lgdo import LH5Store, ls
-import pygama.lgdo.lh5_store as store
-
-import numpy as np
 
 config_dir = Path(__file__).parent / "configs"
 
@@ -98,6 +97,7 @@ def test_outputs_specification(dsp_test_file):
     obj, _ = store.read_object("/geds/hit", outfile)
     assert list(obj.keys()) == ["calE", "AoE", "A_max"]
 
+
 def test_build_hit_spms_basic(dsp_test_file_spm):
     out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
     build_hit(
@@ -108,7 +108,12 @@ def test_build_hit_spms_basic(dsp_test_file_spm):
     )
     assert ls(out_file) == ["ch0", "ch1", "ch2"]
     assert ls(out_file, "ch0/") == ["ch0/hit"]
-    assert ls(out_file, "ch0/hit/") == ["ch0/hit/energy_in_pe", "ch0/hit/quality_cut", "ch0/hit/trigger_pos"]
+    assert ls(out_file, "ch0/hit/") == [
+        "ch0/hit/energy_in_pe",
+        "ch0/hit/quality_cut",
+        "ch0/hit/trigger_pos",
+    ]
+
 
 def test_build_hit_spms_multiconfig(dsp_test_file_spm):
     out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
@@ -121,16 +126,21 @@ def test_build_hit_spms_multiconfig(dsp_test_file_spm):
     )
     assert ls(out_file) == ["ch0", "ch1", "ch2"]
     assert ls(out_file, "ch0/") == ["ch0/hit"]
-    assert ls(out_file, "ch0/hit/") == ["ch0/hit/energy_in_pe", "ch0/hit/quality_cut", "ch0/hit/trigger_pos"]
+    assert ls(out_file, "ch0/hit/") == [
+        "ch0/hit/energy_in_pe",
+        "ch0/hit/quality_cut",
+        "ch0/hit/trigger_pos",
+    ]
+
 
 def test_build_hit_spms_calc(dsp_test_file_spm):
     out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
-   
+
     build_hit(
         dsp_test_file_spm,
         outfile=out_file,
         wo_mode="overwrite_file",
-        lh5_tables_config=f"{config_dir}/spms-hit-a-config.json" 
+        lh5_tables_config=f"{config_dir}/spms-hit-a-config.json",
     )
     assert ls(out_file) == ["ch0", "ch1", "ch2"]
     assert ls(out_file, "ch0/") == ["ch0/hit"]
@@ -148,6 +158,6 @@ def test_build_hit_spms_calc(dsp_test_file_spm):
     assert len(df1["energy_in_pe"][0]) == 20
     assert len(df2["energy_in_pe"][0]) == 20
 
-    assert(np.nanmean(df0["energy_in_pe"])==0)
-    assert(np.nanmean(df1["energy_in_pe"])==1)
-    assert(np.nanmean(df2["energy_in_pe"])==2)
+    assert np.nanmean(df0["energy_in_pe"]) == 0
+    assert np.nanmean(df1["energy_in_pe"]) == 1
+    assert np.nanmean(df2["energy_in_pe"]) == 2

@@ -27,10 +27,13 @@ def test_build_dsp_basics(lgnd_test_data, dsp_test_file):
 
 
 def test_build_dsp_spms_channelwise(dsp_test_file_spm):
-    
+
     assert ls(dsp_test_file_spm) == ["ch0", "ch1", "ch2", "dsp_info"]
     assert ls(dsp_test_file_spm, "ch0/") == ["ch0/dsp"]
-    assert ls(dsp_test_file_spm, "ch0/dsp/") == ["ch0/dsp/energies", "ch0/dsp/trigger_pos"]
+    assert ls(dsp_test_file_spm, "ch0/dsp/") == [
+        "ch0/dsp/energies",
+        "ch0/dsp/trigger_pos",
+    ]
 
     store = LH5Store()
     lh5_obj, n_rows = store.read_object("/ch0/dsp/energies", dsp_test_file_spm)
