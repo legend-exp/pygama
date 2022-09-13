@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 from numba import guvectorize
 
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 @guvectorize(
     [
@@ -10,8 +12,7 @@ from numba import guvectorize
         "void(float64[:], float64[:], float64, float64, float64[:], float64[:])",
     ],
     "(n),(m),(),(),(m),()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
 )
 def peak_snr_threshold(
     w_in: np.ndarray,
@@ -21,23 +22,26 @@ def peak_snr_threshold(
     idx_out: np.ndarray,
     n_idx_out: int,
 ) -> None:
-    """
-    Searches for local minima in a window consisting of +- the given witdth around the provided indices. If a minima is found it is checked if the amplitude of the minima  divided by the amplitude of the waveform at index is smaller then the given ratio. If this is the case the index is passed to the output.
+    """Search for local minima in a window around the provided indices.
+
+    If a minimum is found it is checked whether amplitude of the minimum
+    divided by the amplitude of the waveform at the index is smaller then the
+    given ratio. If this is the case the index is copied to the output.
 
     Parameters
     ----------
-    w_in : array-like
-        The array of data within which noise will be found
-    idx_in : array-like
-        The array of indices of possible signal candidates
-    ratio_in :  float
-        noise cancel sensitivity
-    width_in: int
-        width about index to analyse for noise
-    idx_out,  array-like
-        the cleaned inex array
-    n_idx_out,  int
-        Number of indices in idx_out with a non nan value
+    w_in
+        the input waveform.
+    idx_in
+        the array of indices of possible signal candidates.
+    ratio_in
+        ratio threshold value.
+    width_in
+        width of the local search window.
+    idx_out
+        indices of local minima.
+    n_idx_out
+        number of non-:any:`numpy.nan` indices in `idx_out`.
     """
 
     # prepare output

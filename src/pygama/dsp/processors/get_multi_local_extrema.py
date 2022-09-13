@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 @guvectorize(
@@ -10,8 +13,7 @@ from pygama.dsp.errors import DSPFatal
         "void(float64[:], float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
     "(n),(),(),(),(m),(m),(),(),()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
 )
 def get_multi_local_extrema(
     w_in: np.ndarray,
@@ -37,12 +39,9 @@ def get_multi_local_extrema(
     a_delta_in
         the absolute level by which data must vary (in one direction) about an
         extremum in order for it to be tagged.
-    a_abs_max_in
-        The absolute level by which data must vary (in one direction) about 0
-        in order for a maximum to be tagged
-    a_abs_min_in
-        The absolute level by which data must vary (in one direction) about 0
-        in order for a maximum to be tagged
+    a_abs_min_in, a_abs_max_in
+        the absolute level by which data must vary (in one direction) about 0
+        in order for a maximum to be tagged.
     vt_max_out, vt_min_out
         arrays of fixed length (padded with :any:`numpy.nan`) that hold the
         indices of the identified local maxima and minima.

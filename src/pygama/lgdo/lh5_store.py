@@ -937,7 +937,7 @@ def load_nda(
                 data, _ = sto.read_object(f"{lh5_group}/{par}", f, idx=idx_list[ii])
             if not data:
                 continue
-            if isinstance(data, WaveformTable):
+            if isinstance(data, WaveformTable):  # HACK / FIXME
                 par_data[par].append(data.values.nda)
             else:
                 par_data[par].append(data.nda)

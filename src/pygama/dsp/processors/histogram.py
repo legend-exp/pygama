@@ -20,45 +20,42 @@ def histogram(
     w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
 ) -> None:
 
-    """
-    Produces and returns a binned histogram from a provided waveform
-
-    Note
-    ----
-    Faster then wrapping numpy.histogram().
+    """Produces and returns an histogram of the waveform.
 
     Parameters
     ----------
-    w_in : array-like
-        The array of data within which should be projected
+    w_in
+        Data to be histogrammed.
+    weights_out
+        The output histogram weights.
+    borders_out
+        The output histogram bin edges of the histogram.
 
-    weights_out : array-like
-        Returns the histogram weights of the input waveform
+    Note
+    ----
+    This implementation is significantly faster than just wrapping
+    :func:`numpy.histogram`.
 
-    borders_out : array-like
-        Returns the bin edges of the histogram
+    See Also
+    --------
+    .histogram_stats
     """
-
-    # 5) Initialize output parameters
 
     weights_out[:] = 0
     borders_out[:] = np.nan
 
-    # 6) Check inputs
-
     if np.isnan(w_in).any():
         return
 
-    # 7) Algorithm
+    # number of bins + 1
     bin_in = len(weights_out)
 
-    # define our bin edges
+    # define the bin edges
     delta = (max(w_in) - min(w_in)) / (bin_in - 1)
-
     for i in range(0, bin_in, 1):
         borders_out[i] = min(w_in) + delta * i
 
-    # get the projection on the y axis
+    # make the histogram
     for i in range(0, len(w_in), 1):
         j = floor((w_in[i] - borders_out[0]) / delta)
         if j < 0:
@@ -85,42 +82,38 @@ def histogram_stats(
     max_in: float,
 ) -> None:
 
-    """
-    Provided a projection of a waveform onto the y axis, the baseline is reconstructed by assuming mean of 0 of the projection and the stddev from it.
+    """Compute useful histogram-related quantities.
 
     Parameters
     ----------
-    weights_in : array-like
-        Weights of a binned histogram
+    weights_in
+        histogram weights.
+    edges_in
+        histogram bin edges.
+    max_in
+        if not :any:`numpy.inf`, this value is used as the histogram bin
+        content at the mode.  Otherwise the mode is computed automatically
+        (from left to right).
+    mode_out
+        the computed mode of the histogram. If `max_in` is not :any:`numpy.inf`
+        then the closest waveform index to `max_in` is returned.
+    max_out
+        the histogram bin content at the mode.
+    fwhm_out
+        the FWHM of the histogram, calculated by starting from the mode and
+        descending left and right.
 
-    edges_in : array-like
-        The bin borders of the histogram
-
-    max_in : float, Optional
-        If passed, this value is used as the max. of the histogram. If not the maximum of the histogram is search automatically (from left to right).
-
-    mode_out : int
-        Returns the index of the maximum of the histogram. If max_in is passed the closest index to the input maximum is returned.
-
-    max_out : float
-        Returns the the maximum of the histogram.
-
-    fwhm_out : float
-        Returns the FWHM of the the histogram.
+    See Also
+    --------
+    .histogram
     """
-
-    # 5) Initialize output parameters
 
     fwhm_out[0] = np.nan
     mode_out[0] = np.nan
     max_out[0] = np.nan
 
-    # 6) Check inputs
-
     if np.isnan(weights_in).any():
         return
-
-    # 7) Algorithm
 
     # find global maximum search from left to right
     max_index = 0
