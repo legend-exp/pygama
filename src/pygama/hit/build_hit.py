@@ -118,7 +118,7 @@ def build_hit(
     if outfile is None:
         outfile = os.path.splitext(os.path.basename(infile))[0]
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
-    
+
     first_done = False
     for (tbl, cfg) in lh5_tables_config.items():
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
