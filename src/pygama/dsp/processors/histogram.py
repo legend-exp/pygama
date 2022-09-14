@@ -85,14 +85,7 @@ def histogram(
     "(n),(m),(),(),(),()",
     **nb_kwargs,
 )
-def histogram_stats(
-    weights_in: np.ndarray,
-    edges_in: np.ndarray,
-    mode_out: int,
-    max_out: float,
-    fwhm_out: float,
-    max_in: float,
-) -> None:
+def histogram_stats(weights_in: np.ndarray,edges_in: np.ndarray,mode_out: int,max_out: float,fwhm_out: float,max_in: float,) -> None:
 
     """Compute useful histogram-related quantities.
 
@@ -115,7 +108,7 @@ def histogram_stats(
         the FWHM of the histogram, calculated by starting from the mode and
         descending left and right.
 
-     JSON Configuration Example
+    JSON Configuration Example
     --------------------------
 
     .. code-block :: json
@@ -123,7 +116,7 @@ def histogram_stats(
         "fwhm, idx_out, max_out": {
             "function": "histogram_stats",
             "module": "pygama.dsp.processors.histogram",
-            "args": ["hist_weights","hist_borders",idx_out","max_out","fwhm","np.nan"],
+            "args": ["hist_weights","hist_borders","idx_out","max_out","fwhm","np.nan"],
             "unit": ["ADC", "none", "ADC"]
         }
 
