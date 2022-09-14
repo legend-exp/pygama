@@ -65,7 +65,6 @@ from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
-from .invert_polarity import invert_polarity
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
@@ -131,6 +130,5 @@ __all__ = [
     "upsampler",
     "wiener_filter",
     "windower",
-    "invert_polarity",
     "time_over_threshold",
 ]
