@@ -66,6 +66,7 @@ from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
+from .histogram import histogram, histogram_stats
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
@@ -79,6 +80,7 @@ from .multi_a_filter import multi_a_filter
 from .multi_t_filter import multi_t_filter, remove_duplicates
 from .optimize import optimize_1pz, optimize_2pz
 from .param_lookup import param_lookup
+from .peak_snr_threshold import peak_snr_threshold
 from .pole_zero import double_pole_zero, pole_zero
 from .presum import presum
 from .pulse_injector import inject_exp_pulse, inject_sig_pulse
@@ -103,6 +105,8 @@ __all__ = [
     "fixed_time_pickoff",
     "gaussian_filter1d",
     "get_multi_local_extrema",
+    "histogram",
+    "histogram_stats",
     "linear_slope_fit",
     "log_check",
     "min_max",
@@ -122,6 +126,7 @@ __all__ = [
     "inject_exp_pulse",
     "inject_sig_pulse",
     "saturation",
+    "peak_snr_threshold",
     "soft_pileup_corr",
     "soft_pileup_corr_bl",
     "time_point_thresh",
