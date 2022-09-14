@@ -109,18 +109,19 @@ def test_scipy_gauss_filter(geds_raw_tbl):
 
 def test_histogram_processor_fixed_witdth(spms_raw_tbl):
     dsp_config = {
-        "outputs": ["hist_weights" , "hist_borders"],
+        "outputs": ["hist_weights", "hist_borders"],
         "processors": {
             "hist_weights , hist_borders": {
                 "function": "histogram",
                 "module": "pygama.dsp.processors.histogram",
-                "args": ["waveform","hist_weights(100)", "hist_borders(101)"],
-                "unit": ["none", "ADC"]
+                "args": ["waveform", "hist_weights(100)", "hist_borders(101)"],
+                "unit": ["none", "ADC"],
             }
-        }
+        },
     }
     proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
+
 
 def test_processor_variable_array_output(spms_raw_tbl):
     dsp_config = {
@@ -142,7 +143,7 @@ def test_processor_variable_array_output(spms_raw_tbl):
                 ],
                 "unit": "ADC",
             }
-        }
+        },
     }
 
     proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)

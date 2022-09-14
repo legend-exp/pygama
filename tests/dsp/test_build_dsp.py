@@ -8,6 +8,7 @@ from pygama.lgdo.lh5_store import LH5Store, ls
 
 config_dir = Path(__file__).parent / "configs"
 
+
 def test_build_dsp_basics(lgnd_test_data, dsp_test_file):
     with pytest.raises(FileExistsError):
         build_dsp(

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import floor
 
 import numpy as np
 from numba import guvectorize
@@ -59,24 +58,23 @@ def histogram(
     if np.isnan(w_in).any():
         return
 
-    #create the bin borders
+    # create the bin borders
     borders_out[0] = min(w_in)
-    delta=0
-    
+    delta = 0
+
     # number of bins
     bin_in = len(weights_out)
 
     # define the bin edges
     delta = (max(w_in) - min(w_in)) / (bin_in)
     for i in range(0, bin_in, 1):
-        borders_out[i+1] = min(w_in) + delta *(i+1)
+        borders_out[i + 1] = min(w_in) + delta * (i + 1)
 
-    
     # make the histogram
     for i in range(0, len(w_in), 1):
         for k in range(1, len(borders_out), 1):
             if (w_in[i] - borders_out[k]) < 0:
-                weights_out[k-1] += 1
+                weights_out[k - 1] += 1
                 break
 
 
@@ -117,7 +115,7 @@ def histogram_stats(
     fwhm_out
         the FWHM of the histogram, calculated by starting from the mode and
         descending left and right.
-    
+
      JSON Configuration Example
     --------------------------
 
@@ -158,7 +156,7 @@ def histogram_stats(
 
     # is user specifies mean justfind mean index
     else:
-        if (max_in>edges_in[-2]):
+        if max_in > edges_in[-2]:
             max_index = len(weights_in) - 1
         else:
             for i in range(0, len(weights_in), 1):
@@ -166,7 +164,7 @@ def histogram_stats(
                     max_index = i
 
     mode_out[0] = max_index
-    #returns left bin edge
+    # returns left bin edge
     max_out[0] = edges_in[max_index]
 
     # and the approx fwhm
