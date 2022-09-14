@@ -107,16 +107,49 @@ def test_scipy_gauss_filter(geds_raw_tbl):
     proc_chain.execute(0, 1)
 
 
+def test_histogram_processor_fixed_witdth(spms_raw_tbl):
+    dsp_config = {
+        "outputs": ["wf_hist_c" , "wf_borders_c"],
+        "processors": {
+            "wf_hist_c , wf_borders_c": {
+                "function": "histogram",
+                "module": "pygama.dsp.processors.histogram",
+                "args": ["waveform","[100]","wf_hist_c(100)", "wf_borders_c(101)"],
+                "unit": ["ADC", "ADC"]
+            }
+        }
+    }
+    proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
+    proc_chain.execute(0, 1)
+
+def test_histogram_processor_variable_witdth(spms_raw_tbl):
+    dsp_config = {
+        "outputs": ["wf_hist_c" , "wf_borders_c"],
+        "processors": {
+            "wf_hist_c , wf_borders_c": {
+                "function": "histogram",
+                "module": "pygama.dsp.processors.histogram",
+                "args": ["waveform","[1,2,3,4,1,6,10,8,2,1]","wf_hist_c(10)", "wf_borders_c(11)"],
+                "unit": ["ADC", "ADC"]
+            }
+        }
+    }
+
+    proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
+    proc_chain.execute(0, 1)
+
 def test_processor_variable_array_output(spms_raw_tbl):
     dsp_config = {
-        "outputs": ["wf_cum"],
+        "outputs": ["vt_max_out"],
         "processors": {
             "vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out": {
                 "function": "get_multi_local_extrema",
                 "module": "pygama.dsp.processors",
                 "args": [
-                    "curr",
-                    "3*bl_std",
+                    "waveform",
+                    5,
+                    10,
+                    0,
                     "vt_max_out(10)",
                     "vt_min_out(10)",
                     "n_max_out",
@@ -125,7 +158,7 @@ def test_processor_variable_array_output(spms_raw_tbl):
                 ],
                 "unit": "ADC",
             }
-        },
+        }
     }
 
     proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)

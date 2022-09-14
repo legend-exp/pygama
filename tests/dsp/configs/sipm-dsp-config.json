@@ -17,7 +17,7 @@
     "wf_hist_c , wf_borders_c": {
       "function": "histogram",
       "module": "pygama.dsp.processors.histogram",
-      "args": ["curr", "wf_hist_c(100)", "wf_borders_c(100)"],
+      "args": ["curr","[100]","wf_hist_c(100)", "wf_borders_c(101)"],
       "unit": ["ADC", "ADC"]
     },
     "bl_std_c, idx_out_c, max_out": {
