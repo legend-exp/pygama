@@ -10,14 +10,14 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 @guvectorize(
     [
-        "void(float32[:], float32[:], float32[:])",
-        "void(float64[:], float64[:], float64[:])",
+        "void(float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64[:], float64[:], float64[:])",
     ],
-    "(n),(m),(m)",
+    "(n),(m),(p),(q)",
     **nb_kwargs,
 )
 def histogram(
-    w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
+    w_in: np.ndarray, widths_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
 ) -> None:
 
     """Produces and returns an histogram of the waveform.
@@ -26,6 +26,8 @@ def histogram(
     ----------
     w_in
         Data to be histogrammed.
+    widths_in
+        Widths of each bin. If only 1 element is given, equal widths are assumed and the number of bins  equals the only element in widths_in
     weights_out
         The output histogram weights.
     borders_out
@@ -44,25 +46,36 @@ def histogram(
     weights_out[:] = 0
     borders_out[:] = np.nan
 
-    if np.isnan(w_in).any():
+    if np.isnan(w_in).any() or np.isnan(widths_in).any():
         return
 
-    # number of bins + 1
-    bin_in = len(weights_out)
+    #create the bin borders
+    borders_out[0] = min(w_in)
+    delta=0
+    
+    #in case bin widths are given
+    if len(widths_in) > 1:
+        delta = (max(w_in)-min(w_in))/np.sum(widths_in)
+        for i in range(0,len(widths_in),1):
+            borders_out[i+1] = min(w_in) + sum(widths_in[0:i+1])*delta
 
-    # define the bin edges
-    delta = (max(w_in) - min(w_in)) / (bin_in - 1)
-    for i in range(0, bin_in, 1):
-        borders_out[i] = min(w_in) + delta * i
+    #else equal spaced bins
+    else:
+        # number of bins
+        bin_in = widths_in[0]
 
+        # define the bin edges
+        delta = (max(w_in) - min(w_in)) / (bin_in)
+        for i in range(0, bin_in, 1):
+            borders_out[i+1] = min(w_in) + delta *(i+1)
+
+    
     # make the histogram
     for i in range(0, len(w_in), 1):
-        j = floor((w_in[i] - borders_out[0]) / delta)
-        if j < 0:
-            j = 0
-        if j >= len(borders_out):
-            j = len(borders_out) - 1
-        weights_out[j] += 1
+        for k in range(1, len(borders_out), 1):
+            if (w_in[i] - borders_out[k]) < 0:
+                weights_out[k-1] += 1
+                break
 
 
 @guvectorize(
@@ -70,7 +83,7 @@ def histogram(
         "void(float32[:], float32[:], float32[:], float32[:],float32[:],float32)",
         "void(float64[:], float64[:], float64[:], float64[:],float64[:],float64)",
     ],
-    "(n),(n),(),(),(),()",
+    "(n),(m),(),(),(),()",
     **nb_kwargs,
 )
 def histogram_stats(
@@ -124,21 +137,25 @@ def histogram_stats(
 
     # is user specifies mean justfind mean index
     else:
-        for i in range(0, len(weights_in), 1):
-            if abs(max_in - edges_in[i]) < abs(max_in - edges_in[max_index]):
-                max_index = i
+        if (max_in>edges_in[-2]):
+            max_index = len(weights_in) - 1
+        else:
+            for i in range(0, len(weights_in), 1):
+                if abs(max_in - edges_in[i]) < abs(max_in - edges_in[max_index]):
+                    max_index = i
 
     mode_out[0] = max_index
+    #returns left bin edge
     max_out[0] = edges_in[max_index]
 
-    # and the approx standarddev
-    for i in range(max_index, len(weights_in) - 1, 1):
+    # and the approx fwhm
+    for i in range(max_index, len(weights_in), 1):
         if weights_in[i] <= 0.5 * weights_in[max_index] and weights_in[i] != 0:
             fwhm_out[0] = abs(max_out[0] - edges_in[i])
             break
 
     # look also into the other direction
-    for i in range(1, max_index, 1):
+    for i in range(0, max_index, 1):
         if weights_in[i] >= 0.5 * weights_in[max_index] and weights_in[i] != 0:
             if fwhm_out[0] < abs(max_out[0] - edges_in[i]):
                 fwhm_out[0] = abs(max_out[0] - edges_in[i])
