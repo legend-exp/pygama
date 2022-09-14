@@ -10,14 +10,14 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 @guvectorize(
     [
-        "void(float32[:], float32[:], float32[:], float32[:])",
-        "void(float64[:], float64[:], float64[:], float64[:])",
+        "void(float32[:], float32[:], float32[:])",
+        "void(float64[:], float64[:], float64[:])",
     ],
-    "(n),(m),(p),(q)",
+    "(n),(m),(p)",
     **nb_kwargs,
 )
 def histogram(
-    w_in: np.ndarray, widths_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
+    w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
 ) -> None:
 
     """Produces and returns an histogram of the waveform.
@@ -26,12 +26,22 @@ def histogram(
     ----------
     w_in
         Data to be histogrammed.
-    widths_in
-        Widths of each bin. If only 1 element is given, equal widths are assumed and the number of bins  equals the only element in widths_in
     weights_out
         The output histogram weights.
     borders_out
-        The output histogram bin edges of the histogram.
+        The output histogram bin edges of the histogram. Length must be len(weights_out)+1
+
+    JSON Configuration Example
+    --------------------------
+
+    .. code-block :: json
+
+        "hist_weights, "hist_borders": {
+            "function": "histogram",
+            "module": "pygama.dsp.processors.histogram",
+            "args": ["waveform", "hist_weights(100)", "hist_borders(101)"],
+            "unit": ["none", "ADC"]
+        }
 
     Note
     ----
@@ -46,28 +56,20 @@ def histogram(
     weights_out[:] = 0
     borders_out[:] = np.nan
 
-    if np.isnan(w_in).any() or np.isnan(widths_in).any():
+    if np.isnan(w_in).any():
         return
 
     #create the bin borders
     borders_out[0] = min(w_in)
     delta=0
     
-    #in case bin widths are given
-    if len(widths_in) > 1:
-        delta = (max(w_in)-min(w_in))/np.sum(widths_in)
-        for i in range(0,len(widths_in),1):
-            borders_out[i+1] = min(w_in) + sum(widths_in[0:i+1])*delta
+    # number of bins
+    bin_in = len(weights_out)
 
-    #else equal spaced bins
-    else:
-        # number of bins
-        bin_in = widths_in[0]
-
-        # define the bin edges
-        delta = (max(w_in) - min(w_in)) / (bin_in)
-        for i in range(0, bin_in, 1):
-            borders_out[i+1] = min(w_in) + delta *(i+1)
+    # define the bin edges
+    delta = (max(w_in) - min(w_in)) / (bin_in)
+    for i in range(0, bin_in, 1):
+        borders_out[i+1] = min(w_in) + delta *(i+1)
 
     
     # make the histogram
@@ -104,17 +106,36 @@ def histogram_stats(
     edges_in
         histogram bin edges.
     max_in
-        if not :any:`numpy.inf`, this value is used as the histogram bin
+        if not :any:`numpy.nan`, this value is used as the histogram bin
         content at the mode.  Otherwise the mode is computed automatically
         (from left to right).
     mode_out
-        the computed mode of the histogram. If `max_in` is not :any:`numpy.inf`
+        the computed mode of the histogram. If `max_in` is not :any:`numpy.nan`
         then the closest waveform index to `max_in` is returned.
     max_out
         the histogram bin content at the mode.
     fwhm_out
         the FWHM of the histogram, calculated by starting from the mode and
         descending left and right.
+    
+     JSON Configuration Example
+    --------------------------
+
+    .. code-block :: json
+
+        "fwhm, idx_out, max_out": {
+            "function": "histogram_stats",
+            "module": "pygama.dsp.processors.histogram",
+            "args": [
+                "hist_weights",
+                "hist_borders",
+                "idx_out",
+                "max_out",
+                "bl_std_c",
+                "np.nan"
+            ],
+            "unit": ["ADC", "none", "ADC"]
+        }
 
     See Also
     --------
