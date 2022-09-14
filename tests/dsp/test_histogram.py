@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 
-
 import pygama.lgdo.lh5_store as store
 from pygama.dsp import build_dsp
 
