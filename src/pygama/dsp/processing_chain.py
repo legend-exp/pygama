@@ -9,6 +9,7 @@ import importlib
 import itertools as it
 import json
 import logging
+from multiprocessing.dummy import Array
 import re
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
@@ -22,6 +23,9 @@ import pygama.lgdo as lgdo
 from pygama.dsp.errors import DSPFatal, ProcessingChainError
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
+
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from pygama.lgdo.array import Array as lgdoArray
 
 log = logging.getLogger(__name__)
 
@@ -653,6 +657,13 @@ class ProcessingChain:
         if node is None:
             return None
 
+        elif isinstance(node,ast.List):
+            npparr = np.array(ast.literal_eval(expr))
+            if len(npparr.shape) == 1:
+                return npparr
+            else:
+                ProcessingChainError("only 1D arrays are supported: " + expr)
+
         elif isinstance(node, ast.Num):
             return node.n
 
@@ -1131,8 +1142,12 @@ class ProcessorManager:
                 if not d:
                     continue
                 if d not in dims_dict:
-                    raise ProcessingChainError(
-                        f"could not deduce dimension {d} for {param}"
+                    # If it is an array lets get the length
+                    if isinstance(param,np.ndarray):
+                            dims_dict[d]=self.DimInfo(len(param),None)
+                    else:
+                        raise ProcessingChainError(
+                            f"could not deduce dimension {d} for {param}"
                     )
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
@@ -1173,6 +1188,7 @@ class ProcessorManager:
                         arshape.insert(len(arshape) + idim + 1, 1)
                 param = param.reshape(tuple(arshape))
 
+
             elif param is not None:
                 # Convert scalar to right type, including units
                 if isinstance(param, (Quantity, Unit)):
@@ -1188,7 +1204,7 @@ class ProcessorManager:
                     else:
                         param = float(param / grid.period)
                 if np.issubdtype(dtype, np.integer):
-                    param = dtype.type(round(param))
+                    param = dtype.type(round(param)) 
                 else:
                     param = dtype.type(param)
 
