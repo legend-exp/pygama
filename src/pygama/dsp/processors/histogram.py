@@ -123,14 +123,7 @@ def histogram_stats(
         "fwhm, idx_out, max_out": {
             "function": "histogram_stats",
             "module": "pygama.dsp.processors.histogram",
-            "args": [
-                "hist_weights",
-                "hist_borders",
-                "idx_out",
-                "max_out",
-                "bl_std_c",
-                "np.nan"
-            ],
+            "args": ["hist_weights","hist_borders",idx_out","max_out","fwhm","np.nan"],
             "unit": ["ADC", "none", "ADC"]
         }
 
