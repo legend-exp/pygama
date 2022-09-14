@@ -23,7 +23,6 @@ from pygama.dsp.errors import DSPFatal, ProcessingChainError
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
-
 log = logging.getLogger(__name__)
 
 LGDO = Union[lgdo.Scalar, lgdo.Array, lgdo.VectorOfVectors, lgdo.Struct]
@@ -654,7 +653,7 @@ class ProcessingChain:
         if node is None:
             return None
 
-        elif isinstance(node,ast.List):
+        elif isinstance(node, ast.List):
             npparr = np.array(ast.literal_eval(expr))
             if len(npparr.shape) == 1:
                 return npparr
@@ -1140,12 +1139,12 @@ class ProcessorManager:
                     continue
                 if d not in dims_dict:
                     # If it is an array lets get the length
-                    if isinstance(param,np.ndarray):
-                            dims_dict[d]=self.DimInfo(len(param),None)
+                    if isinstance(param, np.ndarray):
+                        dims_dict[d] = self.DimInfo(len(param), None)
                     else:
                         raise ProcessingChainError(
                             f"could not deduce dimension {d} for {param}"
-                    )
+                        )
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
@@ -1184,7 +1183,6 @@ class ProcessorManager:
                     if arshape[idim] != shape[idim]:
                         arshape.insert(len(arshape) + idim + 1, 1)
                 param = param.reshape(tuple(arshape))
-
 
             elif param is not None:
                 # Convert scalar to right type, including units
