@@ -34,7 +34,7 @@ def histogram(
 
     .. code-block :: json
 
-        "hist_weights, "hist_borders": {
+        "hist_weights, hist_borders": {
             "function": "histogram",
             "module": "pygama.dsp.processors.histogram",
             "args": ["waveform", "hist_weights(100)", "hist_borders(101)"],
