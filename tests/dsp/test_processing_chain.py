@@ -109,32 +109,16 @@ def test_scipy_gauss_filter(geds_raw_tbl):
 
 def test_histogram_processor_fixed_witdth(spms_raw_tbl):
     dsp_config = {
-        "outputs": ["wf_hist_c" , "wf_borders_c"],
+        "outputs": ["hist_weights" , "hist_borders"],
         "processors": {
-            "wf_hist_c , wf_borders_c": {
+            "hist_weights , hist_borders": {
                 "function": "histogram",
                 "module": "pygama.dsp.processors.histogram",
-                "args": ["waveform","[100]","wf_hist_c(100)", "wf_borders_c(101)"],
-                "unit": ["ADC", "ADC"]
+                "args": ["waveform","hist_weights(100)", "hist_borders(101)"],
+                "unit": ["none", "ADC"]
             }
         }
     }
-    proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
-    proc_chain.execute(0, 1)
-
-def test_histogram_processor_variable_witdth(spms_raw_tbl):
-    dsp_config = {
-        "outputs": ["wf_hist_c" , "wf_borders_c"],
-        "processors": {
-            "wf_hist_c , wf_borders_c": {
-                "function": "histogram",
-                "module": "pygama.dsp.processors.histogram",
-                "args": ["waveform","[1,2,3,4,1,6,10,8,2,1]","wf_hist_c(10)", "wf_borders_c(11)"],
-                "unit": ["ADC", "ADC"]
-            }
-        }
-    }
-
     proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
     proc_chain.execute(0, 1)
 
