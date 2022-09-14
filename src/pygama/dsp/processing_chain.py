@@ -9,7 +9,6 @@ import importlib
 import itertools as it
 import json
 import logging
-from multiprocessing.dummy import Array
 import re
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
@@ -24,8 +23,6 @@ from pygama.dsp.errors import DSPFatal, ProcessingChainError
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.array import Array as lgdoArray
 
 log = logging.getLogger(__name__)
 
@@ -1204,7 +1201,7 @@ class ProcessorManager:
                     else:
                         param = float(param / grid.period)
                 if np.issubdtype(dtype, np.integer):
-                    param = dtype.type(round(param)) 
+                    param = dtype.type(round(param))
                 else:
                     param = dtype.type(param)
 
