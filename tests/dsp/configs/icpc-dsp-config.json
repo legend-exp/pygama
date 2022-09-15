@@ -173,9 +173,9 @@
       "unit": "ADC"
     },
     "cuspEftp": {
-      "function": "fixed_sample_pickoff",
+      "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
-      "args": ["wf_cusp", "db.cusp.sample", "cuspEftp"],
+	"args": ["wf_cusp", "db.cusp.sample", "'i'", "cuspEftp"],
       "unit": "ADC",
       "defaults": { "db.cusp.sample": "50" }
     },
@@ -204,9 +204,9 @@
       "unit": "ADC"
     },
     "zacEftp": {
-      "function": "fixed_sample_pickoff",
+      "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
-      "args": ["wf_zac", "db.zac.sample", "zacEftp"],
+      "args": ["wf_zac", "db.zac.sample", "'i'", "zacEftp"],
       "defaults": { "db.zac.sample": "50" },
       "unit": "ADC"
     },
