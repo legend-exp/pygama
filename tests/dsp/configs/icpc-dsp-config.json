@@ -175,7 +175,7 @@
     "cuspEftp": {
       "function": "fixed_time_pickoff",
       "module": "pygama.dsp.processors",
-	"args": ["wf_cusp", "db.cusp.sample", "'i'", "cuspEftp"],
+      "args": ["wf_cusp", "db.cusp.sample", "'i'", "cuspEftp"],
       "unit": "ADC",
       "defaults": { "db.cusp.sample": "50" }
     },
