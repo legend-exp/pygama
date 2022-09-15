@@ -107,16 +107,34 @@ def test_scipy_gauss_filter(geds_raw_tbl):
     proc_chain.execute(0, 1)
 
 
+def test_histogram_processor_fixed_witdth(spms_raw_tbl):
+    dsp_config = {
+        "outputs": ["hist_weights", "hist_borders"],
+        "processors": {
+            "hist_weights , hist_borders": {
+                "function": "histogram",
+                "module": "pygama.dsp.processors.histogram",
+                "args": ["waveform", "hist_weights(100)", "hist_borders(101)"],
+                "unit": ["none", "ADC"],
+            }
+        },
+    }
+    proc_chain, _, _ = build_processing_chain(spms_raw_tbl, dsp_config)
+    proc_chain.execute(0, 1)
+
+
 def test_processor_variable_array_output(spms_raw_tbl):
     dsp_config = {
-        "outputs": ["wf_cum"],
+        "outputs": ["vt_max_out"],
         "processors": {
             "vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out": {
                 "function": "get_multi_local_extrema",
                 "module": "pygama.dsp.processors",
                 "args": [
-                    "curr",
-                    "3*bl_std",
+                    "waveform",
+                    5,
+                    10,
+                    0,
                     "vt_max_out(10)",
                     "vt_min_out(10)",
                     "n_max_out",
