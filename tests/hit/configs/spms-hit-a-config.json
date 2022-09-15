@@ -1,0 +1,38 @@
+{
+  "ch0/dsp": {
+    "outputs": ["energy_in_pe"],
+    "operations": {
+      "energy_in_pe": {
+        "expression": "a + m * energies",
+        "parameters": {
+          "a": 0,
+          "m": 0
+        }
+      }
+    }
+  },
+  "ch1/dsp": {
+    "outputs": ["energy_in_pe"],
+    "operations": {
+      "energy_in_pe": {
+        "expression": "a + m * energies",
+        "parameters": {
+          "a": 1,
+          "m": 0
+        }
+      }
+    }
+  },
+  "ch2/dsp": {
+    "outputs": ["energy_in_pe"],
+    "operations": {
+      "energy_in_pe": {
+        "expression": "a + m * energies",
+        "parameters": {
+          "a": 2,
+          "m": 0
+        }
+      }
+    }
+  }
+}
