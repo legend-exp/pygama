@@ -44,4 +44,4 @@ def multi_a_filter(w_in, vt_maxs_in, va_max_out):
             "The length of your return array must be smaller than the length of your waveform"
         )
 
-    fixed_time_pickoff(w_in, vt_maxs_in, ord('i'), va_max_out)
+    fixed_time_pickoff(w_in, vt_maxs_in, ord("i"), va_max_out)
