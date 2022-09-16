@@ -119,7 +119,7 @@ def wiener_filter(file_name_array: list[str]) -> np.ndarray:
         **nb_kwargs(
             cache=False,
             forceobj=True,
-        )
+        ),
     )
     def wiener_out(fft_w_in: np.ndarray, fft_w_out: np.ndarray) -> None:
         """

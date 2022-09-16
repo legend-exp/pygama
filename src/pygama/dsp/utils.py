@@ -2,6 +2,7 @@ import os
 from collections.abc import MutableMapping
 from typing import Any, Iterator
 
+
 class NumbaDefaults(MutableMapping):
     """Bare-bones class to store some Numba default options.
 
@@ -31,7 +32,7 @@ class NumbaDefaults(MutableMapping):
 
     def __init__(self) -> None:
         cache = os.getenv("PYGAMA_CACHE")
-        if not cache or not cache.lower() in ('1', 't', 'true'):
+        if not cache or not cache.lower() in ("1", "t", "true"):
             self.cache: bool = False
         else:
             self.cache: bool = True
@@ -51,7 +52,7 @@ class NumbaDefaults(MutableMapping):
 
     def __len__(self) -> int:
         return len(self.__dict__)
-    
+
     def __call__(self, **kwargs) -> dict:
         mapping = self.__dict__.copy()
         mapping.update(**kwargs)
@@ -62,6 +63,7 @@ class NumbaDefaults(MutableMapping):
 
     def __repr__(self) -> str:
         return str(self.__dict__)
+
 
 numba_defaults = NumbaDefaults()
 numba_defaults_kwargs = numba_defaults
