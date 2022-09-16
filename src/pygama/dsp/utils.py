@@ -1,3 +1,5 @@
+import os
+
 class NumbaDefaults:
     """Bare-bones class to store some Numba default options.
 
@@ -26,7 +28,11 @@ class NumbaDefaults:
     """
 
     def __init__(self) -> None:
-        self.cache: bool = False
+        cache = os.getenv("PYGAMA_CACHE")
+        if not cache or not cache.lower() in ('1', 't', 'true'):
+            self.cache: bool = False
+        else:
+            self.cache: bool = True
         self.boundscheck: bool = False
 
 
