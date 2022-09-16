@@ -94,6 +94,7 @@ def energy_cal_th(
     threshold: int = 0,
     p_val: float = 0.05,
     n_events: int = 15000,
+    deg:int = 1
 ) -> tuple(dict, dict):
 
     """
@@ -180,7 +181,7 @@ def energy_cal_th(
             uncal_pass[energy_param],
             glines,
             guess_keV,
-            deg=1,
+            deg=deg,
             range_keV=range_keV,
             funcs=funcs,
             gof_funcs=gof_funcs,
@@ -211,7 +212,7 @@ def energy_cal_th(
             uncal_pass[energy_param],
             glines,
             guess_keV,
-            deg=1,
+            deg=deg,
             range_keV=kev_ranges,
             funcs=funcs,
             gof_funcs=gof_funcs,
@@ -225,10 +226,24 @@ def energy_cal_th(
             log.info("Calibration failed")
             continue
         log.info(f"Calibration pars are {pars}")
-        hit_dict[f"{energy_param}_cal"] = {
-            "expression": f"@a*{energy_param}+@b",
-            "parameters": {"a": pars[0], "b": pars[1]},
-        }
+        if deg==1:
+            hit_dict[f"{energy_param}_cal"] = {
+                "expression": f"a*{energy_param}+b",
+                "parameters": {"a": pars[0], "b": pars[1]},
+            }
+        elif deg=0:
+            hit_dict[f"{energy_param}_cal"] = {
+                "expression": f"a*{energy_param}",
+                "parameters": {"a": pars[0]},
+            }
+        elif deg=2:
+            hit_dict[f"{energy_param}_cal"] = {
+                "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
+                "parameters": {"a": pars[0],"b": pars[1],"c": pars[2]},
+            }
+        else:
+            hit_dict[f"{energy_param}_cal"] ={}
+            log.warning(f"hit_dict not implemented for deg = {deg}")
         fitted_peaks = results["fitted_keV"]
         fitted_funcs = []
         fitted_gof_funcs = []
@@ -273,6 +288,10 @@ def energy_cal_th(
                 continue
             elif peak == 1592.53:
                 log.info(f"Tl DEP found at index {i}")
+                indexes.append(i)
+                continue
+            elif np.isnan(dfwhms[i]):
+                log.info(f"{peak} failed")
                 indexes.append(i)
                 continue
             else:
@@ -455,7 +474,7 @@ def energy_cal_th(
                     plt.step(pgh.get_bin_centers(bins_pass), sf)
                     plt.xlabel("Energy (keV)")
                     plt.ylabel("Survival Fraction (%)")
-                    plt.ylim([0, 1])
+                    plt.ylim([0, 100])
                     pdf.savefig()
                     plt.close()
 
@@ -471,8 +490,7 @@ def energy_cal_th(
             "Qbb_fwhm_err": round(qbb_err, 2),
             "2.6_fwhm": fep_fwhm,
             "2.6_fwhm_err": fep_dwhm,
-            "m0": fit_pars[0],
-            "m1": fit_pars[1],
+            "eres_pars": fit_pars
         }
 
     log.info(f"Finished : {hit_dict}")
