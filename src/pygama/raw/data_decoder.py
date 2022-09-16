@@ -3,7 +3,6 @@ Base classes for decoding data into raw LGDO Tables or files
 """
 from __future__ import annotations
 
-from abc import ABC
 from typing import Union
 
 import numpy as np
@@ -15,7 +14,7 @@ from pygama.raw.raw_buffer import RawBuffer
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
 
-class DataDecoder(ABC):
+class DataDecoder:
     r"""Decodes packets from a data stream.
 
     Most decoders will repeatedly decode the same set of values from each
