@@ -505,31 +505,46 @@ def plot_dt_dep(
 
 
 def unbinned_energy_fit(
-    energy: np.array, peak: float, verbose: bool = False
+    energy: np.array, peak: float, eres_pars:list=None, simplex=False, guess = None, verbose: bool = False
 ) -> tuple(np.array, np.array):
 
     """
     Fitting function for energy peaks used to calculate survival fractions
     """
-
-    energy_len = len(energy)
     hist, bins, var = pgh.get_hist(
-        energy, dx=0.5, range=(np.nanmin(energy), np.nanmax(energy))
-    )
-    x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
+            energy, dx=0.5, range=(np.nanmin(energy), np.nanmax(energy))
+        )
+    if guess is None:
+        sigma = ect.fwhm_slope(peak, *eres_pars)/2.355
+
+        x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_gauss_step_pdf)
+        x0[2]=sigma
+        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
+        m = Minuit(c, *x0)
+        m.fixed[-3:] = True
+        m.simplex().migrad()
+        m.hesse()
+        x0_rad = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
+        x0=m.values[:3]
+        x0 += x0_rad[3:5]
+        x0 += m.values[3:]
+        
+    else:
+        x0=guess
     if len(x0) == 0:
         return [np.nan], [np.nan]
+    
     fixed, mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
 
     c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
     m = Minuit(c, *x0)
     m.limits = [
-        (0, energy_len),
+        (0, len(energy)),
         (None, None),
         (None, None),
         (0, 1),
         (0, None),
-        (0, energy_len),
+        (0, len(energy)*1.1),
         (None, None),
         (None, None),
         (None, None),
@@ -537,7 +552,11 @@ def unbinned_energy_fit(
     ]
     for fix in fixed:
         m.fixed[fix] = True
-    m.simplex().migrad()
+    if simplex ==True:
+        m.simplex().migrad()
+    else:
+        m.migrad()
+    
     m.hesse()
     if verbose:
         print(m)
@@ -547,15 +566,16 @@ def unbinned_energy_fit(
     if valid == True and not np.isnan(m.errors[:-3]).all():
         return m.values, m.errors
     else:
+        x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
         c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
         m = Minuit(c, *x0)
         m.limits = [
-            (0, energy_len),
+            (0, len(energy)),
             (None, None),
             (None, None),
             (0, 1),
             (0, None),
-            (0, energy_len),
+            (0, len(energy)),
             (None, None),
             (None, None),
             (None, None),
@@ -563,7 +583,7 @@ def unbinned_energy_fit(
         ]
         for fix in fixed:
             m.fixed[fix] = True
-        m.migrad()
+        m.simplex().migrad()
         m.hesse()
         valid = m.valid
         if verbose:
@@ -1017,7 +1037,6 @@ def cal_aoe(
     cal_energy_param: str,
     eres_pars: list,
     dt_corr: bool = False,
-    cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     plot_savepath: str = None,
 ) -> tuple(dict, dict):
     """
@@ -1026,7 +1045,7 @@ def cal_aoe(
 
     aoe_uncorr, energy, dt, full_dt = load_aoe(
         files, lh5_path, cal_dict, energy_param, cal_energy_param
-    )  # , cut_parameters = cut_parameters
+    ) 
 
     if dt_corr == True:
         aoe, alpha = drift_time_correction(aoe_uncorr, energy, dt)
@@ -1043,13 +1062,25 @@ def cal_aoe(
 
     cal_dict.update(
         {
+            "AoE_Corrected": {
+                "expression": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)",
+                "parameters": {
+                    "a": mu_pars[0],
+                    "b": mu_pars[1]
+                },
+            }
+        }
+    )
+
+    cal_dict.update(
+        {
             "AoE_Classifier": {
-                "expression": f"(((A_max/{energy_param})/(@a*{cal_energy_param} +@b))-1)/(sqrt(@c+(@d/{cal_energy_param})**2))",
+                "expression": f"AoE_Corrected/(sqrt(c+(d/{cal_energy_param})**2)/(a*{cal_energy_param} +b))",
                 "parameters": {
                     "a": mu_pars[0],
                     "b": mu_pars[1],
                     "c": sigma_pars[0],
-                    "d": sigma_pars[1],
+                    "d": sigma_pars[1]
                 },
             }
         }
@@ -1058,7 +1089,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Low_Cut": {
-                "expression": "AoE_Classifier>@a",
+                "expression": "AoE_Classifier>a",
                 "parameters": {"a": cut},
             }
         }
@@ -1067,7 +1098,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Double_Sided_Cut": {
-                "expression": "@b>AoE_Classifier>@a",
+                "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
                 "parameters": {"a": cut, "b": 4},
             }
         }
