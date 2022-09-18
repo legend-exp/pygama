@@ -2,9 +2,21 @@ import os
 from collections.abc import MutableMapping
 from typing import Any, Iterator
 
+def getenv_bool(name: str, default: bool = False) -> bool:
+    """Get environment value as a boolean, returning True for 1, t and true
+    (caps-insensitive), and False for any other value and default if undefined.
+    """
+    val = os.getenv(name)
+    if not val:
+        return default
+    elif val.lower() in ("1", "t", "true"):
+        return True
+    else:
+        return False
 
 class NumbaDefaults(MutableMapping):
-    """Bare-bones class to store some Numba default options.
+    """Bare-bones class to store some Numba default options. Defaults values
+    are set from environment variables
 
     Examples
     --------
@@ -20,7 +32,7 @@ class NumbaDefaults(MutableMapping):
     >>> from pygama.dsp.utils import numba_defaults as nb_defaults
     >>> @guvectorize([], "", **nb_defaults(cache=False) # def proc(...): ...
 
-    Set global options at runtime:
+    Override global options at runtime:
 
     >>> from pygama.dsp.utils import numba_defaults
     >>> from pygama.dsp import build_dsp
@@ -31,12 +43,8 @@ class NumbaDefaults(MutableMapping):
     """
 
     def __init__(self) -> None:
-        cache = os.getenv("PYGAMA_CACHE")
-        if not cache or not cache.lower() in ("1", "t", "true"):
-            self.cache: bool = False
-        else:
-            self.cache: bool = True
-        self.boundscheck: bool = False
+        self.cache: bool = getenv_bool("PYGAMA_CACHE")
+        self.boundscheck: bool = getenv_bool("PYGAMA_BOUNDSCHECK")
 
     def __getitem__(self, item: str) -> Any:
         return self.__dict__[item]
