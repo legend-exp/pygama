@@ -17,8 +17,8 @@ to learn about their meaning.
 
 The environment variables that can be set are:
 :PYGAMA_CACHE: set caching behavior (default False)
-:PYGAMA_BOUNDCHECK: set automatic bounds checking (default False)
-
+:PYGAMA_BOUNDSCHECK: set automatic bounds checking (default False)
+  
 Here's an example of how global option customization can achieved in user
 scripts:
 
