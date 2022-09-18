@@ -2,6 +2,7 @@ import os
 from collections.abc import MutableMapping
 from typing import Any, Iterator
 
+
 def getenv_bool(name: str, default: bool = False) -> bool:
     """Get environment value as a boolean, returning True for 1, t and true
     (caps-insensitive), and False for any other value and default if undefined.
@@ -13,6 +14,7 @@ def getenv_bool(name: str, default: bool = False) -> bool:
         return True
     else:
         return False
+
 
 class NumbaDefaults(MutableMapping):
     """Bare-bones class to store some Numba default options. Defaults values
