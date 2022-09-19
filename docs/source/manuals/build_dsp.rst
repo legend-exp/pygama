@@ -16,8 +16,9 @@ to learn about their meaning.
    Some special processors override default option values.
 
 The environment variables that can be set are:
-:PYGAMA_CACHE: set caching behavior (default False)
-:PYGAMA_BOUNDSCHECK: set automatic bounds checking (default False)
+
+:``PYGAMA_CACHE``: Set caching behavior (default false)
+:``PYGAMA_BOUNDSCHECK``: Set automatic bounds checking (default false)
 
 Here's an example of how global option customization can achieved in user
 scripts:
