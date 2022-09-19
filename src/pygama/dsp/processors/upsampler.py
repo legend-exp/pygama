@@ -15,8 +15,11 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
     **nb_kwargs,
 )
 def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
-    """Upsamples the waveform by the number specified, a series of moving
-    windows should be applied afterwards for smoothing.
+    """Upsamples the waveform by the number specified.
+
+    Note
+    ----
+    A series of moving windows should be applied afterwards for smoothing.
 
     Parameters
     ----------
@@ -53,31 +56,32 @@ def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
 def interpolating_upsampler(
     w_in: np.ndarray, mode_in: np.int8, w_out: np.ndarray
 ) -> None:
-    """Upsamples the waveform; resampling ratio is set by size of w_out
-    and w_in. Using the interpolation technique specified by mode_in to
-    fill newly added samples
+    """Upsamples the waveform.
+
+    Resampling ratio is set by size of `w_out` and `w_in`. Using the
+    interpolation technique specified by `mode_in` to fill newly added samples.
 
     Parameters
     ----------
     w_in
         waveform to upsample.
     mode_in
-        Character selecting which interpolation method to use. Note this
-        must be passed as a int8, e.g. ``ord('i')``. Options:
+        character selecting which interpolation method to use. Note this
+        must be passed as a ``int8``, e.g. ``ord('i')``. Options:
 
-        * 'i': only set values at original samples; fill in between
+        * ``i`` -- only set values at original samples; fill in between
           with zeros. Requires integer resampling ratio
-        * 'n': nearest-neighbor interpolation; defined at all values,
+        * ``n`` -- nearest-neighbor interpolation; defined at all values,
           but not continuous
-        * 'f': floor, or value at previous neighbor; defined at all
+        * ``f`` -- floor, or value at previous neighbor; defined at all
           values but not continuous
-        * 'c': ceiling, or value at next neighbor; defined at all values,
+        * ``c`` -- ceiling, or value at next neighbor; defined at all values,
           but not continuous
-        * 'l': linear interpolation; continuous at all values, but not
+        * ``l`` -- linear interpolation; continuous at all values, but not
           differentiable
-        * 'h': hermite cubic spline interpolation; continuous and
+        * ``h`` -- Hermite cubic spline interpolation; continuous and
           differentiable at all values but not twice-differentiable
-        * 's': natural cubic spline interpolation; continuous and twice-
+        * ``s`` -- natural cubic spline interpolation; continuous and twice-
           differentiable at all values. This method is much slower
           than the others because it utilizes the entire input waveform!
     w_out

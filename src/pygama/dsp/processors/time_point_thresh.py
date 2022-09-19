@@ -93,9 +93,11 @@ def interpolated_time_point_thresh(
     mode_in: np.int8,
     t_out: float,
 ) -> None:
-    """Find the time where the waveform value crosses the threshold, walking
-    either forward or backward from the starting index. Use interpolation to
-    estimate a time between samples. Interpolation mode selected with mode_in
+    """Find the time where the waveform value crosses the threshold
+
+    Search performed walking either forward or backward from the starting
+    index. Use interpolation to estimate a time between samples. Interpolation
+    mode selected with `mode_in`.
 
     Parameters
     ----------
@@ -109,18 +111,19 @@ def interpolated_time_point_thresh(
         the backward (``0``) or forward (``1``) search direction.
     mode_in
         Character selecting which interpolation method to use. Note this
-        must be passed as a int8, e.g. ``ord('i')``. Options:
+        must be passed as a ``int8``, e.g. ``ord('i')``. Options:
 
-        * 'i': integer t_in; equivalent to fixed_sample_pickoff
-        * 'f': floor; interpolated values are at previous neighbor, so
+        * ``i`` -- integer `t_in`; equivalent to
+          :func:`~.dsp.processors.fixed_sample_pickoff`
+        * ``f`` -- floor; interpolated values are at previous neighbor, so
           threshold crossing is at next neighbor
-        * 'c': ceiling, interpolated values are at next neighbor, so
+        * ``c`` -- ceiling, interpolated values are at next neighbor, so
           threshold crossing is at previous neighbor
-        * 'n': nearest-neighbor interpolation; threshold crossing is
+        * ``n`` -- nearest-neighbor interpolation; threshold crossing is
           half-way between samples
-        * 'l': linear interpolation
-        * 'h': hermite cubic spline interpolation (TODO)
-        * 's': natural cubic spline interpolation (TODO)
+        * ``l`` -- linear interpolation
+        * ``h`` -- Hermite cubic spline interpolation (*not implemented*)
+        * ``s`` -- natural cubic spline interpolation (*not implemented*)
     t_out
         the index where the waveform value crosses the threshold.
 

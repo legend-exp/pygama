@@ -17,17 +17,17 @@ from .fixed_time_pickoff import fixed_time_pickoff
     forceobj=True
 )
 def multi_a_filter(w_in, vt_maxs_in, va_max_out):
-    """
-    Finds the maximums in a waveform and returns the amplitude of the wave at those points
+    """Finds the maximums in a waveform and returns the amplitude of the wave
+    at those points.
 
     Parameters
     ----------
-    w_in : array-like
-        The array of data within which amplitudes of extrema will be found
-    vt_maxs_in : array-like
-        The array of max positions for each wf
-    va_max_out : array-like
-        An array (in-place filled) of the amplitudes of the maximums of the waveform
+    w_in
+        the array of data within which amplitudes of extrema will be found.
+    vt_maxs_in
+        the array of max positions for each waveform.
+    va_max_out
+        an array (in-place filled) of the amplitudes of the maximums of the waveform.
     """
 
     # Initialize output parameters

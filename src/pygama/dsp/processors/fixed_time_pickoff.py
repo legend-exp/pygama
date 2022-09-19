@@ -16,40 +16,39 @@ from pygama.dsp.errors import DSPFatal
     cache=True,
 )
 def fixed_time_pickoff(w_in: np.ndarray, t_in: float, mode_in: np.int8, a_out: float):
-    """
-    Pick off the waveform value at the provided time.  If the
-    provided index is out of range, return NaN. For non-integral
-    times, interpolate between samples using the method
-    selected using "mode_in".
+    """Pick off the waveform value at the provided time.
 
-    If the provided index `t_in` is out of range, return :any:`numpy.nan`.
+    For non-integral times, interpolate between samples using the method
+    selected using `mode_in`. If the provided index `t_in` is out of range,
+    return :any:`numpy.nan`.
 
     Parameters
     ----------
     w_in
-        The input waveform
+        the input waveform.
     t_in
-        The waveform index to pick off
+        the waveform index to pick off.
     mode_in
-        Character selecting which interpolation method to use. Note this
-        must be passed as a int8, e.g. ``ord('i')``. Options:
+        character selecting which interpolation method to use. Note this
+        must be passed as a ``int8``, e.g. ``ord('i')``. Options:
 
-        * 'i': integer t_in; equivalent to fixed_sample_pickoff
-        * 'n': nearest-neighbor interpolation; defined at all values,
+        * ``i`` -- integer `t_in`; equivalent to
+          :func:`~.dsp.processors.fixed_sample_pickoff`
+        * ``n`` -- nearest-neighbor interpolation; defined at all values,
           but not continuous
-        * 'f': floor, or value at previous neighbor; defined at all
+        * ``f`` -- floor, or value at previous neighbor; defined at all
           values but not continuous
-        * 'c': ceiling, or value at next neighbor; defined at all values,
+        * ``c`` -- ceiling, or value at next neighbor; defined at all values,
           but not continuous
-        * 'l': linear interpolation; continuous at all values, but not
+        * ``l`` -- linear interpolation; continuous at all values, but not
           differentiable
-        * 'h': hermite cubic spline interpolation; continuous and
+        * ``h`` -- Hermite cubic spline interpolation; continuous and
           differentiable at all values but not twice-differentiable
-        * 's': natural cubic spline interpolation; continuous and twice-
-          differentiable at all values. This method is much slower
+        * ``s`` -- natural cubic spline interpolation; continuous and
+          twice-differentiable at all values. This method is much slower
           than the others because it utilizes the entire input waveform!
     a_out
-        The output pick-off value
+        the output pick-off value.
 
     Examples
     --------
