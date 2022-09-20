@@ -118,7 +118,10 @@ def build_dsp(
         lh5_tables = lh5.ls(f_raw)
     elif isinstance(lh5_tables, str):
         lh5_tables = [lh5_tables]
-    elif not ( hasattr(lh5_tables, '__iter__') and all(isinstance(el, str) for el in lh5_tables) ):
+    elif not (
+        hasattr(lh5_tables, "__iter__")
+        and all(isinstance(el, str) for el in lh5_tables)
+    ):
         raise RuntimeError("lh5_tables must be None, a string, or a list of strings")
 
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
