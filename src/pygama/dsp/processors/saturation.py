@@ -61,5 +61,5 @@ def saturation(
     for i in range(0, len(w_in), 1):
         if w_in[i] == 0:
             n_lo_out[0] += 1
-        elif w_in[i] == np.power(2, int(bit_depth_in)):
+        elif w_in[i] == np.power(2, int(bit_depth_in))-int(bit_depth_in):
             n_hi_out[0] += 1
