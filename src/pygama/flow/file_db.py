@@ -104,7 +104,7 @@ class FileDB:
     --------
     >>> from pygama.flow import FileDB
     >>> db = FileDB("./filedb_config.json")
-    >>> db.get_tables_columns()  # read in also table columns names
+    >>> db.scan_tables_columns()  # read in also table columns names
     >>> print(db)
     << Columns >>
     [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['array_id', 'array_idx', 'cumulative_length']]
@@ -264,7 +264,7 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def get_tables_columns(self, to_file: str = None) -> list[str]:
+    def scan_tables_columns(self, to_file: str = None) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
 

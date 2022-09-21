@@ -82,7 +82,7 @@ class DataLoader:
     >>> dl.set_files("all")
     >>> dl.set_datastreams([0], "ch")
     >>> dl.set_cuts({"hit": "wf_max > 30000"})
-    >>> el = dl.gen_entry_list(tcm_level="tcm", mode="any")
+    >>> el = dl.build_entry_list(tcm_level="tcm", mode="any")
     >>> el.query("hit_table == 20", inplace=True)
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load(el)
@@ -141,6 +141,8 @@ class DataLoader:
         # set the file_list
         if file_query is not None:
             self.file_list = list(self.filedb.df.query(file_query).index)
+
+    ##### Get/Set/Reset Functions #####
 
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
@@ -232,27 +234,12 @@ class DataLoader:
         else:
             self.file_list += inds
 
-    def get_table_name(self, tier: str, tb: str) -> str:
-        """Get the table name for a tier given its table identifier.
-
-        Parameters
-        ----------
-        tier
-            specify the tier whose table format will be used.
-        tb
-            the table identifier that will be passed to the table format.
+    def get_file_list(self) -> pd.DataFrame:
         """
-        template = self.filedb.table_format[tier]
-        fm = string.Formatter()
-        parse_arr = np.array(list(fm.parse(template)))
-        names = list(parse_arr[:, 1])
-        if len(names) > 0:
-            keyword = names[0]
-            args = {keyword: tb}
-            table_name = template.format(**args)
-        else:
-            table_name = template
-        return table_name
+        Returns a copy of the file database with its dataframe pared down to
+        the current file list.
+        """
+        return self.filedb.df.iloc[self.file_list]
 
     # TODO Make this able to handle more complicated requests
     def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
@@ -365,89 +352,22 @@ class DataLoader:
         if columns is not None:
             self.output_columns = columns
 
-    def get_file_list(self) -> pd.DataFrame:
+    def reset(self):
+        """Resets all fields to their default values, as if this is a newly
+        created data loader.
         """
-        Returns a copy of the file database with its dataframe pared down to
-        the current file list.
-        """
-        return self.filedb.df.iloc[self.file_list]
+        self.file_list = None
+        self.table_list = None
+        self.cuts = None
+        self.merge_files = False
+        self.output_format = "lgdo.Table"
+        self.output_columns = None
+        self.data = None
 
-    def get_tiers_for_col(
-        self, columns: list | np.ndarray, merge_files: bool = None
-    ) -> dict:
-        """For each column given, get the tiers and tables in that tier where
-        that column can be found.
-
-        Parameters
-        ----------
-        columns
-            the columns to look for.
-        merge_files
-            whether or not to combine the results for all files
-            If ``None``, uses `self.merge_files`.
-        """
-
-        col_tiers = {}
-
-        # filedb.columns is needed, generate it now if not available
-        if self.filedb.columns is None:
-            self.filedb.get_tables_columns()
-
-        if merge_files is None:
-            merge_files = self.merge_files
-
-        if merge_files:
-            for file in self.file_list:
-                col_inds = set()
-                for i, col_list in enumerate(self.filedb.columns):
-                    if not set(col_list).isdisjoint(columns):
-                        col_inds.add(i)
-
-                for level in self.levels:
-                    for tier in self.tiers[level]:
-                        col_tiers[tier] = set()
-                        if self.filedb.df.loc[file, f"{tier}_col_idx"] is not None:
-                            for i in range(
-                                len(self.filedb.df.loc[file, f"{tier}_col_idx"])
-                            ):
-                                if (
-                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                                    in col_inds
-                                ):
-                                    col_tiers[tier].add(
-                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
-                                    )
-        else:
-            # loop over selected files (db entries)
-            for file in self.file_list:
-                # this is the output object
-                col_tiers[file] = {"tables": {}, "columns": {}}
-                col_inds = set()
-                for i, col_list in enumerate(self.filedb.columns):
-                    if not set(list(col_list)).isdisjoint(columns):
-                        col_inds.add(i)
-
-                for level in self.levels:
-                    for tier in self.tiers[level]:
-                        col_tiers[file]["tables"][tier] = []
-                        tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
-                        if tier_col_idx is not None:
-                            for i in range(len(tier_col_idx)):
-                                col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                                if col_idx in col_inds:
-                                    col_tiers[file]["tables"][tier].append(
-                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
-                                    )
-                                    col_in_tier = set.intersection(
-                                        set(self.filedb.columns[col_idx]), set(columns)
-                                    )
-                                    for c in col_in_tier:
-                                        col_tiers[file]["columns"][c] = tier
-
-        return col_tiers
+    ##### Applying Cuts/Loading Data #####
 
     # TODO: mode
-    def gen_entry_list(
+    def build_entry_list(
         self,
         tcm_level: str = None,
         tcm_table: int | str = None,
@@ -505,7 +425,7 @@ class DataLoader:
 
         # Default columns in the entry_list
         if tcm_level is None:
-            return self.gen_hit_entries(save_output_columns, in_memory, output_file)
+            return self.build_hit_entries(save_output_columns, in_memory, output_file)
         else:
             # Assumes only one tier in a TCM level
             parent = self.tcms[tcm_level]["parent"]
@@ -684,13 +604,13 @@ class DataLoader:
         if in_memory:
             return entries
 
-    def gen_hit_entries(
+    def build_hit_entries(
         self,
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
     ) -> dict[int, pd.DataFrame] | None:
-        """Called by :meth:`.gen_entry_list` to handle the case when
+        """Called by :meth:`.build_entry_list` to handle the case when
         `tcm_level` is unspecified.
 
         Ignores any cuts set on levels above lowest level.
@@ -856,7 +776,7 @@ class DataLoader:
         Parameters
         ----------
         entry_list
-            the output of :meth:`.gen_entry_list`.
+            the output of :meth:`.build_entry_list`.
         in_memory
             if ``True``, returns the loaded data in memory.
         output_file
@@ -869,7 +789,7 @@ class DataLoader:
         """
         # set save_output_columns=True to avoid wasting time
         if entry_list is None:
-            entry_list = self.gen_entry_list(
+            entry_list = self.build_entry_list(
                 tcm_level=tcm_level, save_output_columns=True
             )
 
@@ -929,7 +849,7 @@ class DataLoader:
                     unit=" keys",
                 )
 
-            # now loop over the output of gen_entry_list()
+            # now loop over the output of build_entry_list()
             for file, f_entries in entry_list.items():
 
                 if log.getEffectiveLevel() >= logging.INFO:
@@ -1196,14 +1116,99 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    def reset(self):
-        """Resets all fields to their default values, as if this is a newly
-        created data loader.
+    ##### Helper Functions #####
+    def get_tiers_for_col(
+        self, columns: list | np.ndarray, merge_files: bool = None
+    ) -> dict:
+        """For each column given, get the tiers and tables in that tier where
+        that column can be found.
+
+        Parameters
+        ----------
+        columns
+            the columns to look for.
+        merge_files
+            whether or not to combine the results for all files
+            If ``None``, uses `self.merge_files`.
         """
-        self.file_list = None
-        self.table_list = None
-        self.cuts = None
-        self.merge_files = False
-        self.output_format = "lgdo.Table"
-        self.output_columns = None
-        self.data = None
+
+        col_tiers = {}
+
+        # filedb.columns is needed, generate it now if not available
+        if self.filedb.columns is None:
+            self.filedb.get_tables_columns()
+
+        if merge_files is None:
+            merge_files = self.merge_files
+
+        if merge_files:
+            for file in self.file_list:
+                col_inds = set()
+                for i, col_list in enumerate(self.filedb.columns):
+                    if not set(col_list).isdisjoint(columns):
+                        col_inds.add(i)
+
+                for level in self.levels:
+                    for tier in self.tiers[level]:
+                        col_tiers[tier] = set()
+                        if self.filedb.df.loc[file, f"{tier}_col_idx"] is not None:
+                            for i in range(
+                                len(self.filedb.df.loc[file, f"{tier}_col_idx"])
+                            ):
+                                if (
+                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                                    in col_inds
+                                ):
+                                    col_tiers[tier].add(
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
+                                    )
+        else:
+            # loop over selected files (db entries)
+            for file in self.file_list:
+                # this is the output object
+                col_tiers[file] = {"tables": {}, "columns": {}}
+                col_inds = set()
+                for i, col_list in enumerate(self.filedb.columns):
+                    if not set(list(col_list)).isdisjoint(columns):
+                        col_inds.add(i)
+
+                for level in self.levels:
+                    for tier in self.tiers[level]:
+                        col_tiers[file]["tables"][tier] = []
+                        tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
+                        if tier_col_idx is not None:
+                            for i in range(len(tier_col_idx)):
+                                col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                                if col_idx in col_inds:
+                                    col_tiers[file]["tables"][tier].append(
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
+                                    )
+                                    col_in_tier = set.intersection(
+                                        set(self.filedb.columns[col_idx]), set(columns)
+                                    )
+                                    for c in col_in_tier:
+                                        col_tiers[file]["columns"][c] = tier
+
+        return col_tiers
+
+    def get_table_name(self, tier: str, tb: str) -> str:
+        """Get the table name for a tier given its table identifier.
+
+        Parameters
+        ----------
+        tier
+            specify the tier whose table format will be used.
+        tb
+            the table identifier that will be passed to the table format.
+        """
+        template = self.filedb.table_format[tier]
+        fm = string.Formatter()
+        parse_arr = np.array(list(fm.parse(template)))
+        names = list(parse_arr[:, 1])
+        if len(names) > 0:
+            keyword = names[0]
+            args = {keyword: tb}
+            table_name = template.format(**args)
+        else:
+            table_name = template
+        return table_name
