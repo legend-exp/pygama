@@ -8,58 +8,60 @@ import pandas as pd
 
 
 def generate_tcm_cols(
-    coin_data: list,
+    coin_data: list[np.ndarray],
     coin_window: float = 0,
     window_ref: str = "last",
-    array_ids: list = None,
-    array_idxs: list = None,
-):
-    """
+    array_ids: list[int] = None,
+    array_idxs: list[int] = None,
+) -> dict[np.ndarray]:
+    r"""Generate the columns of a time coincidence map.
+
     Generate the columns of a time coincidence map from a list of arrays of
     coincidence data (e.g. hit times from different channels). Returns 3
-    equal-length ndarrays containing the coincidence index (e.g. event number),
-    array id (e.g. channel number), and array index (e.g. hit id). These can be
-    used to retrieve other data at the same tier as the input data into
-    coincidence structures.
+    equal-length :class:`numpy.ndarray`\ s containing the coincidence index
+    (e.g. event number), array ID (e.g. channel number), and array index (e.g.
+    hit ID). These can be used to retrieve other data at the same tier as the
+    input data into coincidence structures.
 
-    Makes use of pandas DataFrame's concat, sort, groupby, and cumsum/count
-    functions:
-    - pull data into a DataFrame
-    - Sort events by strictly ascending value of coin_col
-    - Group hits if the difference in coin_data is less than coin_window
+    Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
+    :meth:`pandas.DataFrame.groupby`, and
+    :meth:`pandas.DataFrame.cumsum`/:meth:`pandas.DataFrame.count` functions:
+
+    - pull data into a :class:`pandas.DataFrame`
+    - sort events by strictly ascending value of `coin_col`
+    - group hits if the difference in `coin_data` is less than `coin_window`
 
     Parameters
     ----------
-    coin_data : list of ndarrays
-        A list of ndarrays of the data to be clustered
-    coin_window : float (optional)
-        The clustering window width. coin_data within the coin_window get
-        aggregated into the same coincidence cluster. A value of 0 means an
+    coin_data
+        a list of arrays of the data to be clustered.
+    coin_window
+        the clustering window width. `coin_data` within the `coin_window` get
+        aggregated into the same coincidence cluster. A value of ``0`` means an
         equality test.
-    window_ref : str
-        When testing one datum for inclusion in a cluster, test if it is within
-        coin_window of
-        'first' -- the first element in the cluster (rigid window width) (not
-        implemented yet)
-        'last' -- the last element in the clustur (window grows until two data
-        are separated by more than coin_window)
-        In the future, can add more options, like mean/median/mode
-    array_ids : list of ints or None
-        If provided, use array_ids in place of "index in coin_data" as the
-        integer corresponding to each element of coin_data (e.g. a channel
-        number)
-    array_idxs : list of indices or None
-        If provided, use these values in places of df.index for the return
-        values of array_idx
+    window_ref
+        when testing one datum for inclusion in a cluster, test if it is within
+        `coin_window` of
+
+        - ``"first"`` -- the first element in the cluster (rigid window width)
+        - ``"last"`` -- the last element in the cluster (window grows until two
+          data are separated by more than coin_window)
+
+    array_ids
+        if provided, use `array_ids` in place of "index in coin_data" as the
+        integer corresponding to each element of `coin_data` (e.g. a channel
+        number).
+    array_idxs
+        if provided, use these values in places of the ``DataFrame`` index for
+        the return values of `array_idx`.
 
     Returns
     -------
-    col_dict : dict of ndarrays
-        keys are 'coin_idx', 'array_id', and 'array_idx'
-        coin_idx specifies which rows of the output arrays correspond to the
-        which coincidence event
-        array_id and array_idx specify the location in coin_data of each datum
-        belonging to the coincidence event
+    col_dict
+        keys are ``coin_idx``, ``array_id``, and  ``array_idx``. ``coin_idx``
+        specifies which rows of the output arrays correspond to the which
+        coincidence event ``array_id`` and ``array_idx`` specify the location
+        in ``coin_data`` of each datum belonging to the coincidence event.
     """
     dfs = []
     for ii, array in enumerate(coin_data):
@@ -78,6 +80,7 @@ def generate_tcm_cols(
     tcm["dcoin"] = tcm["coin_data"].diff()
 
     # window into coincidences
+    # In the future, can add more options, like mean/median/mode
     if window_ref == "last":
         # create the event column by comparing the time since last event to the coincindence window
         tcm["coin_idx"] = (tcm.dcoin > coin_window).cumsum()
