@@ -247,21 +247,22 @@ def unbinned_energy_fit(
     )
     bin_cs1 = (bins[:-1] + bins[1:]) / 2
     if guess is not None:
-        x0=[*guess[:-2],fit_range[0],fit_range[1],False]
+        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
     else:
         if func == pgf.extended_radford_pdf:
             x0 = simple_guess(hist1, bins, var, pgf.extended_gauss_step_pdf, fit_range)
-            if verbose:print(x0)
+            if verbose:
+                print(x0)
             c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
             m = Minuit(c, *x0)
             m.fixed[-3:] = True
             m.simplex().migrad()
             m.hesse()
             if guess is not None:
-                x0_rad=[*guess[:-2],fit_range[0],fit_range[1],False]
+                x0_rad = [*guess[:-2], fit_range[0], fit_range[1], False]
             else:
                 x0_rad = simple_guess(hist1, bins, var, func, fit_range)
-            x0=m.values[:3]
+            x0 = m.values[:3]
             x0 += x0_rad[3:5]
             x0 += m.values[3:]
         else:
@@ -282,7 +283,7 @@ def unbinned_energy_fit(
 
     valid1 = (
         m.valid
-        #& m.accurate
+        # & m.accurate
         & (~np.isnan(m.errors).any())
         & (~(np.array(m.errors[:-3]) == 0).all())
     )
@@ -300,7 +301,7 @@ def unbinned_energy_fit(
     m2_fit = func(bin_cs1, *m2.values)[1]
     valid2 = (
         m2.valid
-        #& m2.accurate
+        # & m2.accurate
         & (~np.isnan(m.errors).any())
         & (~(np.array(m2.errors[:-3]) == 0).all())
     )
@@ -346,7 +347,7 @@ def unbinned_energy_fit(
         cs = cs[0] / cs[1]
         valid3 = (
             m.valid
-            #& m.accurate
+            # & m.accurate
             & (~np.isnan(m.errors).any())
             & (~(np.array(m.errors[:-3]) == 0).all())
         )
@@ -850,34 +851,39 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
         "n_sig_err": n_sig_err,
     }
 
+
 def get_wf_indexes(sorted_indexs, n_events):
     out_list = []
     if isinstance(n_events, list):
         for i in range(len(n_events)):
             new_list = []
-            for idx,entry in enumerate(sorted_indexs):
-                if (entry >= np.sum(n_events[:i])) and (entry < np.sum(n_events[:i+1])):
-                    new_list.append(idx)
-            out_list.append(new_list)       
-    else:
-        for i in range(int(len(sorted_indexs)/n_events)):
-            new_list = []
-            for idx,entry in enumerate(sorted_indexs):
-                if (entry >= i*n_events) and (entry < (i+1)*n_events):
+            for idx, entry in enumerate(sorted_indexs):
+                if (entry >= np.sum(n_events[:i])) and (
+                    entry < np.sum(n_events[: i + 1])
+                ):
                     new_list.append(idx)
             out_list.append(new_list)
-    return out_list  
+    else:
+        for i in range(int(len(sorted_indexs) / n_events)):
+            new_list = []
+            for idx, entry in enumerate(sorted_indexs):
+                if (entry >= i * n_events) and (entry < (i + 1) * n_events):
+                    new_list.append(idx)
+            out_list.append(new_list)
+    return out_list
+
 
 def index_data(data, indexes):
     new_baselines = lh5.Array(data["baseline"].nda[indexes])
     new_waveform_values = data["waveform"]["values"].nda[indexes]
     new_waveform_dts = data["waveform"]["dt"].nda[indexes]
     new_waveform_t0 = data["waveform"]["t0"].nda[indexes]
-    new_waveform = lh5.WaveformTable(None, new_waveform_t0,"ns" ,
-                                       new_waveform_dts,"ns",
-                                       new_waveform_values)
-    new_data = lh5.Table(col_dict={"waveform": new_waveform, "baseline": new_baselines})    
+    new_waveform = lh5.WaveformTable(
+        None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
+    )
+    new_data = lh5.Table(col_dict={"waveform": new_waveform, "baseline": new_baselines})
     return new_data
+
 
 def event_selection(
     raw_files,
@@ -887,8 +893,8 @@ def event_selection(
     peaks_keV,
     peak_idxs,
     kev_widths,
-    cut_parameters = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
-    energy_parameter = "trapTmax",
+    cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    energy_parameter="trapTmax",
     n_events=10000,
     threshold=1000,
 ):
@@ -896,7 +902,7 @@ def event_selection(
         peak_idxs = [peak_idxs]
     if not isinstance(kev_widths, list):
         kev_widths = [kev_widths]
-    
+
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
 
@@ -912,18 +918,21 @@ def event_selection(
     initial_mask = (df.daqenergy.values > threshold) & (~ids)
     rough_energy = df.daqenergy.values[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
-    
+
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
     Euc_min = threshold / guess_keV * 0.6
     Euc_max = 2620 / guess_keV * 1.1
     dEuc = 1 / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
-        hist, bins, var, np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2614.553])
+        hist,
+        bins,
+        var,
+        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2614.553]),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
-    
-    masks =[]
+
+    masks = []
     for peak_idx in peak_idxs:
         peak = peaks_keV[peak_idx]
         kev_width = kev_widths[peak_idx]
@@ -944,29 +953,29 @@ def event_selection(
             e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
         log.debug(f"lower_lim:{e_lower_lim}, upper_lim:{e_upper_lim}")
         e_mask = (rough_energy > e_lower_lim) & (rough_energy < e_upper_lim)
-        e_idxs = initial_idxs[e_mask][:int(2.5*n_events)]
+        e_idxs = initial_idxs[e_mask][: int(2.5 * n_events)]
         masks.append(e_idxs)
         log.debug(f"{len(e_idxs)} events found in energy range for {peak}")
-        
+
     idx_list_lens = [len(masks[peak_idx]) for peak_idx in peak_idxs]
-        
+
     sort_index = np.argsort(np.concatenate(masks))
     idx_list = get_wf_indexes(sort_index, idx_list_lens)
     idxs = np.array(sorted(np.concatenate(masks)))
-    
+
     waveforms = sto.read_object(
-            f"{lh5_path}/waveform", raw_files, idx=idxs, n_rows=len(idxs)
-        )[0]
+        f"{lh5_path}/waveform", raw_files, idx=idxs, n_rows=len(idxs)
+    )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
     input_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
 
-    if isinstance(dsp_config,str):
-        with open(dsp_config,"r")as r:
+    if isinstance(dsp_config, str):
+        with open(dsp_config) as r:
             dsp_config = json.load(r)
-    
-    dsp_config["outputs"] = list(cut_parameters)+[energy_parameter]
+
+    dsp_config["outputs"] = list(cut_parameters) + [energy_parameter]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
@@ -975,8 +984,8 @@ def event_selection(
     log.debug(f"Cuts are: {cut_dict}")
     log.debug("Loaded Cuts")
     ct_mask = cts.get_cut_indexes(tb_data, cut_dict, "raw")
-        
-    final_events = []    
+
+    final_events = []
     for peak_idx in peak_idxs:
         peak = peaks_keV[peak_idx]
         kev_width = kev_widths[peak_idx]
@@ -984,7 +993,6 @@ def event_selection(
         peak_ids = np.array(idx_list[peak_idx])
         peak_ct_mask = ct_mask[peak_ids]
         peak_ids = peak_ids[peak_ct_mask]
-
 
         energy = tb_data[energy_parameter].nda[peak_ids]
 
@@ -1017,12 +1025,12 @@ def event_selection(
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
-    
+
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
     idxs = np.array(sorted(np.concatenate(final_events)))
-    
-    final_data = index_data(input_data,  idxs)
+
+    final_data = index_data(input_data, idxs)
     return final_data, idx_list
 
 
@@ -1135,7 +1143,8 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         "n_sig_err": n_sig_err,
     }
 
-def single_peak_fom(data,kwarg_dict):
+
+def single_peak_fom(data, kwarg_dict):
     peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
@@ -1144,8 +1153,9 @@ def single_peak_fom(data,kwarg_dict):
     out_dict = fom_FWHM_with_dt_corr_fit(
         data, peak_dicts[0], ctc_param, idxs=idx_list[0], display=0
     )
-    out_dict["y_val"]=out_dict["fwhm"]
+    out_dict["y_val"] = out_dict["fwhm"]
     return out_dict
+
 
 def new_fom(data, kwarg_dict):
 
@@ -1351,7 +1361,7 @@ class BayesianOptimizer:
             if unit is not None:
                 value_str = f"{val}*{unit}"
             else:
-                 value_str = f"{val}"
+                value_str = f"{val}"
             if name not in db_dict.keys():
                 db_dict[name] = {parameter: value_str}
             else:

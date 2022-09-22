@@ -43,16 +43,22 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
-            pars, cov = pgf.gauss_mode_width_max(counts, start_bins, mode_guess=mu, n_bins=10,
-                             cost_func='Least Squares', inflate_errors=False, gof_method='var')
+            pars, cov = pgf.gauss_mode_width_max(
+                counts,
+                start_bins,
+                mode_guess=mu,
+                n_bins=10,
+                cost_func="Least Squares",
+                inflate_errors=False,
+                gof_method="var",
+            )
 
             guess_sig = pars[2]
-            
-            
-            lower_bound = mu-10*guess_sig
 
-            upper_bound = mu+10*guess_sig
-            
+            lower_bound = mu - 10 * guess_sig
+
+            upper_bound = mu + 10 * guess_sig
+
         except:
             bin_range = 1000
 
