@@ -653,6 +653,13 @@ class ProcessingChain:
         if node is None:
             return None
 
+        elif isinstance(node, ast.List):
+            npparr = np.array(ast.literal_eval(expr))
+            if len(npparr.shape) == 1:
+                return npparr
+            else:
+                ProcessingChainError("only 1D arrays are supported: " + expr)
+
         elif isinstance(node, ast.Num):
             return node.n
 
@@ -1131,9 +1138,13 @@ class ProcessorManager:
                 if not d:
                     continue
                 if d not in dims_dict:
-                    raise ProcessingChainError(
-                        f"could not deduce dimension {d} for {param}"
-                    )
+                    # If it is an array lets get the length
+                    if isinstance(param, np.ndarray):
+                        dims_dict[d] = self.DimInfo(len(param), None)
+                    else:
+                        raise ProcessingChainError(
+                            f"could not deduce dimension {d} for {param}"
+                        )
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
