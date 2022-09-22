@@ -133,13 +133,14 @@ class FileDB:
                 self.from_disk(config)
                 return
             else:
+                config_path = config
                 with open(config) as f:
                     config = json.load(f)
 
         if not isinstance(config, dict):
             raise ValueError("Bad FileDB configuration value")
 
-        self.set_config(config)
+        self.set_config(config, config_path)
 
         # Set up column names
         fm = string.Formatter()
@@ -160,14 +161,25 @@ class FileDB:
             self.set_file_status()
             self.set_file_sizes()
 
-    def set_config(self, config: dict) -> None:
+    def set_config(self, config: dict, config_path: str = None) -> None:
         """Read in the configuration dictionary."""
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
-        self.data_dir = self.config["data_dir"]
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
+
+        # Handle environment variables
+        data_dir = os.path.expandvars(self.config["data_dir"])
+
+        # Relative paths are interpreted relative to the configuration file
+        if not data_dir.startswith("/"):
+            config_dir = os.path.dirname(config_path)
+            data_dir = os.path.join(config_dir, data_dir)
+            data_dir = os.path.abspath(data_dir)
+        self.data_dir = data_dir
+
+        print(self.data_dir)
 
     def scan_files(self) -> None:
         """Scan the directory containing files from the lower tier and fill the
