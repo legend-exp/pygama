@@ -37,7 +37,7 @@ class DataLoader:
     processing tier.
 
     Example JSON configuration file:
-    
+
     .. code-block:: json
 
         {
@@ -142,7 +142,7 @@ class DataLoader:
         if file_query is not None:
             self.file_list = list(self.filedb.df.query(file_query).index)
 
-    ##### Get/Set/Reset Functions #####
+    # --------- Get/Set/Reset Functions ----------#
 
     def set_config(self, config: dict) -> None:
         """Load configuration dictionary."""
@@ -364,7 +364,7 @@ class DataLoader:
         self.output_columns = None
         self.data = None
 
-    ##### Applying Cuts/Loading Data #####
+    # ------------- Applying Cuts/Loading Data --------------#
 
     # TODO: mode
     def build_entry_list(
@@ -521,9 +521,7 @@ class DataLoader:
                     if self.cuts is None or level not in self.cuts.keys():
                         continue
                     cut = self.cuts[level]
-                    col_tiers = self.get_tiers_for_col(
-                        cut_cols[level], merge_files=False
-                    )
+                    col_tiers = self.get_tiers_for_col(cut_cols[level])
 
                     # Tables in first tier of event should be the same for all tiers in one level
                     tables = self.filedb.df.loc[file, f"{self.tiers[level][0]}_tables"]
@@ -624,6 +622,13 @@ class DataLoader:
             If ``True``, returns the generated entry list in memory.
         output_file
             HDF5 file name to write the entry list to.
+
+        Returns
+        -------
+        entries
+            the entry list containing columns for ``{low_level}_idx``,
+            ``{low_level}_table``, and output columns if
+            applicable.  Only returned if `in_memory` is ``True``.
         """
         low_level = self.levels[0]
         if in_memory:
@@ -655,7 +660,7 @@ class DataLoader:
                             entry_cols.append(term)
 
         log.debug(f"need to load {cut_cols} columns for applying cuts")
-        col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
+        col_tiers = self.get_tiers_for_col(cut_cols)
 
         sto = LH5Store()
 
@@ -778,7 +783,7 @@ class DataLoader:
         entry_list
             the output of :meth:`.build_entry_list`.
         in_memory
-            if ``True``, returns the loaded data in memory.
+            if ``True``, returns the loaded data in memory and stores in self.data
         output_file
             if not ``None``, writes the loaded data to the specified file.
         orientation
@@ -786,6 +791,12 @@ class DataLoader:
             ``evt``.
         tcm_level
             which TCM was used to create the ``entry_list``.
+
+        Returns
+        -------
+        data
+            The data loaded from disk, as specified by `self.output_format`, `self.output_columns`, and `self.merge_files`
+            Only returned if in_memory is True.
         """
         # set save_output_columns=True to avoid wasting time
         if entry_list is None:
@@ -1116,10 +1127,8 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    ##### Helper Functions #####
-    def get_tiers_for_col(
-        self, columns: list | np.ndarray, merge_files: bool = None
-    ) -> dict:
+    # -------------- Helper Functions ----------------#
+    def get_tiers_for_col(self, columns: list | np.ndarray) -> dict:
         """For each column given, get the tiers and tables in that tier where
         that column can be found.
 
@@ -1127,67 +1136,48 @@ class DataLoader:
         ----------
         columns
             the columns to look for.
-        merge_files
-            whether or not to combine the results for all files
-            If ``None``, uses `self.merge_files`.
+
+        Returns
+        -------
+        col_tiers
+            col_tiers[file]["tables"][tier] gives a list of tables in `tier` that contain a column of interest
+            col_tiers[file]["columns"][column] gives the tier that `column` can be found in
         """
 
         col_tiers = {}
 
         # filedb.columns is needed, generate it now if not available
         if self.filedb.columns is None:
-            self.filedb.get_tables_columns()
+            self.filedb.scan_tables_columns()
 
-        if merge_files is None:
-            merge_files = self.merge_files
+        # loop over selected files (db entries)
+        for file in self.file_list:
+            # this is the output object
+            col_tiers[file] = {"tables": {}, "columns": {}}
+            # Rows of FileDB.columns that include columns that we are interested in
+            col_inds = set()
+            for i, col_list in enumerate(self.filedb.columns):
+                if not set(list(col_list)).isdisjoint(columns):
+                    col_inds.add(i)
 
-        if merge_files:
-            for file in self.file_list:
-                col_inds = set()
-                for i, col_list in enumerate(self.filedb.columns):
-                    if not set(col_list).isdisjoint(columns):
-                        col_inds.add(i)
-
-                for level in self.levels:
-                    for tier in self.tiers[level]:
-                        col_tiers[tier] = set()
-                        if self.filedb.df.loc[file, f"{tier}_col_idx"] is not None:
-                            for i in range(
-                                len(self.filedb.df.loc[file, f"{tier}_col_idx"])
-                            ):
-                                if (
-                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                                    in col_inds
-                                ):
-                                    col_tiers[tier].add(
-                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
-                                    )
-        else:
-            # loop over selected files (db entries)
-            for file in self.file_list:
-                # this is the output object
-                col_tiers[file] = {"tables": {}, "columns": {}}
-                col_inds = set()
-                for i, col_list in enumerate(self.filedb.columns):
-                    if not set(list(col_list)).isdisjoint(columns):
-                        col_inds.add(i)
-
-                for level in self.levels:
-                    for tier in self.tiers[level]:
-                        col_tiers[file]["tables"][tier] = []
-                        tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
-                        if tier_col_idx is not None:
-                            for i in range(len(tier_col_idx)):
-                                col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                                if col_idx in col_inds:
-                                    col_tiers[file]["tables"][tier].append(
-                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
-                                    )
-                                    col_in_tier = set.intersection(
-                                        set(self.filedb.columns[col_idx]), set(columns)
-                                    )
-                                    for c in col_in_tier:
-                                        col_tiers[file]["columns"][c] = tier
+            # Loop over tiers
+            for level in self.levels:
+                for tier in self.tiers[level]:
+                    col_tiers[file]["tables"][tier] = []
+                    tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
+                    if tier_col_idx is not None:
+                        # Loop over tables
+                        for i in range(len(tier_col_idx)):
+                            col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                            if col_idx in col_inds:
+                                col_tiers[file]["tables"][tier].append(
+                                    self.filedb.df.loc[file, f"{tier}_tables"][i]
+                                )
+                                col_in_tier = set.intersection(
+                                    set(self.filedb.columns[col_idx]), set(columns)
+                                )
+                                for c in col_in_tier:
+                                    col_tiers[file]["columns"][c] = tier
 
         return col_tiers
 
@@ -1200,6 +1190,11 @@ class DataLoader:
             specify the tier whose table format will be used.
         tb
             the table identifier that will be passed to the table format.
+
+        Returns
+        -------
+        table_name:
+            the name of the table in `tier` with table identifier `tb`
         """
         template = self.filedb.table_format[tier]
         fm = string.Formatter()
