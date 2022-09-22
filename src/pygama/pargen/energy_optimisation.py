@@ -888,6 +888,7 @@ def event_selection(
     peak_idxs,
     kev_widths,
     cut_parameters = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    energy_parameter = "trapTmax",
     n_events=10000,
     threshold=1000,
 ):
@@ -913,12 +914,12 @@ def event_selection(
     initial_idxs = np.where(initial_mask)[0]
     
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-    Euc_min = peaks_keV[0] / guess_keV * 0.6
-    Euc_max = peaks_keV[-1] / guess_keV * 1.1
+    Euc_min = threshold / guess_keV * 0.6
+    Euc_max = 2620 / guess_keV * 1.1
     dEuc = 1 / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
-        hist, bins, var, peaks_keV
+        hist, bins, var, np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2614.553])
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
     
@@ -960,6 +961,13 @@ def event_selection(
         f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
     input_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+
+    if isinstance(dsp_config,str):
+        with open(dsp_config,"r")as r:
+            dsp_config = json.load(r)
+    
+    dsp_config["outputs"] = list(cut_parameters)+[energy_parameter]
+
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
 
@@ -978,7 +986,7 @@ def event_selection(
         peak_ids = peak_ids[peak_ct_mask]
 
 
-        energy = tb_data["trapEmax"].nda[peak_ids]
+        energy = tb_data[energy_parameter].nda[peak_ids]
 
         hist, bins, var = pgh.get_hist(
             energy, range=(int(threshold), int(np.nanmax(energy))), dx=1
@@ -1127,6 +1135,17 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         "n_sig_err": n_sig_err,
     }
 
+def single_peak_fom(data,kwarg_dict):
+    peaks = kwarg_dict["peaks_keV"]
+    idx_list = kwarg_dict["idx_list"]
+    ctc_param = kwarg_dict["ctc_param"]
+    peak_dicts = kwarg_dict["peak_dicts"]
+
+    out_dict = fom_FWHM_with_dt_corr_fit(
+        data, peak_dicts[0], ctc_param, idxs=idx_list[0], display=0
+    )
+    out_dict["y_val"]=out_dict["fwhm"]
+    return out_dict
 
 def new_fom(data, kwarg_dict):
 
