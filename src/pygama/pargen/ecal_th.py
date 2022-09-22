@@ -26,11 +26,14 @@ import pygama.pargen.energy_cal as cal
 log = logging.getLogger(__name__)
 
 
-def fwhm_slope(x: np.array, m0: float, m1: float) -> np.array:
+def fwhm_slope(x: np.array, m0: float, m1: float, m2:float =None) -> np.array:
     """
     Fit the energy resolution curve
     """
-    return np.sqrt(m0 + m1 * x)
+    if m2 is None:
+        return np.sqrt(m0 + m1 * x)
+    else:
+        return np.sqrt(m0 + m1 * x + m2*x**2)
 
 
 def load_data(
@@ -231,12 +234,12 @@ def energy_cal_th(
                 "expression": f"a*{energy_param}+b",
                 "parameters": {"a": pars[0], "b": pars[1]},
             }
-        elif deg=0:
+        elif deg==0:
             hit_dict[f"{energy_param}_cal"] = {
                 "expression": f"a*{energy_param}",
                 "parameters": {"a": pars[0]},
             }
-        elif deg=2:
+        elif deg==2:
             hit_dict[f"{energy_param}_cal"] = {
                 "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
                 "parameters": {"a": pars[0],"b": pars[1],"c": pars[2]},
@@ -490,7 +493,7 @@ def energy_cal_th(
             "Qbb_fwhm_err": round(qbb_err, 2),
             "2.6_fwhm": fep_fwhm,
             "2.6_fwhm_err": fep_dwhm,
-            "eres_pars": fit_pars
+            "eres_pars": fit_pars.tolist()
         }
 
     log.info(f"Finished : {hit_dict}")
