@@ -291,9 +291,15 @@ class FileDB:
         and adds a column ``{tier}_col_idx`` to the dataframe that maps to the
         column table.
 
-        Optionally write the column table to and LH5 file (as a
-        :class:`~.lgdo.vectorofvectors.VectorOfVectors`) specified by
-        `to_file`.
+        Parameters
+        ----------
+        to_file:
+            Optionally write the column table to an LH5 file (as a
+            :class:`~.lgdo.vectorofvectors.VectorOfVectors`) 
+
+        override:
+            If the FileDB already has a `columns` field, the scan will not run unless
+            this parameter is set to True
         """
         log.info("Getting table column names")
 
