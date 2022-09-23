@@ -586,33 +586,33 @@ class ProcessingChain:
         r"""Parse string `expr` into a NumPy array or value, using the following
         syntax:
 
-          - numeric values are parsed into ``int``\ s or ``float``\ s
-          - units found in the :mod:`pint` package
-          - other strings are parsed into variable names. If `get_names_only` is
-            ``False``, fetch the internal buffer (creating it as needed). Else,
-            return a string of the name
-          - if a string is followed by ``(...)``, try parsing into one of the
-            following expressions:
+        - numeric values are parsed into ``int``\ s or ``float``\ s
+        - units found in the :mod:`pint` package
+        - other strings are parsed into variable names. If `get_names_only` is
+          ``False``, fetch the internal buffer (creating it as needed). Else,
+          return a string of the name
+        - if a string is followed by ``(...)``, try parsing into one of the
+          following expressions:
 
-              - ``len(expr)``: return the length of the array found with `expr`
-              - ``round(expr)``: return the value found with `expr` to the
-                nearest integer
-              - ``varname(shape, type)``: allocate a new buffer with the
-                specified shape and type, using ``varname``. This is used if
-                the automatic type and shape deduction for allocating variables
-                fails
+          - ``len(expr)``: return the length of the array found with `expr`
+          - ``round(expr)``: return the value found with `expr` to the
+            nearest integer
+          - ``varname(shape, type)``: allocate a new buffer with the
+            specified shape and type, using ``varname``. This is used if
+            the automatic type and shape deduction for allocating variables
+            fails
 
-          - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
-            :obj:`//` are available. If a variable name is included in the
-            expression, a processor will be added to the
-            :class:`ProcessingChain` and a new buffer allocated to store the
-            output
-          - ``varname[slice]``: return the variable with a slice applied. Slice
-            values can be ``float``\ s, and will have round applied to them
-          - ``keyword = expr``: return a ``dict`` with a single element
-            pointing from keyword to the parsed `expr`. This is used for
-            `kwargs`. If `expr_only` is ``True``, raise an exception if we see
-            this.
+        - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
+          :obj:`//` are available. If a variable name is included in the
+          expression, a processor will be added to the
+          :class:`ProcessingChain` and a new buffer allocated to store the
+          output
+        - ``varname[slice]``: return the variable with a slice applied. Slice
+          values can be ``float``\ s, and will have round applied to them
+        - ``keyword = expr``: return a ``dict`` with a single element
+          pointing from keyword to the parsed `expr`. This is used for
+          `kwargs`. If `expr_only` is ``True``, raise an exception if we see
+          this.
 
         If `get_names_only` is set to ``True``, do not fetch or allocate new
         arrays, instead return a list of variable names found in the expression.
@@ -1544,28 +1544,28 @@ def build_processing_chain(
           default. See `outputs` argument
         - ``processors`` -- configuration dictionary
 
-           - ``name1, name2`` -- dictionary. key contains comma-separated
-             names of parameters computed
+          - ``name1, name2`` -- dictionary. key contains comma-separated
+            names of parameters computed
 
-              - ``function`` -- string, name of function to call.  Function
-                should implement the :class:`numpy.gufunc` interface, a factory
-                function returning a ``gufunc``, or an arbitrary function that
-                can be mapped onto a ``gufunc``
-              - ``module`` -- string, name of module containing function
-              - ``args``-- list of strings or numerical values. Contains
-                list of names of computed and input parameters or
-                constant values used as inputs to function. Note that
-                outputs should be fed by reference as args! Arguments read
-                from the database are prepended with ``db``.
-              - ``kwargs`` -- dictionary. Keyword arguments for
-                :meth:`ProcesssingChain.add_processor`.
-              - ``init_args`` --  list of strings or numerical values. List
-                of names of computed and input parameters or constant values
-                used to initialize a :class:`numpy.gufunc` via a factory
-                function
-              - ``unit`` -- list of strings. Units for parameters
-              - ``defaults`` -- dictionary. Default value to be used for
-                arguments read from the database
+            - ``function`` -- string, name of function to call.  Function
+              should implement the :class:`numpy.gufunc` interface, a factory
+              function returning a ``gufunc``, or an arbitrary function that
+              can be mapped onto a ``gufunc``
+            - ``module`` -- string, name of module containing function
+            - ``args``-- list of strings or numerical values. Contains
+              list of names of computed and input parameters or
+              constant values used as inputs to function. Note that
+              outputs should be fed by reference as args! Arguments read
+              from the database are prepended with ``db``.
+            - ``kwargs`` -- dictionary. Keyword arguments for
+              :meth:`ProcesssingChain.add_processor`.
+            - ``init_args`` --  list of strings or numerical values. List
+              of names of computed and input parameters or constant values
+              used to initialize a :class:`numpy.gufunc` via a factory
+              function
+            - ``unit`` -- list of strings. Units for parameters
+            - ``defaults`` -- dictionary. Default value to be used for
+              arguments read from the database
 
     db_dict
         A nested :class:`dict` pointing to values for database arguments. As

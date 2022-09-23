@@ -7,7 +7,7 @@ import pygama.lgdo as lgdo
 
 
 def build_tcm(
-    input_tables: list,
+    input_tables: list[tuple[str, str]],
     coin_col: str,
     hash_func: str = r"\d+",
     coin_window: float = 0,
@@ -15,44 +15,45 @@ def build_tcm(
     out_file: str = None,
     out_name: str = "tcm",
     wo_mode: str = "write_safe",
-):
-    """
+) -> lgdo.Table:
+    r"""Build a Time Coincidence Map (TCM).
+
     Given a list of input tables, create an output table containing an entry
-    list of coincidences among the inputs. Uses tcm.generate_tcm_cols().  For
-    use with the data loader.
+    list of coincidences among the inputs. Uses
+    :func:`.evt.tcm.generate_tcm_cols`. For use with the
+    :class:`~.flow.data_loader.DataLoader`.
 
     Parameters
     ----------
-    input_tables : list of tuples
-        each entry is (filename, table_name_pattern). All tables matching
-        [table_name_pattern] in [filename] will be added to the list of input
-        tables.
-    coin_col : str
+    input_tables
+        each entry is ``(filename, table_name_pattern)``. All tables matching
+        ``table_name_pattern`` in ``filename`` will be added to the list of
+        input tables.
+    coin_col
         the name of the column in each tables used to build coincidences. All
-        tables must contain a column with this name
-    hash_func : str (re) or None
-        function to map table names to ints for use in the tcm
-        str hash_func is a regexp pattern that acts on each table_name. The
-        default hash_func pull the first int out of the table name
-        setting to None will use a table's index in input_tables
-        Later can add list or dict or a function(str) --> int
-    coin_window : float
-        The clustering window width (see generate_tcm_cols)
-    window_ref : str
-        Configuration for the clustering window (see generate_tcm_cols)
-    out_file : str or None
-        Name (including path) for the output file. If None, no file will be
-        written; the tcm will just be returned in memory
-    out_name : str
-        Name for the tcm table in the output file
-    wo_mode : str
-        mode to send to LH5Store.write_object(). Typically 'w', 'o', or 'of'
+        tables must contain a column with this name.
+    hash_func
+        mapping of table names to integers for use in the TCM.  `hash_func` is
+        a regexp pattern that acts on each table name. The default `hash_func`
+        ``r"\d+"`` pulls the first integer out of the table name. Setting to
+        ``None`` will use a table's index in `input_tables`.
+    coin_window
+        the clustering window width.
+    window_ref
+        Configuration for the clustering window.
+    out_file
+        name (including path) for the output file. If ``None``, no file will be
+        written; the TCM will just be returned in memory.
+    out_name
+        name for the TCM table in the output file.
+    wo_mode
+        mode to send to :meth:`~.lgdo.lh5_store.LH5Store.write_object`.
 
-    Returns
-    -------
-    tcm : lgdo.Table
-        The tcm!
+    See Also
+    --------
+    .tcm.generate_tcm_cols
     """
+    # hash_func: later can add list or dict or a function(str) --> int.
 
     store = lgdo.LH5Store()
     coin_data = []

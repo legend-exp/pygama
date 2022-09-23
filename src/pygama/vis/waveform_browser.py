@@ -91,11 +91,11 @@ class WaveformBrowser:
             line colors and other style parameters to cycle through when
             drawing waveforms. Can be given as
 
-              - dictionary of lists (e.g. ``{'color':['r', 'g', 'b'],
-                'linestyle':['-', '--', '.']}``)
-              - name of predefined style (see :mod:`matplotlib.style`
-                documentation)
-              - ``None`` (use current :obj:`matplotlib.rcParams` style).
+            - dictionary of lists (e.g. ``{'color':['r', 'g', 'b'],
+              'linestyle':['-', '--', '.']}``)
+            - name of predefined style (see :mod:`matplotlib.style`
+              documentation)
+            - ``None`` (use current :obj:`matplotlib.rcParams` style).
 
             If a single style cycle is given, use for all lines; if a list is
             given, match to lines list.
@@ -119,11 +119,11 @@ class WaveformBrowser:
         x_lim, y_lim
             range of x- or y-values and units passed as tuple.
 
-              - ``None``: Get range from first waveform drawn
-              - :class:`pint.Quantity`: set value and x-unit
-              - ``float``: get unit from first waveform drawn
-              - ``str``: convert to :class:`pint.Quantity` (e.g. ``('0*us',
-                '10*us')``).
+            - ``None``: Get range from first waveform drawn
+            - :class:`pint.Quantity`: set value and x-unit
+            - ``float``: get unit from first waveform drawn
+            - ``str``: convert to :class:`pint.Quantity` (e.g. ``('0*us',
+              '10*us')``).
 
         x_unit
             unit of x-axis.
