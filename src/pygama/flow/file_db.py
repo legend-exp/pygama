@@ -127,7 +127,7 @@ class FileDB:
             whether the file database should scan the directory containing
             `raw` files to fill its rows with file keys.
         """
-
+        config_path = None
         if isinstance(config, str):
             if h5py.is_hdf5(config):
                 self.from_disk(config)

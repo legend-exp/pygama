@@ -69,9 +69,9 @@ def test_filedb_basics(test_filedb):
     ]
 
 
-def test_get_tables_columns(test_filedb):
+def test_scan_tables_columns(test_filedb):
     db = test_filedb
-    db.get_tables_columns()
+    db.scan_tables_columns()
 
     assert list(db.df.keys()) == [
         "exp",
