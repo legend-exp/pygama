@@ -806,6 +806,9 @@ class DataLoader:
 
         if not in_memory and output_file is None:
             raise ValueError("if in_memory is False, need to specify an output file")
+            
+        if self.output_columns is None or not self.output_columns:
+            raise ValueError("need to set output columns to load data")
 
         if orientation == "hit":
             self.data = self.load_hits(entry_list, in_memory, output_file, tcm_level)
@@ -872,9 +875,6 @@ class DataLoader:
                 )
 
                 field_mask = []
-
-                if self.output_columns is None or not self.output_columns:
-                    raise ValueError("need to set output columns to load data")
 
                 for col in self.output_columns:
                     if col not in f_entries.columns:
