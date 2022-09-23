@@ -89,7 +89,7 @@ from .soft_pileup_corr import soft_pileup_corr, soft_pileup_corr_bl
 from .time_over_threshold import time_over_threshold
 from .time_point_thresh import time_point_thresh
 from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
-from .upsampler import upsampler
+from .upsampler import interpolating_upsampler, upsampler
 from .wiener_filter import wiener_filter
 from .windower import windower
 
@@ -135,6 +135,7 @@ __all__ = [
     "trap_norm",
     "trap_pickoff",
     "upsampler",
+    "interpolating_upsampler",
     "wiener_filter",
     "windower",
     "time_over_threshold",

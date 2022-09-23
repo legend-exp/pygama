@@ -1184,6 +1184,19 @@ class ProcessorManager:
                         arshape.insert(len(arshape) + idim + 1, 1)
                 param = param.reshape(tuple(arshape))
 
+            elif isinstance(param, str):
+                # Convert string into integer buffer if appropriate
+                if np.issubdtype(dtype, np.integer):
+                    try:
+                        param = np.frombuffer(param.encode("ascii"), dtype).reshape(
+                            shape
+                        )
+                    except (ValueError):
+                        raise ProcessingChainError(
+                            f"could not convert string '{param}' into"
+                            f"byte-array of type {dtype} and shape {shape}"
+                        )
+
             elif param is not None:
                 # Convert scalar to right type, including units
                 if isinstance(param, (Quantity, Unit)):
@@ -1723,76 +1736,87 @@ def build_processing_chain(
             log.warning(
                 f"I don't know what to do with {input_par}. Building output without it!"
             )
-        proc_chain.link_input_buffer(input_par, buf_in)
+        try:
+            proc_chain.link_input_buffer(input_par, buf_in)
+        except Exception as e:
+            raise ProcessingChainError(
+                f"Exception raised while linking input buffer {input_par}."
+            ) from e
 
     # now add the processors
     for proc_par in proc_par_list:
         recipe = processors[proc_par]
-        module = importlib.import_module(recipe["module"])
-        func = getattr(module, recipe["function"])
-        args = recipe["args"]
-
-        # Initialize the new variables, if needed
-        if "unit" in recipe:
-            new_vars = [k for k in re.split(",| ", proc_par) if k != ""]
-            for i, name in enumerate(new_vars):
-                unit = recipe.get("unit", auto)
-                if isinstance(unit, list):
-                    unit = unit[i]
-
-                proc_chain.add_variable(name, unit=unit)
-
-        # get this list of kwargs
-        kwargs = recipe.get("kwargs", {})  # might also need db lookup here
-
-        # if init_args are defined, parse any strings and then call func
-        # as a factory/constructor function
         try:
-            init_args_in = recipe["init_args"]
-            init_args = []
-            init_kwargs = {}
-            for _, arg in enumerate(init_args_in):
-                for db_var in db_parser.findall(arg):
-                    try:
-                        db_node = db_dict
-                        for key in db_var[3:].split("."):
-                            db_node = db_node[key]
-                        log.debug(f"database lookup: found {db_node} for {db_var}")
-                    except (KeyError, TypeError):
+            module = importlib.import_module(recipe["module"])
+            func = getattr(module, recipe["function"])
+            args = recipe["args"]
+
+            # Initialize the new variables, if needed
+            if "unit" in recipe:
+                new_vars = [k for k in re.split(",| ", proc_par) if k != ""]
+                for i, name in enumerate(new_vars):
+                    unit = recipe.get("unit", auto)
+                    if isinstance(unit, list):
+                        unit = unit[i]
+
+                    proc_chain.add_variable(name, unit=unit)
+
+            # get this list of kwargs
+            kwargs = recipe.get("kwargs", {})  # might also need db lookup here
+
+            # if init_args are defined, parse any strings and then call func
+            # as a factory/constructor function
+            try:
+                init_args_in = recipe["init_args"]
+                init_args = []
+                init_kwargs = {}
+                for _, arg in enumerate(init_args_in):
+                    for db_var in db_parser.findall(arg):
                         try:
-                            db_node = recipe["defaults"][db_var]
-                            log.debug(
-                                "database lookup: using default value of {db_node} for {db_var}"
-                            )
+                            db_node = db_dict
+                            for key in db_var[3:].split("."):
+                                db_node = db_node[key]
+                            log.debug(f"database lookup: found {db_node} for {db_var}")
                         except (KeyError, TypeError):
-                            raise ProcessingChainError(
-                                f"did not find {db_var} in database, and "
-                                f"could not find default value."
-                            )
+                            try:
+                                db_node = recipe["defaults"][db_var]
+                                log.debug(
+                                    "database lookup: using default value of {db_node} for {db_var}"
+                                )
+                            except (KeyError, TypeError):
+                                raise ProcessingChainError(
+                                    f"did not find {db_var} in database, and "
+                                    f"could not find default value."
+                                )
 
-                    if arg == db_var:
-                        arg = db_node
+                        if arg == db_var:
+                            arg = db_node
+                        else:
+                            arg = arg.replace(db_var, str(db_node))
+
+                    # see if string can be parsed by proc_chain
+                    if isinstance(arg, str):
+                        arg = proc_chain.get_variable(arg)
+                    if isinstance(arg, dict):
+                        init_kwargs.update(arg)
                     else:
-                        arg = arg.replace(db_var, str(db_node))
+                        init_args.append(arg)
 
-                # see if string can be parsed by proc_chain
-                if isinstance(arg, str):
-                    arg = proc_chain.get_variable(arg)
-                if isinstance(arg, dict):
-                    init_kwargs.update(arg)
-                else:
-                    init_args.append(arg)
+                expr = ", ".join(
+                    [f"{a}" for a in init_args]
+                    + [f"{k}={v}" for k, v in init_kwargs.items()]
+                )
+                log.debug(f"building function from init_args: {func.__name__}({expr})")
+                func = func(*init_args)
+            except KeyError:
+                pass
 
-            expr = ", ".join(
-                [f"{a}" for a in init_args]
-                + [f"{k}={v}" for k, v in init_kwargs.items()]
-            )
-            log.debug(f"building function from init_args: {func.__name__}({expr})")
-            func = func(*init_args)
-        except KeyError:
-            pass
-
-        proc_chain.add_processor(func, *args, **kwargs)
+            proc_chain.add_processor(func, *args, **kwargs)
+        except Exception as e:
+            raise ProcessingChainError(
+                "Exception raised while attempting to add processor:\n"
+                + json.dumps(recipe, indent=2)
+            ) from e
 
     # build the output buffers
     lh5_out = lgdo.Table(size=proc_chain._buffer_len)
@@ -1809,8 +1833,13 @@ def build_processing_chain(
 
     # finally, add the output buffers to lh5_out and the proc chain
     for out_par in out_par_list:
-        buf_out = proc_chain.link_output_buffer(out_par)
-        lh5_out.add_field(out_par, buf_out)
+        try:
+            buf_out = proc_chain.link_output_buffer(out_par)
+            lh5_out.add_field(out_par, buf_out)
+        except Exception as e:
+            raise ProcessingChainError(
+                f"Exception raised while linking output buffer {out_par}."
+            ) from e
 
     field_mask = input_par_list + copy_par_list
     return (proc_chain, field_mask, lh5_out)
