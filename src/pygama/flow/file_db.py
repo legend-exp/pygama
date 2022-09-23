@@ -162,9 +162,13 @@ class FileDB:
                 log.info("Setting columns/tables from config")
                 self.columns = list(self.config["columns"].values())
                 for tier in self.tiers:
-                    self.df[f"{tier}_tables"] = [self.config["tables"][tier]]*len(self.df)
-                    self.df[f"{tier}_col_idx"] = [[self.columns.index(self.config["columns"][tier])]*len(self.df[f"{tier}_tables"].iloc[0])]*len(self.df)
-
+                    self.df[f"{tier}_tables"] = [self.config["tables"][tier]] * len(
+                        self.df
+                    )
+                    self.df[f"{tier}_col_idx"] = [
+                        [self.columns.index(self.config["columns"][tier])]
+                        * len(self.df[f"{tier}_tables"].iloc[0])
+                    ] * len(self.df)
 
     def set_config(self, config: dict, config_path: str = None) -> None:
         """Read in the configuration dictionary."""
@@ -279,7 +283,9 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def scan_tables_columns(self, to_file: str = None, override: bool = False) -> list[str]:
+    def scan_tables_columns(
+        self, to_file: str = None, override: bool = False
+    ) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
 
@@ -295,7 +301,7 @@ class FileDB:
         ----------
         to_file:
             Optionally write the column table to an LH5 file (as a
-            :class:`~.lgdo.vectorofvectors.VectorOfVectors`) 
+            :class:`~.lgdo.vectorofvectors.VectorOfVectors`)
 
         override:
             If the FileDB already has a `columns` field, the scan will not run unless
@@ -305,7 +311,9 @@ class FileDB:
 
         if self.df.columns is not None:
             if not override:
-                log.warning("Tables/columns already set, if you want to perform the scan anyway, set override=True")
+                log.warning(
+                    "Tables/columns already set, if you want to perform the scan anyway, set override=True"
+                )
                 return
             else:
                 log.info("Overwriting existing tables/columns")

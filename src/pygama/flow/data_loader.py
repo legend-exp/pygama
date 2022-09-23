@@ -562,9 +562,7 @@ class DataLoader:
                         continue
                     tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)
-                    idx_match = f_entries.query(
-                        f"{level}_idx in {list(tb_df.index)}"
-                    )
+                    idx_match = f_entries.query(f"{level}_idx in {list(tb_df.index)}")
                     if level == parent:
                         idx_match = idx_match.query(f"{level}_table == {tb}")
                     if mode == "only":
@@ -595,9 +593,7 @@ class DataLoader:
                 # Convert f_entries DataFrame to Struct
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
-                sto.write_object(
-                    f_struct, f"entries/{file}", output_file, wo_mode="o"
-                )
+                sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
             # end for each file loop
         if in_memory:
             return entries
@@ -806,7 +802,7 @@ class DataLoader:
 
         if not in_memory and output_file is None:
             raise ValueError("if in_memory is False, need to specify an output file")
-            
+
         if self.output_columns is None or not self.output_columns:
             raise ValueError("need to set output columns to load data")
 
