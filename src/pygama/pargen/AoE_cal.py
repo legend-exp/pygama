@@ -21,7 +21,7 @@ from matplotlib.colors import LogNorm
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
-import pygama.pargen.ecal_th as ect
+import pygama.pargen.ecal_th as thc
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
@@ -511,7 +511,7 @@ def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
     """
     if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
-        sigma = ect.fwhm_slope(peak, *eres_pars) / 2.355
+        sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
         i_0 = np.nanargmax(hist)
         mu = peak
         height = hist[i_0]
@@ -545,7 +545,7 @@ def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
 
     elif func_i == pgf.extended_gauss_step_pdf:
         mu = peak
-        sigma = ect.fwhm_slope(peak, *eres_pars) / 2.355
+        sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
         step = bg - np.mean(hist[:10])
