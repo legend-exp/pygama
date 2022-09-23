@@ -20,9 +20,5 @@
     "hit": "ch{ch:03d}/hit",
     "evt": "{grp}/evt",
     "tcm": "hardware_tcm"
-  },
-  "table_keyword": {
-    "hit": "ch",
-    "evt": "grp"
   }
 }

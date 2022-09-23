@@ -90,10 +90,6 @@ class FileDB:
                 "hit": "{ch}/hit",
                 "evt": "{grp}/evt",
                 "tcm": "hardware_tcm"
-            },
-            "table_keyword": {
-                "hit": "ch",
-                "evt": "grp"
             }
         }
 
@@ -161,6 +157,15 @@ class FileDB:
             self.set_file_status()
             self.set_file_sizes()
 
+            # Use config columns and tables if provided
+            if "columns" in self.config.keys() and "tables" in self.config.keys():
+                log.info("Setting columns/tables from config")
+                self.columns = list(self.config["columns"].values())
+                for tier in self.tiers:
+                    self.df[f"{tier}_tables"] = [self.config["tables"][tier]]*len(self.df)
+                    self.df[f"{tier}_col_idx"] = [[self.columns.index(self.config["columns"][tier])]*len(self.df[f"{tier}_tables"].iloc[0])]*len(self.df)
+
+
     def set_config(self, config: dict, config_path: str = None) -> None:
         """Read in the configuration dictionary."""
         self.config = config
@@ -178,8 +183,6 @@ class FileDB:
             data_dir = os.path.join(config_dir, data_dir)
             data_dir = os.path.abspath(data_dir)
         self.data_dir = data_dir
-
-        print(self.data_dir)
 
     def scan_files(self) -> None:
         """Scan the directory containing files from the lower tier and fill the
@@ -276,7 +279,7 @@ class FileDB:
         for tier in self.tiers:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
-    def scan_tables_columns(self, to_file: str = None) -> list[str]:
+    def scan_tables_columns(self, to_file: str = None, override: bool = False) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
 
@@ -293,6 +296,13 @@ class FileDB:
         `to_file`.
         """
         log.info("Getting table column names")
+
+        if self.df.columns is not None:
+            if not override:
+                log.warning("Tables/columns already set, if you want to perform the scan anyway, set override=True")
+                return
+            else:
+                log.info("Overwriting existing tables/columns")
 
         def update_tables_cols(row, tier: str) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
