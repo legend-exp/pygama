@@ -155,7 +155,7 @@ def fom_dpz(tb_data, verbosity=0, rand_arg=None):
     return {"y_val": np.abs(mu)}
 
 
-def get_dpz_consts(grid_out, opt_config):
+def get_dpz_consts(grid_out, opt_dict):
     std_grid = np.ndarray(shape=grid_out.shape)
     for i in range(grid_out.shape[0]):
         for j in range(grid_out.shape[1]):
