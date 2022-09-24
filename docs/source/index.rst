@@ -1,7 +1,7 @@
 Welcome to pygama's documentation!
 ==================================
 
-`pygama <https://github.com/legend-exp/pygama>`_ is a Python package for:
+*pygama* is a Python package for:
 
 * converting physics data acquisition system output to LEGEND LH5-format HDF5 files
 * performing bulk digital signal processing on time-series data
@@ -11,20 +11,37 @@ Welcome to pygama's documentation!
 Getting started
 ---------------
 
-Install on local systems with `pip <https://pip.pypa.io/en/stable/getting-started>`_:
+*pygama* is published on the `Python Package Index
+<https://pypi.org/project/pygama>`_. Install on local systems with `pip
+<https://pip.pypa.io/en/stable/getting-started>`_:
 
-.. code-block:: console
+.. tab:: Stable release
 
-    $ git clone https://github.com/legend-exp/pygama
-    $ pip install pygama
+    .. code-block:: console
 
-.. note::
+        $ pip install pygama
+
+.. tab:: Unstable (``main`` branch)
+
+    .. code-block:: console
+
+        $ pip install pygama@git+https://github.com/legend-exp/pygama@main
+
+.. tab:: Linux Containers
+
+    Get a LEGEND container with *pygama* pre-installed on `Docker hub
+    <https://hub.docker.com/r/legendexp/legend-software>`_ or follow
+    instructions on the `LEGEND wiki
+    <https://legend-exp.atlassian.net/l/cp/nF1ww5KH>`_.
+
+If you plan to develop *pygama*, refer to the :doc:`developer's guide
+<developer>`.
+
+.. attention::
 
     If installing in a user directory (typically when invoking pip as a normal
-    user), make sure ``~/.local/bin`` is appended to ``PATH``.
-
-If you plan to develop *pygama*, have a look at our :doc:`developer's guide
-<developer>`.
+    user), make sure ``~/.local/bin`` is appended to ``PATH``. The ``pygama``
+    executable is installed there.
 
 Next steps
 ----------
