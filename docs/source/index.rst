@@ -51,5 +51,5 @@ Next steps
 
    manuals/index
    tutorials
-   Package API reference <generated/modules>
+   Package API reference <api/modules>
    developer
