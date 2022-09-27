@@ -433,7 +433,6 @@ class DataLoader:
         entry_cols = [
             f"{parent}_table",
             f"{parent}_idx",
-            f"{child}_table",
             f"{child}_idx",
         ]
         if save_output_columns:
@@ -514,6 +513,8 @@ class DataLoader:
                 self.tcms[tcm_level]["tcm_cols"]["parent_idx"]: f"{parent}_idx",
             }
             f_entries.rename(columns=renaming, inplace=True)
+            if self.merge_files:
+                f_entries["file"] = file
             # At this point, should have a list of all available hits/evts joined by tcm
 
             # Perform cuts specified for child or parent level, in that order
@@ -593,9 +594,15 @@ class DataLoader:
                 # Convert f_entries DataFrame to Struct
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
-                sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+                if self.merge_files:
+                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                else:
+                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="a")
             # end for each file loop
+        
         if in_memory:
+            if self.merge_files:
+                entries = pd.concat(entries.values())
             return entries
 
     def build_hit_entries(
@@ -1019,6 +1026,8 @@ class DataLoader:
         sto = LH5Store()
 
         if self.merge_files:  # Try to load all information at once
+            if in_memory: 
+                load_out = 
             raise NotImplementedError
         else:  # Not merge_files
             if in_memory:
