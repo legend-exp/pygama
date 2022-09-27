@@ -1,5 +1,5 @@
 """
-Subpackage description
+Utilities for grouping hit data into events.
 """
 
 from pygama.evt.build_tcm import build_tcm
