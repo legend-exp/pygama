@@ -5,8 +5,8 @@ Global Numba options
 --------------------
 
 Pygama offers the possibility to change the value of some default Numba options
-at runtime. One typical use case is to enable `caching the result of
-compilation <https://numba.readthedocs.io/en/stable/user/jit.html?#cache>`_,
+either using environment variables or at runtime. One typical use case is to enable `caching the result of compilation
+<https://numba.readthedocs.io/en/stable/user/jit.html?#cache>`_,
 which significantly reduces loading times. Numba options globally set by pygama
 are defined as attributes of the :class:`~.dsp.utils.NumbaDefaults` class. Have
 a look to the documentation for :func:`numba.jit` and :func:`numba.guvectorize`
@@ -14,6 +14,11 @@ to learn about their meaning.
 
 .. note::
    Some special processors override default option values.
+
+The environment variables that can be set are:
+
+:``PYGAMA_CACHE``: Set caching behavior (default false)
+:``PYGAMA_BOUNDSCHECK``: Set automatic bounds checking (default false)
 
 Here's an example of how global option customization can achieved in user
 scripts:
