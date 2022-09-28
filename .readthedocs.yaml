@@ -9,12 +9,12 @@ build:
     python: "3.10"
   jobs:
     pre_build:
-      - rm -rf docs/source/generated
+      - rm -rf docs/source/api
       - sphinx-apidoc
         --private
         --module-first
         --force
-        --output-dir docs/source/generated
+        --output-dir docs/source/api
         src/pygama
         src/pygama/_version.py
 
