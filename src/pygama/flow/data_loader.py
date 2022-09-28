@@ -375,7 +375,7 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ) -> dict[int, pd.DataFrame] | None:
+    ) -> dict[int, pd.DataFrame] | pd.DataFrame | None:
         """Applies cuts to the tables and files of interest.
 
         Can only load up to two levels, those joined by `tcm_level`.
@@ -610,7 +610,7 @@ class DataLoader:
         save_output_columns: bool = False,
         in_memory: bool = True,
         output_file: str = None,
-    ) -> dict[int, pd.DataFrame] | None:
+    ) -> dict[int, pd.DataFrame] | pd.DataFrame | None:
         """Called by :meth:`.build_entry_list` to handle the case when
         `tcm_level` is unspecified.
 
@@ -720,6 +720,8 @@ class DataLoader:
                             f"{low_level}_table": tb,
                         }
                     )
+                    if self.merge_files:
+                        tb_df["file"] = file
                 else:
                     # loop over tiers in the lowest level
                     for tier in self.tiers[low_level]:
@@ -754,19 +756,27 @@ class DataLoader:
 
                 # final DataFrame
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
-
+                # end tb loop
+            if self.merge_files
+                f_entries["file"] = file
             if in_memory:
                 entries[file] = f_entries
             if output_file:
                 # Convert f_entries DataFrame to Struct
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
-                sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="o")
+                if self.merge_files:
+                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                else:
+                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="a")
+            # end file loop
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
 
         if in_memory:
+            if self.merge_files:
+                entries = pd.concat(entries.values())
             return entries
 
     # TODO : support chunked reading of entry_list from disk
