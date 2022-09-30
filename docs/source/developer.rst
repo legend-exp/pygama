@@ -226,3 +226,9 @@ new project version must implement the following procedures:
 
        $ git push origin releases/vMAJOR.MINOR
        $ git push origin refs/tags/vMAJOR.MINOR.PATCH
+
+* To upload the release to the `Python Package Index
+  <https://pypi.org/project/pygama>`_, a new release must be created through
+  `the GitHub interface <https://github.com/legend-exp/pygama/releases/new>`_,
+  associated to the just created tag.  Usage of the "Generate release notes"
+  option is recommended.
