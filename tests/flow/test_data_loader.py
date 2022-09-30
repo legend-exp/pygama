@@ -32,6 +32,7 @@ def test_simple_load(test_dl):
     assert isinstance(data, lgdo.Table)
     assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
 
+
 def test_no_merge(test_dl):
     test_dl.set_files("all")
     test_dl.set_output(columns=["timestamp"], merge_files=False)
@@ -41,6 +42,7 @@ def test_no_merge(test_dl):
     assert isinstance(data[0], lgdo.Table)
     assert len(data) == 2
     assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp"]
+
 
 def test_outputs(test_dl):
     test_dl.set_files("all")

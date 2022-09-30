@@ -597,9 +597,11 @@ class DataLoader:
                 if self.merge_files:
                     sto.write_object(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="a")
+                    sto.write_object(
+                        f_struct, f"entries/{file}", output_file, wo_mode="a"
+                    )
             # end for each file loop
-        
+
         if in_memory:
             if self.merge_files:
                 entries = pd.concat(entries.values(), ignore_index=True)
@@ -768,7 +770,9 @@ class DataLoader:
                 if self.merge_files:
                     sto.write_object(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(f_struct, f"entries/{file}", output_file, wo_mode="a")
+                    sto.write_object(
+                        f_struct, f"entries/{file}", output_file, wo_mode="a"
+                    )
             # end file loop
 
         if log.getEffectiveLevel() >= logging.INFO:
@@ -907,9 +911,7 @@ class DataLoader:
                             )
                         col_dict["wf_t0"][tcm_idx] = wf_table["t0"].nda
                         col_dict["wf_dt"][tcm_idx] = wf_table["dt"].nda
-                        col_dict["wf_values"][tcm_idx] = wf_table[
-                            "values"
-                        ].nda
+                        col_dict["wf_values"][tcm_idx] = wf_table["values"].nda
                     else:  # wf_values is a VectorOfVectors
                         log.warning(
                             "not sure how to handle waveforms with values "
@@ -925,7 +927,7 @@ class DataLoader:
         sto = LH5Store()
 
         if self.merge_files:
-            tables = entry_list[f'{parent}_table'].unique()
+            tables = entry_list[f"{parent}_table"].unique()
             field_mask = []
             for col in self.output_columns:
                 if col not in entry_list.columns:
@@ -935,31 +937,40 @@ class DataLoader:
             col_dict = entry_list.to_dict("list")
             table_length = len(entry_list)
 
-            for tb, level in product(
-                tables, load_levels
-            ):
-                q_df = entry_list.query(f"{parent}_table == {tb}")
+            for tb, level in product(tables, load_levels):
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
                 el_idx = list(gb.groups.values())
-                idx_mask = [list(entry_list.loc[i, f'{level}_idx']) for i in el_idx]
+                idx_mask = [list(entry_list.loc[i, f"{level}_idx"]) for i in el_idx]
 
                 for tier in self.tiers[level]:
                     if tb not in col_tiers[tier]:
                         continue
                     tb_name = self.get_table_name(tier, tb)
-                    tier_paths = [os.path.join(
-                        self.data_dir,
-                        self.filedb.tier_dirs[tier].lstrip("/"),
-                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
-                    ) for file in files]
+                    tier_paths = [
+                        os.path.join(
+                            self.data_dir,
+                            self.filedb.tier_dirs[tier].lstrip("/"),
+                            self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                        )
+                        for file in files
+                    ]
 
-                    tier_table, _ = sto.read_object(name=tb_name, lh5_file=tier_paths, idx=idx_mask, field_mask=field_mask)
+                    tier_table, _ = sto.read_object(
+                        name=tb_name,
+                        lh5_file=tier_paths,
+                        idx=idx_mask,
+                        field_mask=field_mask,
+                    )
 
                     if level == child:
-                            explode_evt_cols(entry_list, tier_table)
+                        explode_evt_cols(entry_list, tier_table)
 
-                    col_dict = fill_col_dict(tier_table, col_dict, [idx for l in el_idx for idx in l])  
+                    col_dict = fill_col_dict(
+                        tier_table,
+                        col_dict,
+                        [idx for idx_list in el_idx for idx in idx_list],
+                    )
             # Convert col_dict to lgdo.Table
             for col in col_dict.keys():
                 nda = np.array(col_dict[col])
@@ -967,7 +978,7 @@ class DataLoader:
             f_table = Table(col_dict=col_dict)
 
             if output_file:
-                sto.write_object(f_table, f"merged_data", output_file, wo_mode="o")
+                sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return f_table
@@ -977,7 +988,7 @@ class DataLoader:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"
                     )
-        else: # not merge_files
+        else:  # not merge_files
             if in_memory:
                 load_out = {}
 
@@ -1050,8 +1061,8 @@ class DataLoader:
                         if level == child:
                             explode_evt_cols(f_entries, tier_table)
 
-                        col_dict = fill_col_dict(tier_table, col_dict, tcm_idx)  
-                        # end tb loop                      
+                        col_dict = fill_col_dict(tier_table, col_dict, tcm_idx)
+                        # end tb loop
 
                 # Convert col_dict to lgdo.Table
                 for col in col_dict.keys():
@@ -1202,7 +1213,9 @@ class DataLoader:
         raise NotImplementedError
 
     # -------------- Helper Functions ----------------#
-    def get_tiers_for_col(self, columns: list | np.ndarray, merge_files: bool = None) -> dict:
+    def get_tiers_for_col(
+        self, columns: list | np.ndarray, merge_files: bool = None
+    ) -> dict:
         """For each column given, get the tiers and tables in that tier where
         that column can be found.
 
