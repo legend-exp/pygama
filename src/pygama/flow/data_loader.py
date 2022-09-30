@@ -121,7 +121,7 @@ class DataLoader:
         self.file_list: list = None
         self.table_list = None
         self.cuts = None
-        self.merge_files = False
+        self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
         self.data = None
@@ -602,7 +602,7 @@ class DataLoader:
         
         if in_memory:
             if self.merge_files:
-                entries = pd.concat(entries.values())
+                entries = pd.concat(entries.values(), ignore_index=True)
             return entries
 
     def build_hit_entries(
@@ -663,7 +663,7 @@ class DataLoader:
                             entry_cols.append(term)
 
         log.debug(f"need to load {cut_cols} columns for applying cuts")
-        col_tiers = self.get_tiers_for_col(cut_cols)
+        col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
 
         sto = LH5Store()
 
@@ -757,7 +757,7 @@ class DataLoader:
                 # final DataFrame
                 f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
                 # end tb loop
-            if self.merge_files
+            if self.merge_files:
                 f_entries["file"] = file
             if in_memory:
                 entries[file] = f_entries
@@ -776,7 +776,7 @@ class DataLoader:
 
         if in_memory:
             if self.merge_files:
-                entries = pd.concat(entries.values())
+                entries = pd.concat(entries.values(), ignore_index=True)
             return entries
 
     # TODO : support chunked reading of entry_list from disk
@@ -849,7 +849,6 @@ class DataLoader:
         tcm_level: str = None,
     ) -> None | Table | Struct | pd.DataFrame:
         """Called by :meth:`.load` when orientation is ``hit``."""
-
         if tcm_level is None:
             parent = self.levels[0]
             child = None
@@ -859,12 +858,126 @@ class DataLoader:
             child = self.tcms[tcm_level]["child"]
             load_levels = [parent, child]
 
+        def explode_evt_cols(el, tier_table):
+            # Explode columns from "evt"-style levels, untested
+            # Will only work if column has an "nda" attribute
+            cum_length = build_cl(el[f"{child}_idx"])
+            exp_cols = explode_arrays(
+                cum_length,
+                [a.nda for a in tier_table.values()],
+            )
+            tier_table.update(zip(tier_table.keys(), exp_cols))
+            return tier_table
+
+        def fill_col_dict(tier_table, col_dict, tcm_idx):
+            # Put the information from the tier_table (after the columns have been exploded)
+            # into col_dict, which will be turned into the final Table
+            for col in tier_table.keys():
+                if isinstance(tier_table[col], Array):
+                    # Allocate memory for column for all channels
+                    if col not in col_dict.keys():
+                        col_dict[col] = np.empty(
+                            table_length,
+                            dtype=tier_table[col].dtype,
+                        )
+                    col_dict[col][tcm_idx] = tier_table[col].nda
+
+                elif isinstance(tier_table[col], WaveformTable):
+                    wf_table = tier_table[col]
+                    if isinstance(
+                        wf_table["values"],
+                        ArrayOfEqualSizedArrays,
+                    ):
+                        # Allocate memory for columns for all channels
+                        if "wf_dt" not in col_dict.keys():
+                            col_dict["wf_t0"] = np.empty(
+                                table_length,
+                                dtype=wf_table["t0"].dtype,
+                            )
+                            col_dict["wf_dt"] = np.empty(
+                                table_length,
+                                dtype=wf_table["dt"].dtype,
+                            )
+                            col_dict["wf_values"] = np.empty(
+                                (
+                                    table_length,
+                                    wf_table["values"].nda.shape[1],
+                                ),
+                                dtype=wf_table["values"].dtype,
+                            )
+                        col_dict["wf_t0"][tcm_idx] = wf_table["t0"].nda
+                        col_dict["wf_dt"][tcm_idx] = wf_table["dt"].nda
+                        col_dict["wf_values"][tcm_idx] = wf_table[
+                            "values"
+                        ].nda
+                    else:  # wf_values is a VectorOfVectors
+                        log.warning(
+                            "not sure how to handle waveforms with values "
+                            f"of type {type(tier_table[col]['values'])} yet"
+                        )
+                else:
+                    log.warning(
+                        f"not sure how to handle column {col} "
+                        f"of type {type(tier_table[col])} yet"
+                    )
+            return col_dict
+
         sto = LH5Store()
 
         if self.merge_files:
-            raise NotImplementedError("merge_file option not implemented yet")
+            tables = entry_list[f'{parent}_table'].unique()
+            field_mask = []
+            for col in self.output_columns:
+                if col not in entry_list.columns:
+                    field_mask.append(col)
 
-        else:
+            col_tiers = self.get_tiers_for_col(field_mask)
+            col_dict = entry_list.to_dict("list")
+            table_length = len(entry_list)
+
+            for tb, level in product(
+                tables, load_levels
+            ):
+                q_df = entry_list.query(f"{parent}_table == {tb}")
+                gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
+                files = list(gb.groups.keys())
+                el_idx = list(gb.groups.values())
+                idx_mask = [list(entry_list.loc[i, f'{level}_idx']) for i in el_idx]
+
+                for tier in self.tiers[level]:
+                    if tb not in col_tiers[tier]:
+                        continue
+                    tb_name = self.get_table_name(tier, tb)
+                    tier_paths = [os.path.join(
+                        self.data_dir,
+                        self.filedb.tier_dirs[tier].lstrip("/"),
+                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                    ) for file in files]
+
+                    tier_table, _ = sto.read_object(name=tb_name, lh5_file=tier_paths, idx=idx_mask, field_mask=field_mask)
+
+                    if level == child:
+                            explode_evt_cols(entry_list, tier_table)
+
+                    col_dict = fill_col_dict(tier_table, col_dict, [idx for l in el_idx for idx in l])  
+            # Convert col_dict to lgdo.Table
+            for col in col_dict.keys():
+                nda = np.array(col_dict[col])
+                col_dict[col] = Array(nda=nda)
+            f_table = Table(col_dict=col_dict)
+
+            if output_file:
+                sto.write_object(f_table, f"merged_data", output_file, wo_mode="o")
+            if in_memory:
+                if self.output_format == "lgdo.Table":
+                    return f_table
+                elif self.output_format == "pd.DataFrame":
+                    return f_table.get_dataframe()
+                else:
+                    raise ValueError(
+                        f"'{self.output_format}' output format not supported"
+                    )
+        else: # not merge_files
             if in_memory:
                 load_out = {}
 
@@ -935,63 +1048,10 @@ class DataLoader:
                             field_mask=field_mask,
                         )
                         if level == child:
-                            # Explode columns from "evt"-style levels, untested
-                            # Will only work if column has an "nda" attribute
-                            cum_length = build_cl(f_entries[f"{child}_idx"])
-                            exp_cols = explode_arrays(
-                                cum_length,
-                                [a.nda for a in tier_table.values()],
-                            )
-                            tier_table.update(zip(tier_table.keys(), exp_cols))
+                            explode_evt_cols(f_entries, tier_table)
 
-                        for col in tier_table.keys():
-                            if isinstance(tier_table[col], Array):
-                                # Allocate memory for column for all channels
-                                if col not in col_dict.keys():
-                                    col_dict[col] = np.empty(
-                                        table_length,
-                                        dtype=tier_table[col].dtype,
-                                    )
-                                col_dict[col][tcm_idx] = tier_table[col].nda
-
-                            elif isinstance(tier_table[col], WaveformTable):
-                                wf_table = tier_table[col]
-                                if isinstance(
-                                    wf_table["values"],
-                                    ArrayOfEqualSizedArrays,
-                                ):
-                                    # Allocate memory for columns for all channels
-                                    if "wf_dt" not in col_dict.keys():
-                                        col_dict["wf_t0"] = np.empty(
-                                            table_length,
-                                            dtype=wf_table["t0"].dtype,
-                                        )
-                                        col_dict["wf_dt"] = np.empty(
-                                            table_length,
-                                            dtype=wf_table["dt"].dtype,
-                                        )
-                                        col_dict["wf_values"] = np.empty(
-                                            (
-                                                table_length,
-                                                wf_table["values"].nda.shape[1],
-                                            ),
-                                            dtype=wf_table["values"].dtype,
-                                        )
-                                    col_dict["wf_t0"][tcm_idx] = wf_table["t0"].nda
-                                    col_dict["wf_dt"][tcm_idx] = wf_table["dt"].nda
-                                    col_dict["wf_values"][tcm_idx] = wf_table[
-                                        "values"
-                                    ].nda
-                                else:  # wf_values is a VectorOfVectors
-                                    log.warning(
-                                        "not sure how to handle waveforms with values "
-                                        f"of type {type(tier_table[col]['values'])} yet"
-                                    )
-                            else:
-                                log.warning(
-                                    f"not sure how to handle column {col} "
-                                    f"of type {type(tier_table[col])} yet"
-                                )
+                        col_dict = fill_col_dict(tier_table, col_dict, tcm_idx)  
+                        # end tb loop                      
 
                 # Convert col_dict to lgdo.Table
                 for col in col_dict.keys():
@@ -1003,6 +1063,7 @@ class DataLoader:
                     load_out[file] = f_table
                 if output_file:
                     sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
+                # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.close()
@@ -1036,8 +1097,6 @@ class DataLoader:
         sto = LH5Store()
 
         if self.merge_files:  # Try to load all information at once
-            if in_memory: 
-                load_out = 
             raise NotImplementedError
         else:  # Not merge_files
             if in_memory:
@@ -1143,7 +1202,7 @@ class DataLoader:
         raise NotImplementedError
 
     # -------------- Helper Functions ----------------#
-    def get_tiers_for_col(self, columns: list | np.ndarray) -> dict:
+    def get_tiers_for_col(self, columns: list | np.ndarray, merge_files: bool = None) -> dict:
         """For each column given, get the tiers and tables in that tier where
         that column can be found.
 
@@ -1157,6 +1216,8 @@ class DataLoader:
         col_tiers
             col_tiers[file]["tables"][tier] gives a list of tables in `tier` that contain a column of interest
             col_tiers[file]["columns"][column] gives the tier that `column` can be found in
+            if self.merge_files then
+            col_tiers[tier] is a list of tables in `tier` that contain a column of interest
         """
 
         col_tiers = {}
@@ -1165,34 +1226,59 @@ class DataLoader:
         if self.filedb.columns is None:
             self.filedb.scan_tables_columns()
 
-        # loop over selected files (db entries)
-        for file in self.file_list:
-            # this is the output object
-            col_tiers[file] = {"tables": {}, "columns": {}}
-            # Rows of FileDB.columns that include columns that we are interested in
-            col_inds = set()
-            for i, col_list in enumerate(self.filedb.columns):
-                if not set(list(col_list)).isdisjoint(columns):
-                    col_inds.add(i)
+        if merge_files is None:
+            merge_files = self.merge_files
 
-            # Loop over tiers
-            for level in self.levels:
-                for tier in self.tiers[level]:
-                    col_tiers[file]["tables"][tier] = []
-                    tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
-                    if tier_col_idx is not None:
-                        # Loop over tables
-                        for i in range(len(tier_col_idx)):
-                            col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
-                            if col_idx in col_inds:
-                                col_tiers[file]["tables"][tier].append(
-                                    self.filedb.df.loc[file, f"{tier}_tables"][i]
-                                )
-                                col_in_tier = set.intersection(
-                                    set(self.filedb.columns[col_idx]), set(columns)
-                                )
-                                for c in col_in_tier:
-                                    col_tiers[file]["columns"][c] = tier
+        if merge_files:
+            for file in self.file_list:
+                col_inds = set()
+                for i, col_list in enumerate(self.filedb.columns):
+                    if not set(col_list).isdisjoint(columns):
+                        col_inds.add(i)
+
+                for level in self.levels:
+                    for tier in self.tiers[level]:
+                        col_tiers[tier] = set()
+                        if self.filedb.df.loc[file, f"{tier}_col_idx"] is not None:
+                            for i in range(
+                                len(self.filedb.df.loc[file, f"{tier}_col_idx"])
+                            ):
+                                if (
+                                    self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                                    in col_inds
+                                ):
+                                    col_tiers[tier].add(
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
+                                    )
+        else:
+            # loop over selected files (db entries)
+            for file in self.file_list:
+                # this is the output object
+                col_tiers[file] = {"tables": {}, "columns": {}}
+                # Rows of FileDB.columns that include columns that we are interested in
+                col_inds = set()
+                for i, col_list in enumerate(self.filedb.columns):
+                    if not set(list(col_list)).isdisjoint(columns):
+                        col_inds.add(i)
+
+                # Loop over tiers
+                for level in self.levels:
+                    for tier in self.tiers[level]:
+                        col_tiers[file]["tables"][tier] = []
+                        tier_col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"]
+                        if tier_col_idx is not None:
+                            # Loop over tables
+                            for i in range(len(tier_col_idx)):
+                                col_idx = self.filedb.df.loc[file, f"{tier}_col_idx"][i]
+                                if col_idx in col_inds:
+                                    col_tiers[file]["tables"][tier].append(
+                                        self.filedb.df.loc[file, f"{tier}_tables"][i]
+                                    )
+                                    col_in_tier = set.intersection(
+                                        set(self.filedb.columns[col_idx]), set(columns)
+                                    )
+                                    for c in col_in_tier:
+                                        col_tiers[file]["columns"][c] = tier
 
         return col_tiers
 

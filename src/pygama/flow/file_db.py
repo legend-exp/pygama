@@ -309,7 +309,7 @@ class FileDB:
         """
         log.info("Getting table column names")
 
-        if self.df.columns is not None:
+        if self.columns is not None:
             if not override:
                 log.warning(
                     "Tables/columns already set, if you want to perform the scan anyway, set override=True"
