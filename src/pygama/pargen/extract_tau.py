@@ -20,7 +20,8 @@ import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.pargen.cuts as cts
-from pygama.pargen.dsp_optimize import run_one_dsp
+import pygama.pargen.dsp_optimize as opt
+import pygama.pargen.energy_optimisation as om
 
 log = logging.getLogger(__name__)
 
@@ -29,8 +30,8 @@ def run_tau(
     raw_file: list[str],
     config: dict,
     lh5_path: str,
-    n_events: int = 30000,
-    threshold: int = 3000,
+    n_events: int = 10000,
+    threshold: int = 5000,
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
@@ -53,7 +54,7 @@ def run_tau(
         f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
     )[0]
     tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
-    return run_one_dsp(tb_data, config)
+    return tb_data
 
 
 def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -> dict:
@@ -129,8 +130,79 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
         return tau_dict
 
 
+def fom_dpz(tb_data, verbosity=0, rand_arg=None):
+
+    std = tb_data["pz_std"].nda
+    counts, start_bins, var = pgh.get_hist(std, 10**5)
+    max_idx = np.argmax(counts)
+    mu = start_bins[max_idx]
+    try:
+        pars, cov = pgf.gauss_mode_width_max(
+            counts,
+            start_bins,
+            mode_guess=mu,
+            n_bins=10,
+            cost_func="Least Squares",
+            inflate_errors=False,
+            gof_method="var",
+        )
+
+        mu = pars[0]
+
+    except:
+        mu = start_bins[max_idx]
+
+    return {"y_val": np.abs(mu)}
+
+
+def get_dpz_consts(grid_out, opt_dict):
+    std_grid = np.ndarray(shape=grid_out.shape)
+    for i in range(grid_out.shape[0]):
+        for j in range(grid_out.shape[1]):
+            std_grid[i, j] = grid_out[i, j]["y_val"]
+    min_val = np.amin(std_grid)
+    min_point = np.where(std_grid == np.amin(std_grid))
+
+    opt_name = list(opt_dict.keys())[0]
+    keys = list(opt_dict[opt_name].keys())
+    param_list = []
+    shape = []
+    db_dict = {}
+    for key in keys:
+        param_dict = opt_dict[opt_name][key]
+        grid_axis = np.arange(
+            param_dict["start"], param_dict["end"], param_dict["spacing"]
+        )
+        unit = param_dict.get("unit")
+        param_list.append(grid_axis)
+        shape.append(len(grid_axis))
+    for i, key in enumerate(keys):
+        unit = opt_dict[opt_name][key].get("unit")
+
+        if unit is not None:
+            try:
+                db_dict[opt_name].update(
+                    {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
+                )
+            except:
+                db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
+        else:
+            try:
+                db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
+            except:
+                db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
+    return db_dict
+
+
 def dsp_preprocess_decay_const(
-    raw_files: list[str], dsp_config: dict, lh5_path: str, plot_path: str = None
+    raw_files: list[str],
+    dsp_config: dict,
+    lh5_path: str,
+    double_pz: bool = False,
+    plot_path: str = None,
+    opt_dict: dict = None,
+    threshold: int = 5000,
+    cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "bl_slope": 4},
 ) -> dict:
     """
     This function calculates the pole zero constant for the input data
@@ -149,11 +221,10 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_out = run_tau(raw_files, dsp_config, lh5_path)
+    tb_data = run_tau(raw_files, dsp_config, lh5_path, threshold=threshold)
+    tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
-    cut_dict = cts.generate_cuts(
-        tb_out, parameters={"bl_mean": 4, "bl_std": 4, "bl_slope": 4}
-    )
+    cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
     log.debug("Generated Cuts:", cut_dict)
     idxs = cts.get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
@@ -161,4 +232,12 @@ def dsp_preprocess_decay_const(
     wfs = tb_out["wf_blsub"]["values"].nda
     log.debug("Calculating pz constant")
     tau_dict = get_decay_constant(slopes[idxs], wfs[idxs], plot_path=plot_path)
+    if double_pz == True:
+        log.debug("Calculating double pz constants")
+        pspace = om.set_par_space(opt_dict)
+        grid_out = opt.run_grid(
+            tb_data, dsp_config, pspace, fom_dpz, tau_dict, fom_kwargs=None
+        )
+        out_dict = get_dpz_consts(grid_out, opt_dict)
+        tau_dict["pz"].update(out_dict["pz"])
     return tau_dict

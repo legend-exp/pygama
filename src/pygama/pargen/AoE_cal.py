@@ -21,6 +21,7 @@ from matplotlib.colors import LogNorm
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
+import pygama.pargen.ecal_th as thc
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
@@ -504,32 +505,119 @@ def plot_dt_dep(
     plt.title(title)
 
 
+def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
+    """
+    Simple guess for peak fitting
+    """
+    if func_i == pgf.extended_radford_pdf:
+        bin_cs = (bins[1:] + bins[:-1]) / 2
+        sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
+        i_0 = np.nanargmax(hist)
+        mu = peak
+        height = hist[i_0]
+        bg0 = np.mean(hist[-10:])
+        step = np.mean(hist[:10]) - bg0
+        htail = 1.0 / 5
+        tau = 0.5 * sigma
+
+        hstep = step / (bg0 + np.mean(hist[:10]))
+        dx = np.diff(bins)[0]
+        n_bins_range = int((3 * sigma) // dx)
+        nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
+        nbkg_guess = np.sum(hist) - nsig_guess
+        if nbkg_guess < 0:
+            nbkg_guess = 0
+        if nsig_guess < 0:
+            nsig_guess = 0
+        parguess = [
+            nsig_guess,
+            mu,
+            sigma,
+            htail,
+            tau,
+            nbkg_guess,
+            hstep,
+            fit_range[0],
+            fit_range[1],
+            0,
+        ]  #
+        return parguess
+
+    elif func_i == pgf.extended_gauss_step_pdf:
+        mu = peak
+        sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
+        i_0 = np.argmax(hist)
+        bg = np.mean(hist[-10:])
+        step = bg - np.mean(hist[:10])
+        hstep = step / (bg + np.mean(hist[:10]))
+        dx = np.diff(bins)[0]
+        n_bins_range = int((3 * sigma) // dx)
+        nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
+        nbkg_guess = np.sum(hist) - nsig_guess
+        if nbkg_guess < 0:
+            nbkg_guess = 0
+        if nsig_guess < 0:
+            nsig_guess = 0
+        return [nsig_guess, mu, sigma, nbkg_guess, hstep, fit_range[0], fit_range[1], 0]
+
+
 def unbinned_energy_fit(
-    energy: np.array, peak: float, verbose: bool = False
+    energy: np.array,
+    peak: float,
+    eres_pars: list = None,
+    simplex=False,
+    guess=None,
+    verbose: bool = False,
 ) -> tuple(np.array, np.array):
 
     """
     Fitting function for energy peaks used to calculate survival fractions
     """
-
-    energy_len = len(energy)
     hist, bins, var = pgh.get_hist(
         energy, dx=0.5, range=(np.nanmin(energy), np.nanmax(energy))
     )
-    x0 = pgc.get_hpge_E_peak_par_guess(hist, bins, var, pgf.extended_radford_pdf)
+    if guess is None:
+
+        x0 = energy_guess(
+            hist,
+            bins,
+            var,
+            pgf.extended_gauss_step_pdf,
+            peak,
+            eres_pars,
+            (np.nanmin(energy), np.nanmax(energy)),
+        )
+        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
+        m = Minuit(c, *x0)
+        m.fixed[-3:] = True
+        m.simplex().migrad()
+        m.hesse()
+        x0 = m.values[:3]
+        x0 += [1 / 5, 0.2 * m.values[2]]
+        x0 += m.values[3:]
+        if verbose:
+            print(m)
+    else:
+        x0 = guess
     if len(x0) == 0:
         return [np.nan], [np.nan]
-    fixed, mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
 
+    fixed, mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
+    if verbose:
+        print(x0)
     c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
     m = Minuit(c, *x0)
+    if x0[0] <= 0:
+        sig_lim = 0.2 * len(energy)
+    else:
+        sig_lim = 1.2 * x0[0]
     m.limits = [
-        (0, energy_len),
+        (0, sig_lim),
         (None, None),
         (None, None),
         (0, 1),
         (0, None),
-        (0, energy_len),
+        (0, len(energy) * 1.1),
         (None, None),
         (None, None),
         (None, None),
@@ -537,7 +625,11 @@ def unbinned_energy_fit(
     ]
     for fix in fixed:
         m.fixed[fix] = True
-    m.simplex().migrad()
+    if simplex == True:
+        m.simplex().migrad()
+    else:
+        m.migrad()
+
     m.hesse()
     if verbose:
         print(m)
@@ -547,15 +639,28 @@ def unbinned_energy_fit(
     if valid == True and not np.isnan(m.errors[:-3]).all():
         return m.values, m.errors
     else:
+        x0 = energy_guess(
+            hist,
+            bins,
+            var,
+            pgf.extended_radford_pdf,
+            peak,
+            eres_pars,
+            (np.nanmin(energy), np.nanmax(energy)),
+        )
         c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
         m = Minuit(c, *x0)
+        if x0[0] <= 0:
+            sig_lim = 0.2 * len(energy)
+        else:
+            sig_lim = 1.2 * x0[0]
         m.limits = [
-            (0, energy_len),
+            (0, sig_lim),
             (None, None),
             (None, None),
             (0, 1),
             (0, None),
-            (0, energy_len),
+            (0, len(energy) * 1.1),
             (None, None),
             (None, None),
             (None, None),
@@ -563,7 +668,7 @@ def unbinned_energy_fit(
         ]
         for fix in fixed:
             m.fixed[fix] = True
-        m.migrad()
+        m.simplex().migrad()
         m.hesse()
         valid = m.valid
         if verbose:
@@ -587,12 +692,47 @@ def get_peak_label(peak: float) -> str:
         return "Tl FEP @"
 
 
+def get_survival_fraction(
+    energy,
+    aoe,
+    cut_val,
+    peak,
+    eres_pars,
+    high_cut=None,
+    guess_pars_cut=None,
+    guess_pars_surv=None,
+):
+    if high_cut is not None:
+        idxs = (aoe > cut_val) & (aoe < high_cut)
+    else:
+        idxs = aoe > cut_val
+    cut_pars, ct_errs = unbinned_energy_fit(
+        energy[~idxs], peak, eres_pars, guess=guess_pars_cut, simplex=True
+    )
+    surv_pars, surv_errs = unbinned_energy_fit(
+        energy[idxs], peak, eres_pars, guess=guess_pars_surv, simplex=True
+    )
+
+    ct_n = cut_pars[0]
+    ct_err = ct_errs[0]
+    surv_n = surv_pars[0]
+    surv_err = surv_errs[0]
+
+    pc_n = ct_n + surv_n
+    pc_err = np.sqrt(surv_err**2 + ct_err**2)
+
+    sf = (surv_n / pc_n) * 100
+    err = sf * np.sqrt((pc_err / pc_n) ** 2 + (surv_err / surv_n) ** 2)
+    return sf, err, cut_pars, surv_pars
+
+
 def get_aoe_cut_fit(
     energy: np.array,
     aoe: np.array,
     peak: float,
     ranges: tuple(int, int),
     dep_acc: float,
+    eres_pars: list,
     display: int = 1,
 ) -> float:
 
@@ -607,30 +747,54 @@ def get_aoe_cut_fit(
         :20000
     ]
     peak_aoe = aoe[(energy > peak - min_range) & (energy < peak + max_range)][:20000]
-    cut_vals = np.arange(-8, -0.4, 0.2)
-    pars, errors = unbinned_energy_fit(peak_energy, peak)
+
+    cut_vals = np.arange(-8, 0, 0.2)
+    pars, errors = unbinned_energy_fit(peak_energy, peak, eres_pars, simplex=True)
+    if np.isnan(pars[0]):
+        print("first fit failed")
+        pars, errors = unbinned_energy_fit(peak_energy, peak, eres_pars, simplex=False)
     pc_n = pars[0]
     pc_err = errors[0]
     sfs = []
     sf_errs = []
     for cut_val in cut_vals:
-        idxs = peak_aoe > cut_val
-        cut_pars, ct_errs = unbinned_energy_fit(peak_energy[idxs], peak)
-        ct_n = cut_pars[0]
-        ct_err = ct_errs[0]
-        sf = (ct_n / pc_n) * 100
+        sf, err, cut_pars, surv_pars = get_survival_fraction(
+            peak_energy,
+            peak_aoe,
+            cut_val,
+            peak,
+            eres_pars,
+            guess_pars_cut=None,
+            guess_pars_surv=None,
+        )
         sfs.append(sf)
-        err = sf * np.sqrt((pc_err / pc_n) ** 2 + (ct_err / ct_n) ** 2)
         sf_errs.append(err)
+
     # return cut_vals, sfs, sf_errs
-    ids = (sf_errs < (1.5 * np.nanpercentile(sf_errs, 50))) & (~np.isnan(sf_errs))
+    ids = (
+        (sf_errs < (1.5 * np.nanpercentile(sf_errs, 70)))
+        & (~np.isnan(sf_errs))
+        & (np.array(sfs) < 95)
+    )
     fit = np.polynomial.polynomial.polyfit(
-        cut_vals[ids], np.array(sfs)[ids], w=1 / np.array(sf_errs)[ids], deg=4
+        cut_vals[ids], np.array(sfs)[ids], w=1 / np.array(sf_errs)[ids], deg=6
     )
 
-    xs = np.arange(-8, -0.4, 0.01)
+    xs = np.arange(np.nanmin(cut_vals[ids]), np.nanmax(cut_vals[ids]), 0.01)
     p = np.polynomial.polynomial.polyval(xs, fit)
     cut_val = xs[np.argmin(np.abs(p - (100 * dep_acc)))]
+
+    if display > 0:
+        plt.figure()
+        plt.errorbar(
+            cut_vals[ids],
+            np.array(sfs)[ids],
+            yerr=np.array(sf_errs)[ids],
+            linestyle=" ",
+        )
+
+        plt.plot(xs, p)
+        plt.show()
 
     return cut_val
 
@@ -641,7 +805,8 @@ def get_sf(
     peak: float,
     fit_width: tuple(int, int),
     aoe_cut_val: float,
-    display: int = 1,
+    eres_pars: list,
+    display: int = 0,
 ) -> tuple(np.array, np.array, np.array, float, float):
 
     """
@@ -657,7 +822,7 @@ def get_sf(
     else:
         peak_energy = energy[(energy > min_range) & (energy < max_range)][:50000]
         peak_aoe = aoe[(energy > min_range) & (energy < max_range)][:50000]
-    pars, errors = unbinned_energy_fit(peak_energy, peak)
+    pars, errors = unbinned_energy_fit(peak_energy, peak, eres_pars, simplex=False)
     pc_n = pars[0]
     pc_err = errors[0]
     sfs = []
@@ -667,18 +832,18 @@ def get_sf(
     # cut_vals = np.append(cut_vals, aoe_cut_val)
     final_cut_vals = []
     for cut_val in cut_vals:
-        idxs = peak_aoe > cut_val
         try:
-            cut_pars, ct_errs = unbinned_energy_fit(peak_energy[idxs], peak)
-            ct_n = cut_pars[0]
-            ct_err = ct_errs[0]
-            sf = (ct_n / pc_n) * 100
-            err = sf * np.sqrt((pc_err / pc_n) ** 2 + (ct_err / ct_n) ** 2)
+
+            sf, err, cut_pars, surv_pars = get_survival_fraction(
+                peak_energy, peak_aoe, cut_val, peak, eres_pars
+            )
+            if np.isnan(cut_pars).all() == False and np.isnan(surv_pars).all() == False:
+                guess_pars_cut = cut_pars
+                guess_pars_surv = surv_pars
         except:
             sf = np.nan
             err = np.nan
         sfs.append(sf)
-
         sf_errs.append(err)
         final_cut_vals.append(cut_val)
     ids = (
@@ -686,12 +851,15 @@ def get_sf(
         & (~np.isnan(sf_errs))
         & (np.array(sfs) < 100)
     )
-    idxs = peak_aoe > aoe_cut_val
-    cut_pars, ct_errs = unbinned_energy_fit(peak_energy[idxs], peak)
-    ct_n = cut_pars[0]
-    ct_err = ct_errs[0]
-    sf = (ct_n / pc_n) * 100
-    sf_err = sf * np.sqrt((pc_err / pc_n) ** 2 + (ct_err / ct_n) ** 2)
+    sf, sf_err, cut_pars, surv_pars = get_survival_fraction(
+        peak_energy, peak_aoe, aoe_cut_val, peak, eres_pars
+    )
+
+    if display > 0:
+        plt.figure()
+        plt.errorbar(cut_vals, sfs, sf_errs)
+        plt.show()
+
     return (
         np.array(final_cut_vals)[ids],
         np.array(sfs)[ids],
@@ -732,6 +900,7 @@ def get_sf_no_sweep(
     aoe: np.array,
     peak: float,
     fit_width: tuple(int, int),
+    eres_pars: list,
     aoe_low_cut_val: float,
     aoe_high_cut_val: float = None,
     display: int = 1,
@@ -749,18 +918,15 @@ def get_sf_no_sweep(
     else:
         peak_energy = energy[(energy > min_range) & (energy < max_range)][:50000]
         peak_aoe = aoe[(energy > min_range) & (energy < max_range)][:50000]
-    pars, errors = unbinned_energy_fit(peak_energy, peak)
-    pc_n = pars[0]
-    pc_err = errors[0]
-    if aoe_high_cut_val is None:
-        idxs = peak_aoe > aoe_low_cut_val
-    else:
-        idxs = (peak_aoe > aoe_low_cut_val) & (peak_aoe < aoe_high_cut_val)
-    cut_pars, ct_errs = unbinned_energy_fit(peak_energy[idxs], peak)
-    ct_n = cut_pars[0]
-    ct_err = ct_errs[0]
-    sf = (ct_n / pc_n) * 100
-    sf_err = sf * np.sqrt((pc_err / pc_n) ** 2 + (ct_err / ct_n) ** 2)
+
+    sf, sf_err, cut_pars, surv_pars = get_survival_fraction(
+        peak_energy,
+        peak_aoe,
+        aoe_low_cut_val,
+        peak,
+        eres_pars,
+        high_cut=aoe_high_cut_val,
+    )
     return sf, sf_err
 
 
@@ -1017,7 +1183,6 @@ def cal_aoe(
     cal_energy_param: str,
     eres_pars: list,
     dt_corr: bool = False,
-    cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     plot_savepath: str = None,
 ) -> tuple(dict, dict):
     """
@@ -1026,7 +1191,7 @@ def cal_aoe(
 
     aoe_uncorr, energy, dt, full_dt = load_aoe(
         files, lh5_path, cal_dict, energy_param, cal_energy_param
-    )  # , cut_parameters = cut_parameters
+    )
 
     if dt_corr == True:
         aoe, alpha = drift_time_correction(aoe_uncorr, energy, dt)
@@ -1039,12 +1204,21 @@ def cal_aoe(
 
     classifier = get_classifier(aoe, energy, mu_pars, sigma_pars)
 
-    cut = get_aoe_cut_fit(energy, classifier, 1592, (40, 20), 0.9, display=0)
+    cut = get_aoe_cut_fit(energy, classifier, 1592, (40, 20), 0.9, eres_pars, display=0)
+
+    cal_dict.update(
+        {
+            "AoE_Corrected": {
+                "expression": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)",
+                "parameters": {"a": mu_pars[0], "b": mu_pars[1]},
+            }
+        }
+    )
 
     cal_dict.update(
         {
             "AoE_Classifier": {
-                "expression": f"(((A_max/{energy_param})/(@a*{cal_energy_param} +@b))-1)/(sqrt(@c+(@d/{cal_energy_param})**2))",
+                "expression": f"AoE_Corrected/(sqrt(c+(d/{cal_energy_param})**2)/(a*{cal_energy_param} +b))",
                 "parameters": {
                     "a": mu_pars[0],
                     "b": mu_pars[1],
@@ -1058,7 +1232,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Low_Cut": {
-                "expression": "AoE_Classifier>@a",
+                "expression": "AoE_Classifier>a",
                 "parameters": {"a": cut},
             }
         }
@@ -1067,7 +1241,7 @@ def cal_aoe(
     cal_dict.update(
         {
             "AoE_Double_Sided_Cut": {
-                "expression": "@b>AoE_Classifier>@a",
+                "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
                 "parameters": {"a": cut, "b": 4},
             }
         }
@@ -1096,7 +1270,7 @@ def cal_aoe(
                 full_sf_errs.append(None)
             else:
                 cut_vals, sfs, sf_errs, sf[i], sferr[i] = get_sf(
-                    energy, classifier, peak, fit_widths[i], cut
+                    energy, classifier, peak, fit_widths[i], cut, eres_pars
                 )
                 full_cut_vals.append(cut_vals)
                 full_sfs.append(sfs)
@@ -1111,11 +1285,17 @@ def cal_aoe(
             if peak == 2039:
                 sf_2side[i] = compton_sf_no_sweep(
                     energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=4
-                )  # upper_cut=upper_cut
+                )
                 sferr_2side[i] = 0
             else:
                 sf_2side[i], sferr_2side[i] = get_sf_no_sweep(
-                    energy, classifier, peak, fit_widths[i], cut, aoe_high_cut_val=4
+                    energy,
+                    classifier,
+                    peak,
+                    fit_widths[i],
+                    eres_pars,
+                    cut,
+                    aoe_high_cut_val=4,
                 )
 
             log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
@@ -1285,6 +1465,7 @@ def cal_aoe(
             "Low_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf, sferr),
             "2_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side),
         }
+
     except:
         log.error("survival fraction determination failed")
         pathlib.Path(plot_savepath).touch()
@@ -1298,9 +1479,6 @@ def cal_aoe(
             "Low_cut": cut,
             "High_cut": 4,
         }
-
-    if dt_corr == True:
-        out_dict["Alpha"] = alpha
 
     log.info(f"Results are {out_dict}")
     return cal_dict, out_dict

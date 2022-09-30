@@ -91,8 +91,10 @@ def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
             "void(int64[:], int64[:])",
         ],
         "(n),(m)",
-        **nb_kwargs,
-        forceobj=True,
+        **nb_kwargs(
+            cache=False,
+            forceobj=True,
+        ),
     )
     def gaussian_filter1d_out(wf_in, wf_out):
 
