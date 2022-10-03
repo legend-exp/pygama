@@ -68,7 +68,7 @@ jobs:
       - name: Setup build environment
         run: |
           python -m pip install --upgrade pip wheel setuptools
-          python -m pip install --upgrade .[docs]
+          python -m pip install --upgrade .[all]
       - name: Build docs for current ref
         run: |
           cd docs
