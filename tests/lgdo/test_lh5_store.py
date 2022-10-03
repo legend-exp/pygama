@@ -39,6 +39,12 @@ def test_gimme_group(lgnd_file):
     assert isinstance(g, h5py.Group)
 
 
+def test_show(lgnd_file):
+    lh5.show(lgnd_file)
+    lh5.show(lgnd_file, "/geds/raw")
+    lh5.show(lgnd_file, "geds/raw")
+
+
 def test_ls(lgnd_file):
     assert lh5.ls(lgnd_file) == ["geds"]
     assert lh5.ls(lgnd_file, "/*/raw") == ["geds/raw"]
