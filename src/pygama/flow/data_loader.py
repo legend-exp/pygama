@@ -359,7 +359,7 @@ class DataLoader:
         self.file_list = None
         self.table_list = None
         self.cuts = None
-        self.merge_files = False
+        self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
         self.data = None
