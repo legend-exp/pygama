@@ -9,6 +9,7 @@ import sys
 import numpy as np
 
 import pygama
+import pygama.logging
 from pygama.dsp import build_dsp
 from pygama.hit import build_hit
 from pygama.raw import build_raw
@@ -43,6 +44,12 @@ def pygama_cli():
         action="store_true",
         help="""Increase the program verbosity""",
     )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="""Increase the program verbosity to maximum""",
+    )
 
     subparsers = parser.add_subparsers()
 
@@ -57,16 +64,11 @@ def pygama_cli():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(
-            level=logging.DEBUG, format="%(name)s [%(levelname)s] %(message)s"
-        )
-        logging.getLogger("numba").setLevel(logging.INFO)
-        logging.getLogger("parse").setLevel(logging.INFO)
-        logging.getLogger("h5py").setLevel(logging.INFO)
+        pygama.logging.setup(logging.DEBUG)
+    elif args.debug:
+        pygama.logging.setup(logging.DEBUG, logging.root)
     else:
-        logging.basicConfig(
-            level=logging.INFO, format="%(name)s [%(levelname)s] %(message)s"
-        )
+        pygama.logging.setup()
 
     if args.version:
         print(pygama.__version__)  # noqa: T201
