@@ -522,7 +522,7 @@ class DataLoader:
                 if self.cuts is None or level not in self.cuts.keys():
                     continue
                 cut = self.cuts[level]
-                col_tiers = self.get_tiers_for_col(cut_cols[level])
+                col_tiers = self.get_tiers_for_col(cut_cols[level], merge_files=False)
 
                 # Tables in first tier of event should be the same for all tiers in one level
                 tables = self.filedb.df.loc[file, f"{self.tiers[level][0]}_tables"]
