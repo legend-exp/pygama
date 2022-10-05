@@ -122,7 +122,7 @@ def lh5_file():
     )
 
     store.write_object(
-        struct['vov'],
+        struct["vov"],
         "vov2",
         "/tmp/tmp-pygama-lgdo-types.lh5",
         group="/data",
