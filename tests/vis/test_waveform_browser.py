@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from pygama.vis import WaveformBrowser
 
@@ -26,10 +27,25 @@ def test_waveform_browser(lgnd_test_data):
 
 
 def test_entry_mask(lgnd_test_data):
+    selection = pd.Series(
+        [
+            False, False, False, False, False, False, False, True, False, True,
+            False, False, False, False, False, False, False, False, False,
+            False, False, False, False, False, False, True, False, True, False,
+            False, False, False, False, True, False, False, False, False, True,
+            False, False, False, False, False, False, False, True, False,
+            False, False, False, False, True, False, False, False, False, True,
+            False, True, False, False, False, False, False, False, False, True,
+            False, False, False, True, True, False, False, False, False, False,
+            False, False, False, False, True, False, False, False, False,
+            False, False, False, True, False, True, True, True, False, False,
+            True, False, False]
+    )
     wb = WaveformBrowser(
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
         "/geds/raw",
-        entry_mask=np.ones(100, dtype=bool),
+        entry_mask=selection,
+        n_drawn=5
     )
 
     wb.draw_next()
