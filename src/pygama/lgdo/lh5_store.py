@@ -766,7 +766,7 @@ class LH5Store:
 
             # First write flattened_data array. Only write rows with data.
             fd_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row - 1]
-            fd_n_rows = obj.cumulative_length.nda[n_rows] - fd_start
+            fd_n_rows = obj.cumulative_length.nda[start_row + n_rows-1] - fd_start
             self.write_object(
                 obj.flattened_data,
                 "flattened_data",

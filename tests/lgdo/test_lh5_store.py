@@ -121,6 +121,14 @@ def lh5_file():
         wo_mode="overwrite_file",
     )
 
+    store.write_object(
+        struct['vov'],
+        "vov2",
+        "/tmp/tmp-pygama-lgdo-types.lh5",
+        group="/data",
+        wo_mode="append",
+    )
+
     return "/tmp/tmp-pygama-lgdo-types.lh5"
 
 
