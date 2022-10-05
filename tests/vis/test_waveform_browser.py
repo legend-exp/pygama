@@ -1,12 +1,12 @@
 from pathlib import Path
 
+import numpy as np
 from pygama.vis import WaveformBrowser
 
 config_dir = Path(__file__).parent / "configs"
 
 
 def test_waveform_browser(lgnd_test_data):
-
     wb = WaveformBrowser(
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
         "/geds/raw",
@@ -22,3 +22,13 @@ def test_waveform_browser(lgnd_test_data):
     wb.draw_next()
     wb.draw_entry(24)
     wb.draw_entry((2, 24))
+
+
+def test_entry_mask(lgnd_test_data):
+    wb = WaveformBrowser(
+        lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
+        "/geds/raw",
+        entry_mask=np.ones(100, dtype=bool)
+    )
+
+    wb.draw_next()
