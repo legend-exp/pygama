@@ -14,8 +14,8 @@ from collections import defaultdict
 from typing import Any, Union
 
 import h5py
-import numpy as np
 import numba as nb
+import numpy as np
 import pandas as pd
 
 from pygama.lgdo.array import Array
