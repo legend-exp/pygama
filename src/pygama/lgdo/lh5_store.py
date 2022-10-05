@@ -436,14 +436,6 @@ class LH5Store:
             if obj_buf is not None and not isinstance(obj_buf, VectorOfVectors):
                 raise ValueError(f"obj_buf for '{name}' not a LGDO VectorOfVectors")
 
-            if idx is not None:
-                raise NotImplementedError(
-                    "fancy indexed readout not implemented for VectorOfVectors"
-                )
-                # TODO: implement idx: first pull out all of cumulative length,
-                # use it to build an idx for the data_array, then rebuild
-                # cumulative length
-
             # read out cumulative_length
             cumulen_buf = None if obj_buf is None else obj_buf.cumulative_length
             cumulative_length, n_rows_read = self.read_object(
@@ -451,6 +443,7 @@ class LH5Store:
                 h5f,
                 start_row=start_row,
                 n_rows=n_rows,
+                idx=idx,
                 obj_buf=cumulen_buf,
                 obj_buf_start=obj_buf_start,
             )
@@ -459,65 +452,104 @@ class LH5Store:
                 obj_buf_start : obj_buf_start + n_rows_read
             ]
 
-            # determine the start_row and n_rows for the flattened_data readout
-            da_start = 0
-            if start_row > 0 and n_rows_read > 0:
-                # need to read out the cumulen sample -before- the first sample
-                # read above in order to get the starting row of the first
-                # vector to read out in flattened_data
-                da_start = h5f[f"{name}/cumulative_length"][start_row - 1]
+            if idx is not None and n_rows_read > 0:
+                # get the starting indices for each array in flattended data:
+                # the starting index for array[i] is cumulative_length[i-1]
+                idx2 = (np.asarray(idx[0]).copy()-1,)
+                # re-read cumulative_length with these indices
+                # note this will allocate memory for fd_starts!
+                fd_start = None
+                if idx2[0][0] == -1: 
+                    idx2 = (idx2[0][1:],)
+                    fd_start = 0 # this variable avoids an ndarray append
+                fd_starts, fds_n_rows_read = self.read_object(
+                    f"{name}/cumulative_length",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx2
+                )
+                fd_starts = fd_starts.nda # we just need the nda
+                if fd_start is None: fd_start = fd_starts[0]
 
-                # check limits for values that will be used subsequently
-                if this_cumulen_nda[-1] < da_start:
-                    log.debug(
-                        f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
-                        f"da_start = {da_start}, "
-                        f"start_row = {start_row}, "
-                        f"n_rows_read = {n_rows_read}"
-                    )
-                    raise RuntimeError(
-                        f"cumulative_length non-increasing between entries "
-                        f"{start_row} and {start_row+n_rows_read} ??"
-                    )
+                # compute the length that flattened_data will have after the
+                # fancy-indexed read
+                fd_n_rows = np.sum(this_cumulen_nda[-len(fd_starts):] - fd_starts)
+                if fd_start == 0: fd_n_rows += this_cumulen_nda[0]
 
-            # determine the number of rows for the flattened_data readout
-            da_nrows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
+                # now make fd_idx
+                fd_idx = np.empty(fd_n_rows, dtype='uint32')
+                fd_idx = _make_fd_idx(fd_starts, this_cumulen_nda, fd_idx)
 
-            # Now done with this_cumulen_nda, so we can clean it up to be ready
-            # to match the in-memory version of flattened_data. Note: these
-            # operations on the view change the original array because they are
-            # numpy arrays, not lists.
-            #
-            # First we need to subtract off the in-file offset for the start of
-            # read for flattened_data
-            this_cumulen_nda -= da_start
+                # Now clean up this_cumulen_nda, to be ready
+                # to match the in-memory version of flattened_data. Note: these
+                # operations on the view change the original array because they are
+                # numpy arrays, not lists.
+                this_cumulen_nda[-len(fd_starts):] -= fd_starts
+                np.cumsum(this_cumulen_nda, out=this_cumulen_nda)
 
-            # Then, if we started with a partially-filled buffer, add the
+            else: 
+                fd_idx = None
+
+                # determine the start_row and n_rows for the flattened_data readout
+                fd_start = 0
+                if start_row > 0 and n_rows_read > 0:
+                    # need to read out the cumulen sample -before- the first sample
+                    # read above in order to get the starting row of the first
+                    # vector to read out in flattened_data
+                    fd_start = h5f[f"{name}/cumulative_length"][start_row - 1]
+    
+                    # check limits for values that will be used subsequently
+                    if this_cumulen_nda[-1] < fd_start:
+                        log.debug(
+                            f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
+                            f"fd_start = {fd_start}, "
+                            f"start_row = {start_row}, "
+                            f"n_rows_read = {n_rows_read}"
+                        )
+                        raise RuntimeError(
+                            f"cumulative_length non-increasing between entries "
+                            f"{start_row} and {start_row+n_rows_read} ??"
+                        )
+
+                # determine the number of rows for the flattened_data readout
+                fd_n_rows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
+
+                # Now done with this_cumulen_nda, so we can clean it up to be ready
+                # to match the in-memory version of flattened_data. Note: these
+                # operations on the view change the original array because they are
+                # numpy arrays, not lists.
+                #
+                # First we need to subtract off the in-file offset for the start of
+                # read for flattened_data
+                this_cumulen_nda -= fd_start
+
+            # If we started with a partially-filled buffer, add the
             # appropriate offset for the start of the in-memory flattened
             # data for this read.
-            da_buf_start = 0
+            fd_buf_start = 0
             if obj_buf_start > 0:
-                da_buf_start = cumulative_length.nda[obj_buf_start - 1]
-                this_cumulen_nda += da_buf_start
+                fd_buf_start = cumulative_length.nda[obj_buf_start - 1]
+                this_cumulen_nda += fd_buf_start
 
             # Now prepare the object buffer if necessary
-            da_buf = None
+            fd_buf = None
             if obj_buf is not None:
-                da_buf = obj_buf.flattened_data
-                # grow da_buf if necessary to hold the data
-                dab_size = da_buf_start + da_nrows
-                if len(da_buf) < dab_size:
-                    da_buf.resize(dab_size)
+                fd_buf = obj_buf.flattened_data
+                # grow fd_buf if necessary to hold the data
+                dab_size = fd_buf_start + fd_n_rows
+                if len(fd_buf) < dab_size:
+                    fd_buf.resize(dab_size)
 
             # now read
             flattened_data, dummy_rows_read = self.read_object(
                 f"{name}/flattened_data",
                 h5f,
-                start_row=da_start,
-                n_rows=da_nrows,
-                idx=idx,
-                obj_buf=da_buf,
-                obj_buf_start=da_buf_start,
+                start_row=fd_start,
+                n_rows=fd_n_rows,
+                idx=fd_idx,
+                obj_buf=fd_buf,
+                obj_buf_start=fd_buf_start,
             )
             if obj_buf is not None:
                 return obj_buf, n_rows_read
@@ -728,9 +760,30 @@ class LH5Store:
                     write_start = len_cl
                 if len_cl > 0:
                     offset = group["cumulative_length"][write_start - 1]
+
+            # First write flattened_data array. Only write rows with data.
+            fd_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row - 1]
+            fd_n_rows = obj.cumulative_length.nda[n_rows] - fd_start
+            self.write_object(
+                obj.flattened_data,
+                "flattened_data",
+                lh5_file,
+                group=group,
+                start_row=fd_start,
+                n_rows=fd_n_rows,
+                wo_mode=wo_mode,
+                write_start=offset,
+            )
+
+            # now offset is used to give appropriate in-file values for
+            # cumulative_length. Need to adjust it for start_row
+            if start_row > 0: offset -= obj.cumulative_length.nda[start_row-1]
+
             # Add offset to obj.cumulative_length itself to avoid memory allocation.
-            # Then subtract it off after writing!
+            # Then subtract it off after writing! (otherwise it will be changed
+            # upon return)
             obj.cumulative_length.nda += offset
+
             self.write_object(
                 obj.cumulative_length,
                 "cumulative_length",
@@ -743,19 +796,6 @@ class LH5Store:
             )
             obj.cumulative_length.nda -= offset
 
-            # now write data array. Only write rows with data.
-            da_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row - 1]
-            da_n_rows = obj.cumulative_length.nda[n_rows - 1] - da_start
-            self.write_object(
-                obj.flattened_data,
-                "flattened_data",
-                lh5_file,
-                group=group,
-                start_row=da_start,
-                n_rows=da_n_rows,
-                wo_mode=wo_mode,
-                write_start=offset,
-            )
             return
 
         # if we get this far, must be one of the Array types
@@ -1143,3 +1183,22 @@ class LH5Iterator:
             buf, n_rows = self.read(entry)
             yield (buf, entry, n_rows)
             entry += n_rows
+
+
+
+import numba as nb
+@nb.njit(parallel=False, fastmath=True)
+def _make_fd_idx(starts, stops, idx):
+    k = 0
+    if len(starts) < len(stops):
+        for i in range(stops[0]): 
+            idx[k] = i
+            k += 1
+        stops = stops[1:]
+    for j in range(len(starts)):
+        for i in range(starts[j], stops[j]): 
+            idx[k] = i
+            k += 1
+    return (idx,)
+
+
