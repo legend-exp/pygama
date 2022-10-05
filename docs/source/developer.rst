@@ -168,6 +168,9 @@ We adopt the following guidelines for writing documentation:
   <https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html>`_.
 * We support also the Markdown format through the `MyST-Parser
   <https://myst-parser.readthedocs.io/en/latest/syntax/syntax.html>`_.
+* Jupyter notebooks placed below ``docs/source/notebooks`` are automatically
+  rendered to HTML pages by the `nbsphinx <https://nbsphinx.readthedocs.io>`_
+  extension.
 
 Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -181,7 +184,8 @@ required. You can get all the needed dependencies by running:
   $ cd pygama
   $ pip install '.[docs]'
 
-To build documentation, run the following commands:
+`Pandoc <https://pandoc.org/installing.html>`_ is also required to render
+Jupyter notebooks. To build documentation, run the following commands:
 
 .. code-block:: console
 
@@ -226,3 +230,9 @@ new project version must implement the following procedures:
 
        $ git push origin releases/vMAJOR.MINOR
        $ git push origin refs/tags/vMAJOR.MINOR.PATCH
+
+* To upload the release to the `Python Package Index
+  <https://pypi.org/project/pygama>`_, a new release must be created through
+  `the GitHub interface <https://github.com/legend-exp/pygama/releases/new>`_,
+  associated to the just created tag.  Usage of the "Generate release notes"
+  option is recommended.

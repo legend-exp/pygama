@@ -9,6 +9,10 @@ on:
   pull_request:
   release:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   build-and-test:
@@ -67,8 +71,9 @@ jobs:
           python-version: '3.10'
       - name: Setup build environment
         run: |
+          sudo apt-get install -y pandoc
           python -m pip install --upgrade pip wheel setuptools
-          python -m pip install --upgrade .[docs]
+          python -m pip install --upgrade .[all]
       - name: Build docs for current ref
         run: |
           cd docs
