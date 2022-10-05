@@ -838,7 +838,9 @@ def hpge_E_calibration(
         for i in (peaks_keV[0] * 0.9, peaks_keV[-1] * 1.1)
     )
     Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
-    Euc_max = Euc_max[np.logical_and(Euc_max >= Euc_min, Euc_max <= max(E_uncal))][0]
+    Euc_max = Euc_max[
+        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal))
+    ][0]
     dEuc = 0.2 / roughpars[-2]
 
     if uncal_is_int:

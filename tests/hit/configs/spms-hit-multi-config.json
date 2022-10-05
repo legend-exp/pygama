@@ -1,0 +1,5 @@
+{
+  "ch0/dsp": "tests/hit/configs/spms-hit-config.json",
+  "ch1/dsp": "tests/hit/configs/spms-hit-config.json",
+  "ch2/dsp": "tests/hit/configs/spms-hit-config.json"
+}
