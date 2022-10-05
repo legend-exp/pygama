@@ -146,15 +146,15 @@ def test_read_array(lh5_file):
 
 def test_read_vov(lh5_file):
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/data/struct/vov", lh5_file)
+    lh5_obj, n_rows = store.read_object("/data/struct/vov", lh5_file, idx=[0,2])
     assert isinstance(lh5_obj, lgdo.VectorOfVectors)
 
-    desired = [np.array([3, 4, 5, 2]), np.array([]), np.array([])]
+    desired = [np.array([3, 4, 5]), np.array([4, 8, 9, 7])]
 
     for i in range(len(desired)):
         assert (desired[i] == list(lh5_obj)[i]).all()
 
-    assert n_rows == 3
+    assert n_rows == 2
 
 
 def test_read_aoesa(lh5_file):
