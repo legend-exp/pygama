@@ -146,7 +146,7 @@ def test_read_array(lh5_file):
 
 def test_read_vov(lh5_file):
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/data/struct/vov", lh5_file, idx=[0,2])
+    lh5_obj, n_rows = store.read_object("/data/struct/vov", lh5_file, idx=[0, 2])
     assert isinstance(lh5_obj, lgdo.VectorOfVectors)
 
     desired = [np.array([3, 4, 5]), np.array([4, 8, 9, 7])]
