@@ -15,6 +15,7 @@ from typing import Any, Union
 
 import h5py
 import numpy as np
+import numba as nb
 import pandas as pd
 
 from pygama.lgdo.array import Array
@@ -1186,7 +1187,6 @@ class LH5Iterator:
 
 
 
-import numba as nb
 @nb.njit(parallel=False, fastmath=True)
 def _make_fd_idx(starts, stops, idx):
     k = 0
