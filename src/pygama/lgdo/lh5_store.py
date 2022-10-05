@@ -456,40 +456,42 @@ class LH5Store:
             if idx is not None and n_rows_read > 0:
                 # get the starting indices for each array in flattended data:
                 # the starting index for array[i] is cumulative_length[i-1]
-                idx2 = (np.asarray(idx[0]).copy()-1,)
+                idx2 = (np.asarray(idx[0]).copy() - 1,)
                 # re-read cumulative_length with these indices
                 # note this will allocate memory for fd_starts!
                 fd_start = None
-                if idx2[0][0] == -1: 
+                if idx2[0][0] == -1:
                     idx2 = (idx2[0][1:],)
-                    fd_start = 0 # this variable avoids an ndarray append
+                    fd_start = 0  # this variable avoids an ndarray append
                 fd_starts, fds_n_rows_read = self.read_object(
                     f"{name}/cumulative_length",
                     h5f,
                     start_row=start_row,
                     n_rows=n_rows,
-                    idx=idx2
+                    idx=idx2,
                 )
-                fd_starts = fd_starts.nda # we just need the nda
-                if fd_start is None: fd_start = fd_starts[0]
+                fd_starts = fd_starts.nda  # we just need the nda
+                if fd_start is None:
+                    fd_start = fd_starts[0]
 
                 # compute the length that flattened_data will have after the
                 # fancy-indexed read
-                fd_n_rows = np.sum(this_cumulen_nda[-len(fd_starts):] - fd_starts)
-                if fd_start == 0: fd_n_rows += this_cumulen_nda[0]
+                fd_n_rows = np.sum(this_cumulen_nda[-len(fd_starts) :] - fd_starts)
+                if fd_start == 0:
+                    fd_n_rows += this_cumulen_nda[0]
 
                 # now make fd_idx
-                fd_idx = np.empty(fd_n_rows, dtype='uint32')
+                fd_idx = np.empty(fd_n_rows, dtype="uint32")
                 fd_idx = _make_fd_idx(fd_starts, this_cumulen_nda, fd_idx)
 
                 # Now clean up this_cumulen_nda, to be ready
                 # to match the in-memory version of flattened_data. Note: these
                 # operations on the view change the original array because they are
                 # numpy arrays, not lists.
-                this_cumulen_nda[-len(fd_starts):] -= fd_starts
+                this_cumulen_nda[-len(fd_starts) :] -= fd_starts
                 np.cumsum(this_cumulen_nda, out=this_cumulen_nda)
 
-            else: 
+            else:
                 fd_idx = None
 
                 # determine the start_row and n_rows for the flattened_data readout
@@ -499,7 +501,7 @@ class LH5Store:
                     # read above in order to get the starting row of the first
                     # vector to read out in flattened_data
                     fd_start = h5f[f"{name}/cumulative_length"][start_row - 1]
-    
+
                     # check limits for values that will be used subsequently
                     if this_cumulen_nda[-1] < fd_start:
                         log.debug(
@@ -778,7 +780,8 @@ class LH5Store:
 
             # now offset is used to give appropriate in-file values for
             # cumulative_length. Need to adjust it for start_row
-            if start_row > 0: offset -= obj.cumulative_length.nda[start_row-1]
+            if start_row > 0:
+                offset -= obj.cumulative_length.nda[start_row - 1]
 
             # Add offset to obj.cumulative_length itself to avoid memory allocation.
             # Then subtract it off after writing! (otherwise it will be changed
@@ -1186,19 +1189,16 @@ class LH5Iterator:
             entry += n_rows
 
 
-
 @nb.njit(parallel=False, fastmath=True)
 def _make_fd_idx(starts, stops, idx):
     k = 0
     if len(starts) < len(stops):
-        for i in range(stops[0]): 
+        for i in range(stops[0]):
             idx[k] = i
             k += 1
         stops = stops[1:]
     for j in range(len(starts)):
-        for i in range(starts[j], stops[j]): 
+        for i in range(starts[j], stops[j]):
             idx[k] = i
             k += 1
     return (idx,)
-
-
