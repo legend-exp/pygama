@@ -530,7 +530,7 @@ class LH5Store:
             # If we started with a partially-filled buffer, add the
             # appropriate offset for the start of the in-memory flattened
             # data for this read.
-            fd_buf_start = 0
+            fd_buf_start = np.uint32(0)
             if obj_buf_start > 0:
                 fd_buf_start = cumulative_length.nda[obj_buf_start - 1]
                 this_cumulen_nda += fd_buf_start
@@ -540,9 +540,9 @@ class LH5Store:
             if obj_buf is not None:
                 fd_buf = obj_buf.flattened_data
                 # grow fd_buf if necessary to hold the data
-                dab_size = fd_buf_start + fd_n_rows
-                if len(fd_buf) < dab_size:
-                    fd_buf.resize(dab_size)
+                fdb_size = fd_buf_start + fd_n_rows
+                if len(fd_buf) < fdb_size:
+                    fd_buf.resize(fdb_size)
 
             # now read
             flattened_data, dummy_rows_read = self.read_object(
