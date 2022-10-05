@@ -99,7 +99,7 @@ def run_optimisation_multiprocessed(
     db_dict: dict
         Dictionary specifying any values to put in processing chain e.g. pz constant
     processes : int
-        Number of speperate processes to run for the multiprocessing
+        Number of separate processes to run for the multiprocessing
     """
 
     def form_dict(in_dict, length):
@@ -557,7 +557,7 @@ def get_peak_fwhm_with_dt_corr(
 
 def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, display=0):
     """
-    Fom for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
+    FOM for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
     the corresponding alpha value and the number of events in the fitted peak, also the reduced chisquare of the
     """
     parameter = kwarg_dict["parameter"]
@@ -796,7 +796,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
 
 def fom_all_fit(tb_in, kwarg_dict):
     """
-    Fom to run over different ctc parameters
+    FOM to run over different ctc parameters
     """
     ctc_parameters = ["QDrift"]  #'dt',
     output_dict = {}
@@ -808,7 +808,7 @@ def fom_all_fit(tb_in, kwarg_dict):
 
 def fom_FWHM_fit(tb_in, kwarg_dict):
     """
-    Fom with no ctc sweep, used for optimising ftp.
+    FOM with no ctc sweep, used for optimising ftp.
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
@@ -1081,7 +1081,7 @@ def interpolate_energy(peak_energies, points, err_points, energy):
 
 def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
     """
-    Fom for sweeping over ctc values to find the best value, returns the best found fwhm
+    FOM for sweeping over ctc values to find the best value, returns the best found fwhm
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
