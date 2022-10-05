@@ -147,7 +147,6 @@ class DataStreamer(ABC):
             if dec_name not in dec_names:
                 log.warning(f"no decoder named '{dec_name}' requested by rb_lib")
 
-
     def close_stream(self) -> None:
         """Close this data stream.
 
@@ -155,7 +154,6 @@ class DataStreamer(ABC):
             Needs to be overloaded.
         """
         pass
-
 
     @abstractmethod
     def read_packet(self) -> bool:
@@ -172,7 +170,6 @@ class DataStreamer(ABC):
             returns `True` while there is still data to read.
         """
         return True
-
 
     def read_chunk(
         self,
@@ -257,7 +254,6 @@ class DataStreamer(ABC):
                     list_of_rbs.append(rb)
         return list_of_rbs
 
-
     @abstractmethod
     def get_decoder_list(self) -> list:
         """Returns a list of decoder objects for this data stream.
@@ -267,7 +263,6 @@ class DataStreamer(ABC):
         Needs to be overloaded. Gets called during :meth:`.open_stream`.
         """
         return []
-
 
     def build_default_rb_lib(self, out_stream: str = "") -> RawBufferLibrary:
         """Build the most basic :class:`~.RawBufferLibrary` that will work for

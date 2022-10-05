@@ -14,7 +14,7 @@ from pygama.raw.raw_buffer import RawBuffer
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
 
-class DataDecoder():
+class DataDecoder:
     r"""Decodes packets from a data stream.
 
     Most decoders will repeatedly decode the same set of values from each
@@ -57,13 +57,11 @@ class DataDecoder():
             "garbage_code", lgdo.Array(shape=garbage_length, dtype="uint32")
         )
 
-
     def get_key_list(self) -> list[int | str]:
         """Overload with list of keys for this decoder, e.g. ``return
         range(n_channels)``.  The default version works for decoders with
         single / no keys."""
         return [None]
-
 
     def get_decoded_values(self, key: int | str = None) -> dict:
         """Get decoded values (optionally for a given key, typically a channel).
@@ -82,7 +80,6 @@ class DataDecoder():
             "you need to implement key-specific get_decoded_values for",
             type(self).__name__,
         )
-
 
     def make_lgdo(self, key: int | str = None, size: int = None) -> LGDO:
         """Make an LGDO for this :class:`DataDecoder` to fill.
@@ -196,7 +193,6 @@ class DataDecoder():
 
         return data_obj
 
-
     def put_in_garbage(self, packet: int, packet_id: int, code: int) -> None:
         i_row = self.garbage_table.loc
         p8 = np.frombuffer(packet, dtype="uint8")
@@ -204,7 +200,6 @@ class DataDecoder():
         self.garbage_table["packet_id"].nda[i_row] = packet_id
         self.garbage_table["garbage_codes"].nda[i_row] = code
         self.garbage_table.push_row()
-
 
     def write_out_garbage(
         self, filename: str, group: str = "/", lh5_store: LH5Store = None
@@ -219,7 +214,6 @@ class DataDecoder():
         )
         self.garbage_table.clear()
 
-
     def get_max_rows_in_packet(self) -> int:
         """Returns the maximum number of rows that could be read out in a
         packet.
@@ -228,7 +222,6 @@ class DataDecoder():
         buffers.
         """
         return 1
-
 
     def buffer_is_full(self, rb: RawBuffer) -> bool:
         """Returns whether the buffer is too full to read in another packet."""
