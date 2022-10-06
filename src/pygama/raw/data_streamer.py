@@ -4,7 +4,7 @@ Base classes for streaming data.
 from __future__ import annotations
 
 import logging
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
 
@@ -33,6 +33,7 @@ class DataStreamer(ABC):
         self.any_full = False
         self.packet_id = 0
 
+    @abstractmethod
     def open_stream(
         self,
         stream_name: str,
@@ -154,6 +155,7 @@ class DataStreamer(ABC):
         """
         pass
 
+    @abstractmethod
     def read_packet(self) -> bool:
         """Reads a single packet's worth of data in to the
         :class:`.RawBufferLibrary`.
@@ -252,6 +254,7 @@ class DataStreamer(ABC):
                     list_of_rbs.append(rb)
         return list_of_rbs
 
+    @abstractmethod
     def get_decoder_list(self) -> list:
         """Returns a list of decoder objects for this data stream.
 

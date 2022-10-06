@@ -128,19 +128,22 @@ class ProcChainVar:
         Parameters
         ----------
         proc_chain
-            DOCME
+            ProcessingChain that contains this variable
         name
-            DOCME
+            Name of variable used to look it up
         shape
-            DOCME
+            Shape of variable, without buffer_len dimension
         dtype
-            DOCME
+            Data type of variable
         grid
-            DOCME
+            Coordinate grid associated with variable. This contains the
+            period and offset of the variable. For variables where
+            is_coord is True, use this to perform unit conversions
         unit
-            DOCME
+            Unit associated with variable during I/O.
         is_coord
-            DOCME
+            If True, variable represents an array index and can be converted
+            into a unitted number using grid
         """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
         self.proc_chain = proc_chain
@@ -379,7 +382,7 @@ class ProcessingChain:
         grid : CoordinateGrid
             for variable, containing period and offset
         unit
-            DOCME
+            unit of variable
         period
             unit with period of waveform associated with object. Do not use if
             `grid` is provided
@@ -443,22 +446,24 @@ class ProcessingChain:
 
         # Create input buffer that will be linked and returned if none exists
         if buff is None:
+            dtype = var.get_buffer().dtype
+
             if var is None:
                 raise ProcessingChainError(
                     f"{varname} does not exist and no buffer was provided"
                 )
             elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
                 buff = lgdo.WaveformTable(
-                    size=self._buffer_len, wf_len=var.shape[0], dtype=var.dtype
+                    size=self._buffer_len, wf_len=var.shape[0], dtype=dtype
                 )
             elif len(var.shape) == 0:
-                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=dtype)
             elif len(var.shape) > 0:
                 buff = lgdo.ArrayOfEqualSizedArrays(
-                    shape=(self._buffer_len, *var.shape), dtype=var.dtype
+                    shape=(self._buffer_len, *var.shape), dtype=dtype
                 )
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, dtype)
 
         # Add the buffer to the input buffers list
         if isinstance(buff, np.ndarray):
@@ -511,22 +516,24 @@ class ProcessingChain:
 
         # Create output buffer that will be linked and returned if none exists
         if buff is None:
+            dtype = var.get_buffer().dtype
+
             if var is None:
                 raise ProcessingChainError(
                     varname + " does not exist and no buffer was provided"
                 )
             elif isinstance(var.grid, CoordinateGrid) and len(var.shape) == 1:
                 buff = lgdo.WaveformTable(
-                    size=self._buffer_len, wf_len=var.shape[0], dtype=var.dtype
+                    size=self._buffer_len, wf_len=var.shape[0], dtype=dtype
                 )
             elif len(var.shape) == 0:
-                buff = lgdo.Array(shape=(self._buffer_len), dtype=var.dtype)
+                buff = lgdo.Array(shape=(self._buffer_len), dtype=dtype)
             elif len(var.shape) > 0:
                 buff = lgdo.ArrayOfEqualSizedArrays(
-                    shape=(self._buffer_len, *var.shape), dtype=var.dtype
+                    shape=(self._buffer_len, *var.shape), dtype=dtype
                 )
             else:
-                buff = np.ndarray((self._buffer_len,) + var.shape, var.dtype)
+                buff = np.ndarray((self._buffer_len,) + var.shape, dtype)
 
         # Add the buffer to the output buffers list
         if isinstance(buff, np.ndarray):
@@ -579,33 +586,33 @@ class ProcessingChain:
         r"""Parse string `expr` into a NumPy array or value, using the following
         syntax:
 
-          - numeric values are parsed into ``int``\ s or ``float``\ s
-          - units found in the :mod:`pint` package
-          - other strings are parsed into variable names. If `get_names_only` is
-            ``False``, fetch the internal buffer (creating it as needed). Else,
-            return a string of the name
-          - if a string is followed by ``(...)``, try parsing into one of the
-            following expressions:
+        - numeric values are parsed into ``int``\ s or ``float``\ s
+        - units found in the :mod:`pint` package
+        - other strings are parsed into variable names. If `get_names_only` is
+          ``False``, fetch the internal buffer (creating it as needed). Else,
+          return a string of the name
+        - if a string is followed by ``(...)``, try parsing into one of the
+          following expressions:
 
-              - ``len(expr)``: return the length of the array found with `expr`
-              - ``round(expr)``: return the value found with `expr` to the
-                nearest integer
-              - ``varname(shape, type)``: allocate a new buffer with the
-                specified shape and type, using ``varname``. This is used if
-                the automatic type and shape deduction for allocating variables
-                fails
+          - ``len(expr)``: return the length of the array found with `expr`
+          - ``round(expr)``: return the value found with `expr` to the
+            nearest integer
+          - ``varname(shape, type)``: allocate a new buffer with the
+            specified shape and type, using ``varname``. This is used if
+            the automatic type and shape deduction for allocating variables
+            fails
 
-          - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
-            :obj:`//` are available. If a variable name is included in the
-            expression, a processor will be added to the
-            :class:`ProcessingChain` and a new buffer allocated to store the
-            output
-          - ``varname[slice]``: return the variable with a slice applied. Slice
-            values can be ``float``\ s, and will have round applied to them
-          - ``keyword = expr``: return a ``dict`` with a single element
-            pointing from keyword to the parsed `expr`. This is used for
-            `kwargs`. If `expr_only` is ``True``, raise an exception if we see
-            this.
+        - Unary and binary operators :obj:`+`, :obj:`-`, :obj:`*`, :obj:`/`,
+          :obj:`//` are available. If a variable name is included in the
+          expression, a processor will be added to the
+          :class:`ProcessingChain` and a new buffer allocated to store the
+          output
+        - ``varname[slice]``: return the variable with a slice applied. Slice
+          values can be ``float``\ s, and will have round applied to them
+        - ``keyword = expr``: return a ``dict`` with a single element
+          pointing from keyword to the parsed `expr`. This is used for
+          `kwargs`. If `expr_only` is ``True``, raise an exception if we see
+          this.
 
         If `get_names_only` is set to ``True``, do not fetch or allocate new
         arrays, instead return a list of variable names found in the expression.
@@ -645,6 +652,13 @@ class ProcessingChain:
         """
         if node is None:
             return None
+
+        elif isinstance(node, ast.List):
+            npparr = np.array(ast.literal_eval(expr))
+            if len(npparr.shape) == 1:
+                return npparr
+            else:
+                ProcessingChainError("only 1D arrays are supported: " + expr)
 
         elif isinstance(node, ast.Num):
             return node.n
@@ -1124,9 +1138,13 @@ class ProcessorManager:
                 if not d:
                     continue
                 if d not in dims_dict:
-                    raise ProcessingChainError(
-                        f"could not deduce dimension {d} for {param}"
-                    )
+                    # If it is an array lets get the length
+                    if isinstance(param, np.ndarray):
+                        dims_dict[d] = self.DimInfo(len(param), None)
+                    else:
+                        raise ProcessingChainError(
+                            f"could not deduce dimension {d} for {param}"
+                        )
                 dim_list.append(dims_dict[d])
             shape = tuple(d.length for d in dim_list)
             this_grid = dim_list[-1].grid if dim_list else None
@@ -1137,6 +1155,7 @@ class ProcessorManager:
                 is_coord = False
                 if param.is_coord is True and grid is not None:
                     unit = str(grid.period.u)
+                    this_grid = grid
                 elif (
                     isinstance(param.unit, str)
                     and param.unit in ureg
@@ -1144,6 +1163,7 @@ class ProcessorManager:
                     and ureg.is_compatible_with(grid.period, param.unit)
                 ):
                     is_coord = True
+                    this_grid = grid
 
                 param.update_auto(
                     shape=shape,
@@ -1163,6 +1183,19 @@ class ProcessorManager:
                     if arshape[idim] != shape[idim]:
                         arshape.insert(len(arshape) + idim + 1, 1)
                 param = param.reshape(tuple(arshape))
+
+            elif isinstance(param, str):
+                # Convert string into integer buffer if appropriate
+                if np.issubdtype(dtype, np.integer):
+                    try:
+                        param = np.frombuffer(param.encode("ascii"), dtype).reshape(
+                            shape
+                        )
+                    except (ValueError):
+                        raise ProcessingChainError(
+                            f"could not convert string '{param}' into"
+                            f"byte-array of type {dtype} and shape {shape}"
+                        )
 
             elif param is not None:
                 # Convert scalar to right type, including units
@@ -1223,7 +1256,7 @@ class UnitConversionManager(ProcessorManager):
 
         from_buffer, from_grid = var._buffer[0]
         period_ratio = from_grid.get_period(unit.period)
-        self.out_buffer = np.zeros_like(from_buffer)
+        self.out_buffer = np.zeros_like(from_buffer, dtype="float64")
         self.args = [
             from_buffer,
             from_grid.get_offset(),
@@ -1302,13 +1335,6 @@ class LGDOArrayIOManager(IOManager):
         unit = io_array.attrs.get("units", None)
         var.update_auto(dtype=io_array.dtype, shape=io_array.nda.shape[1:], unit=unit)
 
-        if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError(
-                f"LGDO object "
-                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
-                f"incompatible with {str(self.var)}"
-            )
-
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
                 unit = var.unit.period.u
@@ -1327,6 +1353,16 @@ class LGDOArrayIOManager(IOManager):
         self.raw_buf = io_array.nda
         self.var = var
         self.raw_var = var.get_buffer(unit)
+
+        if (
+            self.var.shape != self.io_array.nda.shape[1:]
+            or self.raw_var.dtype != self.io_array.dtype
+        ):
+            raise ProcessingChainError(
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()} is "
+                f"incompatible with {str(self.var)}"
+            )
 
     def read(self, start: int, end: int) -> None:
         np.copyto(
@@ -1353,13 +1389,6 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
         unit = io_array.attrs.get("units", None)
         var.update_auto(dtype=io_array.dtype, shape=io_array.nda.shape[1:], unit=unit)
 
-        if var.shape != io_array.nda.shape[1:] or var.dtype != io_array.dtype:
-            raise ProcessingChainError(
-                f"LGDO object "
-                f"{self.io_buf.form_datatype()}@{self.raw_buf.data} is "
-                f"incompatible with {str(self.var)}"
-            )
-
         if isinstance(var.unit, CoordinateGrid):
             if unit is None:
                 unit = var.unit.period.u
@@ -1378,6 +1407,16 @@ class LGDOArrayOfEqualSizedArraysIOManager(IOManager):
         self.raw_buf = io_array.nda
         self.var = var
         self.raw_var = var.get_buffer(unit)
+
+        if (
+            self.var.shape != self.io_array.nda.shape[1:]
+            or self.raw_var.dtype != self.io_array.dtype
+        ):
+            raise ProcessingChainError(
+                f"LGDO object "
+                f"{self.io_buf.form_datatype()} is "
+                f"incompatible with {str(self.var)}"
+            )
 
     def read(self, start: int, end: int) -> None:
         np.copyto(
@@ -1518,28 +1557,28 @@ def build_processing_chain(
           default. See `outputs` argument
         - ``processors`` -- configuration dictionary
 
-           - ``name1, name2`` -- dictionary. key contains comma-separated
-             names of parameters computed
+          - ``name1, name2`` -- dictionary. key contains comma-separated
+            names of parameters computed
 
-              - ``function`` -- string, name of function to call.  Function
-                should implement the :class:`numpy.gufunc` interface, a factory
-                function returning a ``gufunc``, or an arbitrary function that
-                can be mapped onto a ``gufunc``
-              - ``module`` -- string, name of module containing function
-              - ``args``-- list of strings or numerical values. Contains
-                list of names of computed and input parameters or
-                constant values used as inputs to function. Note that
-                outputs should be fed by reference as args! Arguments read
-                from the database are prepended with ``db``.
-              - ``kwargs`` -- dictionary. Keyword arguments for
-                :meth:`ProcesssingChain.add_processor`.
-              - ``init_args`` --  list of strings or numerical values. List
-                of names of computed and input parameters or constant values
-                used to initialize a :class:`numpy.gufunc` via a factory
-                function
-              - ``unit`` -- list of strings. Units for parameters
-              - ``defaults`` -- dictionary. Default value to be used for
-                arguments read from the database
+            - ``function`` -- string, name of function to call.  Function
+              should implement the :class:`numpy.gufunc` interface, a factory
+              function returning a ``gufunc``, or an arbitrary function that
+              can be mapped onto a ``gufunc``
+            - ``module`` -- string, name of module containing function
+            - ``args``-- list of strings or numerical values. Contains
+              list of names of computed and input parameters or
+              constant values used as inputs to function. Note that
+              outputs should be fed by reference as args! Arguments read
+              from the database are prepended with ``db``.
+            - ``kwargs`` -- dictionary. Keyword arguments for
+              :meth:`ProcesssingChain.add_processor`.
+            - ``init_args`` --  list of strings or numerical values. List
+              of names of computed and input parameters or constant values
+              used to initialize a :class:`numpy.gufunc` via a factory
+              function
+            - ``unit`` -- list of strings. Units for parameters
+            - ``defaults`` -- dictionary. Default value to be used for
+              arguments read from the database
 
     db_dict
         A nested :class:`dict` pointing to values for database arguments. As
@@ -1697,76 +1736,87 @@ def build_processing_chain(
             log.warning(
                 f"I don't know what to do with {input_par}. Building output without it!"
             )
-        proc_chain.link_input_buffer(input_par, buf_in)
+        try:
+            proc_chain.link_input_buffer(input_par, buf_in)
+        except Exception as e:
+            raise ProcessingChainError(
+                f"Exception raised while linking input buffer {input_par}."
+            ) from e
 
     # now add the processors
     for proc_par in proc_par_list:
         recipe = processors[proc_par]
-        module = importlib.import_module(recipe["module"])
-        func = getattr(module, recipe["function"])
-        args = recipe["args"]
-
-        # Initialize the new variables, if needed
-        if "unit" in recipe:
-            new_vars = [k for k in re.split(",| ", proc_par) if k != ""]
-            for i, name in enumerate(new_vars):
-                unit = recipe.get("unit", auto)
-                if isinstance(unit, list):
-                    unit = unit[i]
-
-                proc_chain.add_variable(name, unit=unit)
-
-        # get this list of kwargs
-        kwargs = recipe.get("kwargs", {})  # might also need db lookup here
-
-        # if init_args are defined, parse any strings and then call func
-        # as a factory/constructor function
         try:
-            init_args_in = recipe["init_args"]
-            init_args = []
-            init_kwargs = {}
-            for _, arg in enumerate(init_args_in):
-                for db_var in db_parser.findall(arg):
-                    try:
-                        db_node = db_dict
-                        for key in db_var[3:].split("."):
-                            db_node = db_node[key]
-                        log.debug(f"database lookup: found {db_node} for {db_var}")
-                    except (KeyError, TypeError):
+            module = importlib.import_module(recipe["module"])
+            func = getattr(module, recipe["function"])
+            args = recipe["args"]
+
+            # Initialize the new variables, if needed
+            if "unit" in recipe:
+                new_vars = [k for k in re.split(",| ", proc_par) if k != ""]
+                for i, name in enumerate(new_vars):
+                    unit = recipe.get("unit", auto)
+                    if isinstance(unit, list):
+                        unit = unit[i]
+
+                    proc_chain.add_variable(name, unit=unit)
+
+            # get this list of kwargs
+            kwargs = recipe.get("kwargs", {})  # might also need db lookup here
+
+            # if init_args are defined, parse any strings and then call func
+            # as a factory/constructor function
+            try:
+                init_args_in = recipe["init_args"]
+                init_args = []
+                init_kwargs = {}
+                for _, arg in enumerate(init_args_in):
+                    for db_var in db_parser.findall(arg):
                         try:
-                            db_node = recipe["defaults"][db_var]
-                            log.debug(
-                                "database lookup: using default value of {db_node} for {db_var}"
-                            )
+                            db_node = db_dict
+                            for key in db_var[3:].split("."):
+                                db_node = db_node[key]
+                            log.debug(f"database lookup: found {db_node} for {db_var}")
                         except (KeyError, TypeError):
-                            raise ProcessingChainError(
-                                f"did not find {db_var} in database, and "
-                                f"could not find default value."
-                            )
+                            try:
+                                db_node = recipe["defaults"][db_var]
+                                log.debug(
+                                    "database lookup: using default value of {db_node} for {db_var}"
+                                )
+                            except (KeyError, TypeError):
+                                raise ProcessingChainError(
+                                    f"did not find {db_var} in database, and "
+                                    f"could not find default value."
+                                )
 
-                    if arg == db_var:
-                        arg = db_node
+                        if arg == db_var:
+                            arg = db_node
+                        else:
+                            arg = arg.replace(db_var, str(db_node))
+
+                    # see if string can be parsed by proc_chain
+                    if isinstance(arg, str):
+                        arg = proc_chain.get_variable(arg)
+                    if isinstance(arg, dict):
+                        init_kwargs.update(arg)
                     else:
-                        arg = arg.replace(db_var, str(db_node))
+                        init_args.append(arg)
 
-                # see if string can be parsed by proc_chain
-                if isinstance(arg, str):
-                    arg = proc_chain.get_variable(arg)
-                if isinstance(arg, dict):
-                    init_kwargs.update(arg)
-                else:
-                    init_args.append(arg)
+                expr = ", ".join(
+                    [f"{a}" for a in init_args]
+                    + [f"{k}={v}" for k, v in init_kwargs.items()]
+                )
+                log.debug(f"building function from init_args: {func.__name__}({expr})")
+                func = func(*init_args)
+            except KeyError:
+                pass
 
-            expr = ", ".join(
-                [f"{a}" for a in init_args]
-                + [f"{k}={v}" for k, v in init_kwargs.items()]
-            )
-            log.debug(f"building function from init_args: {func.__name__}({expr})")
-            func = func(*init_args)
-        except KeyError:
-            pass
-
-        proc_chain.add_processor(func, *args, **kwargs)
+            proc_chain.add_processor(func, *args, **kwargs)
+        except Exception as e:
+            raise ProcessingChainError(
+                "Exception raised while attempting to add processor:\n"
+                + json.dumps(recipe, indent=2)
+            ) from e
 
     # build the output buffers
     lh5_out = lgdo.Table(size=proc_chain._buffer_len)
@@ -1783,8 +1833,13 @@ def build_processing_chain(
 
     # finally, add the output buffers to lh5_out and the proc chain
     for out_par in out_par_list:
-        buf_out = proc_chain.link_output_buffer(out_par)
-        lh5_out.add_field(out_par, buf_out)
+        try:
+            buf_out = proc_chain.link_output_buffer(out_par)
+            lh5_out.add_field(out_par, buf_out)
+        except Exception as e:
+            raise ProcessingChainError(
+                f"Exception raised while linking output buffer {out_par}."
+            ) from e
 
     field_mask = input_par_list + copy_par_list
     return (proc_chain, field_mask, lh5_out)

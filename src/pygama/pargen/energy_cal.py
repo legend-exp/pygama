@@ -784,12 +784,12 @@ def hpge_E_calibration(
             arrays of gaussian parameters / covariances fit to the peak tops in
             the first refinement
         'pt_cal_pars', 'pt_cal_cov' : array, 2D array
-            array of calibraiton parameters E_uncal = poly(E_keV) for fit to
+            array of calibration parameters E_uncal = poly(E_keV) for fit to
             means of gausses fit to tops of each peak
         'pk_pars', 'pk_cov', 'pk_binws', 'pk_ranges' : list of (array), list of (2D array), list, list of (array)
             the best fit parameters, covariances, bin width and energy range for the local fit to each peak
         'pk_cal_pars', 'pk_cal_cov' : array, 2D array
-            array of calibraiton parameters E_uncal = poly(E_keV) for fit to
+            array of calibration parameters E_uncal = poly(E_keV) for fit to
             means from full peak fits
         'fwhms', 'dfwhms' : array, array
             the numeric fwhms and their uncertainties for each peak.
@@ -838,7 +838,9 @@ def hpge_E_calibration(
         for i in (peaks_keV[0] * 0.9, peaks_keV[-1] * 1.1)
     )
     Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
-    Euc_max = Euc_max[np.logical_and(Euc_max >= Euc_min, Euc_max <= max(E_uncal))][0]
+    Euc_max = Euc_max[
+        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal))
+    ][0]
     dEuc = 0.2 / roughpars[-2]
 
     if uncal_is_int:

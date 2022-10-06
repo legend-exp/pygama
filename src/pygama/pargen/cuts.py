@@ -42,20 +42,38 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
         counts, start_bins, var = pgh.get_hist(par_array, 10**5)
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
-        bin_range = 1000
+        try:
+            pars, cov = pgf.gauss_mode_width_max(
+                counts,
+                start_bins,
+                mode_guess=mu,
+                n_bins=10,
+                cost_func="Least Squares",
+                inflate_errors=False,
+                gof_method="var",
+            )
 
-        if max_idx < bin_range:
-            lower_bound_idx = 0
-        else:
-            lower_bound_idx = max_idx - bin_range
-        lower_bound = start_bins[lower_bound_idx]
+            guess_sig = pars[2]
 
-        if max_idx > len(start_bins) - bin_range:
-            upper_bound_idx = -1
-        else:
-            upper_bound_idx = max_idx + bin_range
+            lower_bound = mu - 10 * guess_sig
 
-        upper_bound = start_bins[upper_bound_idx]
+            upper_bound = mu + 10 * guess_sig
+
+        except:
+            bin_range = 1000
+
+            if max_idx < bin_range:
+                lower_bound_idx = 0
+            else:
+                lower_bound_idx = max_idx - bin_range
+            lower_bound = start_bins[lower_bound_idx]
+
+            if max_idx > len(start_bins) - bin_range:
+                upper_bound_idx = -1
+            else:
+                upper_bound_idx = max_idx + bin_range
+
+            upper_bound = start_bins[upper_bound_idx]
 
         try:
             counts, bins, var = pgh.get_hist(
@@ -153,7 +171,7 @@ def cut_dict_to_hit_dict(cut_dict):
     for param in cut_dict:
 
         out_dict[f"{param}_cut"] = {
-            "expression": f"@a<{param}<@b",
+            "expression": f"(a<{param})&({param}<b)",
             "parameters": {
                 "a": cut_dict[param]["Lower Boundary"],
                 "b": cut_dict[param]["Upper Boundary"],

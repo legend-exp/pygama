@@ -3,15 +3,15 @@ SOURCEDIR = source
 BUILDDIR = build
 
 all: apidoc
-	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going
+	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going -j$(shell nproc)
 
 apidoc: clean-apidoc
 	sphinx-apidoc --private --module-first --force \
-      --output-dir "$(SOURCEDIR)/generated" \
+      --output-dir "$(SOURCEDIR)/api" \
       ../src/pygama ../src/pygama/_version.py
 
 clean-apidoc:
-	rm -rf "$(SOURCEDIR)/generated"
+	rm -rf "$(SOURCEDIR)/api"
 
 clean: clean-apidoc
 	rm -rf "$(BUILDDIR)"
