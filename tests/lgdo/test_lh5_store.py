@@ -5,7 +5,7 @@ import pytest
 
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
-from pygama.lgdo.lh5_store import LH5Iterator, LH5Store
+from pygama.lgdo.lh5_store import LH5Store
 
 
 @pytest.fixture(scope="module")
@@ -217,26 +217,3 @@ def test_read_lgnd_waveform_table(lgnd_file):
     assert isinstance(lh5_obj, lgdo.Table)
     assert list(lh5_obj.keys()) == ["t0", "dt"]
     assert len(lh5_obj) == 10
-
-
-def test_lh5_iterator(lgnd_file):
-    lh5_it = LH5Iterator(
-        lgnd_file,
-        "/geds/raw",
-        entry_list=range(100),
-        field_mask=["baseline"],
-        buffer_len=5,
-    )
-
-    lh5_obj, n_rows = lh5_it.read(4)
-    assert n_rows == 5
-    assert isinstance(lh5_obj, lgdo.Table)
-    assert list(lh5_obj.keys()) == ["baseline"]
-    assert (
-        lh5_obj["baseline"].nda == np.array([14353, 14254, 14525, 11656, 13576])
-    ).all()
-
-    for lh5_obj, entry, n_rows in lh5_it:
-        assert len(lh5_obj) == 5
-        assert n_rows == 5
-        assert entry % 5 == 0
