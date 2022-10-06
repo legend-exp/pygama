@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 from pygama.vis import WaveformBrowser
 
 config_dir = Path(__file__).parent / "configs"

@@ -45,8 +45,28 @@ def test_lgnd_waveform_table_fancy_idx(lgnd_file):
     lh5_it = LH5Iterator(
         lgnd_file,
         "geds/raw/waveform",
-        entry_list=[7, 9, 25, 27, 33, 38, 46, 52, 57, 59, 67, 71, 72, 82, 90, 92, 93, 94, 97],
-        buffer_len=5
+        entry_list=[
+            7,
+            9,
+            25,
+            27,
+            33,
+            38,
+            46,
+            52,
+            57,
+            59,
+            67,
+            71,
+            72,
+            82,
+            90,
+            92,
+            93,
+            94,
+            97,
+        ],
+        buffer_len=5,
     )
 
     lh5_obj, n_rows = lh5_it.read(0)
