@@ -160,7 +160,9 @@ def test_read_array(lh5_file):
 
 def test_read_array_fancy_idx(lh5_file):
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/data/struct_full/array", lh5_file, idx=[0, 3, 4])
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct_full/array", lh5_file, idx=[0, 3, 4]
+    )
     assert isinstance(lh5_obj, lgdo.Array)
     assert (lh5_obj.nda == np.array([1, 4, 5])).all()
     assert n_rows == 3
@@ -226,7 +228,9 @@ def test_read_lgnd_array(lgnd_file):
 def test_read_lgnd_array_fancy_idx(lgnd_file):
     store = LH5Store()
 
-    lh5_obj, n_rows = store.read_object("/geds/raw/baseline", lgnd_file, idx=[2, 4, 6, 9, 11, 16, 68])
+    lh5_obj, n_rows = store.read_object(
+        "/geds/raw/baseline", lgnd_file, idx=[2, 4, 6, 9, 11, 16, 68]
+    )
     assert isinstance(lh5_obj, lgdo.Array)
     assert n_rows == 7
     assert len(lh5_obj) == 7
@@ -245,7 +249,9 @@ def test_read_lgnd_vov(lgnd_file):
 def test_read_lgnd_vov_fancy_idx(lgnd_file):
     store = LH5Store()
 
-    lh5_obj, n_rows = store.read_object("/geds/raw/tracelist", lgnd_file, idx=[2, 4, 6, 9, 11, 16, 68])
+    lh5_obj, n_rows = store.read_object(
+        "/geds/raw/tracelist", lgnd_file, idx=[2, 4, 6, 9, 11, 16, 68]
+    )
     assert isinstance(lh5_obj, lgdo.VectorOfVectors)
     assert n_rows == 7
     assert len(lh5_obj) == 7
