@@ -1121,9 +1121,13 @@ class LH5Iterator:
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
             lh5_files = [lh5_files]
+        elif not isinstance(lh5_files, list):
+            raise ValueError("lh5_files must be a string or list of strings")
+
         self.lh5_files = [
             f for f_wc in lh5_files for f in sorted(glob.glob(os.path.expandvars(f_wc)))
         ]
+
         # Map to last row in each file
         self.file_map = np.array(
             [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
