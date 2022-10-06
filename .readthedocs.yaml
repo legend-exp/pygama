@@ -3,8 +3,14 @@ version: 2
 sphinx:
   configuration: docs/source/conf.py
 
+formats:
+  - epub
+  - pdf
+
 build:
   os: "ubuntu-22.04"
+  apt_packages:
+    - pandoc
   tools:
     python: "3.10"
   jobs:
