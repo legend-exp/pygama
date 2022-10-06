@@ -282,3 +282,15 @@ def test_read_lgnd_waveform_table(lgnd_file):
     assert isinstance(lh5_obj, lgdo.Table)
     assert list(lh5_obj.keys()) == ["t0", "dt"]
     assert len(lh5_obj) == 10
+
+
+def test_read_lgnd_waveform_table_fancy_idx(lgnd_file):
+    store = LH5Store()
+
+    lh5_obj, n_rows = store.read_object(
+        "/geds/raw/waveform",
+        lgnd_file,
+        idx=[7, 9, 25, 27, 33, 38, 46, 52, 57, 59, 67, 71, 72, 82, 90, 92, 93, 94, 97],
+    )
+    assert isinstance(lh5_obj, lgdo.WaveformTable)
+    assert len(lh5_obj) == 19
