@@ -9,8 +9,10 @@ import sys
 import numpy as np
 
 import pygama
+import pygama.logging
 from pygama.dsp import build_dsp
 from pygama.hit import build_hit
+from pygama.lgdo import show
 from pygama.raw import build_raw
 
 
@@ -43,9 +45,16 @@ def pygama_cli():
         action="store_true",
         help="""Increase the program verbosity""",
     )
+    parser.add_argument(
+        "--debug",
+        "-d",
+        action="store_true",
+        help="""Increase the program verbosity to maximum""",
+    )
 
     subparsers = parser.add_subparsers()
 
+    add_lh5ls_parser(subparsers)
     add_build_raw_parser(subparsers)
     add_build_dsp_parser(subparsers)
     add_build_hit_parser(subparsers)
@@ -57,22 +66,39 @@ def pygama_cli():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(
-            level=logging.DEBUG, format="%(name)s [%(levelname)s] %(message)s"
-        )
-        logging.getLogger("numba").setLevel(logging.INFO)
-        logging.getLogger("parse").setLevel(logging.INFO)
-        logging.getLogger("h5py").setLevel(logging.INFO)
+        pygama.logging.setup(logging.DEBUG)
+    elif args.debug:
+        pygama.logging.setup(logging.DEBUG, logging.root)
     else:
-        logging.basicConfig(
-            level=logging.INFO, format="%(name)s [%(levelname)s] %(message)s"
-        )
+        pygama.logging.setup()
 
     if args.version:
         print(pygama.__version__)  # noqa: T201
         sys.exit()
 
     args.func(args)
+
+
+def add_lh5ls_parser(subparsers):
+    """Configure :func:`.lgdo.lh5_store.show` command line interface."""
+
+    parser_lh5ls = subparsers.add_parser(
+        "lh5ls", description="""Inspect LEGEND HDF5 (LH5) file contents"""
+    )
+    parser_lh5ls.add_argument(
+        "lh5_file",
+        help="""Input LH5 file.""",
+    )
+    parser_lh5ls.add_argument(
+        "lh5_group", nargs="?", help="""LH5 group.""", default="/"
+    )
+    parser_lh5ls.set_defaults(func=lh5_show_cli)
+
+
+def lh5_show_cli(args):
+    """Passes command line arguments to :func:`.lgdo.lh5_store.show`."""
+
+    show(args.lh5_file, args.lh5_group)
 
 
 def add_build_raw_parser(subparsers):

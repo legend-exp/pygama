@@ -891,8 +891,9 @@ class LH5Store:
 
 
 def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
-    """Return a list of LH5 groups in the input file and group, similar
-    to ``ls`` or ``h5ls``. Supports wildcards in group names.
+    """Return a list of LH5 groups in the input `lh5_file` and `lh5_group`.
+
+    Similar to ``ls`` or ``h5ls``. Supports wildcards in group names.
 
     Parameters
     ----------
@@ -923,6 +924,92 @@ def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
         for key in matchingkeys:
             ret.extend([f"{key}/{path}" for path in ls(lh5_file[key], splitpath[1])])
         return ret
+
+
+def show(
+    lh5_file: str | h5py.Group,
+    lh5_group: str = "/",
+    indent: str = "",
+    header: bool = True,
+) -> None:
+    """Print a tree of LH5 file contents with LGDO datatype.
+
+    Parameters
+    ----------
+    lh5_file
+        the LH5 file.
+    lh5_group
+        print only contents of this HDF5 group.
+    indent
+        indent the diagram with this string.
+    header
+        print `lh5_group` at the top of the diagram.
+
+    Examples
+    --------
+    >>> from pygama.lgdo import show
+    >>> show("file.lh5", "/geds/raw")
+    /geds/raw
+    ├── channel · array<1>{real}
+    ├── energy · array<1>{real}
+    ├── timestamp · array<1>{real}
+    ├── waveform · table{t0,dt,values}
+    │   ├── dt · array<1>{real}
+    │   ├── t0 · array<1>{real}
+    │   └── values · array_of_equalsized_arrays<1,1>{real}
+    └── wf_std · array<1>{real}
+    """
+    # open file
+    if isinstance(lh5_file, str):
+        lh5_file = h5py.File(lh5_file, "r")
+
+    # go to group
+    if lh5_group != "/":
+        lh5_file = lh5_file[lh5_group]
+
+    if header:
+        print(f"\033[1m{lh5_group}\033[0m")  # noqa: T201
+
+    # get an iterator over the keys in the group
+    it = iter(lh5_file)
+    key = None
+
+    # make sure there is actually something in this file/group
+    try:
+        key = next(it)  # get first key
+    except StopIteration:
+        print(f"{indent}└──  empty")  # noqa: T201
+        return
+
+    # loop over keys
+    while True:
+        val = lh5_file[key]
+        # we want to print the LGDO datatype
+        attr = val.attrs.get("datatype", default="no datatype")
+        if attr == "no datatype" and isinstance(val, h5py.Group):
+            attr = "HDF5 group"
+
+        # is this the last key?
+        killme = False
+        try:
+            k_new = next(it)  # get next key
+        except StopIteration:
+            char = "└──"
+            killme = True  # we'll have to kill this loop later
+        else:
+            char = "├──"
+
+        print(f"{indent}{char} \033[1m{key}\033[0m · {attr}")  # noqa: T201
+
+        # if it's a group, call this function recursively
+        if isinstance(val, h5py.Group):
+            show(val, indent=indent + ("    " if killme else "│   "), header=False)
+
+        # break or move to next key
+        if killme:
+            break
+        else:
+            key = k_new
 
 
 def load_nda(
@@ -1078,9 +1165,13 @@ class LH5Iterator:
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
             lh5_files = [lh5_files]
+        elif not isinstance(lh5_files, list):
+            raise ValueError("lh5_files must be a string or list of strings")
+
         self.lh5_files = [
             f for f_wc in lh5_files for f in sorted(glob.glob(os.path.expandvars(f_wc)))
         ]
+
         # Map to last row in each file
         self.file_map = np.array(
             [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
@@ -1096,7 +1187,7 @@ class LH5Iterator:
                 field_mask=field_mask,
             )
         else:
-            None
+            raise RuntimeError(f"can't open any files from {lh5_files}")
 
         self.n_rows = 0
         self.current_entry = 0
