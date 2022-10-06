@@ -849,7 +849,6 @@ class LH5Store:
         raise RuntimeError(f"don't know how to read datatype '{datatype}'")
 
 
-
 def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
     """Return a list of LH5 groups in the input file and group, similar
     to ``ls`` or ``h5ls``. Supports wildcards in group names.
