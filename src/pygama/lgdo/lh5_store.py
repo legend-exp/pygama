@@ -1139,7 +1139,7 @@ class LH5Iterator:
                 field_mask=field_mask,
             )
         else:
-            None
+            raise RuntimeError(f"can't open any files from {lh5_files}")
 
         self.n_rows = 0
         self.current_entry = 0
