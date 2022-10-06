@@ -186,8 +186,6 @@ def test_read_vov_fancy_idx(lh5_file):
     lh5_obj, n_rows = store.read_object("/data/struct_full/vov", lh5_file, idx=[0, 2])
     assert isinstance(lh5_obj, lgdo.VectorOfVectors)
 
-    print(lh5_obj)
-
     desired = [np.array([1, 2]), np.array([2])]
 
     for i in range(len(desired)):
