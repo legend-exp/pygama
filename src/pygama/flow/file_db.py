@@ -69,7 +69,7 @@ class FileDB:
     .. code-block:: json
 
         {
-            "data_dir": "/home/gipert/kindergarten/pygama/prod-ref-l200/generated/tier",
+            "data_dir": "prod-ref-l200/generated/tier",
             "tier_dirs": {
                 "raw": "/raw",
                 "dsp": "/dsp",
@@ -90,6 +90,20 @@ class FileDB:
                 "hit": "{ch}/hit",
                 "evt": "{grp}/evt",
                 "tcm": "hardware_tcm"
+            },
+            "tables": {
+                "raw": [0, 1, 2, 4, 5, 6, 7],
+                "dsp": [0, 1, 2, 4, 5, 6, 7],
+                "hit": [0, 1, 2, 4, 5, 6, 7],
+                "tcm": [""],
+                "evt": [""]
+            },
+            "columns": {
+                "raw": ["baseline", "waveform", "daqenergy"],
+                "dsp": ["trapEftp", "AoE", "trapEmax"],
+                "hit": ["trapEftp_cal", "trapEmax_cal"],
+                "tcm": ["cumulative_length", "array_id", "array_idx"],
+                "evt": ["lar_veto", "muon_veto", "ge_mult"]
             }
         }
 
@@ -312,11 +326,11 @@ class FileDB:
         if self.columns is not None:
             if not override:
                 log.warning(
-                    "Tables/columns already set, if you want to perform the scan anyway, set override=True"
+                    "LH5 tables/columns names already set, if you want to perform the scan anyway, set override=True"
                 )
                 return
             else:
-                log.info("Overwriting existing tables/columns")
+                log.warning("Overwriting existing LH5 tables/columns names")
 
         def update_tables_cols(row, tier: str) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]

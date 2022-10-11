@@ -811,7 +811,8 @@ class DataLoader:
         entry_list
             the output of :meth:`.build_entry_list`.
         in_memory
-            if ``True``, returns the loaded data in memory and stores in self.data
+            if ``True``, returns the loaded data in memory and stores in
+            `self.data`.
         output_file
             if not ``None``, writes the loaded data to the specified file.
         orientation
@@ -823,8 +824,9 @@ class DataLoader:
         Returns
         -------
         data
-            The data loaded from disk, as specified by `self.output_format`, `self.output_columns`, and `self.merge_files`
-            Only returned if in_memory is True.
+            The data loaded from disk, as specified by `self.output_format`,
+            `self.output_columns`, and `self.merge_files`. Only returned if
+            `in_memory` is ``True``.
         """
         # set save_output_columns=True to avoid wasting time
         if entry_list is None:
@@ -1238,10 +1240,12 @@ class DataLoader:
         Returns
         -------
         col_tiers
-            col_tiers[file]["tables"][tier] gives a list of tables in `tier` that contain a column of interest
-            col_tiers[file]["columns"][column] gives the tier that `column` can be found in
-            if self.merge_files then
-            col_tiers[tier] is a list of tables in `tier` that contain a column of interest
+            ``col_tiers[file]["tables"][tier]`` gives a list of tables in
+            ``tier`` that contain a column of interest.
+            ``col_tiers[file]["columns"][column]`` gives the tier that
+            ``column`` can be found in. If `self.merge_file`s then `
+            col_tiers[tier]`` is a list of tables in ``tier`` that contain a
+            column of interest.
         """
 
         col_tiers = {}
@@ -1318,7 +1322,7 @@ class DataLoader:
 
         Returns
         -------
-        table_name:
+        table_name
             the name of the table in `tier` with table identifier `tb`
         """
         template = self.filedb.table_format[tier]
