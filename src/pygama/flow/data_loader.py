@@ -517,6 +517,9 @@ class DataLoader:
                 f_entries["file"] = file
             # At this point, should have a list of all available hits/evts joined by tcm
 
+            if mode == "any":
+                drop_idx = None
+
             # Perform cuts specified for child or parent level, in that order
             for level in [child, parent]:
                 if self.cuts is None or level not in self.cuts.keys():
@@ -571,22 +574,28 @@ class DataLoader:
                         drop_idx = set.symmetric_difference(
                             set(tcm_idx), list(keep_idx)
                         )
+                        f_entries.drop(drop_idx, inplace=True)
                     elif mode == "any":
                         evts = idx_match[f"{child}_idx"].unique()
                         keep_idx = f_entries.query(f"{child}_idx in {evts}").index
-                        drop_idx = set.symmetric_difference(
+                        drop = set.symmetric_difference(
                             set(f_entries.index), list(keep_idx)
                         )
+                        if drop_idx is None:
+                            drop_idx = drop
+                        else:
+                            drop_idx = set.intersection(drop_idx, drop)
                     else:
                         raise ValueError("mode must be either 'any' or 'only'")
 
-                    f_entries.drop(drop_idx, inplace=True)
                     if save_output_columns:
                         for col in tb_df.columns:
                             if col in for_output:
                                 f_entries.loc[keep_idx, col] = tb_df[col].tolist()
                     # end for each table loop
                 # end for each level loop
+            if mode == "any":
+                f_entries.drop(drop_idx, inplace=True)
             f_entries.reset_index(inplace=True, drop=True)
             if in_memory:
                 entries[file] = f_entries
@@ -750,6 +759,8 @@ class DataLoader:
                             else:
                                 tb_table.join(tier_tb)
 
+                    if tb_table is None:
+                        continue
                     # convert to DataFrame and apply cuts
                     tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)

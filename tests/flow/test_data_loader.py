@@ -63,6 +63,15 @@ def test_outputs(test_dl):
     ]
 
 
+def test_any_mode(test_dl):
+    test_dl.filedb.scan_tables_columns()
+    test_dl.set_files("all")
+    test_dl.set_cuts({"hit": "daqenergy == 634"})
+    el = test_dl.build_entry_list(tcm_level="tcm", mode="any")
+
+    assert len(el) == 42
+
+
 def test_set_files(test_dl):
     test_dl.set_files("timestamp == '20220716T104550Z'")
     test_dl.set_output(columns=["timestamp"], merge_files=False)
