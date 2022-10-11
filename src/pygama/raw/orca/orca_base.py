@@ -22,18 +22,36 @@ class OrcaDecoder(DataDecoder):
         self.header = header
 
 
-# define a standard hash for crate, card, channel <--> integer
 def get_ccc(crate: int, card: int, channel: int) -> int:
+    """Define a standard hash for (crate, card, channel) to integer."""
     return (crate << 9) + ((card & 0x1F) << 4) + (channel & 0xF)
 
 
 def get_crate(ccc: int) -> int:
+    """Get crate number back from hash value.
+
+    See Also
+    --------
+    .get_ccc
+    """
     return ccc >> 9
 
 
 def get_card(ccc: int) -> int:
+    """Get card number back from hash value.
+
+    See Also
+    --------
+    .get_ccc
+    """
     return (ccc >> 4) & 0x1F
 
 
 def get_channel(ccc: int) -> int:
+    """Get channel number back from hash value.
+
+    See Also
+    --------
+    .get_ccc
+    """
     return ccc & 0xF
