@@ -149,12 +149,14 @@ class WaveformBrowser:
         self.next_entry = 0
 
         # data i/o initialization
+        # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
+        # remove this hack once VOV support is properly implemented
         self.lh5_it = lh5.LH5Iterator(
             files_in,
             lh5_group,
             base_path=base_path,
             entry_list=entry_list,
-            entry_mask=entry_mask,
+            field_mask={"tracelist": False},
             buffer_len=buffer_len,
         )
 
