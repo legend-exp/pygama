@@ -289,7 +289,7 @@ class LH5Store:
             elif isinstance(field_mask, dict):
                 default = True
                 if len(field_mask) > 0:
-                    default = not field_mask[field_mask.keys[0]]
+                    default = not field_mask[list(field_mask.keys())[0]]
                 field_mask = defaultdict(lambda: default, field_mask)
             elif isinstance(field_mask, (list, tuple)):
                 field_mask = defaultdict(

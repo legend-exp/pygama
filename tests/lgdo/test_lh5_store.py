@@ -211,6 +211,22 @@ def test_read_table(lh5_file):
     assert n_rows == 6
 
 
+def test_read_with_field_mask(lh5_file):
+    store = LH5Store()
+
+    lh5_obj, n_rows = store.read_object("/data/struct_full", lh5_file, field_mask=["array"])
+    assert list(lh5_obj.keys()) == ["array"]
+
+    lh5_obj, n_rows = store.read_object("/data/struct_full", lh5_file, field_mask=("array", "table"))
+    assert list(lh5_obj.keys()) == ["array", "table"]
+
+    lh5_obj, n_rows = store.read_object("/data/struct_full", lh5_file, field_mask={"array": True})
+    assert list(lh5_obj.keys()) == ["array"]
+
+    lh5_obj, n_rows = store.read_object("/data/struct_full", lh5_file, field_mask={"vov": False})
+    assert list(lh5_obj.keys()) == ["scalar", "array", "aoesa", "table"]
+
+
 def test_read_lgnd_array(lgnd_file):
     store = LH5Store()
 
