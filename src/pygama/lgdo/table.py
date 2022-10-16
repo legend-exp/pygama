@@ -208,10 +208,15 @@ class Table(Struct):
         if cols is None:
             cols = self.keys()
         for col in cols:
-            if not hasattr(self[col], "nda"):
+            if isinstance(self[col], VectorOfVectors):
+                column = self[col].to_aoesa()
+            else:
+                column = self[col]
+
+            if not hasattr(column, "nda"):
                 raise ValueError(f"column {col} does not have an nda")
             else:
-                df[col] = self[col].nda
+                df[col] = column.nda.tolist()
 
         return df
 

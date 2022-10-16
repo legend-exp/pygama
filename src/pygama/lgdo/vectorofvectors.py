@@ -11,6 +11,7 @@ import numpy as np
 from numba import njit
 
 from pygama.lgdo.array import Array
+from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
@@ -206,6 +207,16 @@ class VectorOfVectors:
         )
         np.set_printoptions(**npopt)
         return out
+
+    def to_aoesa(self) -> ArrayOfEqualSizedArrays:
+        """Convert to ArrayOfEqualSizedArrays, padding with NaNs"""
+        ind_lengths = np.diff(self.cumulative_length.nda, prepend=0)
+        arr_len = np.max(ind_lengths)
+        nda = np.empty((len(self.cumulative_length), arr_len))
+        nda.fill(np.nan)
+        for i in range(len(self.cumulative_length)):
+            nda[i, : ind_lengths[i]] = self[i]
+        return ArrayOfEqualSizedArrays(nda=nda)
 
 
 def build_cl(

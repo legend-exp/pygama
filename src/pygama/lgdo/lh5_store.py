@@ -258,7 +258,10 @@ class LH5Store:
             return obj_buf, n_rows_read
 
         # start read from single file. fail if the object is not found
-        log.debug(f"reading '{name}' from {lh5_file}")
+        log.debug(
+            f"reading '{name}' from {lh5_file}"
+            + (f" with field mask {field_mask}" if field_mask else "")
+        )
 
         # get the file from the store
         h5f = self.gimme_file(lh5_file, "r")
@@ -890,10 +893,10 @@ class LH5Store:
         raise RuntimeError(f"don't know how to read datatype '{datatype}'")
 
 
-def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
-    """Return a list of LH5 groups in the input `lh5_file` and `lh5_group`.
+def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
+    """Return a list of LH5 groups in the input file and group, similar
+    to ``ls`` or ``h5ls``. Supports wildcards in group names.
 
-    Similar to ``ls`` or ``h5ls``. Supports wildcards in group names.
 
     Parameters
     ----------
@@ -903,6 +906,11 @@ def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
         group to search. add a ``/`` to the end of the group name if you want to
         list all objects inside that group.
     """
+
+    log.debug(
+        f"Listing objects in '{lh5_file}'"
+        + ("" if lh5_group == "" else f" (and group {lh5_group})")
+    )
 
     lh5_st = LH5Store()
     # To use recursively, make lh5_file a h5group instead of a string
