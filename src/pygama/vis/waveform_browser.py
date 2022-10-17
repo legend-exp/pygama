@@ -514,7 +514,6 @@ class WaveformBrowser:
 
         # Draw legend
         self.ax.set_xlabel(self.x_unit)
-        self.ax.xaxis.set_label_coords(0.98, -0.05)
         if self.x_lim:
             self.ax.set_xlim(*self.x_lim)
         if len(leg_labels) > 0:
