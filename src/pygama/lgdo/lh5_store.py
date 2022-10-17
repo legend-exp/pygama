@@ -385,7 +385,8 @@ class LH5Store:
                     obj_buf.resize(obj_buf_start + n_rows_read)
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
-            n_rows_read = rows_read[0]
+            if len(rows_read) == 0:
+                n_rows_read = rows_read[0]
             for n in rows_read[1:]:
                 if n != n_rows_read:
                     log.warning(
