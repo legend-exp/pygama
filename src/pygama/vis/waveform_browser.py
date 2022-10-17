@@ -227,7 +227,7 @@ class WaveformBrowser:
             base_path=base_path,
             entry_list=entry_list,
             entry_mask=entry_mask,
-            field_mask = outputs,
+            field_mask=outputs,
             buffer_len=buffer_len,
         )
 
