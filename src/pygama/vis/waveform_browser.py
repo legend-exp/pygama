@@ -147,7 +147,30 @@ class WaveformBrowser:
         self.align_par = align
         self.n_drawn = n_drawn
         self.next_entry = 0
+
+        # data i/o initialization
+        # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
+        # remove this hack once VOV support is properly implemented
+        self.lh5_it = lh5.LH5Iterator(
+            files_in,
+            lh5_group,
+            base_path=base_path,
+            entry_list=entry_list,
+            field_mask={"tracelist": False},
+            buffer_len=buffer_len,
+        )
+
+        # Get the input buffer and read the first chunk
+        self.lh5_in, _ = self.lh5_it.read(0)
+
         self.aux_vals = aux_values
+        # Apply entry selection to aux_vals if needed
+        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it):
+            entries = []
+            for i, f_entries in enumerate(self.lh5_it.entry_list):
+                entry_offset = self.lh5_it.file_map[i - 1] if i > 0 else 0
+                entries += [entry_offset + entry for entry in f_entries]
+            self.aux_vals = self.aux_vals.iloc[entries].reset_index()
 
         # initialize objects to draw: dict from name to list of 2DLines
         if isinstance(lines, str):
@@ -220,20 +243,6 @@ class WaveformBrowser:
         if self.aux_vals is not None:
             outputs = [o for o in outputs if o not in self.aux_vals]
 
-        # data i/o initialization
-        self.lh5_it = lh5.LH5Iterator(
-            files_in,
-            lh5_group,
-            base_path=base_path,
-            entry_list=entry_list,
-            entry_mask=entry_mask,
-            field_mask=outputs,
-            buffer_len=buffer_len,
-        )
-
-        # Get the input buffer and read the first chunk
-        self.lh5_in, _ = self.lh5_it.read(0)
-
         self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(
             self.lh5_in,
             dsp_config,
@@ -242,13 +251,6 @@ class WaveformBrowser:
             block_width=block_width,
         )
         self.proc_chain.execute()
-
-        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it):
-            entries = []
-            for i, f_entries in enumerate(self.lh5_it.entry_list):
-                entry_offset = self.lh5_it.file_map[i - 1] if i > 0 else 0
-                entries += [entry_offset + entry for entry in f_entries]
-            self.aux_vals = self.aux_vals.iloc[entries].reset_index()
 
         # Check if all of our outputs can be found
         for name in outputs:
