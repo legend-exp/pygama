@@ -387,6 +387,10 @@ class LH5Store:
             # warn if all columns don't read in the same number of rows
             if len(rows_read) > 0:
                 n_rows_read = rows_read[0]
+            else:
+                n_rows_read = 0
+                log.warning(f"Table '{name}' has no subgroups accepted by field mask")
+
             for n in rows_read[1:]:
                 if n != n_rows_read:
                     log.warning(
