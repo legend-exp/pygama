@@ -10,3 +10,4 @@ Tutorials are currently available as `Jupyter notebooks on GitHub
 
    notebooks/LH5Files
    notebooks/WaveformBrowser
+   notebooks/DataProcessing
