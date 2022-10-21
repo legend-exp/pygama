@@ -38,32 +38,6 @@ html_theme_options = {
 }
 html_title = f"{project} {version}"
 
-# list here pygama dependencies that are not required for building docs and
-# could be unmet at build time
-autodoc_mock_imports = [
-    "pygama._version",
-    "pandas",
-    # 'numpy',
-    "matplotlib",
-    "mplhep",
-    "scipy",
-    "sklearn",
-    "numba",
-    "pytest",
-    "pyhf",
-    "awkward",
-    "iminuit",
-    "boost-histogram",
-    "hepunits",
-    "hepstats",
-    "uproot",
-    "h5py",
-    "pint",
-    "pyfftw",
-    "tqdm",
-    "tinydb",
-    "parse",
-]
 autodoc_default_options = {"ignore-module-all": True}
 
 # sphinx-napoleon
