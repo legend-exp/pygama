@@ -156,6 +156,7 @@ class WaveformBrowser:
             lh5_group,
             base_path=base_path,
             entry_list=entry_list,
+            entry_mask=entry_mask,
             field_mask={"tracelist": False},
             buffer_len=buffer_len,
         )

@@ -1181,6 +1181,11 @@ class LH5Iterator:
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
 
+        if entry_list is not None and entry_mask is not None:
+            raise ValueError(
+                "entry_list and entry_mask arguments are mutually exclusive"
+            )
+
         self.lh5_files = [
             f for f_wc in lh5_files for f in sorted(glob.glob(os.path.expandvars(f_wc)))
         ]
