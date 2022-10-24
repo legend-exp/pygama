@@ -355,7 +355,7 @@ class WaveformBrowser:
             return
 
         if entry > len(self.lh5_it):
-            if safe:
+            if not safe:
                 raise IndexError
             else:
                 return
