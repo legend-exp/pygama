@@ -17,6 +17,7 @@ from tqdm import tqdm
 import pygama
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
+from pygama.lgdo.lgdo_utils import expand_path
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processing_chain import build_processing_chain
 
@@ -100,13 +101,6 @@ def build_dsp(
                 log.debug(f"table {tb} not found")
         return
 
-    if isinstance(dsp_config, str):
-        with open(dsp_config) as config_file:
-            dsp_config = json.load(config_file)
-
-    if not isinstance(dsp_config, dict):
-        raise ValueError("dsp_config must be a dict")
-
     raw_store = lh5.LH5Store()
     lh5_file = raw_store.gimme_file(f_raw, "r")
     if lh5_file is None:
@@ -134,19 +128,13 @@ def build_dsp(
     if len(lh5_tables) == 0:
         raise RuntimeError(f"could not find any valid LH5 table in {f_raw}")
 
-    # load DSP config (default: one config file for all tables)
-    if isinstance(dsp_config, str):
-        with open(dsp_config) as config_file:
-            dsp_config = json.load(config_file)
-
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
-        with open(database) as db_file:
+        with open(expand_path(database)) as db_file:
             database = json.load(db_file)
 
     if database and not isinstance(database, dict):
-        database = None
         raise ValueError("input database is not a valid JSON file or dict")
 
     if write_mode is None and os.path.isfile(f_dsp):
