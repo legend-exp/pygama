@@ -98,7 +98,7 @@ def test_fixed_time_pickoff():
 
         a_out = np.empty(len_wf)
         fixed_time_pickoff.__wrapped__(w_in, 3.25, ord(char), a_out)
-        assert a_out[0] == sol
+        assert np.isclose(a_out[0], sol)
 
     # last few corner cases of 'h'
     w_in = np.sin(np.arange(len_wf))
@@ -113,4 +113,4 @@ def test_fixed_time_pickoff():
 
         a_out = np.empty(len_wf)
         fixed_time_pickoff.__wrapped__(w_in, ftp, ord("h"), a_out)
-        assert a_out[0] == sol
+        assert np.isclose(a_out[0], sol)
