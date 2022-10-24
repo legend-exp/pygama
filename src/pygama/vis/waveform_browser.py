@@ -182,6 +182,7 @@ class WaveformBrowser:
             self.lines = {line: [] for line in lines}
 
         # styles
+        default_style = cycler(plt.rcParams['axes.prop_cycle'])
         if isinstance(styles, (list, tuple)):
             self.styles = [None for _ in self.lines]
             for i, sty in enumerate(styles):
@@ -191,7 +192,7 @@ class WaveformBrowser:
                     except KeyError:
                         self.styles[i] = itertools.repeat(None)
                 elif sty is None:
-                    self.styles[i] = itertools.repeat(None)
+                    self.styles[i] = default_style
                 else:
                     self.styles[i] = cycler(**sty)
         else:
@@ -201,7 +202,7 @@ class WaveformBrowser:
                 except KeyError:
                     self.styles = itertools.repeat(None)
             elif styles is None:
-                self.styles = itertools.repeat(None)
+                self.styles = default_style
             else:
                 self.styles = cycler(**styles)
 
@@ -485,11 +486,12 @@ class WaveformBrowser:
             styles = self.styles
 
         # draw lines
+        default_style = cycler(plt.rcParams['axes.prop_cycle'])
         for i, lines in enumerate(self.lines.values()):
             if isinstance(self.styles, list):
                 styles = self.styles[i]
             if styles is None:
-                styles = cycler(plt.rcparams)
+                styles = default_style
 
             for line, sty in zip(lines, styles):
                 if sty is not None:
