@@ -109,9 +109,9 @@ def expand_path(path: str, list: bool=False) -> str | list:
     paths = glob.glob(os.path.expanduser(os.path.expandvars((path))))
     if not list:
         if len(paths) == 0:
-            raise RuntimeError(f"could not find path matching {path}")
+            raise FileNotFoundError(f"could not find path matching {path}")
         elif len(paths) >1:
-            raise RuntimeError(f"found multiple paths matching {path}")
+            raise FileNotFoundError(f"found multiple paths matching {path}")
         else:
             return paths[0]
     else:

@@ -73,7 +73,8 @@ class LH5Store:
         """
         if isinstance(lh5_file, h5py.File):
             return lh5_file
-        lh5_file = expand_path(lh5_file)
+        if mode == "r":
+            lh5_file = expand_path(lh5_file)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
