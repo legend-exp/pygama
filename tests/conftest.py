@@ -107,7 +107,8 @@ def compare_numba_vs_python():
                 output_dict[key] = output_dict[key][0]
         outputs_python = [output_dict[key] for key in output_names]
 
-        # assert that numba and purepython should be the same (maybe use np.isclose)
+        # assert that numba and python are the same up to floating point
+        # precision, setting nans to be equal
         assert np.allclose(outputs_numba, outputs_python, equal_nan=True)
 
         # return value for comparison with expected solution
