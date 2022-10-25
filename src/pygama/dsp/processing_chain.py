@@ -1244,7 +1244,7 @@ class UnitConversionManager(ProcessorManager):
 
     @vectorize(nopython=True, cache=True)
     def convert(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
-        return (buf_in - offset_in) * period_ratio + offset_out
+        return (buf_in + offset_in) * period_ratio - offset_out
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
         # reference back to our processing chain
