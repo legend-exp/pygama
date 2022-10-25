@@ -1,6 +1,7 @@
+import inspect
+
 import numpy as np
 import pytest
-import inspect
 
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import fixed_time_pickoff
@@ -69,7 +70,9 @@ def test_fixed_time_pickoff(compare_numba_vs_python):
     ]
 
     for char, sol in zip(chars, sols):
-        assert np.isclose(compare_numba_vs_python(fixed_time_pickoff, w_in, 3.25, ord(char)), sol)
+        assert np.isclose(
+            compare_numba_vs_python(fixed_time_pickoff, w_in, 3.25, ord(char)), sol
+        )
 
     # last few corner cases of 'h'
     w_in = np.sin(np.arange(len_wf))
@@ -80,4 +83,6 @@ def test_fixed_time_pickoff(compare_numba_vs_python):
     ]
 
     for ftp, sol in zip(ftps, sols):
-        assert np.isclose(compare_numba_vs_python(fixed_time_pickoff, w_in, ftp, ord("h")), sol)
+        assert np.isclose(
+            compare_numba_vs_python(fixed_time_pickoff, w_in, ftp, ord("h")), sol
+        )

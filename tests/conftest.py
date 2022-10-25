@@ -1,9 +1,9 @@
-import os
-from pathlib import Path
-import re
 import inspect
-import numpy as np
+import os
+import re
+from pathlib import Path
 
+import numpy as np
 import pytest
 from legend_testdata import LegendTestData
 
@@ -87,23 +87,21 @@ def compare_numba_vs_python():
     def numba_vs_python(func, *inputs):
         # get outputs
         all_params = list(inspect.signature(func).parameters)
-        output_sizes = re.findall(r'(\(n*\))', func.signature.split('->')[-1])
+        output_sizes = re.findall(r"(\(n*\))", func.signature.split("->")[-1])
         noutputs = len(output_sizes)
         output_names = all_params[-noutputs:]
 
         # numba outputs
         outputs_numba = func(*inputs)
-        if noutputs==1:
+        if noutputs == 1:
             outputs_numba = [outputs_numba]
 
         # unwrapped python outputs
         func_unwrapped = inspect.unwrap(func)
-        output_dict = {
-            key: np.empty(len(inputs[0])) for key in output_names
-        }
+        output_dict = {key: np.empty(len(inputs[0])) for key in output_names}
         func_unwrapped(*inputs, **output_dict)
         for spec, key in zip(output_sizes, output_dict):
-            if spec == '()':
+            if spec == "()":
                 output_dict[key] = output_dict[key][0]
         outputs_python = [output_dict[key] for key in output_names]
 
