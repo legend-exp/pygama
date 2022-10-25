@@ -182,7 +182,7 @@ class WaveformBrowser:
             self.lines = {line: [] for line in lines}
 
         # styles
-        default_style = cycler(plt.rcParams['axes.prop_cycle'])
+        default_style = cycler(plt.rcParams["axes.prop_cycle"])
         if isinstance(styles, (list, tuple)):
             self.styles = [None for _ in self.lines]
             for i, sty in enumerate(styles):
@@ -422,7 +422,7 @@ class WaveformBrowser:
                     self._update_auto_limit(val, None)
                 else:
                     # Horizontal line
-                    lines.append(Line2D([-lim, lim], np.tile(val/norm, 2)))
+                    lines.append(Line2D([-lim, lim], np.tile(val / norm, 2)))
                     self._update_auto_limit(None, val)
 
             elif data is None:
@@ -486,7 +486,7 @@ class WaveformBrowser:
             styles = self.styles
 
         # draw lines
-        default_style = cycler(plt.rcParams['axes.prop_cycle'])
+        default_style = cycler(plt.rcParams["axes.prop_cycle"])
         for i, lines in enumerate(self.lines.values()):
             if isinstance(self.styles, list):
                 styles = self.styles[i]
@@ -532,7 +532,7 @@ class WaveformBrowser:
     def _update_auto_limit(self, x: np.ndarray, y: np.ndarray) -> None:
         # Helper to update the automatic limits
         where = True
-        
+
         if x is not None:
             where &= np.isfinite(x)
             if self.x_lim is not None:
@@ -546,13 +546,13 @@ class WaveformBrowser:
         if x is not None:
             self.auto_x_lim = [
                 np.amin(x, where=where, initial=self.auto_x_lim[0]),
-                np.amax(x, where=where, initial=self.auto_x_lim[1])
+                np.amax(x, where=where, initial=self.auto_x_lim[1]),
             ]
 
         if y is not None:
             self.auto_y_lim = [
                 np.amin(y, where=where, initial=self.auto_y_lim[0]),
-                np.amax(y, where=where, initial=self.auto_y_lim[1])
+                np.amax(y, where=where, initial=self.auto_y_lim[1]),
             ]
 
     def draw_entry(

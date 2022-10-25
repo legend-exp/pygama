@@ -19,8 +19,8 @@ import numpy as np
 from numba import vectorize
 
 import pygama.lgdo as lgdo
-from pygama.lgdo.lgdo_utils import expand_path
 from pygama.dsp.errors import DSPFatal, ProcessingChainError
+from pygama.lgdo.lgdo_utils import expand_path
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 

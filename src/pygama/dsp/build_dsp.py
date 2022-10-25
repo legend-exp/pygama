@@ -17,9 +17,9 @@ from tqdm import tqdm
 import pygama
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
-from pygama.lgdo.lgdo_utils import expand_path
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processing_chain import build_processing_chain
+from pygama.lgdo.lgdo_utils import expand_path
 
 log = logging.getLogger(__name__)
 

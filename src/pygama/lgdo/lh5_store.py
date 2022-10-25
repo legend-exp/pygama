@@ -21,7 +21,7 @@ import pandas as pd
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import parse_datatype, expand_path
+from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
@@ -1188,9 +1188,7 @@ class LH5Iterator:
                 "entry_list and entry_mask arguments are mutually exclusive"
             )
 
-        self.lh5_files = [
-            f for f_wc in lh5_files for f in expand_path(f_wc, True)
-        ]
+        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
 
         # Map to last row in each file
         self.file_map = np.array(
