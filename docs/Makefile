@@ -3,7 +3,7 @@ SOURCEDIR = source
 BUILDDIR = build
 
 all: apidoc
-	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going -j$(shell nproc)
+	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going
 
 apidoc: clean-apidoc
 	sphinx-apidoc --private --module-first --force \

@@ -4,7 +4,6 @@ import glob
 import json
 import logging
 import os
-import sys
 import time
 
 import numpy as np
@@ -148,19 +147,16 @@ def build_raw(
     log.info(f"buffer size: {buffer_size}")
     if n_max < np.inf:
         log.info(f"maximum number of events: {n_max}")
-    if log.level <= logging.INFO:
+    if log.getEffectiveLevel() >= logging.INFO:
         if n_max < np.inf:
-            progress_bar = tqdm(
-                desc="Processing", total=n_max, delay=2, unit="rows", file=sys.stdout
-            )
+            progress_bar = tqdm(desc="Decoding", total=n_max, delay=2, unit=" rows")
         else:
             progress_bar = tqdm(
-                desc="Processing",
+                desc="Decoding",
                 total=in_stream_size,
                 delay=2,
-                unit="B",
+                unit=" B",
                 unit_scale=True,
-                file=sys.stdout,
             )
 
     # start a timer and a byte counter
@@ -182,7 +178,7 @@ def build_raw(
         raise NotImplementedError("unknown input stream type {in_stream_type}")
 
     # initialize the stream and read header. Also initializes rb_lib
-    if log.level <= logging.INFO:
+    if log.getEffectiveLevel() >= logging.INFO:
         progress_bar.update(0)
 
     out_stream = out_spec if isinstance(out_spec, str) else ""
@@ -194,7 +190,7 @@ def build_raw(
         out_stream=out_stream,
     )
     rb_lib = streamer.rb_lib
-    if log.level <= logging.INFO and n_max == np.inf:
+    if log.getEffectiveLevel() >= logging.INFO and n_max == np.inf:
         progress_bar.update(streamer.n_bytes_read)
 
     # rb_lib should now be fully initialized. Check if files need to be
@@ -226,7 +222,7 @@ def build_raw(
     n_bytes_last = streamer.n_bytes_read
     while True:
         chunk_list = streamer.read_chunk()
-        if log.level <= logging.INFO and n_max == np.inf:
+        if log.getEffectiveLevel() >= logging.INFO and n_max == np.inf:
             progress_bar.update(streamer.n_bytes_read - n_bytes_last)
             n_bytes_last = streamer.n_bytes_read
         if len(chunk_list) == 0:
@@ -237,7 +233,7 @@ def build_raw(
                 rb.loc = n_max
             n_max -= rb.loc
             n_read += rb.loc
-        if log.level <= logging.INFO and n_max < np.inf:
+        if log.getEffectiveLevel() >= logging.INFO and n_max < np.inf:
             progress_bar.update(n_read)
         write_to_lh5_and_clear(chunk_list, lh5_store)
         if n_max <= 0:

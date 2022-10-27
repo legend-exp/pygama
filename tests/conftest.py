@@ -13,7 +13,7 @@ config_dir = Path(__file__).parent / "dsp" / "configs"
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("9c248f1")
+    ldata.checkout("39f9927")
     return ldata
 
 
