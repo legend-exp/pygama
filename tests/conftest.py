@@ -85,7 +85,25 @@ def dsp_test_file_spm(multich_raw_file):
 @pytest.fixture(scope="session")
 def compare_numba_vs_python():
     def numba_vs_python(func, *inputs):
-        # get outputs
+        """
+        Function for testing that the numba and python versions of a
+        function are equal.
+
+        Parameters
+        ----------
+        func
+            The Numba-wrapped function to be tested
+        *inputs
+            The various inputs to be passed to the function to be
+            tested.
+
+        Returns
+        -------
+        func_output
+            The output of the function to be used in a unit test.
+
+        """
+        # parse outputs from function signature
         all_params = list(inspect.signature(func).parameters)
         output_sizes = re.findall(r"(\(n*\))", func.signature.split("->")[-1])
         noutputs = len(output_sizes)
