@@ -156,7 +156,7 @@ As an example, we show a snippet from the test for
         w_in[4] = np.nan
         assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, 1, ord("i")))
 
-In the assertion that the output is what we expect, we use 
+In the assertion that the output is what we expect, we use
 ``compare_numba_vs_python(fixed_time_pickoff, w_in, 1, ord("i"))`` in place of
 ``fixed_time_pickoff(w_in, 1, ord("i"))``. In general, the replacement to make is
 ``func(*inputs)`` becomes ``compare_numba_vs_python(func, *inputs)``.
