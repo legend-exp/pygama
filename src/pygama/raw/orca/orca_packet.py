@@ -46,11 +46,12 @@ def hex_dump(
     as_int: bool = False,
     as_short: bool = False,
     id_dict: dict = None,
-    use_logging: bool = True
+    use_logging: bool = True,
 ) -> None:
 
     dump_cmd = print
-    if use_logging: dump_cmd = log.debug
+    if use_logging:
+        dump_cmd = log.debug
 
     data_id = get_data_id(packet, shift=shift_data_id)
     n_words = get_n_words(packet)
