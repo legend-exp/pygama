@@ -1,44 +1,44 @@
 {
-    "ch002": {
-        "cusp": {
-            "sigma": "6.36*us",
-            "flat": "1.68*us"
-        },
-        "zac": {
-            "sigma": "7.99*us",
-            "flat": "1.68*us"
-        },
-        "trap": {
-            "rise": "1*us",
-            "flat": "1*us"
-        }
+  "ch002": {
+    "cusp": {
+      "sigma": "6.36*us",
+      "flat": "1.68*us"
     },
-    "ch003": {
-        "cusp": {
-            "sigma": "12*us",
-            "flat": "5*us"
-        },
-        "zac": {
-            "sigma": "7.98*us",
-            "flat": "4.48*us"
-        },
-        "trap": {
-            "rise": "1*us",
-            "flat": "1*us"
-        }
+    "zac": {
+      "sigma": "7.99*us",
+      "flat": "1.68*us"
     },
-    "ch005": {
-        "cusp": {
-            "sigma": "4.68*us",
-            "flat": "3.62*us"
-        },
-        "zac": {
-            "sigma": "6.58*us",
-            "flat": "1.68*us"
-        },
-        "trap": {
-            "rise": "1*us",
-            "flat": "1*us"
-        }
+    "trap": {
+      "rise": "1*us",
+      "flat": "1*us"
     }
+  },
+  "ch003": {
+    "cusp": {
+      "sigma": "12*us",
+      "flat": "5*us"
+    },
+    "zac": {
+      "sigma": "7.98*us",
+      "flat": "4.48*us"
+    },
+    "trap": {
+      "rise": "1*us",
+      "flat": "1*us"
+    }
+  },
+  "ch005": {
+    "cusp": {
+      "sigma": "4.68*us",
+      "flat": "3.62*us"
+    },
+    "zac": {
+      "sigma": "6.58*us",
+      "flat": "1.68*us"
+    },
+    "trap": {
+      "rise": "1*us",
+      "flat": "1*us"
+    }
+  }
 }
