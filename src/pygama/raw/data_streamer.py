@@ -147,6 +147,7 @@ class DataStreamer(ABC):
             if dec_name not in dec_names:
                 log.warning(f"no decoder named '{dec_name}' requested by rb_lib")
 
+    @abstractmethod
     def close_stream(self) -> None:
         """Close this data stream.
 
