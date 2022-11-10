@@ -57,7 +57,7 @@ def run_tau(
     return tb_data
 
 
-def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -> dict:
+def get_decay_constant(slopes: np.array, display:int=0) -> dict:
 
     """
     Finds the decay constant from the modal value of the tail slope after cuts
@@ -84,12 +84,9 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
     bin_centres = pgh.get_bin_centers(bins)
     tau = round(-1 / (bin_centres[np.argmax(counts)]), 1)
 
-    tau_dict["pz"] = {"tau": tau}
-    if plot_path is None:
-        return tau_dict
-    else:
+    tau_dict["pz"] = {"tau": tau}    
+    if display>0:
         out_plot_dict = {}
-        pathlib.Path(os.path.dirname(plot_path)).mkdir(parents=True, exist_ok=True)
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
@@ -115,18 +112,12 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
         labels = ax.get_xticklabels()
         ax.set_xticklabels(labels=labels, rotation=45)
         out_plot_dict["slope"] = fig
-        plt.close()
-
-        wf_idxs = np.random.choice(len(wfs), 100)
-        fig2 = plt.figure()
-        for wf_idx in wf_idxs:
-            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), wfs[wf_idx])
-        plt.xlabel("Samples")
-        plt.ylabel("ADU")
-        out_plot_dict["waveforms"] = fig2
-        with open(plot_path, "wb") as f:
-            pkl.dump(out_plot_dict, f)
-        plt.close()
+        if display>1:
+            plt.show()
+        else:
+            plt.close()
+        return tau_dict, out_plot_dict
+    else:
         return tau_dict
 
 
@@ -199,7 +190,7 @@ def dsp_preprocess_decay_const(
     dsp_config: dict,
     lh5_path: str,
     double_pz: bool = False,
-    plot_path: str = None,
+    display: int = 0,
     opt_dict: dict = None,
     threshold: int = 5000,
     cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "bl_slope": 4},
@@ -231,7 +222,10 @@ def dsp_preprocess_decay_const(
     slopes = tb_out["tail_slope"].nda
     wfs = tb_out["wf_blsub"]["values"].nda
     log.debug("Calculating pz constant")
-    tau_dict = get_decay_constant(slopes[idxs], wfs[idxs], plot_path=plot_path)
+    if display>0:
+        tau_dict,plot_dict = get_decay_constant(slopes[idxs], display=display)
+    else: 
+        tau_dict = get_decay_constant(slopes[idxs])
     if double_pz == True:
         log.debug("Calculating double pz constants")
         pspace = om.set_par_space(opt_dict)
@@ -240,4 +234,23 @@ def dsp_preprocess_decay_const(
         )
         out_dict = get_dpz_consts(grid_out, opt_dict)
         tau_dict["pz"].update(out_dict["pz"])
-    return tau_dict
+    if display>0:
+        tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict = tau_dict)
+        wfs = tb_out["wf_pz"]["values"].nda[idxs]
+        means = tb_out["pz_mean"].nda[idxs]
+        wf_idxs = np.random.choice(len(wfs), 100)
+        fig2 = plt.figure()
+        for wf_idx in wf_idxs:
+            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), np.divide(wfs[wf_idx], means[wf_idx]))
+        plt.axhline(1, color="black")
+        plt.axhline(0, color="black")
+        plt.xlabel("Samples")
+        plt.ylabel("ADU")
+        plot_dict["waveforms"] = fig2
+        if display>1:
+            plt.show()
+        else:
+            plt.close()
+        return tau_dict, plot_dict
+    else:
+        return tau_dict

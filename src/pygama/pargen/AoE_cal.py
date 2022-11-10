@@ -184,7 +184,7 @@ def sigma_fit(x: np.array, a: float, b: float) -> np.array:
 
 
 def AoEcorrection(
-    energy: np.array, aoe: np.array, eres: list, pdf_path: str = None, display: int = 0
+    energy: np.array, aoe: np.array, eres: list, plot_dict: dict = {}, display: int = 0
 ) -> tuple(np.array, np.array):
 
     """
@@ -258,8 +258,8 @@ def AoEcorrection(
     cNorm = mcolors.Normalize(vmin=0, vmax=len(comptBands))
     scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=copper)
 
-    if display > 0 or pdf_path is not None:
-        plt.figure()
+    if display > 0:
+        fits_fig = plt.figure()
 
     # Fit each compton band
     for i, band in enumerate(comptBands):
@@ -276,7 +276,7 @@ def AoEcorrection(
             (errs[0] / pars[0]) ** 2 + (errs[1] / pars[1]) ** 2
         )
 
-        if display > 0 or pdf_path is not None:
+        if display > 0:
             if np.isnan(errs[2]) | np.isnan(errs[3]) | (errs[2] == 0) | (errs[3] == 0):
                 pass
             else:
@@ -286,7 +286,7 @@ def AoEcorrection(
                 colorVal = scalarMap.to_rgba(i)
                 plt.plot(xs, PDF_AoE(xs, *pars)[1], color=colorVal)
 
-    if display > 0 or pdf_path is not None:
+    if display > 0:
         plt.xlabel("A/E")
         plt.ylabel("Expected Counts")
         plt.title("Compton Band Fits")
@@ -304,9 +304,8 @@ def AoEcorrection(
                 comptBands[::-1][-1],
             ]
         )
-        if pdf_path is not None:
-            pdf_path.savefig()
-        if display > 0:
+        plot_dict["band_fits"] = fits_fig
+        if display > 1:
             plt.show()
         else:
             plt.close()
@@ -359,8 +358,8 @@ def AoEcorrection(
         aoe[(energy > emin) & (energy < emax) & (aoe > 0)][:10000]
     )
 
-    if display > 0 or pdf_path is not None:
-        fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+    if display > 0:
+        mean_fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
         ax1.errorbar(
             comptBands[~ids] + 10,
             compt_aoe[~ids],
@@ -394,15 +393,14 @@ def AoEcorrection(
         )
         ax2.set_ylabel("Residuals %", ha="right", y=1)
         ax2.set_xlabel("Energy (keV)", ha="right", x=1)
-        if pdf_path is not None:
-            pdf_path.savefig()
-        if display > 0:
+        plot_dict["mean_fit"] = mean_fig
+        if display > 1:
             plt.show()
         else:
             plt.close()
 
-    if display > 0 or pdf_path is not None:
-        fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+    if display > 0:
+        sig_fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
         ax1.errorbar(
             comptBands[~ids] + 10,
             aoe_sigmas[~ids],
@@ -440,14 +438,14 @@ def AoEcorrection(
         )
         ax2.set_ylabel("Residuals", ha="right", y=1)
         ax2.set_xlabel("Energy (keV)", ha="right", x=1)
-        if pdf_path is not None:
-            pdf_path.savefig()
-        if display > 0:
+        plot_dict["sigma_fit"] = sig_fig
+        if display > 1:
             plt.show()
         else:
             plt.close()
-
-    return pars, sig_pars
+        return pars, sig_pars, plot_dict
+    else:
+        return pars, sig_pars
 
 
 def plot_compt_bands_overlayed(
@@ -1014,7 +1012,7 @@ def drift_time_correction(
     energy: np.array,
     dt: np.array,
     display: int = 0,
-    pdf_path: str = None,
+    plot_dict: dict = {},
 ) -> tuple(np.array, float):
     """
     Calculates the correction needed to align the two drift time regions for ICPC detectors
@@ -1086,8 +1084,8 @@ def drift_time_correction(
     )
     aoe_corrected = apply_dtcorr(aoe, dt, alpha)
 
-    if display > 0 or pdf_path is not None:
-        plt.figure()
+    if display > 0:
+        dt_fig = plt.figure()
         plt.subplot(3, 2, 1)
         plt.step(pgh.get_bin_centers(bins), hist, label="Data")
         plt.plot(
@@ -1166,13 +1164,14 @@ def drift_time_correction(
         plt.legend(loc="upper left")
         plt.tight_layout()
         plt.xlim([aoe_pars[-3], aoe_pars[-2] * 1.01])
-        if pdf_path is not None:
-            pdf_path.savefig()
-        if display > 0:
+        plot_dict["dt_corr"] = dt_fig
+        if display > 1:
             plt.show()
         else:
             plt.close()
-    return aoe_corrected, alpha
+        return aoe_corrected, alpha, plot_dict
+    else:
+        return aoe_corrected, alpha
 
 
 def cal_aoe(
@@ -1183,7 +1182,7 @@ def cal_aoe(
     cal_energy_param: str,
     eres_pars: list,
     dt_corr: bool = False,
-    plot_savepath: str = None,
+    display: int = 0,
 ) -> tuple(dict, dict):
     """
     Main function for running the a/e correction and cut determination.
@@ -1299,151 +1298,7 @@ def cal_aoe(
                 )
 
             log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
-        log.info("Done")
-
-        if plot_savepath is not None:
-            mpl.use("pdf")
-            pathlib.Path(os.path.dirname(plot_savepath)).mkdir(
-                parents=True, exist_ok=True
-            )
-            with PdfPages(plot_savepath) as pdf:
-
-                plt.rcParams["figure.figsize"] = (12, 8)
-                plt.rcParams["font.size"] = 16
-
-                plt.figure()
-                plt.subplot(3, 2, 1)
-                plot_dt_dep(aoe, energy, dt, [1582, 1602], f"Tl DEP")
-                plt.subplot(3, 2, 2)
-                plot_dt_dep(aoe, energy, dt, [1510, 1630], f"Bi FEP")
-                plt.subplot(3, 2, 3)
-                plot_dt_dep(aoe, energy, dt, [2030, 2050], "Qbb")
-                plt.subplot(3, 2, 4)
-                plot_dt_dep(aoe, energy, dt, [2080, 2120], f"Tl SEP")
-                plt.subplot(3, 2, 5)
-                plot_dt_dep(aoe, energy, dt, [2584, 2638], f"Tl FEP")
-                plt.tight_layout()
-                pdf.savefig()
-                plt.close()
-
-                plt.figure()
-                plot_compt_bands_overlayed(
-                    aoe, energy, [950, 1250, 1460, 1660, 1860, 2060]
-                )
-                plt.ylabel("Counts")
-                plt.xlabel("Raw A/E")
-                plt.title(f"Compton Bands before Correction")
-                plt.legend(loc="upper left")
-                pdf.savefig()
-                plt.close()
-
-                if dt_corr == True:
-                    _ = drift_time_correction(aoe_uncorr, energy, dt, pdf_path=pdf)
-
-                mu_pars, sigma_pars = AoEcorrection(energy, aoe, eres_pars, pdf)
-
-                plt.figure()
-                plot_compt_bands_overlayed(
-                    classifier, energy, [950, 1250, 1460, 1660, 1860, 2060], [-5, 5]
-                )
-                plt.ylabel("Counts")
-                plt.xlabel("Corrected A/E")
-                plt.title(f"Compton Bands after Correction")
-                plt.legend(loc="upper left")
-                pdf.savefig()
-                plt.close()
-
-                plt.figure()
-                plt.vlines(cut, 0, 100, label=f"Cut Value: {cut:1.2f}", color="black")
-
-                for i, peak in enumerate(peaks_of_interest):
-                    if peak == 2039:
-                        plt.plot(
-                            full_cut_vals[i],
-                            full_sfs[i],
-                            label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
-                        )
-                    else:
-                        plt.errorbar(
-                            full_cut_vals[i],
-                            full_sfs[i],
-                            yerr=full_sf_errs[i],
-                            label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
-                        )
-
-                handles, labels = plt.gca().get_legend_handles_labels()
-                order = [1, 2, 3, 0, 4, 5]
-                plt.legend(
-                    [handles[idx] for idx in order],
-                    [labels[idx] for idx in order],
-                    loc="upper right",
-                )
-                plt.xlabel("Cut Value")
-                plt.ylabel("Survival Fraction %")
-                pdf.savefig()
-                plt.close()
-
-                fig, ax = plt.subplots()
-                bins = np.linspace(1000, 3000, 2000)
-                ax.hist(energy, bins=bins, histtype="step", label="Before PSD")
-                ax.hist(
-                    energy[classifier > cut],
-                    bins=bins,
-                    histtype="step",
-                    label="Low side PSD cut",
-                )
-                ax.hist(
-                    energy[(classifier > cut) & (classifier < 4)],
-                    bins=bins,
-                    histtype="step",
-                    label="Double sided PSD cut",
-                )
-                ax.hist(
-                    energy[(classifier < cut) | (classifier > 4)],
-                    bins=bins,
-                    histtype="step",
-                    label="Rejected by PSD cut",
-                )
-
-                axins = ax.inset_axes([0.25, 0.1, 0.3, 0.3])
-                bins = np.linspace(1580, 1640, 200)
-                axins.hist(energy, bins=bins, histtype="step")
-                axins.hist(energy[classifier > cut], bins=bins, histtype="step")
-                axins.hist(
-                    energy[(classifier > cut) & (classifier < 4)],
-                    bins=bins,
-                    histtype="step",
-                )
-                axins.hist(
-                    energy[(classifier < cut) | (classifier > 4)],
-                    bins=bins,
-                    histtype="step",
-                )
-                axins.set_xlabel("Energy (keV)")
-                axins.set_ylabel("Counts")
-                ax.set_xlim([1000, 3000])
-                ax.set_yscale("log")
-                plt.xlabel("Energy (keV)")
-                plt.ylabel("Counts")
-                plt.legend()
-                pdf.savefig()
-                plt.close()
-
-                plt.figure()
-                bins = np.linspace(1000, 3000, 1000)
-                counts_pass, bins_pass, _ = pgh.get_hist(
-                    energy[(classifier > cut) & (classifier < 4)], bins=bins
-                )
-                counts, bins, _ = pgh.get_hist(energy, bins=bins)
-                survival_fracs = counts_pass / (counts)
-
-                plt.step(pgh.get_bin_centers(bins_pass), survival_fracs)
-                plt.xlabel("Energy (keV)")
-                plt.ylabel("Survival Fraction")
-                plt.ylim([0, 1])
-                pdf.savefig()
-                plt.close()
-
+        
         def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
             out_dict = {}
             for i, peak in enumerate(peaks_of_interest):
@@ -1465,10 +1320,172 @@ def cal_aoe(
             "Low_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf, sferr),
             "2_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side),
         }
+        log.info("Done")
+        log.info(f"Results are {out_dict}")
+
+        if display>0:
+            plot_dict = {}
+
+            plt.rcParams["figure.figsize"] = (12, 8)
+            plt.rcParams["font.size"] = 16
+
+            fig1 = plt.figure()
+            plt.subplot(3, 2, 1)
+            plot_dt_dep(aoe, energy, dt, [1582, 1602], f"Tl DEP")
+            plt.subplot(3, 2, 2)
+            plot_dt_dep(aoe, energy, dt, [1510, 1630], f"Bi FEP")
+            plt.subplot(3, 2, 3)
+            plot_dt_dep(aoe, energy, dt, [2030, 2050], "Qbb")
+            plt.subplot(3, 2, 4)
+            plot_dt_dep(aoe, energy, dt, [2080, 2120], f"Tl SEP")
+            plt.subplot(3, 2, 5)
+            plot_dt_dep(aoe, energy, dt, [2584, 2638], f"Tl FEP")
+            plt.tight_layout()
+            plot_dict["dt_deps"] = fig1
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+            fig2 = plt.figure()
+            plot_compt_bands_overlayed(
+                aoe, energy, [950, 1250, 1460, 1660, 1860, 2060]
+            )
+            plt.ylabel("Counts")
+            plt.xlabel("Raw A/E")
+            plt.title(f"Compton Bands before Correction")
+            plt.legend(loc="upper left")
+            plot_dict["compt_bands_nocorr"] = fig2
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+            if dt_corr == True:
+                _, plot_dict = drift_time_correction(aoe_uncorr, energy, dt, display=display, plot_dict=plot_dict)
+
+            mu_pars, sigma_pars, plot_dict = AoEcorrection(energy, aoe, eres_pars, plot_dict, display=display)
+
+            fig3 = plt.figure()
+            plot_compt_bands_overlayed(
+                classifier, energy, [950, 1250, 1460, 1660, 1860, 2060], [-5, 5]
+            )
+            plt.ylabel("Counts")
+            plt.xlabel("Corrected A/E")
+            plt.title(f"Compton Bands after Correction")
+            plt.legend(loc="upper left")
+            plot_dict["compt_bands_corr"] = fig3
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+            fig4 = plt.figure()
+            plt.vlines(cut, 0, 100, label=f"Cut Value: {cut:1.2f}", color="black")
+
+            for i, peak in enumerate(peaks_of_interest):
+                if peak == 2039:
+                    plt.plot(
+                        full_cut_vals[i],
+                        full_sfs[i],
+                        label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
+                    )
+                else:
+                    plt.errorbar(
+                        full_cut_vals[i],
+                        full_sfs[i],
+                        yerr=full_sf_errs[i],
+                        label=f"{get_peak_label(peak)} {peak} keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %",
+                    )
+
+            handles, labels = plt.gca().get_legend_handles_labels()
+            order = [1, 2, 3, 0, 4, 5]
+            plt.legend(
+                [handles[idx] for idx in order],
+                [labels[idx] for idx in order],
+                loc="upper right",
+            )
+            plt.xlabel("Cut Value")
+            plt.ylabel("Survival Fraction %")
+            plot_dict["surv_fracs"] = fig4
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+            fig5, ax = plt.subplots()
+            bins = np.linspace(1000, 3000, 2000)
+            ax.hist(energy, bins=bins, histtype="step", label="Before PSD")
+            ax.hist(
+                energy[classifier > cut],
+                bins=bins,
+                histtype="step",
+                label="Low side PSD cut",
+            )
+            ax.hist(
+                energy[(classifier > cut) & (classifier < 4)],
+                bins=bins,
+                histtype="step",
+                label="Double sided PSD cut",
+            )
+            ax.hist(
+                energy[(classifier < cut) | (classifier > 4)],
+                bins=bins,
+                histtype="step",
+                label="Rejected by PSD cut",
+            )
+
+            axins = ax.inset_axes([0.25, 0.07, 0.4, 0.3])
+            bins = np.linspace(1580, 1640, 200)
+            axins.hist(energy, bins=bins, histtype="step")
+            axins.hist(energy[classifier > cut], bins=bins, histtype="step")
+            axins.hist(
+                energy[(classifier > cut) & (classifier < 4)],
+                bins=bins,
+                histtype="step",
+            )
+            axins.hist(
+                energy[(classifier < cut) | (classifier > 4)],
+                bins=bins,
+                histtype="step",
+            )
+            ax.set_xlim([1000, 3000])
+            ax.set_yscale("log")
+            plt.xlabel("Energy (keV)")
+            plt.ylabel("Counts")
+            plt.legend(loc="upper left")
+            plot_dict["PSD_spectrum"] = fig5
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+            fig6 = plt.figure()
+            bins = np.linspace(1000, 3000, 1000)
+            counts_pass, bins_pass, _ = pgh.get_hist(
+                energy[(classifier > cut) & (classifier < 4)], bins=bins
+            )
+            counts, bins, _ = pgh.get_hist(energy, bins=bins)
+            survival_fracs = counts_pass / (counts)
+
+            plt.step(pgh.get_bin_centers(bins_pass), survival_fracs)
+            plt.xlabel("Energy (keV)")
+            plt.ylabel("Survival Fraction")
+            plt.ylim([0, 1])
+            plot_dict["psd_sf"] = fig6
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
+        
+
+            return cal_dict, out_dict, plot_dict
+        else:
+            return cal_dict, out_dict
 
     except:
         log.error("survival fraction determination failed")
-        pathlib.Path(plot_savepath).touch()
         out_dict = {
             "A/E_Energy_param": "cuspEmax",
             "Cal_energy_param": "cuspEmax_ctc",
@@ -1479,6 +1496,8 @@ def cal_aoe(
             "Low_cut": cut,
             "High_cut": 4,
         }
-
-    log.info(f"Results are {out_dict}")
-    return cal_dict, out_dict
+        if display>0:
+            plot_dict={}
+            return cal_dict, out_dict, plot_dict
+        else:
+            return cal_dict, out_dict
