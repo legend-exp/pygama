@@ -10,6 +10,7 @@ import os
 import pathlib
 
 import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -359,7 +360,7 @@ def AoEcorrection(
     )
 
     if display > 0:
-        mean_fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+        mean_fig, (ax1, ax2) = plt.subplots(2, 1,sharex=True)
         ax1.errorbar(
             comptBands[~ids] + 10,
             compt_aoe[~ids],
@@ -393,6 +394,7 @@ def AoEcorrection(
         )
         ax2.set_ylabel("Residuals %", ha="right", y=1)
         ax2.set_xlabel("Energy (keV)", ha="right", x=1)
+        plt.tight_layout()
         plot_dict["mean_fit"] = mean_fig
         if display > 1:
             plt.show()
@@ -400,7 +402,7 @@ def AoEcorrection(
             plt.close()
 
     if display > 0:
-        sig_fig, (ax1, ax2) = plt.subplots(2, 1, constrained_layout=True, sharex=True)
+        sig_fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
         ax1.errorbar(
             comptBands[~ids] + 10,
             aoe_sigmas[~ids],
@@ -438,6 +440,7 @@ def AoEcorrection(
         )
         ax2.set_ylabel("Residuals", ha="right", y=1)
         ax2.set_xlabel("Energy (keV)", ha="right", x=1)
+        plt.tight_layout()
         plot_dict["sigma_fit"] = sig_fig
         if display > 1:
             plt.show()

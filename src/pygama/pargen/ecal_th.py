@@ -9,9 +9,12 @@ import logging
 import math
 import os
 import pathlib
+from datetime import datetime
 
 import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import numpy as np
 import scipy.stats
 from matplotlib.backends.backend_pdf import PdfPages
@@ -54,21 +57,22 @@ def load_data(
         ids = ~(out_df.isPulser == 1)
         log.debug(f"pulser found: {pulser_props}")
 
-        plt.rcParams["figure.figsize"] = (12, 8)
-        plt.rcParams["font.size"] = 10
+        if display>0:
+            plt.rcParams["figure.figsize"] = (12, 8)
+            plt.rcParams["font.size"] = 10
 
-        fig = plt.figure()
-        plt.hist(df["trapTmax"], bins=10000, histtype="step", label="With Pulser")
-        plt.hist(df["trapTmax"][ids], bins=10000, histtype="step", label="Pulser Removed")
-        plt.xlim([0, np.nanpercentile(df["trapTmax"], 99)])
-        plt.xlabel("Energy (ADC)")
-        plt.ylabel("Counts")
-        plt.legend(loc="upper right")
-        plot_dict["pulser"] = fig
-        if display>1:
-            plt.show()
-        else:
-            plt.close()
+            fig = plt.figure()
+            plt.hist(df["trapTmax"], bins=10000, histtype="step", label="With Pulser")
+            plt.hist(df["trapTmax"][ids], bins=10000, histtype="step", label="Pulser Removed")
+            plt.xlim([0, np.nanpercentile(df["trapTmax"], 99)])
+            plt.xlabel("Energy (ADC)")
+            plt.ylabel("Counts")
+            plt.legend(loc="upper right")
+            plot_dict["pulser"] = fig
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
 
     else:
         ids = np.ones(len(df), dtype=bool)
@@ -82,13 +86,14 @@ def load_data(
                 energy_param.split("_")[0] for energy_param in energy_params
             ]
             energy_dict = lh5.load_nda(files, energy_params, lh5_path)
+            energy_dict["timestamp"] = df["timestamp"][ids].to_numpy()
+
     else:
         sto = lh5.LH5Store()
-
+        energy_dict = {"timestamp":df["timestamp"][ids].to_numpy()}
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(hit_dict).get_dataframe()
 
-        energy_dict = {}
         for param in energy_params:
             if param in df:
                 energy_dict[param] = df[param][ids].to_numpy()
@@ -363,8 +368,26 @@ def energy_cal_th(
 
         if display > 0 :
             plot_dict_param = {}
+            plt.rcParams["figure.figsize"] = (12, 8)
+            plt.rcParams["font.size"] = 12
+            selection = (ecal_pass>2560) &(ecal_pass<2660)
+            fig_sta = plt.figure()
+            plt.hist2d(uncal_pass["timestamp"][selection], ecal_pass[selection], bins=[100,np.arange(2560,2660,1)], norm=LogNorm())
+
+            ticks, labels = plt.xticks()
+            plt.xlabel(f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}")
+            plt.ylabel("Energy(keV)")
+            plt.ylim([2600,2630])
+
+            plt.xticks(ticks, [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks])
+            plot_dict_param["cal_stability"] = fig_sta
+            if display>1:
+                plt.show()
+            else:
+                plt.close()
+
             plt.rcParams["figure.figsize"] = (12, 20)
-            plt.rcParams["font.size"] = 10
+            plt.rcParams["font.size"] = 12
 
             fig1 = plt.figure()
             range_adu = 5 / pars[0]  # 10keV window around peak in adu
@@ -428,7 +451,7 @@ def energy_cal_th(
                 plt.close()
 
             plt.rcParams["figure.figsize"] = (12, 8)
-            plt.rcParams["font.size"] = 10
+            plt.rcParams["font.size"] = 12
 
             fig2, (ax1, ax2) = plt.subplots(
                 2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]}
