@@ -15,7 +15,7 @@ def packet(lgnd_test_data):
     assert pkt is not None  # load was successful
     assert (
         streamer.n_bytes_read
-        == init_rbytes + 25 + 2 * streamer.header["boards"][0]["wf_len"]
+        == init_rbytes + 25 + 2 * streamer.header["boards"]["0"]["wf_len"].value
     )
     streamer.close_stream()
     return pkt

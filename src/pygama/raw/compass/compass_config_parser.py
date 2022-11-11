@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
 import xmltodict
+
+from pygama import lgdo
 
 log = logging.getLogger(__name__)
 
@@ -13,7 +16,9 @@ DT5730_sample_freq = 0.5  # sample/ns, because wf_len is stored in ns in the xml
 DT5725_sample_freq = 0.25  # sample/ns
 
 
-def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) -> dict:
+def compass_config_to_struct(
+    compass_config_file: str = None, wf_len: int = None
+) -> lgdo.Struct:
     """
     Read run-level data from a CoMPASS configuration file.
 
@@ -24,8 +29,8 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
 
     Returns
     -------
-    config_dict
-        A dictionary of configuration data to pass to the streamer
+    config_struct
+        A struct of configuration data to pass to the streamer
 
     JSON Configuration Example
     --------------------------
@@ -51,7 +56,7 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
     Notes
     -----
     First, if the CoMPASS xml config is not none, it is turned into a dictionary.
-    If the CoMPASS config file is none, then a generic dictionary with the
+    If the CoMPASS config file is none, then a generic struct with the
     maximum number of channels and boards is returned, in order to create the
     most generic raw buffer to fill.
     """
@@ -61,32 +66,38 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
         with open(compass_config_file) as xml_file:
             data_dict = xmltodict.parse(xml_file.read())
 
-        # Initialize a dictionary to hold the config data
-        config_dict = {}
-        config_dict["boards"] = {}
+        # Initialize a struct to hold the config data
+        config_struct = lgdo.Struct()
+        config_struct.add_field("boards", lgdo.Struct())
 
         # get the number of boards enabled
         # "configuration/board" is a dictionary if there is only one board
         if isinstance(data_dict["configuration"]["board"], dict):
-            config_dict["boards"][0] = {}
+            config_struct["boards"].add_field("0", lgdo.Struct())
             # Read in board and adc
-            config_dict["boards"][0]["modelName"] = data_dict["configuration"]["board"][
-                "modelName"
-            ]
-            config_dict["boards"][0]["adcBitCount"] = data_dict["configuration"][
-                "board"
-            ]["adcBitCount"]
+            config_struct["boards"]["0"].add_field(
+                "modelName",
+                lgdo.Scalar(data_dict["configuration"]["board"]["modelName"]),
+            )
+            config_struct["boards"]["0"].add_field(
+                "adcBitCount",
+                lgdo.Scalar(data_dict["configuration"]["board"]["adcBitCount"]),
+            )
 
             # Write the sampling rate, in samples/ns and store for conversion of the wf_len
-            if config_dict["boards"][0]["modelName"] == "DT5730":
-                config_dict["boards"][0]["sample_rate"] = DT5730_sample_freq
-            elif config_dict["boards"][0]["modelName"] == "DT5725":
-                config_dict["boards"][0]["sample_rate"] = DT5725_sample_freq
+            if config_struct["boards"]["0"]["modelName"].value == "DT5730":
+                config_struct["boards"]["0"].add_field(
+                    "sample_rate", lgdo.Scalar(DT5730_sample_freq)
+                )
+            elif config_struct["boards"]["0"]["modelName"].value == "DT5725":
+                config_struct["boards"]["0"].add_field(
+                    "sample_rate", lgdo.Scalar(DT5725_sample_freq)
+                )
             else:
                 raise NotImplementedError(
-                    f'warning! no sample rate defined yet for board {config_dict["boards"][0]["modelName"]}'
+                    f'warning! no sample rate defined yet for board {config_struct["boards"][0]["modelName"].value}'
                 )
-                config_dict["boards"][0]["sample_rate"] = 1
+                config_struct["boards"]["0"].add_field("sample_rate", lgdo.Scalar(1))
 
             # The parameters tag is a list of dictionaries, turn it into one dictionary
             param_dict = {}
@@ -98,14 +109,18 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
             if "SRV_PARAM_RECLEN" in param_dict.keys():
                 # all xml values are stored with the key "#text" in the config_file
                 # the wf_len are stored in ns, but we need the sample length to decode the packets, so convert using the sample rate
-                config_dict["boards"][0]["wf_len"] = float(
-                    param_dict["SRV_PARAM_RECLEN"]["value"]["#text"]
-                ) * float(config_dict["boards"][0]["sample_rate"])
+                config_struct["boards"]["0"].add_field(
+                    "wf_len",
+                    lgdo.Scalar(
+                        float(param_dict["SRV_PARAM_RECLEN"]["value"]["#text"])
+                        * float(config_struct["boards"]["0"]["sample_rate"].value)
+                    ),
+                )
             else:
                 raise RuntimeError("wf_len not in config file!")
 
-            # Now, loop through the channels and update the dictionary
-            config_dict["boards"][0]["channels"] = {}
+            # Now, loop through the channels and update the struct
+            config_struct["boards"]["0"].add_field("channels", lgdo.Struct())
 
             for channel_dictionary in data_dict["configuration"]["board"]["channel"]:
 
@@ -117,45 +132,59 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
                 # if channel_dictionary["values"]["entry"] is a dictionary, then that channel is not enabled
                 if isinstance(channel_dictionary["values"]["entry"], dict):
                     continue
-                # initialize the sub dictionary
+                # initialize the sub struct
                 else:
-                    config_dict["boards"][0]["channels"][channel_number] = {}
+                    config_struct["boards"]["0"]["channels"].add_field(
+                        str(channel_number), lgdo.Struct()
+                    )
 
                 for x in channel_dictionary["values"]["entry"]:
 
                     # if a value isn't present, then the key is just set to the default in the param_dict
                     if (x["key"] in param_dict.keys()) and ("value" not in x.keys()):
-                        config_dict["boards"][0]["channels"][channel_number][
-                            x["key"]
-                        ] = param_dict[x["key"]]["value"]["#text"]
-                    else:
+                        config_struct["boards"]["0"]["channels"][
+                            str(channel_number)
+                        ].add_field(
+                            str(x["key"]),
+                            lgdo.Scalar(param_dict[x["key"]]["value"]["#text"]),
+                        )
 
-                        config_dict["boards"][0]["channels"][channel_number][
-                            x["key"]
-                        ] = x["value"]["#text"]
+                    else:
+                        config_struct["boards"]["0"]["channels"][
+                            str(channel_number)
+                        ].add_field(str(x["key"]), lgdo.Scalar(x["value"]["#text"]))
 
         # if there is more than one board, loop over each board and get the values
         if isinstance(data_dict["configuration"]["board"], list):
             for i in range(len(data_dict["configuration"]["board"])):
-                config_dict["boards"][i] = {}
+                config_struct["boards"].add_field(str(i), lgdo.Struct())
                 # Read in board and adc
-                config_dict["boards"][i]["modelName"] = data_dict["configuration"][
-                    "board"
-                ][i]["modelName"]
-                config_dict["boards"][i]["adcBitCount"] = data_dict["configuration"][
-                    "board"
-                ][i]["adcBitCount"]
+                config_struct["boards"][str(i)].add_field(
+                    "modelName",
+                    lgdo.Scalar(data_dict["configuration"]["board"][i]["modelName"]),
+                )
+
+                config_struct["boards"][str(i)].add_field(
+                    "adcBitCount",
+                    lgdo.Scalar(data_dict["configuration"]["board"][i]["adcBitCount"]),
+                )
 
                 # Write the sampling rate, in samples/ns and store for conversion of the wf_len
-                if config_dict["boards"][i]["modelName"] == "DT5730":
-                    config_dict["boards"][i]["sample_rate"] = DT5730_sample_freq
-                elif config_dict["boards"][i]["modelName"] == "DT5725":
-                    config_dict["boards"][i]["sample_rate"] = DT5725_sample_freq
+                if config_struct["boards"][str(i)]["modelName"].value == "DT5730":
+                    config_struct["boards"][str(i)].add_field(
+                        "sample_rate", lgdo.Scalar(DT5730_sample_freq)
+                    )
+                elif config_struct["boards"][str(i)]["modelName"].value == "DT5725":
+                    config_struct["boards"][str(i)].add_field(
+                        "sample_rate", lgdo.Scalar(DT5725_sample_freq)
+                    )
                 else:
                     raise NotImplementedError(
-                        f'warning! no sample rate defined yet for board {config_dict["boards"][i]["modelName"]}'
+                        f'warning! no sample rate defined yet for board {config_struct["boards"][i]["modelName"].value}'
                     )
-                    config_dict["boards"][i]["sample_rate"] = 1
+                    config_struct["boards"][str(i)].add_field(
+                        "sample_rate", lgdo.Scalar(1)
+                    )
 
                 # The parameters tag is a list of dictionaries, turn it into one dictionary
                 param_dict = {}
@@ -169,15 +198,19 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
                 if "SRV_PARAM_RECLEN" in param_dict.keys():
                     # all xml values are stored with the key "#text" in the config_file
                     # the wf_len are stored in ns, but we need the sample length to decode the packets, so convert using the sample rate
-                    config_dict["boards"][i]["wf_len"] = float(
-                        param_dict["SRV_PARAM_RECLEN"]["value"]["#text"]
-                    ) * float(
-                        config_dict["boards"][i]["sample_rate"]
+                    config_struct["boards"][str(i)].add_field(
+                        "wf_len",
+                        lgdo.Scalar(
+                            float(param_dict["SRV_PARAM_RECLEN"]["value"]["#text"])
+                            * float(
+                                config_struct["boards"][str(i)]["sample_rate"].value
+                            )
+                        ),
                     )  # all xml values are stored with the key "#text" in the config_file
                 else:
                     raise RuntimeError("wf_len not in config file!")
 
-                config_dict["boards"][i]["channels"] = {}
+                config_struct["boards"][str(i)].add_field("channels", lgdo.Struct())
 
                 # Now, loop through the channels and update the dictionary
                 for channel_dictionary in data_dict["configuration"]["board"][i][
@@ -188,9 +221,11 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
                     # if channel_dictionary["values"]["entry"] is a dictionary, then that channel is not enabled
                     if isinstance(channel_dictionary["values"]["entry"], dict):
                         continue
-                    # initialize the sub dictionary
+                    # initialize the sub struct
                     else:
-                        config_dict["boards"][i]["channels"][channel_number] = {}
+                        config_struct["boards"][str(i)]["channels"].add_field(
+                            str(channel_number), lgdo.Struct()
+                        )
 
                     for x in channel_dictionary["values"]["entry"]:
 
@@ -198,40 +233,50 @@ def compass_config_to_dict(compass_config_file: str = None, wf_len: int = None) 
                         if (x["key"] in param_dict.keys()) and (
                             "value" not in x.keys()
                         ):
-                            config_dict["boards"][i]["channels"][channel_number][
-                                x["key"]
-                            ] = param_dict[x["key"]]["value"]["#text"]
+                            config_struct["boards"][str(i)]["channels"][
+                                str(channel_number)
+                            ].add_field(
+                                str(x["key"]),
+                                lgdo.Scalar(param_dict[x["key"]]["value"]["#text"]),
+                            )
                         else:
+                            config_struct["boards"][str(i)]["channels"][
+                                str(channel_number)
+                            ].add_field(str(x["key"]), lgdo.Scalar(x["value"]["#text"]))
 
-                            config_dict["boards"][i]["channels"][channel_number][
-                                x["key"]
-                            ] = x["value"]["#text"]
+        return config_struct
 
-        return config_dict
-
-    # if the config file is none, return a generic dict with the most channels and boards enabled possible, in order to create a alrge enough raw buffer
+    # if the config file is none, return a generic struct with the most channels and boards enabled possible, in order to create a large enough raw buffer
     else:
-        config_dict = {}
-        config_dict["boards"] = {}
+        config_struct = lgdo.Struct()
+        config_struct.add_field("boards", lgdo.Struct())
         for i in range(max_number_of_boards):
-            config_dict["boards"][i] = {}
+
+            config_struct["boards"].add_field(str(i), lgdo.Struct())
 
             # Set board and adc to none
-            config_dict["boards"][i]["modelName"] = None
-            config_dict["boards"][i]["adcBitCount"] = None
-            config_dict["boards"][i]["sample_rate"] = None
+            config_struct["boards"][str(i)].add_field("modelName", lgdo.Scalar(np.nan))
+            config_struct["boards"][str(i)].add_field(
+                "adcBitCount", lgdo.Scalar(np.nan)
+            )
+            config_struct["boards"][str(i)].add_field(
+                "sample_rate", lgdo.Scalar(np.nan)
+            )
 
             # set the wf_len
             if wf_len is not None:
-                config_dict["boards"][i]["wf_len"] = float(wf_len)
+                config_struct["boards"][str(i)].add_field(
+                    "wf_len", lgdo.Scalar(float(wf_len))
+                )
             else:
                 raise RuntimeError(
                     "wf_len not passed correctly when config file is absent!"
                 )
-
-            config_dict["boards"][i]["channels"] = {}
+            config_struct["boards"][str(i)].add_field("channels", lgdo.Struct())
             for j in range(max_number_channels):
                 # initialize the sub-dict
-                config_dict["boards"][i]["channels"][j] = {}
+                config_struct["boards"][str(i)]["channels"].add_field(
+                    str(j), lgdo.Scalar(np.nan)
+                )
 
-        return config_dict
+        return config_struct

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from pygama import lgdo
-from pygama.raw.compass.compass_config_parser import compass_config_to_dict
+from pygama.raw.compass.compass_config_parser import compass_config_to_struct
 from pygama.raw.data_decoder import DataDecoder
 from pygama.raw.raw_buffer import RawBuffer
 
@@ -17,7 +17,7 @@ class CompassHeaderDecoder(DataDecoder):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.config = lgdo.Struct()
+        self.config = None  # initialize to none, because compass_config_to_struct always returns a struct
 
     def decode_header(
         self, in_stream: bytes, config_file: str = None, wf_len: int = None
@@ -39,8 +39,8 @@ class CompassHeaderDecoder(DataDecoder):
             A dict containing the header information, as well as the important config information
             of wf_len and num_enabled_channels
         """
-        config_dict = compass_config_to_dict(config_file, wf_len)
-        self.config = config_dict
+        config_struct = compass_config_to_struct(config_file, wf_len)
+        self.config = config_struct
 
         config_names = [
             "energy_channels",  # energy is given in channels (0: false, 1: true)
@@ -61,11 +61,14 @@ class CompassHeaderDecoder(DataDecoder):
                 log.warning(f"{name} already in self.config. skipping...")
                 continue
             value = int(header_as_list[i])
-            self.config[str(name)] = value
+            self.config.add_field(
+                str(name), lgdo.Scalar(value)
+            )  # self.config is a struct
+
         return self.config
 
     def make_lgdo(self, key: int = None, size: int = None) -> lgdo.Struct:
-        return lgdo.Scalar(value="")
+        return self.config  # self.config is already an lgdo, namely it is a struct
 
     def buffer_is_full(self, rb: RawBuffer) -> bool:
         return rb.loc > 0

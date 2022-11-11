@@ -29,7 +29,6 @@ def test_decoding(event_rbkd):
 def test_data_types(event_rbkd):
 
     for _, v in event_rbkd.items():
-        # assert v.out_name == 'FCEvent' FIXME: is this a bug?
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
         assert isinstance(tbl["packet_id"], lgdo.Array)
@@ -49,7 +48,6 @@ def test_data_types(event_rbkd):
 def test_values(event_rbkd):
 
     for _, v in event_rbkd.items():
-        # assert v.out_name == 'FCEvent' FIXME: is this a bug?
         tbl = v.lgdo
         assert tbl["packet_id"].nda == [1]
         assert tbl["board"].nda == 0

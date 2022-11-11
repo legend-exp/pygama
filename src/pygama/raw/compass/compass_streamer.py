@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 
 import numpy as np
@@ -135,9 +134,6 @@ class CompassStreamer(DataStreamer):
             rb = header_rb_list[0]
         else:
             rb = RawBuffer(lgdo=self.header_decoder.make_lgdo())
-        rb.lgdo.value = json.dumps(
-            self.header
-        )  # dump our header dictionary into the raw buffer
         rb.loc = 1  # we have filled this buffer
         return [rb]
 
@@ -181,7 +177,7 @@ class CompassStreamer(DataStreamer):
             )
 
         # packets have metadata of variable lengths, depending on if the header shows that energy_short is present in the metadata
-        if int(self.header["energy_short"]) == 1:
+        if int(self.header["energy_short"].value) == 1:
             header_length = 25  # if the energy short is present, then there are an extra 2 bytes in the metadata
         else:
             header_length = 23  # the normal packet metadata is 23 bytes long

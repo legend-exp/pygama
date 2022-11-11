@@ -90,7 +90,9 @@ class CompassEventDecoder(DataDecoder):
 
                 # get trace length(s). Should all be the same
                 self.decoded_values[bc]["waveform"]["wf_len"] = int(
-                    float(self.header["boards"][board]["wf_len"])
+                    float(
+                        self.header["boards"][board]["wf_len"].value
+                    )  # the header is a struct, so we need to return its value
                 )
 
     def get_key_list(self):
@@ -166,7 +168,7 @@ class CompassEventDecoder(DataDecoder):
         tbl["timestamp"].nda[ii] = np.frombuffer(packet[4:12], dtype=np.uint64)[0]
 
         # get the rest of the values depending on if there is an energy_short present
-        if int(header["energy_short"]) == 1:
+        if int(header["energy_short"].value) == 1:  # again, the header is a struct
             tbl["energy"].nda[ii] = np.frombuffer(packet[12:14], dtype=np.uint16)[0]
             tbl["energy_short"].nda[ii] = np.frombuffer(packet[14:16], dtype=np.uint16)[
                 0
