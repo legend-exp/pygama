@@ -92,6 +92,7 @@ from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import interpolating_upsampler, upsampler
 from .wiener_filter import wiener_filter
 from .windower import windower
+from .dplms import dplms_filter
 
 __all__ = [
     "bl_subtract",
@@ -139,4 +140,5 @@ __all__ = [
     "wiener_filter",
     "windower",
     "time_over_threshold",
+    "dplms_filter",
 ]
