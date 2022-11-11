@@ -21,7 +21,7 @@ import pandas as pd
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import parse_datatype
+from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
@@ -57,7 +57,7 @@ class LH5Store:
             whether to keep files open by storing the :mod:`h5py` objects as
             class attributes.
         """
-        self.base_path = base_path
+        self.base_path = "" if base_path == "" else expand_path(base_path)
         self.keep_open = keep_open
         self.files = {}
 
@@ -73,6 +73,8 @@ class LH5Store:
         """
         if isinstance(lh5_file, h5py.File):
             return lh5_file
+        if mode == "r":
+            lh5_file = expand_path(lh5_file)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
@@ -974,7 +976,7 @@ def show(
     """
     # open file
     if isinstance(lh5_file, str):
-        lh5_file = h5py.File(lh5_file, "r")
+        lh5_file = h5py.File(expand_path(lh5_file), "r")
 
     # go to group
     if lh5_group != "/":
@@ -1177,7 +1179,7 @@ class LH5Iterator:
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
-            lh5_files = [lh5_files]
+            lh5_files = expand_path(lh5_files, True)
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
 
@@ -1186,9 +1188,7 @@ class LH5Iterator:
                 "entry_list and entry_mask arguments are mutually exclusive"
             )
 
-        self.lh5_files = [
-            f for f_wc in lh5_files for f in sorted(glob.glob(os.path.expandvars(f_wc)))
-        ]
+        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
 
         # Map to last row in each file
         self.file_map = np.array(
