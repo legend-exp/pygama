@@ -8,36 +8,81 @@ import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
-#def dplms_filter(file_name_array: list[str]) -> np.ndarray:
-
-def dplms_filter(baselines: np.ndarray, reference: np.ndarray, length: int, a1: float, a2: int, a3: int, ff: int, diff: bool) -> Callable:
+def dplms_filter(noise_mat: list, reference: list, length: int, a1: float, a2: int, a3: int, ff: int) -> Callable:
+    """Calculate and apply an optimum DPLMS filter to the waveform.
+    Note
+    ----
+    This processor is composed of a factory function that is called using the
+    `init_args` argument. The input and output waveforms are passed using
+    `args`.
+    Parameters
+    ----------
+    noise_mat
+        noise matrix
+    reference
+        reference signal
+    length
+        length of the calculated filter.
+    a1
+        penalized coefficient for the noise matrix.
+    a2
+        penalized coefficient for the reference matrix.
+    a3
+        penalized coefficient for the zero area matrix.
+    ff
+        flat top length for the reference signal.
     
-    # noise matrix
-    if diff: baselines = np.diff(baselines)
-    nwf = int(baselines.shape[0])
-    bsize = baselines.shape[1]
-    nmat =  np.matmul(baselines.transpose(), baselines)/nwf
-    nmat = signal.convolve2d(nmat, np.identity(bsize-length+1),
-                            boundary='symm', mode='valid')/(bsize-length+1)
+    JSON Configuration Example
+    --------------------------
+    .. code-block :: json
+        "wf_dplms": {
+            "function": "dplms_filter",
+            "module": "pygama.dsp.processors",
+            "args": ["wf_diff", "wf_dplms(len(wf_diff)-49, 'f')"],
+            "unit": "ADC",
+            "init_args": [
+                "db.dplms.noise_matrix",
+                "db.dplms.reference",
+                "50", "0.1", "1", "0", "0"]
+        }
+    """
+    
+    if length <= 0:
+        raise DSPFatal("The length of the filter must be positive")
+    
+    noise_mat = np.array(noise_mat)
+    reference = np.array(reference)
+    
+    if length != noise_mat.shape[0]:
+        raise DSPFatal("The length of the filter is not consistent with the noise matrix")
+    
+    if len(reference) <= 0:
+        raise DSPFatal("The length of the reference signal must be positive")
+    
+    if a1 <= 0:
+        raise DSPFatal("The penalized coefficient for the noise must be positive")
+    
+    if a2 <= 0:
+        raise DSPFatal("The penalized coefficient for the reference must be positive")
     
     # reference matrix
     ssize = len(reference)
     flo = int(ssize/2 - length/2)
     fhi = int(ssize/2 + length/2)
-    rmat = np.zeros([length,length])
-    rsig = np.zeros([length])
+    ref_mat = np.zeros([length,length])
+    ref_sig = np.zeros([length])
     if ff == 0: ff = [0]
     else: ff = [-1,0,1]
     for i in ff:
-        rmat += np.outer(reference[flo+i:fhi+i], reference[flo+i:fhi+i])        
-        rsig +=  reference[flo+i:fhi+i]
-    rmat /= len(ff)
-    rsig = np.transpose(rsig)/len(ff)
+        ref_mat += np.outer(reference[flo+i:fhi+i], reference[flo+i:fhi+i])        
+        ref_sig +=  reference[flo+i:fhi+i]
+    ref_mat /= len(ff)
+    ref_sig = np.transpose(ref_sig)/len(ff)
     
     # filter calculation
-    mat = a1*nmat + a2*rmat + a3*np.ones([length,length])
-    x = np.linalg.solve(mat, rsig)
-    conv = signal.convolve(reference, np.flip(x), mode = 'valid')
+    mat = a1*noise_mat + a2*ref_mat + a3*np.ones([length,length])
+    x = np.linalg.solve(mat, ref_sig)
+    conv = signal.convolve(reference, x, mode = 'valid')
     
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],

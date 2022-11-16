@@ -92,9 +92,9 @@
 	    "args": ["wf_diff", "wf_dplms(len(wf_diff)-49, 'f')"],
 	    "unit": "ADC",
 	    "init_args": [
-		"db.dplms.baselines",
+		"db.dplms.noise_matrix",
 		"db.dplms.reference",
-		"50", "0.1", "1", "0", "0", "True"]
+		"50", "0.01", "1", "0", "0"]
 	},
 	"dplms_max": {
 	    "function": "amax",
