@@ -14,7 +14,6 @@ import scipy.stats
 from scipy.signal import find_peaks_cwt, medfilt
 
 import pygama.math.binned_fitting as pgb
-import pygama.math.distribution_selector as pgds
 import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
 import pygama.math.least_squares as pgl
@@ -209,7 +208,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
     func : function
         The function to be fit to the peak in the (windowed) hist
     """
-    if  func == pgd.nb_gauss_step_cdf or func == pgd.nb_gauss_step_pdf or func == pgd.nb_gauss_step:
+    if func == pgd.gauss_on_step.get_cdf or func == pgd.gauss_on_step.get_pdf or func == pgd.gauss_on_step.pdf_ext: 
         # get mu and height from a gauss fit, also sigma as fallback
         pars, cov = pgb.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
@@ -245,9 +244,17 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         n_bkg = np.sum(hist)-n_sig
 
         hstep = step /(bg + np.mean(hist[:10]))
-        return [n_sig, mu, sigma/2,n_bkg, hstep,bins[0], bins[-1],0]
 
-    if  func == pgd.nb_hpge_peak_cdf or func == pgd.nb_hpge_peak_pdf or func == pgd.nb_extended_hpge_peak_pdf:
+        # the argument order for gauss_on_step is "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        func_args = [mu, sigma/2, n_sig, hstep, bins[0], bins[-1], n_bkg]
+
+        # for an extended fit we also need to pass x_lo, x_hi:
+        if func == pgd.gauss_on_step.pdf_ext: 
+            return np.array([np.array([bins[0], bins[-1], *func_args])])
+        else: 
+            return np.array([np.array(func_args)]) 
+
+    if  func == pgd.hpge_peak.get_cdf or func == pgd.hpge_peak.get_pdf or func == pgd.hpge_peak.pdf_ext:
 
         #guess mu, height
         pars, cov = pgb.gauss_mode_width_max(hist, bins, var)
@@ -291,9 +298,15 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         n_sig = np.sum(hist[(bin_centres>mu-3*sigma)&(bin_centres<mu+3*sigma)])
         n_bkg = np.sum(hist)-n_sig
 
-        parguess = [n_sig,  mu, sigma, htail, tau, n_bkg,hstep,bins[0], bins[-1],0]
+        # The correct ordering for hpge_peak arguments is "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        parguess = [mu, sigma, tau, htail, n_sig, hstep, bins[0], bins[-1], n_bkg]
 
-        return parguess
+        # for an extended fit we also need to pass x_lo, x_hi:
+        # we need to return an array of arrays so that when we pass *parguess to binned_fit and thus a sum_dist class, we need an array, not a tuple
+        if func == pgd.hpge_peak.pdf_ext: 
+            return np.array([np.array([bins[0], bins[-1], *parguess])])
+        else: 
+            return np.array([np.array(parguess)]) 
 
     else:
         print(f'get_hpge_E_peak_par_guess not implemented for {func.__name__}')
@@ -304,14 +317,21 @@ def get_hpge_E_fixed( func):
     """
     Returns: Sequence list of fixed indexes for fitting and mask for parameters
     """
+    if func == pgd.gauss_on_step.get_cdf or func == pgd.gauss_on_step.get_pdf: 
+        # pars are: "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [4, 5], np.array([True, True, True, True, False, False, True ])
 
-    if  func ==  pgd.nb_gauss_step_cdf or func ==  pgd.nb_gauss_step_pdf or func == pgd.nb_gauss_step :
-        # pars are: n_sig, mu, sigma, n_bkg, hstep, components
-        return [5,6,7] , np.array([True, True, True,True,True,False,False,False])
+    if func == pgd.gauss_on_step.pdf_ext: 
+        # pars are: x_lo, x_hi, "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [0, 1, 6, 7], np.array([False, False, True, True, True, True, False, False, True ])
 
-    if  func == pgd.nb_hpge_peak_cdf or func == pgd.nb_hpge_peak_pdf or func == pgd.nb_extended_hpge_peak_pdf:
-        # pars are: n_sig, mu, sigma, htail,tau, n_bkg, hstep, components
-        return [7,8,9], np.array([True, True, True,True,True,True,True,False,False,False])
+    if func == pgd.hpge_peak.get_cdf or func == pgd.hpge_peak.get_pdf: 
+        # pars are: "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [6, 7], np.array([True, True, True, True, True, True, False, False, True])
+
+    if func == pgd.hpge_peak.pdf_ext: 
+        # pars are: x_lo, x_hi, "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [0, 1, 8, 9], np.array([False, False, True, True, True, True, True, True, False, False, True])
 
     else:
         print(f'get_hpge_E_fixed not implemented for {func.__name__}')
@@ -319,19 +339,27 @@ def get_hpge_E_fixed( func):
     return None
 
 def get_hpge_E_bounds(func):
-    if  func == pgd.nb_hpge_peak_cdf or func == pgd.nb_hpge_peak_pdf or func == pgd.nb_extended_hpge_peak_pdf:
-        return [(0,None), (None,None), (None,None), (0,1),(None,None),(0,None), (None,None)
-                ,(None,None),(None,None),(None,None)]
+    if func == pgd.gauss_on_step.get_cdf or func == pgd.gauss_on_step.get_pdf: 
+        # pars are: "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [(None, None), (None, None), (0, None), (None, None), (None, None), (None, None), (0, None)]
 
-    elif  func ==  pgd.nb_gauss_step_cdf or func ==  pgd.nb_gauss_step_pdf or func == pgd.nb_gauss_step :
-        return [(0,None), (None,None), (None,None),(0,None), (None,None),(None,None)
-                ,(None,None),(None,None)]
+    if func == pgd.gauss_on_step.pdf_ext: 
+        # pars are: x_lo, x_hi, "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [(None, None), (None, None), (None, None), (None, None), (0, None), (None, None), (None, None), (None, None), (0, None)]
+
+    if func == pgd.hpge_peak.get_cdf or func == pgd.hpge_peak.get_pdf: 
+        # pars are: "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [(None, None), (None, None), (None, None), (0, 1), (0, None), (None, None), (None, None), (None, None), (0, None)]
+
+    if func == pgd.hpge_peak.pdf_ext: 
+        # pars are: x_lo, x_hi, "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return [(None, None), (None, None), (None, None), (None, None), (None, None), (0, 1), (0, None), (None, None), (None, None), (None, None), (0, None)]
 
     else:
         print(f'get_hpge_E_bounds not implemented for {func.__name__}')
         return []
 
-def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgd.nb_gauss_step_cdf,
+def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgd.gauss_on_step.get_cdf,
                      method = 'unbinned', gof_funcs=None, n_events=15000, allowed_p_val= 0.05,
                      uncal_is_int=False, simplex=False):
     """Fit the Energy peaks specified using the function given
@@ -403,7 +431,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgd.nb_gau
                 bounds = get_hpge_E_bounds(func_i)
                 fixed, mask = get_hpge_E_fixed(func_i)
 
-                pars_i,errs_i, cov_i = pgub.fit_unbinned(func_i,energies ,
+                pars_i,errs_i, cov_i = pgub.fit_unbinned(func_i, energies,
                                         guess=par_guesses, Extended=True, fixed=fixed,simplex=simplex, bounds= bounds)
             else:
                 hist, bins, var = pgh.get_hist(E_uncal, bins=n_bins_i, range=(Euc_min,Euc_max))
@@ -422,7 +450,7 @@ def hpge_fit_E_peaks(E_uncal, mode_guesses, wwidths, n_bins=50, funcs=pgd.nb_gau
             errs_i = np.array(errs_i)[mask]
             cov_i = np.array(cov_i)[mask,:][:,mask]
 
-            total_events = pgds.get_total_events_func(func_i, pars_i, errors=errs_i)
+            total_events = func_i.get_total_events(pars_i, errors=errs_i)
             if (sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf or
                 sum(sum(c) if c is not None else 0 for c in cov_i) == 0 or
                 np.isnan(sum(sum(c) if c is not None else 0 for c in cov_i))) :
@@ -533,7 +561,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
 
 
 def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False, range_keV=None,
-                       funcs=pgd.nb_gauss_step_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
+                       funcs=pgd.gauss_on_step.get_cdf, gof_funcs = None, method = 'unbinned', gof_func =None,
                        n_events=15000, simplex=False, allowed_p_val=0.05, verbose=True):
     """Calibrate HPGe data to a set of known peaks
 
@@ -731,7 +759,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
                 #fwhm??
 
     # Do a second calibration to the results of the full peak fits
-    mus = [pgds.get_mu_func(func_i, pars_i, errors=errors_i) for func_i, pars_i, errors_i in zip(funcs, pk_pars, pk_errors)]
+    mus = [func_i.get_mu(pars_i, errors=errors_i) for func_i, pars_i, errors_i in zip(funcs, pk_pars, pk_errors)]
     mus, mu_vars = zip(*mus)
     mus = np.asarray(mus)
     mu_vars = np.asarray(mu_vars)**2
@@ -748,7 +776,7 @@ def hpge_E_calibration(E_uncal, peaks_keV, guess_keV, deg=0, uncal_is_int=False,
     pars, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
 
     # Finally, calculate fwhms in keV
-    uncal_fwhms = [pgds.get_fwhm_func(func_i, pars_i, cov = covs_i) for func_i, pars_i, covs_i in zip(funcs, pk_pars, pk_covs)]
+    uncal_fwhms = [func_i.get_fwhm(pars_i, cov = covs_i) for func_i, pars_i, covs_i in zip(funcs, pk_pars, pk_covs)]
     uncal_fwhms, uncal_fwhm_errs = zip(*uncal_fwhms)
     uncal_fwhms = np.asarray(uncal_fwhms)
     uncal_fwhm_errs = np.asarray(uncal_fwhm_errs)

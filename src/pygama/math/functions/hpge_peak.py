@@ -1,152 +1,135 @@
-"""
-Radford Ge peak shape distributions for pygama
-"""
+import sys
+
 import numba as nb
 import numpy as np
 
-from pygama.math.functions.gauss_with_tail import (
-    nb_gauss_with_tail_cdf,
-    nb_gauss_with_tail_pdf,
-)
-from pygama.math.functions.step import nb_step_cdf, nb_step_pdf
+from scipy.stats import rv_continuous
+from pygama.math.functions.sum_dists import sum_dists
 
-kwd = {"parallel": False, "fastmath": True}
+from pygama.math.functions.gauss import gaussian
+from pygama.math.functions.exgauss import exgauss
+from pygama.math.functions.step import step
 
-
-@nb.njit(**kwd)
-def nb_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
-                lower_range=np.inf, upper_range=np.inf, components=False):
-    """
-    HPGe peak shape PDF consists of a gaussian with tail signal
-    on a step background.
-    As a Numba JIT function, it runs slightly faster than
-    'out of the box' functions.
-
-    Parameters
-    ----------
-    x : array-like
-        Input data
-    n_sig : float
-        Number of counts in the signal
-    mu : float
-        The centroid of the Gaussian
-    sigma : float
-        The standard deviation of the Gaussian
-    htail : float
-        The height of the Gaussian tail
-    tau : float
-        The characteristic scale of the Gaussian tail
-    n_bkg : float
-        The number of counts in the background
-    hstep : float
-        The height of the step function background
-    lower_range : float
-        Lower bound of the step function
-    upper_range : float
-        Upper bound of the step function
-    components : bool
-        If true, returns the signal and background components separately
-    """
-    try:
-        bkg= nb_step_pdf(x, mu, sigma, hstep, lower_range, upper_range)
-    except ZeroDivisionError:
-        bkg = np.zeros_like(x, dtype=np.float64)
-    if np.any(bkg<0):
-        bkg = np.zeros_like(x, dtype=np.float64)
-    if components == False:
-        sig = nb_gauss_with_tail_pdf(x, mu, sigma, htail,  tau)
-        pdf = (n_bkg * bkg +\
-             n_sig *  sig)
-        return pdf
-    else:
-        peak, tail = nb_gauss_with_tail_pdf(x, mu, sigma, htail,  tau, components=components)
-        return n_sig *peak, n_sig*tail, n_bkg * bkg
+from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 
 
-@nb.njit(**kwd)
-def nb_hpge_peak_cdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range=np.inf, upper_range=np.inf, components=False):
-    """
-    Cdf for gaussian with tail signal and step background
-    As a Numba JIT function, it runs slightly faster than
-    'out of the box' functions.
+class hpge_peak_gen(sum_dists):
+    r"""
+    Provide a convenience function for the HPGe peak shape. 
+
+    A HPGe peak consists of a Gaussian
+    on an Exgauss on a step function. 
+
+    .. math::
+    
+        PDF = n_sig*((1-htail)*gauss + htail*exgauss) + n_bkg*step
+
+
+    Called with 
+
+    hpge_peak.get_pdf(x, params=[mu, sigma, tau, htail, n_sig, hstep, lower_range, upper_range, n_bkg])
 
     Parameters
     ----------
-    x : array-like
+    x
         Input data
-    n_sig : float
-        Number of counts in the signal
-    mu : float
+    mu
         The centroid of the Gaussian
-    sigma : float
+    sigma
         The standard deviation of the Gaussian
-    htail : float
-        The height of the Gaussian tail
-    tau : float
+    tau
         The characteristic scale of the Gaussian tail
-    n_bkg : float
-        The number of counts in the background
-    hstep : float
-        The height of the step function background
-    lower_range : float
-        Lower bound of the step function
-    upper_range : float
-        Upper bound of the step function
-    components : bool
-        If true, returns the signal and background components separately
-    """
-    try:
-        bkg = nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
-    except ZeroDivisionError:
-        bkg = np.zeros_like(x, dtype=np.float64)
-    if np.any(bkg<0):
-        bkg= np.zeros_like(x, dtype=np.float64)
-    if components ==False:
-        sig = nb_gauss_with_tail_cdf(x, mu, sigma, htail)
-        pdf = (1/(n_sig+n_bkg))*(n_sig*nb_gauss_with_tail_cdf(x, mu, sigma, htail,tau) +\
-            n_bkg*bkg)
-        return pdf
-    else:
-        peak, tail = nb_gauss_with_tail_cdf(x, mu, sigma, htail, components= True)
-        return (n_sig/(n_sig+n_bkg))*peak, (n_sig/(n_sig+n_bkg))*tail, (n_bkg/(n_sig+n_bkg))*bkg
-
-
-@nb.njit(**kwd)
-def nb_extended_hpge_peak_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep,
-                         lower_range=np.inf, upper_range=np.inf, components=False):
-    """
-    PDF for gaussian with tail signal and step background, also returns number of events
-    As a Numba JIT function, it runs slightly faster than
-    'out of the box' functions.
-
-    Parameters
-    ----------
-    x : array-like
-        Input data
-    n_sig : float
-        Number of counts in the signal
-    mu : float
-        The centroid of the Gaussian
-    sigma : float
-        The standard deviation of the Gaussian
-    htail : float
+    htail
         The height of the Gaussian tail
-    tau : float
-        The characteristic scale of the Gaussian tail
-    n_bkg : float
-        The number of counts in the background
-    hstep : float
+    n_sig
+        The area of the gauss on exgauss
+    hstep
         The height of the step function background
-    lower_range : float
+    lower_range
         Lower bound of the step function
-    upper_range : float
+    upper_range
         Upper bound of the step function
-    components : bool
-        If true, returns the signal and background components separately
+    n_bkg
+        The area of the step background
+
+    Returns 
+    -------
+    hpge_peak
+        A subclass of sum_dists and rv_continuous, has methods of pdf, cdf, etc.
+
+    Notes 
+    ----- 
+    The extended Gaussian distribution and the step distribution share the mu, sigma with the Gaussian
     """
-    if components ==False:
-        return n_sig + n_bkg, nb_hpge_peak_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
-    else:
-        peak, tail, bkg = nb_hpge_peak_pdf(x, n_sig,  mu, sigma, htail, tau, n_bkg, hstep,
-                                      lower_range, upper_range,components=components)
-        return n_sig + n_bkg, peak, tail, bkg
+    
+    def __init__(self):
+        
+        (mu, sigma, tau, frac1, n_sig, hstep, lower_range, upper_range, n_bkg) = range(9)
+        args = [gaussian, [mu, sigma, n_sig, frac1], exgauss, [tau, mu, sigma, n_sig, frac1], step, [hstep, lower_range, upper_range, mu, sigma, n_bkg, frac1, frac1] ]
+        
+        # throw the step distribution htail because we will override its frac and total area to 1
+        
+        super().__init__(*args, frac_flag = "both")
+        
+    def _link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
+        shape_pars, cum_len, areas, fracs, total_area = super()._link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
+    
+        fracs[0] = 1-fracs[1] # create (1-htail) for the gaussian, and htail for the exgauss
+        fracs[2] = 1 # make sure that the step function has a frac of 1
+        total_area[0] = 1 # make sure that the total area is also just 1
+        
+        
+        return shape_pars, cum_len, areas, fracs, total_area 
+    
+    def get_req_args(self) -> tuple[str,str,str,str,str,str,str,str,str]:
+        r"""
+        Return the required args for this instance
+        """
+        return "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        
+
+    def get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
+        r"""
+        Get the fwhm value from the output of a fit quickly
+        Need to overload this to use hpge_peak_fwhm (to avoid a circular import) for when self is an hpge peak, 
+        and otherwise returns 2sqrt(2log(2))*sigma
+
+        Parameters 
+        ----------
+        pars 
+            Array of fit parameters
+        cov 
+            Optional, array of covariances for calculating error on the fwhm
+
+
+        Returns 
+        -------
+        fwhm, error 
+            the value of the fwhm and its error
+        """
+
+        req_args = np.array(self.get_req_args())
+        sigma_idx = np.where(req_args == "sigma")[0][0]
+
+        if ("htail" in req_args) and ("hstep" in req_args): #having both the htail and hstep means it is an exgauss on a step
+            htail_idx = np.where(req_args == "htail")[0][0]
+            tau_idx = np.where(req_args == "tau")[0][0]
+            
+            # We need to move around the cov matrix because hpge_peak_fwhm has a different ordering on the cov matrix...
+            mu_idx = np.where(req_args == "mu")[0][0]
+            hstep_idx = np.where(req_args == "hstep")[0][0]
+            n_bkg_idx = np.where(req_args == "n_bkg")[0][0]
+            n_sig_idx = np.where(req_args == "n_sig")[0][0]
+            rearranged_cov = np.diag(np.array([cov[mu_idx][mu_idx], cov[sigma_idx][sigma_idx], cov[hstep_idx][hstep_idx], cov[htail_idx][htail_idx], cov[tau_idx][tau_idx], cov[n_bkg_idx][n_bkg_idx], cov[n_sig_idx][n_sig_idx] ]))
+
+            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], rearranged_cov)
+
+        else: 
+            if cov is None:
+                return pars[sigma_idx]*2*np.sqrt(2*np.log(2))
+            else:
+                return pars[sigma_idx]*2*np.sqrt(2*np.log(2)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(2*np.log(2))
+
+
+    
+hpge_peak = hpge_peak_gen()

@@ -11,8 +11,8 @@ import numpy as np
 from scipy import stats
 
 from pygama.math.binned_fitting import *
-from pygama.math.distributions import *
 from pygama.math.functions.gauss import nb_gauss
+from pygama.math.functions.crystal_ball import nb_crystal_ball_scaled_pdf
 from pygama.math.histogram import *
 
 
@@ -78,13 +78,13 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     #fit gaussians to that
     # result = fit_unbinned(gauss, hist, [median, width/2] )
     # print("unbinned: {}".format(result))
-    p0 = get_gaussian_guess(hist, bin_centers)
-    bounds = [(p0[0] * .5, p0[1] * .5, p0[2] * .2, 0, 1),
-              (p0[0] * 1.5, p0[1] * 1.5, p0[2] * 5, np.inf, np.inf)]
+    p0 = get_gaussian_guess(hist, bin_centers) # returns (guess_mu, guess_sigma, guess_area)
+    # nb_crystal_ball_scaled_pdf has parameter order area, beta, m, mu, sigma
+    bounds = [(p0[2] * .2, 0, 1, p[0] * .5, p0[1] * .5), (p0[2] * 5, np.inf, np.inf, p0[0] * 1.5, p0[1] * 1.5)]
     result = fit_binned(
-        nb_xtalball_pdf,
+        nb_crystal_ball_scaled_pdf,
         hist,
-        bin_centers, [p0[0], p0[1], p0[2], 10, 1],
+        bin_centers, [p0[2], 10, 1, p0[0], p0[1]],
         bounds=bounds)
     # print("binned: {}".format(result))
     cut_lo = result[0] - cut_sigma * result[1]
@@ -93,7 +93,7 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     if plotFigure is not None:
         plt.figure(plotFigure.number)
         plt.plot(bin_centers, hist, ls="steps-mid", color="k", label="data")
-        fit = nb_xtalball_pdf(bin_centers, *result)
+        fit = nb_crystal_ball_scaled_pdf(bin_centers, *result)
         plt.plot(bin_centers, fit, label="xtalball fit")
         plt.axvline(result[0], color="g", label="fit mean")
         plt.axvline(cut_lo, color="r", label=f"+/- {cut_sigma} sigma")

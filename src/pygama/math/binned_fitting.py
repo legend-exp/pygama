@@ -3,46 +3,53 @@ pygama convenience functions for fitting binned data
 """
 import logging
 import math
+from typing import Optional, Union, Callable
 
 import numpy as np
 from iminuit import Minuit, cost
 from scipy.optimize import brentq, minimize_scalar
 
 import pygama.math.histogram as pgh
-from pygama.math.distributions import (
-    nb_exgauss,
-    nb_gauss_norm,
-    nb_gauss_with_tail_pdf,
-    nb_unnorm_step_pdf,
-)
 from pygama.math.functions.gauss import nb_gauss_amp
 
 log = logging.getLogger(__name__)
 
 
-def fit_binned(func, hist, bins, var=None, guess=None,
-             cost_func='LL', Extended=True,  simplex=False, bounds=None, fixed = None):
-    """Do a binned fit to a histogram.
+def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarray=None, guess: np.ndarray=None,
+             cost_func: str='LL', Extended: bool=True,  simplex: bool=False, bounds: tuple[tuple[float, float], ...]=None, fixed: tuple[int, ...] = None) -> tuple[np.ndarray, ...]:
+    """
+    Do a binned fit to a histogram.
 
     Default is Extended Log Likelihood fit, with option for either Least
     Squares or other cost function.
 
     Parameters
     ----------
-    func : the function to fit, if using LL as method needs to be a cdf
-    hist, bins, var : histogrammed data
-    guess : initial guess parameters
-    cost_func : cost function to use
-    Extended : run extended or non extended fit
-    simplex : whether to include a round of simpson minimisation before main minimisation
-    bounds : list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-    fixed : list of parameter indices to fix
+    func 
+        the function to fit, if using LL as method needs to be a cdf
+    hist, bins, var 
+        histogrammed data
+    guess 
+        initial guess parameters
+    cost_func
+        cost function to use
+    Extended
+        run extended or non extended fit
+    simplex
+        whether to include a round of simpson minimisation before main minimisation
+    bounds 
+        list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
+    fixed   
+        list of parameter indices to fix
 
     Returns
     -------
-    coeff : array
-    error : array
-    cov_matrix : array
+    coeff
+        Returned fit parameters
+    error
+        Iminuit errors
+    cov_matrix
+        Covariance matrix
     """
     if guess is None:
         raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
@@ -68,6 +75,8 @@ def fit_binned(func, hist, bins, var=None, guess=None,
 
         if len(bins) == len(hist)+1:
             bin_centres = pgh.get_bin_centers(bins)
+        else:
+             bin_centres = bins
 
         # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
@@ -77,7 +86,7 @@ def fit_binned(func, hist, bins, var=None, guess=None,
         hist = hist[mask]
         var = np.sqrt(var[mask])
         xvals = bin_centres[mask]
-        cost_func = cost.LeastSquares(xvals, hist,var, func)
+        cost_func = cost.LeastSquares(xvals, hist, var, func)
 
     m = Minuit(cost_func, *guess)
     if bounds is not None:
@@ -93,18 +102,19 @@ def fit_binned(func, hist, bins, var=None, guess=None,
     return m.values, m.errors, m.covariance
 
 
-def goodness_of_fit(hist, bins, var, func, pars, method='var'):
-    """Compute chisq and dof of fit
+def goodness_of_fit(hist: np.ndarray, bins: np.ndarray, var: np.ndarray, func: Callable, pars: np.ndarray, method: str='var', scale_bins: bool = False) -> tuple[float, int]:
+    """
+    Compute chisq and dof of fit
 
     Parameters
     ----------
-    hist, bins, var : array, array, array or None
+    hist, bins, var 
         histogram data. var can be None if hist is integer counts
-    func : function
+    func
         the function that was fit to the hist
-    pars : array
+    pars
         the best-fit pars of func. Assumes all pars are free parameters
-    method : str
+    method
         Sets the choice of "denominator" in the chi2 sum
         'var': user passes in the variances in var (must not have zeros)
         'Pearson': use func (hist must contain integer counts)
@@ -112,9 +122,9 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
 
     Returns
     -------
-    chisq : float
+    chisq
         the summed up value of chisquared
-    dof : int
+    dof
         the number of degrees of freedom
     """
     # arg checks
@@ -128,7 +138,10 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
 
 
     # compute expected values
-    yy = func(pgh.get_bin_centers(bins), *pars) * pgh.get_bin_widths(bins)
+    yy = func(pgh.get_bin_centers(bins), *pars)
+    if scale_bins == True: 
+        yy *= pgh.get_bin_widths(bins)
+    
 
     if method == 'LR':
         log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (yy+1.e-99)), yy-hist))
@@ -153,19 +166,40 @@ def goodness_of_fit(hist, bins, var, func, pars, method='var'):
         return chisq, dof
 
 
-def poisson_gof(pars, func, hist, bins, integral=None, **kwargs):
+def poisson_gof(pars: np.ndarray, func: Callable, hist: np.ndarray, bins: np.ndarray, is_integral: bool=False, **kwargs) -> float:
     """
+    Calculate the goodness of fit for the Poisson likelihood. 
+
+    Parameters 
+    ----------
+    pars 
+        The parameters of the function, func
+    func 
+        The function that was fit 
+    hist 
+        The data that were fit 
+    bins 
+        The bins of the histogram that was fit to 
+    is_integral 
+        Tells get_bin_estimates if the function is an integral function 
+
+    Returns 
+    -------
+    Poisson G.O.F.
+
+    Notes
+    -----
     The Poisson likelihood does not give a good GOF until the counts are very
     high and all the poisson stats are roughly gaussian and you don't need it
     anyway. But the G.O.F. is calculable for the Poisson likelihood. So we do
     it here.
     """
-    mu = pgh.get_bin_estimates(pars, func, hist, bins, integral, **kwargs)
+    mu = pgh.get_bin_estimates(pars, func, bins, is_integral, **kwargs)
     return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
 
 
-def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
-                         cost_func='Least Squares', inflate_errors=False, gof_method='var'):
+def gauss_mode_width_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.ndarray]=None, mode_guess: Optional[float]=None, n_bins: Optional[int]=5,
+                         cost_func: str='Least Squares', inflate_errors: Optional[bool]=False, gof_method: Optional[str]='var') -> tuple[np.ndarray, ...]:
     r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
@@ -187,26 +221,26 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
 
     Parameters
     ----------
-    hist : array-like
+    hist
         The values of the histogram to be fit
-    bins : array-like
+    bins
         The bin edges of the histogram to be fit
-    var : array-like (optional)
+    var
         The variances of the histogram values. If not provided, square-root
         variances are assumed.
-    mode_guess : float (optional)
+    mode_guess
         An x-value (not a bin index!) near which a peak is expected. The
         algorithm fits around the maximum within +/- n_bins of the guess. If not
         provided, the center of the max bin of the histogram is used.
-    n_bins : int (optional)
+    n_bins
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
-    cost_func : str (optional)
+    cost_func
         Passed to fit_binned()
-    inflate_errors : bool (optional)
+    inflate_errors
         If true, the parameter uncertainties are inflated by sqrt(chi2red)
         if it is greater than 1
-    gof_method : str (optional)
+    gof_method
         method flag for goodness_of_fit
 
     Returns
@@ -242,7 +276,7 @@ def gauss_mode_width_max(hist, bins, var=None, mode_guess=None, n_bins=5,
     return np.asarray([pars['mu'], pars['sigma'], pars['a']]), np.asarray(cov)
 
 
-def gauss_mode_max(hist, bins, **kwargs):
+def gauss_mode_max(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[np.ndarray, ...]:
     """Alias for gauss_mode_width_max that just returns the max and mode
 
     See Also
@@ -271,8 +305,9 @@ def gauss_mode_max(hist, bins, **kwargs):
     return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
 
 
-def gauss_mode(hist, bins, **kwargs):
+def gauss_mode(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[float, float]:
     """Alias for gauss_mode_max that just returns the mode (position) of a peak
+
     See Also
     --------
     gauss_mode_max
@@ -287,29 +322,27 @@ def gauss_mode(hist, bins, **kwargs):
     return pars[0], np.sqrt(cov[0, 0])
 
 
-def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=False):
+def taylor_mode_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.ndarray]=None, mode_guess: Optional[float]=None, n_bins: int = 5) -> tuple[np.ndarray, ...]:
     """Get the max and mode of a peak based on Taylor exp near the max
     Returns the amplitude and position of a peak based on a poly fit over n_bins
     in the vicinity of the maximum of the hist (or the max near mode_guess, if provided)
 
     Parameters
     ----------
-    hist : array-like
+    hist
         The values of the histogram to be fit. Often: send in a slice around a peak
-    bins : array-like
+    bins
         The bin edges of the histogram to be fit
-    var : array-like (optional)
+    var
         The variances of the histogram values. If not provided, square-root
         variances are assumed.
-    mode_guess : float (optional)
+    mode_guess
         An x-value (not a bin index!) near which a peak is expected. The
         algorithm fits around the maximum within +/- n_bins of the guess. If not
         provided, the center of the max bin of the histogram is used.
-    n_bins : int
+    n_bins
         The number of bins (including the max bin) to be used in the fit. Also
         used for searching for a max near mode_guess
-    poissonLL
-        DOCME
 
     Returns
     -------
@@ -333,7 +366,7 @@ def taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5, poissonLL=F
     i_n = i_0 + n_bins
     wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
 
-    pars, cov = np.nb_polyfit(pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
+    pars, cov = np.polyfit(pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
     mode = -pars[1] / 2 / pars[0]
     maximum = pars[2] - pars[0] * mode**2
     # build the jacobian to compute the output covariance matrix

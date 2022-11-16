@@ -1,4 +1,6 @@
+from typing import Union
 import math
+from math import erf, erfc
 
 import numba as nb
 import numpy as np
@@ -6,8 +8,8 @@ import numpy as np
 
 @nb.vectorize([nb.float32(nb.float32),
 nb.float64(nb.float64)])
-def nb_erf(x: float) -> float:
-    """
+def nb_erf(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    r"""
     Numba version of error function.
     Vectorization is necessary here for the math.erf
     This runs faster than numpy vectorized and the
@@ -15,23 +17,23 @@ def nb_erf(x: float) -> float:
 
     Parameters
     ----------
-    x : float or array-like
+    x
         The input data
 
     Returns
     -------
-    math.erf(x): float or array-like
+    math.erf(x)
         Error function acting on the input
-
     """
-    return math.erf(x)
+
+    return erf(x)
 
 
 
 @nb.vectorize([nb.float32(nb.float32),
 nb.float64(nb.float64)])
-def nb_erfc(x:float) -> float:
-    """
+def nb_erfc(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+    r"""
     Numba version of complementary error function
     Vectorization is necessary here for the math.erfc
     This runs faster than numpy vectorized and the
@@ -39,12 +41,13 @@ def nb_erfc(x:float) -> float:
 
     Parameters
     ----------
-    x : float or array-like
+    x
         The input data
 
     Returns
     -------
-    math.erfc(x): float or array-like
+    math.erfc(x)
         Complementary error function acting on the input
     """
-    return math.erfc(x)
+    
+    return erfc(x)
