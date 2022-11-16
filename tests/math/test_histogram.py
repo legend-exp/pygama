@@ -92,16 +92,16 @@ def test_get_fwfm():
     hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="bins_over_f")
-    assert fwfm == 2.4
-    assert dfwfm == 0.1911676414793058
+    assert fwfm == approx(2.4)
+    assert dfwfm == approx(0.1911676414793058)
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="interpolate")
-    assert fwfm == 1.9897727272727268
-    assert dfwfm == 1.0740819016912582
+    assert fwfm == approx(1.9897727272727268)
+    assert dfwfm == approx(1.0740819016912582)
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="fit_slopes")
-    assert fwfm == 2.2320859865745684
-    assert dfwfm == 0.14298871443488284
+    assert fwfm == approx(2.2320859865745684)
+    assert dfwfm == approx(0.14298871443488284)
 
 
 def test_get_fwhm():
@@ -111,16 +111,16 @@ def test_get_fwhm():
     hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="bins_over_f")
-    assert fwfm == 2.4
-    assert dfwfm == 0.1911676414793058
+    assert fwfm == approx(2.4)
+    assert dfwfm == approx(0.1911676414793058)
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="interpolate")
-    assert fwfm == 1.9897727272727268
-    assert dfwfm == 1.0740819016912582
+    assert fwfm == approx(1.9897727272727268)
+    assert dfwfm == approx(1.0740819016912582)
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="fit_slopes")
-    assert fwfm == 2.2320859865745684
-    assert dfwfm == 0.14298871443488284
+    assert fwfm == approx(2.2320859865745684)
+    assert dfwfm == approx(0.14298871443488284)
 
 
 def test_get_gaussian_guess():
