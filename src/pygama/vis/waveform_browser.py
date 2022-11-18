@@ -182,6 +182,7 @@ class WaveformBrowser:
             self.lines = {line: [] for line in lines}
 
         # styles
+        default_style = cycler(plt.rcParams["axes.prop_cycle"])
         if isinstance(styles, (list, tuple)):
             self.styles = [None for _ in self.lines]
             for i, sty in enumerate(styles):
@@ -191,7 +192,7 @@ class WaveformBrowser:
                     except KeyError:
                         self.styles[i] = itertools.repeat(None)
                 elif sty is None:
-                    self.styles[i] = itertools.repeat(None)
+                    self.styles[i] = default_style
                 else:
                     self.styles[i] = cycler(**sty)
         else:
@@ -201,7 +202,7 @@ class WaveformBrowser:
                 except KeyError:
                     self.styles = itertools.repeat(None)
             elif styles is None:
-                self.styles = itertools.repeat(None)
+                self.styles = default_style
             else:
                 self.styles = cycler(**styles)
 
@@ -355,7 +356,7 @@ class WaveformBrowser:
             return
 
         if entry > len(self.lh5_it):
-            if safe:
+            if not safe:
                 raise IndexError
             else:
                 return
@@ -416,18 +417,18 @@ class WaveformBrowser:
                 unit = data.attrs.get("units", None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
                     # Vertical line
-                    val = val * float(ureg(unit) / self.x_unit) - ref_time
-                    lines.append(Line2D([val] * 2, [-lim, lim]))
+                    val = np.array([val * float(ureg(unit) / self.x_unit) - ref_time])
+                    lines.append(Line2D(np.tile(val, 2), [-lim, lim]))
                     self._update_auto_limit(val, None)
                 else:
                     # Horizontal line
-                    lines.append(Line2D([-lim, lim], [val / norm] * 2))
+                    lines.append(Line2D([-lim, lim], np.tile(val / norm, 2)))
                     self._update_auto_limit(None, val)
 
             elif data is None:
                 # Check for data in auxiliary table. It's unitless so I guess just do an hline...
-                val = self.aux_vals[name][entry] / norm
-                lines.append(Line2D([-lim, lim], [val] * 2))
+                val = np.array([self.aux_vals[name][entry] / norm])
+                lines.append(Line2D([-lim, lim], np.tile(val, 2)))
                 self._update_auto_limit(None, val)
 
             else:
@@ -485,11 +486,12 @@ class WaveformBrowser:
             styles = self.styles
 
         # draw lines
+        default_style = cycler(plt.rcParams["axes.prop_cycle"])
         for i, lines in enumerate(self.lines.values()):
             if isinstance(self.styles, list):
                 styles = self.styles[i]
             if styles is None:
-                styles = cycler(plt.rcparams)
+                styles = default_style
 
             for line, sty in zip(lines, styles):
                 if sty is not None:
@@ -529,18 +531,29 @@ class WaveformBrowser:
 
     def _update_auto_limit(self, x: np.ndarray, y: np.ndarray) -> None:
         # Helper to update the automatic limits
-        y_where = {}
-        if isinstance(y, np.ndarray) and self.y_lim is not None:
-            y_where["where"] = (y >= self.y_lim[0]) & (y <= self.y_lim[1])
-        x_where = {}
-        if isinstance(x, np.ndarray) and self.x_lim is not None:
-            x_where["where"] = (x >= self.x_lim[0]) & (x <= self.x_lim[1])
+        where = True
+
         if x is not None:
-            self.auto_x_lim[0] = np.amin(x, **y_where, initial=self.auto_x_lim[0])
-            self.auto_x_lim[1] = np.amax(x, **y_where, initial=self.auto_x_lim[1])
+            where &= np.isfinite(x)
+            if self.x_lim is not None:
+                where &= (x >= self.x_lim[0]) & (x <= self.x_lim[1])
+
         if y is not None:
-            self.auto_y_lim[0] = np.amin(y, **y_where, initial=self.auto_y_lim[0])
-            self.auto_y_lim[1] = np.amax(y, **y_where, initial=self.auto_y_lim[1])
+            where &= np.isfinite(y)
+            if self.y_lim is not None:
+                where &= (y >= self.y_lim[0]) & (y <= self.y_lim[1])
+
+        if x is not None:
+            self.auto_x_lim = [
+                np.amin(x, where=where, initial=self.auto_x_lim[0]),
+                np.amax(x, where=where, initial=self.auto_x_lim[1]),
+            ]
+
+        if y is not None:
+            self.auto_y_lim = [
+                np.amin(y, where=where, initial=self.auto_y_lim[0]),
+                np.amax(y, where=where, initial=self.auto_y_lim[1]),
+            ]
 
     def draw_entry(
         self,

@@ -1,3 +1,5 @@
+import inspect
+
 import numpy as np
 import pytest
 
@@ -5,7 +7,7 @@ from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import fixed_time_pickoff
 
 
-def test_fixed_time_pickoff():
+def test_fixed_time_pickoff(compare_numba_vs_python):
     """Testing function for the fixed_time_pickoff processor."""
 
     len_wf = 20
@@ -13,72 +15,46 @@ def test_fixed_time_pickoff():
     # test for nan if w_in has a nan
     w_in = np.ones(len_wf)
     w_in[4] = np.nan
-    assert np.isnan(fixed_time_pickoff(w_in, 1, ord("i")))
-
-    a_out = np.empty(len_wf)
-    fixed_time_pickoff.__wrapped__(w_in, 1, ord("i"), a_out)
-    assert np.isnan(a_out[0])
+    assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, 1, ord("i")))
 
     # test for nan if nan is passed to t_in
     w_in = np.ones(len_wf)
-    assert np.isnan(fixed_time_pickoff(w_in, np.nan, ord("i")))
-
-    a_out = np.empty(len_wf)
-    fixed_time_pickoff.__wrapped__(w_in, np.nan, ord("i"), a_out)
-    assert np.isnan(a_out[0])
+    assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, np.nan, ord("i")))
 
     # test for nan if t_in is negative
     w_in = np.ones(len_wf)
-    assert np.isnan(fixed_time_pickoff(w_in, -1, ord("i")))
-
-    a_out = np.empty(len_wf)
-    fixed_time_pickoff.__wrapped__(w_in, -1, ord("i"), a_out)
-    assert np.isnan(a_out[0])
+    assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, -1, ord("i")))
 
     # test for nan if t_in is too large
     w_in = np.ones(len_wf)
-    assert np.isnan(fixed_time_pickoff(w_in, len_wf, ord("i")))
-
-    a_out = np.empty(len_wf)
-    fixed_time_pickoff.__wrapped__(w_in, len_wf, ord("i"), a_out)
-    assert np.isnan(a_out[0])
+    assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, len_wf, ord("i")))
 
     # test for DSPFatal errors being raised
     # noninteger t_in with integer interpolation
     with pytest.raises(DSPFatal):
         w_in = np.ones(len_wf)
         fixed_time_pickoff(w_in, 1.5, ord("i"))
-
     with pytest.raises(DSPFatal):
         a_out = np.empty(len_wf)
-        fixed_time_pickoff.__wrapped__(w_in, 1.5, ord("i"), a_out)
+        inspect.unwrap(fixed_time_pickoff)(w_in, 1.5, ord("i"), a_out)
 
     # unsupported mode_in character
     with pytest.raises(DSPFatal):
         w_in = np.ones(len_wf)
         fixed_time_pickoff(w_in, 1.5, ord(" "))
-
     with pytest.raises(DSPFatal):
         a_out = np.empty(len_wf)
-        fixed_time_pickoff.__wrapped__(w_in, 1.5, ord(" "), a_out)
+        inspect.unwrap(fixed_time_pickoff)(w_in, 1.5, ord(" "), a_out)
 
     # linear tests
     w_in = np.arange(len_wf, dtype=float)
-    assert fixed_time_pickoff(w_in, 3, ord("i")) == 3
-
-    a_out = np.empty(len_wf)
-    fixed_time_pickoff.__wrapped__(w_in, 3, ord("i"), a_out)
-    assert a_out[0] == 3
+    assert compare_numba_vs_python(fixed_time_pickoff, w_in, 3, ord("i")) == 3
 
     chars = ["n", "f", "c", "l", "h", "s"]
     sols = [4, 3, 4, 3.5, 3.5, 3.5]
 
     for char, sol in zip(chars, sols):
-        assert fixed_time_pickoff(w_in, 3.5, ord(char)) == sol
-
-        a_out = np.empty(len_wf)
-        fixed_time_pickoff.__wrapped__(w_in, 3.5, ord(char), a_out)
-        assert a_out[0] == sol
+        assert compare_numba_vs_python(fixed_time_pickoff, w_in, 3.5, ord(char)) == sol
 
     # sine wave tests
     w_in = np.sin(np.arange(len_wf))
@@ -94,11 +70,9 @@ def test_fixed_time_pickoff():
     ]
 
     for char, sol in zip(chars, sols):
-        assert np.isclose(fixed_time_pickoff(w_in, 3.25, ord(char)), sol)
-
-        a_out = np.empty(len_wf)
-        fixed_time_pickoff.__wrapped__(w_in, 3.25, ord(char), a_out)
-        assert np.isclose(a_out[0], sol)
+        assert np.isclose(
+            compare_numba_vs_python(fixed_time_pickoff, w_in, 3.25, ord(char)), sol
+        )
 
     # last few corner cases of 'h'
     w_in = np.sin(np.arange(len_wf))
@@ -109,8 +83,6 @@ def test_fixed_time_pickoff():
     ]
 
     for ftp, sol in zip(ftps, sols):
-        assert np.isclose(fixed_time_pickoff(w_in, ftp, ord("h")), sol)
-
-        a_out = np.empty(len_wf)
-        fixed_time_pickoff.__wrapped__(w_in, ftp, ord("h"), a_out)
-        assert np.isclose(a_out[0], sol)
+        assert np.isclose(
+            compare_numba_vs_python(fixed_time_pickoff, w_in, ftp, ord("h")), sol
+        )
