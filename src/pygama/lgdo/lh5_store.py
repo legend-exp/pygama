@@ -618,6 +618,7 @@ class LH5Store:
                 # have to apply this patch to h5py (or update h5py, if it's
                 # fixed): https://github.com/h5py/h5py/issues/1792
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
+                nda = obj_buf.nda
             else:
                 if n_rows == 0:
                     tmp_shape = (0,) + h5f[name].shape[1:]
