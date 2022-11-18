@@ -12,7 +12,7 @@ def test_basics(lgnd_test_data):
         dsp_config=f"{config_dir}/hpge-dsp-config.json",
         lines=["wf_blsub", "wf_trap", "trapEmax"],
         legend=["waveform", "trapezoidal", "energy = {trapEmax:0.1f}"],
-        styles="seaborn",
+        # styles="seaborn",
         n_drawn=2,
         x_lim=("20*us", "60*us"),
         x_unit="us",
