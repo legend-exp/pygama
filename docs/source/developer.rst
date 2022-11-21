@@ -5,11 +5,15 @@ The following rules and conventions have been established for the package
 development and are enforced throughout the entire code base. Merge requests
 that do not comply to the following directives will be rejected.
 
-To start developing :mod:`pygama`, clone the remote repository:
+To start developing :mod:`pygama`, fork the remote repository to your personal
+GitHub account (see `About Forks <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks>`_).
+If you have not set up your ssh keys on the computer you will be working on,
+please follow `GitHub's instructions <https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent>`_. Once you have your own fork, you can clone it via
+(replace "yourusername" with your GitHub username):
 
 .. code-block:: console
 
-  $ git clone https://github.com/legend-exp/pygama
+  $ git clone git@github.com:yourusername/pygama.git
 
 All extra tools needed to develop :mod:`pygama` are listed as optional
 dependencies and can be installed via pip by running:
@@ -121,6 +125,74 @@ Testing
 
     $ pytest --cov=pygama
 
+Testing Numba-Wrapped Functions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When using Numba to vectorize Python functions, the Python version of the function
+does not, by default, get directly tested, but the Numba version instead. In
+this case, we need to unwrap the Numba function and test the pure Python version.
+With various processors in :mod:`pygama.dsp.processors`, this means that testing
+and triggering the code coverage requires this unwrapping.
+
+Within the testing suite, we use the :func:`@pytest.fixture()<pytest.fixture>`
+decorator to include a helper function called ``compare_numba_vs_python`` that
+can be used in any test. This function runs both the Numba and pure Python versions
+of a function, asserts that they are equal up to floating precision, and returns the
+output value.
+
+As an example, we show a snippet from the test for
+:func:`pygama.dsp.processors.fixed_time_pickoff`, a processor which uses the
+:func:`@numba.guvectorize()<numba.guvectorize>` decorator.
+
+.. code-block:: python
+
+    def test_fixed_time_pickoff(compare_numba_vs_python):
+        """Testing function for the fixed_time_pickoff processor."""
+
+        len_wf = 20
+
+        # test for nan if w_in has a nan
+        w_in = np.ones(len_wf)
+        w_in[4] = np.nan
+        assert np.isnan(compare_numba_vs_python(fixed_time_pickoff, w_in, 1, ord("i")))
+
+In the assertion that the output is what we expect, we use
+``compare_numba_vs_python(fixed_time_pickoff, w_in, 1, ord("i"))`` in place of
+``fixed_time_pickoff(w_in, 1, ord("i"))``. In general, the replacement to make is
+``func(*inputs)`` becomes ``compare_numba_vs_python(func, *inputs)``.
+
+Note, that in cases of testing for the raising of errors, it is recommended
+to instead run the function twice: once with the Numba version, and once using the
+:func:`inspect.unwrap` function. We again show a snippet from the test for
+:func:`pygama.dsp.processors.fixed_time_pickoff` below. We include the various
+required imports in the snippet for verbosity.
+
+.. code-block:: python
+
+    import inspect
+
+    import numpy as np
+    import pytest
+
+    from pygama.dsp.errors import DSPFatal
+    from pygama.dsp.processors import fixed_time_pickoff
+
+    def test_fixed_time_pickoff(compare_numba_vs_python):
+    "skipping parts of function..."
+    # test for DSPFatal errors being raised
+    # noninteger t_in with integer interpolation
+    with pytest.raises(DSPFatal):
+        w_in = np.ones(len_wf)
+        fixed_time_pickoff(w_in, 1.5, ord("i"))
+
+    with pytest.raises(DSPFatal):
+        a_out = np.empty(len_wf)
+        inspect.unwrap(fixed_time_pickoff)(w_in, 1.5, ord("i"), a_out)
+
+In this case, the general idea is to use :func:`pytest.raises` twice, once with
+``func(*inputs)``, and again with ``inspect.unwrap(func)(*inputs)``.
+
+
 Documentation
 -------------
 
@@ -168,6 +240,9 @@ We adopt the following guidelines for writing documentation:
   <https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html>`_.
 * We support also the Markdown format through the `MyST-Parser
   <https://myst-parser.readthedocs.io/en/latest/syntax/syntax.html>`_.
+* Jupyter notebooks placed below ``docs/source/notebooks`` are automatically
+  rendered to HTML pages by the `nbsphinx <https://nbsphinx.readthedocs.io>`_
+  extension.
 
 Building documentation
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -181,7 +256,8 @@ required. You can get all the needed dependencies by running:
   $ cd pygama
   $ pip install '.[docs]'
 
-To build documentation, run the following commands:
+`Pandoc <https://pandoc.org/installing.html>`_ is also required to render
+Jupyter notebooks. To build documentation, run the following commands:
 
 .. code-block:: console
 
@@ -226,3 +302,9 @@ new project version must implement the following procedures:
 
        $ git push origin releases/vMAJOR.MINOR
        $ git push origin refs/tags/vMAJOR.MINOR.PATCH
+
+* To upload the release to the `Python Package Index
+  <https://pypi.org/project/pygama>`_, a new release must be created through
+  `the GitHub interface <https://github.com/legend-exp/pygama/releases/new>`_,
+  associated to the just created tag.  Usage of the "Generate release notes"
+  option is recommended.

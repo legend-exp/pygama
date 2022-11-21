@@ -1,0 +1,21 @@
+{
+  "levels": {
+    "hit": {
+      "tiers": ["raw", "dsp", "hit"]
+    },
+    "tcm": {
+      "tiers": ["tcm"],
+      "parent": "hit",
+      "child": "evt",
+      "tcm_cols": {
+        "child_idx": "coin_idx",
+        "parent_tb": "array_id",
+        "parent_idx": "array_idx"
+      }
+    },
+    "evt": {
+      "tiers": ["evt"]
+    }
+  },
+  "channel_map": {}
+}
