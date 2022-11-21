@@ -1,5 +1,5 @@
 {
-    "outputs": ["energies", "channel", "trigger_pos","wf_dplms","dplms_max"],
+    "outputs": ["curr","energies","trigger_pos","wf_dplms","energies_dplms","trigger_pos_dplms"],
     "processors": {
 	"wf_gaus": {
 	    "function": "gaussian_filter1d",
@@ -74,12 +74,6 @@
             "args" : ["waveform[:50]", "bl_mean", "bl_std", "bl_slope", "bl_intercept"],
             "unit": ["ADC", "ADC", "ADC", "ADC"]
         },
-        "wf_blsub":{
-            "function": "bl_subtract",
-            "module": "pygama.dsp.processors",
-            "args": ["waveform", "bl_mean", "wf_blsub"],
-            "unit": "ADC"
-        },
 	"wf_diff": {
 	    "function": "avg_current",
 	    "module": "pygama.dsp.processors",
@@ -96,12 +90,59 @@
 		"db.dplms.reference",
 		"50", "0.01", "1", "0", "0"]
 	},
-	"dplms_max": {
-	    "function": "amax",
-	    "module": "numpy",
-	    "args": ["wf_dplms", 1, "dplms_max"],
-	    "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
-	    "unit": "ADC"
+	"h_weights , h_borders": {
+	    "function": "histogram",
+	    "module": "pygama.dsp.processors.histogram",
+	    "args": ["wf_dplms", "h_weights(100)", "h_borders(101)"],
+	    "unit": ["none", "ADC"]
+	},
+	"fwhm_d, idx_out_d, max_out_d": {
+	    "function": "histogram_stats",
+	    "module": "pygama.dsp.processors.histogram",
+	    "args": [
+		"h_weights",
+		"h_borders",
+		"idx_out_d",
+		"max_out_d",
+		"fwhm_d",
+		"np.nan"
+	    ],
+	    "unit": ["ADC", "non", "ADC"]
+	},
+	"vt_max_candidate_out_d, vt_min_out_d, n_max_out_d, n_min_out_d, flag_out_d": {
+	    "function": "get_multi_local_extrema",
+	    "module": "pygama.dsp.processors.get_multi_local_extrema",
+	    "args": [
+		"wf_dplms",
+		10,
+		"3*fwhm_d",
+		0,
+		"vt_max_candidate_out_d(20)",
+		"vt_min_out_d(20)",
+		"n_max_out_d",
+		"n_min_out_d",
+		"flag_out_d"
+	    ],
+	    "unit": ["ns", "ns", "none", "none", "none"]
+	},
+	"trigger_pos_dplms, no_out_d": {
+	    "function": "peak_snr_threshold",
+	    "module": "pygama.dsp.processors.peak_snr_threshold",
+	    "args": [
+		"wf_dplms",
+		"vt_max_candidate_out_d",
+		0.8,
+		10,
+		"trigger_pos_dplms",
+		"no_out_d"
+	    ],
+	    "unit": ["ns", "none"]
+	},
+	"energies_dplms": {
+	    "function": "multi_a_filter",
+	    "module": "pygama.dsp.processors.multi_a_filter",
+	    "args": ["wf_dplms", "trigger_pos_dplms", "energies_dplms"],
+	    "unit": ["ADC"]
 	}
     }
 }
