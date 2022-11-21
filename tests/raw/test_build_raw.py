@@ -140,3 +140,21 @@ def test_build_raw_overwrite(lgnd_test_data):
         build_raw(
             in_stream=lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
         )
+
+
+def test_build_raw_orca_sis3316(lgnd_test_data):
+    out_file = "/tmp/coherent-run1141-bkg.lh5"
+    out_spec = {
+        "ORSIS3316WaveformDecoder": {
+            "Card1": {"key_list": [48], "out_stream": out_file}
+        }
+    }
+
+    build_raw(
+        in_stream=lgnd_test_data.get_path("orca/sis3316/coherent-run1141-bkg.orca"),
+        out_spec=out_spec,
+        n_max=10,
+        overwrite=True,
+    )
+
+    assert os.path.exists(out_file)

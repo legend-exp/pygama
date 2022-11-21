@@ -14,13 +14,14 @@ from collections import defaultdict
 from typing import Any, Union
 
 import h5py
+import numba as nb
 import numpy as np
 import pandas as pd
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import parse_datatype
+from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
@@ -56,7 +57,7 @@ class LH5Store:
             whether to keep files open by storing the :mod:`h5py` objects as
             class attributes.
         """
-        self.base_path = base_path
+        self.base_path = "" if base_path == "" else expand_path(base_path)
         self.keep_open = keep_open
         self.files = {}
 
@@ -72,6 +73,8 @@ class LH5Store:
         """
         if isinstance(lh5_file, h5py.File):
             return lh5_file
+        if mode == "r":
+            lh5_file = expand_path(lh5_file)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
@@ -257,7 +260,10 @@ class LH5Store:
             return obj_buf, n_rows_read
 
         # start read from single file. fail if the object is not found
-        log.debug(f"reading '{name}' from {lh5_file}")
+        log.debug(
+            f"reading '{name}' from {lh5_file}"
+            + (f" with field mask {field_mask}" if field_mask else "")
+        )
 
         # get the file from the store
         h5f = self.gimme_file(lh5_file, "r")
@@ -285,7 +291,7 @@ class LH5Store:
             elif isinstance(field_mask, dict):
                 default = True
                 if len(field_mask) > 0:
-                    default = not field_mask[field_mask.keys[0]]
+                    default = not field_mask[list(field_mask.keys())[0]]
                 field_mask = defaultdict(lambda: default, field_mask)
             elif isinstance(field_mask, (list, tuple)):
                 field_mask = defaultdict(
@@ -381,7 +387,12 @@ class LH5Store:
                     obj_buf.resize(obj_buf_start + n_rows_read)
                 rows_read.append(n_rows_read)
             # warn if all columns don't read in the same number of rows
-            n_rows_read = rows_read[0]
+            if len(rows_read) > 0:
+                n_rows_read = rows_read[0]
+            else:
+                n_rows_read = 0
+                log.warning(f"Table '{name}' has no subgroups accepted by field mask")
+
             for n in rows_read[1:]:
                 if n != n_rows_read:
                     log.warning(
@@ -436,14 +447,6 @@ class LH5Store:
             if obj_buf is not None and not isinstance(obj_buf, VectorOfVectors):
                 raise ValueError(f"obj_buf for '{name}' not a LGDO VectorOfVectors")
 
-            if idx is not None:
-                raise NotImplementedError(
-                    "fancy indexed readout not implemented for VectorOfVectors"
-                )
-                # TODO: implement idx: first pull out all of cumulative length,
-                # use it to build an idx for the data_array, then rebuild
-                # cumulative length
-
             # read out cumulative_length
             cumulen_buf = None if obj_buf is None else obj_buf.cumulative_length
             cumulative_length, n_rows_read = self.read_object(
@@ -451,6 +454,7 @@ class LH5Store:
                 h5f,
                 start_row=start_row,
                 n_rows=n_rows,
+                idx=idx,
                 obj_buf=cumulen_buf,
                 obj_buf_start=obj_buf_start,
             )
@@ -459,65 +463,106 @@ class LH5Store:
                 obj_buf_start : obj_buf_start + n_rows_read
             ]
 
-            # determine the start_row and n_rows for the flattened_data readout
-            da_start = 0
-            if start_row > 0 and n_rows_read > 0:
-                # need to read out the cumulen sample -before- the first sample
-                # read above in order to get the starting row of the first
-                # vector to read out in flattened_data
-                da_start = h5f[f"{name}/cumulative_length"][start_row - 1]
+            if idx is not None and n_rows_read > 0:
+                # get the starting indices for each array in flattended data:
+                # the starting index for array[i] is cumulative_length[i-1]
+                idx2 = (np.asarray(idx[0]).copy() - 1,)
+                # re-read cumulative_length with these indices
+                # note this will allocate memory for fd_starts!
+                fd_start = None
+                if idx2[0][0] == -1:
+                    idx2 = (idx2[0][1:],)
+                    fd_start = 0  # this variable avoids an ndarray append
+                fd_starts, fds_n_rows_read = self.read_object(
+                    f"{name}/cumulative_length",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx2,
+                )
+                fd_starts = fd_starts.nda  # we just need the nda
+                if fd_start is None:
+                    fd_start = fd_starts[0]
 
-                # check limits for values that will be used subsequently
-                if this_cumulen_nda[-1] < da_start:
-                    log.debug(
-                        f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
-                        f"da_start = {da_start}, "
-                        f"start_row = {start_row}, "
-                        f"n_rows_read = {n_rows_read}"
-                    )
-                    raise RuntimeError(
-                        f"cumulative_length non-increasing between entries "
-                        f"{start_row} and {start_row+n_rows_read} ??"
-                    )
+                # compute the length that flattened_data will have after the
+                # fancy-indexed read
+                fd_n_rows = np.sum(this_cumulen_nda[-len(fd_starts) :] - fd_starts)
+                if fd_start == 0:
+                    fd_n_rows += this_cumulen_nda[0]
 
-            # determine the number of rows for the flattened_data readout
-            da_nrows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
+                # now make fd_idx
+                fd_idx = np.empty(fd_n_rows, dtype="uint32")
+                fd_idx = _make_fd_idx(fd_starts, this_cumulen_nda, fd_idx)
 
-            # Now done with this_cumulen_nda, so we can clean it up to be ready
-            # to match the in-memory version of flattened_data. Note: these
-            # operations on the view change the original array because they are
-            # numpy arrays, not lists.
-            #
-            # First we need to subtract off the in-file offset for the start of
-            # read for flattened_data
-            this_cumulen_nda -= da_start
+                # Now clean up this_cumulen_nda, to be ready
+                # to match the in-memory version of flattened_data. Note: these
+                # operations on the view change the original array because they are
+                # numpy arrays, not lists.
+                this_cumulen_nda[-len(fd_starts) :] -= fd_starts
+                np.cumsum(this_cumulen_nda, out=this_cumulen_nda)
 
-            # Then, if we started with a partially-filled buffer, add the
+            else:
+                fd_idx = None
+
+                # determine the start_row and n_rows for the flattened_data readout
+                fd_start = 0
+                if start_row > 0 and n_rows_read > 0:
+                    # need to read out the cumulen sample -before- the first sample
+                    # read above in order to get the starting row of the first
+                    # vector to read out in flattened_data
+                    fd_start = h5f[f"{name}/cumulative_length"][start_row - 1]
+
+                    # check limits for values that will be used subsequently
+                    if this_cumulen_nda[-1] < fd_start:
+                        log.debug(
+                            f"this_cumulen_nda[-1] = {this_cumulen_nda[-1]}, "
+                            f"fd_start = {fd_start}, "
+                            f"start_row = {start_row}, "
+                            f"n_rows_read = {n_rows_read}"
+                        )
+                        raise RuntimeError(
+                            f"cumulative_length non-increasing between entries "
+                            f"{start_row} and {start_row+n_rows_read} ??"
+                        )
+
+                # determine the number of rows for the flattened_data readout
+                fd_n_rows = this_cumulen_nda[-1] if n_rows_read > 0 else 0
+
+                # Now done with this_cumulen_nda, so we can clean it up to be ready
+                # to match the in-memory version of flattened_data. Note: these
+                # operations on the view change the original array because they are
+                # numpy arrays, not lists.
+                #
+                # First we need to subtract off the in-file offset for the start of
+                # read for flattened_data
+                this_cumulen_nda -= fd_start
+
+            # If we started with a partially-filled buffer, add the
             # appropriate offset for the start of the in-memory flattened
             # data for this read.
-            da_buf_start = 0
+            fd_buf_start = np.uint32(0)
             if obj_buf_start > 0:
-                da_buf_start = cumulative_length.nda[obj_buf_start - 1]
-                this_cumulen_nda += da_buf_start
+                fd_buf_start = cumulative_length.nda[obj_buf_start - 1]
+                this_cumulen_nda += fd_buf_start
 
             # Now prepare the object buffer if necessary
-            da_buf = None
+            fd_buf = None
             if obj_buf is not None:
-                da_buf = obj_buf.flattened_data
-                # grow da_buf if necessary to hold the data
-                dab_size = da_buf_start + da_nrows
-                if len(da_buf) < dab_size:
-                    da_buf.resize(dab_size)
+                fd_buf = obj_buf.flattened_data
+                # grow fd_buf if necessary to hold the data
+                fdb_size = fd_buf_start + fd_n_rows
+                if len(fd_buf) < fdb_size:
+                    fd_buf.resize(fdb_size)
 
             # now read
             flattened_data, dummy_rows_read = self.read_object(
                 f"{name}/flattened_data",
                 h5f,
-                start_row=da_start,
-                n_rows=da_nrows,
-                idx=idx,
-                obj_buf=da_buf,
-                obj_buf_start=da_buf_start,
+                start_row=fd_start,
+                n_rows=fd_n_rows,
+                idx=fd_idx,
+                obj_buf=fd_buf,
+                obj_buf_start=fd_buf_start,
             )
             if obj_buf is not None:
                 return obj_buf, n_rows_read
@@ -575,6 +620,7 @@ class LH5Store:
                 # have to apply this patch to h5py (or update h5py, if it's
                 # fixed): https://github.com/h5py/h5py/issues/1792
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
+                nda = obj_buf.nda
             else:
                 if n_rows == 0:
                     tmp_shape = (0,) + h5f[name].shape[1:]
@@ -728,9 +774,31 @@ class LH5Store:
                     write_start = len_cl
                 if len_cl > 0:
                     offset = group["cumulative_length"][write_start - 1]
+
+            # First write flattened_data array. Only write rows with data.
+            fd_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row - 1]
+            fd_n_rows = obj.cumulative_length.nda[start_row + n_rows - 1] - fd_start
+            self.write_object(
+                obj.flattened_data,
+                "flattened_data",
+                lh5_file,
+                group=group,
+                start_row=fd_start,
+                n_rows=fd_n_rows,
+                wo_mode=wo_mode,
+                write_start=offset,
+            )
+
+            # now offset is used to give appropriate in-file values for
+            # cumulative_length. Need to adjust it for start_row
+            if start_row > 0:
+                offset -= obj.cumulative_length.nda[start_row - 1]
+
             # Add offset to obj.cumulative_length itself to avoid memory allocation.
-            # Then subtract it off after writing!
+            # Then subtract it off after writing! (otherwise it will be changed
+            # upon return)
             obj.cumulative_length.nda += offset
+
             self.write_object(
                 obj.cumulative_length,
                 "cumulative_length",
@@ -743,19 +811,6 @@ class LH5Store:
             )
             obj.cumulative_length.nda -= offset
 
-            # now write data array. Only write rows with data.
-            da_start = 0 if start_row == 0 else obj.cumulative_length.nda[start_row - 1]
-            da_n_rows = obj.cumulative_length.nda[n_rows - 1] - da_start
-            self.write_object(
-                obj.flattened_data,
-                "flattened_data",
-                lh5_file,
-                group=group,
-                start_row=da_start,
-                n_rows=da_n_rows,
-                wo_mode=wo_mode,
-                write_start=offset,
-            )
             return
 
         # if we get this far, must be one of the Array types
@@ -846,9 +901,10 @@ class LH5Store:
         raise RuntimeError(f"don't know how to read datatype '{datatype}'")
 
 
-def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
+def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
     """Return a list of LH5 groups in the input file and group, similar
     to ``ls`` or ``h5ls``. Supports wildcards in group names.
+
 
     Parameters
     ----------
@@ -858,6 +914,11 @@ def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
         group to search. add a ``/`` to the end of the group name if you want to
         list all objects inside that group.
     """
+
+    log.debug(
+        f"Listing objects in '{lh5_file}'"
+        + ("" if lh5_group == "" else f" (and group {lh5_group})")
+    )
 
     lh5_st = LH5Store()
     # To use recursively, make lh5_file a h5group instead of a string
@@ -879,6 +940,92 @@ def ls(lh5_file: str, lh5_group: str = "") -> list[str]:
         for key in matchingkeys:
             ret.extend([f"{key}/{path}" for path in ls(lh5_file[key], splitpath[1])])
         return ret
+
+
+def show(
+    lh5_file: str | h5py.Group,
+    lh5_group: str = "/",
+    indent: str = "",
+    header: bool = True,
+) -> None:
+    """Print a tree of LH5 file contents with LGDO datatype.
+
+    Parameters
+    ----------
+    lh5_file
+        the LH5 file.
+    lh5_group
+        print only contents of this HDF5 group.
+    indent
+        indent the diagram with this string.
+    header
+        print `lh5_group` at the top of the diagram.
+
+    Examples
+    --------
+    >>> from pygama.lgdo import show
+    >>> show("file.lh5", "/geds/raw")
+    /geds/raw
+    ├── channel · array<1>{real}
+    ├── energy · array<1>{real}
+    ├── timestamp · array<1>{real}
+    ├── waveform · table{t0,dt,values}
+    │   ├── dt · array<1>{real}
+    │   ├── t0 · array<1>{real}
+    │   └── values · array_of_equalsized_arrays<1,1>{real}
+    └── wf_std · array<1>{real}
+    """
+    # open file
+    if isinstance(lh5_file, str):
+        lh5_file = h5py.File(expand_path(lh5_file), "r")
+
+    # go to group
+    if lh5_group != "/":
+        lh5_file = lh5_file[lh5_group]
+
+    if header:
+        print(f"\033[1m{lh5_group}\033[0m")  # noqa: T201
+
+    # get an iterator over the keys in the group
+    it = iter(lh5_file)
+    key = None
+
+    # make sure there is actually something in this file/group
+    try:
+        key = next(it)  # get first key
+    except StopIteration:
+        print(f"{indent}└──  empty")  # noqa: T201
+        return
+
+    # loop over keys
+    while True:
+        val = lh5_file[key]
+        # we want to print the LGDO datatype
+        attr = val.attrs.get("datatype", default="no datatype")
+        if attr == "no datatype" and isinstance(val, h5py.Group):
+            attr = "HDF5 group"
+
+        # is this the last key?
+        killme = False
+        try:
+            k_new = next(it)  # get next key
+        except StopIteration:
+            char = "└──"
+            killme = True  # we'll have to kill this loop later
+        else:
+            char = "├──"
+
+        print(f"{indent}{char} \033[1m{key}\033[0m · {attr}")  # noqa: T201
+
+        # if it's a group, call this function recursively
+        if isinstance(val, h5py.Group):
+            show(val, indent=indent + ("    " if killme else "│   "), header=False)
+
+        # break or move to next key
+        if killme:
+            break
+        else:
+            key = k_new
 
 
 def load_nda(
@@ -1033,10 +1180,17 @@ class LH5Iterator:
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
-            lh5_files = [lh5_files]
-        self.lh5_files = [
-            f for f_wc in lh5_files for f in sorted(glob.glob(os.path.expandvars(f_wc)))
-        ]
+            lh5_files = expand_path(lh5_files, True)
+        elif not isinstance(lh5_files, list):
+            raise ValueError("lh5_files must be a string or list of strings")
+
+        if entry_list is not None and entry_mask is not None:
+            raise ValueError(
+                "entry_list and entry_mask arguments are mutually exclusive"
+            )
+
+        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
+
         # Map to last row in each file
         self.file_map = np.array(
             [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
@@ -1052,7 +1206,7 @@ class LH5Iterator:
                 field_mask=field_mask,
             )
         else:
-            None
+            raise RuntimeError(f"can't open any files from {lh5_files}")
 
         self.n_rows = 0
         self.current_entry = 0
@@ -1143,3 +1297,18 @@ class LH5Iterator:
             buf, n_rows = self.read(entry)
             yield (buf, entry, n_rows)
             entry += n_rows
+
+
+@nb.njit(parallel=False, fastmath=True)
+def _make_fd_idx(starts, stops, idx):
+    k = 0
+    if len(starts) < len(stops):
+        for i in range(stops[0]):
+            idx[k] = i
+            k += 1
+        stops = stops[1:]
+    for j in range(len(starts)):
+        for i in range(starts[j], stops[j]):
+            idx[k] = i
+            k += 1
+    return (idx,)

@@ -1,0 +1,18 @@
+{
+  "outputs": ["energy_in_pe", "quality_cut", "trigger_pos"],
+  "operations": {
+    "energy_in_pe": {
+      "expression": "a + m * energies",
+      "parameters": {
+        "a": -0.00391,
+        "m": 0.06087
+      }
+    },
+    "quality_cut": {
+      "expression": "energy_in_pe > a",
+      "parameters": {
+        "a": 0.3
+      }
+    }
+  }
+}

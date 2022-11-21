@@ -6,6 +6,7 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
@@ -69,7 +70,10 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
-        forceobj=True,
+        **nb_kwargs(
+            cache=False,
+            forceobj=True,
+        ),
     )
     def cusp_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
@@ -172,7 +176,10 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
-        forceobj=True,
+        **nb_kwargs(
+            cache=False,
+            forceobj=True,
+        ),
     )
     def zac_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
@@ -233,13 +240,19 @@ def t0_filter(rise: int, fall: int) -> Callable:
     if fall < 0:
         raise DSPFatal("The length of the fall section must be positive")
 
-    t0_kern = np.arange(2 / float(rise), 0, -2 / (float(rise) ** 2))
-    t0_kern = np.append(t0_kern, np.zeros(int(fall)) - (1 / float(fall)))
+    t0_kern = np.zeros(int(rise) + int(fall))
+    for i in range(int(rise)):
+        t0_kern[i] = 2 * (int(rise) - i) / (rise**2)
+    for i in range(int(rise), len(t0_kern), 1):
+        t0_kern[i] = -1 / fall
 
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
-        forceobj=True,
+        **nb_kwargs(
+            cache=False,
+            forceobj=True,
+        ),
     )
     def t0_filter_out(w_in: np.ndarray, w_out: np.ndarray) -> None:
         """
