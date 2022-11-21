@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+import numpy as np
+from numba import guvectorize
+
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
+
+@guvectorize(
+    [
+        "void(float32[:], int32[:])",
+        "void(float64[:], int64[:])",
+        "void(float32[:], uint32[:])",
+        "void(float64[:], uint64[:])",
+    ],
+    "(n),(m)",
+    **nb_kwargs,
+)
+def unnorm_presum(w_in: np.ndarray, w_out: np.ndarray) -> None:
+    """Presum the waveform, without normalization by the length of a chunk.
+
+    Combine bins in chunks of ``len(w_in) / len(w_out)``, which is hopefully an
+    integer. If it isn't, then some samples at the end will be omitted.
+
+    Parameters
+    ----------
+    w_in
+        the input waveform.
+    w_out
+        the output waveform.
+    """
+    w_out[:] = np.nan
+
+    if np.isnan(w_in).any():
+        return
+
+    ps_fact = len(w_in) // len(w_out)
+    for i in range(0, len(w_out), 1):
+        j0 = i * ps_fact
+        w_out[i] = w_in[j0]
+        for j in range(j0 + 1, j0 + ps_fact, 1):
+            w_out[i] += w_in[j]
