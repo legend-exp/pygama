@@ -61,6 +61,7 @@ several advantages:
 
 from .bl_subtract import bl_subtract
 from .convolutions import cusp_filter, t0_filter, zac_filter
+from .dplms import dplms_filter
 from .dwt import discrete_wavelet_transform
 from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
@@ -92,7 +93,6 @@ from .trap_filters import asym_trap_filter, trap_filter, trap_norm, trap_pickoff
 from .upsampler import interpolating_upsampler, upsampler
 from .wiener_filter import wiener_filter
 from .windower import windower
-from .dplms import dplms_filter
 
 __all__ = [
     "bl_subtract",
