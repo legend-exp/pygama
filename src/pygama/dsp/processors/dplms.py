@@ -19,13 +19,13 @@ def dplms_filter(
     ff: int,
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
-    
+
     Note
     ----
     This processor is composed of a factory function that is called using the
     `init_args` argument. The input and output waveforms are passed using
     `args`.
-    
+
     Parameters
     ----------
     noise_mat
@@ -45,9 +45,9 @@ def dplms_filter(
 
     JSON Configuration Example
     --------------------------
-    
+
     .. code-block :: json
-    
+
         "wf_dplms": {
             "function": "dplms_filter",
             "module": "pygama.dsp.processors",
