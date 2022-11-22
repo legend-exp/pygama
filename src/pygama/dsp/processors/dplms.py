@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from typing import Callable
+
 import numpy as np
-import scipy.signal as signal
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
@@ -9,14 +10,22 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 def dplms_filter(
-    noise_mat: list, reference: list, length: int, a1: float, a2: int, a3: int, ff: int
+    noise_mat: list,
+    reference: list,
+    length: int,
+    a1: float,
+    a2: float,
+    a3: float,
+    ff: int,
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
+    
     Note
     ----
     This processor is composed of a factory function that is called using the
     `init_args` argument. The input and output waveforms are passed using
     `args`.
+    
     Parameters
     ----------
     noise_mat
@@ -36,7 +45,9 @@ def dplms_filter(
 
     JSON Configuration Example
     --------------------------
+    
     .. code-block :: json
+    
         "wf_dplms": {
             "function": "dplms_filter",
             "module": "pygama.dsp.processors",
@@ -88,7 +99,7 @@ def dplms_filter(
     # filter calculation
     mat = a1 * noise_mat + a2 * ref_mat + a3 * np.ones([length, length])
     x = np.linalg.solve(mat, ref_sig)
-    conv = signal.convolve(reference, x, mode="valid")
+    # conv = signal.convolve(reference, x, mode="valid")
 
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
