@@ -410,7 +410,7 @@ def write_to_lh5_and_clear(
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
     trim_config
-        A dsp config that, if present, is used to do data trimming
+        A DSP config that, if present, is used to do data trimming
     """
     if lh5_store is None:
         lh5_store = lgdo.LH5Store()
@@ -432,7 +432,7 @@ def write_to_lh5_and_clear(
             # overwrite the filename to include the _tier flag:
             filename = filename.replace(".", "_trim.")
             # check to see if waveforms are part of the rb.lgdo
-            if type(rb.lgdo) == lgdo.Table or type(rb.lgdo) == lgdo.Struct:
+            if isinstance(rb.lgdo, lgdo.Table) or isinstance(rb.lgdo, lgdo.Struct):
                 if "waveform" in rb.lgdo.keys():
                     # trim the data in-place on rb.lgdo
                     # the waveform names are updated in data_trimmer

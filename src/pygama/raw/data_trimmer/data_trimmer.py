@@ -10,14 +10,17 @@ from pygama.lgdo import Array, Struct, Table
 
 def data_trimmer(lgdo_table: Table | Struct, dsp_config: str | dict) -> None:
     """
-    Takes in an lgdo table that contains waveforms, performs user specified dsp on the table, and then updates the table in place
+    Takes in an :class:`~.lgdo.table.Table` that contains waveforms, performs user specified
+    DSP on the table, and then updates the table in place.
 
     Parameters
     ----------
     lgdo_table
-        An lgdo Table or Struct that must contain waveforms so that the dsp can work!
+        An :class:`~.lgdo.table.Table` or :class:`~.lgdo.struct.Struct` that must contain waveforms so that the DSP
+        can work!
     dsp_config
-        Either the path to the dsp json config file to use, or a dictionary of dsp config
+        Either the path to the DSP JSON config file to use, or a dictionary
+        of DSP config.
 
     Notes
     -----
@@ -94,7 +97,7 @@ def data_trimmer(lgdo_table: Table | Struct, dsp_config: str | dict) -> None:
 
 def process_presum_dt(dts: Array, presum_rate: int) -> Array:
     """
-    Multiply a waveform's dts by the presumming rate, used for presummed waveforms
+    Multiply a waveform's `dts` by the presumming rate, used for presummed waveforms.
     """
     # don't want to modify the original lgdo_table dts
     copy_dts = copy.deepcopy(dts)
@@ -106,7 +109,8 @@ def process_presum_dt(dts: Array, presum_rate: int) -> Array:
 
 def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     """
-    Transform the t0 of a waveform to number of samples, and then shift by the start_index of a windowed waveform
+    Transform the ``t0`` of a waveform to number of samples, and then shift
+    by the `start_index` of a windowed waveform.
     """
     # don't want to modify the original lgdo_table dts
     copy_dts = copy.deepcopy(dts)

@@ -67,7 +67,7 @@ def build_raw(
         sets whether to overwrite the output file(s) if it (they) already exist.
 
     trim_config
-        dsp config used for data trimming. If none, no data trimming is performed.
+        DSP config used for data trimming. If ``None``, no data trimming is performed.
 
     **kwargs
         sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
