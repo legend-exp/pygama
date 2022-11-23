@@ -37,7 +37,7 @@ sto = lh5.LH5Store()
 
 
 def run_optimisation(
-    file, opt_config, dsp_config, cuts, fom, db_dict=None, n_events=8000, **fom_kwargs
+    file, opt_config, dsp_config, cuts, fom, db_dict=None, n_events=8000, wf_field="waveform",**fom_kwargs
 ):
     """
     Runs optimisation on .lh5 file
@@ -60,9 +60,9 @@ def run_optimisation(
         Number of events to run over
     """
     grid = set_par_space(opt_config)
-    waveforms = sto.read_object("/raw/waveform", file, idx=cuts, n_rows=n_events)[0]
+    waveforms = sto.read_object(f"/raw/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
     baseline = sto.read_object("/raw/baseline", file, idx=cuts, n_rows=n_events)[0]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid(tb_data, dsp_config, grid, fom, db_dict, **fom_kwargs)
 
 
@@ -131,12 +131,12 @@ def run_optimisation_multiprocessed(
         fom_kwargs = form_dict(fom_kwargs, len(grid))
     sto = lh5.LH5Store()
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/{wf_field}", file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(f"{lh5_path}/baseline", file, idx=cuts, n_rows=n_events)[
         0
     ]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid_multiprocess_parallel(
         tb_data,
         dsp_config,
@@ -895,6 +895,7 @@ def event_selection(
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     energy_parameter="trapTmax",
+    wf_field:str = "waveform",
     n_events=10000,
     threshold=1000,
 ):
@@ -964,12 +965,12 @@ def event_selection(
     idxs = np.array(sorted(np.concatenate(masks)))
 
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", raw_files, idx=idxs, n_rows=len(idxs)
+        f"{lh5_path}/{wf_field}", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
-    input_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    input_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:

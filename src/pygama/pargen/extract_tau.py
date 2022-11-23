@@ -33,6 +33,7 @@ def run_tau(
     lh5_path: str,
     n_events: int = 10000,
     threshold: int = 5000,
+    wf_field: str = "waveform"
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
@@ -49,12 +50,12 @@ def run_tau(
     cuts = np.where((df.daqenergy.values > threshold) & (ids))[0]
 
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", raw_file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
     )[0]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return tb_data
 
 
@@ -194,6 +195,9 @@ def dsp_preprocess_decay_const(
     display: int = 0,
     opt_dict: dict = None,
     threshold: int = 5000,
+    wf_field: str = "waveform",
+    wf_plot: str = "wf_pz",
+    norm_param: str = "pz_mean",
     cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "bl_slope": 4},
 ) -> dict:
     """
@@ -213,7 +217,7 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = run_tau(raw_files, dsp_config, lh5_path, threshold=threshold)
+    tb_data = run_tau(raw_files, dsp_config, lh5_path, wf_field=wf_field, threshold=threshold)
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
     cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
@@ -221,7 +225,6 @@ def dsp_preprocess_decay_const(
     idxs = cts.get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
     slopes = tb_out["tail_slope"].nda
-    wfs = tb_out["wf_blsub"]["values"].nda
     log.debug("Calculating pz constant")
     if display>0:
         tau_dict,plot_dict = get_decay_constant(slopes[idxs], display=display)
@@ -237,12 +240,16 @@ def dsp_preprocess_decay_const(
         tau_dict["pz"].update(out_dict["pz"])
     if display>0:
         tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict = tau_dict)
-        wfs = tb_out["wf_pz"]["values"].nda[idxs]
-        means = tb_out["pz_mean"].nda[idxs]
         wf_idxs = np.random.choice(len(wfs), 100)
+        wfs = tb_out[wf_plot]["values"].nda[idxs]
+        if norm_param is not None:
+            means = tb_out["norm_param"].nda[idxs]
+            wfs = np.divide(wfs[wf_idx], means[wf_idx])
+        else:
+            wfs = wfs[wf_idx]
         fig2 = plt.figure()
         for wf_idx in wf_idxs:
-            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), np.divide(wfs[wf_idx], means[wf_idx]))
+            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), wfs)
         plt.axhline(1, color="black")
         plt.axhline(0, color="black")
         plt.xlabel("Samples")
