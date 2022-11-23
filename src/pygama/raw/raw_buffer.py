@@ -66,6 +66,7 @@ from typing import Union
 
 from pygama import lgdo
 from pygama.lgdo.lh5_store import LH5Store
+from pygama.raw.data_trimmer.data_trimmer import data_trimmer
 
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
@@ -390,7 +391,10 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
 
 
 def write_to_lh5_and_clear(
-    raw_buffers: list[RawBuffer], lh5_store: LH5Store = None, wo_mode: str = "append"
+    raw_buffers: list[RawBuffer],
+    lh5_store: LH5Store = None,
+    wo_mode: str = "append",
+    trim_config: str | dict = None,
 ) -> None:
     r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
     them.
@@ -405,6 +409,8 @@ def write_to_lh5_and_clear(
         files (saves some time opening / closing files)
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
+    trim_config
+        A dsp config that, if present, is used to do data trimming
     """
     if lh5_store is None:
         lh5_store = lgdo.LH5Store()
@@ -420,6 +426,18 @@ def write_to_lh5_and_clear(
             group = rb.out_stream[ii + 1 :]
             if len(group) == 0:
                 group = "/"  # in case out_stream ends with :
+
+        # If we have a trim_config, then trim the data and write that to the file!
+        if trim_config is not None:
+            # overwrite the filename to include the _tier flag:
+            filename = filename.replace(".", "_trim.")
+            # check to see if waveforms are part of the rb.lgdo
+            if type(rb.lgdo) == lgdo.Table or type(rb.lgdo) == lgdo.Struct:
+                if "waveform" in rb.lgdo.keys():
+                    # trim the data in-place on rb.lgdo
+                    # the waveform names are updated in data_trimmer
+                    data_trimmer(rb.lgdo, trim_config)
+
         # write if requested...
         if filename != "":
             lh5_store.write_object(

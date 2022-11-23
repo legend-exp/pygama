@@ -26,6 +26,7 @@ def build_raw(
     buffer_size: int = 8192,
     n_max: int = np.inf,
     overwrite: bool = False,
+    trim_config: str | dict = None,
     **kwargs,
 ) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
@@ -64,6 +65,9 @@ def build_raw(
 
     overwrite
         sets whether to overwrite the output file(s) if it (they) already exist.
+
+    trim_config
+        dsp config used for data trimming. If none, no data trimming is performed.
 
     **kwargs
         sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
@@ -205,7 +209,7 @@ def build_raw(
 
     # Write header data
     lh5_store = lgdo.LH5Store(keep_open=True)
-    write_to_lh5_and_clear(header_data, lh5_store)
+    write_to_lh5_and_clear(header_data, lh5_store, trim_config=trim_config)
 
     # Now loop through the data
     n_bytes_last = streamer.n_bytes_read
@@ -224,7 +228,7 @@ def build_raw(
             n_read += rb.loc
         if log.getEffectiveLevel() >= logging.INFO and n_max < np.inf:
             progress_bar.update(n_read)
-        write_to_lh5_and_clear(chunk_list, lh5_store)
+        write_to_lh5_and_clear(chunk_list, lh5_store, trim_config=trim_config)
         if n_max <= 0:
             break
 
