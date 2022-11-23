@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 
 def load_aoe(
-    files: list, lh5_path: str, cal_dict: dict, energy_param: str, cal_energy_param: str
+    files: list, lh5_path: str, cal_dict: dict, energy_param: str, cal_energy_param: str, cut_field:str="Cal_cuts"
 ) -> tuple(np.array, np.array, np.array, np.array):
 
     """
@@ -1184,6 +1184,7 @@ def cal_aoe(
     energy_param: str,
     cal_energy_param: str,
     eres_pars: list,
+    cut_field:str = "Cal_cuts",
     dt_corr: bool = False,
     display: int = 0,
 ) -> tuple(dict, dict):
@@ -1192,7 +1193,7 @@ def cal_aoe(
     """
 
     aoe_uncorr, energy, dt, full_dt = load_aoe(
-        files, lh5_path, cal_dict, energy_param, cal_energy_param
+        files, lh5_path, cal_dict, energy_param, cal_energy_param, cut_field=cut_field
     )
 
     if dt_corr == True:
