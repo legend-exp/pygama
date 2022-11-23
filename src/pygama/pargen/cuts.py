@@ -181,7 +181,7 @@ def cut_dict_to_hit_dict(cut_dict):
     for par in list(cut_dict)[:-1]:
         quality_cut_exp += f"({par}_cut)&"
     quality_cut_exp += f"({list(cut_dict)[-1]}_cut)"
-    out_dict["Quality_cuts"] = {"expression": quality_cut_exp, "parameters": {}}
+    out_dict["Cal_cuts"] = {"expression": quality_cut_exp, "parameters": {}}
     return out_dict
 
 
