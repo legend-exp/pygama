@@ -240,16 +240,16 @@ def dsp_preprocess_decay_const(
         tau_dict["pz"].update(out_dict["pz"])
     if display>0:
         tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict = tau_dict)
-        wf_idxs = np.random.choice(len(wfs), 100)
         wfs = tb_out[wf_plot]["values"].nda[idxs]
+        wf_idxs = np.random.choice(len(wfs), 100)
         if norm_param is not None:
-            means = tb_out["norm_param"].nda[idxs]
-            wfs = np.divide(wfs[wf_idx], means[wf_idx])
+            means = tb_out[norm_param].nda[idxs]
+            wfs = np.divide(wfs[wf_idxs], np.reshape(means[wf_idxs], (len(wf_idxs),1)))
         else:
-            wfs = wfs[wf_idx]
+            wfs = wfs[wf_idxs]
         fig2 = plt.figure()
-        for wf_idx in wf_idxs:
-            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), wfs)
+        for wf in wfs:
+            plt.plot(np.arange(0, len(wf), 1), wf)
         plt.axhline(1, color="black")
         plt.axhline(0, color="black")
         plt.xlabel("Samples")
