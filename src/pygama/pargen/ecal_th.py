@@ -12,12 +12,13 @@ import pathlib
 from datetime import datetime
 
 import matplotlib as mpl
-mpl.use('agg')
+
+mpl.use("agg")
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import numpy as np
 import scipy.stats
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
 
 import pygama.lgdo.lh5_store as lh5
@@ -45,31 +46,33 @@ def load_data(
     energy_params: list[str],
     hit_dict: dict = {},
     cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"],
-    display=0
+    display=0,
 ) -> dict[str, np.ndarray]:
 
     df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
     pulser_props = cts.find_pulser_properties(df, energy="trapTmax")
-    if display>0:
+    if display > 0:
         plot_dict = {}
     if len(pulser_props) > 0:
         out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
         ids = ~(out_df.isPulser == 1)
         log.debug(f"pulser found: {pulser_props}")
 
-        if display>0:
+        if display > 0:
             plt.rcParams["figure.figsize"] = (12, 8)
             plt.rcParams["font.size"] = 10
 
             fig = plt.figure()
             plt.hist(df["trapTmax"], bins=10000, histtype="step", label="With Pulser")
-            plt.hist(df["trapTmax"][ids], bins=10000, histtype="step", label="Pulser Removed")
+            plt.hist(
+                df["trapTmax"][ids], bins=10000, histtype="step", label="Pulser Removed"
+            )
             plt.xlim([0, np.nanpercentile(df["trapTmax"], 99)])
             plt.xlabel("Energy (ADC)")
             plt.ylabel("Counts")
             plt.legend(loc="upper right")
             plot_dict["pulser"] = fig
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -90,7 +93,7 @@ def load_data(
 
     else:
         sto = lh5.LH5Store()
-        energy_dict = {"timestamp":df["timestamp"][ids].to_numpy()}
+        energy_dict = {"timestamp": df["timestamp"][ids].to_numpy()}
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(hit_dict).get_dataframe()
 
@@ -107,7 +110,7 @@ def load_data(
                 else:
                     dat = lh5.load_nda(files, [param], lh5_path)[param]
                     energy_dict.update({param: dat[ids]})
-    if display>0:
+    if display > 0:
         return energy_dict, plot_dict
     else:
         return energy_dict
@@ -124,7 +127,7 @@ def energy_cal_th(
     threshold: int = 0,
     p_val: float = 0,
     n_events: int = 15000,
-    final_cut_field:str="is_valid_cal",
+    final_cut_field: str = "is_valid_cal",
     deg: int = 1,
 ) -> tuple(dict, dict):
 
@@ -141,17 +144,17 @@ def energy_cal_th(
 
     log.debug(f"{len(files)} files found")
     log.debug("Loading and applying charge trapping corr...")
-    if display>0:
-        uncal_pass,plot_dict = load_data(
+    if display > 0:
+        uncal_pass, plot_dict = load_data(
             files,
             lh5_path,
             energy_params,
             hit_dict,
             cut_parameters=list(cut_parameters) if cut_parameters is not None else None,
-            display=display
+            display=display,
         )
     else:
-        uncal_pass,plot_dict = load_data(
+        uncal_pass, plot_dict = load_data(
             files,
             lh5_path,
             energy_params,
@@ -163,7 +166,9 @@ def energy_cal_th(
     log.debug("Done")
     if cut_parameters is not None:
         cut_dict = cts.generate_cuts(uncal_pass, cut_parameters)
-        hit_dict.update(cts.cut_dict_to_hit_dict(cut_dict, final_cut_field=final_cut_field))
+        hit_dict.update(
+            cts.cut_dict_to_hit_dict(cut_dict, final_cut_field=final_cut_field)
+        )
         mask = cts.get_cut_indexes(uncal_pass, cut_dict)
         uncal_fail = {}
         for param in uncal_pass:
@@ -296,7 +301,7 @@ def energy_cal_th(
         ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
         if cut_parameters is not None:
             ecal_fail = pgf.poly(uncal_fail[energy_param], pars)
- 
+
         fitted_peaks = results["fitted_keV"]
         pk_pars = results["pk_pars"]
         pk_covs = results["pk_covs"]
@@ -367,43 +372,62 @@ def energy_cal_th(
         fit_qbb = fwhm_slope(2039.0, *fit_pars)
         log.info(f"FWHM energy resolution at Qbb: {fit_qbb:1.2f} +- {qbb_err:1.2f} keV")
 
-        if display > 0 :
+        if display > 0:
             plot_dict_param = {}
             plt.rcParams["figure.figsize"] = (12, 8)
             plt.rcParams["font.size"] = 12
-            selection = (ecal_pass>2560) &(ecal_pass<2660)
+            selection = (ecal_pass > 2560) & (ecal_pass < 2660)
             fig_sta = plt.figure()
-            plt.hist2d(uncal_pass["timestamp"][selection], ecal_pass[selection], bins=[100,np.arange(2560,2660,1)], norm=LogNorm())
+            plt.hist2d(
+                uncal_pass["timestamp"][selection],
+                ecal_pass[selection],
+                bins=[100, np.arange(2560, 2660, 1)],
+                norm=LogNorm(),
+            )
 
             ticks, labels = plt.xticks()
-            plt.xlabel(f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}")
+            plt.xlabel(
+                f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
+            )
             plt.ylabel("Energy(keV)")
-            plt.ylim([2600,2630])
+            plt.ylim([2600, 2630])
 
-            plt.xticks(ticks, [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks])
+            plt.xticks(
+                ticks,
+                [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
+            )
             plot_dict_param["cal_stability"] = fig_sta
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
-    
+
             time_slice = 500
             utime_array = uncal_pass["timestamp"][selection]
-            par_array=ecal_pass[selection]
-            bins = np.arange((np.amin(utime_array)//time_slice)*time_slice, ((np.amax(utime_array)//time_slice)+2)*time_slice, time_slice)  
-            #bin time values
-            times_average = (bins[:-1] + bins[1:])/2
-                    
+            par_array = ecal_pass[selection]
+            bins = np.arange(
+                (np.amin(utime_array) // time_slice) * time_slice,
+                ((np.amax(utime_array) // time_slice) + 2) * time_slice,
+                time_slice,
+            )
+            # bin time values
+            times_average = (bins[:-1] + bins[1:]) / 2
+
             binned = np.digitize(utime_array, bins)
             bin_nos = np.unique(binned)
-            
-            par_average = np.zeros(len(bins)-1)
+
+            par_average = np.zeros(len(bins) - 1)
             par_average[:] = np.nan
             for i in bin_nos:
-                if len(par_array[np.where(binned==i)[0]])>50:
-                    par_average[i-1] = np.percentile(par_array[np.where(binned==i)[0]],50)
+                if len(par_array[np.where(binned == i)[0]]) > 50:
+                    par_average[i - 1] = np.percentile(
+                        par_array[np.where(binned == i)[0]], 50
+                    )
 
-            plot_dict_param["mean_stability"] = {"energy":par_average, "time":times_average}
+            plot_dict_param["mean_stability"] = {
+                "energy": par_average,
+                "time": times_average,
+            }
 
             plt.rcParams["figure.figsize"] = (12, 20)
             plt.rcParams["font.size"] = 12
@@ -464,7 +488,7 @@ def energy_cal_th(
 
             plt.tight_layout()
             plot_dict_param["peak_fits"] = fig1
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -473,53 +497,50 @@ def energy_cal_th(
             plt.rcParams["font.size"] = 12
 
             fig2, (ax1, ax2) = plt.subplots(
-                2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]}
+                2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
             )
 
-            cal_bins = np.arange(
-                0, np.nanmax(mus)*1.1, 10
-            )
+            cal_bins = np.arange(0, np.nanmax(mus) * 1.1, 10)
 
-            ax1.scatter(
-                all_peaks, mus, marker="x", c="b"
-            )
+            ax1.scatter(all_peaks, mus, marker="x", c="b")
 
-
-            ax1.plot(
-                pgf.poly(cal_bins, pars), cal_bins, lw=1, c="g"
-            )
+            ax1.plot(pgf.poly(cal_bins, pars), cal_bins, lw=1, c="g")
 
             ax1.grid()
-            ax1.set_xlim([200,2700])
+            ax1.set_xlim([200, 2700])
             ax1.set_ylabel("Energy (ADC)")
-            ax2.plot(all_peaks, pgf.poly(np.array(mus), pars) - all_peaks, lw=0, marker="x", c="b")
+            ax2.plot(
+                all_peaks,
+                pgf.poly(np.array(mus), pars) - all_peaks,
+                lw=0,
+                marker="x",
+                c="b",
+            )
             ax2.grid()
             ax2.set_xlabel("Energy (keV)")
             ax2.set_ylabel("Residuals (keV)")
             plot_dict_param["cal_fit"] = fig2
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
 
-
             fig3, (ax1, ax2) = plt.subplots(
-                2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]}
+                2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
             )
             ax1.errorbar(
-            fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", lw=0, c="b"
+                fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", lw=0, c="b"
             )
 
-
-            fwhm_slope_bins = np.arange(
-                200, 2700, 10
-            )
+            fwhm_slope_bins = np.arange(200, 2700, 10)
 
             qbb_line_vx = [2039.0, 2039.0]
-            qbb_line_vy = [0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)), fit_qbb]
+            qbb_line_vy = [
+                0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)),
+                fit_qbb,
+            ]
             qbb_line_hx = [200, 2039.0]
             qbb_line_hy = [fit_qbb, fit_qbb]
-
 
             ax1.plot(
                 fwhm_slope_bins, fwhm_slope(fwhm_slope_bins, *fit_pars), lw=1, c="g"
@@ -535,18 +556,27 @@ def energy_cal_th(
             )
             ax1.legend(loc="upper left", frameon=False)
             ax1.set_ylim(
-                [0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)), 1.1 * np.nanmax(fwhm_slope(fwhm_slope_bins, *fit_pars))]
+                [
+                    0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)),
+                    1.1 * np.nanmax(fwhm_slope(fwhm_slope_bins, *fit_pars)),
+                ]
             )
-            ax1.set_xlim([200,2700])
+            ax1.set_xlim([200, 2700])
             ax1.grid()
             ax1.set_ylabel("FWHM energy resolution (keV)")
-            ax2.plot(fwhm_peaks, (fit_fwhms - fwhm_slope(fwhm_peaks, *fit_pars))/fit_dfwhms, lw=0, marker="x",c="b")
+            ax2.plot(
+                fwhm_peaks,
+                (fit_fwhms - fwhm_slope(fwhm_peaks, *fit_pars)) / fit_dfwhms,
+                lw=0,
+                marker="x",
+                c="b",
+            )
             ax2.set_xlabel("Energy (keV)")
             ax2.set_ylabel("Normalised Residuals")
             ax2.grid()
             plt.tight_layout()
             plot_dict_param["fwhm_fit"] = fig3
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -571,7 +601,7 @@ def energy_cal_th(
             plt.ylabel("Counts")
             plt.legend(loc="upper right")
             plot_dict_param["spectrum"] = fig4
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -585,15 +615,19 @@ def energy_cal_th(
                 counts_fail, bins_fail, _ = pgh.get_hist(
                     ecal_fail, bins=n_bins, range=(0, 3000)
                 )
-                sf = 100 * (counts_pass+10**(-6)) / (counts_pass + counts_fail+10**(-6))
+                sf = (
+                    100
+                    * (counts_pass + 10 ** (-6))
+                    / (counts_pass + counts_fail + 10 ** (-6))
+                )
 
                 plt.step(pgh.get_bin_centers(bins_pass), sf, where="post")
                 plt.xlabel("Energy (keV)")
                 plt.ylabel("Survival Fraction (%)")
                 plt.ylim([50, 100])
-                plt.xlim([0,3000])
+                plt.xlim([0, 3000])
                 plot_dict_param["survival_frac"] = fig5
-                if display>1:
+                if display > 1:
                     plt.show()
                 else:
                     plt.close()
@@ -614,13 +648,14 @@ def energy_cal_th(
             "2.6_fwhm_err": fep_dwhm,
             "eres_pars": fit_pars.tolist(),
             "fitted_peaks": results["fitted_keV"].tolist(),
-            "fwhms":results["pk_fwhms"].tolist(),
+            "fwhms": results["pk_fwhms"].tolist(),
         }
-        log.info(f"Results {energy_param}: {json.dumps(output_dict[f'{energy_param}_cal'], indent=2)}")
-
+        log.info(
+            f"Results {energy_param}: {json.dumps(output_dict[f'{energy_param}_cal'], indent=2)}"
+        )
 
     log.info(f"Finished all calibrations")
-    if display>0:
+    if display > 0:
         return hit_dict, output_dict, plot_dict
     else:
         return hit_dict, output_dict

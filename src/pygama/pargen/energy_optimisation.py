@@ -37,7 +37,15 @@ sto = lh5.LH5Store()
 
 
 def run_optimisation(
-    file, opt_config, dsp_config, cuts, fom, db_dict=None, n_events=8000, wf_field="waveform",**fom_kwargs
+    file,
+    opt_config,
+    dsp_config,
+    cuts,
+    fom,
+    db_dict=None,
+    n_events=8000,
+    wf_field="waveform",
+    **fom_kwargs,
 ):
     """
     Runs optimisation on .lh5 file
@@ -895,7 +903,7 @@ def event_selection(
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     energy_parameter="trapTmax",
-    wf_field:str = "waveform",
+    wf_field: str = "waveform",
     n_events=10000,
     threshold=1000,
 ):
