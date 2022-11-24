@@ -386,8 +386,6 @@ def energy_cal_th(
                 plt.show()
             else:
                 plt.close()
-
-                selection = (hit_data["cuspEmax_ctc_cal"]>2610) &(hit_data["cuspEmax_ctc_cal"]<2620)
     
             time_slice = 500
             utime_array = uncal_pass["timestamp"][selection]
