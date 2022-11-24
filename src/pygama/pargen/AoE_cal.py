@@ -10,7 +10,8 @@ import os
 import pathlib
 
 import matplotlib as mpl
-mpl.use('agg')
+
+mpl.use("agg")
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -29,7 +30,12 @@ log = logging.getLogger(__name__)
 
 
 def load_aoe(
-    files: list, lh5_path: str, cal_dict: dict, energy_param: str, cal_energy_param: str, cut_field:str="Cal_cuts"
+    files: list,
+    lh5_path: str,
+    cal_dict: dict,
+    energy_param: str,
+    cal_energy_param: str,
+    cut_field: str = "Cal_cuts",
 ) -> tuple(np.array, np.array, np.array, np.array):
 
     """
@@ -360,7 +366,7 @@ def AoEcorrection(
     )
 
     if display > 0:
-        mean_fig, (ax1, ax2) = plt.subplots(2, 1,sharex=True)
+        mean_fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
         ax1.errorbar(
             comptBands[~ids] + 10,
             compt_aoe[~ids],
@@ -1184,7 +1190,7 @@ def cal_aoe(
     energy_param: str,
     cal_energy_param: str,
     eres_pars: list,
-    cut_field:str = "Cal_cuts",
+    cut_field: str = "Cal_cuts",
     dt_corr: bool = False,
     display: int = 0,
 ) -> tuple(dict, dict):
@@ -1302,7 +1308,7 @@ def cal_aoe(
                 )
 
             log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
-        
+
         def convert_sfs_to_dict(peaks_of_interest, sfs, sf_errs):
             out_dict = {}
             for i, peak in enumerate(peaks_of_interest):
@@ -1327,7 +1333,7 @@ def cal_aoe(
         log.info("Done")
         log.info(f"Results are {out_dict}")
 
-        if display>0:
+        if display > 0:
             plot_dict = {}
 
             plt.rcParams["figure.figsize"] = (12, 8)
@@ -1346,29 +1352,31 @@ def cal_aoe(
             plot_dt_dep(aoe, energy, dt, [2584, 2638], f"Tl FEP")
             plt.tight_layout()
             plot_dict["dt_deps"] = fig1
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
 
             fig2 = plt.figure()
-            plot_compt_bands_overlayed(
-                aoe, energy, [950, 1250, 1460, 1660, 1860, 2060]
-            )
+            plot_compt_bands_overlayed(aoe, energy, [950, 1250, 1460, 1660, 1860, 2060])
             plt.ylabel("Counts")
             plt.xlabel("Raw A/E")
             plt.title(f"Compton Bands before Correction")
             plt.legend(loc="upper left")
             plot_dict["compt_bands_nocorr"] = fig2
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
 
             if dt_corr == True:
-                _, plot_dict = drift_time_correction(aoe_uncorr, energy, dt, display=display, plot_dict=plot_dict)
+                _, plot_dict = drift_time_correction(
+                    aoe_uncorr, energy, dt, display=display, plot_dict=plot_dict
+                )
 
-            mu_pars, sigma_pars, plot_dict = AoEcorrection(energy, aoe, eres_pars, plot_dict, display=display)
+            mu_pars, sigma_pars, plot_dict = AoEcorrection(
+                energy, aoe, eres_pars, plot_dict, display=display
+            )
 
             fig3 = plt.figure()
             plot_compt_bands_overlayed(
@@ -1379,7 +1387,7 @@ def cal_aoe(
             plt.title(f"Compton Bands after Correction")
             plt.legend(loc="upper left")
             plot_dict["compt_bands_corr"] = fig3
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -1412,7 +1420,7 @@ def cal_aoe(
             plt.xlabel("Cut Value")
             plt.ylabel("Survival Fraction %")
             plot_dict["surv_fracs"] = fig4
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -1459,7 +1467,7 @@ def cal_aoe(
             plt.ylabel("Counts")
             plt.legend(loc="upper left")
             plot_dict["PSD_spectrum"] = fig5
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
@@ -1477,12 +1485,10 @@ def cal_aoe(
             plt.ylabel("Survival Fraction")
             plt.ylim([0, 1])
             plot_dict["psd_sf"] = fig6
-            if display>1:
+            if display > 1:
                 plt.show()
             else:
                 plt.close()
-
-        
 
             return cal_dict, out_dict, plot_dict
         else:
@@ -1500,8 +1506,8 @@ def cal_aoe(
             "Low_cut": cut,
             "High_cut": 4,
         }
-        if display>0:
-            plot_dict={}
+        if display > 0:
+            plot_dict = {}
             return cal_dict, out_dict, plot_dict
         else:
             return cal_dict, out_dict

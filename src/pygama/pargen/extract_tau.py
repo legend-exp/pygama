@@ -12,7 +12,8 @@ import pickle as pkl
 from collections import OrderedDict
 
 import matplotlib as mpl
-mpl.use('agg')
+
+mpl.use("agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -33,7 +34,7 @@ def run_tau(
     lh5_path: str,
     n_events: int = 10000,
     threshold: int = 5000,
-    wf_field: str = "waveform"
+    wf_field: str = "waveform",
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
@@ -59,7 +60,7 @@ def run_tau(
     return tb_data
 
 
-def get_decay_constant(slopes: np.array, display:int=0) -> dict:
+def get_decay_constant(slopes: np.array, display: int = 0) -> dict:
 
     """
     Finds the decay constant from the modal value of the tail slope after cuts
@@ -86,8 +87,8 @@ def get_decay_constant(slopes: np.array, display:int=0) -> dict:
     bin_centres = pgh.get_bin_centers(bins)
     tau = round(-1 / (bin_centres[np.argmax(counts)]), 1)
 
-    tau_dict["pz"] = {"tau": tau}    
-    if display>0:
+    tau_dict["pz"] = {"tau": tau}
+    if display > 0:
         out_plot_dict = {}
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
@@ -114,7 +115,7 @@ def get_decay_constant(slopes: np.array, display:int=0) -> dict:
         labels = ax.get_xticklabels()
         ax.set_xticklabels(labels=labels, rotation=45)
         out_plot_dict["slope"] = fig
-        if display>1:
+        if display > 1:
             plt.show()
         else:
             plt.close()
@@ -217,7 +218,9 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = run_tau(raw_files, dsp_config, lh5_path, wf_field=wf_field, threshold=threshold)
+    tb_data = run_tau(
+        raw_files, dsp_config, lh5_path, wf_field=wf_field, threshold=threshold
+    )
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
     cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
@@ -226,9 +229,9 @@ def dsp_preprocess_decay_const(
     log.debug("Applied cuts")
     slopes = tb_out["tail_slope"].nda
     log.debug("Calculating pz constant")
-    if display>0:
-        tau_dict,plot_dict = get_decay_constant(slopes[idxs], display=display)
-    else: 
+    if display > 0:
+        tau_dict, plot_dict = get_decay_constant(slopes[idxs], display=display)
+    else:
         tau_dict = get_decay_constant(slopes[idxs])
     if double_pz == True:
         log.debug("Calculating double pz constants")
@@ -238,13 +241,13 @@ def dsp_preprocess_decay_const(
         )
         out_dict = get_dpz_consts(grid_out, opt_dict)
         tau_dict["pz"].update(out_dict["pz"])
-    if display>0:
-        tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict = tau_dict)
+    if display > 0:
+        tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict=tau_dict)
         wfs = tb_out[wf_plot]["values"].nda[idxs]
         wf_idxs = np.random.choice(len(wfs), 100)
         if norm_param is not None:
             means = tb_out[norm_param].nda[idxs]
-            wfs = np.divide(wfs[wf_idxs], np.reshape(means[wf_idxs], (len(wf_idxs),1)))
+            wfs = np.divide(wfs[wf_idxs], np.reshape(means[wf_idxs], (len(wf_idxs), 1)))
         else:
             wfs = wfs[wf_idxs]
         fig2 = plt.figure()
@@ -255,7 +258,7 @@ def dsp_preprocess_decay_const(
         plt.xlabel("Samples")
         plt.ylabel("ADU")
         plot_dict["waveforms"] = fig2
-        if display>1:
+        if display > 1:
             plt.show()
         else:
             plt.close()
