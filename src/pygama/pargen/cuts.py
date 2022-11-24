@@ -166,7 +166,7 @@ def get_cut_indexes(
     return indexes
 
 
-def cut_dict_to_hit_dict(cut_dict):
+def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
     out_dict = {}
     for param in cut_dict:
 
@@ -181,7 +181,7 @@ def cut_dict_to_hit_dict(cut_dict):
     for par in list(cut_dict)[:-1]:
         quality_cut_exp += f"({par}_cut)&"
     quality_cut_exp += f"({list(cut_dict)[-1]}_cut)"
-    out_dict["Cal_cuts"] = {"expression": quality_cut_exp, "parameters": {}}
+    out_dict[final_cut_field] = {"expression": quality_cut_exp, "parameters": {}}
     return out_dict
 
 
