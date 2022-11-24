@@ -124,6 +124,7 @@ def energy_cal_th(
     threshold: int = 0,
     p_val: float = 0,
     n_events: int = 15000,
+    final_cut_field:str="is_valid_cal",
     deg: int = 1,
 ) -> tuple(dict, dict):
 
@@ -162,7 +163,7 @@ def energy_cal_th(
     log.debug("Done")
     if cut_parameters is not None:
         cut_dict = cts.generate_cuts(uncal_pass, cut_parameters)
-        hit_dict.update(cts.cut_dict_to_hit_dict(cut_dict))
+        hit_dict.update(cts.cut_dict_to_hit_dict(cut_dict, final_cut_field=final_cut_field))
         mask = cts.get_cut_indexes(uncal_pass, cut_dict)
         uncal_fail = {}
         for param in uncal_pass:
@@ -385,6 +386,26 @@ def energy_cal_th(
                 plt.show()
             else:
                 plt.close()
+
+                selection = (hit_data["cuspEmax_ctc_cal"]>2610) &(hit_data["cuspEmax_ctc_cal"]<2620)
+    
+            time_slice = 500
+            utime_array = uncal_pass["timestamp"][selection]
+            par_array=ecal_pass[selection]
+            bins = np.arange((np.amin(utime_array)//time_slice)*time_slice, ((np.amax(utime_array)//time_slice)+2)*time_slice, time_slice)  
+            #bin time values
+            times_average = (bins[:-1] + bins[1:])/2
+                    
+            binned = np.digitize(utime_array, bins)
+            bin_nos = np.unique(binned)
+            
+            par_average = np.zeros(len(bins)-1)
+            par_average[:] = np.nan
+            for i in bin_nos:
+                if len(par_array[np.where(binned==i)[0]])>50:
+                    par_average[i-1] = np.percentile(par_array[np.where(binned==i)[0]],50)
+
+            plot_dict_param["mean_stability"] = {"energy":par_average, "time":times_average}
 
             plt.rcParams["figure.figsize"] = (12, 20)
             plt.rcParams["font.size"] = 12
