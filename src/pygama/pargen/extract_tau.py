@@ -60,7 +60,7 @@ def run_tau(
     return tb_data
 
 
-def get_decay_constant(slopes: np.array, display: int = 0) -> dict:
+def get_decay_constant(slopes: np.array, wfs:lgdo.WaveformTable, display: int = 0) -> dict:
 
     """
     Finds the decay constant from the modal value of the tail slope after cuts
@@ -86,6 +86,9 @@ def get_decay_constant(slopes: np.array, display: int = 0) -> dict:
     counts, bins, var = pgh.get_hist(slopes, bins=50000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
     tau = round(-1 / (bin_centres[np.argmax(counts)]), 1)
+    sampling_rate = wfs["dt"].nda[0]
+    units = wfs["dt"].attrs["units"]
+    tau = f"{tau*sampling_rate}*{units}"
 
     tau_dict["pz"] = {"tau": tau}
     if display > 0:
@@ -230,9 +233,9 @@ def dsp_preprocess_decay_const(
     slopes = tb_out["tail_slope"].nda
     log.debug("Calculating pz constant")
     if display > 0:
-        tau_dict, plot_dict = get_decay_constant(slopes[idxs], display=display)
+        tau_dict, plot_dict = get_decay_constant(slopes[idxs], tb_data[wf_field],display=display)
     else:
-        tau_dict = get_decay_constant(slopes[idxs])
+        tau_dict = get_decay_constant(slopes[idxs], tb_data[wf_field])
     if double_pz == True:
         log.debug("Calculating double pz constants")
         pspace = om.set_par_space(opt_dict)
