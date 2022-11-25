@@ -60,7 +60,9 @@ def run_tau(
     return tb_data
 
 
-def get_decay_constant(slopes: np.array, wfs:lgdo.WaveformTable, display: int = 0) -> dict:
+def get_decay_constant(
+    slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
+) -> dict:
 
     """
     Finds the decay constant from the modal value of the tail slope after cuts
@@ -233,7 +235,9 @@ def dsp_preprocess_decay_const(
     slopes = tb_out["tail_slope"].nda
     log.debug("Calculating pz constant")
     if display > 0:
-        tau_dict, plot_dict = get_decay_constant(slopes[idxs], tb_data[wf_field],display=display)
+        tau_dict, plot_dict = get_decay_constant(
+            slopes[idxs], tb_data[wf_field], display=display
+        )
     else:
         tau_dict = get_decay_constant(slopes[idxs], tb_data[wf_field])
     if double_pz == True:
