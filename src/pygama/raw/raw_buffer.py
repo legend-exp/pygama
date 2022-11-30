@@ -436,7 +436,7 @@ def write_to_lh5_and_clear(
                 if "waveform" in rb.lgdo.keys():
                     # trim the data in-place on rb.lgdo
                     # the waveform names are updated in data_trimmer
-                    data_trimmer(rb.lgdo, trim_config)
+                    data_trimmer(rb.lgdo, trim_config, group)
 
         # write if requested...
         if filename != "":

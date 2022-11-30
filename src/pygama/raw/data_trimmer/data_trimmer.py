@@ -2,25 +2,35 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 
 import pygama.lgdo as lgdo
 from pygama.dsp.processing_chain import build_processing_chain as bpc
 from pygama.lgdo import Array, Struct, Table
 
+log = logging.getLogger(__name__)
 
-def data_trimmer(lgdo_table: Table | Struct, dsp_config: str | dict) -> None:
+
+def data_trimmer(
+    lgdo_table: Table | Struct, dsp_config: str | dict, group: str = None
+) -> None:
     """
-    Takes in an :class:`~.lgdo.table.Table` that contains waveforms, performs user specified
+    Takes in a :class:`.RawBuffer` that contains waveforms, performs user specified
     DSP on the table, and then updates the table in place.
 
     Parameters
     ----------
     lgdo_table
-        An :class:`~.lgdo.table.Table` or :class:`~.lgdo.struct.Struct` that must contain waveforms so that the DSP
-        can work!
+        An :class:`~.lgdo.table.Table` or :class:`~.lgdo.struct.Struct`
+        that must contain waveforms so that the DSP can work!
     dsp_config
         Either the path to the DSP JSON config file to use, or a dictionary
         of DSP config.
+    group
+        The name of the group that the :class:`rb.lgdo` is being written to.
+        If a matching key is found in the :class:`dsp_config`, that config
+        sub_dict is used to do the data trimming. If no match is found,
+        then all valid waveform tables are trimmed with the same DSP.
 
     Notes
     -----
@@ -37,6 +47,15 @@ def data_trimmer(lgdo_table: Table | Struct, dsp_config: str | dict) -> None:
     # Or we could get a dict as the config
     elif isinstance(dsp_config, dict):
         dsp_dict = dsp_config
+
+    # Now check the RawBuffer's group and see if that there is a matching key in the dsp_dict, then take that sub dictionary.
+    if group in dsp_dict.keys():
+        dsp_dict = dsp_dict[group]
+    # If there are no subdicts in dsp_dict, then we use the same dsp on all valid waveform tables in the daq file
+    else:
+        log.debug(
+            "No sub_dicts found, trimming all waveform tables with one dsp_config"
+        )
 
     # if we want to window waveforms, we can do it outside of processing chain for the sake of memory
 
