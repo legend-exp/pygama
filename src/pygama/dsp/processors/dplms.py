@@ -99,12 +99,14 @@ def dplms_filter(
     # filter calculation
     mat = a1 * noise_mat + a2 * ref_mat + a3 * np.ones([length, length])
     x = np.linalg.solve(mat, ref_sig)
-    if invert: y = np.convolve(reference, -x, mode = 'valid')
-    else: y = np.convolve(reference, x, mode = 'valid')
+    if invert:
+        y = np.convolve(reference, -x, mode="valid")
+    else:
+        y = np.convolve(reference, x, mode="valid")
     maxy = np.amax(y)
     x /= maxy
     y /= maxy
-    
+
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
@@ -130,7 +132,9 @@ def dplms_filter(
 
         if len(x) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
-        if invert: w_out[:] = np.convolve(w_in, -x, mode = 'valid')
-        else: w_out[:] = np.convolve(w_in, x, "valid")
+        if invert:
+            w_out[:] = np.convolve(w_in, -x, mode="valid")
+        else:
+            w_out[:] = np.convolve(w_in, x, "valid")
 
     return dplms_out
