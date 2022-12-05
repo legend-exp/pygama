@@ -93,13 +93,13 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         objs = []
         for obj in gc.get_objects():
             try:
-                if isinstance(obj, ORFlashCamADCWaveformDecoder):
+                if isinstance(obj, ORFlashCamWaveformDecoder):
                     objs.append(obj)
             except ReferenceError:
                 # avoids "weakly-referenced object no longer exists"
                 pass
         if len(objs) != 1:
-            log.warning(f"got {len(objs)} ORFlashCamADCWaveformDecoders in memory!")
+            log.warning(f"got {len(objs)} ORFlashCam Waveform Decoders in memory!")
         else:
             objs[0].assert_nsamples(tbl["nsamples"].nda[ii], tbl["fcid"].nda[ii])
 
