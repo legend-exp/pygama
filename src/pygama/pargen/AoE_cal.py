@@ -61,8 +61,7 @@ def load_aoe(
             param_dict[entry] = param_dict[entry][df["Cal_cuts"].to_numpy()]
 
     aoe = np.divide(param_dict["A_max"], param_dict[energy_param])
-    full_dt = param_dict["tp_99"] - param_dict["tp_0_est"]
-    return aoe, param_dict[cal_energy_param], param_dict["dt_eff"], full_dt
+    return aoe, param_dict[cal_energy_param], param_dict["dt_eff"]
 
 
 def PDF_AoE(
@@ -1190,15 +1189,16 @@ def cal_aoe(
     energy_param: str,
     cal_energy_param: str,
     eres_pars: list,
-    cut_field: str = "Cal_cuts",
+    cut_field: str = "is_valid_cal",
     dt_corr: bool = False,
+    aoe_high_cut: int = 4,
     display: int = 0,
 ) -> tuple(dict, dict):
     """
     Main function for running the a/e correction and cut determination.
     """
 
-    aoe_uncorr, energy, dt, full_dt = load_aoe(
+    aoe_uncorr, energy, dt = load_aoe(
         files, lh5_path, cal_dict, energy_param, cal_energy_param, cut_field=cut_field
     )
 
@@ -1206,6 +1206,11 @@ def cal_aoe(
         aoe, alpha = drift_time_correction(aoe_uncorr, energy, dt)
     else:
         aoe = aoe_uncorr
+
+    aoe_tmp = aoe[
+            (energy > 1000) & (energy <1300) & (aoe > 0)
+        ]  # [:20000]
+    bulk_pars, bulk_errs = unbinned_aoe_fit(aoe_tmp, display=0)
 
     log.info("Starting A/E correction")
     mu_pars, sigma_pars = AoEcorrection(energy, aoe, eres_pars)
@@ -1251,7 +1256,7 @@ def cal_aoe(
         {
             "AoE_Double_Sided_Cut": {
                 "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
-                "parameters": {"a": cut, "b": 4},
+                "parameters": {"a": cut, "b": aoe_high_cut},
             }
         }
     )
@@ -1293,7 +1298,7 @@ def cal_aoe(
         for i, peak in enumerate(peaks_of_interest):
             if peak == 2039:
                 sf_2side[i] = compton_sf_no_sweep(
-                    energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=4
+                    energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=aoe_high_cut
                 )
                 sferr_2side[i] = 0
             else:
@@ -1304,7 +1309,7 @@ def cal_aoe(
                     fit_widths[i],
                     eres_pars,
                     cut,
-                    aoe_high_cut_val=4,
+                    aoe_high_cut_val=aoe_high_cut,
                 )
 
             log.info(f"{peak}keV: {sf[i]:2.1f} +/- {sferr[i]:2.1f} %")
@@ -1319,14 +1324,15 @@ def cal_aoe(
             return out_dict
 
         out_dict = {
-            "A/E_Energy_param": "cuspEmax",
-            "Cal_energy_param": "cuspEmax_ctc",
+            "A/E_Energy_param": energy_param,
+            "Cal_energy_param": cal_energy_param,
             "dt_param": "dt_eff",
-            "rt_correction": False,
+            "rt_correction": dt_corr,
+            "1000-1300keV_mean":bulk_pars[2],
             "Mean_pars": list(mu_pars),
             "Sigma_pars": list(sigma_pars),
             "Low_cut": cut,
-            "High_cut": 4,
+            "High_cut": aoe_high_cut,
             "Low_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf, sferr),
             "2_side_sfs": convert_sfs_to_dict(peaks_of_interest, sf_2side, sferr_2side),
         }
@@ -1452,12 +1458,12 @@ def cal_aoe(
             axins.hist(energy, bins=bins, histtype="step")
             axins.hist(energy[classifier > cut], bins=bins, histtype="step")
             axins.hist(
-                energy[(classifier > cut) & (classifier < 4)],
+                energy[(classifier > cut) & (classifier < aoe_high_cut)],
                 bins=bins,
                 histtype="step",
             )
             axins.hist(
-                energy[(classifier < cut) | (classifier > 4)],
+                energy[(classifier < cut) | (classifier > aoe_high_cut)],
                 bins=bins,
                 histtype="step",
             )
@@ -1475,7 +1481,7 @@ def cal_aoe(
             fig6 = plt.figure()
             bins = np.linspace(1000, 3000, 1000)
             counts_pass, bins_pass, _ = pgh.get_hist(
-                energy[(classifier > cut) & (classifier < 4)], bins=bins
+                energy[(classifier > cut) & (classifier < aoe_high_cut)], bins=bins
             )
             counts, bins, _ = pgh.get_hist(energy, bins=bins)
             survival_fracs = counts_pass / (counts)
@@ -1501,10 +1507,11 @@ def cal_aoe(
             "Cal_energy_param": "cuspEmax_ctc",
             "dt_param": "dt_eff",
             "rt_correction": False,
+            "1000-1300keV_mean":bulk_pars[2],
             "Mean_pars": list(mu_pars),
             "Sigma_pars": list(sigma_pars),
             "Low_cut": cut,
-            "High_cut": 4,
+            "High_cut": aoe_high_cut,
         }
         if display > 0:
             plot_dict = {}
