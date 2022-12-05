@@ -1207,9 +1207,7 @@ def cal_aoe(
     else:
         aoe = aoe_uncorr
 
-    aoe_tmp = aoe[
-            (energy > 1000) & (energy <1300) & (aoe > 0)
-        ]  # [:20000]
+    aoe_tmp = aoe[(energy > 1000) & (energy < 1300) & (aoe > 0)]  # [:20000]
     bulk_pars, bulk_errs = unbinned_aoe_fit(aoe_tmp, display=0)
 
     log.info("Starting A/E correction")
@@ -1298,7 +1296,12 @@ def cal_aoe(
         for i, peak in enumerate(peaks_of_interest):
             if peak == 2039:
                 sf_2side[i] = compton_sf_no_sweep(
-                    energy, classifier, peak, eres_pars, cut, aoe_high_cut_val=aoe_high_cut
+                    energy,
+                    classifier,
+                    peak,
+                    eres_pars,
+                    cut,
+                    aoe_high_cut_val=aoe_high_cut,
                 )
                 sferr_2side[i] = 0
             else:
@@ -1328,7 +1331,7 @@ def cal_aoe(
             "Cal_energy_param": cal_energy_param,
             "dt_param": "dt_eff",
             "rt_correction": dt_corr,
-            "1000-1300keV_mean":bulk_pars[2],
+            "1000-1300keV_mean": bulk_pars[2],
             "Mean_pars": list(mu_pars),
             "Sigma_pars": list(sigma_pars),
             "Low_cut": cut,
@@ -1507,7 +1510,7 @@ def cal_aoe(
             "Cal_energy_param": "cuspEmax_ctc",
             "dt_param": "dt_eff",
             "rt_correction": False,
-            "1000-1300keV_mean":bulk_pars[2],
+            "1000-1300keV_mean": bulk_pars[2],
             "Mean_pars": list(mu_pars),
             "Sigma_pars": list(sigma_pars),
             "Low_cut": cut,

@@ -85,19 +85,19 @@ def get_decay_constant(
 
     pz = tau_dict.get("pz")
 
-    counts, bins, var = pgh.get_hist(slopes[idxs], bins=50000, range=(-0.01,0))
+    counts, bins, var = pgh.get_hist(slopes[idxs], bins=50000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
         pars, cov = pgf.gauss_mode_width_max(
-                    counts,
-                    bins,
-                    mode_guess=high_bin,
-                    n_bins=10,
-                    cost_func="Least Squares",
-                    inflate_errors=False,
-                    gof_method="var",
-                )
+            counts,
+            bins,
+            mode_guess=high_bin,
+            n_bins=10,
+            cost_func="Least Squares",
+            inflate_errors=False,
+            gof_method="var",
+        )
         high_bin = pars[0]
     except:
         pass
@@ -238,9 +238,7 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = load_data(
-        raw_files, lh5_path, wf_field=wf_field, threshold=threshold
-    )
+    tb_data = load_data(raw_files, lh5_path, wf_field=wf_field, threshold=threshold)
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
     cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
