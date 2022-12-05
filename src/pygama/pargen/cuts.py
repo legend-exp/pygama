@@ -21,7 +21,9 @@ import pygama.pargen.energy_cal as pgc
 log = logging.getLogger(__name__)
 
 
-def generate_cuts(data: dict[str, np.ndarray], parameters: dict[str,int], rounding:int=2) -> dict:
+def generate_cuts(
+    data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 2
+) -> dict:
     """
     Finds double sided cut boundaries for a file for the parameters specified
 
@@ -118,10 +120,10 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: dict[str,int], roundi
         upper = float((num_sigmas_right * std) + mean)
         lower = float((-num_sigmas_left * std) + mean)
         output_dict[par] = {
-            "Mean Value": round(mean,rounding),
+            "Mean Value": round(mean, rounding),
             "Sigmas Cut": num_sigmas,
-            "Upper Boundary": round(upper,rounding),
-            "Lower Boundary": round(lower,rounding),
+            "Upper Boundary": round(upper, rounding),
+            "Lower Boundary": round(lower, rounding),
         }
     return output_dict
 

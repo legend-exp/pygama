@@ -1251,8 +1251,10 @@ class BayesianOptimizer:
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
 
-    def add_dimension(self, name, parameter, min_val, max_val, rounding =2, unit=None):
-        self.dims.append(OptimiserDimension(name, parameter, min_val, max_val, rounding, unit))
+    def add_dimension(self, name, parameter, min_val, max_val, rounding=2, unit=None):
+        self.dims.append(
+            OptimiserDimension(name, parameter, min_val, max_val, rounding, unit)
+        )
 
     def get_n_dimensions(self):
         return len(self.dims)
@@ -1327,25 +1329,29 @@ class BayesianOptimizer:
             )
             if response.fun[0] < min_ei:
                 min_ei = response.fun[0]
-                x_optimal = [y.round(dim.rounding) for y,dim in zip(response.x, self.dims)]
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(response.x, self.dims)
+                ]
         if x_optimal in self.x_init and self.iters < 5:
             if self.iters < 5:
                 self.iters += 1
                 x_optimal, min_ei = self._get_next_probable_point()
             else:
                 perturb = np.random.uniform(
-                    np.array([(dim.max_val-dim.min_val)/100 for dim in self.dims]),
-                    np.array([(dim.max_val-dim.min_val)/10 for dim in self.dims]),
-                    (1, len(self.dims))
+                    np.array([(dim.max_val - dim.min_val) / 100 for dim in self.dims]),
+                    np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                    (1, len(self.dims)),
                 )
                 x_optimal += perturb
-                x_optimal = [y.round(dim.rounding) for y,dim in zip(x_optimal[0], self.dims)]
-                for i,y in enumerate(x_optimal):
-                    if y>self.dims[i].max_val:
-                        x_optimal[i]=self.dims[i].max_val
-                    elif y<self.dims[i].min_val:
-                        x_optimal[i]=self.dims[i].min_val
-            
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(x_optimal[0], self.dims)
+                ]
+                for i, y in enumerate(x_optimal):
+                    if y > self.dims[i].max_val:
+                        x_optimal[i] = self.dims[i].max_val
+                    elif y < self.dims[i].min_val:
+                        x_optimal[i] = self.dims[i].min_val
+
         return x_optimal, min_ei
 
     def _extend_prior_with_posterior_data(self, x, y):
@@ -1421,33 +1427,58 @@ class BayesianOptimizer:
         return out_dict
 
     def plot(self, init_samples=None):
-        if len(self.dims)!=2:
+        if len(self.dims) != 2:
             raise Exception("Plotting not implemented for dim!=2")
-        x,y = np.mgrid[self.dims[0].min_val:self.dims[0].max_val:0.1, 
-                    self.dims[1].min_val:self.dims[1].max_val:0.1]
+        x, y = np.mgrid[
+            self.dims[0].min_val : self.dims[0].max_val : 0.1,
+            self.dims[1].min_val : self.dims[1].max_val : 0.1,
+        ]
         points = np.vstack((x.flatten(), y.flatten())).T
-        out_grid = np.zeros((int((self.dims[0].max_val-self.dims[0].min_val)*10),
-                            int((self.dims[1].max_val-self.dims[1].min_val)*10)))
-        
-        j=0
-        for i,_ in np.ndenumerate(out_grid):
-            out_grid[i] = self.gauss_pr.predict(points[j].reshape(1, -1) , return_std=False)
-            j+=1
-            
+        out_grid = np.zeros(
+            (
+                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+            )
+        )
+
+        j = 0
+        for i, _ in np.ndenumerate(out_grid):
+            out_grid[i] = self.gauss_pr.predict(
+                points[j].reshape(1, -1), return_std=False
+            )
+            j += 1
+
         plt.figure()
-        plt.imshow(out_grid, norm =LogNorm(), origin='lower',aspect='auto', extent=(0, out_grid.shape[1], 0, out_grid.shape[0]))
-        plt.scatter( np.array(self.x_init-self.dims[1].min_val)[:,1]*10, np.array(self.x_init-self.dims[0].min_val)[:,0]*10)
+        plt.imshow(
+            out_grid,
+            norm=LogNorm(),
+            origin="lower",
+            aspect="auto",
+            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+        )
+        plt.scatter(
+            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+        )
         if init_samples is not None:
-            plt.scatter((init_samples[:,1]-self.dims[1].min_val)*10, (init_samples[:,0]-self.dims[0].min_val)*10, color="red")
-        plt.scatter((self.optimal_x[1]-self.dims[1].min_val)*10, (self.optimal_x[0]-self.dims[0].min_val)*10, color="orange")
-        ticks,labels = plt.xticks()
-        labels = np.linspace(self.dims[1].min_val,self.dims[1].max_val,5)
-        ticks = np.linspace(0, out_grid.shape[1],5)
-        plt.xticks(ticks= ticks, labels=labels, rotation = 45)
-        ticks,labels = plt.yticks()
-        labels = np.linspace(self.dims[0].min_val,self.dims[0].max_val,5)
-        ticks = np.linspace(0, out_grid.shape[0],5)
-        plt.yticks(ticks= ticks, labels=labels, rotation = 45)
+            plt.scatter(
+                (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                color="red",
+            )
+        plt.scatter(
+            (self.optimal_x[1] - self.dims[1].min_val) * 10,
+            (self.optimal_x[0] - self.dims[0].min_val) * 10,
+            color="orange",
+        )
+        ticks, labels = plt.xticks()
+        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[1], 5)
+        plt.xticks(ticks=ticks, labels=labels, rotation=45)
+        ticks, labels = plt.yticks()
+        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[0], 5)
+        plt.yticks(ticks=ticks, labels=labels, rotation=45)
         plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
         plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
         plt.title(f"{self.dims[0].name} Kernel Prediction")
@@ -1455,33 +1486,56 @@ class BayesianOptimizer:
         plt.show()
 
     def plot_acq(self, init_samples=None):
-        if len(self.dims)!=2:
+        if len(self.dims) != 2:
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        x,y = np.mgrid[self.dims[0].min_val:self.dims[0].max_val:0.1, 
-                    self.dims[1].min_val:self.dims[1].max_val:0.1]
+        x, y = np.mgrid[
+            self.dims[0].min_val : self.dims[0].max_val : 0.1,
+            self.dims[1].min_val : self.dims[1].max_val : 0.1,
+        ]
         points = np.vstack((x.flatten(), y.flatten())).T
-        out_grid = np.zeros((int((self.dims[0].max_val-self.dims[0].min_val)*10),
-                            int((self.dims[1].max_val-self.dims[1].min_val)*10)))
-        
-        j=0
-        for i,_ in np.ndenumerate(out_grid):
+        out_grid = np.zeros(
+            (
+                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+            )
+        )
+
+        j = 0
+        for i, _ in np.ndenumerate(out_grid):
             out_grid[i] = self._acquisition_function(points[j])
-            j+=1
-            
+            j += 1
+
         plt.figure()
-        plt.imshow(out_grid, norm =LogNorm(), origin='lower',aspect='auto', extent=(0, out_grid.shape[1], 0, out_grid.shape[0]))
-        plt.scatter( np.array(self.x_init-self.dims[1].min_val)[:,1]*10, np.array(self.x_init-self.dims[0].min_val)[:,0]*10)
+        plt.imshow(
+            out_grid,
+            norm=LogNorm(),
+            origin="lower",
+            aspect="auto",
+            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+        )
+        plt.scatter(
+            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+        )
         if init_samples is not None:
-            plt.scatter((init_samples[:,1]-self.dims[1].min_val)*10, (init_samples[:,0]-self.dims[0].min_val)*10, color="red")
-        plt.scatter((self.optimal_x[1]-self.dims[1].min_val)*10, (self.optimal_x[0]-self.dims[0].min_val)*10, color="orange")
-        ticks,labels = plt.xticks()
-        labels = np.linspace(self.dims[1].min_val,self.dims[1].max_val,5)
-        ticks = np.linspace(0, out_grid.shape[1],5)
-        plt.xticks(ticks= ticks, labels=labels, rotation = 45)
-        ticks,labels = plt.yticks()
-        labels = np.linspace(self.dims[0].min_val,self.dims[0].max_val,5)
-        ticks = np.linspace(0, out_grid.shape[0],5)
-        plt.yticks(ticks= ticks, labels=labels, rotation = 45)
+            plt.scatter(
+                (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                color="red",
+            )
+        plt.scatter(
+            (self.optimal_x[1] - self.dims[1].min_val) * 10,
+            (self.optimal_x[0] - self.dims[0].min_val) * 10,
+            color="orange",
+        )
+        ticks, labels = plt.xticks()
+        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[1], 5)
+        plt.xticks(ticks=ticks, labels=labels, rotation=45)
+        ticks, labels = plt.yticks()
+        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[0], 5)
+        plt.yticks(ticks=ticks, labels=labels, rotation=45)
         plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
         plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
         plt.title(f"{self.dims[0].name} Acquisition Space")
