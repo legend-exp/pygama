@@ -16,6 +16,7 @@ from pygama.raw.orca.orca_digitizers import (  # noqa: F401
 from pygama.raw.orca.orca_flashcam import (  # noqa: F401
     ORFlashCamADCWaveformDecoder,
     ORFlashCamListenerConfigDecoder,
+    ORFlashCamWaveformDecoder,
 )
 from pygama.raw.orca.orca_header_decoder import OrcaHeaderDecoder
 from pygama.raw.raw_buffer import RawBuffer, RawBufferLibrary
