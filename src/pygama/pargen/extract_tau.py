@@ -21,6 +21,7 @@ import pygama
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
@@ -28,9 +29,8 @@ import pygama.pargen.energy_optimisation as om
 log = logging.getLogger(__name__)
 
 
-def run_tau(
+def load_data(
     raw_file: list[str],
-    config: dict,
     lh5_path: str,
     n_events: int = 10000,
     threshold: int = 5000,
@@ -85,9 +85,24 @@ def get_decay_constant(
 
     pz = tau_dict.get("pz")
 
-    counts, bins, var = pgh.get_hist(slopes, bins=50000, range=(-0.01, 0))
+    counts, bins, var = pgh.get_hist(slopes[idxs], bins=50000, range=(-0.01,0))
     bin_centres = pgh.get_bin_centers(bins)
-    tau = round(-1 / (bin_centres[np.argmax(counts)]), 1)
+    high_bin = bin_centres[np.argmax(counts)]
+    try:
+        pars, cov = pgf.gauss_mode_width_max(
+                    counts,
+                    bins,
+                    mode_guess=high_bin,
+                    n_bins=10,
+                    cost_func="Least Squares",
+                    inflate_errors=False,
+                    gof_method="var",
+                )
+        high_bin = pars[0]
+    except:
+        pass
+    tau = round(-1 / (high_bin), 1)
+
     sampling_rate = wfs["dt"].nda[0]
     units = wfs["dt"].attrs["units"]
     tau = f"{tau*sampling_rate}*{units}"
@@ -223,8 +238,8 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = run_tau(
-        raw_files, dsp_config, lh5_path, wf_field=wf_field, threshold=threshold
+    tb_data = load_data(
+        raw_files, lh5_path, wf_field=wf_field, threshold=threshold
     )
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
