@@ -583,6 +583,7 @@ def energy_cal_th(
 
             fig4 = plt.figure()
             bins = np.linspace(0, 3000, 1000)
+            plot_dict_param["spectrum"] = {"bins":bins, "counts": np.histogram(ecal_pass,bins)[0]}
             plt.hist(
                 ecal_pass,
                 bins=bins,
@@ -600,7 +601,7 @@ def energy_cal_th(
             plt.xlabel("Energy (keV)")
             plt.ylabel("Counts")
             plt.legend(loc="upper right")
-            plot_dict_param["spectrum"] = fig4
+            plot_dict_param["spectrum_plot"] = fig4
             if display > 1:
                 plt.show()
             else:
