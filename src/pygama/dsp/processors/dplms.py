@@ -17,6 +17,7 @@ def dplms_filter(
     a2: float,
     a3: float,
     ff: int,
+    invert: bool,
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
 
@@ -56,7 +57,7 @@ def dplms_filter(
             "init_args": [
                 "db.dplms.noise_matrix",
                 "db.dplms.reference",
-                "50", "0.1", "1", "0", "0"]
+                "50", "0.1", "1", "0", "0", "False"]
         }
     """
 
@@ -94,13 +95,16 @@ def dplms_filter(
         ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
         ref_sig += reference[flo + i : fhi + i]
     ref_mat /= len(ff)
-    ref_sig = np.transpose(ref_sig) / len(ff)
 
     # filter calculation
     mat = a1 * noise_mat + a2 * ref_mat + a3 * np.ones([length, length])
     x = np.linalg.solve(mat, ref_sig)
-    # conv = signal.convolve(reference, x, mode="valid")
-
+    if invert: y = np.convolve(reference, -x, mode = 'valid')
+    else: y = np.convolve(reference, x, mode = 'valid')
+    maxy = np.amax(y)
+    x /= maxy
+    y /= maxy
+    
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
@@ -126,7 +130,7 @@ def dplms_filter(
 
         if len(x) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
-
-        w_out[:] = np.convolve(w_in, x, "valid")
+        if invert: w_out[:] = np.convolve(w_in, -x, mode = 'valid')
+        else: w_out[:] = np.convolve(w_in, x, "valid")
 
     return dplms_out
