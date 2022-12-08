@@ -19,6 +19,7 @@ import numpy as np
 from iminuit import Minuit, cost, util
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
+from scipy.stats import chi2
 
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
@@ -250,7 +251,7 @@ def AoEcorrection(
             2350,
         ]
     )
-
+    results_dict = {}
     comptBands = comptBands[::-1]  # Flip so color gets darker when plotting
     # peaks = np.array([1080,1094,1459,1512, 1552, 1592,1620, 1650, 1670,1830,2105])
     compt_aoe = np.zeros(len(comptBands))
@@ -322,7 +323,7 @@ def AoEcorrection(
         | (aoe_sigmas_err == 0)
         | (compt_aoe_err == 0)
     )
-
+    results_dict["n_of_valid_fits"] = len(np.where(~ids)[0])
     # Fit mus against energy
     p0_mu = [-1e-06, 5e-01]
     c_mu = cost.LeastSquares(
@@ -337,6 +338,11 @@ def AoEcorrection(
     pars = m_mu.values
     errs = m_mu.errors
 
+    csqr_mu =  np.sum(((compt_aoe[~ids]-pol1(comptBands[~ids], *pars))**2) /compt_aoe_err[~ids])
+    dof_mu = (len(compt_aoe[~ids])-len(pars))
+    results_dict["p_val_mu"] = chi2.sf(csqr_mu, dof_mu)
+    results_dict["csqr_mu"] = (csqr_mu,dof_mu)
+
     # Fit sigma against energy
     p0_sig = [np.nanpercentile(aoe_sigmas[~ids], 50) ** 2, 2]
     c_sig = cost.LeastSquares(
@@ -350,6 +356,11 @@ def AoEcorrection(
 
     sig_pars = m_sig.values
     sig_errs = m_sig.errors
+
+    csqr_sig = np.sum(((aoe_sigmas[~ids]-sigma_fit(comptBands[~ids], *sig_pars))**2) /aoe_sigmas_err[~ids])
+    dof_sig = (len(aoe_sigmas[~ids])-len(sig_pars))
+    results_dict["p_val_sig"] = chi2.sf(csqr_sig, dof_sig)
+    results_dict["csqr_sig"] = (csqr_sig,dof_sig)
 
     model = pol1(comptBands, *pars)
     sig_model = sigma_fit(comptBands, *sig_pars)
@@ -451,9 +462,9 @@ def AoEcorrection(
             plt.show()
         else:
             plt.close()
-        return pars, sig_pars, plot_dict
+        return pars, sig_pars, results_dict, plot_dict
     else:
-        return pars, sig_pars
+        return pars, sig_pars, results_dict
 
 
 def plot_compt_bands_overlayed(
@@ -1211,7 +1222,7 @@ def cal_aoe(
     bulk_pars, bulk_errs = unbinned_aoe_fit(aoe_tmp, display=0)
 
     log.info("Starting A/E correction")
-    mu_pars, sigma_pars = AoEcorrection(energy, aoe, eres_pars)
+    mu_pars, sigma_pars, results_dict = AoEcorrection(energy, aoe, eres_pars)
     log.info("Finished A/E correction")
 
     classifier = get_classifier(aoe, energy, mu_pars, sigma_pars)
@@ -1327,6 +1338,7 @@ def cal_aoe(
             return out_dict
 
         out_dict = {
+            "correction_fit_results":results_dict,
             "A/E_Energy_param": energy_param,
             "Cal_energy_param": cal_energy_param,
             "dt_param": "dt_eff",
@@ -1383,7 +1395,7 @@ def cal_aoe(
                     aoe_uncorr, energy, dt, display=display, plot_dict=plot_dict
                 )
 
-            mu_pars, sigma_pars, plot_dict = AoEcorrection(
+            mu_pars, sigma_pars, results_dict, plot_dict = AoEcorrection(
                 energy, aoe, eres_pars, plot_dict, display=display
             )
 
@@ -1506,6 +1518,7 @@ def cal_aoe(
     except:
         log.error("survival fraction determination failed")
         out_dict = {
+            "correction_fit_results":results_dict,
             "A/E_Energy_param": "cuspEmax",
             "Cal_energy_param": "cuspEmax_ctc",
             "dt_param": "dt_eff",
