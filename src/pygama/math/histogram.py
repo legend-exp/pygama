@@ -587,7 +587,7 @@ def get_gaussian_guess(hist: np.ndarray , bins: np.ndarray) -> tuple[float, floa
     guess_amp = hist[max_idx]
 
     # find 50% amp bounds on both sides for a FWHM guess
-    guess_sigma, gauss_err = np.array(get_fwhm(hist, bins)) / np.array([2.355, 1]) # FWHM to sigma
+    guess_sigma = get_fwhm(hist, bins)[0] / 2.355  # FWHM to sigma
     guess_area = guess_amp * guess_sigma * np.sqrt(2 * np.pi)
 
     return (guess_mu, guess_sigma, guess_area)

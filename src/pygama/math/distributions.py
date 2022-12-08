@@ -9,6 +9,7 @@ from pygama.math.functions.gauss import (
     nb_gauss,
     nb_gauss_cdf,
     nb_gauss_pdf,
+    nb_gauss_scaled_pdf
 )
 from pygama.math.functions.gauss_on_linear import gauss_on_linear
 from pygama.math.functions.gauss_on_uniform import gauss_on_uniform

@@ -652,7 +652,8 @@ class sum_dists(rv_continuous):
 
         Notes
         -----
-        Params *must* have x_lo, x_hi as the first two parameters, and the rest of the shape parameters in the rest of the array
+        Params can have x_lo, x_hi as the first two parameters, and the rest of the shape parameters in the rest of the array
+        If params is the same length as the required params, the x_lo and x_hi are interpreted to be the max and min of the input array x
         
         """
         pdf_exts = self.dists 
@@ -667,9 +668,13 @@ class sum_dists(rv_continuous):
 
         # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
         # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
-        x_lo = params[0]
-        x_hi = params[1]
-        params = params[2:]
+        if len(params) == len(self.get_req_args())+2:
+            x_lo = params[0]
+            x_hi = params[1]
+            params = params[2:]
+        else:
+            x_lo = np.amin(x)
+            x_hi = np.amax(x)
 
                 
         shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
@@ -679,6 +684,10 @@ class sum_dists(rv_continuous):
 
         probs = [pdf_exts[i].pdf_ext(x, 1, x_lo, x_hi, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(pdf_exts))]
         probs = np.array(probs, dtype = object) # this is going to be very slow! Think of a way around this
+        # Maybe try this 
+        # probs = list(zip(*probs))
+        # sigs = np.array(probs[0])
+        # probs = np.array(probs[1])
         sigs = probs[:,0]
         probs = probs[:,1]
         

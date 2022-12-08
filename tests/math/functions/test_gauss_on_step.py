@@ -17,7 +17,7 @@ def test_gauss_on_step_pdf():
     n_bkg = 4
 
     pars = np.array(
-        [mu, sigma, n_sig, hstep, lower_range, upper_range, n_bkg], dtype=float
+        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
     )
 
     y_direct = gauss_on_step.get_pdf(x, pars)
@@ -71,7 +71,7 @@ def test_gauss_on_step_cdf():
     n_bkg = 4
 
     pars = np.array(
-        [mu, sigma, n_sig, hstep, lower_range, upper_range, n_bkg], dtype=float
+        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
     )
 
     y_direct = gauss_on_step.get_cdf(x, pars)

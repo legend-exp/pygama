@@ -9,6 +9,10 @@ on:
   pull_request:
   release:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   build-and-test:
@@ -36,7 +40,6 @@ jobs:
 
   test-coverage:
     name: Calculate and upload test coverage
-    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -53,10 +56,12 @@ jobs:
           pytest --cov=pygama --cov-report=xml
       - name: Upload Coverage to codecov.io
         uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   test-docs:
     name: Build documentation
-    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -67,8 +72,9 @@ jobs:
           python-version: '3.10'
       - name: Setup build environment
         run: |
+          sudo apt-get install -y pandoc
           python -m pip install --upgrade pip wheel setuptools
-          python -m pip install --upgrade .[docs]
+          python -m pip install --upgrade .[all]
       - name: Build docs for current ref
         run: |
           cd docs

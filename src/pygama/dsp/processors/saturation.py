@@ -4,6 +4,7 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 @guvectorize(
@@ -12,8 +13,7 @@ from pygama.dsp.errors import DSPFatal
         "void(float64[:], float64, float64[:], float64[:])",
     ],
     "(n),()->(),()",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
 )
 def saturation(
     w_in: np.ndarray, bit_depth_in: int, n_lo_out: int, n_hi_out: int
@@ -61,5 +61,5 @@ def saturation(
     for i in range(0, len(w_in), 1):
         if w_in[i] == 0:
             n_lo_out[0] += 1
-        elif w_in[i] == np.power(2, int(bit_depth_in)):
+        elif w_in[i] == np.power(2, int(bit_depth_in)) - int(bit_depth_in):
             n_hi_out[0] += 1

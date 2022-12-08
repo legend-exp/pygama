@@ -27,30 +27,28 @@ class hpge_peak_gen(sum_dists):
 
     Called with 
 
-    hpge_peak.get_pdf(x, params=[mu, sigma, tau, htail, n_sig, hstep, lower_range, upper_range, n_bkg])
+    hpge_peak.get_pdf(x, params=[n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range])
 
     Parameters
     ----------
-    x
-        Input data
+    n_sig
+        The area of the gauss on exgauss
     mu
         The centroid of the Gaussian
     sigma
         The standard deviation of the Gaussian
-    tau
-        The characteristic scale of the Gaussian tail
     htail
         The height of the Gaussian tail
-    n_sig
-        The area of the gauss on exgauss
+    tau
+        The characteristic scale of the Gaussian tail
+    n_bkg
+        The area of the step background
     hstep
         The height of the step function background
     lower_range
         Lower bound of the step function
     upper_range
         Upper bound of the step function
-    n_bkg
-        The area of the step background
 
     Returns 
     -------
@@ -64,7 +62,7 @@ class hpge_peak_gen(sum_dists):
     
     def __init__(self):
         
-        (mu, sigma, tau, frac1, n_sig, hstep, lower_range, upper_range, n_bkg) = range(9)
+        (n_sig, mu, sigma, frac1, tau, n_bkg, hstep, lower_range, upper_range) = range(9)
         args = [gaussian, [mu, sigma, n_sig, frac1], exgauss, [tau, mu, sigma, n_sig, frac1], step, [hstep, lower_range, upper_range, mu, sigma, n_bkg, frac1, frac1] ]
         
         # throw the step distribution htail because we will override its frac and total area to 1
@@ -85,7 +83,7 @@ class hpge_peak_gen(sum_dists):
         r"""
         Return the required args for this instance
         """
-        return "mu", "sigma", "tau", "htail", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return "n_sig", "mu", "sigma",  "htail", "tau", "n_bkg", "hstep", "lower_range", "upper_range"
         
 
     def get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
@@ -114,15 +112,11 @@ class hpge_peak_gen(sum_dists):
         if ("htail" in req_args) and ("hstep" in req_args): #having both the htail and hstep means it is an exgauss on a step
             htail_idx = np.where(req_args == "htail")[0][0]
             tau_idx = np.where(req_args == "tau")[0][0]
+            # We need to ditch the lower and upper_range columns and rows
+            cov = np.array(cov)
+            dropped_cov = cov[:, :-2][:-2, :]
             
-            # We need to move around the cov matrix because hpge_peak_fwhm has a different ordering on the cov matrix...
-            mu_idx = np.where(req_args == "mu")[0][0]
-            hstep_idx = np.where(req_args == "hstep")[0][0]
-            n_bkg_idx = np.where(req_args == "n_bkg")[0][0]
-            n_sig_idx = np.where(req_args == "n_sig")[0][0]
-            rearranged_cov = np.diag(np.array([cov[mu_idx][mu_idx], cov[sigma_idx][sigma_idx], cov[hstep_idx][hstep_idx], cov[htail_idx][htail_idx], cov[tau_idx][tau_idx], cov[n_bkg_idx][n_bkg_idx], cov[n_sig_idx][n_sig_idx] ]))
-
-            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], rearranged_cov)
+            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov)
 
         else: 
             if cov is None:

@@ -16,10 +16,12 @@ class gauss_on_uniform_gen(sum_dists):
 
     Parameters 
     ----------
+    area1 
+        The area of the Gaussian distribution
     mu, sigma
         The location and scale of the first Gaussian
-    area1, area2 
-        The areas of the gaussian and uniform distributions respectively
+    area2 
+        The area of the uniform distributions respectively
 
     Returns 
     -------
@@ -33,7 +35,7 @@ class gauss_on_uniform_gen(sum_dists):
     
     def __init__(self):
         
-        (mu, sigma, area1, area2) = range(4)
+        (area1, mu, sigma, area2) = range(4)
 
         args = [gaussian, [mu, sigma, area1], uniform, [area2, area2, area2]]
         
@@ -55,7 +57,7 @@ class gauss_on_uniform_gen(sum_dists):
         r"""
         Return required parameters for this class
         """
-        return "mu", "sigma", "n_sig", "n_bkg"
+        return  "n_sig", "mu", "sigma", "n_bkg"
 
 
 

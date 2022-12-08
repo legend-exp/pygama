@@ -4,13 +4,13 @@ import numpy as np
 from numba import guvectorize
 
 from pygama.dsp.errors import DSPFatal
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
 @guvectorize(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
     "(n),()->(n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
 )
 def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
     """Apply a pole-zero cancellation using the provided time
@@ -54,8 +54,7 @@ def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
         "void(float64[:], float64, float64, float64, float64[:])",
     ],
     "(n),(),(),()->(n)",
-    nopython=True,
-    cache=True,
+    **nb_kwargs,
 )
 def double_pole_zero(
     w_in: np.ndarray, t_tau1: float, t_tau2: float, frac: float, w_out: np.ndarray

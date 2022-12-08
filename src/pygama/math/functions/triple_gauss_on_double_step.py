@@ -34,7 +34,7 @@ class triple_gauss_on_double_step_gen(sum_dists):
 
     Example
     ------- 
-    triple_gauss_on_double_step.get_pdf(x, pars = [mu1, sigma1, n_sig1, mu2, sigma2, n_sig2, mu3, sigma3, n_sig3, hstep1, lower_range, upper_range, n_bkg1, hstep2, n_bkg2])
+    triple_gauss_on_double_step.get_pdf(x, pars = [n_sig1, mu1, sigma1, n_sig2, mu2, sigma2, n_sig3, mu3, sigma3, n_bkg1, hstep1, n_bkg2, hstep2, lower_range, upper_range])
 
     Returns 
     -------
@@ -49,7 +49,7 @@ class triple_gauss_on_double_step_gen(sum_dists):
     
     def __init__(self):
         
-        (mu1, sigma1, area1, mu2, sigma2, area2, mu3, sigma3, area3, hstep1, lower_range, upper_range, area4, hstep2, area5) = range(15)
+        (area1, mu1, sigma1, area2, mu2, sigma2, area3, mu3, sigma3, area4, hstep1, area5, hstep2, lower_range, upper_range) = range(15)
         args = [gaussian, [mu1, sigma1, area1], gaussian, [mu2, sigma2, area2], gaussian, [mu3, sigma3, area3], step, [hstep1, lower_range, upper_range, mu1, sigma1, area4], step, [hstep2, lower_range, upper_range, mu2, sigma2, area5]]
         
         super().__init__(*args, frac_flag = "areas")
@@ -59,6 +59,6 @@ class triple_gauss_on_double_step_gen(sum_dists):
         r"""
         Return the required arguments for this instance
         """
-        return "mu1", "sigma1", "n_sig1", "mu2", "sigma2", "n_sig2", "mu3", "sigma3" , "n_sig3", "hstep1", "lower_range", "upper_range", "n_bkg1", "hstep2", "n_bkg2"
+        return "n_sig1", "mu1", "sigma1", "n_sig2", "mu2", "sigma2",  "n_sig3", "mu3", "sigma3", "n_bkg1", "hstep1", "n_bkg2", "hstep2", "lower_range", "upper_range"
         
 triple_gauss_on_double_step = triple_gauss_on_double_step_gen()

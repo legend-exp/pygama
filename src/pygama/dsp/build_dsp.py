@@ -19,6 +19,7 @@ import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processing_chain import build_processing_chain
+from pygama.lgdo.lgdo_utils import expand_path
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def build_dsp(
     f_raw: str,
     f_dsp: str,
     dsp_config: str | dict = None,
-    lh5_tables: list[str] = None,
+    lh5_tables: list[str] | str = None,
     database: str | dict = None,
     outputs: list[str] = None,
     n_max: int = np.inf,
@@ -100,13 +101,6 @@ def build_dsp(
                 log.debug(f"table {tb} not found")
         return
 
-    if isinstance(dsp_config, str):
-        with open(dsp_config) as config_file:
-            dsp_config = json.load(config_file)
-
-    if not isinstance(dsp_config, dict):
-        raise ValueError("dsp_config must be a dict")
-
     raw_store = lh5.LH5Store()
     lh5_file = raw_store.gimme_file(f_raw, "r")
     if lh5_file is None:
@@ -116,6 +110,13 @@ def build_dsp(
     # if no group is specified, assume we want to decode every table in the file
     if lh5_tables is None:
         lh5_tables = lh5.ls(f_raw)
+    elif isinstance(lh5_tables, str):
+        lh5_tables = [lh5_tables]
+    elif not (
+        hasattr(lh5_tables, "__iter__")
+        and all(isinstance(el, str) for el in lh5_tables)
+    ):
+        raise RuntimeError("lh5_tables must be None, a string, or a list of strings")
 
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
     for i, tb in enumerate(lh5_tables):
@@ -127,19 +128,13 @@ def build_dsp(
     if len(lh5_tables) == 0:
         raise RuntimeError(f"could not find any valid LH5 table in {f_raw}")
 
-    # load DSP config (default: one config file for all tables)
-    if isinstance(dsp_config, str):
-        with open(dsp_config) as config_file:
-            dsp_config = json.load(config_file)
-
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
-        with open(database) as db_file:
+        with open(expand_path(database)) as db_file:
             database = json.load(db_file)
 
     if database and not isinstance(database, dict):
-        database = None
         raise ValueError("input database is not a valid JSON file or dict")
 
     if write_mode is None and os.path.isfile(f_dsp):
@@ -186,13 +181,12 @@ def build_dsp(
                 proc_chain, lh5_it.field_mask, tb_out = build_processing_chain(
                     lh5_in, dsp_config, db_dict, outputs, block_width
                 )
-                if log.level <= logging.INFO:
+                if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar = tqdm(
                         desc=f"Processing table {tb}",
                         total=tot_n_rows,
                         delay=2,
-                        unit="rows",
-                        file=sys.stdout,
+                        unit=" rows",
                     )
 
             n_rows = min(tot_n_rows - start_row, n_rows)
@@ -212,13 +206,13 @@ def build_dsp(
                 write_start=write_offset + start_row,
             )
 
-            if log.level <= logging.INFO:
+            if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update(n_rows)
 
             if start_row + n_rows >= tot_n_rows:
                 break
 
-        if log.level <= logging.INFO:
+        if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
 
     raw_store.write_object(dsp_info, "dsp_info", f_dsp, wo_mode="o")

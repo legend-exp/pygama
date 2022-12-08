@@ -17,14 +17,16 @@ class gauss_on_linear_gen(sum_dists):
 
     Parameters 
     ----------
+    area1 
+        The area of the Gaussian distribution
     mu, sigma
         The location and scale of the first Gaussian
+    area2 
+        The area of the linear distributions respectively
     m 
         The slope of the linear distribution 
     b 
         The y intercept of the linear distribution
-    area1, area2 
-        The areas of the gaussian and linear distributions respectively
 
     Returns 
     -------
@@ -34,11 +36,12 @@ class gauss_on_linear_gen(sum_dists):
     Notes 
     -----
     link_pars automatically makes sure that the linear distribution is only evaluated on the range of the x array eventually passed 
+    Parameters must be in the order (area1, mu, sigma, area2, m, b) 
     """
 
     def __init__(self):
         
-        (mu, sigma, area1, m, b, area2) = range(6)
+        (area1, mu, sigma, area2, m, b) = range(6)
 
         args = [gaussian, [mu, sigma, area1], linear, [area2, area2, m, b, area2]]
         
@@ -58,7 +61,7 @@ class gauss_on_linear_gen(sum_dists):
         Return the required args for this instance
         """ 
 
-        return "mu", "sigma", "n_sig", "m", "b", "n_bkg"
+        return "n_sig", "mu", "sigma", "n_bkg", "m", "b"
 
         
 gauss_on_linear = gauss_on_linear_gen()

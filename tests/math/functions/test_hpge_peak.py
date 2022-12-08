@@ -20,7 +20,7 @@ def test_hpge_peak_pdf():
     n_bkg = 20
 
     pars = np.array(
-        [mu, sigma, tau, htail, n_sig, hstep, lower_range, upper_range, n_bkg],
+        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
         dtype=float,
     )
 
@@ -54,6 +54,11 @@ def test_hpge_peak_pdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
+    x = np.arange(-100, 100)
+    y_sig, y_ext = hpge_peak.pdf_ext(x, pars)
+    assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
+
+    x = np.arange(-10, 10)
     x_lo = -100
     x_hi = 100
     pars = np.insert(pars, 0, [x_lo, x_hi])
@@ -77,7 +82,7 @@ def test_hpge_peak_cdf():
     n_bkg = 20
 
     pars = np.array(
-        [mu, sigma, tau, htail, n_sig, hstep, lower_range, upper_range, n_bkg],
+        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
         dtype=float,
     )
 

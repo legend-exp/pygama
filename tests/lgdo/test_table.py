@@ -87,6 +87,30 @@ def test_join():
 def test_get_dataframe():
     tbl = Table(3)
     tbl.add_column("a", lgdo.Array(np.array([1, 2, 3])))
+    tbl.add_column("b", lgdo.Array(np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])))
+    tbl.add_column(
+        "c",
+        lgdo.VectorOfVectors(
+            flattened_data=lgdo.Array(np.array([0, 1, 2, 3, 4, 5, 6])),
+            cumulative_length=lgdo.Array(np.array([3, 4, 7])),
+        ),
+    )
     df = tbl.get_dataframe()
     assert isinstance(df, pd.DataFrame)
-    assert df.keys().all() == "a"
+    assert list(df.keys()) == ["a", "b", "c"]
+
+
+def test_remove_column():
+    col_dict = {
+        "a": lgdo.Array(nda=np.array([1, 2, 3, 4])),
+        "b": lgdo.Array(nda=np.array([5, 6, 7, 8])),
+        "c": lgdo.Array(nda=np.array([9, 10, 11, 12])),
+    }
+
+    tbl = Table(col_dict=col_dict)
+
+    tbl.remove_column("a")
+    assert list(tbl.keys()) == ["b", "c"]
+
+    tbl.remove_column("c")
+    assert list(tbl.keys()) == ["b"]

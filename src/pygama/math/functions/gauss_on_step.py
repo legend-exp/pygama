@@ -15,17 +15,16 @@ class gauss_on_step_gen(sum_dists):
 
     Parameters 
     ----------
-    mu, sigma
-        The location and scale of the first Gaussian, and step function
     area1
         The area of the Gaussian distribution
+    mu, sigma
+        The location and scale of the first Gaussian, and step function
+    area2 
+        The area of the step function
     hstep
         The height of the step function
     lower_range, upper_range 
         The lower and upper bounds of the support of the step function 
-    area2 
-        The area of the step function
-
     Returns 
     -------
     gauss_on_step
@@ -34,11 +33,12 @@ class gauss_on_step_gen(sum_dists):
     Notes 
     -----
     The step function shares a mu and sigma with the step function 
+    The parameter array must have ordering (area1, mu, sigma, area2, hstep, lower_range, upper_range) 
     """
     
     def __init__(self):
         
-        (mu, sigma, area1, hstep, lower_range, upper_range, area2) = range(7)
+        (area1, mu, sigma, area2, hstep, lower_range, upper_range) = range(7)
         args = [gaussian, [mu, sigma, area1], step, [hstep, lower_range, upper_range, mu, sigma, area2]] 
         
         super().__init__(*args, frac_flag = "areas")
@@ -105,7 +105,7 @@ class gauss_on_step_gen(sum_dists):
         r""" 
         Return the required arguments
         """
-        return "mu", "sigma", "n_sig", "hstep", "lower_range", "upper_range", "n_bkg"
+        return "n_sig", "mu", "sigma", "n_bkg", "hstep", "lower_range", "upper_range"
 
 
 gauss_on_step = gauss_on_step_gen()

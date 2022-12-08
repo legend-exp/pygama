@@ -8,29 +8,32 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from pygama.math.binned_fitting import fit_binned
-from pygama.math.functions.gauss import nb_gauss
+from pygama.math.binned_fitting import *
+from pygama.math.distributions import nb_gauss
+from pygama.math.functions import *
 from pygama.math.histogram import get_bin_centers, get_gaussian_guess
+from pygama.math.least_squares import *
 
 
 def get_avse_cut(e_cal, current, plotFigure=None):
-    #DEP range and nearby BG for BG subtraction
-    dep_idxs = (e_cal > 1585) & (e_cal < 1595
-                                )  #(asymmetric around 1592 to account for CT)
+    # DEP range and nearby BG for BG subtraction
+    dep_idxs = (e_cal > 1585) & (
+        e_cal < 1595
+    )  # (asymmetric around 1592 to account for CT)
     bg_idxs = (e_cal > 1560) & (e_cal < 1570)
 
-    #SEP range and nearby BG for BG subtraction
+    # SEP range and nearby BG for BG subtraction
     sep_idxs = (e_cal > 2090) & (e_cal < 2115)
     bg_sep_idxs = (e_cal > 2060) & (e_cal < 2080)
 
-    #Bin the data in 2D, 25 keV bins
+    # Bin the data in 2D, 25 keV bins
     # xedges = np.arange(200,2300,25)
     # e_cent = get_bin_centers(xedges)
     # y_max = np.zeros_like(e_cent)
     # plt.ion()
     # plt.figure()
 
-    compton_shoulder = 2614 * (1 - 1. / (1 + 2 * 2614 / 511))
+    compton_shoulder = 2614 * (1 - 1.0 / (1 + 2 * 2614 / 511))
 
     # peaks = [238,510,583,727,860,1078,1512,1592,1806,compton_shoulder, 2614]
     # peaks = np.array(peaks)
@@ -75,13 +78,13 @@ def get_avse_cut(e_cal, current, plotFigure=None):
         # inp = input("q to quit")
         # if inp == "q": exit()
 
-    #quadratic fit
-    #first fit a line:
+    # quadratic fit
+    # first fit a line:
     p_lin = np.polyfit(e_cent, y_max, 1)
-    #find residuals:
+    # find residuals:
     resid = y_max - np.poly1d(p_lin)(e_cent)
     resid_std = np.std(resid)
-    #a really big residual is a pulser peak:
+    # a really big residual is a pulser peak:
     puls_idx = resid > resid_std
 
     e_cent_cut = e_cent[~puls_idx]
@@ -92,18 +95,18 @@ def get_avse_cut(e_cal, current, plotFigure=None):
 
     a_adjusted = current - np.poly1d(avse_quad)(e_cal)
 
-    #Look at DEP, bg subtract the AvsE spectrum
+    # Look at DEP, bg subtract the AvsE spectrum
     h_dep, bins = np.histogram(a_adjusted[dep_idxs], bins=5000)
     h_bg, bins = np.histogram(a_adjusted[bg_idxs], bins=bins)
     bin_centers = get_bin_centers(bins)
     h_bgs = h_dep - h_bg
-    #fit AvsE peak to gaussian to get the 90% cut
+    # fit AvsE peak to gaussian to get the 90% cut
     p0 = get_gaussian_guess(h_bgs, bin_centers)
     p = fit_binned(nb_gauss, h_bgs, bin_centers, p0)
     fit = nb_gauss(bin_centers, *p)
 
     ae_mean, ae_std = p[0], p[1]
-    ae_cut = p[0] - 1.28 * p[1]  #cuts at 10% of CDF
+    ae_cut = p[0] - 1.28 * p[1]  # cuts at 10% of CDF
 
     avse2, avse1, avse0 = avse_quad[:]
     avse_cut = ae_cut
@@ -143,12 +146,13 @@ def get_avse_cut(e_cal, current, plotFigure=None):
         ax_sep = plt.subplot(grid[1, 0])
         ax_ae = plt.subplot(grid[:, 1])
 
-        #adjust a over e for mean
+        # adjust a over e for mean
         a_over_e = a_adjusted
         ae_cut_mod = ae_cut
 
         h_dep, bins = np.histogram(
-            a_over_e[dep_idxs], bins=np.linspace(-12 * ae_std, 8 * ae_std, 100))
+            a_over_e[dep_idxs], bins=np.linspace(-12 * ae_std, 8 * ae_std, 100)
+        )
         h_bg, bins = np.histogram(a_over_e[bg_idxs], bins=bins)
         bin_centers = bins[:-1] + 0.5 * (bins[1] - bins[0])
         h_bgs = h_dep - h_bg
@@ -161,17 +165,15 @@ def get_avse_cut(e_cal, current, plotFigure=None):
         # ax_ae.plot(bin_centers, h_bgs_sep/ np.sum(h_bgs), ls="steps-mid", color = "g", label = "SEP (BG subtracted)")
 
         ax_ae.plot(
-            bin_centers,
-            h_bgs,
-            ls="steps-mid",
-            color="b",
-            label="DEP (BG subtracted)")
+            bin_centers, h_bgs, ls="steps-mid", color="b", label="DEP (BG subtracted)"
+        )
         ax_ae.plot(
             bin_centers,
             h_bgs_sep,
             ls="steps-mid",
             color="g",
-            label="SEP (BG subtracted)")
+            label="SEP (BG subtracted)",
+        )
         ax_ae.axvline(ae_cut_mod, color="r", ls=":")
         ax_ae.set_xlim(-12 * ae_std, 8 * ae_std)
         ax_ae.legend(loc=2)
@@ -185,7 +187,7 @@ def get_avse_cut(e_cal, current, plotFigure=None):
         e_cal_aepass = e_cal[ae_cut_idxs]
 
         pad = 50
-        bin_size = 0.2  #keV
+        bin_size = 0.2  # keV
         bins = np.arange(1592 - pad, 1592 + pad + bin_size, bin_size)
 
         ax_dep.hist(
@@ -193,14 +195,15 @@ def get_avse_cut(e_cal, current, plotFigure=None):
             histtype="step",
             color="k",
             label="DEP",
-            bins=bins)
+            bins=bins,
+        )
         ax_dep.hist(
-            e_cal_aepass[(e_cal_aepass > 1592 - pad) &
-                         (e_cal_aepass < 1592 + pad)],
+            e_cal_aepass[(e_cal_aepass > 1592 - pad) & (e_cal_aepass < 1592 + pad)],
             histtype="step",
             color="b",
             label="After Cut",
-            bins=bins)
+            bins=bins,
+        )
         ax_dep.legend(loc=2)
         ax_dep.set_xlabel("Energy [keV]")
 
@@ -210,14 +213,15 @@ def get_avse_cut(e_cal, current, plotFigure=None):
             histtype="step",
             color="k",
             label="SEP",
-            bins=bins)
+            bins=bins,
+        )
         ax_sep.hist(
-            e_cal_aepass[(e_cal_aepass > 2103 - pad) &
-                         (e_cal_aepass < 2103 + pad)],
+            e_cal_aepass[(e_cal_aepass > 2103 - pad) & (e_cal_aepass < 2103 + pad)],
             histtype="step",
             color="b",
             label="After Cut",
-            bins=bins)
+            bins=bins,
+        )
         ax_sep.legend(loc=2)
         ax_sep.set_xlabel("Energy [keV]")
 
@@ -225,14 +229,15 @@ def get_avse_cut(e_cal, current, plotFigure=None):
 
 
 def get_ae_cut(e_cal, current, plotFigure=None):
-    #try to get a rough A/E cut
+    # try to get a rough A/E cut
 
-    #DEP range and nearby BG for BG subtraction
-    dep_idxs = (e_cal > 1585) & (e_cal < 1595
-                                )  #(asymmetric around 1592 to account for CT)
+    # DEP range and nearby BG for BG subtraction
+    dep_idxs = (e_cal > 1585) & (
+        e_cal < 1595
+    )  # (asymmetric around 1592 to account for CT)
     bg_idxs = (e_cal > 1560) & (e_cal < 1570)
 
-    #SEP range and nearby BG for BG subtraction
+    # SEP range and nearby BG for BG subtraction
     sep_idxs = (e_cal > 2090) & (e_cal < 2115)
     bg_sep_idxs = (e_cal > 2060) & (e_cal < 2080)
 
@@ -252,7 +257,7 @@ def get_ae_cut(e_cal, current, plotFigure=None):
     fit = nb_gauss(bin_centers, *p)
 
     ae_mean, ae_std = p[0], p[1]
-    ae_cut = p[0] - 1.28 * p[1]  #cuts at 10% of CDF
+    ae_cut = p[0] - 1.28 * p[1]  # cuts at 10% of CDF
 
     if plotFigure is not None:
         ####
@@ -266,13 +271,12 @@ def get_ae_cut(e_cal, current, plotFigure=None):
         ax_sep = plt.subplot(grid[1, 0])
         ax_ae = plt.subplot(grid[:, 1])
 
-        #adjust a over e for mean
+        # adjust a over e for mean
 
         a_over_e = (a_over_e - ae_mean) / ae_std
         ae_cut_mod = (ae_cut - ae_mean) / ae_std
 
-        h_dep, bins = np.histogram(
-            a_over_e[dep_idxs], bins=np.linspace(-8, 6, 50))
+        h_dep, bins = np.histogram(a_over_e[dep_idxs], bins=np.linspace(-8, 6, 50))
         h_bg, bins = np.histogram(a_over_e[bg_idxs], bins=bins)
         bin_centers = bins[:-1] + 0.5 * (bins[1] - bins[0])
         h_bgs = h_dep - h_bg
@@ -286,13 +290,15 @@ def get_ae_cut(e_cal, current, plotFigure=None):
             h_bgs / np.sum(h_bgs),
             ls="steps-mid",
             color="b",
-            label="DEP (BG subtracted)")
+            label="DEP (BG subtracted)",
+        )
         ax_ae.plot(
             bin_centers,
             h_bgs_sep / np.sum(h_bgs),
             ls="steps-mid",
             color="g",
-            label="SEP (BG subtracted)")
+            label="SEP (BG subtracted)",
+        )
         # plt.plot(bin_centers, fit, color="g")
         ax_ae.axvline(ae_cut_mod, color="r", ls=":")
         ax_ae.set_xlim(-8, 5)
@@ -314,14 +320,15 @@ def get_ae_cut(e_cal, current, plotFigure=None):
             histtype="step",
             color="k",
             label="DEP",
-            bins=bins)
+            bins=bins,
+        )
         ax_dep.hist(
-            e_cal_aepass[(e_cal_aepass > 1592 - pad) &
-                         (e_cal_aepass < 1592 + pad)],
+            e_cal_aepass[(e_cal_aepass > 1592 - pad) & (e_cal_aepass < 1592 + pad)],
             histtype="step",
             color="b",
             label="After Cut",
-            bins=bins)
+            bins=bins,
+        )
         ax_dep.legend(loc=2)
         ax_dep.set_xlabel("Energy [keV]")
 
@@ -331,14 +338,15 @@ def get_ae_cut(e_cal, current, plotFigure=None):
             histtype="step",
             color="k",
             label="SEP",
-            bins=bins)
+            bins=bins,
+        )
         ax_sep.hist(
-            e_cal_aepass[(e_cal_aepass > 2103 - pad) &
-                         (e_cal_aepass < 2103 + pad)],
+            e_cal_aepass[(e_cal_aepass > 2103 - pad) & (e_cal_aepass < 2103 + pad)],
             histtype="step",
             color="b",
             label="After Cut",
-            bins=bins)
+            bins=bins,
+        )
         ax_sep.legend(loc=2)
         ax_sep.set_xlabel("Energy [keV]")
 

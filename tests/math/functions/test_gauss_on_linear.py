@@ -25,7 +25,7 @@ def test_gauss_on_linear_pdf():
     n_sig = 10
     n_bkg = 20
 
-    pars = np.array([mu, sigma, n_sig, m, b, n_bkg], dtype=float)
+    pars = np.array([n_sig, mu, sigma, n_bkg, m, b], dtype=float)
 
     assert isinstance(gauss_on_linear, sum_dists)
 
@@ -60,7 +60,7 @@ def test_gauss_on_linear_cdf():
     n_sig = 10
     n_bkg = 20
 
-    pars = np.array([mu, sigma, n_sig, m, b, n_bkg], dtype=float)
+    pars = np.array([n_sig, mu, sigma, n_bkg, m, b], dtype=float)
 
     assert isinstance(gauss_on_linear, sum_dists)
 
