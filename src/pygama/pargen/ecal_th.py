@@ -305,7 +305,7 @@ def energy_cal_th(
         pk_pars = results["pk_pars"]
         pk_covs = results["pk_covs"]
 
-        pk_rs_dict = {peak: pk_pars[i].tolist() for i,peak in enumerate(fitted_peaks)}
+        pk_rs_dict = {peak: pk_pars[i].tolist() for i, peak in enumerate(fitted_peaks)}
 
         peaks_kev = results["got_peaks_keV"]
 
@@ -654,7 +654,7 @@ def energy_cal_th(
             "eres_pars": fit_pars.tolist(),
             "fitted_peaks": results["fitted_keV"].tolist(),
             "fwhms": results["pk_fwhms"].tolist(),
-            "peak_fit_pars":pk_rs_dict
+            "peak_fit_pars": pk_rs_dict,
         }
         log.info(
             f"Results {energy_param}: {json.dumps(output_dict[f'{energy_param}_cal'], indent=2)}"

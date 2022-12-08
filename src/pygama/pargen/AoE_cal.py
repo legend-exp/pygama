@@ -338,10 +338,12 @@ def AoEcorrection(
     pars = m_mu.values
     errs = m_mu.errors
 
-    csqr_mu =  np.sum(((compt_aoe[~ids]-pol1(comptBands[~ids], *pars))**2) /compt_aoe_err[~ids])
-    dof_mu = (len(compt_aoe[~ids])-len(pars))
+    csqr_mu = np.sum(
+        ((compt_aoe[~ids] - pol1(comptBands[~ids], *pars)) ** 2) / compt_aoe_err[~ids]
+    )
+    dof_mu = len(compt_aoe[~ids]) - len(pars)
     results_dict["p_val_mu"] = chi2.sf(csqr_mu, dof_mu)
-    results_dict["csqr_mu"] = (csqr_mu,dof_mu)
+    results_dict["csqr_mu"] = (csqr_mu, dof_mu)
 
     # Fit sigma against energy
     p0_sig = [np.nanpercentile(aoe_sigmas[~ids], 50) ** 2, 2]
@@ -357,10 +359,13 @@ def AoEcorrection(
     sig_pars = m_sig.values
     sig_errs = m_sig.errors
 
-    csqr_sig = np.sum(((aoe_sigmas[~ids]-sigma_fit(comptBands[~ids], *sig_pars))**2) /aoe_sigmas_err[~ids])
-    dof_sig = (len(aoe_sigmas[~ids])-len(sig_pars))
+    csqr_sig = np.sum(
+        ((aoe_sigmas[~ids] - sigma_fit(comptBands[~ids], *sig_pars)) ** 2)
+        / aoe_sigmas_err[~ids]
+    )
+    dof_sig = len(aoe_sigmas[~ids]) - len(sig_pars)
     results_dict["p_val_sig"] = chi2.sf(csqr_sig, dof_sig)
-    results_dict["csqr_sig"] = (csqr_sig,dof_sig)
+    results_dict["csqr_sig"] = (csqr_sig, dof_sig)
 
     model = pol1(comptBands, *pars)
     sig_model = sigma_fit(comptBands, *sig_pars)
@@ -1338,7 +1343,7 @@ def cal_aoe(
             return out_dict
 
         out_dict = {
-            "correction_fit_results":results_dict,
+            "correction_fit_results": results_dict,
             "A/E_Energy_param": energy_param,
             "Cal_energy_param": cal_energy_param,
             "dt_param": "dt_eff",
@@ -1518,7 +1523,7 @@ def cal_aoe(
     except:
         log.error("survival fraction determination failed")
         out_dict = {
-            "correction_fit_results":results_dict,
+            "correction_fit_results": results_dict,
             "A/E_Energy_param": "cuspEmax",
             "Cal_energy_param": "cuspEmax_ctc",
             "dt_param": "dt_eff",
