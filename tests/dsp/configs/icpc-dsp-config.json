@@ -155,7 +155,7 @@
       "init_args": [
         "len(wf_blsub)-100",
         "db.cusp.sigma/wf_blsub.period",
-        "db.cusp.flat/wf_blsub.period",
+        "round(db.cusp.flat/wf_blsub.period)",
         "db.pz.tau"
       ],
       "defaults": {
@@ -186,7 +186,7 @@
       "init_args": [
         "len(wf_blsub)-100",
         "db.zac.sigma/wf_blsub.period",
-        "db.zac.flat/wf_blsub.period",
+        "round(db.zac.flat/wf_blsub.period)",
         "db.pz.tau"
       ],
       "defaults": {

@@ -37,7 +37,15 @@ sto = lh5.LH5Store()
 
 
 def run_optimisation(
-    file, opt_config, dsp_config, cuts, fom, db_dict=None, n_events=8000, **fom_kwargs
+    file,
+    opt_config,
+    dsp_config,
+    cuts,
+    fom,
+    db_dict=None,
+    n_events=8000,
+    wf_field="waveform",
+    **fom_kwargs,
 ):
     """
     Runs optimisation on .lh5 file
@@ -60,9 +68,9 @@ def run_optimisation(
         Number of events to run over
     """
     grid = set_par_space(opt_config)
-    waveforms = sto.read_object("/raw/waveform", file, idx=cuts, n_rows=n_events)[0]
+    waveforms = sto.read_object(f"/raw/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
     baseline = sto.read_object("/raw/baseline", file, idx=cuts, n_rows=n_events)[0]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid(tb_data, dsp_config, grid, fom, db_dict, **fom_kwargs)
 
 
@@ -131,12 +139,12 @@ def run_optimisation_multiprocessed(
         fom_kwargs = form_dict(fom_kwargs, len(grid))
     sto = lh5.LH5Store()
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/{wf_field}", file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(f"{lh5_path}/baseline", file, idx=cuts, n_rows=n_events)[
         0
     ]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid_multiprocess_parallel(
         tb_data,
         dsp_config,
@@ -895,6 +903,7 @@ def event_selection(
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     energy_parameter="trapTmax",
+    wf_field: str = "waveform",
     n_events=10000,
     threshold=1000,
 ):
@@ -964,12 +973,12 @@ def event_selection(
     idxs = np.array(sorted(np.concatenate(masks)))
 
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", raw_files, idx=idxs, n_rows=len(idxs)
+        f"{lh5_path}/{wf_field}", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
-    input_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    input_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:
@@ -1211,12 +1220,12 @@ def new_fom(data, kwarg_dict):
 
 
 OptimiserDimension = namedtuple(
-    "OptimiserDimension", "name parameter min_val max_val unit"
+    "OptimiserDimension", "name parameter min_val max_val rounding unit"
 )
 
 
 class BayesianOptimizer:
-
+    np.random.seed(55)
     lambda_param = 0.01
     eta_param = 0
     kernel = None
@@ -1242,8 +1251,10 @@ class BayesianOptimizer:
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
 
-    def add_dimension(self, name, parameter, min_val, max_val, unit=None):
-        self.dims.append(OptimiserDimension(name, parameter, min_val, max_val, unit))
+    def add_dimension(self, name, parameter, min_val, max_val, rounding=2, unit=None):
+        self.dims.append(
+            OptimiserDimension(name, parameter, min_val, max_val, rounding, unit)
+        )
 
     def get_n_dimensions(self):
         return len(self.dims)
@@ -1303,7 +1314,6 @@ class BayesianOptimizer:
     def _get_next_probable_point(self):
         min_ei = float(sys.maxsize)
         x_optimal = None
-        np.random.seed(55)
         # Trial with an array of random data points
         rands = np.random.uniform(
             np.array([dim.min_val for dim in self.dims]),
@@ -1319,18 +1329,29 @@ class BayesianOptimizer:
             )
             if response.fun[0] < min_ei:
                 min_ei = response.fun[0]
-                x_optimal = [y.round(2) for y in response.x]
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(response.x, self.dims)
+                ]
         if x_optimal in self.x_init and self.iters < 5:
-            self.iters += 1
-            x_optimal, min_ei = self._get_next_probable_point()
+            if self.iters < 5:
+                self.iters += 1
+                x_optimal, min_ei = self._get_next_probable_point()
+            else:
+                perturb = np.random.uniform(
+                    np.array([(dim.max_val - dim.min_val) / 100 for dim in self.dims]),
+                    np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                    (1, len(self.dims)),
+                )
+                x_optimal += perturb
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(x_optimal[0], self.dims)
+                ]
+                for i, y in enumerate(x_optimal):
+                    if y > self.dims[i].max_val:
+                        x_optimal[i] = self.dims[i].max_val
+                    elif y < self.dims[i].min_val:
+                        x_optimal[i] = self.dims[i].min_val
 
-        if x_optimal in self.x_init and self.iters == 5:
-            x_optimal += np.random.uniform(
-                np.array([0.1 for dim in self.dims]),
-                np.array([1 for dim in self.dims]),
-                (1, len(self.dims)),
-            )
-            x_optimal = [y.round(2) for y in x_optimal[0]]
         return x_optimal, min_ei
 
     def _extend_prior_with_posterior_data(self, x, y):
@@ -1357,7 +1378,7 @@ class BayesianOptimizer:
         self.current_x = x_new
         self.current_ei = ei
         for i, val in enumerate(x_new):
-            name, parameter, min_val, max_val, unit = self.dims[i]
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             if unit is not None:
                 value_str = f"{val}*{unit}"
             else:
@@ -1397,13 +1418,129 @@ class BayesianOptimizer:
     def get_best_vals(self):
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
-            name, parameter, min_val, max_val, unit = self.dims[i]
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             value_str = f"{val}*{unit}"
             if name not in out_dict.keys():
                 out_dict[name] = {parameter: value_str}
             else:
                 out_dict[name][parameter] = value_str
         return out_dict
+
+    def plot(self, init_samples=None):
+        if len(self.dims) != 2:
+            raise Exception("Plotting not implemented for dim!=2")
+        x, y = np.mgrid[
+            self.dims[0].min_val : self.dims[0].max_val : 0.1,
+            self.dims[1].min_val : self.dims[1].max_val : 0.1,
+        ]
+        points = np.vstack((x.flatten(), y.flatten())).T
+        out_grid = np.zeros(
+            (
+                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+            )
+        )
+
+        j = 0
+        for i, _ in np.ndenumerate(out_grid):
+            out_grid[i] = self.gauss_pr.predict(
+                points[j].reshape(1, -1), return_std=False
+            )
+            j += 1
+
+        plt.figure()
+        plt.imshow(
+            out_grid,
+            norm=LogNorm(),
+            origin="lower",
+            aspect="auto",
+            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+        )
+        plt.scatter(
+            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+        )
+        if init_samples is not None:
+            plt.scatter(
+                (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                color="red",
+            )
+        plt.scatter(
+            (self.optimal_x[1] - self.dims[1].min_val) * 10,
+            (self.optimal_x[0] - self.dims[0].min_val) * 10,
+            color="orange",
+        )
+        ticks, labels = plt.xticks()
+        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[1], 5)
+        plt.xticks(ticks=ticks, labels=labels, rotation=45)
+        ticks, labels = plt.yticks()
+        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[0], 5)
+        plt.yticks(ticks=ticks, labels=labels, rotation=45)
+        plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
+        plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+        plt.title(f"{self.dims[0].name} Kernel Prediction")
+        plt.tight_layout()
+        plt.show()
+
+    def plot_acq(self, init_samples=None):
+        if len(self.dims) != 2:
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        x, y = np.mgrid[
+            self.dims[0].min_val : self.dims[0].max_val : 0.1,
+            self.dims[1].min_val : self.dims[1].max_val : 0.1,
+        ]
+        points = np.vstack((x.flatten(), y.flatten())).T
+        out_grid = np.zeros(
+            (
+                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+            )
+        )
+
+        j = 0
+        for i, _ in np.ndenumerate(out_grid):
+            out_grid[i] = self._acquisition_function(points[j])
+            j += 1
+
+        plt.figure()
+        plt.imshow(
+            out_grid,
+            norm=LogNorm(),
+            origin="lower",
+            aspect="auto",
+            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+        )
+        plt.scatter(
+            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+        )
+        if init_samples is not None:
+            plt.scatter(
+                (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                color="red",
+            )
+        plt.scatter(
+            (self.optimal_x[1] - self.dims[1].min_val) * 10,
+            (self.optimal_x[0] - self.dims[0].min_val) * 10,
+            color="orange",
+        )
+        ticks, labels = plt.xticks()
+        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[1], 5)
+        plt.xticks(ticks=ticks, labels=labels, rotation=45)
+        ticks, labels = plt.yticks()
+        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+        ticks = np.linspace(0, out_grid.shape[0], 5)
+        plt.yticks(ticks=ticks, labels=labels, rotation=45)
+        plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
+        plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+        plt.title(f"{self.dims[0].name} Acquisition Space")
+        plt.tight_layout()
+        plt.show()
 
 
 def run_optimisation(
