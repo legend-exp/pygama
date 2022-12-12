@@ -891,10 +891,16 @@ class DataLoader:
                 if isinstance(tier_table[col], Array):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
-                        col_dict[col] = np.empty(
-                            table_length,
-                            dtype=tier_table[col].dtype,
-                        )
+                        if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
+                            col_dict[col] = np.empty(
+                                (table_length, tier_table[col].nda.shape[1]),
+                                dtype=tier_table[col].dtype,
+                            )
+                        else:
+                            col_dict[col] = np.empty(
+                                table_length,
+                                dtype=tier_table[col].dtype,
+                            )
                     col_dict[col][tcm_idx] = tier_table[col].nda
 
                 elif isinstance(tier_table[col], WaveformTable):
