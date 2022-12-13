@@ -40,7 +40,6 @@ jobs:
 
   test-coverage:
     name: Calculate and upload test coverage
-    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -57,10 +56,12 @@ jobs:
           pytest --cov=pygama --cov-report=xml
       - name: Upload Coverage to codecov.io
         uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   test-docs:
     name: Build documentation
-    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
