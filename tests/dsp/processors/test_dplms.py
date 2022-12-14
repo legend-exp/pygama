@@ -11,23 +11,23 @@ def test_dplms(compare_numba_vs_python):
     """Testing function for the dplms processor."""
 
     db_file = '/home/dandrea/legend-notes/SiPMs_processing/database/l60_r022_sipm_dplms_database.json"
-    
+
     with open(db_file, 'r') as fp:
         database = json.load(fp)
-    
+
     func = dplms( database['ch046']['dplms']['noise_matrix'],
                  database['ch046']['dplms']['average'],
                  50, 0.1,1, 0, 0, True)
-    
-    
+
+
     len_wf = 20
-    
+
     # test for nan if w_in has a nan
     w_in = np.ones(len_wf)
     w_in[4] = np.nan
-    
+
     assert np.isnan(compare_numba_vs_python(func(w_in)))
-    
+
     """
     # test for nan if nan is passed to t_in
     w_in = np.ones(len_wf)

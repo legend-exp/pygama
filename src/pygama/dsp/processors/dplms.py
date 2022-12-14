@@ -89,9 +89,14 @@ def dplms(
     fhi = int(ssize / 2 + length / 2)
     ref_mat = np.zeros([length, length])
     ref_sig = np.zeros([length])
-    if ff == 0: ff = [0]
-    elif ff == 1: ff = [-1, 0, 1]
-    else: raise DSPFatal("The penalized coefficient for the reference pulse must be 0 or 1")
+    if ff == 0:
+        ff = [0]
+    elif ff == 1:
+        ff = [-1, 0, 1]
+    else:
+        raise DSPFatal(
+            "The penalized coefficient for the reference pulse must be 0 or 1"
+        )
     for i in ff:
         ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
         ref_sig += reference[flo + i : fhi + i]

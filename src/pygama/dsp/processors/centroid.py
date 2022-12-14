@@ -9,9 +9,7 @@ from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
-def step(
-    length: int
-) -> Callable:
+def step(length: int) -> Callable:
     """Process waveforms with a step function.
 
     Note
@@ -38,14 +36,18 @@ def step(
             "init_args": ["16"]
         }
     """
-    
+
     x = np.linspace(0, length, length)
-    y = np.piecewise(x,
-                     [((x >= 0) & (x < length/4)),
-                      ((x >= length/4) & (x <= 3*length/4)),
-                      ((x > 3*length/4) & (x <= length))],
-                     [-1, 1, -1])
-    
+    y = np.piecewise(
+        x,
+        [
+            ((x >= 0) & (x < length / 4)),
+            ((x >= length / 4) & (x <= 3 * length / 4)),
+            ((x > 3 * length / 4) & (x <= length)),
+        ],
+        [-1, 1, -1],
+    )
+
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
@@ -71,8 +73,8 @@ def step(
 
         if len(y) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
-        w_out[:] = np.convolve(w_in, y, mode = 'valid')
-        
+        w_out[:] = np.convolve(w_in, y, mode="valid")
+
     return step_out
 
 
@@ -84,13 +86,8 @@ def step(
     "(n),(m),(),(),(m)",
     **nb_kwargs,
 )
-
 def find_centroid(
-    w_in: np.ndarray,
-    idx_in: np.ndarray,
-    length: int,
-    shift: int,
-    idx_out: np.ndarray
+    w_in: np.ndarray, idx_in: np.ndarray, length: int, shift: int, idx_out: np.ndarray
 ) -> None:
     """Calculate centroid position of the waveform.
 
@@ -129,18 +126,19 @@ def find_centroid(
             "unit": ["ns"]
         },
     """
-    
+
     idx_out[:] = np.nan
     k = 0
     for i in range(len(idx_in)):
         if not np.isnan(idx_in[i]):
             t = int(idx_in[i])
-            tstart = int(t-length/2+length/10)
-            if (tstart < 0): tstart = 0
+            tstart = int(t - length / 2 + length / 10)
+            if tstart < 0:
+                tstart = 0
             try:
                 c_a = np.where(w_in[tstart:t] > 0)[0][0] + tstart
                 c_b = np.where(w_in[tstart:t] < 0)[0][-1] + tstart
-                idx_out[k] = int( c_a  / 2 + c_b / 2 ) + shift
+                idx_out[k] = int(c_a / 2 + c_b / 2) + shift
             except:
                 idx_out[k] = 0
             k += 1
