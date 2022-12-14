@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 import pygama.lgdo as lgdo
+from pygama.dsp import build_processing_chain as bpc
 from pygama.raw.build_raw import build_raw
 
 config_dir = Path(__file__).parent / "test_data_trimmer_configs"
@@ -428,19 +429,39 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
         "spms": "pass",
 
         "geds": {
-        "outputs" : [ "presummed_waveform" ],
-        "processors" : {
+        "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
+        "processors": {
             "windowed_waveform": {
             "start_index": 2000,
             "end_index": -1000
-            },
+                },
             "presummed_waveform": {
                 "function": "presum",
                 "module": "pygama.dsp.processors",
                 "args": ["waveform", "presummed_waveform(len(waveform)/16, 'f')"],
                 "unit": "ADC"
+                },
+            "t_sat_lo, t_sat_hi": {
+                "function": "saturation",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                "unit": "ADC"
                 }
             }
+        }
+    }
+    """
+
+    raw_dsp_config = """
+    {
+        "outputs": ["t_sat_lo", "t_sat_hi"],
+        "processors": {
+            "t_sat_lo, t_sat_hi": {
+                "function": "saturation",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                "unit": "ADC"
+                }
         }
     }
     """
@@ -589,3 +610,19 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
             raw_packet_waveform_dts.nda[0]
             == presummed_packet_waveform_dts.nda[0] / presum_rate
         )
+
+        # check that the t_lo_sat and t_sat_hi are correct
+        if not pass_flag:
+            wf_table, _ = sto.read_object(str(raw_group), raw_file)
+            pc, _, wf_out = bpc(wf_table, json.loads(raw_dsp_config))
+            pc.execute()
+            raw_sat_lo = wf_out["t_sat_lo"]
+            raw_sat_hi = wf_out["t_sat_hi"]
+
+            trim_sat_lo, _ = sto.read_object(str(raw_group) + "/t_sat_lo", trimmed_file)
+
+            trim_sat_hi, _ = sto.read_object(str(raw_group) + "/t_sat_hi", trimmed_file)
+
+            assert np.array_equal(raw_sat_lo.nda, trim_sat_lo.nda)
+            assert np.array_equal(raw_sat_hi.nda, trim_sat_hi.nda)
+            assert type(trim_sat_lo.nda[0]) == np.uint16

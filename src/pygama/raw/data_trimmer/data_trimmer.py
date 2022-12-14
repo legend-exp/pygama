@@ -4,9 +4,11 @@ import copy
 import json
 import logging
 
+import numpy as np
+
 import pygama.lgdo as lgdo
 from pygama.dsp.processing_chain import build_processing_chain as bpc
-from pygama.lgdo import Array, Struct, Table
+from pygama.lgdo import Array, ArrayOfEqualSizedArrays, Struct, Table
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,39 @@ def data_trimmer(
     The original "waveforms" column in the table is deleted!
     If "pass" is present as a the value of a group in the dsp_config, no trimming is performed.
     Otherwise, dsp_config is assumed to apply to all valid waveforms and is applied.
+    The names of the outputs must follow what is in the example.
+
+    Example dsp_config
+    ------------------
+
+
+    .. code-block :: json
+
+    {
+        "spms": pass,
+
+        "geds" : {
+            "outputs" : [ "presummed_waveform", "t_sat_lo", "t_sat_hi"],
+            "processors" : {
+                "windowed_waveform": {
+                    "start_index": 2000,
+                    "end_index": -1000
+                },
+                "presummed_waveform": {
+                    "function": "presum",
+                    "module": "pygama.dsp.processors",
+                    "args": ["waveform", "presummed_waveform(len(waveform)/16, 'f')"],
+                    "unit": "ADC"
+                },
+                "t_sat_lo", "t_sat_hi": {
+                    "function": "saturation",
+                    "module": "pygama.dsp.processors",
+                    "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                    "unit": "ADC"
+                }
+            }
+        }
+    }
     """
     # Convert the dsp_config to a dict so that we can grab the constants from the dsp config
     if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
@@ -89,31 +124,41 @@ def data_trimmer(
     proc_chain, mask, dsp_out = bpc(lgdo_table, dsp_dict)
     proc_chain.execute()
 
-    # for every processed waveform, create a new waveform table and add it to the original lgdo table
+    # For every processor in dsp_config for this group, create a new entry in the lgdo table with that processor's name
+    # If the processor returns a waveform, create a new waveform table and add it to the original lgdo table
     for proc in dsp_out.keys():
 
-        # Process dt and t0 for specific dsp processor, can add new ones as necessary
-        if proc == "presummed_waveform":
-            # find the presum rate from the dsp_config
-            presum_rate_string = dsp_dict["processors"]["presummed_waveform"]["args"][1]
-            presum_rate_start_idx = presum_rate_string.find("/") + 1
-            presum_rate_end_idx = presum_rate_string.find(",")
-            presum_rate = int(
-                presum_rate_string[presum_rate_start_idx:presum_rate_end_idx]
-            )
+        # Check if the processor returned a waveform or not, denoted by an array of equal sized arrays
+        if type(dsp_out[proc]) == ArrayOfEqualSizedArrays:
+            # Process dt and t0 for specific dsp processor, can add new ones as necessary
+            if proc == "presummed_waveform":
+                # find the presum rate from the dsp_config
+                presum_rate_string = dsp_dict["processors"]["presummed_waveform"][
+                    "args"
+                ][1]
+                presum_rate_start_idx = presum_rate_string.find("/") + 1
+                presum_rate_end_idx = presum_rate_string.find(",")
+                presum_rate = int(
+                    presum_rate_string[presum_rate_start_idx:presum_rate_end_idx]
+                )
 
-            dt = process_presum_dt(lgdo_table["waveform"]["dt"], presum_rate)
-            t0 = lgdo_table["waveform"]["t0"]
+                dt = process_presum_dt(lgdo_table["waveform"]["dt"], presum_rate)
+                t0 = lgdo_table["waveform"]["t0"]
 
-        else:
-            t0 = lgdo_table["waveform"]["t0"]
-            dt = lgdo_table["waveform"]["dt"]
+            else:
+                t0 = lgdo_table["waveform"]["t0"]
+                dt = lgdo_table["waveform"]["dt"]
 
-        # Create the new waveform table
-        wf_table = lgdo.WaveformTable(t0=t0, dt=dt, values=dsp_out[proc].nda)
+            # Create the new waveform table
+            new_obj = lgdo.WaveformTable(t0=t0, dt=dt, values=dsp_out[proc].nda)
 
-        # add this wf_table to the original table
-        lgdo_table.add_field(proc, wf_table, use_obj_size=True)
+        # otherwise, the processor returned just an array
+        elif type(dsp_out[proc]) == Array:
+            if (proc == "t_sat_lo") or (proc == "t_sat_hi"):
+                new_obj = process_saturation(dsp_out[proc])
+
+        # add this new_obj to the original table
+        lgdo_table.add_field(proc, new_obj, use_obj_size=True)
 
     # remove the original waveform
     lgdo_table.pop("waveform")
@@ -148,3 +193,13 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     start_index *= copy_dts.nda
     copy_t0s.nda += start_index
     return copy_t0s
+
+
+def process_saturation(n_sat: Array) -> None:
+    r"""
+    If the :func:`saturation` DSP processor is used, the output is stored in floats.
+    However, the output are just the number of times a waveform crosses the saturation,
+    so it can be stored as an unsigned integer.
+    """
+    n_sat.nda = n_sat.nda.astype(np.uint16)
+    return n_sat
