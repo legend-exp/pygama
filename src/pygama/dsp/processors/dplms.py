@@ -9,7 +9,7 @@ from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
-def dplms_filter(
+def dplms(
     noise_mat: list,
     reference: list,
     length: int,
@@ -43,6 +43,8 @@ def dplms_filter(
         penalized coefficient for the zero area matrix.
     ff
         flat top length for the reference signal.
+    invert
+        option to invert the signal.
 
     JSON Configuration Example
     --------------------------
@@ -50,14 +52,14 @@ def dplms_filter(
     .. code-block :: json
 
         "wf_dplms": {
-            "function": "dplms_filter",
+            "function": "dplms",
             "module": "pygama.dsp.processors",
             "args": ["wf_diff", "wf_dplms(len(wf_diff)-49, 'f')"],
             "unit": "ADC",
             "init_args": [
                 "db.dplms.noise_matrix",
                 "db.dplms.reference",
-                "50", "0.1", "1", "0", "0", "False"]
+                "50", "0.1", "1", "0", "1", "False"]
         }
     """
 
@@ -87,10 +89,9 @@ def dplms_filter(
     fhi = int(ssize / 2 + length / 2)
     ref_mat = np.zeros([length, length])
     ref_sig = np.zeros([length])
-    if ff == 0:
-        ff = [0]
-    else:
-        ff = [-1, 0, 1]
+    if ff == 0: ff = [0]
+    elif ff == 1: ff = [-1, 0, 1]
+    else: raise DSPFatal("The penalized coefficient for the reference pulse must be 0 or 1")
     for i in ff:
         ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
         ref_sig += reference[flo + i : fhi + i]

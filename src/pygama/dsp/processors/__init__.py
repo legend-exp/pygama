@@ -61,7 +61,9 @@ several advantages:
 
 from .bl_subtract import bl_subtract
 from .convolutions import cusp_filter, t0_filter, zac_filter
-from .dplms import dplms_filter
+from .dplms import dplms
+from .centroid import step
+from .centroid import find_centroid
 from .dwt import discrete_wavelet_transform
 from .fftw import dft, inv_dft, psd
 from .fixed_time_pickoff import fixed_time_pickoff
@@ -140,5 +142,7 @@ __all__ = [
     "wiener_filter",
     "windower",
     "time_over_threshold",
-    "dplms_filter",
+    "dplms",
+    "step",
+    "find_centroid",
 ]
