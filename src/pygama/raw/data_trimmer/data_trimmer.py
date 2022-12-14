@@ -35,6 +35,8 @@ def data_trimmer(
     Notes
     -----
     The original "waveforms" column in the table is deleted!
+    If "pass" is present as a the value of a group in the dsp_config, no trimming is performed.
+    Otherwise, dsp_config is assumed to apply to all valid waveforms and is applied.
     """
     # Convert the dsp_config to a dict so that we can grab the constants from the dsp config
     if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
@@ -56,6 +58,10 @@ def data_trimmer(
         log.debug(
             "No sub_dicts found, trimming all waveform tables with one dsp_config"
         )
+
+    # If the user passes a value "pass" in the dsp_config for this group, just skip on the data trimming
+    if (type(dsp_dict) == str) & (dsp_dict == "pass"):
+        return
 
     # if we want to window waveforms, we can do it outside of processing chain for the sake of memory
 
