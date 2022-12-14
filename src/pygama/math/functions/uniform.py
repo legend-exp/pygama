@@ -163,7 +163,7 @@ class uniform_gen(pygama_continuous):
     def cdf_ext(self, x: np.ndarray, area: float, a: float = np.inf, b: float = np.inf) -> np.ndarray:
         return nb_uniform_scaled_cdf(x, a, b, area)
 
-    def required_args(self) -> tuple[str, str, str, str]:
+    def required_args(self) -> tuple[str, str]:
         return "a", "b"
 
 uniform = uniform_gen(a=0.0, b=1.0, name='uniform')

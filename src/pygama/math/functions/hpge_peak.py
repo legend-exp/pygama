@@ -79,7 +79,7 @@ class hpge_peak_gen(sum_dists):
         
         return shape_pars, cum_len, areas, fracs, total_area 
     
-    def get_req_args(self) -> tuple[str,str,str,str,str,str,str,str,str]:
+    def get_req_args(self) -> tuple[str, str, str, str, str, str, str, str, str]:
         r"""
         Return the required args for this instance
         """

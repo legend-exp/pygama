@@ -161,7 +161,7 @@ class exponential_gen(pygama_continuous):
     def cdf_ext(self, x: np.ndarray, area: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
         return nb_exponential_scaled_cdf(x, lamb, mu, sigma, area)
     
-    def required_args(self) -> tuple[str, str, str, str]:
+    def required_args(self) -> tuple[str, str, str]:
         return "lambda", "mu", "sigma"
 
 exponential = exponential_gen(a=0.0, name='exponential')

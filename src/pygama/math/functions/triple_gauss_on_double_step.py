@@ -17,16 +17,16 @@ class triple_gauss_on_double_step_gen(sum_dists):
 
     Parameters 
     ----------
-    mu_1, sigma_1 
-        The location and scale of the first Gaussian
-    mu_2, sigma_2
-        The location and scale of the second Gaussian 
-    mu_3, sigma_3 
-        The location and scale of the third Gaussian 
-    hstep_1 
-        The height of the first step function
-    hstep_2
-        The height of the second step function 
+    area1, mu_1, sigma_1 
+        The area, location, and scale of the first Gaussian
+    area2, mu_2, sigma_2
+        The area, location, and scale of the second Gaussian 
+    area3, mu_3, sigma_3 
+        The area, location, and scale of the third Gaussian
+    area4, hstep_1 
+        The area and height of the first step function
+    area5, hstep_2
+        The area and height of the second step function 
     lower_range
         The lower range to compute the normalization of the step functions 
     upper_range

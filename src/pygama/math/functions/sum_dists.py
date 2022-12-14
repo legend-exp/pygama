@@ -30,6 +30,7 @@ def get_idx(idx_array, frac_flag):
     during class initialization. So we need to know what array the actual values of the fracs and areas will be in.
 
     This will return None for an array index whose values are not located in the parameter array passed to a method call
+    This allows :func:`link_pars` to use either the default 1s for the missing areas/fracs/total_area, or user-specified values (passed using keywords). 
     """
     
     if frac_flag is None:
@@ -155,25 +156,28 @@ class sum_dists(rv_continuous):
     sum of the distributions. 
 
     The correct way to initialize is sum_dists(d1, p1, d2, p2, ..., dn, pn, frac_flag)
-    Where ds are distributions and ps are parameter index arrays
-    There are some checks to ensure the input is correct, but it is up to the user
-    to use it correctly...
+    Where d_i is a distribution and p_i is a parameter index array for that distribution.
 
-    dists are the unfrozen distributions
-
-    idx_array is an array of arrays, each array contains the indicies that each distribution should 
-    pass to the actual parameters array sent to the actual function call
+    Parameter index arrays contain indices that slice a single parameter array that is passed to method calls. 
+    For example, if the user will eventually pass parameters=[mu, sigma, frac1, frac2] to function.get_pdf(x, parameters)
+    and the first distribution takes mu, sigma, frac1 as its parameters, then p1=[0,1,2]. If the second distribution takes mu, sigma, frac2
+    then its parameter index array would be p2=[0, 1, 3] because frac2 is the index 3 entry in parameters. 
 
     Each par array can contain [shape, mu, sigma, area, frac] with area and frac being optional, and
-    depend on the flag sent to the constructor
+    depend on the flag sent to the constructor, but *must be placed in that order*. 
 
-    4 options:
+    There are 4 flag options:
 
     1. flag = "areas", areas passed as fit variables, global fracs optional (but can be passed by kwarg, default all to 1)
     2. flag = "fracs", fracs and total area passed as fit variables, global areas optional (but can be passed by kwarg, default all to 1)
-        by default, the total area is just a parameter of the last distribution...
-    3. flag = "both", fracs and areas passed as fit variables
+        by default, the total area is just a parameter of the last distribution. I.e. dist1, [shapes, mu, sigma, frac1], ..., distn, [shapes, mu, sigma, frac2, total_area]
+    3. flag = "both", fracs and areas passed as fit variables. dist1, [shapes, mu, sigma, area1, frac1], ..., distn, [shapes, mu, sigma, area_n, frac_n, total_area]
     4. flag = None, no areas or fracs passed as fit variables, all default to 1
+
+
+    Notes 
+    -----
+    dists are the unfrozen pygama distributions
     """
     def __init__(self, *args, **kwargs): 
 
@@ -186,9 +190,11 @@ class sum_dists(rv_continuous):
 
         # Read in the kwargs
         self.components = kwargs.pop('components', False)
+        self.frac_flag = kwargs.pop('frac_flag', None)
+        # The fracs, areas, and total_area are set to 1s so that if any one of frac, area, total_area is missing from the idx_arrays,
+        # then we just multiply by 1 when we compute the sum of total_area*frac*area*distribution
         self.areas = kwargs.pop('areas', np.ones(len(dists)))
         self.fracs = kwargs.pop('fracs', np.ones(len(dists)))
-        self.frac_flag = kwargs.pop('frac_flag', None)
         self.total_area = kwargs.pop('total_area', 1)
         
         # Check that the dists are in fact distributions
@@ -197,18 +203,21 @@ class sum_dists(rv_continuous):
                 raise ValueError(f"Distribution at index {i} has value {dists[i]},\
                 and is an array and not a pygama_continuous distribution")
                 
-        # Now, create the arrays of indices corresponding to the pars, and whichever area and/or fracs are present
+        # Now, create the arrays of indices corresponding to the shape pars, and whichever area and/or fracs are present
         shape_par_idx, area_idx, frac_idx, total_area_idx = get_idx(idx_array, self.frac_flag)
         
         fracs = self.fracs
-        
         self.dists = dists
+
+        # Perform some checks that ensure we are splitting up parameter arrays correctly 
         self.fracs = _precompute_fracs(fracs, dists)
         self.shape_par_idx = _precompute_shape_par_idx(shape_par_idx, dists)
+
         self.area_idx = area_idx
         self.frac_idx = frac_idx
         self.total_area_idx = total_area_idx
 
+        # We need this so that scipy methods don't get angry
         self.shapes = None
         
         super().__init__(self)
@@ -743,9 +752,96 @@ class sum_dists(rv_continuous):
         for dist in dists:
             args.append(dist.required_args())
         return args
+
+
+    def norm_pdf(self, x, *args, **kwds):
+        r"""
+        Normalize a pdf on a subset of its support, typically over a fit-range. 
+
+        Parameters 
+        ---------- 
+        x 
+            The data
+        args 
+            The parameter array, can start with x_lo, x_hi
+
+        Returns 
+        -------
+        norm_pdf 
+            The pdf that is normalized on a smaller range 
+
+        Notes 
+        ----- 
+        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
+        We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names
+        For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
+        """
+        params = args[0]
+        # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
+        # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
+        if len(params) == len(self.get_req_args())+2:
+            x_lo = params[0]
+            x_hi = params[1]
+            params = params[2:]
+        else:
+            x_lo = np.amin(x)
+            x_hi = np.amax(x)
+
+        if (x_lo == np.inf) and (x_hi == np.inf):
+            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), params))
+        else: 
+            norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), params))
+
+        if norm == 0:
+            return np.full_like(x, np.inf)
+        else:
+            return self.get_pdf(x, params)/norm
+    
+    def norm_cdf(self, x, *args, **kwds):
+        r"""
+        Derive a cdf from a pdf that is normalized on a subset of its support, typically over a fit-range. 
+
+        Parameters 
+        ---------- 
+        x 
+            The data
+        args 
+            The parameter array, can contain x_lo and x_hi at the start of the array
+
+        Returns 
+        -------
+        norm_pdf 
+            The pdf that is normalized on a smaller range 
+
+        Notes 
+        ----- 
+        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
+        We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names. 
+        For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
+        """
+        # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
+        # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
+        params = args[0]
+        if len(params) == len(self.get_req_args())+2:
+            x_lo = params[0]
+            x_hi = params[1]
+            params = params[2:]
+        else:
+            x_lo = np.amin(x)
+            x_hi = np.amax(x)
+
+        if (x_lo == np.inf) and (x_hi == np.inf):
+            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), params))
+        else: 
+            norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), params))
+        
+        if norm == 0:
+            return np.full_like(x, np.inf)
+        else:
+            return (self.get_cdf(x, params))/norm
     
     
-    def link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area ):
+    def link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
         r"""
         Overload this if you want to link specific parameters together! 
         Need to overload by first calling pars, areas, fracs, total_area = super()._link_pars
@@ -755,6 +851,7 @@ class sum_dists(rv_continuous):
         def _link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
             shape_pars, cum_len, areas, fracs, total_area = super()._link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
             fracs[1]= 1 - frac1
+            total_area[0] = 1
             return shape_pars, cum_len, areas, fracs, total_area
             (mu, sigma, area1, frac1, tau, area2) = range(6)
 
@@ -784,13 +881,16 @@ class sum_dists(rv_continuous):
         # Depending on what frac_flag is passed, the fracs and areas might be in the param array fed to the method,
         # or they might be provided by the user during class initialization
         if (area_idx is None) and (frac_idx is None):
+            # Either the user passed areas and fracs, or they are all defaulting to 1
             pass
         
         if (frac_idx is not None) and (area_idx is None):
+            # Either the user passed areas, or they are all defaulting to 1
             fracs = params[np.array(frac_idx, dtype=int)]
             total_area = params[np.array(total_area_idx, dtype=int)] 
             
         if (area_idx is not None) and (frac_idx is None):
+            # Either the user passed fracs, or they are all defaulting to 1
             areas = params[np.array(area_idx, dtype=int)]
             
         if (area_idx is not None) and (frac_idx is not None):
@@ -942,6 +1042,11 @@ class sum_dist_frozen(rv_frozen):
         return self.dist.pdf_ext(np.array(x), *self.args, **self.kwds)
     def cdf_ext(self, x):
         return self.dist.cdf_ext(np.array(x), *self.args, **self.kwds)
+
+    def norm_pdf(self, x):
+        return self.dist.norm_pdf(np.array(x), *self.args, **self.kwds)
+    def norm_cdf(self, x):
+        return self.dist.norm_cdf(np.array(x), *self.args, **self.kwds)
     
             
     def draw_pdf(self, x: np.ndarray, **kwargs) -> None:
