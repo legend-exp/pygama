@@ -153,13 +153,18 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         )
 
         # Check that the t0s match what we expect, with the correct units
-        assert (
-            raw_packet_waveform_t0s.nda[0]
-            == (windowed_packet_waveform_t0s.nda[0] - window_start_index)
-            * raw_packet_waveform_t0s.nda[0]
+        assert np.array_equal(
+            raw_packet_waveform_t0s.nda,
+            windowed_packet_waveform_t0s.nda
+            - window_start_index * raw_packet_waveform_dts.nda,
         )
-        assert windowed_packet_waveform_t0s.attrs["units"] == "samples"
-        assert raw_packet_waveform_t0s.nda[0] == presummed_packet_waveform_t0s.nda[0]
+        assert (
+            windowed_packet_waveform_t0s.attrs["units"]
+            == raw_packet_waveform_t0s.attrs["units"]
+        )
+        assert np.array_equal(
+            raw_packet_waveform_t0s.nda, presummed_packet_waveform_t0s.nda
+        )
         assert (
             presummed_packet_waveform_t0s.attrs["units"]
             == raw_packet_waveform_t0s.attrs["units"]
@@ -170,9 +175,8 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         )
 
         # Check that the dts match what we expect, with the correct units
-        assert (
-            raw_packet_waveform_dts.nda[0]
-            == presummed_packet_waveform_dts.nda[0] / presum_rate
+        assert np.array_equal(
+            raw_packet_waveform_dts.nda, presummed_packet_waveform_dts.nda / presum_rate
         )
 
 
@@ -370,10 +374,13 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
         # Check that the t0s match what we expect, with the correct units
         assert (
             raw_packet_waveform_t0s.nda[0]
-            == (windowed_packet_waveform_t0s.nda[0] - window_start_index)
-            * raw_packet_waveform_t0s.nda[0]
+            == windowed_packet_waveform_t0s.nda[0]
+            - raw_packet_waveform_dts.nda[0] * window_start_index
         )
-        assert windowed_packet_waveform_t0s.attrs["units"] == "samples"
+        assert (
+            windowed_packet_waveform_t0s.attrs["units"]
+            == raw_packet_waveform_t0s.attrs["units"]
+        )
         assert raw_packet_waveform_t0s.nda[0] == presummed_packet_waveform_t0s.nda[0]
         assert (
             presummed_packet_waveform_t0s.attrs["units"]

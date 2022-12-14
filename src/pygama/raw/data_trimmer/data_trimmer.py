@@ -128,15 +128,17 @@ def process_presum_dt(dts: Array, presum_rate: int) -> Array:
 
 def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     """
-    Transform the ``t0`` of a waveform to number of samples, and then shift
-    by the `start_index` of a windowed waveform.
+    In order for the trimmed data to work well with `build_dsp`, we need
+    to keep `t0` in its original units.
+
+    So we transform ``start_index`` to the units of ``t0`` and add it to every
+    ``t0`` value.
     """
     # don't want to modify the original lgdo_table dts
     copy_dts = copy.deepcopy(dts)
     copy_t0s = copy.deepcopy(t0s)
 
-    # perform t0/dt+start_index to rewrite the new t0 in terms of sample
-    copy_t0s.nda /= copy_dts.nda
+    # perform t0+start_index*dt to rewrite the new t0 in terms of sample
+    start_index *= copy_dts.nda
     copy_t0s.nda += start_index
-    copy_t0s.attrs["units"] = "samples"
     return copy_t0s
