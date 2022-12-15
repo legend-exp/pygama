@@ -45,11 +45,17 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     if length <= 0:
         raise DSPFatal("The length of the filter must be positive")
 
+    if np.floor(length) != length:
+        raise DSPFatal("The length of the filter must be an integer")
+
     if sigma < 0:
         raise DSPFatal("The curvature parameter must be positive")
 
     if flat < 0:
         raise DSPFatal("The length of the flat section must be positive")
+
+    if np.floor(flat) != flat:
+        raise DSPFatal("The length of the flat section must be an integer")
 
     if decay < 0:
         raise DSPFatal("The decay constant must be positive")
@@ -133,11 +139,17 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
     if length <= 0:
         raise DSPFatal("The length of the filter must be positive")
 
+    if np.floor(length) != length:
+        raise DSPFatal("The length of the filter must be an integer")
+
     if sigma < 0:
         raise DSPFatal("The curvature parameter must be positive")
 
     if flat < 0:
         raise DSPFatal("The length of the flat section must be positive")
+
+    if np.floor(flat) != flat:
+        raise DSPFatal("The length of the flat section must be an integer")
 
     if decay < 0:
         raise DSPFatal("The decay constant must be positive")

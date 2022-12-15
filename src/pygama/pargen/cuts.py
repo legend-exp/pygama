@@ -21,7 +21,9 @@ import pygama.pargen.energy_cal as pgc
 log = logging.getLogger(__name__)
 
 
-def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
+def generate_cuts(
+    data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 2
+) -> dict:
     """
     Finds double sided cut boundaries for a file for the parameters specified
 
@@ -53,7 +55,7 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
                 gof_method="var",
             )
 
-            guess_sig = pars[2]
+            guess_sig = pars[1]
 
             lower_bound = mu - 10 * guess_sig
 
@@ -118,10 +120,10 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
         upper = float((num_sigmas_right * std) + mean)
         lower = float((-num_sigmas_left * std) + mean)
         output_dict[par] = {
-            "Mean Value": mean,
+            "Mean Value": round(mean, rounding),
             "Sigmas Cut": num_sigmas,
-            "Upper Boundary": upper,
-            "Lower Boundary": lower,
+            "Upper Boundary": round(upper, rounding),
+            "Lower Boundary": round(lower, rounding),
         }
     return output_dict
 
@@ -166,7 +168,7 @@ def get_cut_indexes(
     return indexes
 
 
-def cut_dict_to_hit_dict(cut_dict):
+def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
     out_dict = {}
     for param in cut_dict:
 
@@ -181,7 +183,7 @@ def cut_dict_to_hit_dict(cut_dict):
     for par in list(cut_dict)[:-1]:
         quality_cut_exp += f"({par}_cut)&"
     quality_cut_exp += f"({list(cut_dict)[-1]}_cut)"
-    out_dict["Quality_cuts"] = {"expression": quality_cut_exp, "parameters": {}}
+    out_dict[final_cut_field] = {"expression": quality_cut_exp, "parameters": {}}
     return out_dict
 
 
