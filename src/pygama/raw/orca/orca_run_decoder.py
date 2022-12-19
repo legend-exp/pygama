@@ -10,7 +10,12 @@ log = logging.getLogger(__name__)
 
 
 class ORRunDecoderForRun(OrcaDecoder):
+    """Decoder for Run Control data written by ORCA."""
+
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
+        # quickstartrun through startsubrunrecord are in order
+        # of increasing bit location with respect to the rightmost
+        # bit in data packet
         self.decoded_values = {
             "subrun_number": {"dtype": "uint16"},
             "runstartorstop": {"dtype": "bool8"},
@@ -30,6 +35,14 @@ class ORRunDecoderForRun(OrcaDecoder):
     def decode_packet(
         self, packet: OrcaPacket, packet_id: int, rbl: RawBufferLibrary
     ) -> bool:
+        """
+        Decode the ORCA Run packet.
+
+        Format is taken from the ORCA website: `Run Control
+        <http://orca.physics.unc.edu/orca/Data_Chain/Run_Control.html>`_
+
+        """
+
         if len(rbl) != 1:
             log.warning(
                 f"got {len(rbl)} rb's, should have only 1 (no keyed decoded values)"
