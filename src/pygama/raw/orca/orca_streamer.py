@@ -19,6 +19,7 @@ from pygama.raw.orca.orca_flashcam import (  # noqa: F401
     ORFlashCamWaveformDecoder,
 )
 from pygama.raw.orca.orca_header_decoder import OrcaHeaderDecoder
+from pygama.raw.orca.orca_run_decoder import ORRunDecoderForRun  # noqa: F401
 from pygama.raw.raw_buffer import RawBuffer, RawBufferLibrary
 
 log = logging.getLogger(__name__)
