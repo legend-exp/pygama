@@ -322,4 +322,3 @@ class ORFlashCamADCWaveformDecoder(ORFlashCamWaveformDecoder):
         self.ch_orca_mask = 0x00003C00
         self.ch_orca_shift = 10
         self.channel_mask = 0x000003FF
-
