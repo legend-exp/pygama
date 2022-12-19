@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import copy
-import json
 import logging
+from copy import deepcopy
 
 import numpy as np
 
@@ -13,9 +13,7 @@ from pygama.lgdo import Array, ArrayOfEqualSizedArrays, Struct, Table
 log = logging.getLogger(__name__)
 
 
-def data_trimmer(
-    lgdo_table: Table | Struct, dsp_config: str | dict, group: str = None
-) -> None:
+def data_trimmer(lgdo_table: Table | Struct, dsp_dict: dict, group: str = None) -> None:
     """
     Takes in a :class:`.RawBuffer` that contains waveforms, performs user specified
     DSP on the table, and then updates the table in place.
@@ -25,23 +23,23 @@ def data_trimmer(
     lgdo_table
         An :class:`~.lgdo.table.Table` or :class:`~.lgdo.struct.Struct`
         that must contain waveforms so that the DSP can work!
-    dsp_config
-        Either the path to the DSP JSON config file to use, or a dictionary
-        of DSP config.
+    dsp_dict
+        A dictionary containing the DSP config. See :mod:`pygama.dsp.proc_chain` for
+        specifics of DSP config format.
     group
         The name of the group that the :class:`rb.lgdo` is being written to.
-        If a matching key is found in the :class:`dsp_config`, that config
+        If a matching key is found in the :class:`dsp_dict`, that config
         sub_dict is used to do the data trimming. If no match is found,
         then all valid waveform tables are trimmed with the same DSP.
 
     Notes
     -----
     The original "waveforms" column in the table is deleted!
-    If "pass" is present as a the value of a group in the dsp_config, no trimming is performed.
-    Otherwise, dsp_config is assumed to apply to all valid waveforms and is applied.
+    If "pass" is present as a the value of a group in the dsp_dict, no trimming is performed.
+    Otherwise, dsp_dict is assumed to apply to all valid waveforms and is applied.
     The names of the outputs must follow what is in the example.
 
-    Example dsp_config
+    Example dsp_dict
     ------------------
 
 
@@ -73,35 +71,22 @@ def data_trimmer(
         }
     }
     """
-    # Convert the dsp_config to a dict so that we can grab the constants from the dsp config
-    if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
-        f = open(dsp_config)
-        dsp_dict = json.load(f)
-        f.close()
-    # If we get a string that is in the correct format as a json file
-    elif isinstance(dsp_config, str):
-        dsp_dict = json.loads(dsp_config)
-    # Or we could get a dict as the config
-    elif isinstance(dsp_config, dict):
-        dsp_dict = dsp_config
-
-    # Now check the RawBuffer's group and see if that there is a matching key in the dsp_dict, then take that sub dictionary.
+    # Now check the :meth:`lgdo.RawBufferLibrary`'s group and see if that there is a matching key in the dsp_dict, then take that sub dictionary.
     if group in dsp_dict.keys():
-        dsp_dict = dsp_dict[group]
+        dsp_dict = deepcopy(dsp_dict[group])
+
     # If there are no subdicts in dsp_dict, then we use the same dsp on all valid waveform tables in the daq file
     else:
-        log.debug(
-            "No sub_dicts found, trimming all waveform tables with one dsp_config"
-        )
+        log.debug("No sub_dicts found, trimming all waveform tables with one dsp_dict")
+        dsp_dict = deepcopy(dsp_dict)
 
-    # If the user passes a value "pass" in the dsp_config for this group, just skip on the data trimming
+    # If the user passes a value "pass" in the dsp_dict for this group, just skip on the data trimming
     if (type(dsp_dict) == str) & (dsp_dict == "pass"):
         return
 
     # if we want to window waveforms, we can do it outside of processing chain for the sake of memory
-
     if "windowed_waveform" in dsp_dict["processors"].keys():
-        # find the start index from the dsp_config
+        # find the start index from the dsp_dict
         start_index = int(dsp_dict["processors"]["windowed_waveform"]["start_index"])
         end_index = int(dsp_dict["processors"]["windowed_waveform"]["end_index"])
 
@@ -124,7 +109,7 @@ def data_trimmer(
     proc_chain, mask, dsp_out = bpc(lgdo_table, dsp_dict)
     proc_chain.execute()
 
-    # For every processor in dsp_config for this group, create a new entry in the lgdo table with that processor's name
+    # For every processor in dsp_dict for this group, create a new entry in the lgdo table with that processor's name
     # If the processor returns a waveform, create a new waveform table and add it to the original lgdo table
     for proc in dsp_out.keys():
 
@@ -132,7 +117,7 @@ def data_trimmer(
         if type(dsp_out[proc]) == ArrayOfEqualSizedArrays:
             # Process dt and t0 for specific dsp processor, can add new ones as necessary
             if proc == "presummed_waveform":
-                # find the presum rate from the dsp_config
+                # find the presum rate from the dsp_dict
                 presum_rate_string = dsp_dict["processors"]["presummed_waveform"][
                     "args"
                 ][1]

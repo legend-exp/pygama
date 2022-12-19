@@ -4,6 +4,7 @@ import glob
 import json
 import logging
 import os
+import re
 import time
 
 import numpy as np
@@ -68,6 +69,12 @@ def build_raw(
 
     trim_config
         DSP config used for data trimming. If ``None``, no data trimming is performed.
+        See :mod:`pygama.dsp.proc_chain` for DSP config structure.
+
+        - if a string not ending in ``.json``, then it is treated as a string representation of a ``.json`` file
+        - if a str ending in ``.json``, interpreted as a filename containing
+          json-shorthand for the DSP config
+        - if a ``dict``, treated as a dictionary containing the DSP config
 
     **kwargs
         sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
@@ -207,9 +214,36 @@ def build_raw(
 
         os.remove(out_file_glob[0])
 
+    # Before we loop through the data, we load the trim_config as a dict, if it's present
+    if trim_config is not None:
+        # Convert the trim_config to a dict so that we can grab the constants from the trim DSP config
+        if isinstance(trim_config, str) and trim_config.endswith(".json"):
+            f = open(trim_config)
+            trim_dict = json.load(f)
+            f.close()
+        # If we get a string that is in the correct format as a json file
+        elif isinstance(trim_config, str):
+            trim_dict = json.loads(trim_config)
+        # Or we could get a dict as the config
+        elif isinstance(trim_config, dict):
+            trim_dict = trim_config
+
+        multi_key_trim_dict = {}
+
+        # If we have multiple keys with the same trim config, add each to the group to the dict
+        for key, node in trim_dict.items():
+            keys = [k for k in re.split(",| ", key) if k != ""]
+            if len(keys) >= 1:
+                for k in keys:
+                    multi_key_trim_dict[k] = node
+
+        trim_config_dict = multi_key_trim_dict
+    else:
+        trim_config_dict = None
+
     # Write header data
     lh5_store = lgdo.LH5Store(keep_open=True)
-    write_to_lh5_and_clear(header_data, lh5_store, trim_config=trim_config)
+    write_to_lh5_and_clear(header_data, lh5_store, trim_config=trim_config_dict)
 
     # Now loop through the data
     n_bytes_last = streamer.n_bytes_read
@@ -228,7 +262,7 @@ def build_raw(
             n_read += rb.loc
         if log.getEffectiveLevel() >= logging.INFO and n_max < np.inf:
             progress_bar.update(n_read)
-        write_to_lh5_and_clear(chunk_list, lh5_store, trim_config=trim_config)
+        write_to_lh5_and_clear(chunk_list, lh5_store, trim_config=trim_config_dict)
         if n_max <= 0:
             break
 

@@ -394,7 +394,7 @@ def write_to_lh5_and_clear(
     raw_buffers: list[RawBuffer],
     lh5_store: LH5Store = None,
     wo_mode: str = "append",
-    trim_config: str | dict = None,
+    trim_config: dict = None,
 ) -> None:
     r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
     them.

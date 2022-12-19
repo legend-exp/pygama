@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 
 import h5py
 
@@ -15,7 +17,7 @@ log = logging.getLogger(__name__)
 def raw_trimmer(
     lh5_raw_file_in: str,
     overwrite: bool = False,
-    trim_config: str | dict = None,
+    trim_config: dict = None,
     trim_file_name: str = None,
 ) -> None:
     """
@@ -29,7 +31,7 @@ def raw_trimmer(
     overwrite
         sets whether to overwrite the output file(s) if it (they) already exist.
     trim_config
-        DSP config used for data trimming. If ``None``, no data trimming is performed.
+        DSP config dict used for data trimming. If ``None``, no data trimming is performed.
     trim_file_name
         The path to the trimmed output file created
 
@@ -92,6 +94,31 @@ def raw_trimmer(
         if os.path.isfile(trim_file_name):
             os.remove(trim_file_name)
     raw_store.gimme_file(trim_file_name, "a")
+
+    # Before we loop through the data, we load the trim_config as a dict if it's present
+    if trim_config is not None:
+        # Convert the trim_config to a dict so that we can grab the constants from the trim DSP config
+        if isinstance(trim_config, str) and trim_config.endswith(".json"):
+            f = open(trim_config)
+            trim_dict = json.load(f)
+            f.close()
+        # If we get a string that is in the correct format as a json file
+        elif isinstance(trim_config, str):
+            trim_dict = json.loads(trim_config)
+        # Or we could get a dict as the config
+        elif isinstance(trim_config, dict):
+            trim_dict = trim_config
+
+        multi_key_trim_dict = {}
+
+        # If we have multiple keys with the same trim config, add each to the group to the dict
+        for key, node in trim_dict.items():
+            keys = [k for k in re.split(",| ", key) if k != ""]
+            if len(keys) >= 1:
+                for k in keys:
+                    multi_key_trim_dict[k] = node
+
+        trim_config = multi_key_trim_dict
 
     # Write everything in the raw file to the new file, trim appropriately
     for tb in lh5_tables:
