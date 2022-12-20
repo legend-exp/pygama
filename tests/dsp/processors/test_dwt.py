@@ -4,12 +4,13 @@ import pytest
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import discrete_wavelet_transform
 
+
 def test_discrete_wavelet_transform(compare_numba_vs_python):
     """Testing function for the discrete_wavelet_transform processor."""
 
     # set up values to use for each test case
     len_wf_in = 16
-    wave_type = 'haar'
+    wave_type = "haar"
     level = 2
     len_wf_out = 4
 
@@ -20,7 +21,7 @@ def test_discrete_wavelet_transform(compare_numba_vs_python):
     # ensure that a valid input gives the expected output
     w_in = np.ones(len_wf_in)
     w_out = np.empty(len_wf_out)
-    w_out_expected = np.ones(len_wf_out) * 2**(level / 2)
+    w_out_expected = np.ones(len_wf_out) * 2 ** (level / 2)
 
     dwt_func = discrete_wavelet_transform(wave_type, level)
     assert np.allclose(
