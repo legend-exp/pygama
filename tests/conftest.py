@@ -103,25 +103,39 @@ def compare_numba_vs_python():
             The output of the function to be used in a unit test.
 
         """
-        # parse outputs from function signature
-        all_params = list(inspect.signature(func).parameters)
-        output_sizes = re.findall(r"(\(n*\))", func.signature.split("->")[-1])
-        noutputs = len(output_sizes)
-        output_names = all_params[-noutputs:]
 
-        # numba outputs
-        outputs_numba = func(*inputs)
-        if noutputs == 1:
-            outputs_numba = [outputs_numba]
+        if "->" in func.signature:
+            # parse outputs from function signature
+            all_params = list(inspect.signature(func).parameters)
+            output_sizes = re.findall(r"(\(n*\))", func.signature.split("->")[-1])
+            noutputs = len(output_sizes)
+            output_names = all_params[-noutputs:]
 
-        # unwrapped python outputs
-        func_unwrapped = inspect.unwrap(func)
-        output_dict = {key: np.empty(len(inputs[0])) for key in output_names}
-        func_unwrapped(*inputs, **output_dict)
-        for spec, key in zip(output_sizes, output_dict):
-            if spec == "()":
-                output_dict[key] = output_dict[key][0]
-        outputs_python = [output_dict[key] for key in output_names]
+            # numba outputs
+            outputs_numba = func(*inputs)
+            if noutputs == 1:
+                outputs_numba = [outputs_numba]
+
+            # unwrapped python outputs
+            func_unwrapped = inspect.unwrap(func)
+            output_dict = {key: np.empty(len(inputs[0])) for key in output_names}
+            func_unwrapped(*inputs, **output_dict)
+            for spec, key in zip(output_sizes, output_dict):
+                if spec == "()":
+                    output_dict[key] = output_dict[key][0]
+            outputs_python = [output_dict[key] for key in output_names]
+        else:
+            # we are testing a factory function output, which updates
+            # a single output in-place
+            noutputs = 1
+            # numba outputs
+            func(*inputs)
+            outputs_numba = inputs[-noutputs:]
+
+            # unwrapped python outputs
+            func_unwrapped = inspect.unwrap(func)
+            func_unwrapped(*inputs)
+            outputs_python = inputs[-noutputs:]
 
         # assert that numba and python are the same up to floating point
         # precision, setting nans to be equal
