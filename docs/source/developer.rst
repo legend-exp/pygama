@@ -215,7 +215,7 @@ a factory function to return a function wrapped by the
     from pygama.dsp.processors import discrete_wavelet_transform
 
     def test_discrete_wavelet_transform(compare_numba_vs_python):
-        """Testing function for the fixed_time_pickoff processor."""
+        """Testing function for the discrete_wavelet_transform processor."""
 
         # set up values to use for each test case
         len_wf_in = 16
