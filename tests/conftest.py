@@ -1,3 +1,4 @@
+import copy
 import inspect
 import os
 import re
@@ -130,12 +131,12 @@ def compare_numba_vs_python():
             noutputs = 1
             # numba outputs
             func(*inputs)
-            outputs_numba = inputs[-noutputs:]
+            outputs_numba = copy.deepcopy(inputs[-noutputs:])
 
             # unwrapped python outputs
             func_unwrapped = inspect.unwrap(func)
             func_unwrapped(*inputs)
-            outputs_python = inputs[-noutputs:]
+            outputs_python = copy.deepcopy(inputs[-noutputs:])
 
         # assert that numba and python are the same up to floating point
         # precision, setting nans to be equal
