@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-import pywt
 
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import discrete_wavelet_transform
