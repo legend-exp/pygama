@@ -192,6 +192,59 @@ required imports in the snippet for verbosity.
 In this case, the general idea is to use :func:`pytest.raises` twice, once with
 ``func(*inputs)``, and again with ``inspect.unwrap(func)(*inputs)``.
 
+Testing Factory Functions that Return Numba-Wrapped Functions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+As in the previous section, we also have processors that are first initialized
+with a factory function, which then returns a callable Numba-wrapped function.
+In this case, there is a slightly different way of testing the function to ensure
+full code coverage when using ``compare_numba_vs_python``, as the function
+signature is generally different.
+
+As an example, we show a snippet from the test for
+:func:`pygama.dsp.processors.dwt.discrete_wavelet_transform`, a processor which uses
+a factory function to return a function wrapped by the
+:func:`@numba.guvectorize()<numba.guvectorize>` decorator.
+
+.. code-block:: python
+
+    import numpy as np
+    import pytest
+
+    from pygama.dsp.errors import DSPFatal
+    from pygama.dsp.processors import discrete_wavelet_transform
+
+    def test_discrete_wavelet_transform(compare_numba_vs_python):
+        """Testing function for the fixed_time_pickoff processor."""
+
+        # set up values to use for each test case
+        len_wf_in = 16
+        wave_type = 'haar'
+        level = 2
+        len_wf_out = 4
+
+        # ensure the DSPFatal is raised for a negative level
+        with pytest.raises(DSPFatal):
+            discrete_wavelet_transform(wave_type, -1)
+
+        # ensure that a valid input gives the expected output
+        w_in = np.ones(len_wf_in)
+        w_out = np.empty(len_wf_out)
+        w_out_expected = np.ones(len_wf_out) * 2**(level / 2)
+
+        dwt_func = discrete_wavelet_transform(wave_type, level)
+        assert np.allclose(
+            compare_numba_vs_python(dwt_func, w_in, w_out),
+            w_out_expected,
+        )
+        ## rest of test function is truncated in this example
+
+In this case, the error is raised outside of the Numba-wrapped function, and
+we only need to test for the error once. For the comparison of the calculated
+values to expectation, we must initialize the output array and pass it to the
+list of inputs that should be used in the comparison. This is different than
+the previous section, where we are instead now updating the outputted values
+in place.
 
 Documentation
 -------------
