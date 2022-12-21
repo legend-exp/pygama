@@ -17,7 +17,6 @@ def dplms(
     a2: float,
     a3: float,
     ff: int,
-    invert: bool,
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
 
@@ -43,8 +42,7 @@ def dplms(
         penalized coefficient for the zero area matrix.
     ff
         flat top length for the reference signal.
-    invert
-        option to invert the signal.
+    
 
     JSON Configuration Example
     --------------------------
@@ -59,7 +57,7 @@ def dplms(
             "init_args": [
                 "db.dplms.noise_matrix",
                 "db.dplms.reference",
-                "50", "0.1", "1", "0", "1", "False"]
+                "50", "0.1", "1", "0", "1"]
         }
     """
 
@@ -83,6 +81,12 @@ def dplms(
     if a2 <= 0:
         raise DSPFatal("The penalized coefficient for the reference must be positive")
 
+    if a3 <= 0:
+        raise DSPFatal("The penalized coefficient for the zero area must be positive")
+
+    if ff <= 0:
+        raise DSPFatal("The penalized coefficient for the ref matrix must be positive")
+
     # reference matrix
     ssize = len(reference)
     flo = int(ssize / 2 - length / 2)
@@ -95,7 +99,7 @@ def dplms(
         ff = [-1, 0, 1]
     else:
         raise DSPFatal(
-            "The penalized coefficient for the reference pulse must be 0 or 1"
+            "The penalized coefficient for the ref matrix must be 0 or 1"
         )
     for i in ff:
         ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
@@ -105,10 +109,7 @@ def dplms(
     # filter calculation
     mat = a1 * noise_mat + a2 * ref_mat + a3 * np.ones([length, length])
     x = np.linalg.solve(mat, ref_sig)
-    if invert:
-        y = np.convolve(reference, -x, mode="valid")
-    else:
-        y = np.convolve(reference, x, mode="valid")
+    y = np.convolve(reference, np.flip(x), mode="valid")
     maxy = np.amax(y)
     x /= maxy
     y /= maxy
@@ -138,9 +139,7 @@ def dplms(
 
         if len(x) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
-        if invert:
-            w_out[:] = np.convolve(w_in, -x, mode="valid")
-        else:
-            w_out[:] = np.convolve(w_in, x, "valid")
+
+        w_out[:] = np.convolve(w_in, np.flip(x), "valid")
 
     return dplms_out
