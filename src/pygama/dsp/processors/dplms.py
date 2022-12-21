@@ -18,10 +18,15 @@ def dplms(
     a3: float,
     ff: int,
 ) -> Callable:
-    """Calculate and apply an optimum DPLMS filter to the waveform. The processor
-    take the noise matrix and the reference signal as input and calculate the
-    optimum filter according to the provided length and penalized coefficients.
-    For reference of DPLMS optimum filter synthesis see: arXiv:2209.09863
+    """Calculate and apply an optimum DPLMS filter to the waveform.
+
+    The processor takes the noise matrix and the reference signal as input and
+    calculates the optimum filter according to the provided length and
+    penalized coefficients [DPLMS]_.
+
+    .. [DPLMS] V. D'Andrea et al. “Optimum Filter Synthesis with DPLMS
+        Method for Energy Reconstruction” In: arXiv (Sept. 2022).
+        https://arxiv.org/abs/2209.09863
 
     Note
     ----
@@ -36,15 +41,15 @@ def dplms(
     reference
         reference signal
     length
-        length of the calculated filter.
+        length of the calculated filter
     a1
-        penalized coefficient for the noise matrix.
+        penalized coefficient for the noise matrix
     a2
-        penalized coefficient for the reference matrix.
+        penalized coefficient for the reference matrix
     a3
-        penalized coefficient for the zero area matrix.
+        penalized coefficient for the zero area matrix
     ff
-        flat top length for the reference signal.
+        flat top length for the reference signal
 
 
     JSON Configuration Example
