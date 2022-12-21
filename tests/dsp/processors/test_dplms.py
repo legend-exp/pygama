@@ -27,8 +27,8 @@ def test_dplms(compare_numba_vs_python):
         dplms(nmat, ref, length, -1, 1, 1, 1)
     with pytest.raises(DSPFatal):
         dplms(nmat, ref, length, 1, -1, 1, 1)
-    # with pytest.raises(DSPFatal):
-    #    dplms(nmat, ref, length, 1, 1, -1, 1)
+    with pytest.raises(DSPFatal):
+        dplms(nmat, ref, length, 1, 1, -1, 1)
     with pytest.raises(DSPFatal):
         dplms(nmat, ref, length, 1, 1, 1, -1)
     with pytest.raises(DSPFatal):
