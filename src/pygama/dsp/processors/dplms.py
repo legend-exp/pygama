@@ -42,7 +42,7 @@ def dplms(
         penalized coefficient for the zero area matrix.
     ff
         flat top length for the reference signal.
-    
+
 
     JSON Configuration Example
     --------------------------
@@ -98,9 +98,7 @@ def dplms(
     elif ff == 1:
         ff = [-1, 0, 1]
     else:
-        raise DSPFatal(
-            "The penalized coefficient for the ref matrix must be 0 or 1"
-        )
+        raise DSPFatal("The penalized coefficient for the ref matrix must be 0 or 1")
     for i in ff:
         ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
         ref_sig += reference[flo + i : fhi + i]
