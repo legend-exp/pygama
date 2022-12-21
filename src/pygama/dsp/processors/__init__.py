@@ -60,7 +60,6 @@ several advantages:
 """
 
 from .bl_subtract import bl_subtract
-from .centroid import find_centroid, step
 from .convolutions import cusp_filter, t0_filter, zac_filter
 from .dplms import dplms
 from .dwt import discrete_wavelet_transform
@@ -142,6 +141,4 @@ __all__ = [
     "windower",
     "time_over_threshold",
     "dplms",
-    "step",
-    "find_centroid",
 ]
