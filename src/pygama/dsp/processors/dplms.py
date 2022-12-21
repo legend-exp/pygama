@@ -18,7 +18,10 @@ def dplms(
     a3: float,
     ff: int,
 ) -> Callable:
-    """Calculate and apply an optimum DPLMS filter to the waveform.
+    """Calculate and apply an optimum DPLMS filter to the waveform. The processor
+    take the noise matrix and the reference signal as input and calculate the
+    optimum filter according to the provided length and penalized coefficients.
+    For reference of DPLMS optimum filter synthesis see: arXiv:2209.09863
 
     Note
     ----

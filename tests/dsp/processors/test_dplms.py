@@ -21,7 +21,7 @@ def test_dplms(compare_numba_vs_python):
     with pytest.raises(DSPFatal):
         dplms(nmat, ref, 10, 1, 1, 1, 1)
 
-    # ensure the DSPFatal is raised for negative coefficents
+    # ensure the DSPFatal is raised for negative coefficients
     with pytest.raises(DSPFatal):
         dplms(nmat, ref, length, -1, 1, 1, 1)
     with pytest.raises(DSPFatal):
