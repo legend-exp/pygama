@@ -62,7 +62,7 @@ class OrcaEncoder:
 
         self.header = init_header + self.header
 
-    def encode_ORFlashCamConfig(self, ii):
+    def encode_orflashcamconfig(self, ii):
         """Convert orca flashcam config data back to byte strings."""
 
         LH5 = LH5Store()
@@ -95,7 +95,7 @@ class OrcaEncoder:
 
         return packets
 
-    def encode_ORFlashCamADCWaveform(self, ii):
+    def encode_orflashcamadcwaveform(self, ii):
         """Convert orca flashcam ADC waveform data back to byte strings."""
 
         LH5 = LH5Store()
@@ -161,7 +161,7 @@ class OrcaEncoder:
 
         return packets
 
-    def encode_ORRunDecoderForRun(self, ii):
+    def encode_orrun(self, ii):
         """Convert orca run data back to byte strings."""
 
         LH5 = LH5Store()
@@ -201,10 +201,10 @@ def test_daq_to_raw(lgnd_test_data):
     )
 
     # recreate the header
-    OE = OrcaEncoder(out_spec)
-    OE.encode_header()
+    encoder = OrcaEncoder(out_spec)
+    encoder.encode_header()
 
-    rebuilt_orca_data = OE.header
+    rebuilt_orca_data = encoder.header
 
     # get the order of all of the data IDs
     orstr = orca_streamer.OrcaStreamer()
@@ -231,13 +231,13 @@ def test_daq_to_raw(lgnd_test_data):
         ii = buffer_count[dd] - 1
 
         if dd == 7:
-            this_packet = OE.encode_ORRunDecoderForRun(ii)
+            this_packet = encoder.encode_orrun(ii)
         elif dd == 4:
-            this_packet = OE.encode_ORFlashCamConfig(ii)
+            this_packet = encoder.encode_orflashcamconfig(ii)
         elif dd == 3:
-            this_packet = OE.encode_ORFlashCamADCWaveform(ii)
+            this_packet = encoder.encode_orflashcamadcwaveform(ii)
         else:
-            raise ValueError(f"Encoder does not exist for data ID {ii}")
+            raise ValueError(f"Encoder does not exist for data ID {dd}")
 
         rebuilt_orca_data += struct.pack(f"{len(this_packet)}I", *this_packet)
 
