@@ -1,3 +1,4 @@
+from collections import Counter
 from io import BytesIO
 import json
 import plistlib
@@ -6,18 +7,22 @@ import struct
 
 from pygama.lgdo import LH5Store
 from pygama.raw import build_raw
+from pygama.raw.orca import orca_streamer
 from pygama.raw.orca.orca_flashcam import ORFlashCamListenerConfigDecoder, ORFlashCamADCWaveformDecoder
 from pygama.raw.orca.orca_run_decoder import ORRunDecoderForRun
 
 
 class OrcaEncoder(object):
-    
+    """Encoding function for recreating raw Orca files."""
+
     def __init__(self, file):
+        """Initialize the encoder for daq to raw testing."""
 
         self.file = file
         self.header = None
 
     def encode_header(self):
+        """Convert orca header back to a byte string."""
 
         LH5 = LH5Store()
         test_file, _ = LH5.read_object(
@@ -55,7 +60,8 @@ class OrcaEncoder(object):
 
         self.header = init_header + self.header
 
-    def encode_ORFlashCamConfig(self):
+    def encode_ORFlashCamConfig(self, ii):
+        """Convert orca flashcam config data back to byte strings."""
 
         LH5 = LH5Store()
         tbl, _ = LH5.read_object(
@@ -64,27 +70,28 @@ class OrcaEncoder(object):
 
         packets = []
         packets.append(4 << 18)
-        packets.append((tbl['readout_id'].nda[0] << 16) + tbl['fcid'].nda[0])
+        packets.append((tbl['readout_id'].nda[ii] << 16) + tbl['fcid'].nda[ii])
 
         decoded_values = ORFlashCamListenerConfigDecoder().get_decoded_values()
 
         for i, k in enumerate(decoded_values):
             if i < 2:
                 continue
-            packets.append(tbl[k].nda[0])
+            packets.append(tbl[k].nda[ii])
             if k == "gps":
                 break
 
         npacks = tbl['ch_boardid'].nda.shape[-1]
 
-        for ii in range(npacks):
-            packets.append((tbl['ch_boardid'].nda[0, ii] << 16) + tbl['ch_inputnum'].nda[0, ii])
+        for jj in range(npacks):
+            packets.append((tbl['ch_boardid'].nda[ii, jj] << 16) + tbl['ch_inputnum'].nda[ii, jj])
 
         packets[0] += len(packets)
 
         return packets
 
     def encode_ORFlashCamADCWaveform(self, ii):
+        """Convert orca flashcam ADC waveform data back to byte strings."""
 
         LH5 = LH5Store()
         tbl, _ = LH5.read_object(
@@ -145,6 +152,7 @@ class OrcaEncoder(object):
         return packets
 
     def encode_ORRunDecoderForRun(self, ii):
+        """Convert orca run data back to byte strings."""
 
         LH5 = LH5Store()
         tbl, _ = LH5.read_object(
@@ -168,7 +176,9 @@ class OrcaEncoder(object):
 
 
 def test_daq_to_raw(lgnd_test_data):
+    """Test function for the daq to raw validation."""
 
+    # open orca daq file and create LH5 file
     orca_file = lgnd_test_data.get_path(
         'orca/fc/L200-comm-20220519-phy-geds.orca'
     )
@@ -181,31 +191,50 @@ def test_daq_to_raw(lgnd_test_data):
         overwrite=True,
     )
 
+    # recreate the header
     OE = OrcaEncoder(out_spec)
     OE.encode_header()
 
-    packets_run = []
-    for ii in range(2):
-        packets_run.append(OE.encode_ORRunDecoderForRun(ii))
+    rebuilt_orca_data = OE.header
 
-    packets_fcconfig = OE.encode_ORFlashCamConfig()
+    # get the order of all of the data IDs
+    orstr = orca_streamer.OrcaStreamer()
+    orstr.open_stream(orca_file)
+    raw_packets = []
 
-    packets_wf = []
-    for ii in range(67):
-        packets_wf.append(OE.encode_ORFlashCamADCWaveform(ii))
+    while True:
+        this_packet = orstr.load_packet(skip_unknown_ids=False)
+        if this_packet is None:
+            break
+        raw_packets.append(this_packet.copy())
 
-    rebuilt_orca_data = OE.header 
-    rebuilt_orca_data += b''.join(
-        struct.pack(f'{len(pp)}I', *pp) for pp in packets_run
-    )
-    rebuilt_orca_data += struct.pack(
-        f'{len(packets_fcconfig)}I', *packets_fcconfig
-    )
-    rebuilt_orca_data += b''.join(
-        struct.pack(f'{len(pp)}I', *pp) for pp in packets_wf
-    )
+    orstr.close_stream()
 
+    data_ids = [pack[0] >> 18 for pack in raw_packets]
+
+    # count the number of each ID
+    full_count = Counter(data_ids)
+    buffer_count = {k: 0 for k in full_count}
+
+    # build the raw orca file in the order of data IDs
+    for dd in data_ids:
+        buffer_count[dd] += 1
+        ii = buffer_count[dd] - 1
+
+        if dd == 7:
+            this_packet = OE.encode_ORRunDecoderForRun(ii)
+        elif dd == 4:
+            this_packet = OE.encode_ORFlashCamConfig(ii)
+        elif dd == 3:
+            this_packet = OE.encode_ORFlashCamADCWaveform(ii)
+        else:
+            raise ValueError(f'Encoder does not exist for data ID {ii}')
+
+        rebuilt_orca_data += struct.pack(f'{len(this_packet)}I', *this_packet)
+
+    # load the original raw orca file as a byte string
     with open(orca_file, 'rb') as ff:
         orig_orca_data = ff.read()
 
+    # assert the byte strings are the same
     assert rebuilt_orca_data == orig_orca_data
