@@ -24,8 +24,8 @@ class OrcaEncoder:
     def encode_header(self):
         """Convert orca header back to a byte string."""
 
-        LH5 = LH5Store()
-        test_file, _ = LH5.read_object(
+        lh5 = LH5Store()
+        test_file, _ = lh5.read_object(
             "OrcaHeader",
             self.file,
         )
@@ -63,8 +63,8 @@ class OrcaEncoder:
     def encode_orflashcamconfig(self, ii):
         """Convert orca flashcam config data back to byte strings."""
 
-        LH5 = LH5Store()
-        tbl, _ = LH5.read_object(
+        lh5 = LH5Store()
+        tbl, _ = lh5.read_object(
             "ORFlashCamListenerConfig",
             self.file,
         )
@@ -96,8 +96,8 @@ class OrcaEncoder:
     def encode_orflashcamadcwaveform(self, ii):
         """Convert orca flashcam ADC waveform data back to byte strings."""
 
-        LH5 = LH5Store()
-        tbl, _ = LH5.read_object(
+        lh5 = LH5Store()
+        tbl, _ = lh5.read_object(
             "ORFlashCamADCWaveform",
             self.file,
         )
@@ -162,8 +162,8 @@ class OrcaEncoder:
     def encode_orrun(self, ii):
         """Convert orca run data back to byte strings."""
 
-        LH5 = LH5Store()
-        tbl, _ = LH5.read_object(
+        lh5 = LH5Store()
+        tbl, _ = lh5.read_object(
             "ORRunDecoderForRun",
             self.file,
         )
