@@ -8,9 +8,7 @@ from io import BytesIO
 from pygama.lgdo import LH5Store
 from pygama.raw import build_raw
 from pygama.raw.orca import orca_streamer
-from pygama.raw.orca.orca_flashcam import (
-    ORFlashCamListenerConfigDecoder,
-)
+from pygama.raw.orca.orca_flashcam import ORFlashCamListenerConfigDecoder
 from pygama.raw.orca.orca_run_decoder import ORRunDecoderForRun
 
 
