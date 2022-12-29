@@ -40,7 +40,7 @@ class LH5Store:
     >>> store = LH5Store()
     >>> obj, _ = store.read_object("/geds/waveform", "file.lh5")
     >>> type(obj)
-    pygama.lgdo.waveform_table.WaveformTable
+    pygama.lgdo.waveformtable.WaveformTable
     """
 
     def __init__(self, base_path: str = "", keep_open: bool = False) -> None:

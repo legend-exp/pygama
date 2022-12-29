@@ -36,7 +36,7 @@ from .scalar import Scalar
 from .struct import Struct
 from .table import Table
 from .vectorofvectors import VectorOfVectors
-from .waveform_table import WaveformTable
+from .waveformtable import WaveformTable
 
 __all__ = [
     "Array",

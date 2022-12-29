@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 import pygama.lgdo as lgdo
-from pygama.lgdo.table import Table
+from pygama.lgdo import Table
 
 
 def test_init():

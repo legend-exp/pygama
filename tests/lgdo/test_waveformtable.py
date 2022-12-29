@@ -1,7 +1,7 @@
 import numpy as np
 
 import pygama.lgdo as lgdo
-from pygama.lgdo.waveform_table import WaveformTable
+from pygama.lgdo import WaveformTable
 
 
 def test_init():
