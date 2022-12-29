@@ -1,32 +1,28 @@
-"""
-This module implements routines from reading and writing LEGEND Data Objects in
-HDF5 files.
-"""
 from __future__ import annotations
 
-import fnmatch
-import glob
 import logging
 import os
 import sys
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 from collections import defaultdict
 from typing import Any, Union
 
 import h5py
 import numba as nb
 import numpy as np
-import pandas as pd
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
-from pygama.lgdo.waveform_table import WaveformTable
+from .. import (
+    Array,
+    ArrayOfEqualSizedArrays,
+    FixedSizeArray,
+    Scalar,
+    Struct,
+    Table,
+    VectorOfVectors,
+    WaveformTable,
+)
+from .. import utils as lgdo_utils
+from . import utils
 
 LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
@@ -57,7 +53,7 @@ class LH5Store:
             whether to keep files open by storing the :mod:`h5py` objects as
             class attributes.
         """
-        self.base_path = "" if base_path == "" else expand_path(base_path)
+        self.base_path = "" if base_path == "" else utils.expand_path(base_path)
         self.keep_open = keep_open
         self.files = {}
 
@@ -74,7 +70,7 @@ class LH5Store:
         if isinstance(lh5_file, h5py.File):
             return lh5_file
         if mode == "r":
-            lh5_file = expand_path(lh5_file)
+            lh5_file = utils.expand_path(lh5_file)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
@@ -282,7 +278,7 @@ class LH5Store:
             )
 
         datatype = h5f[name].attrs["datatype"]
-        datatype, shape, elements = parse_datatype(datatype)
+        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
 
         # check field_mask and make it a default dict
         if datatype == "struct" or datatype == "table":
@@ -864,7 +860,7 @@ class LH5Store:
             )
 
         datatype = h5f[name].attrs["datatype"]
-        datatype, shape, elements = parse_datatype(datatype)
+        datatype, shape, elements = lgdo_utils.parse_datatype(datatype)
 
         # scalars are dim-0 datasets
         if datatype == "scalar":
@@ -899,404 +895,6 @@ class LH5Store:
             return h5f[name].shape[0]
 
         raise RuntimeError(f"don't know how to read datatype '{datatype}'")
-
-
-def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
-    """Return a list of LH5 groups in the input file and group, similar
-    to ``ls`` or ``h5ls``. Supports wildcards in group names.
-
-
-    Parameters
-    ----------
-    lh5_file
-        name of file.
-    lh5_group
-        group to search. add a ``/`` to the end of the group name if you want to
-        list all objects inside that group.
-    """
-
-    log.debug(
-        f"Listing objects in '{lh5_file}'"
-        + ("" if lh5_group == "" else f" (and group {lh5_group})")
-    )
-
-    lh5_st = LH5Store()
-    # To use recursively, make lh5_file a h5group instead of a string
-    if isinstance(lh5_file, str):
-        lh5_file = lh5_st.gimme_file(lh5_file, "r")
-        if lh5_group.startswith("/"):
-            lh5_group = lh5_group[1:]
-
-    if lh5_group == "":
-        lh5_group = "*"
-
-    splitpath = lh5_group.split("/", 1)
-    matchingkeys = fnmatch.filter(lh5_file.keys(), splitpath[0])
-
-    if len(splitpath) == 1:
-        return matchingkeys
-    else:
-        ret = []
-        for key in matchingkeys:
-            ret.extend([f"{key}/{path}" for path in ls(lh5_file[key], splitpath[1])])
-        return ret
-
-
-def show(
-    lh5_file: str | h5py.Group,
-    lh5_group: str = "/",
-    indent: str = "",
-    header: bool = True,
-) -> None:
-    """Print a tree of LH5 file contents with LGDO datatype.
-
-    Parameters
-    ----------
-    lh5_file
-        the LH5 file.
-    lh5_group
-        print only contents of this HDF5 group.
-    indent
-        indent the diagram with this string.
-    header
-        print `lh5_group` at the top of the diagram.
-
-    Examples
-    --------
-    >>> from pygama.lgdo import show
-    >>> show("file.lh5", "/geds/raw")
-    /geds/raw
-    ├── channel · array<1>{real}
-    ├── energy · array<1>{real}
-    ├── timestamp · array<1>{real}
-    ├── waveform · table{t0,dt,values}
-    │   ├── dt · array<1>{real}
-    │   ├── t0 · array<1>{real}
-    │   └── values · array_of_equalsized_arrays<1,1>{real}
-    └── wf_std · array<1>{real}
-    """
-    # open file
-    if isinstance(lh5_file, str):
-        lh5_file = h5py.File(expand_path(lh5_file), "r")
-
-    # go to group
-    if lh5_group != "/":
-        lh5_file = lh5_file[lh5_group]
-
-    if header:
-        print(f"\033[1m{lh5_group}\033[0m")  # noqa: T201
-
-    # get an iterator over the keys in the group
-    it = iter(lh5_file)
-    key = None
-
-    # make sure there is actually something in this file/group
-    try:
-        key = next(it)  # get first key
-    except StopIteration:
-        print(f"{indent}└──  empty")  # noqa: T201
-        return
-
-    # loop over keys
-    while True:
-        val = lh5_file[key]
-        # we want to print the LGDO datatype
-        attr = val.attrs.get("datatype", default="no datatype")
-        if attr == "no datatype" and isinstance(val, h5py.Group):
-            attr = "HDF5 group"
-
-        # is this the last key?
-        killme = False
-        try:
-            k_new = next(it)  # get next key
-        except StopIteration:
-            char = "└──"
-            killme = True  # we'll have to kill this loop later
-        else:
-            char = "├──"
-
-        print(f"{indent}{char} \033[1m{key}\033[0m · {attr}")  # noqa: T201
-
-        # if it's a group, call this function recursively
-        if isinstance(val, h5py.Group):
-            show(val, indent=indent + ("    " if killme else "│   "), header=False)
-
-        # break or move to next key
-        if killme:
-            break
-        else:
-            key = k_new
-
-
-def load_nda(
-    f_list: str | list[str],
-    par_list: list[str],
-    lh5_group: str = "",
-    idx_list: list[np.ndarray | list | tuple] = None,
-) -> dict[str, np.ndarray]:
-    r"""Build a dictionary of :class:`numpy.ndarray`\ s from LH5 data.
-
-    Given a list of files, a list of LH5 table parameters, and an optional
-    group path, return a NumPy array with all values for each parameter.
-
-    Parameters
-    ----------
-    f_list
-        A list of files. Can contain wildcards.
-    par_list
-        A list of parameters to read from each file.
-    lh5_group
-        group path within which to find the specified parameters.
-    idx_list
-        for fancy-indexed reads. Must be one index array for each file in
-        `f_list`.
-
-    Returns
-    -------
-    par_data
-        A dictionary of the parameter data keyed by the elements of `par_list`.
-        Each entry contains the data for the specified parameter concatenated
-        over all files in `f_list`.
-    """
-    if isinstance(f_list, str):
-        f_list = [f_list]
-        if idx_list is not None:
-            idx_list = [idx_list]
-    if idx_list is not None and len(f_list) != len(idx_list):
-        raise ValueError(
-            f"f_list length ({len(f_list)}) != idx_list length ({len(idx_list)})!"
-        )
-
-    # Expand wildcards
-    f_list = [f for f_wc in f_list for f in sorted(glob.glob(os.path.expandvars(f_wc)))]
-
-    sto = LH5Store()
-    par_data = {par: [] for par in par_list}
-    for ii, f in enumerate(f_list):
-        f = sto.gimme_file(f, "r")
-        for par in par_list:
-            if f"{lh5_group}/{par}" not in f:
-                raise RuntimeError(f"'{lh5_group}/{par}' not in file {f_list[ii]}")
-
-            if idx_list is None:
-                data, _ = sto.read_object(f"{lh5_group}/{par}", f)
-            else:
-                data, _ = sto.read_object(f"{lh5_group}/{par}", f, idx=idx_list[ii])
-            if not data:
-                continue
-            par_data[par].append(data.nda)
-    par_data = {par: np.concatenate(par_data[par]) for par in par_list}
-    return par_data
-
-
-def load_dfs(
-    f_list: str | list[str],
-    par_list: list[str],
-    lh5_group: str = "",
-    idx_list: list[np.ndarray | list | tuple] = None,
-) -> pd.DataFrame:
-    """Build a :class:`pandas.DataFrame` from LH5 data.
-
-    Given a list of files (can use wildcards), a list of LH5 columns, and
-    optionally the group path, return a :class:`pandas.DataFrame` with all
-    values for each parameter.
-
-    See Also
-    --------
-    :func:`load_nda`
-
-    Returns
-    -------
-    dataframe
-        contains columns for each parameter in `par_list`, and rows containing
-        all data for the associated parameters concatenated over all files in
-        `f_list`.
-    """
-    return pd.DataFrame(
-        load_nda(f_list, par_list, lh5_group=lh5_group, idx_list=idx_list)
-    )
-
-
-class LH5Iterator:
-    """
-    A class for iterating through one or more LH5 files, one block of entries
-    at a time. This also accepts an entry list/mask to enable event selection,
-    and a field mask.
-
-    This class can be used either for random access:
-
-    >>> lh5_obj, n_rows = lh5_it.read(entry)
-
-    to read the block of entries starting at entry. In case of multiple files
-    or the use of an event selection, entry refers to a global event index
-    across files and does not count events that are excluded by the selection.
-
-    This can also be used as an iterator:
-
-    >>> for lh5_obj, entry, n_rows in LH5Iterator(...):
-    >>>    # do the thing!
-
-    This is intended for if you are reading a large quantity of data but
-    want to limit your memory usage (particularly when reading in waveforms!).
-    The ``lh5_obj`` that is read by this class is reused in order to avoid
-    reallocation of memory; this means that if you want to hold on to data
-    between reads, you will have to copy it somewhere!
-    """
-
-    def __init__(
-        self,
-        lh5_files: str | list[str],
-        group: str,
-        base_path: str = "",
-        entry_list: list[int] | list[list[int]] = None,
-        entry_mask: list[bool] | list[list[bool]] = None,
-        field_mask: dict[str, bool] | list[str] | tuple[str] = None,
-        buffer_len: int = 3200,
-    ) -> None:
-        """
-        Parameters
-        ----------
-        lh5_files
-            file or files to read from. May include wildcards and environment
-            variables.
-        group
-            HDF5 group to read.
-        base_path
-            HDF5 path to prepend.
-        entry_list
-            list of entry numbers to read. If a nested list is provided,
-            expect one top-level list for each file, containing a list of
-            local entries. If a list of ints is provided, use global entries.
-        entry_mask
-            mask of entries to read. If a list of arrays is provided, expect
-            one for each file. Ignore if a selection list is provided.
-        field_mask
-            mask of which fields to read. See :meth:`LH5Store.read_object` for
-            more details.
-        buffer_len
-            number of entries to read at a time while iterating through files.
-        """
-        self.lh5_st = LH5Store(base_path=base_path, keep_open=True)
-
-        # List of files, with wildcards and env vars expanded
-        if isinstance(lh5_files, str):
-            lh5_files = expand_path(lh5_files, True)
-        elif not isinstance(lh5_files, list):
-            raise ValueError("lh5_files must be a string or list of strings")
-
-        if entry_list is not None and entry_mask is not None:
-            raise ValueError(
-                "entry_list and entry_mask arguments are mutually exclusive"
-            )
-
-        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
-
-        # Map to last row in each file
-        self.file_map = np.array(
-            [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
-        ).cumsum()
-        self.group = group
-        self.buffer_len = buffer_len
-
-        if len(self.lh5_files) > 0:
-            self.lh5_buffer = self.lh5_st.get_buffer(
-                self.group,
-                self.lh5_files[0],
-                size=self.buffer_len,
-                field_mask=field_mask,
-            )
-        else:
-            raise RuntimeError(f"can't open any files from {lh5_files}")
-
-        self.n_rows = 0
-        self.current_entry = 0
-
-        self.field_mask = field_mask
-
-        # List of entry indices from each file
-        self.entry_list = None
-        if entry_list is not None:
-            entry_list = list(entry_list)
-            if isinstance(entry_list[0], int):
-                entry_list.sort()
-                i_start = 0
-                self.entry_list = []
-                for f_end in self.file_map:
-                    i_stop = bisect_right(entry_list, f_end, lo=i_start)
-                    self.entry_list.append(entry_list[i_start:i_stop])
-                    i_start = i_stop
-
-            else:
-                self.entry_list = [[]] * len(self.file_map)
-                for i_file, local_list in enumerate(entry_list):
-                    self.entry_list[i_file] = list(local_list)
-
-        elif entry_mask is not None:
-            # Convert entry mask into an entry list
-            if isinstance(entry_mask, pd.Series):
-                entry_mask = entry_mask.values
-            if isinstance(entry_mask, np.ndarray):
-                self.entry_list = []
-                f_start = 0
-                for f_end in self.file_map:
-                    self.entry_list.append(
-                        list(np.nonzero(entry_mask[f_start:f_end])[0])
-                    )
-                    f_start = f_end
-            else:
-                self.entry_list = [[]] * len(self.file_map)
-                for i_file, local_mask in enumerate(entry_mask):
-                    self.entry_list[i_file] = list(np.nonzero(local_mask)[0])
-
-        # Map to last entry of each file
-        self.entry_map = (
-            self.file_map
-            if self.entry_list is None
-            else np.array([len(elist) for elist in self.entry_list]).cumsum()
-        )
-
-    def read(self, entry: int) -> tuple[LGDO, int]:
-        """Read the next chunk of events, starting at entry. Return the
-        LH5 buffer and number of rows read."""
-        i_file = np.searchsorted(self.entry_map, entry, "right")
-        local_entry = entry
-        if i_file > 0:
-            local_entry -= self.entry_map[i_file - 1]
-        self.n_rows = 0
-
-        while self.n_rows < self.buffer_len and i_file < len(self.file_map):
-            # Loop through files
-            local_idx = self.entry_list[i_file] if self.entry_list is not None else None
-            i_local = local_idx[local_entry] if local_idx is not None else local_entry
-            self.lh5_buffer, n_rows = self.lh5_st.read_object(
-                self.group,
-                self.lh5_files[i_file],
-                start_row=i_local,
-                n_rows=self.buffer_len - self.n_rows,
-                idx=local_idx,
-                field_mask=self.field_mask,
-                obj_buf=self.lh5_buffer,
-                obj_buf_start=self.n_rows,
-            )
-
-            self.n_rows += n_rows
-            i_file += 1
-            local_entry = 0
-
-        self.current_entry = entry
-        return (self.lh5_buffer, self.n_rows)
-
-    def __len__(self) -> int:
-        """Return the total number of entries."""
-        return self.entry_map[-1] if len(self.entry_map) > 0 else 0
-
-    def __iter__(self) -> tuple[LGDO, int, int]:
-        """Loop through entries in blocks of size buffer_len."""
-        entry = 0
-        while entry < len(self):
-            buf, n_rows = self.read(entry)
-            yield (buf, entry, n_rows)
-            entry += n_rows
 
 
 @nb.njit(parallel=False, fastmath=True)

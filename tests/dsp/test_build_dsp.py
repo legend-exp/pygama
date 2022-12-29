@@ -4,7 +4,7 @@ import pytest
 
 from pygama import lgdo
 from pygama.dsp import build_dsp
-from pygama.lgdo.lh5_store import LH5Store, ls
+from pygama.lgdo.lh5 import LH5Store, ls
 
 config_dir = Path(__file__).parent / "configs"
 

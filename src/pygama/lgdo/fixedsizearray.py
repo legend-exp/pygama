@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy
 
-from pygama.lgdo.array import Array
+from .array import Array
 
 
 class FixedSizeArray(Array):

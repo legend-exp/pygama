@@ -16,14 +16,8 @@ import pandas as pd
 from tqdm import tqdm
 
 from pygama.flow.file_db import FileDB
-from pygama.lgdo import (
-    Array,
-    ArrayOfEqualSizedArrays,
-    LH5Store,
-    Struct,
-    Table,
-    WaveformTable,
-)
+from pygama.lgdo import Array, ArrayOfEqualSizedArrays, Struct, Table, WaveformTable
+from pygama.lgdo.lh5 import LH5Store
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
 log = logging.getLogger(__name__)

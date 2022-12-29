@@ -65,7 +65,7 @@ import os
 from typing import Union
 
 from pygama import lgdo
-from pygama.lgdo.lh5_store import LH5Store
+from pygama.lgdo.lh5 import LH5Store
 
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
@@ -407,7 +407,7 @@ def write_to_lh5_and_clear(
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
     """
     if lh5_store is None:
-        lh5_store = lgdo.LH5Store()
+        lh5_store = LH5Store()
     for rb in raw_buffers:
         if rb.lgdo is None or rb.loc == 0:
             continue  # no data to write

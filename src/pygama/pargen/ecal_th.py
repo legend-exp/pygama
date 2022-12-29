@@ -21,11 +21,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.energy_cal as cal
+from pygama.lgdo import lh5
 
 log = logging.getLogger(__name__)
 

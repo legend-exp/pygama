@@ -12,7 +12,7 @@ import pygama
 import pygama.logging
 from pygama.dsp import build_dsp
 from pygama.hit import build_hit
-from pygama.lgdo import show
+from pygama.lgdo.lh5 import show
 from pygama.raw import build_raw
 
 

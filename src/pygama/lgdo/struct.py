@@ -9,9 +9,9 @@ from typing import Any, Union
 
 import numpy as np
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .scalar import Scalar
+from .vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 

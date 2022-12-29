@@ -3,9 +3,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import pygama.lgdo as lgdo
-import pygama.lgdo.lh5_store as lh5
-from pygama.lgdo.lh5_store import LH5Store
+from pygama import lgdo
+from pygama.lgdo import lh5
+from pygama.lgdo.lh5 import LH5Store
 
 
 @pytest.fixture(scope="module")

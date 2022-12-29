@@ -1,7 +1,7 @@
 import pytest
 
 import pygama.dsp.processors  # noqa: F401
-from pygama.lgdo import LH5Store
+from pygama.lgdo.lh5 import LH5Store
 from pygama.raw.build_raw import build_raw
 
 

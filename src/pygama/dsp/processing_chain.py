@@ -18,9 +18,9 @@ from typing import Any, Union
 import numpy as np
 from numba import vectorize
 
-import pygama.lgdo as lgdo
+from pygama import lgdo
 from pygama.dsp.errors import DSPFatal, ProcessingChainError
-from pygama.lgdo.lgdo_utils import expand_path
+from pygama.lgdo.lh5 import utils
 from pygama.math.units import Quantity, Unit
 from pygama.math.units import unit_registry as ureg
 
@@ -1607,7 +1607,7 @@ def build_processing_chain(
     proc_chain = ProcessingChain(block_width, lh5_in.size)
 
     if isinstance(dsp_config, str):
-        with open(expand_path(dsp_config)) as f:
+        with open(utils.expand_path(dsp_config)) as f:
             dsp_config = json.load(f)
     elif dsp_config is None:
         dsp_config = {"outputs": [], "processors": {}}

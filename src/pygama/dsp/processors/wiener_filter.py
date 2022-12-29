@@ -3,9 +3,9 @@ from __future__ import annotations
 import numpy as np
 from numba import guvectorize
 
-import pygama.lgdo.lh5_store as lh5
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+from pygama.lgdo import lh5
 
 
 def wiener_filter(file_name_array: list[str]) -> np.ndarray:

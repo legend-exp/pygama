@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 from pandas.io.formats import format as fmt
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .scalar import Scalar
+from .struct import Struct
+from .vectorofvectors import VectorOfVectors
 
 LGDO = Union[Scalar, Struct, Array, VectorOfVectors]
 

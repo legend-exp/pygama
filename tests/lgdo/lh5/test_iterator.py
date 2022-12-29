@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 import pygama.lgdo as lgdo
-from pygama.lgdo.lh5_store import LH5Iterator
+from pygama.lgdo.lh5 import LH5Iterator
 
 
 @pytest.fixture(scope="module")

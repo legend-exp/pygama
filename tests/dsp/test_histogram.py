@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 
-import pygama.lgdo.lh5_store as store
 from pygama.dsp import build_dsp
+from pygama.lgdo import lh5
 
 config_dir = Path(__file__).parent / "configs"
 dsp_file = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds__numpy_test_dsp.lh5"
@@ -30,7 +30,7 @@ def test_histogram_fixed_width(lgnd_test_data):
     )
     assert os.path.exists(dsp_file)
 
-    df = store.load_nda(dsp_file, ["hist_weights", "hist_borders"], "geds/dsp/")
+    df = lh5.load_nda(dsp_file, ["hist_weights", "hist_borders"], "geds/dsp/")
 
     assert len(df["hist_weights"][0]) + 1 == len(df["hist_borders"][0])
     for i in range(2, len(df["hist_borders"][0])):

@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.lgdo_utils import get_element_type
+from . import utils
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class Array:
         """Return this LGDO's datatype attribute string."""
         dt = self.datatype_name()
         nd = str(len(self.nda.shape))
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:

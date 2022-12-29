@@ -19,7 +19,7 @@ import numpy as np
 
 import pygama
 import pygama.lgdo as lgdo
-import pygama.lgdo.lh5_store as lh5
+import pygama.lgdo.lh5 as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts

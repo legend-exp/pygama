@@ -9,7 +9,7 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-from pygama import lgdo
+from pygama.lgdo.lh5 import LH5Store
 from pygama.math.utils import sizeof_fmt
 
 from .fc.fc_streamer import FCStreamer
@@ -204,7 +204,7 @@ def build_raw(
         os.remove(out_file_glob[0])
 
     # Write header data
-    lh5_store = lgdo.LH5Store(keep_open=True)
+    lh5_store = LH5Store(keep_open=True)
     write_to_lh5_and_clear(header_data, lh5_store)
 
     # Now loop through the data

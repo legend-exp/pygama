@@ -10,10 +10,10 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .table import Table
+from .vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 

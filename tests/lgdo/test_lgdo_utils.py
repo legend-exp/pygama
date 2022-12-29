@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pytest
 
-import pygama.lgdo.lgdo_utils as lgdo_utils
+from pygama.lgdo import lh5, utils
 
 
 def test_get_element_type():
@@ -21,7 +21,7 @@ def test_get_element_type():
     ]
 
     for obj, name in objs:
-        get_name = lgdo_utils.get_element_type(obj)
+        get_name = utils.get_element_type(obj)
         assert get_name == name
 
 
@@ -44,7 +44,7 @@ def test_parse_datatype():
     ]
 
     for string, dt_tuple in datatypes:
-        pd_dt_tuple = lgdo_utils.parse_datatype(string)
+        pd_dt_tuple = utils.parse_datatype(string)
         assert pd_dt_tuple == dt_tuple
 
 
@@ -59,15 +59,15 @@ def test_expand_path(lgnd_test_data):
     ]
     base_dir = os.path.dirname(files[0])
 
-    assert lgdo_utils.expand_path(f"{base_dir}/*20220716T104550Z*") == files[0]
+    assert lh5.utils.expand_path(f"{base_dir}/*20220716T104550Z*") == files[0]
 
     # Should fail if file not found
     with pytest.raises(FileNotFoundError):
-        lgdo_utils.expand_path(f"{base_dir}/not_a_real_file.lh5")
+        lh5.utils.expand_path(f"{base_dir}/not_a_real_file.lh5")
 
     # Should fail if multiple files found
     with pytest.raises(FileNotFoundError):
-        lgdo_utils.expand_path(f"{base_dir}/*.lh5")
+        lh5.utils.expand_path(f"{base_dir}/*.lh5")
 
     # Check if it finds a list of files correctly
-    assert sorted(lgdo_utils.expand_path(f"{base_dir}/*.lh5", True)) == sorted(files)
+    assert sorted(lh5.utils.expand_path(f"{base_dir}/*.lh5", True)) == sorted(files)

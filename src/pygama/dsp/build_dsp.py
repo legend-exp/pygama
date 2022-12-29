@@ -15,11 +15,11 @@ import numpy as np
 from tqdm import tqdm
 
 import pygama
-import pygama.lgdo as lgdo
-import pygama.lgdo.lh5_store as lh5
-from pygama.dsp.errors import DSPFatal
-from pygama.dsp.processing_chain import build_processing_chain
-from pygama.lgdo.lgdo_utils import expand_path
+from pygama import lgdo
+from pygama.lgdo import lh5
+
+from .errors import DSPFatal
+from .processing_chain import build_processing_chain
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def build_dsp(
     # get the database parameters. For now, this will just be a dict in a json
     # file, but eventually we will want to interface with the metadata repo
     if isinstance(database, str):
-        with open(expand_path(database)) as db_file:
+        with open(lh5.utils.expand_path(database)) as db_file:
             database = json.load(db_file)
 
     if database and not isinstance(database, dict):

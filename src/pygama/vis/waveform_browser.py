@@ -12,8 +12,9 @@ import pint
 from cycler import cycler
 from matplotlib.lines import Line2D
 
-import pygama.lgdo.lh5_store as lh5
+from pygama import lgdo
 from pygama.dsp.processing_chain import build_processing_chain
+from pygama.lgdo import lh5
 from pygama.math.units import unit_registry as ureg
 
 
@@ -285,7 +286,7 @@ class WaveformBrowser:
         # If we still have no x_unit get it from the first waveform we can find
         if self.x_unit is None:
             for wf in self.lh5_out.values():
-                if not isinstance(wf, lh5.WaveformTable):
+                if not isinstance(wf, lgdo.WaveformTable):
                     continue
                 self.x_unit = ureg(wf.dt_units)
 
@@ -380,7 +381,7 @@ class WaveformBrowser:
             ref_time = 0
         elif isinstance(self.align_par, str):
             data = self.lh5_out.get(self.align_par, None)
-            if isinstance(data, lh5.Array):
+            if isinstance(data, lgdo.Array):
                 ref_time = data.nda[i_tb]
                 unit = data.attrs.get("units", None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
@@ -395,7 +396,7 @@ class WaveformBrowser:
         for name, lines in self.lines.items():
             # Get the data; note this is implicitly copying it!
             data = self.lh5_out.get(name, None)
-            if isinstance(data, lh5.WaveformTable):
+            if isinstance(data, lgdo.WaveformTable):
                 y = data.values.nda[i_tb, :] / norm
                 dt = data.dt.nda[i_tb] * float(ureg(data.dt_units) / self.x_unit)
                 t0 = (
@@ -406,13 +407,13 @@ class WaveformBrowser:
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
 
-            elif isinstance(data, lh5.ArrayOfEqualSizedArrays):
+            elif isinstance(data, lgdo.ArrayOfEqualSizedArrays):
                 y = data.nda[i_tb, :] / norm
                 x = np.arange(len(y), dtype="float")
                 lines.append(Line2D(x, y))
                 self._update_auto_limit(x, y)
 
-            elif isinstance(data, lh5.Array):
+            elif isinstance(data, lgdo.Array):
                 val = data.nda[i_tb]
                 unit = data.attrs.get("units", None)
                 if unit and unit in ureg and ureg.is_compatible_with(unit, self.x_unit):
@@ -443,7 +444,7 @@ class WaveformBrowser:
 
             if not data:
                 data = ureg.Quantity(self.aux_vals[name][entry])
-            elif isinstance(data, lh5.Array):
+            elif isinstance(data, lgdo.Array):
                 unit = data.attrs.get("units", None)
                 if unit and unit in ureg:
                     data = data.nda[i_tb] * ureg(unit)

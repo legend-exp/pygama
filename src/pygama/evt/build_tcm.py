@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 
 import pygama.evt.tcm as ptcm
-import pygama.lgdo as lgdo
+from pygama import lgdo
+from pygama.lgdo import lh5
 
 
 def build_tcm(
@@ -55,12 +56,12 @@ def build_tcm(
     """
     # hash_func: later can add list or dict or a function(str) --> int.
 
-    store = lgdo.LH5Store()
+    store = lh5.LH5Store()
     coin_data = []
     array_ids = []
     all_tables = []
     for filename, pattern in input_tables:
-        tables = lgdo.ls(filename, lh5_group=pattern)
+        tables = lh5.ls(filename, lh5_group=pattern)
         for table in tables:
             all_tables.append(table)
             array_id = len(array_ids)

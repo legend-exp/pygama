@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
-import pygama.lgdo.lh5_store as store
 from pygama.dsp import build_dsp
+from pygama.lgdo import lh5
 
 config_dir = Path(__file__).parent / "configs"
 dsp_file = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds__numpy_test_dsp.lh5"
@@ -33,6 +33,6 @@ def test_list_parisng(lgnd_test_data):
     )
     assert os.path.exists(dsp_file)
 
-    df = store.load_nda(dsp_file, ["wf_out"], "geds/dsp/")
+    df = lh5.load_nda(dsp_file, ["wf_out"], "geds/dsp/")
 
     assert np.all(df["wf_out"][:] == np.array([7, 9, 11, 13, 15]))

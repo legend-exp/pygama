@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.lgdo_utils import get_element_type
+from . import utils
 
 log = logging.getLogger(__name__)
 
@@ -39,14 +39,14 @@ class Scalar:
                     f"not match value type ({type(value).__name__})!"
                 )
         else:
-            self.attrs["datatype"] = get_element_type(self.value)
+            self.attrs["datatype"] = utils.get_element_type(self.value)
 
     def datatype_name(self) -> str:
         """Returns the name for this LGDO's datatype attribute."""
         if hasattr(self.value, "datatype_name"):
             return self.value.datatype_name
         else:
-            return get_element_type(self.value)
+            return utils.get_element_type(self.value)
 
     def form_datatype(self) -> str:
         """Return this LGDO's datatype attribute string."""

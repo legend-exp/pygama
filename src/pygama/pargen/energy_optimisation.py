@@ -25,12 +25,12 @@ from scipy.stats import chisquare, norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_cal as pgc
+from pygama.lgdo import lh5
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()

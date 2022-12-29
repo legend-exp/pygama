@@ -16,8 +16,7 @@ import numpy as np
 import pandas as pd
 from parse import parse
 
-from pygama.lgdo import Array, LH5Store, Scalar, VectorOfVectors
-from pygama.lgdo.lh5_store import ls
+from pygama.lgdo import Array, Scalar, VectorOfVectors, lh5
 
 log = logging.getLogger(__name__)
 
@@ -364,7 +363,7 @@ class FileDB:
                 )
 
                 # TODO this call here is really expensive!
-                groups = ls(f, wildcard)
+                groups = lh5.ls(f, wildcard)
                 tier_tables = [
                     list(parse(template, g).named.values())[0] for g in groups
                 ]
@@ -384,7 +383,7 @@ class FileDB:
                 else:
                     table_name = template
 
-                col = ls(f[table_name])
+                col = lh5.ls(f[table_name])
                 if col not in columns:
                     columns.append(col)
                     col_idx.append(len(columns) - 1)
@@ -417,7 +416,7 @@ class FileDB:
             columns_vov = VectorOfVectors(
                 flattened_data=flattened, cumulative_length=length
             )
-            sto = LH5Store()
+            sto = lh5.LH5Store()
             sto.write_object(columns_vov, "unique_columns", to_file)
 
         return columns
@@ -427,7 +426,7 @@ class FileDB:
         Fills the dataframe (and configuration dictionary) with the information
         from a file created by :meth:`to_disk`.
         """
-        sto = LH5Store()
+        sto = lh5.LH5Store()
         cfg, _ = sto.read_object("config", filename)
         self.set_config(json.loads(cfg.value.decode()))
 
@@ -453,7 +452,7 @@ class FileDB:
         """
         log.debug(f"Writing database to {filename}")
 
-        sto = LH5Store()
+        sto = lh5.LH5Store()
         sto.write_object(
             Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
         )

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import numpy as np
 
-import pygama.lgdo.lh5_store as store
 from pygama.dsp import build_dsp
+from pygama.lgdo import lh5
 
 config_dir = Path(__file__).parent / "configs"
 dsp_file = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds__numpy_test_dsp.lh5"
@@ -23,7 +23,7 @@ def test_build_dsp(lgnd_test_data):
 
 
 def test_numpy_math_constants_dsp():
-    df = store.load_nda(dsp_file, ["timestamp", "calc1", "calc2", "calc3"], "geds/dsp/")
+    df = lh5.load_nda(dsp_file, ["timestamp", "calc1", "calc2", "calc3"], "geds/dsp/")
 
     a1 = df["timestamp"] - df["timestamp"] - np.pi * df["timestamp"]
     a2 = df["timestamp"] - df["timestamp"] - np.pi
@@ -39,7 +39,7 @@ def test_numpy_math_constants_dsp():
 
 
 def test_numpy_infinity_and_nan_dsp():
-    df = store.load_nda(dsp_file, ["calc4", "calc5", "calc6"], "geds/dsp/")
+    df = lh5.load_nda(dsp_file, ["calc4", "calc5", "calc6"], "geds/dsp/")
 
     assert (np.isnan(df["calc4"])).all()
     assert (np.isneginf(df["calc5"])).all()

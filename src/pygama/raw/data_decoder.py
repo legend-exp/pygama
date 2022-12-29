@@ -8,7 +8,7 @@ from typing import Union
 import numpy as np
 
 from pygama import lgdo
-from pygama.lgdo.lh5_store import LH5Store
+from pygama.lgdo.lh5 import LH5Store
 from pygama.raw.raw_buffer import RawBuffer
 
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
@@ -158,7 +158,7 @@ class DataDecoder:
                 continue
 
             # Parse datatype for remaining lgdos
-            datatype, shape, elements = lgdo.lgdo_utils.parse_datatype(datatype)
+            datatype, shape, elements = lgdo.utils.parse_datatype(datatype)
 
             # ArrayOfEqualSizedArrays
             if datatype == "array_of_equalsized_arrays":
@@ -205,7 +205,7 @@ class DataDecoder:
         self, filename: str, group: str = "/", lh5_store: LH5Store = None
     ) -> None:
         if lh5_store is None:
-            lh5_store = lgdo.LH5Store()
+            lh5_store = LH5Store()
         n_rows = self.garbage_table.loc
         if n_rows == 0:
             return

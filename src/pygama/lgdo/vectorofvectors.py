@@ -10,9 +10,9 @@ from typing import Any
 import numpy as np
 from numba import njit
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.lgdo_utils import get_element_type
+from . import utils
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 
 log = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class VectorOfVectors:
 
     def form_datatype(self) -> str:
         """Return this LGDO's datatype attribute string."""
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return "array<1>{array<1>{" + et + "}}"
 
     def set_vector(self, i_vec: int, nda: np.ndarray) -> None:
