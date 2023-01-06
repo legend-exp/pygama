@@ -30,18 +30,18 @@ repos:
   - id: setup-cfg-fmt
 
 - repo: https://github.com/PyCQA/isort
-  rev: "5.10.1"
+  rev: "5.11.4"
   hooks:
   - id: isort
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: "v3.3.0"
+  rev: "v3.3.1"
   hooks:
   - id: pyupgrade
     args: ["--py38-plus"]
 
 - repo: https://github.com/psf/black
-  rev: "22.10.0"
+  rev: "22.12.0"
   hooks:
   - id: black-jupyter
 
@@ -91,7 +91,7 @@ repos:
   - id: codespell
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: "v0.8.0.4"
+  rev: "v0.9.0.2"
   hooks:
   - id: shellcheck
 
