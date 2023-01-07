@@ -9,15 +9,16 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 @guvectorize(
     [
-        "void(float32[:], float32, float32, float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
-        "void(float64[:], float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
+        "void(float32[:], float32, float32, float32, float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64, float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
-    "(n),(),(),(),(m),(m),(),(),()",
+    "(n),(),(),(),(),(m),(m),(),(),()",
     **nb_kwargs,
 )
 def get_multi_local_extrema(
     w_in: np.ndarray,
     a_delta_in: float,
+    search_direction: int,
     a_abs_max_in: float,
     a_abs_min_in: float,
     vt_max_out: np.ndarray,
@@ -37,8 +38,12 @@ def get_multi_local_extrema(
     w_in
         the array of data within which extrema will be found.
     a_delta_in
-        the absolute level by which data must vary (in one direction) about an
+        the relative level by which data must vary (in one direction) about an
         extremum in order for it to be tagged.
+    search_direction
+        the direction in which the relative maximum is searched. 
+        0=left to right search, 
+        1=right to left search.
     a_abs_min_in, a_abs_max_in
         the absolute level by which data must vary (in one direction) about 0
         in order for a maximum to be tagged.
@@ -78,40 +83,74 @@ def get_multi_local_extrema(
         raise DSPFatal("a_delta_in must be positive")
 
     # now loop over data
-
-    imax, imin = 0, 0
     find_max = True
-    for i in range(len(w_in)):
+    #left to right search
+    if search_direction == 0:
+        imax, imin = 0, 0
+        for i in range(len(w_in)):
 
-        if w_in[i] > w_in[imax]:
-            imax = i
-        if w_in[i] < w_in[imin]:
-            imin = i
-
-        if find_max:
-            # if the sample is less than the current max by more than a_delta_in,
-            # declare the previous one a maximum, then set this as the new "min"
-            if (
-                w_in[i] < w_in[imax] - a_delta_in
-                and int(n_max_counter) < int(len(vt_max_out))
-                and w_in[imax] > a_abs_max_in
-            ):
-                vt_max_out[int(n_max_counter)] = imax
-                n_max_counter += 1
-                imin = i
-                find_max = False
-        else:
-            # if the sample is more than the current min by more than a_delta_in,
-            # declare the previous one a minimum, then set this as the new "max"
-            if (
-                w_in[i] > w_in[imin] + a_delta_in
-                and int(n_min_counter) < int(len(vt_min_out))
-                and w_in[imin] < a_abs_min_in
-            ):
-                vt_min_out[int(n_min_counter)] = imin
-                n_min_counter += 1
+            if w_in[i] > w_in[imax]:
                 imax = i
-                find_max = True
+            if w_in[i] < w_in[imin]:
+                imin = i
+            if find_max:
+                # if the sample is less than the current max by more than a_delta_in,
+                # declare the previous one a maximum, then set this as the new "min"
+                if (
+                    w_in[i] < w_in[imax] - a_delta_in
+                    and int(n_max_counter) < int(len(vt_max_out))
+                    and w_in[imax] > a_abs_max_in
+                ):
+                    vt_max_out[int(n_max_counter)] = imax
+                    n_max_counter += 1
+                    imin = i
+                    find_max = False
+            else:
+                # if the sample is more than the current min by more than a_delta_in,
+                # declare the previous one a minimum, then set this as the new "max"
+                if (
+                    w_in[i] > w_in[imin] + a_delta_in
+                    and int(n_min_counter) < int(len(vt_min_out))
+                    and w_in[imin] < a_abs_min_in
+                ):
+                    vt_min_out[int(n_min_counter)] = imin
+                    n_min_counter += 1
+                    imax = i
+                    find_max = True
+
+    # right to left search
+    elif search_direction == 1:
+        imax, imin = len(w_in)-1, len(w_in)-1
+        for i in range(len(w_in)-1,-1,-1):
+
+            if w_in[i] > w_in[imax]:
+                imax = i
+            if w_in[i] < w_in[imin]:
+                imin = i
+            if find_max:
+                # if the sample is less than the current max by more than a_delta_in,
+                # declare the previous one a maximum, then set this as the new "min"
+                if (
+                    w_in[i] < w_in[imax] - a_delta_in
+                    and int(n_max_counter) < int(len(vt_max_out))
+                    and w_in[imax] > a_abs_max_in
+                ):
+                    vt_max_out[int(n_max_counter)] = imax
+                    n_max_counter += 1
+                    imin = i
+                    find_max = False
+            else:
+                # if the sample is more than the current min by more than a_delta_in,
+                # declare the previous one a minimum, then set this as the new "max"
+                if (
+                    w_in[i] > w_in[imin] + a_delta_in
+                    and int(n_min_counter) < int(len(vt_min_out))
+                    and w_in[imin] < a_abs_min_in
+                ):
+                    vt_min_out[int(n_min_counter)] = imin
+                    n_min_counter += 1
+                    imax = i
+                    find_max = True
 
     # set output
     n_max_out[0] = n_max_counter
