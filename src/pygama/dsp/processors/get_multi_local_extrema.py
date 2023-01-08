@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 from numba import guvectorize
+#from numba.types import bool_, int_
 
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
@@ -44,7 +45,9 @@ def get_multi_local_extrema(
     search_direction
         the direction in which the relative maximum is searched. 
         0=left to right search, 
-        1=right to left search.
+        1=right to left search,
+        2=conservative search (only extrema found in both directions),
+        3=aggressive search (extrema found in either directions)
     a_abs_min_in, a_abs_max_in
         the absolute level by which data must vary (in one direction) about 0
         in order for a maximum to be tagged.
@@ -67,77 +70,90 @@ def get_multi_local_extrema(
     flag_out[0] = np.nan
 
     # initialize internal counters
+    n_max_left_counter = 0
+    n_max_right_counter = 0
+    n_min_left_counter = 0 
+    n_min_right_counter = 0
 
-    n_max_counter = 0
-    n_min_counter = 0
+    # initialize temporary arrays
+    left_vt_max = np.zeros(len(vt_max_out),dtype=np.float_)
+    left_vt_min = np.zeros(len(vt_min_out),dtype=np.float_)
+    right_vt_max = np.zeros(len(vt_max_out),dtype=np.float_)
+    right_vt_min = np.zeros(len(vt_min_out),dtype=np.float_)
+
+    left_vt_max[:] =  np.nan
+    left_vt_min[:] =  np.nan
+    right_vt_max[:] = np.nan
+    right_vt_min[:] = np.nan
 
     # Checks
 
-    if np.isnan(w_in).any() or np.isnan(a_delta_max_in) or np.isnan(a_delta_min_in):
+    if(np.isnan(w_in).any() or np.isnan(a_delta_max_in) or np.isnan(a_delta_min_in)):
         return
 
-    if not len(vt_max_out) < len(w_in) or not len(vt_min_out) < len(w_in):
+    if (not len(vt_max_out) < len(w_in)) or (not len(vt_min_out) < len(w_in)):
         raise DSPFatal(
             "The length of your return array must be smaller than the length of your waveform"
         )
-    if not a_delta_max_in >= 0 or not a_delta_min_in >=0:
-        raise DSPFatal("delta must be positive")
+    if((not a_delta_max_in >= 0) or (not a_delta_min_in >=0)):
+        raise DSPFatal("Delta must be positive")
 
     # now loop over data
-    find_max = True
     #left to right search
-    if search_direction == 0:
+    if((search_direction == 0) or (search_direction >1)):
+        find_max = True
         imax, imin = 0, 0
         for i in range(len(w_in)):
 
-            if w_in[i] > w_in[imax]:
+            if(w_in[i] > w_in[imax]):
                 imax = i
-            if w_in[i] < w_in[imin]:
+            if(w_in[i] < w_in[imin]):
                 imin = i
-            if find_max:
+            if(find_max):
                 # if the sample is less than the current max by more than a_delta_in,
                 # declare the previous one a maximum, then set this as the new "min"
                 if (
-                    w_in[i] < w_in[imax] - a_delta_max_in
-                    and int(n_max_counter) < int(len(vt_max_out))
-                    and w_in[imax] > a_abs_max_in
+                    (w_in[i] < w_in[imax] - a_delta_max_in)
+                    and (int(n_max_left_counter) < int(len(left_vt_max)))
+                    and (w_in[imax] > a_abs_max_in)
                 ):
-                    vt_max_out[int(n_max_counter)] = imax
-                    n_max_counter += 1
+                    left_vt_max[int(n_max_left_counter)] = imax
+                    n_max_left_counter += 1
                     imin = i
                     find_max = False
             else:
                 # if the sample is more than the current min by more than a_delta_in,
                 # declare the previous one a minimum, then set this as the new "max"
                 if (
-                    w_in[i] > w_in[imin] + a_delta_min_in
-                    and int(n_min_counter) < int(len(vt_min_out))
-                    and w_in[imin] < a_abs_min_in
+                    (w_in[i] > w_in[imin] + a_delta_min_in)
+                    and (int(n_min_left_counter) < int(len(left_vt_min)))
+                    and (w_in[imin] < a_abs_min_in)
                 ):
-                    vt_min_out[int(n_min_counter)] = imin
-                    n_min_counter += 1
+                    left_vt_min[int(n_min_left_counter)] = imin
+                    n_min_left_counter += 1
                     imax = i
                     find_max = True
 
     # right to left search
-    elif search_direction == 1:
+    elif(search_direction >0):
+        find_max = True
         imax, imin = len(w_in)-1, len(w_in)-1
         for i in range(len(w_in)-1,-1,-1):
 
-            if w_in[i] > w_in[imax]:
+            if(w_in[i] > w_in[imax]):
                 imax = i
-            if w_in[i] < w_in[imin]:
+            if(w_in[i] < w_in[imin]):
                 imin = i
-            if find_max:
+            if(find_max):
                 # if the sample is less than the current max by more than a_delta_in,
                 # declare the previous one a maximum, then set this as the new "min"
                 if (
                     w_in[i] < w_in[imax] - a_delta_max_in
-                    and int(n_max_counter) < int(len(vt_max_out))
+                    and int(n_max_right_counter) < int(len(right_vt_max))
                     and w_in[imax] > a_abs_max_in
                 ):
-                    vt_max_out[int(n_max_counter)] = imax
-                    n_max_counter += 1
+                    right_vt_max[int(n_max_right_counter)] = imax
+                    n_max_right_counter += 1
                     imin = i
                     find_max = False
             else:
@@ -145,19 +161,122 @@ def get_multi_local_extrema(
                 # declare the previous one a minimum, then set this as the new "max"
                 if (
                     w_in[i] > w_in[imin] + a_delta_min_in
-                    and int(n_min_counter) < int(len(vt_min_out))
+                    and int(n_min_right_counter) < int(len(right_vt_min))
                     and w_in[imin] < a_abs_min_in
                 ):
-                    vt_min_out[int(n_min_counter)] = imin
-                    n_min_counter += 1
+                    right_vt_min[int(n_min_right_counter)] = imin
+                    n_min_right_counter += 1
                     imax = i
                     find_max = True
 
+    else:
+        raise DSPFatal("search direction type not found.")
     # set output
-    n_max_out[0] = n_max_counter
-    n_min_out[0] = n_min_counter
+    # left search
+    if(search_direction == 0):
+        n_max_out[0] = n_max_left_counter
+        n_min_out[0] = n_min_left_counter
+        vt_max_out[:] = left_vt_max
+        vt_min_out[:] = left_vt_min
+    
+    # right search
+    elif(search_direction == 1):
+        n_max_out[0] = n_max_right_counter
+        n_min_out[0] = n_min_right_counter
+        vt_max_out[:] = right_vt_max
+        vt_min_out[:] = right_vt_min
+    
+    # conservative search (only extrema found in both directions)
+    elif(search_direction == 2):
 
-    if n_max_out[0] == 1:
+        # sort the right search result. Left search should be already sorted
+        right_vt_max = np.sort(right_vt_max)
+        right_vt_min = np.sort(right_vt_min)
+
+        rge_right = (right_vt_max[~np.isnan(right_vt_max)]).astype(np.int_)
+        rge_left = (left_vt_max[~np.isnan(left_vt_max)]).astype(np.int_)
+
+        # only continue if both arrays have something in them
+        if( len(rge_right) > 0 and len(rge_left)>0):
+            r_max = int(rge_right[0])
+            r_min = int(rge_right[-1])
+            rge = r_max - r_min
+            
+            #coincidence mask
+            coin_mask = np.zeros(len(rge_left), dtype=np.bool_)
+
+            # helper array: 1 if integer exists in rge_right
+            helper_ar = np.zeros(rge+1,dtype=np.bool_)
+            helper_ar[rge_right-r_min] = 1
+
+            # masking
+            # only integers in [r_min,r_max] could be in coincidence
+            basic_mask = (rge_left <= r_max) & (rge_left >= r_min)
+            
+            # take candidates of rge_left surviving ths basic mask,
+            # shift by rmin to get the indices for the integer mask.
+            # Apply basic mask to coincidenc mask and indexed integer mask.
+            coin_mask[basic_mask] = helper_ar[rge_left[basic_mask]-r_min]
+
+            # Apply coincidence mask to rge_left & fill into output
+            rge_left = rge_left[coin_mask]
+            vt_max_out[:len(rge_left)] = rge_left
+            n_max_out[0] = len(rge_left)
+
+        # Do the same for the minima
+        rge_right = (right_vt_max[~np.isnan(right_vt_min)]).astype(np.int_)
+        rge_left = (left_vt_max[~np.isnan(left_vt_min)]).astype(np.int_)
+
+        # only continue if both arrays have something in them
+        if(len(rge_right) > 0 and len(rge_left)>0):
+            r_max = int(rge_right[0])
+            r_min = int(rge_right[-1])
+            rge = r_max - r_min
+            
+            #coincidence mask
+            coin_mask = np.zeros(len(rge_left), dtype=np.bool_)
+
+            # helper array: 1 if integer exists in rge_right
+            helper_ar = np.zeros(rge+1,dtype=np.bool_)
+            helper_ar[rge_right-r_min] = 1
+
+            # masking
+            # only integers in [r_min,r_max] could be in coincidence
+            basic_mask = (rge_left <= r_max) & (rge_left >= r_min)
+            
+            # take candidates of rge_left surviving ths basic mask,
+            # shift by rmin to get the indices for the integer mask.
+            # Apply basic mask to coincidenc mask and indexed integer mask.
+            coin_mask[basic_mask] = helper_ar[rge_left[basic_mask]-r_min]
+
+            # Apply coincidence mask to rge_left & fill into output
+            rge_left = rge_left[coin_mask]
+            vt_min_out[:len(rge_left)] = rge_left
+            n_min_out[0] = len(rge_left)
+        
+    
+    # aggressive search (extrema found in either directions)
+    elif(search_direction == 3):
+        both = np.unique(np.append(left_vt_max,right_vt_max))
+        if(len(vt_max_out) <= len(both)): 
+            vt_max_out[:]= both[:len(vt_max_out)]
+            n_max_out[0] = len(vt_max_out)
+        else: 
+            vt_max_out[:len(both)] = both
+            n_max_out[0] = len(both)
+
+        both = np.unique(np.append(left_vt_min,right_vt_min))
+        if(len(vt_min_out) <= len(both)): 
+            vt_min_out[:]= both[:len(vt_min_out)]
+            n_min_out[0] = len(vt_min_out)
+        else: 
+            vt_min_out[:len(both)] = both
+            n_min_out[0] = len(both)
+    
+    else:
+        raise DSPFatal("search direction type not found.")
+
+    if(n_max_out[0] == 1):
         flag_out[0] = 1
     else:
         flag_out[0] = 0
