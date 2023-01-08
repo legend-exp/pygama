@@ -9,15 +9,16 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 @guvectorize(
     [
-        "void(float32[:], float32, float32, float32, float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
-        "void(float64[:], float64, float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
+        "void(float32[:], float32, float32, float32, float32, float32, float32[:], float32[:], float32[:], float32[:], float32[:])",
+        "void(float64[:], float64, float64, float64, float64, float64, float64[:], float64[:], float64[:], float64[:], float64[:])",
     ],
-    "(n),(),(),(),(),(m),(m),(),(),()",
+    "(n),(),(),(),(),(),(m),(m),(),(),()",
     **nb_kwargs,
 )
 def get_multi_local_extrema(
     w_in: np.ndarray,
-    a_delta_in: float,
+    a_delta_max_in: float,
+    a_delta_min_in: float,
     search_direction: int,
     a_abs_max_in: float,
     a_abs_min_in: float,
@@ -37,7 +38,7 @@ def get_multi_local_extrema(
     ----------
     w_in
         the array of data within which extrema will be found.
-    a_delta_in
+    a_delta_min_in, a_delta_max_in
         the relative level by which data must vary (in one direction) about an
         extremum in order for it to be tagged.
     search_direction
@@ -72,15 +73,15 @@ def get_multi_local_extrema(
 
     # Checks
 
-    if np.isnan(w_in).any() or np.isnan(a_delta_in):
+    if np.isnan(w_in).any() or np.isnan(a_delta_max_in) or np.isnan(a_delta_min_in):
         return
 
     if not len(vt_max_out) < len(w_in) or not len(vt_min_out) < len(w_in):
         raise DSPFatal(
             "The length of your return array must be smaller than the length of your waveform"
         )
-    if not a_delta_in >= 0:
-        raise DSPFatal("a_delta_in must be positive")
+    if not a_delta_max_in >= 0 or not a_delta_min_in >=0:
+        raise DSPFatal("delta must be positive")
 
     # now loop over data
     find_max = True
@@ -97,7 +98,7 @@ def get_multi_local_extrema(
                 # if the sample is less than the current max by more than a_delta_in,
                 # declare the previous one a maximum, then set this as the new "min"
                 if (
-                    w_in[i] < w_in[imax] - a_delta_in
+                    w_in[i] < w_in[imax] - a_delta_max_in
                     and int(n_max_counter) < int(len(vt_max_out))
                     and w_in[imax] > a_abs_max_in
                 ):
@@ -109,7 +110,7 @@ def get_multi_local_extrema(
                 # if the sample is more than the current min by more than a_delta_in,
                 # declare the previous one a minimum, then set this as the new "max"
                 if (
-                    w_in[i] > w_in[imin] + a_delta_in
+                    w_in[i] > w_in[imin] + a_delta_min_in
                     and int(n_min_counter) < int(len(vt_min_out))
                     and w_in[imin] < a_abs_min_in
                 ):
@@ -131,7 +132,7 @@ def get_multi_local_extrema(
                 # if the sample is less than the current max by more than a_delta_in,
                 # declare the previous one a maximum, then set this as the new "min"
                 if (
-                    w_in[i] < w_in[imax] - a_delta_in
+                    w_in[i] < w_in[imax] - a_delta_max_in
                     and int(n_max_counter) < int(len(vt_max_out))
                     and w_in[imax] > a_abs_max_in
                 ):
@@ -143,7 +144,7 @@ def get_multi_local_extrema(
                 # if the sample is more than the current min by more than a_delta_in,
                 # declare the previous one a minimum, then set this as the new "max"
                 if (
-                    w_in[i] > w_in[imin] + a_delta_in
+                    w_in[i] > w_in[imin] + a_delta_min_in
                     and int(n_min_counter) < int(len(vt_min_out))
                     and w_in[imin] < a_abs_min_in
                 ):
