@@ -136,7 +136,7 @@ def get_multi_local_extrema(
                     find_max = True
 
     # right to left search
-    elif search_direction > 0:
+    if search_direction > 0:
         find_max = True
         imax, imin = len(w_in) - 1, len(w_in) - 1
         for i in range(len(w_in) - 1, -1, -1):
