@@ -137,6 +137,12 @@ def data_trimmer(lgdo_table: Table | Struct, dsp_dict: dict, group: str = None) 
             # Create the new waveform table
             new_obj = lgdo.WaveformTable(t0=t0, dt=dt, values=dsp_out[proc].nda)
 
+            # Write the presum_rate as an array to the table as a new field
+            presum_rate_array = lgdo.Array(
+                shape=len(t0), dtype=np.uint16, fill_val=presum_rate
+            )
+            lgdo_table.add_field("presum_rate", presum_rate_array)
+
         # otherwise, the processor returned just an array
         elif type(dsp_out[proc]) == Array:
             if (proc == "t_sat_lo") or (proc == "t_sat_hi"):

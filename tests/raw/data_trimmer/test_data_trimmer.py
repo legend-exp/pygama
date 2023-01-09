@@ -181,6 +181,12 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
             raw_packet_waveform_dts.nda, presummed_packet_waveform_dts.nda / presum_rate
         )
 
+        # Check that the presum_rate is correctly identified
+        presum_rate_from_file, _ = sto.read_object(
+            str(raw_group) + "/presum_rate", trimmed_file
+        )
+        assert presum_rate_from_file.nda[0] == presum_rate
+
 
 def test_data_trimmer_file_size_decrease(lgnd_test_data):
     # Set up I/O files, including config
@@ -399,6 +405,12 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
             == presummed_packet_waveform_dts.nda[0] / presum_rate
         )
 
+        # Check that the presum_rate is correctly identified
+        presum_rate_from_file, _ = sto.read_object(
+            str(raw_group) + "/presum_rate", trimmed_file
+        )
+        assert presum_rate_from_file.nda[0] == presum_rate
+
 
 def test_trim_geds_no_trim_spms(lgnd_test_data):
     # Set up I/O files, including config
@@ -606,6 +618,12 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/presummed_waveform/dt", trimmed_file
             )
+
+            # Check that the presum_rate is correctly identified
+            presum_rate_from_file, _ = sto.read_object(
+                str(raw_group) + "/presum_rate", trimmed_file
+            )
+            assert presum_rate_from_file.nda[0] == presum_rate
         # Check that the dts match what we expect, with the correct units
         assert (
             raw_packet_waveform_dts.nda[0]
@@ -870,6 +888,12 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/presummed_waveform/dt", trimmed_file
             )
+
+            # Check that the presum_rate is correctly identified
+            presum_rate_from_file, _ = sto.read_object(
+                str(raw_group) + "/presum_rate", trimmed_file
+            )
+            assert presum_rate_from_file.nda[0] == presum_rate
         # Check that the dts match what we expect, with the correct units
         assert (
             raw_packet_waveform_dts.nda[0]
