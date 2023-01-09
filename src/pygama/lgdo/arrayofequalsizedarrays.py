@@ -67,11 +67,9 @@ class ArrayOfEqualSizedArrays(Array):
         )
 
     def datatype_name(self) -> str:
-        """Returns the name for this LGDO's datatype attribute."""
         return "array_of_equalsized_arrays"
 
     def form_datatype(self) -> str:
-        """Return this LGDO's datatype attribute string."""
         dt = self.datatype_name()
         nd = str(len(self.nda.shape))
         if self.dims is not None:
