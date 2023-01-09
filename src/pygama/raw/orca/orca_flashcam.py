@@ -169,6 +169,11 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 card = child["station"]
                 self.fcid[crate][card] = fcid
 
+                if crate not in obj_info_dict:
+                    raise RuntimeError(f"no crate {crate} in obj_info_dict")
+                if card not in obj_info_dict[crate]:
+                    raise RuntimeError(f"no card {card} in obj_info_dict[{crate}]")
+
                 # load self.nadc
                 self.nadc[fcid] += np.count_nonzero(
                     obj_info_dict[crate][card]["Enabled"]
