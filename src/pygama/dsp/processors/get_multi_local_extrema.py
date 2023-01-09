@@ -197,8 +197,8 @@ def get_multi_local_extrema(
 
         # only continue if both arrays have something in them
         if len(rge_right) > 0 and len(rge_left) > 0:
-            r_max = int(rge_right[0])
-            r_min = int(rge_right[-1])
+            r_max = int(rge_right[-1])
+            r_min = int(rge_right[0])
             rge = r_max - r_min
 
             # coincidence mask
@@ -221,15 +221,16 @@ def get_multi_local_extrema(
             rge_left = rge_left[coin_mask]
             vt_max_out[: len(rge_left)] = rge_left
             n_max_out[0] = len(rge_left)
-
+        else:
+            n_max_out[0] = 0
         # Do the same for the minima
         rge_right = (right_vt_max[~np.isnan(right_vt_min)]).astype(np.int_)
         rge_left = (left_vt_max[~np.isnan(left_vt_min)]).astype(np.int_)
 
         # only continue if both arrays have something in them
         if len(rge_right) > 0 and len(rge_left) > 0:
-            r_max = int(rge_right[0])
-            r_min = int(rge_right[-1])
+            r_max = int(rge_right[-1])
+            r_min = int(rge_right[0])
             rge = r_max - r_min
 
             # coincidence mask
@@ -252,24 +253,26 @@ def get_multi_local_extrema(
             rge_left = rge_left[coin_mask]
             vt_min_out[: len(rge_left)] = rge_left
             n_min_out[0] = len(rge_left)
+        else:
+            n_min_out[0] = 0
 
     # aggressive search (extrema found in either directions)
     elif search_direction == 3:
         both = np.unique(np.append(left_vt_max, right_vt_max))
         if len(vt_max_out) <= len(both):
             vt_max_out[:] = both[: len(vt_max_out)]
-            n_max_out[0] = len(vt_max_out)
+            n_max_out[0] = len(vt_max_out[~np.isnan(vt_max_out)])
         else:
             vt_max_out[: len(both)] = both
-            n_max_out[0] = len(both)
+            n_max_out[0] = len(both[~np.isnan(both)])
 
         both = np.unique(np.append(left_vt_min, right_vt_min))
         if len(vt_min_out) <= len(both):
             vt_min_out[:] = both[: len(vt_min_out)]
-            n_min_out[0] = len(vt_min_out)
+            n_min_out[0] = len(vt_min_out[~np.isnan(vt_min_out)])
         else:
             vt_min_out[: len(both)] = both
-            n_min_out[0] = len(both)
+            n_min_out[0] = len(both[~np.isnan(both)])
 
     else:
         raise DSPFatal("search direction type not found.")
