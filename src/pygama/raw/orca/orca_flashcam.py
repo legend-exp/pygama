@@ -159,6 +159,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 raise ValueError("got fcid=0 unexpectedly!")
 
             obj_info_dict = header.get_object_info("ORFlashCamADCModel")
+            obj_info_dict.update(header.get_object_info("ORFlashCamADCStdModel"))
             self.nadc[fcid] = 0
             for child in info["children"]:
                 # load self.fcid
@@ -167,6 +168,11 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                     self.fcid[crate] = {}
                 card = child["station"]
                 self.fcid[crate][card] = fcid
+
+                if crate not in obj_info_dict:
+                    raise RuntimeError(f"no crate {crate} in obj_info_dict")
+                if card not in obj_info_dict[crate]:
+                    raise RuntimeError(f"no card {card} in obj_info_dict[{crate}]")
 
                 # load self.nadc
                 self.nadc[fcid] += np.count_nonzero(
