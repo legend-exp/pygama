@@ -170,8 +170,6 @@ def get_multi_local_extrema(
                     imax = i
                     find_max = True
 
-    else:
-        raise DSPFatal("search direction type not found.")
     # set output
     # left search
     if search_direction == 0:
