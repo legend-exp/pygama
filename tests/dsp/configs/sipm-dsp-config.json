@@ -39,6 +39,8 @@
       "args": [
         "curr",
         5,
+        0.1,
+        1,
         "3*fwhm",
         0,
         "vt_max_candidate_out(20)",

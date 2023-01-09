@@ -133,6 +133,8 @@ def test_processor_variable_array_output(spms_raw_tbl):
                 "args": [
                     "waveform",
                     5,
+                    5,
+                    0,
                     10,
                     0,
                     "vt_max_out(10)",
