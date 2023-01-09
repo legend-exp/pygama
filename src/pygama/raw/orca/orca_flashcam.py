@@ -192,8 +192,8 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
-            dec_vals_list = self.decoded_values.values()
-            if len(dec_vals_list) >= 0:
+            dec_vals_list = list(self.decoded_values.values())
+            if len(dec_vals_list) > 0:
                 return dec_vals_list[0]
             raise RuntimeError("decoded_values not built")
         fcid = get_fcid(key)
