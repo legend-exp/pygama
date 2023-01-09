@@ -5,6 +5,8 @@ from numba import guvectorize
 
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
+from pygama.dsp.errors import DSPFatal
+
 
 @guvectorize(
     [
