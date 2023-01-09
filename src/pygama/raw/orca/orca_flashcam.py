@@ -159,6 +159,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 raise ValueError("got fcid=0 unexpectedly!")
 
             obj_info_dict = header.get_object_info("ORFlashCamADCModel")
+            obj_info_dict.update(header.get_object_info("ORFlashCamADCStdModel"))
             self.nadc[fcid] = 0
             for child in info["children"]:
                 # load self.fcid
