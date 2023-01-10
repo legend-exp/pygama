@@ -15,8 +15,8 @@ from scipy import stats
 
 import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
+from pygama.math.binned_fitting import gauss_mode_width_max
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
-            pars, cov = pgf.gauss_mode_width_max(
+            pars, cov = gauss_mode_width_max(
                 counts,
                 start_bins,
                 mode_guess=mu,

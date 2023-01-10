@@ -19,10 +19,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 
 import pygama.lgdo.lh5_store as lh5
+import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
 import pygama.pargen.ecal_th as thc
 import pygama.pargen.energy_cal as pgc
+from pygama.math.binned_fitting import fit_binned, gauss_mode_max
 
 log = logging.getLogger(__name__)
 
@@ -73,9 +74,9 @@ def PDF_AoE(
     PDF for A/E consists of a gaussian signal with gaussian tail background
     """
     try:
-        sig = lambda_s * pgf.gauss_norm(x, mu, sigma)
-        bkg = lambda_b * pgf.gauss_tail_norm(
-            x, mu, sigma, tau, lower_range, upper_range
+        sig = lambda_s * pgd.gaussian.get_pdf(x, mu, sigma)
+        bkg = lambda_b * pgd.exgauss.norm_pdf(
+            x, lower_range, upper_range, tau, mu, sigma
         )
     except:
         sig = np.full_like(x, np.nan)
@@ -100,7 +101,7 @@ def unbinned_aoe_fit(
     hist, bins, var = pgh.get_hist(aoe, bins=500)
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
-    pars, cov = pgf.gauss_mode_max(hist, bins)
+    pars, cov = gauss_mode_max(hist, bins)
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
     ls_guess = 2 * np.sum(hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))])
@@ -108,7 +109,7 @@ def unbinned_aoe_fit(
     c1_max = mu + 5 * sigma
 
     # Initial fit just using Gaussian
-    c1 = cost.UnbinnedNLL(aoe[(aoe < c1_max) & (aoe > c1_min)], pgf.gauss_pdf)
+    c1 = cost.UnbinnedNLL(aoe[(aoe < c1_max) & (aoe > c1_min)], pgd.nb_gauss_scaled_pdf)
     m1 = Minuit(c1, mu, sigma, ls_guess)
     m1.limits = [
         (mu * 0.8, mu * 1.2),
@@ -153,7 +154,11 @@ def unbinned_aoe_fit(
         n_events, sig, bkg = PDF_AoE(xs, *m.values[:-1], True)
         plt.plot(xs, sig * dx[0], label="Signal")
         plt.plot(xs, bkg * dx[0], label="Background")
-        plt.plot(xs, pgf.gauss_pdf(xs, *m1.values) * dx[0], label="Initial Gaussian")
+        plt.plot(
+            xs,
+            pgd.nb_gauss_scaled_pdf(xs, *m1.values) * dx[0],
+            label="Initial Gaussian",
+        )
         plt.legend(loc="upper left")
         plt.show()
 
@@ -509,7 +514,7 @@ def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
     """
     Simple guess for peak fitting
     """
-    if func_i == pgf.extended_radford_pdf:
+    if func_i == pgd.hpge_peak.pdf_ext:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
         i_0 = np.nanargmax(hist)
@@ -539,11 +544,10 @@ def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
             hstep,
             fit_range[0],
             fit_range[1],
-            0,
         ]  #
-        return parguess
+        return np.array([np.array(parguess)])
 
-    elif func_i == pgf.extended_gauss_step_pdf:
+    elif func_i == pgd.gauss_on_step.pdf_ext:
         mu = peak
         sigma = thc.fwhm_slope(peak, *eres_pars) / 2.355
         i_0 = np.argmax(hist)
@@ -558,7 +562,21 @@ def energy_guess(hist, bins, var, func_i, peak, eres_pars, fit_range):
             nbkg_guess = 0
         if nsig_guess < 0:
             nsig_guess = 0
-        return [nsig_guess, mu, sigma, nbkg_guess, hstep, fit_range[0], fit_range[1], 0]
+        return np.array(
+            [
+                np.array(
+                    [
+                        nsig_guess,
+                        mu,
+                        sigma,
+                        nbkg_guess,
+                        hstep,
+                        fit_range[0],
+                        fit_range[1],
+                    ]
+                )
+            ]
+        )
 
 
 def unbinned_energy_fit(
@@ -582,19 +600,22 @@ def unbinned_energy_fit(
             hist,
             bins,
             var,
-            pgf.extended_gauss_step_pdf,
+            pgd.gauss_on_step.pdf_ext,
             peak,
             eres_pars,
             (np.nanmin(energy), np.nanmax(energy)),
         )
-        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
+        c = cost.ExtendedUnbinnedNLL(energy, pgd.gauss_on_step.pdf_ext)
         m = Minuit(c, *x0)
-        m.fixed[-3:] = True
+        m.fixed[-2:] = True
         m.simplex().migrad()
         m.hesse()
         x0 = m.values[:3]
         x0 += [1 / 5, 0.2 * m.values[2]]
         x0 += m.values[3:]
+        x0 = np.array(
+            [np.array(x0)]
+        )  # need an array with the param array in it for extended fits
         if verbose:
             print(m)
     else:
@@ -602,15 +623,15 @@ def unbinned_energy_fit(
     if len(x0) == 0:
         return [np.nan], [np.nan]
 
-    fixed, mask = pgc.get_hpge_E_fixed(pgf.extended_radford_pdf)
+    fixed, mask = pgc.get_hpge_E_fixed(pgd.hpge_peak.pdf_ext)
     if verbose:
         print(x0)
-    c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
+    c = cost.ExtendedUnbinnedNLL(energy, pgd.hpge_peak.pdf_ext)
     m = Minuit(c, *x0)
-    if x0[0] <= 0:
+    if x0[0][0] <= 0:
         sig_lim = 0.2 * len(energy)
     else:
-        sig_lim = 1.2 * x0[0]
+        sig_lim = 1.2 * x0[0][0]
     m.limits = [
         (0, sig_lim),
         (None, None),
@@ -618,7 +639,6 @@ def unbinned_energy_fit(
         (0, 1),
         (0, None),
         (0, len(energy) * 1.1),
-        (None, None),
         (None, None),
         (None, None),
         (None, None),
@@ -636,24 +656,24 @@ def unbinned_energy_fit(
 
     valid = m.valid
 
-    if valid == True and not np.isnan(m.errors[:-3]).all():
+    if valid == True and not np.isnan(m.errors[:-2]).all():
         return m.values, m.errors
     else:
         x0 = energy_guess(
             hist,
             bins,
             var,
-            pgf.extended_radford_pdf,
+            pgd.hpge_peak.pdf_ext,
             peak,
             eres_pars,
             (np.nanmin(energy), np.nanmax(energy)),
         )
-        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
+        c = cost.ExtendedUnbinnedNLL(energy, pgd.hpge_peak.pdf_ext)
         m = Minuit(c, *x0)
-        if x0[0] <= 0:
+        if x0[0][0] <= 0:
             sig_lim = 0.2 * len(energy)
         else:
-            sig_lim = 1.2 * x0[0]
+            sig_lim = 1.2 * x0[0][0]
         m.limits = [
             (0, sig_lim),
             (None, None),
@@ -661,7 +681,6 @@ def unbinned_energy_fit(
             (0, 1),
             (0, None),
             (0, len(energy) * 1.1),
-            (None, None),
             (None, None),
             (None, None),
             (None, None),
@@ -992,16 +1011,21 @@ def get_dt_guess(hist: np.array, bins: np.array, var: np.array) -> list:
     n_bins_range = int((3 * sigma) // dx)
     nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
     nbkg_guess = np.sum(hist) - nsig_guess
-    return [
-        nsig_guess * np.diff(bins)[0],
-        mu,
-        sigma,
-        nbkg_guess * np.diff(bins)[0],
-        hstep,
-        np.inf,
-        np.inf,
-        0,
-    ]
+    return np.array(
+        [
+            np.array(
+                [
+                    nsig_guess * np.diff(bins)[0],
+                    mu,
+                    sigma,
+                    nbkg_guess * np.diff(bins)[0],
+                    hstep,
+                    np.inf,
+                    np.inf,
+                ]
+            )
+        ]
+    )
 
 
 def apply_dtcorr(aoe: np.array, dt: np.array, alpha: float) -> np.array:
@@ -1039,12 +1063,12 @@ def drift_time_correction(
     )
 
     gpars = get_dt_guess(hist, bins, var)
-    dt_pars, dt_errs, dt_cov = pgf.fit_binned(
-        pgf.gauss_step_pdf,
+    dt_pars, dt_errs, dt_cov = fit_binned(
+        pgd.gauss_on_step.get_pdf,
         hist,
         bins,
         guess=gpars,
-        fixed=[-3, -2, -1],
+        fixed=[-2, -1],
         cost_func="Least Squares",
     )
 
@@ -1064,12 +1088,12 @@ def drift_time_correction(
     )
     gpars2 = get_dt_guess(hist2, bins2, var2)
 
-    dt_pars2, dt_errs2, dt_cov2 = pgf.fit_binned(
-        pgf.gauss_step_pdf,
+    dt_pars2, dt_errs2, dt_cov2 = fit_binned(
+        pgd.gauss_on_step.get_pdf,
         hist2,
         bins2,
         guess=gpars2,
-        fixed=[-3, -2, -1],
+        fixed=[-2, -1],
         cost_func="Least Squares",
     )
 
@@ -1092,12 +1116,12 @@ def drift_time_correction(
         plt.step(pgh.get_bin_centers(bins), hist, label="Data")
         plt.plot(
             pgh.get_bin_centers(bins),
-            pgf.gauss_step_pdf(pgh.get_bin_centers(bins), *gpars),
+            pgd.gauss_on_step.get_pdf(pgh.get_bin_centers(bins), *gpars),
             label="Guess",
         )
         plt.plot(
             pgh.get_bin_centers(bins),
-            pgf.gauss_step_pdf(pgh.get_bin_centers(bins), *dt_pars),
+            pgd.gauss_on_step.get_pdf(pgh.get_bin_centers(bins), np.array(dt_pars)),
             label="Fit",
         )
         plt.xlabel("Drift Time (ns)")
@@ -1108,12 +1132,12 @@ def drift_time_correction(
         plt.step(pgh.get_bin_centers(bins2), hist2, label="Data")
         plt.plot(
             pgh.get_bin_centers(bins2),
-            pgf.gauss_step_pdf(pgh.get_bin_centers(bins2), *gpars2),
+            pgd.gauss_on_step.get_pdf(pgh.get_bin_centers(bins2), *gpars2),
             label="Guess",
         )
         plt.plot(
             pgh.get_bin_centers(bins2),
-            pgf.gauss_step_pdf(pgh.get_bin_centers(bins2), *dt_pars2),
+            pgd.gauss_on_step.get_pdf(pgh.get_bin_centers(bins2), np.array(dt_pars2)),
             label="Fit",
         )
         plt.xlabel("Drift Time (ns)")

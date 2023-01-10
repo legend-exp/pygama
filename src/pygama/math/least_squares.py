@@ -2,9 +2,9 @@
 pygama convenience functions for linearly fitting data
 """
 import numpy as np
+from typing import Optional, Union
 
-
-def linear_fit_by_sums(x, y, var=1):
+def linear_fit_by_sums(x: np.ndarray, y: np.ndarray, var: Optional[Union[float, np.ndarray]] = 1) -> tuple[float, float]:
     """
     Fast computation of weighted linear least squares fit to a linear model
 
@@ -12,16 +12,16 @@ def linear_fit_by_sums(x, y, var=1):
 
     Parameters
     ----------
-    x : array like
+    x
         x values for the fit
-    y : array like
+    y
         y values for the fit
-    var : array like (optional)
+    var
         The variances for each y-value
 
     Returns
     -------
-    (m, b) : tuple (float, float)
+    (m, b)
         The slope (m) and y-intercept (b) of the best fit (in the least-squares
         sense) of the data to y = mx + b
     """
@@ -37,7 +37,7 @@ def linear_fit_by_sums(x, y, var=1):
     return m, b
 
 
-def fit_simple_scaling(x, y, var=1):
+def fit_simple_scaling(x: np.ndarray, y: np.ndarray, var: Optional[Union[float, np.ndarray]] = 1) -> tuple[float, float]:
     """
     Fast computation of weighted linear least squares fit to a simple scaling
 
@@ -45,16 +45,16 @@ def fit_simple_scaling(x, y, var=1):
 
     Parameters
     ----------
-    x : array like
+    x
         x values for the fit
-    y : array like
+    y
         y values for the fit
-    var : array like (optional)
+    var
         The variances for each y-value
 
     Returns
     -------
-    scale, scale_var: tuple (float, float)
+    scale, scale_var
         The scale parameter and its variance
     """
     x = np.asarray(x)

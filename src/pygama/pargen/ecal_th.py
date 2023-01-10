@@ -18,8 +18,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.optimize import curve_fit
 
 import pygama.lgdo.lh5_store as lh5
+import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.energy_cal as cal
 
@@ -153,22 +153,22 @@ def energy_cal_th(
         (60, 60),
     ]  # side bands width
     funcs = [
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
+        pgd.hpge_peak.pdf_ext,
     ]
     gof_funcs = [
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
+        pgd.hpge_peak.get_pdf,
     ]
     output_dict = {}
     for energy_param in energy_params:
@@ -255,9 +255,9 @@ def energy_cal_th(
                 fitted_funcs.append(funcs[i])
                 fitted_gof_funcs.append(gof_funcs[i])
 
-        ecal_pass = pgf.poly(uncal_pass[energy_param], pars)
+        ecal_pass = pgd.nb_poly(uncal_pass[energy_param], pars)
         if cut_parameters is not None:
-            ecal_fail = pgf.poly(uncal_fail[energy_param], pars)
+            ecal_fail = pgd.nb_poly(uncal_fail[energy_param], pars)
         xpb = 1
         xlo = 0
         xhi = 4000
@@ -272,10 +272,7 @@ def energy_cal_th(
 
         pk_ranges = results["pk_ranges"]
         p_vals = results["pk_pvals"]
-        mus = [
-            pgf.get_mu_func(func_i, pars_i)
-            for func_i, pars_i in zip(fitted_funcs, pk_pars)
-        ]
+        mus = [func_i.get_mu(pars_i) for func_i, pars_i in zip(fitted_funcs, pk_pars)]
 
         fwhms = results["pk_fwhms"][:, 0]
         dfwhms = results["pk_fwhms"][:, 1]
@@ -354,7 +351,9 @@ def energy_cal_th(
                     ][:n_events]
 
                     counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
-                    fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(bs)
+                    fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(
+                        bs
+                    )  # this might need to be changed to an array holding an array...
                     plt.plot(bin_cs, fit_vals)
                     plt.step(
                         bin_cs,
@@ -435,7 +434,9 @@ def energy_cal_th(
                     [1, 1.1 * np.nanmax(fwhm_slope(fwhm_slope_bins, *fit_pars))]
                 )
                 ax1.set_ylabel("FWHM energy resolution (keV)", ha="right", y=1)
-                ax2.plot(fwhm_peaks, pgf.poly(fit_mus, pars) - fwhm_peaks, lw=1, c="b")
+                ax2.plot(
+                    fwhm_peaks, pgd.nb_poly(fit_mus, pars) - fwhm_peaks, lw=1, c="b"
+                )
                 ax2.set_xlabel("Energy (keV)", ha="right", x=1)
                 ax2.set_ylabel("Residuals (keV)", ha="right", y=1)
                 pdf.savefig()
@@ -509,7 +510,7 @@ def get_peak_labels(
         if i % 2 == 1:
             continue
         else:
-            out.append(f"{pgf.poly(label, pars):.1f}")
+            out.append(f"{pgd.nb_poly(label, pars):.1f}")
             out_labels.append(label)
     return out_labels, out
 
