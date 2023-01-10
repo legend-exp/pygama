@@ -6,46 +6,14 @@ import pytest
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import get_multi_local_extrema
 
-# symmetric delta tests (all searches should behave identical)
+wf = np.array([0, 0, 1, 2, 3, 4, 5, 4, 3, 4, 5, 6, 7, 8, 9, 10,
+               9, 8, 7, 6, 5, 4, 3, 4, 5, 4, 3, 2, 1, 0, 0])  # fmt: skip
 
+
+# symmetric delta tests (all searches should behave identical)
 
 # test with symmetric delta L->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -78,41 +46,6 @@ def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
 
 # test with symmetric delta L<-R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_rtol(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -145,41 +78,6 @@ def test_get_multi_local_extrema_rtol(compare_numba_vs_python):
 
 # test with symmetric delta L<-c->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_both_cons(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -212,41 +110,6 @@ def test_get_multi_local_extrema_both_cons(compare_numba_vs_python):
 
 # test with symmetric delta L<-a->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -281,41 +144,6 @@ def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
 
 # test with asymmetric delta L->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -348,41 +176,6 @@ def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
 
 # test with asymmetric delta L<-R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_rtol_asym(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -415,41 +208,6 @@ def test_get_multi_local_extrema_rtol_asym(compare_numba_vs_python):
 
 # test with asymmetric delta L<-c->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_both_cons_asym(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -482,41 +240,6 @@ def test_get_multi_local_extrema_both_cons_asym(compare_numba_vs_python):
 
 # test with asymmetric delta L<-a->R (dont care about abs. thresholds here)
 def test_get_multi_local_extrema_both_agro_asym(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
@@ -549,41 +272,6 @@ def test_get_multi_local_extrema_both_agro_asym(compare_numba_vs_python):
 
 # Absolute threshold test with aggressive both direction search
 def test_get_multi_local_extrema_both_agro_asym_abs(compare_numba_vs_python):
-    wf = np.array(
-        [
-            0,
-            0,
-            1,
-            2,
-            3,
-            4,
-            5,
-            4,
-            3,
-            4,
-            5,
-            6,
-            7,
-            8,
-            9,
-            10,
-            9,
-            8,
-            7,
-            6,
-            5,
-            4,
-            3,
-            4,
-            5,
-            4,
-            3,
-            2,
-            1,
-            0,
-            0,
-        ]
-    )
     max_out = np.zeros(3)
     max_out[:] = np.nan
     min_out = np.zeros(3)
