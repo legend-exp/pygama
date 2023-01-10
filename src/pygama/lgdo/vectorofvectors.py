@@ -29,6 +29,7 @@ class VectorOfVectors:
         self,
         flattened_data: Array = None,
         cumulative_length: Array = None,
+        listoflists: list = None,
         shape_guess: tuple[int, int] = None,
         dtype: np.dtype = None,
         attrs: dict[str, Any] = None,
@@ -45,6 +46,9 @@ class VectorOfVectors:
             `cumulative_length`. Should be `dtype` :any:`numpy.uint32`. If
             `cumulative_length` is ``None``, an internal `cumulative_length` is
             allocated based on the first element of `shape_guess`.
+        listoflists
+            To create a VectorOfVectors out of a list of lists. Takes priority over
+            flattened_data and cumulative_length. 
         shape_guess
             A NumPy-format shape specification, required if either of
             `flattened_data` or `cumulative_length` are not supplied.  The
@@ -54,35 +58,46 @@ class VectorOfVectors:
             of `flattened_data` if it was not supplied.
         dtype
             Sets the type of data stored in `flattened_data`. Required if
-            `flattened_data` is ``None``.
+            `flattened_data` and `listoflists` are ``None``.
         attrs
             A set of user attributes to be carried along with this LGDO.
         """
-        if cumulative_length is None:
-            self.cumulative_length = Array(
-                shape=(shape_guess[0],), dtype="uint32", fill_val=0
-            )
-        else:
-            if isinstance(cumulative_length, Array):
-                self.cumulative_length = cumulative_length
-            else:
-                self.cumulative_length = Array(cumulative_length)
-        if flattened_data is None:
-            length = np.prod(shape_guess)
-            if dtype is None:
-                raise ValueError("flattened_data and dtype cannot both be None!")
-            else:
-                self.flattened_data = Array(shape=(length,), dtype=dtype)
+        if listoflists is not None:
+            cum_length = []
+            for vec in listoflists:
+                cum_length.append(len(vec))
+            self.flattened_data = Array(nda=np.array([item for sublist in listoflists for item in sublist]))
+            self.cumulative_length = Array(nda=np.cumsum(cum_length) )
+            if dtype is not None:
                 self.dtype = np.dtype(dtype)
-        else:
-            if isinstance(flattened_data, Array):
-                self.flattened_data = flattened_data
             else:
-                self.flattened_data = Array(flattened_data)
-            if dtype is None:
                 self.dtype = self.flattened_data.dtype
+        else:
+            if cumulative_length is None:
+                self.cumulative_length = Array(
+                    shape=(shape_guess[0],), dtype="uint32", fill_val=0
+                )
             else:
-                self.dtype = np.dtype(dtype)
+                if isinstance(cumulative_length, Array):
+                    self.cumulative_length = cumulative_length
+                else:
+                    self.cumulative_length = Array(cumulative_length)
+            if flattened_data is None:
+                length = np.prod(shape_guess)
+                if dtype is None:
+                    raise ValueError("flattened_data and dtype cannot both be None!")
+                else:
+                    self.flattened_data = Array(shape=(length,), dtype=dtype)
+                    self.dtype = np.dtype(dtype)
+            else:
+                if isinstance(flattened_data, Array):
+                    self.flattened_data = flattened_data
+                else:
+                    self.flattened_data = Array(flattened_data)
+                if dtype is None:
+                    self.dtype = self.flattened_data.dtype
+                else:
+                    self.dtype = np.dtype(dtype)
 
         self.attrs = {} if attrs is None else dict(attrs)
 
