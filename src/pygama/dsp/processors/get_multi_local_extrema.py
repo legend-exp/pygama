@@ -6,8 +6,6 @@ from numba import guvectorize
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
-# from numba.types import bool_, int_
-
 
 @guvectorize(
     [
@@ -45,10 +43,12 @@ def get_multi_local_extrema(
         extremum in order for it to be tagged.
     search_direction
         the direction in which the relative maximum is searched.
-        0=left to right search,
-        1=right to left search,
-        2=conservative search (only extrema found in both directions),
-        3=aggressive search (extrema found in either directions)
+
+        * ``0``: left to right search,
+        * ``1``: right to left search,
+        * ``2``: conservative search (only extrema found in both directions)
+        * ``3``: aggressive search (extrema found in either directions)
+
     a_abs_min_in, a_abs_max_in
         the absolute level by which data must vary (in one direction) about 0
         in order for a maximum to be tagged.
