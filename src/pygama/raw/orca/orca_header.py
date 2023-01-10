@@ -66,14 +66,11 @@ class OrcaHeader(dict):
 
         crates = self["ObjectInfo"]["Crates"]
         for crate in crates:
-            object_info_dict[crate["CrateNumber"]] = {}
-            cards = crate["Cards"]
-            for card in cards:
+            for card in crate["Cards"]:
                 if card["Class Name"] == orca_class_name:
+                    if crate["CrateNumber"] not in object_info_dict:
+                        object_info_dict[crate["CrateNumber"]] = {}
                     object_info_dict[crate["CrateNumber"]][card["Card"]] = card
-
-        if len(object_info_dict) == 0:
-            raise KeyError(f"no object info for class {orca_class_name}")
 
         return object_info_dict
 
