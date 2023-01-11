@@ -6,6 +6,7 @@ general strategy for the implementation is to dress standard Python and NumPy
 objects with an ``attr`` dictionary holding LGDO metadata, plus some convenience
 functions. The basic data object classes are:
 
+* :class:`.LGDO`: abstract base class for all LGDOs
 * :class:`.Scalar`: typed Python scalar. Access data via the :attr:`value`
   attribute
 * :class:`.Array`: basic :class:`numpy.ndarray`. Access data via the
@@ -32,6 +33,7 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.fixedsizearray import FixedSizeArray
+from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.lh5_store import LH5Iterator, LH5Store, load_dfs, load_nda, ls, show
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
@@ -49,6 +51,7 @@ __all__ = [
     "Array",
     "ArrayOfEqualSizedArrays",
     "FixedSizeArray",
+    "LGDO",
     "Scalar",
     "Struct",
     "Table",

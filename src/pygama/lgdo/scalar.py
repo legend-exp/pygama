@@ -7,12 +7,13 @@ from typing import Any
 
 import numpy as np
 
+from pygama.lgdo import LGDO
 from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
 
-class Scalar:
+class Scalar(LGDO):
     """Holds just a scalar value and some attributes (datatype, units, ...)."""
 
     # TODO: do scalars need proper numpy dtypes?
@@ -30,26 +31,15 @@ class Scalar:
             raise ValueError("cannot instantiate a Scalar with a non-scalar value")
 
         self.value = value
-        self.attrs = {} if attrs is None else dict(attrs)
-
-        if "datatype" in self.attrs:
-            if self.attrs["datatype"] != self.form_datatype():
-                raise ValueError(
-                    f"datatype ({self.attrs['datatype']}) does "
-                    f"not match value type ({type(value).__name__})!"
-                )
-        else:
-            self.attrs["datatype"] = get_element_type(self.value)
+        super().__init__(attrs)
 
     def datatype_name(self) -> str:
-        """Returns the name for this LGDO's datatype attribute."""
         if hasattr(self.value, "datatype_name"):
             return self.value.datatype_name
         else:
             return get_element_type(self.value)
 
     def form_datatype(self) -> str:
-        """Return this LGDO's datatype attribute string."""
         return self.datatype_name()
 
     def __str__(self) -> str:
