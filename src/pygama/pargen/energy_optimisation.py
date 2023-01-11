@@ -584,6 +584,11 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
+
+    if idxs is not None:
+        Energies = Energies[idxs]
+        dt = dt[idxs]
+
     if np.isnan(Energies).any():
         return {
             "fwhm": np.nan,
@@ -604,10 +609,6 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
-
-    if idxs is not None:
-        Energies = Energies[idxs]
-        dt = dt[idxs]
 
     alphas = np.array(
         [
@@ -838,7 +839,13 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
         dt = 0
 
     if np.isnan(Energies).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan}
+        return {
+        "fwhm_o_max": np.nan,
+        "max_o_fwhm": np.nan,
+        "chisquare": np.nan,
+        "n_sig": np.nan,
+        "n_sig_err": np.nan,
+    }
 
     (
         _,
@@ -984,7 +991,7 @@ def event_selection(
         with open(dsp_config) as r:
             dsp_config = json.load(r)
 
-    dsp_config["outputs"] = list(cut_parameters) + [energy_parameter]
+    dsp_config["outputs"] = cts.get_keys(dsp_config["outputs"], list(cut_parameters)) + ["energy_parameter"]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
@@ -1106,11 +1113,13 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
-    if np.isnan(Energies).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan}
-    if np.isnan(dt).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan}
-
+    if np.isnan(Energies).any() or np.isnan(dt).any():
+        if np.isnan(Energies).any():
+            log.warning(f"nan energy values for peak {peak}")
+        else:
+            log.warning(f"nan dt values for peak {peak}")
+        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan, "chisquare": np.nan, "n_sig": np.nan, "n_sig_err": np.nan}
+    
     if idxs is not None:
         Energies = Energies[idxs]
         dt = dt[idxs]
@@ -1427,120 +1436,181 @@ class BayesianOptimizer:
         return out_dict
 
     def plot(self, init_samples=None):
-        if len(self.dims) != 2:
-            raise Exception("Plotting not implemented for dim!=2")
-        x, y = np.mgrid[
-            self.dims[0].min_val : self.dims[0].max_val : 0.1,
-            self.dims[1].min_val : self.dims[1].max_val : 0.1,
-        ]
-        points = np.vstack((x.flatten(), y.flatten())).T
-        out_grid = np.zeros(
-            (
-                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
-                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val,self.dims[0].max_val,0.1)
+            ys = np.zeros_like(points)
+            for i,point in enumerate(points):
+                ys[i] = self.gauss_pr.predict(
+                np.array([point]).reshape(1, -1), return_std=False
             )
-        )
-
-        j = 0
-        for i, _ in np.ndenumerate(out_grid):
-            out_grid[i] = self.gauss_pr.predict(
-                points[j].reshape(1, -1), return_std=False
-            )
-            j += 1
-
-        plt.figure()
-        plt.imshow(
-            out_grid,
-            norm=LogNorm(),
-            origin="lower",
-            aspect="auto",
-            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
-        )
-        plt.scatter(
-            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
-            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
-        )
-        if init_samples is not None:
+            fig = plt.figure()
+            plt.plot(points, ys)
             plt.scatter(
-                (init_samples[:, 1] - self.dims[1].min_val) * 10,
-                (init_samples[:, 0] - self.dims[0].min_val) * 10,
-                color="red",
+                np.array(self.x_init),np.array(self.y_init)
             )
-        plt.scatter(
-            (self.optimal_x[1] - self.dims[1].min_val) * 10,
-            (self.optimal_x[0] - self.dims[0].min_val) * 10,
-            color="orange",
-        )
-        ticks, labels = plt.xticks()
-        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
-        ticks = np.linspace(0, out_grid.shape[1], 5)
-        plt.xticks(ticks=ticks, labels=labels, rotation=45)
-        ticks, labels = plt.yticks()
-        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
-        ticks = np.linspace(0, out_grid.shape[0], 5)
-        plt.yticks(ticks=ticks, labels=labels, rotation=45)
-        plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
-        plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            if init_samples is not None:
+                init_ys = np.array([np.where(init_sample==self.x_init)[0][0] for init_sample in init_samples])
+                plt.scatter(
+                    np.array(init_samples)[:,0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                )
+            plt.scatter(
+                self.optimal_x[0],
+                self.y_min,
+                color="orange",
+            )
+
+            plt.xlabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.ylabel(f"Kernel Value")
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self.gauss_pr.predict(
+                    points[j].reshape(1, -1), return_std=False
+                )
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
+            plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
         plt.title(f"{self.dims[0].name} Kernel Prediction")
         plt.tight_layout()
-        plt.show()
+        plt.close()
+        return fig
 
     def plot_acq(self, init_samples=None):
-        if len(self.dims) != 2:
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        x, y = np.mgrid[
-            self.dims[0].min_val : self.dims[0].max_val : 0.1,
-            self.dims[1].min_val : self.dims[1].max_val : 0.1,
-        ]
-        points = np.vstack((x.flatten(), y.flatten())).T
-        out_grid = np.zeros(
-            (
-                int((self.dims[0].max_val - self.dims[0].min_val) * 10),
-                int((self.dims[1].max_val - self.dims[1].min_val) * 10),
-            )
-        )
-
-        j = 0
-        for i, _ in np.ndenumerate(out_grid):
-            out_grid[i] = self._acquisition_function(points[j])
-            j += 1
-
-        plt.figure()
-        plt.imshow(
-            out_grid,
-            norm=LogNorm(),
-            origin="lower",
-            aspect="auto",
-            extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
-        )
-        plt.scatter(
-            np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
-            np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
-        )
-        if init_samples is not None:
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val,self.dims[0].max_val,0.1)
+            ys = np.zeros_like(points)
+            for i,point in enumerate(points):
+                ys[i] = self._acquisition_function(np.array([point]).reshape(1, -1)[0])
+            fig = plt.figure()
+            plt.plot(points, ys)
             plt.scatter(
-                (init_samples[:, 1] - self.dims[1].min_val) * 10,
-                (init_samples[:, 0] - self.dims[0].min_val) * 10,
-                color="red",
+                np.array(self.x_init),np.array(self.y_init)
             )
-        plt.scatter(
-            (self.optimal_x[1] - self.dims[1].min_val) * 10,
-            (self.optimal_x[0] - self.dims[0].min_val) * 10,
-            color="orange",
-        )
-        ticks, labels = plt.xticks()
-        labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
-        ticks = np.linspace(0, out_grid.shape[1], 5)
-        plt.xticks(ticks=ticks, labels=labels, rotation=45)
-        ticks, labels = plt.yticks()
-        labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
-        ticks = np.linspace(0, out_grid.shape[0], 5)
-        plt.yticks(ticks=ticks, labels=labels, rotation=45)
-        plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
-        plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            if init_samples is not None:
+                init_ys = np.array([np.where(init_sample==self.x_init)[0][0] for init_sample in init_samples])
+                plt.scatter(
+                    np.array(init_samples)[:,0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                )
+            plt.scatter(
+                self.optimal_x[0],
+                self.y_min,
+                color="orange",
+            )
+
+            plt.xlabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.ylabel(f"Acquisition Function Value")
+
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self._acquisition_function(points[j])
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
+            plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
         plt.title(f"{self.dims[0].name} Acquisition Space")
         plt.tight_layout()
-        plt.show()
+        plt.close()
+        return fig
 
 
 def run_optimisation(
