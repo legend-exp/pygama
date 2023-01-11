@@ -20,6 +20,7 @@ import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
 
+
 def get_keys(in_data, parameters):
     out_params = []
     if isinstance(in_data, dict):
@@ -28,8 +29,10 @@ def get_keys(in_data, parameters):
         possible_keys = in_data
     for param in parameters:
         for key in possible_keys:
-            if key in param: out_params.append(key)
+            if key in param:
+                out_params.append(key)
     return np.unique(out_params).tolist()
+
 
 def generate_cuts(
     data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 2
@@ -55,7 +58,9 @@ def generate_cuts(
         data = pd.DataFrame.from_dict(data)
     for par in parameters.keys():
         if isinstance(parameters[par], dict):
-            if "Lower Boundary" in list(parameters[par]) or "Upper Boundary" in list(parameters[par]):
+            if "Lower Boundary" in list(parameters[par]) or "Upper Boundary" in list(
+                parameters[par]
+            ):
                 output_dict[par] = parameters[par].copy()
                 if "Lower Boundary" not in parameters[par]:
                     output_dict[par]["Lower Boundary"] = -np.inf
@@ -67,8 +72,10 @@ def generate_cuts(
             all_par_array = data[par].to_numpy()
         except KeyError:
             all_par_array = data.eval(par).to_numpy()
-        idxs = (all_par_array>np.nanpercentile(all_par_array,1))&(all_par_array<np.nanpercentile(all_par_array,99))
-        par_array= all_par_array[idxs]
+        idxs = (all_par_array > np.nanpercentile(all_par_array, 1)) & (
+            all_par_array < np.nanpercentile(all_par_array, 99)
+        )
+        par_array = all_par_array[idxs]
         counts, start_bins, var = pgh.get_hist(par_array, 1000)
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
@@ -89,16 +96,16 @@ def generate_cuts(
 
             upper_bound = guess_mu + 10 * guess_sig
 
-            if lower_bound<np.nanmin(par_array) or upper_bound>np.nanmax(par_array):
+            if lower_bound < np.nanmin(par_array) or upper_bound > np.nanmax(par_array):
                 pars, cov = pgf.gauss_mode_width_max(
-                counts,
-                start_bins,
-                mode_guess=mu,
-                n_bins=5,
-                cost_func="Least Squares",
-                inflate_errors=False,
-                gof_method="var",
-            )
+                    counts,
+                    start_bins,
+                    mode_guess=mu,
+                    n_bins=5,
+                    cost_func="Least Squares",
+                    inflate_errors=False,
+                    gof_method="var",
+                )
 
             guess_mu, guess_sig, guess_amp = pars
 
@@ -122,10 +129,10 @@ def generate_cuts(
 
             upper_bound = start_bins[upper_bound_idx]
 
-        if lower_bound<np.nanmin(par_array):
-            lower_bound =np.nanmin(par_array)
-        if upper_bound>np.nanmax(par_array):
-            upper_bound =np.nanmax(par_array)
+        if lower_bound < np.nanmin(par_array):
+            lower_bound = np.nanmin(par_array)
+        if upper_bound > np.nanmax(par_array):
+            upper_bound = np.nanmax(par_array)
 
         try:
             counts, bins, var = pgh.get_hist(
@@ -137,13 +144,13 @@ def generate_cuts(
             fwhm = pgh.get_fwhm(counts, bins)[0]
             mean = float(bin_centres[np.argmax(counts)])
             pars, cov = pgf.gauss_mode_width_max(
-            counts,
-            bins,
-            mode_guess=mean,
-            n_bins=20,
-            cost_func="Least Squares",
-            inflate_errors=False,
-            gof_method="var",
+                counts,
+                bins,
+                mode_guess=mean,
+                n_bins=20,
+                cost_func="Least Squares",
+                inflate_errors=False,
+                gof_method="var",
             )
             mean - pars[0]
             std = fwhm / 2.355
@@ -218,7 +225,9 @@ def get_cut_indexes(
     elif isinstance(all_data, lh5.Table):
         cut_keys = list(cut_dict)
         cut_keys.append(energy_param)
-        all_data = {entry: all_data[entry].nda for entry in get_keys(all_data, cut_keys)}
+        all_data = {
+            entry: all_data[entry].nda for entry in get_keys(all_data, cut_keys)
+        }
         all_data = pd.DataFrame.from_dict(all_data)
     elif isinstance(all_data, dict):
         all_data = pd.DataFrame.from_dict(all_data)
@@ -247,11 +256,13 @@ def get_cut_indexes(
 
 def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
     out_dict = {}
-    symbols = '/-+*'
-    replacewith = '_'
-    for i,param in enumerate(cut_dict):
-        
-        out_dict[f"{''.join(replacewith  if c in symbols else c for c in param).replace('(','').replace(')','')}_cut"] = {
+    symbols = "/-+*"
+    replacewith = "_"
+    for i, param in enumerate(cut_dict):
+
+        out_dict[
+            f"{''.join(replacewith  if c in symbols else c for c in param).replace('(','').replace(')','')}_cut"
+        ] = {
             "expression": f"(a<({param}))&(({param})<b)",
             "parameters": {
                 "a": cut_dict[param]["Lower Boundary"],

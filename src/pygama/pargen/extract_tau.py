@@ -147,7 +147,7 @@ def get_decay_constant(
 def fom_dpz(tb_data, verbosity=0, rand_arg=None):
 
     std = tb_data["pz_std"].nda
-    counts, start_bins, var = pgh.get_hist(std, dx=0.1,range=(0,400))
+    counts, start_bins, var = pgh.get_hist(std, dx=0.1, range=(0, 400))
     max_idx = np.argmax(counts)
     mu = start_bins[max_idx]
     try:

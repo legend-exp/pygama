@@ -840,12 +840,12 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
 
     if np.isnan(Energies).any():
         return {
-        "fwhm_o_max": np.nan,
-        "max_o_fwhm": np.nan,
-        "chisquare": np.nan,
-        "n_sig": np.nan,
-        "n_sig_err": np.nan,
-    }
+            "fwhm_o_max": np.nan,
+            "max_o_fwhm": np.nan,
+            "chisquare": np.nan,
+            "n_sig": np.nan,
+            "n_sig_err": np.nan,
+        }
 
     (
         _,
@@ -991,7 +991,9 @@ def event_selection(
         with open(dsp_config) as r:
             dsp_config = json.load(r)
 
-    dsp_config["outputs"] = cts.get_keys(dsp_config["outputs"], list(cut_parameters)) + ["energy_parameter"]
+    dsp_config["outputs"] = cts.get_keys(
+        dsp_config["outputs"], list(cut_parameters)
+    ) + ["energy_parameter"]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
@@ -1118,8 +1120,15 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
             log.warning(f"nan energy values for peak {peak}")
         else:
             log.warning(f"nan dt values for peak {peak}")
-        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan, "chisquare": np.nan, "n_sig": np.nan, "n_sig_err": np.nan}
-    
+        return {
+            "fwhm": np.nan,
+            "fwhm_err": np.nan,
+            "alpha": np.nan,
+            "chisquare": np.nan,
+            "n_sig": np.nan,
+            "n_sig_err": np.nan,
+        }
+
     if idxs is not None:
         Energies = Energies[idxs]
         dt = dt[idxs]
@@ -1441,21 +1450,24 @@ class BayesianOptimizer:
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
         elif len(self.dims) == 1:
-            points = np.arange(self.dims[0].min_val,self.dims[0].max_val,0.1)
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
-            for i,point in enumerate(points):
+            for i, point in enumerate(points):
                 ys[i] = self.gauss_pr.predict(
-                np.array([point]).reshape(1, -1), return_std=False
-            )
+                    np.array([point]).reshape(1, -1), return_std=False
+                )
             fig = plt.figure()
             plt.plot(points, ys)
-            plt.scatter(
-                np.array(self.x_init),np.array(self.y_init)
-            )
+            plt.scatter(np.array(self.x_init), np.array(self.y_init))
             if init_samples is not None:
-                init_ys = np.array([np.where(init_sample==self.x_init)[0][0] for init_sample in init_samples])
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
                 plt.scatter(
-                    np.array(init_samples)[:,0],
+                    np.array(init_samples)[:, 0],
                     np.array(self.y_init)[init_ys],
                     color="red",
                 )
@@ -1465,7 +1477,9 @@ class BayesianOptimizer:
                 color="orange",
             )
 
-            plt.xlabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
             plt.ylabel(f"Kernel Value")
         elif len(self.dims) == 2:
             x, y = np.mgrid[
@@ -1518,8 +1532,12 @@ class BayesianOptimizer:
             labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[0], 5)
             plt.yticks(ticks=ticks, labels=labels, rotation=45)
-            plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
-            plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
         plt.title(f"{self.dims[0].name} Kernel Prediction")
         plt.tight_layout()
         plt.close()
@@ -1531,19 +1549,22 @@ class BayesianOptimizer:
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
         elif len(self.dims) == 1:
-            points = np.arange(self.dims[0].min_val,self.dims[0].max_val,0.1)
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
-            for i,point in enumerate(points):
+            for i, point in enumerate(points):
                 ys[i] = self._acquisition_function(np.array([point]).reshape(1, -1)[0])
             fig = plt.figure()
             plt.plot(points, ys)
-            plt.scatter(
-                np.array(self.x_init),np.array(self.y_init)
-            )
+            plt.scatter(np.array(self.x_init), np.array(self.y_init))
             if init_samples is not None:
-                init_ys = np.array([np.where(init_sample==self.x_init)[0][0] for init_sample in init_samples])
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
                 plt.scatter(
-                    np.array(init_samples)[:,0],
+                    np.array(init_samples)[:, 0],
                     np.array(self.y_init)[init_ys],
                     color="red",
                 )
@@ -1553,7 +1574,9 @@ class BayesianOptimizer:
                 color="orange",
             )
 
-            plt.xlabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
             plt.ylabel(f"Acquisition Function Value")
 
         elif len(self.dims) == 2:
@@ -1605,8 +1628,12 @@ class BayesianOptimizer:
             labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[0], 5)
             plt.yticks(ticks=ticks, labels=labels, rotation=45)
-            plt.xlabel(f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})")
-            plt.ylabel(f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})")
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
         plt.title(f"{self.dims[0].name} Acquisition Space")
         plt.tight_layout()
         plt.close()

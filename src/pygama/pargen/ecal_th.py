@@ -124,7 +124,7 @@ def energy_cal_th(
     cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     lh5_path: str = "dsp",
     display: int = 0,
-    guess_keV: float|None = None,
+    guess_keV: float | None = None,
     threshold: int = 0,
     p_val: float = 0,
     n_events: int = 15000,
@@ -221,7 +221,7 @@ def energy_cal_th(
             guess_keV = 2620 / np.nanpercentile(
                 uncal_pass[energy_param][uncal_pass[energy_param] > threshold], 99
             )
-        
+
         log.debug(f"Find peaks and compute calibration curve for {energy_param}")
         log.debug(f"Guess is {guess_keV:.3f}")
 
@@ -350,16 +350,16 @@ def energy_cal_th(
                 bounds=param_bounds,
                 absolute_sigma=True,
             )
-            
+
             output_dict[f"{energy_param}_cal"] = {
-            "Qbb_fwhm": np.nan,
-            "Qbb_fwhm_err": np.nan,
-            "2.6_fwhm": np.nan,
-            "2.6_fwhm_err": np.nan,
-            "eres_pars": fit_pars.tolist(),
-            "fitted_peaks": np.nan,
-            "fwhms": np.nan,
-            "peak_fit_pars": np.nan,
+                "Qbb_fwhm": np.nan,
+                "Qbb_fwhm_err": np.nan,
+                "2.6_fwhm": np.nan,
+                "2.6_fwhm_err": np.nan,
+                "eres_pars": fit_pars.tolist(),
+                "fitted_peaks": np.nan,
+                "fwhms": np.nan,
+                "peak_fit_pars": np.nan,
             }
             continue
         log.info(f"Calibration pars are {pars}")

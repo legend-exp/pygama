@@ -1,14 +1,15 @@
+import logging
 import multiprocessing as mp
 from collections import namedtuple
 from multiprocessing import get_context
 from pprint import pprint
-import logging
 
 import numpy as np
 
 from pygama.dsp import build_processing_chain
 
 log = logging.getLogger(__name__)
+
 
 def run_one_dsp(
     tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0, fom_kwargs=None
@@ -137,7 +138,7 @@ class ParGrid:
         print_string = f"Grid point at indices {indices}:"
         for i_dim, i_par in enumerate(indices):
             name, parameter, value_str = self.get_data(i_dim, i_par)
-            print_string +=(f"\n {name}.{parameter} = {value_str}")
+            print_string += f"\n {name}.{parameter} = {value_str}"
         return print_string
 
     def set_dsp_pars(self, db_dict, indices):
@@ -199,7 +200,7 @@ def run_grid(
         db_dict = grid.set_dsp_pars(db_dict, iii)
         if verbosity > 1:
             pprint(dsp_config)
-        log.debug(grid.print_data(iii))    
+        log.debug(grid.print_data(iii))
         grid_values[tuple(iii)] = run_one_dsp(
             tb_data,
             dsp_config,
