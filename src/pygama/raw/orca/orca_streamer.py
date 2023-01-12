@@ -286,7 +286,7 @@ class OrcaStreamer(DataStreamer):
             # look up the data id, decoder, and rbl
             data_id = orca_packet.get_data_id(packet, shift=False)
             log.debug(f"packet {self.packet_id}: data_id = {data_id}, decoder = {'None' if data_id not in self.decoder_id_dict else type(self.decoder_id_dict[data_id]).__name__}")
-            if data_id in self.decoder_id_dict:
+            if data_id in self.rbl_id_dict:
                 break
 
         # now decode
