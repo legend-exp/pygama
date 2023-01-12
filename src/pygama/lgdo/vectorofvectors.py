@@ -12,12 +12,13 @@ from numba import njit
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
 
-class VectorOfVectors:
+class VectorOfVectors(LGDO):
     """A variable-length array of variable-length arrays.
 
     For now only a 1D vector of 1D vectors is supported. Internal representation
@@ -86,19 +87,14 @@ class VectorOfVectors:
 
         self.attrs = {} if attrs is None else dict(attrs)
 
-        if "datatype" in self.attrs:
-            if self.attrs["datatype"] != self.form_datatype():
-                log.warning(
-                    f"datatype does not match dtype! "
-                    f"datatype: {self.attrs['datatype']}, "
-                    f"form_datatype(): {self.form_datatype()}"
-                )
-        else:
-            self.attrs["datatype"] = self.form_datatype()
+        super().__init__()
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
         return "array"
+
+    def form_datatype(self) -> str:
+        et = get_element_type(self)
+        return "array<1>{array<1>{" + et + "}}"
 
     def __len__(self) -> int:
         """Provides ``__len__`` for this array-like class."""
@@ -106,11 +102,6 @@ class VectorOfVectors:
 
     def resize(self, new_size: int) -> None:
         self.cumulative_length.resize(new_size)
-
-    def form_datatype(self) -> str:
-        """Return this LGDO's datatype attribute string."""
-        et = get_element_type(self)
-        return "array<1>{array<1>{" + et + "}}"
 
     def set_vector(self, i_vec: int, nda: np.ndarray) -> None:
         """Insert vector `nda` at location `i_vec`.
