@@ -57,9 +57,9 @@ def load_aoe(
             param_dict[param] = df[param].to_numpy()
         else:
             param_dict.update(lh5.load_nda(files, [param], lh5_path))
-    if "Cal_cuts" in df.keys():
+    if cut_field in df.keys():
         for entry in param_dict:
-            param_dict[entry] = param_dict[entry][df["Cal_cuts"].to_numpy()]
+            param_dict[entry] = param_dict[entry][df[cut_field].to_numpy()]
 
     aoe = np.divide(param_dict["A_max"], param_dict[energy_param])
     return aoe, param_dict[cal_energy_param], param_dict["dt_eff"]
