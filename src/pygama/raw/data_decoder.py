@@ -58,7 +58,7 @@ class DataDecoder:
         )
 
     def get_key_lists(self) -> list[list[int | str]]:
-        """ Return a list of lists of keys available for this decoder.
+        """Return a list of lists of keys available for this decoder.
         Each list must contain keys that can share a buffer, i.e. decoded_values
         is exactly the same (including e.g. waveform length) for all keys in the list.
         Overload with lists of keys for this decoder, e.g. ``return

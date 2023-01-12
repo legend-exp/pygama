@@ -127,7 +127,9 @@ class DataStreamer(ABC):
                 if len(rb.key_list) == 1 and rb.key_list[0] == "*":
                     key_lists = decoder.get_key_lists()
                     if len(key_lists) != 1:
-                        log.warning(f"{dec_name} has {len(key_lists)} lists of keys, need a rb for each. Only the first will be decoded.")
+                        log.warning(
+                            f"{dec_name} has {len(key_lists)} lists of keys, need a rb for each. Only the first will be decoded."
+                        )
                     rb.key_list = key_lists[0]
             keyed_name_rbs = []
             ii = 0
@@ -304,7 +306,9 @@ class DataStreamer(ABC):
                         this_name = f"{dec_key}_{key_list[0]}"
                     else:
                         this_name = f"{dec_key}_{ii}"
-                rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=this_name)
+                rb = RawBuffer(
+                    key_list=key_list, out_stream=out_stream, out_name=this_name
+                )
                 if dec_name not in rb_lib:
                     rb_lib[dec_name] = RawBufferList()
                 rb_lib[dec_name].append(rb)

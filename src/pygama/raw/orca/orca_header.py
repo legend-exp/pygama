@@ -11,13 +11,11 @@ log = logging.getLogger(__name__)
 class OrcaHeader(dict):
     """ORCA file header object."""
 
-
     def __init__(self, jsons: str = None, lgdo_scalar: lgdo.Scalar = None) -> None:
         if jsons is not None:
             self.update(json.loads(jsons))
         elif lgdo_scalar is not None:
             self.set_from_lgdo(lgdo_scalar)
-
 
     def set_from_lgdo(self, lgdo_scalar: lgdo.Scalar) -> None:
         if not isinstance(lgdo_scalar, lgdo.Scalar):
@@ -25,13 +23,11 @@ class OrcaHeader(dict):
         else:
             self.update(json.loads(lgdo_scalar.value))
 
-
     def get_decoder_list(self) -> list[str]:
         return list(set(self.get_id_to_decoder_name_dict().values()))
 
-
     def get_id_to_decoder_name_dict(self, shift_data_id: bool = True) -> dict[int, str]:
-        id_dict = { 0 : "OrcaHeaderDecoder" }
+        id_dict = {0: "OrcaHeaderDecoder"}
         dd = self["dataDescription"]
         for class_key in dd.keys():
             for super_key in dd[class_key].keys():
@@ -44,13 +40,11 @@ class OrcaHeader(dict):
                 id_dict[data_id] = dd[class_key][super_key]["decoder"]
         return id_dict
 
-
     def get_run_number(self) -> int:
         for d in self["ObjectInfo"]["DataChain"]:
             if "Run Control" in d:
                 return d["Run Control"]["RunNumber"]
         raise ValueError("No run number found in header!")
-
 
     def get_object_info(self, orca_class_name: str) -> dict[int, dict[int, dict]]:
         """Returns a ``dict[crate][card]`` with all info from the header for
@@ -67,7 +61,6 @@ class OrcaHeader(dict):
                     object_info_dict[crate["CrateNumber"]][card["Card"]] = card
 
         return object_info_dict
-
 
     def get_readout_info(self, orca_class_name: str, unique_id: int = -1) -> list:
         """Returns a list with all the readout list info from the header with
@@ -92,7 +85,6 @@ class OrcaHeader(dict):
         if len(readout_info_list) == 0:
             log.warning(f"no readout info for class name '{orca_class_name}'")
         return readout_info_list
-
 
     def get_auxhw_info(self, orca_class_name: str, unique_id: int = -1) -> list:
         """Returns a list with all the info from the ``AuxHw`` table of the header
