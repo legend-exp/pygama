@@ -248,6 +248,7 @@ class OrcaStreamer(DataStreamer):
             name = id_to_dec_name_dict[data_id]
             if name not in self.rb_lib:
                 log.info(f"skipping data from {name}")
+                continue
             self.rbl_id_dict[data_id] = self.rb_lib[name]
             good_buffers.append(name)
         # check that we have instantiated decoders for all buffers
