@@ -106,11 +106,18 @@ class DataStreamer(ABC):
                     dec_key = dec_key.removesuffix("Decoder")
                 out_name = rb_lib["*"][0].out_name.format(name=dec_key)
                 out_stream = rb_lib["*"][0].out_stream.format(name=dec_key)
-                key_list = decoder.get_key_list()
-                rb = RawBuffer(
-                    key_list=key_list, out_stream=out_stream, out_name=out_name
-                )
-                rb_lib[dec_name].append(rb)
+                key_lists = decoder.get_key_lists()
+                for ii, key_list in enumerate(key_lists):
+                    this_name = out_name
+                    if len(key_lists > 1):
+                        if len(key_list) == 1:
+                            this_name = f"{out_name}_{key_list[0]}"
+                        else:
+                            this_name = f"{out_name}_{ii}"
+                    rb = RawBuffer(
+                        key_list=key_list, out_stream=out_stream, out_name=this_name
+                    )
+                    rb_lib[dec_name].append(rb)
 
             # dec_name is in rb_lib: store the name, and initialize its buffer lgdos
             dec_names.append(dec_name)
@@ -118,7 +125,10 @@ class DataStreamer(ABC):
             # set up wildcard key buffers
             for rb in rb_lib[dec_name]:
                 if len(rb.key_list) == 1 and rb.key_list[0] == "*":
-                    rb.key_list = decoder.get_key_list()
+                    key_lists = decoder.get_key_lists()
+                    if len(key_lists) != 1:
+                        log.warning(f"{dec_name} has {len(key_lists)} lists of keys, need a rb for each. Only the first will be decoded.")
+                    rb.key_list = key_lists[0]
             keyed_name_rbs = []
             ii = 0
             while ii < len(rb_lib[dec_name]):
@@ -286,8 +296,16 @@ class DataStreamer(ABC):
             dec_key = dec_name
             if dec_key.endswith("Decoder"):
                 dec_key = dec_key.removesuffix("Decoder")
-            key_list = decoder.get_key_list()
-            rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=dec_key)
-            rb_lib[dec_name] = RawBufferList()
-            rb_lib[dec_name].append(rb)
+            key_lists = decoder.get_key_lists()
+            for ii, key_list in enumerate(key_lists):
+                this_name = dec_key
+                if len(key_lists) > 1:
+                    if len(key_list) == 1:
+                        this_name = f"{dec_key}_{key_list[0]}"
+                    else:
+                        this_name = f"{dec_key}_{ii}"
+                rb = RawBuffer(key_list=key_list, out_stream=out_stream, out_name=this_name)
+                if dec_name not in rb_lib:
+                    rb_lib[dec_name] = RawBufferList()
+                rb_lib[dec_name].append(rb)
         return rb_lib
