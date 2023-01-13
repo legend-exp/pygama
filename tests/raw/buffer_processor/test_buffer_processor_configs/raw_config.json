@@ -1,0 +1,8 @@
+{
+  "*": {
+    "{name}": {
+      "key_list": ["*"],
+      "out_stream": "/tmp/L200-comm-20220519-phy-geds.lh5"
+    }
+  }
+}

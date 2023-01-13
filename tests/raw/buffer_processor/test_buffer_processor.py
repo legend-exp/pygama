@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -10,43 +9,42 @@ import pygama.lgdo as lgdo
 from pygama.dsp import build_processing_chain as bpc
 from pygama.raw.build_raw import build_raw
 
-config_dir = Path(__file__).parent / "test_data_trimmer_configs"
+config_dir = Path(__file__).parent / "test_buffer_processor_configs"
 
 
 # check that packet indexes match in verification test
-def test_data_trimmer_packet_ids(lgnd_test_data):
+def test_buffer_processor_packet_ids(lgnd_test_data):
 
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
-    dsp_config = f"{config_dir}/data_trimmer_config.json"
+    proc_out_spec = f"{config_dir}/buffer_processor_config.json"
+    raw_out_spec = f"{config_dir}/raw_config.json"
 
-    trimmed_file = daq_file.replace(
-        "L200-comm-20220519-phy-geds.orca", "L200-comm-20220519-phy-geds_trim.lh5"
-    )
+    processed_file = "/tmp/L200-comm-20220519-phy-geds_proc.lh5"
 
-    build_raw(in_stream=daq_file, overwrite=True, trim_config=dsp_config)
-    build_raw(in_stream=daq_file, overwrite=True)
+    build_raw(in_stream=daq_file, out_spec=proc_out_spec, overwrite=True)
+    build_raw(in_stream=daq_file, out_spec=raw_out_spec, overwrite=True)
 
-    raw_file = daq_file.replace(
-        "L200-comm-20220519-phy-geds.orca", "L200-comm-20220519-phy-geds.lh5"
-    )
+    raw_file = "/tmp/L200-comm-20220519-phy-geds.lh5"
 
     sto = lgdo.LH5Store()
 
     raw_group = "ORFlashCamADCWaveform"
     raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
-    trimmed_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", trimmed_file)
+    processed_packet_ids, _ = sto.read_object(
+        str(raw_group) + "/packet_id", processed_file
+    )
 
-    assert np.array_equal(raw_packet_ids.nda, trimmed_packet_ids.nda)
+    assert np.array_equal(raw_packet_ids.nda, processed_packet_ids.nda)
 
 
 # check that packet indexes match in verification test
-def test_data_trimmer_waveform_lengths(lgnd_test_data):
+def test_buffer_processor_waveform_lengths(lgnd_test_data):
 
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
-    trimmed_file = daq_file.replace(
-        "L200-comm-20211130-phy-spms.fcio", "L200-comm-20211130-phy-spms_trim.lh5"
+    processed_file = daq_file.replace(
+        "L200-comm-20211130-phy-spms.fcio", "L200-comm-20211130-phy-spms_proc.lh5"
     )
     raw_file = daq_file.replace(
         "L200-comm-20211130-phy-spms.fcio", "L200-comm-20211130-phy-spms.lh5"
@@ -56,34 +54,51 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         "FCEventDecoder": {
             "ch{key}": {
                 "key_list": [[0, 6]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 1000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                ],
+                                "unit": "ADC",
+                            }
+                        },
+                    },
+                    "drop": {"waveform"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                    },
+                },
+            }
+        }
+    }
+
+    copy_out_spec = {
+        "FCEventDecoder": {
+            "ch{key}": {
+                "key_list": [[0, 6]],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             }
         }
     }
 
-    dsp_config = """
-    {
-        "outputs" : [ "presummed_waveform" ],
-        "processors" : {
-            "windowed_waveform": {
-            "start_index": 1000,
-            "end_index": -1000
-            },
-            "presummed_waveform": {
-                "function": "presum",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", "presummed_waveform(len(waveform)/4, 'f')"],
-                "unit": "ADC"
-            }
-        }
-    }
-    """
-
-    build_raw(
-        in_stream=daq_file, out_spec=out_spec, overwrite=True, trim_config=dsp_config
-    )
     build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
+
+    proc_spec = out_spec["FCEventDecoder"]["ch0"].pop("proc_spec")
+    dsp_config = proc_spec["dsp_config"]
+    window_config = proc_spec["window"]
+
+    build_raw(in_stream=daq_file, out_spec=copy_out_spec, overwrite=True)
 
     lh5_tables = lgdo.ls(raw_file)
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
@@ -93,16 +108,7 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         elif not lgdo.ls(raw_file, tb):
             del lh5_tables[i]
 
-    if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
-        f = open(dsp_config)
-        jsonfile = json.load(f)
-        f.close()
-    # If we get a string that is in the correct format as a json file
-    elif isinstance(dsp_config, str):
-        jsonfile = json.loads(dsp_config)
-    # Or we could get a dict as the config
-    elif isinstance(dsp_config, dict):
-        jsonfile = dsp_config
+    jsonfile = dsp_config
 
     # Read in the presummed rate from the config file to modify the clock rate later
     presum_rate_string = jsonfile["processors"]["presummed_waveform"]["args"][1]
@@ -110,9 +116,9 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
     presum_rate_end_idx = presum_rate_string.find(",")
     presum_rate = int(presum_rate_string[presum_rate_start_idx:presum_rate_end_idx])
 
-    # This needs to be overwritten with the correct windowing values set in data_trimmer.py
-    window_start_index = 1000
-    window_end_index = 1000
+    # This needs to be overwritten with the correct windowing values set in buffer_processor.py
+    window_start_index = window_config[1]
+    window_end_index = window_config[2]
 
     sto = lgdo.LH5Store()
 
@@ -122,19 +128,17 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
             str(raw_group) + "/waveform/values", raw_file
         )
         presummed_packet_waveform_values = sto.read_object(
-            str(raw_group) + "/presummed_waveform/values", trimmed_file
+            str(raw_group) + "/presummed_waveform/values", processed_file
         )
         windowed_packet_waveform_values = sto.read_object(
-            str(raw_group) + "/windowed_waveform/values", trimmed_file
+            str(raw_group) + "/windowed_waveform/values", processed_file
         )
 
         # Check that the lengths of the waveforms match what we expect
         assert len(raw_packet_waveform_values[0].nda[0]) == presum_rate * len(
             presummed_packet_waveform_values[0].nda[0]
         )
-        assert isinstance(
-            presummed_packet_waveform_values[0].nda[0][0], np.float32
-        )  # change this to np.uint32 when we merge unnorm_presum
+        assert isinstance(presummed_packet_waveform_values[0].nda[0][0], np.uint32)
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
@@ -148,10 +152,10 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         )
 
         windowed_packet_waveform_t0s, _ = sto.read_object(
-            str(raw_group) + "/windowed_waveform/t0", trimmed_file
+            str(raw_group) + "/windowed_waveform/t0", processed_file
         )
         presummed_packet_waveform_t0s, _ = sto.read_object(
-            str(raw_group) + "/presummed_waveform/t0", trimmed_file
+            str(raw_group) + "/presummed_waveform/t0", processed_file
         )
 
         # Check that the t0s match what we expect, with the correct units
@@ -173,7 +177,7 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
         )
 
         presummed_packet_waveform_dts, _ = sto.read_object(
-            str(raw_group) + "/presummed_waveform/dt", trimmed_file
+            str(raw_group) + "/presummed_waveform/dt", processed_file
         )
 
         # Check that the dts match what we expect, with the correct units
@@ -183,30 +187,59 @@ def test_data_trimmer_waveform_lengths(lgnd_test_data):
 
         # Check that the presum_rate is correctly identified
         presum_rate_from_file, _ = sto.read_object(
-            str(raw_group) + "/presum_rate", trimmed_file
+            str(raw_group) + "/presum_rate", processed_file
         )
         assert presum_rate_from_file.nda[0] == presum_rate
 
 
-def test_data_trimmer_file_size_decrease(lgnd_test_data):
+def test_buffer_processor_file_size_decrease(lgnd_test_data):
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/sis3316/coherent-run1141-bkg.orca")
-    dsp_config = f"{config_dir}/data_trimmer_config.json"
-    trimmed_file = daq_file.replace(
-        "coherent-run1141-bkg.orca", "coherent-run1141-bkg_trim.lh5"
+    processed_file = daq_file.replace(
+        "coherent-run1141-bkg.orca", "coherent-run1141-bkg_proc.lh5"
     )
     raw_file = daq_file.replace("coherent-run1141-bkg.orca", "coherent-run1141-bkg.lh5")
 
-    out_spec = {
+    raw_out_spec = {
         "ORSIS3316WaveformDecoder": {
             "Card1": {"key_list": [48], "out_stream": raw_file, "out_name": "raw"}
         }
     }
 
-    build_raw(
-        in_stream=daq_file, out_spec=out_spec, overwrite=True, trim_config=dsp_config
-    )
-    build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
+    proc_out_spec = {
+        "ORSIS3316WaveformDecoder": {
+            "Card1": {
+                "key_list": [48],
+                "out_stream": processed_file,
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 1000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/4, 'f')",
+                                ],
+                                "unit": "ADC",
+                            }
+                        },
+                    },
+                    "drop": {"waveform": "True"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                    },
+                },
+            }
+        }
+    }
+
+    build_raw(in_stream=daq_file, out_spec=proc_out_spec, overwrite=True)
+    build_raw(in_stream=daq_file, out_spec=raw_out_spec, overwrite=True)
 
     lh5_tables = lgdo.ls(raw_file)
     for i, tb in enumerate(lh5_tables):
@@ -224,22 +257,81 @@ def test_data_trimmer_file_size_decrease(lgnd_test_data):
         )
 
     # Make sure we are taking up less space than a file that has two copies of the waveform table in it
-    assert os.path.getsize(trimmed_file) < os.path.getsize(raw_file) + wf_size
+    assert os.path.getsize(processed_file) < os.path.getsize(raw_file) + wf_size
 
 
 # check that packet indexes match in verification test on file that has both spms and geds
-def test_data_trimmer_separate_name_tables(lgnd_test_data):
+def test_buffer_processor_separate_name_tables(lgnd_test_data):
 
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
-    trimmed_file = daq_file.replace(
-        "L200-comm-20211130-phy-spms.fcio", "L200-comm-fake-geds-and-spms_trim.lh5"
+    processed_file = daq_file.replace(
+        "L200-comm-20211130-phy-spms.fcio", "L200-comm-fake-geds-and-spms_proc.lh5"
     )
     raw_file = daq_file.replace(
         "L200-comm-20211130-phy-spms.fcio", "L200-comm-fake-geds-and-spms.lh5"
     )
 
     out_spec = {
+        "FCEventDecoder": {
+            "geds": {
+                "key_list": [[0, 3]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 2000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/8, 'f')",
+                                ],
+                                "unit": "ADC",
+                            }
+                        },
+                    },
+                    "drop": {"waveform"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                    },
+                },
+            },
+            "spms": {
+                "key_list": [[3, 6]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 1000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/4, 'f')",
+                                ],
+                                "unit": "ADC",
+                            }
+                        },
+                    },
+                    "drop": {"waveform"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                    },
+                },
+            },
+        }
+    }
+
+    copy_out_spec = {
         "FCEventDecoder": {
             "geds": {
                 "key_list": [[0, 3]],
@@ -254,48 +346,19 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
         }
     }
 
-    dsp_config = """
-    {
-        "spms": {
-        "outputs" : [ "presummed_waveform" ],
-        "processors" : {
-            "windowed_waveform": {
-            "start_index": 1000,
-            "end_index": -1000
-            },
-            "presummed_waveform": {
-                "function": "presum",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", "presummed_waveform(len(waveform)/4, 'f')"],
-                "unit": "ADC"
-                }
-            }
-        },
-
-        "geds": {
-        "outputs" : [ "presummed_waveform" ],
-        "processors" : {
-            "windowed_waveform": {
-            "start_index": 2000,
-            "end_index": -1000
-            },
-            "presummed_waveform": {
-                "function": "presum",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", "presummed_waveform(len(waveform)/8, 'f')"],
-                "unit": "ADC"
-                }
-            }
-        }
-    }
-    """
-
-    build_raw(
-        in_stream=daq_file, out_spec=out_spec, overwrite=True, trim_config=dsp_config
-    )
     build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
 
+    # Grab the proc_spec after keylist expansion from build_raw
+    proc_spec = {}
+    for key in out_spec["FCEventDecoder"].keys():
+        if "proc_spec" in out_spec["FCEventDecoder"][key].keys():
+            proc_spec[key] = out_spec["FCEventDecoder"][key].pop("proc_spec")
+
+    # build the unprocessed raw file
+    build_raw(in_stream=daq_file, out_spec=copy_out_spec, overwrite=True)
+
     lh5_tables = lgdo.ls(raw_file)
+
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
     for i, tb in enumerate(lh5_tables):
         if "raw" not in tb and lgdo.ls(raw_file, f"{tb}/raw"):
@@ -303,16 +366,7 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
         elif not lgdo.ls(raw_file, tb):
             del lh5_tables[i]
 
-    if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
-        f = open(dsp_config)
-        jsonfile = json.load(f)
-        f.close()
-    # If we get a string that is in the correct format as a json file
-    elif isinstance(dsp_config, str):
-        jsonfile = json.loads(dsp_config)
-    # Or we could get a dict as the config
-    elif isinstance(dsp_config, dict):
-        jsonfile = dsp_config
+    jsonfile = proc_spec
 
     sto = lgdo.LH5Store()
 
@@ -320,46 +374,40 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
 
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
-        trimmed_packet_ids, _ = sto.read_object(
-            str(raw_group) + "/packet_id", trimmed_file
+        processed_packet_ids, _ = sto.read_object(
+            str(raw_group) + "/packet_id", processed_file
         )
 
-        assert np.array_equal(raw_packet_ids.nda, trimmed_packet_ids.nda)
+        assert np.array_equal(raw_packet_ids.nda, processed_packet_ids.nda)
 
         # Read in the presummed rate from the config file to modify the clock rate later
         group_name = raw_group.split("/raw")[0]
-        presum_rate_string = jsonfile[group_name]["processors"]["presummed_waveform"][
-            "args"
-        ][1]
+        presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
+            "presummed_waveform"
+        ]["args"][1]
         presum_rate_start_idx = presum_rate_string.find("/") + 1
         presum_rate_end_idx = presum_rate_string.find(",")
         presum_rate = int(presum_rate_string[presum_rate_start_idx:presum_rate_end_idx])
 
-        # This needs to be overwritten with the correct windowing values set in data_trimmer.py
-        window_start_index = int(
-            jsonfile[group_name]["processors"]["windowed_waveform"]["start_index"]
-        )
-        window_end_index = int(
-            jsonfile[group_name]["processors"]["windowed_waveform"]["end_index"]
-        )
+        # This needs to be overwritten with the correct windowing values set in buffer_processor.py
+        window_start_index = int(jsonfile[group_name]["window"][1])
+        window_end_index = int(jsonfile[group_name]["window"][2])
 
         raw_packet_waveform_values = sto.read_object(
             str(raw_group) + "/waveform/values", raw_file
         )
         presummed_packet_waveform_values = sto.read_object(
-            str(raw_group) + "/presummed_waveform/values", trimmed_file
+            str(raw_group) + "/presummed_waveform/values", processed_file
         )
         windowed_packet_waveform_values = sto.read_object(
-            str(raw_group) + "/windowed_waveform/values", trimmed_file
+            str(raw_group) + "/windowed_waveform/values", processed_file
         )
 
         # Check that the lengths of the waveforms match what we expect
         assert len(raw_packet_waveform_values[0].nda[0]) == presum_rate * len(
             presummed_packet_waveform_values[0].nda[0]
         )
-        assert isinstance(
-            presummed_packet_waveform_values[0].nda[0][0], np.float32
-        )  # change this to np.uint32 when we merge unnorm_presum
+        assert isinstance(presummed_packet_waveform_values[0].nda[0][0], np.uint32)
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
@@ -373,10 +421,10 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
         )
 
         windowed_packet_waveform_t0s, _ = sto.read_object(
-            str(raw_group) + "/windowed_waveform/t0", trimmed_file
+            str(raw_group) + "/windowed_waveform/t0", processed_file
         )
         presummed_packet_waveform_t0s, _ = sto.read_object(
-            str(raw_group) + "/presummed_waveform/t0", trimmed_file
+            str(raw_group) + "/presummed_waveform/t0", processed_file
         )
 
         # Check that the t0s match what we expect, with the correct units
@@ -396,7 +444,7 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
         )
 
         presummed_packet_waveform_dts, _ = sto.read_object(
-            str(raw_group) + "/presummed_waveform/dt", trimmed_file
+            str(raw_group) + "/presummed_waveform/dt", processed_file
         )
 
         # Check that the dts match what we expect, with the correct units
@@ -407,22 +455,67 @@ def test_data_trimmer_separate_name_tables(lgnd_test_data):
 
         # Check that the presum_rate is correctly identified
         presum_rate_from_file, _ = sto.read_object(
-            str(raw_group) + "/presum_rate", trimmed_file
+            str(raw_group) + "/presum_rate", processed_file
         )
         assert presum_rate_from_file.nda[0] == presum_rate
 
 
-def test_trim_geds_no_trim_spms(lgnd_test_data):
+def test_proc_geds_no_proc_spms(lgnd_test_data):
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
-    trimmed_file = daq_file.replace(
-        "L200-comm-20211130-phy-spms.fcio", "L200-comm-test-pass_trim.lh5"
+    processed_file = daq_file.replace(
+        "L200-comm-20211130-phy-spms.fcio", "L200-comm-test-pass_proc.lh5"
     )
     raw_file = daq_file.replace(
         "L200-comm-20211130-phy-spms.fcio", "L200-comm-test-pass.lh5"
     )
 
     out_spec = {
+        "FCEventDecoder": {
+            "geds": {
+                "key_list": [[0, 1]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 2000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform", "t_sat_lo", "t_sat_hi"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                ],
+                                "unit": "ADC",
+                            },
+                            "t_sat_lo, t_sat_hi": {
+                                "function": "saturation",
+                                "module": "pygama.dsp.processors",
+                                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                                "unit": "ADC",
+                            },
+                        },
+                    },
+                    "drop": {"waveform"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                        "t_sat_lo": "uint16",
+                        "t_sat_hi": "uint16",
+                    },
+                },
+            },
+            "spms": {
+                "key_list": [[3, 4]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+            },
+        }
+    }
+
+    copy_out_spec = {
         "FCEventDecoder": {
             "geds": {
                 "key_list": [[0, 1]],
@@ -436,34 +529,6 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
             },
         }
     }
-
-    dsp_config = """
-    {
-        "spms": "pass",
-
-        "geds": {
-        "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
-        "processors": {
-            "windowed_waveform": {
-            "start_index": 2000,
-            "end_index": -1000
-                },
-            "presummed_waveform": {
-                "function": "presum",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", "presummed_waveform(len(waveform)/16, 'f')"],
-                "unit": "ADC"
-                },
-            "t_sat_lo, t_sat_hi": {
-                "function": "saturation",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
-                "unit": "ADC"
-                }
-            }
-        }
-    }
-    """
 
     raw_dsp_config = """
     {
@@ -479,10 +544,17 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
     }
     """
 
-    build_raw(
-        in_stream=daq_file, out_spec=out_spec, overwrite=True, trim_config=dsp_config
-    )
+    # Do the data procming
     build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
+
+    # Grab the proc_spec after keylist expansion from build_raw
+    proc_spec = {}
+    for key in out_spec["FCEventDecoder"].keys():
+        if "proc_spec" in out_spec["FCEventDecoder"][key].keys():
+            proc_spec[key] = out_spec["FCEventDecoder"][key].pop("proc_spec")
+
+    # Do the unprocessed build raw
+    build_raw(in_stream=daq_file, out_spec=copy_out_spec, overwrite=True)
 
     lh5_tables = lgdo.ls(raw_file)
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
@@ -492,16 +564,7 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
         elif not lgdo.ls(raw_file, tb):
             del lh5_tables[i]
 
-    if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
-        f = open(dsp_config)
-        jsonfile = json.load(f)
-        f.close()
-    # If we get a string that is in the correct format as a json file
-    elif isinstance(dsp_config, str):
-        jsonfile = json.loads(dsp_config)
-    # Or we could get a dict as the config
-    elif isinstance(dsp_config, dict):
-        jsonfile = dsp_config
+    jsonfile = proc_spec
 
     sto = lgdo.LH5Store()
 
@@ -509,23 +572,24 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
 
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
-        trimmed_packet_ids, _ = sto.read_object(
-            str(raw_group) + "/packet_id", trimmed_file
+        processed_packet_ids, _ = sto.read_object(
+            str(raw_group) + "/packet_id", processed_file
         )
 
-        assert np.array_equal(raw_packet_ids.nda, trimmed_packet_ids.nda)
+        assert np.array_equal(raw_packet_ids.nda, processed_packet_ids.nda)
 
         # Read in the presummed rate from the config file to modify the clock rate later
         group_name = raw_group.split("/raw")[0]
         pass_flag = False
-        # If the user passes trimming on a group, then the presum_rate is just 1 and there is no windowing
-        if (type(jsonfile[group_name]) == str) & (jsonfile[group_name] == "pass"):
+        # If the user passes procming on a group, then the presum_rate is just 1 and there is no windowing
+        # If a group_name is absent from the jsonfile, then that means no procming was performed
+        if group_name not in jsonfile.keys():
             presum_rate = 1
             window_start_index = 0
             window_end_index = 0
             pass_flag = True
         else:
-            presum_rate_string = jsonfile[group_name]["processors"][
+            presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
                 "presummed_waveform"
             ]["args"][1]
             presum_rate_start_idx = presum_rate_string.find("/") + 1
@@ -534,13 +598,9 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
                 presum_rate_string[presum_rate_start_idx:presum_rate_end_idx]
             )
 
-            # This needs to be overwritten with the correct windowing values set in data_trimmer.py
-            window_start_index = int(
-                jsonfile[group_name]["processors"]["windowed_waveform"]["start_index"]
-            )
-            window_end_index = int(
-                jsonfile[group_name]["processors"]["windowed_waveform"]["end_index"]
-            )
+            # This needs to be overwritten with the correct windowing values set in buffer_processor.py
+            window_start_index = int(jsonfile[group_name]["window"][1])
+            window_end_index = int(jsonfile[group_name]["window"][2])
 
         # Read in the waveforms
         raw_packet_waveform_values = sto.read_object(
@@ -548,17 +608,17 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
         )
         if pass_flag:
             presummed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/waveform/values", trimmed_file
+                str(raw_group) + "/waveform/values", processed_file
             )
             windowed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/waveform/values", trimmed_file
+                str(raw_group) + "/waveform/values", processed_file
             )
         else:
             presummed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/presummed_waveform/values", trimmed_file
+                str(raw_group) + "/presummed_waveform/values", processed_file
             )
             windowed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/windowed_waveform/values", trimmed_file
+                str(raw_group) + "/windowed_waveform/values", processed_file
             )
 
         # Check that the lengths of the waveforms match what we expect
@@ -579,17 +639,17 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
 
         if pass_flag:
             windowed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/waveform/t0", trimmed_file
+                str(raw_group) + "/waveform/t0", processed_file
             )
             presummed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/waveform/t0", trimmed_file
+                str(raw_group) + "/waveform/t0", processed_file
             )
         else:
             windowed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/windowed_waveform/t0", trimmed_file
+                str(raw_group) + "/windowed_waveform/t0", processed_file
             )
             presummed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/presummed_waveform/t0", trimmed_file
+                str(raw_group) + "/presummed_waveform/t0", processed_file
             )
 
         # Check that the t0s match what we expect, with the correct units
@@ -611,17 +671,17 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
         if pass_flag:
 
             presummed_packet_waveform_dts, _ = sto.read_object(
-                str(raw_group) + "/waveform/dt", trimmed_file
+                str(raw_group) + "/waveform/dt", processed_file
             )
         else:
 
             presummed_packet_waveform_dts, _ = sto.read_object(
-                str(raw_group) + "/presummed_waveform/dt", trimmed_file
+                str(raw_group) + "/presummed_waveform/dt", processed_file
             )
 
             # Check that the presum_rate is correctly identified
             presum_rate_from_file, _ = sto.read_object(
-                str(raw_group) + "/presum_rate", trimmed_file
+                str(raw_group) + "/presum_rate", processed_file
             )
             assert presum_rate_from_file.nda[0] == presum_rate
         # Check that the dts match what we expect, with the correct units
@@ -638,23 +698,27 @@ def test_trim_geds_no_trim_spms(lgnd_test_data):
             raw_sat_lo = wf_out["t_sat_lo"]
             raw_sat_hi = wf_out["t_sat_hi"]
 
-            trim_sat_lo, _ = sto.read_object(str(raw_group) + "/t_sat_lo", trimmed_file)
+            proc_sat_lo, _ = sto.read_object(
+                str(raw_group) + "/t_sat_lo", processed_file
+            )
 
-            trim_sat_hi, _ = sto.read_object(str(raw_group) + "/t_sat_hi", trimmed_file)
+            proc_sat_hi, _ = sto.read_object(
+                str(raw_group) + "/t_sat_hi", processed_file
+            )
 
-            assert np.array_equal(raw_sat_lo.nda, trim_sat_lo.nda)
-            assert np.array_equal(raw_sat_hi.nda, trim_sat_hi.nda)
-            assert type(trim_sat_lo.nda[0]) == np.uint16
+            assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
+            assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
+            assert type(proc_sat_lo.nda[0]) == np.uint16
 
 
 # check that packet indexes match in verification test
-def test_data_trimmer_multiple_keys(lgnd_test_data):
+def test_buffer_processor_multiple_keys(lgnd_test_data):
 
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
-    trimmed_file = daq_file.replace(
+    processed_file = daq_file.replace(
         "L200-comm-20220519-phy-geds.orca",
-        "L200-comm-20220519-phy-geds-key-test_trim.lh5",
+        "L200-comm-20220519-phy-geds-key-test_proc.lh5",
     )
     raw_file = daq_file.replace(
         "L200-comm-20220519-phy-geds.orca", "L200-comm-20220519-phy-geds-key-test.lh5"
@@ -663,40 +727,63 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
     out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1, 3, 4],
+                "key_list": [0, 1],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 2000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presummed_waveform", "t_sat_lo", "t_sat_hi"],
+                        "processors": {
+                            "presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                ],
+                                "unit": "ADC",
+                            },
+                            "t_sat_lo, t_sat_hi": {
+                                "function": "saturation",
+                                "module": "pygama.dsp.processors",
+                                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                                "unit": "ADC",
+                            },
+                        },
+                    },
+                    "drop": {"waveform"},
+                    "return_type": {
+                        "windowed_waveform/values": "uint16",
+                        "presummed_waveform/values": "uint32",
+                        "t_sat_lo": "uint16",
+                        "t_sat_hi": "uint16",
+                    },
+                },
+            },
+            "chan{key}": {
+                "key_list": [3, 4],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+            },
+        }
+    }
+
+    copy_out_spec = {
+        "ORFlashCamADCWaveformDecoder": {
+            "ch{key}": {
+                "key_list": [0, 1],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
-            }
+            },
+            "chan{key}": {
+                "key_list": [3, 4],
+                "out_stream": raw_file + ":{name}",
+                "out_name": "raw",
+            },
         }
     }
 
-    dsp_config = """
-    {
-        "ch3, ch4": "pass",
-
-        "ch0, ch1": {
-        "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
-        "processors": {
-            "windowed_waveform": {
-            "start_index": 2000,
-            "end_index": -1000
-                },
-            "presummed_waveform": {
-                "function": "presum",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", "presummed_waveform(len(waveform)/16, 'f')"],
-                "unit": "ADC"
-                },
-            "t_sat_lo, t_sat_hi": {
-                "function": "saturation",
-                "module": "pygama.dsp.processors",
-                "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
-                "unit": "ADC"
-                }
-            }
-        }
-    }
-    """
     raw_dsp_config = """
     {
         "outputs": ["t_sat_lo", "t_sat_hi"],
@@ -710,11 +797,19 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
         }
     }
     """
-
-    build_raw(
-        in_stream=daq_file, out_spec=out_spec, overwrite=True, trim_config=dsp_config
-    )
+    # Do the data procming
     build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
+
+    # Grab the proc_spec after keylist expansion from build_raw
+    proc_spec = {}
+    for key in out_spec["ORFlashCamADCWaveformDecoder"].keys():
+        if "proc_spec" in out_spec["ORFlashCamADCWaveformDecoder"][key].keys():
+            proc_spec[key] = out_spec["ORFlashCamADCWaveformDecoder"][key].pop(
+                "proc_spec"
+            )
+
+    # Build the unprocessed raw file for comparison
+    build_raw(in_stream=daq_file, out_spec=copy_out_spec, overwrite=True)
 
     lh5_tables = lgdo.ls(raw_file)
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
@@ -724,27 +819,7 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
         elif not lgdo.ls(raw_file, tb):
             del lh5_tables[i]
 
-    if isinstance(dsp_config, str) and dsp_config.endswith(".json"):
-        f = open(dsp_config)
-        jsonfile = json.load(f)
-        f.close()
-    # If we get a string that is in the correct format as a json file
-    elif isinstance(dsp_config, str):
-        jsonfile = json.loads(dsp_config)
-    # Or we could get a dict as the config
-    elif isinstance(dsp_config, dict):
-        jsonfile = dsp_config
-
-    multi_key_dsp_dict = {}
-    # Now check the RawBuffer's group and see if that there is a matching key in the dsp_dict, then take that sub dictionary.
-    for key, node in jsonfile.items():
-        # if we have multiple outputs, add each to the processesors list
-        keys = [k for k in re.split(",| ", key) if k != ""]
-        if len(keys) >= 1:
-            for k in keys:
-                multi_key_dsp_dict[k] = node
-
-    jsonfile = multi_key_dsp_dict
+    jsonfile = proc_spec
 
     sto = lgdo.LH5Store()
 
@@ -752,24 +827,25 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
 
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
-        trimmed_packet_ids, _ = sto.read_object(
-            str(raw_group) + "/packet_id", trimmed_file
+        processed_packet_ids, _ = sto.read_object(
+            str(raw_group) + "/packet_id", processed_file
         )
 
-        assert np.array_equal(raw_packet_ids.nda, trimmed_packet_ids.nda)
+        assert np.array_equal(raw_packet_ids.nda, processed_packet_ids.nda)
 
         # Read in the presummed rate from the config file to modify the clock rate later
         group_name = raw_group.split("/raw")[0]
 
         pass_flag = False
-        # If the user passes trimming on a group, then the presum_rate is just 1 and there is no windowing
-        if (type(jsonfile[group_name]) == str) & (jsonfile[group_name] == "pass"):
+        # If the user passes procming on a group, then the presum_rate is just 1 and there is no windowing
+        # If the group_name is absent from the jsonfile, then no procming was done
+        if group_name not in jsonfile.keys():
             presum_rate = 1
             window_start_index = 0
             window_end_index = 0
             pass_flag = True
         else:
-            presum_rate_string = jsonfile[group_name]["processors"][
+            presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
                 "presummed_waveform"
             ]["args"][1]
             presum_rate_start_idx = presum_rate_string.find("/") + 1
@@ -778,13 +854,9 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
                 presum_rate_string[presum_rate_start_idx:presum_rate_end_idx]
             )
 
-            # This needs to be overwritten with the correct windowing values set in data_trimmer.py
-            window_start_index = int(
-                jsonfile[group_name]["processors"]["windowed_waveform"]["start_index"]
-            )
-            window_end_index = int(
-                jsonfile[group_name]["processors"]["windowed_waveform"]["end_index"]
-            )
+            # This needs to be overwritten with the correct windowing values set in buffer_processor.py
+            window_start_index = int(jsonfile[group_name]["window"][1])
+            window_end_index = int(jsonfile[group_name]["window"][2])
 
         # Read in the waveforms
         raw_packet_waveform_values = sto.read_object(
@@ -792,17 +864,17 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
         )
         if pass_flag:
             presummed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/waveform/values", trimmed_file
+                str(raw_group) + "/waveform/values", processed_file
             )
             windowed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/waveform/values", trimmed_file
+                str(raw_group) + "/waveform/values", processed_file
             )
         else:
             presummed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/presummed_waveform/values", trimmed_file
+                str(raw_group) + "/presummed_waveform/values", processed_file
             )
             windowed_packet_waveform_values = sto.read_object(
-                str(raw_group) + "/windowed_waveform/values", trimmed_file
+                str(raw_group) + "/windowed_waveform/values", processed_file
             )
 
         # Check that the lengths of the waveforms match what we expect
@@ -817,12 +889,13 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
         assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
 
         # Check that the waveforms match
-        if group_name == "ch3" or group_name == "ch4":
+        # These are the channels that should be unprocessed
+        if group_name == "chan3" or group_name == "chan4":
             raw_packet_waveform_values, _ = sto.read_object(
                 str(raw_group) + "/waveform/values", raw_file
             )
             windowed_packet_waveform_values, _ = sto.read_object(
-                str(raw_group) + "/waveform/values", trimmed_file
+                str(raw_group) + "/waveform/values", processed_file
             )
             assert np.array_equal(
                 raw_packet_waveform_values.nda, windowed_packet_waveform_values.nda
@@ -832,7 +905,7 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
                 str(raw_group) + "/waveform/values", raw_file
             )
             windowed_packet_waveform_values, _ = sto.read_object(
-                str(raw_group) + "/windowed_waveform/values", trimmed_file
+                str(raw_group) + "/windowed_waveform/values", processed_file
             )
             assert np.array_equal(
                 raw_packet_waveform_values.nda[:, window_start_index:window_end_index],
@@ -849,17 +922,17 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
 
         if pass_flag:
             windowed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/waveform/t0", trimmed_file
+                str(raw_group) + "/waveform/t0", processed_file
             )
             presummed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/waveform/t0", trimmed_file
+                str(raw_group) + "/waveform/t0", processed_file
             )
         else:
             windowed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/windowed_waveform/t0", trimmed_file
+                str(raw_group) + "/windowed_waveform/t0", processed_file
             )
             presummed_packet_waveform_t0s, _ = sto.read_object(
-                str(raw_group) + "/presummed_waveform/t0", trimmed_file
+                str(raw_group) + "/presummed_waveform/t0", processed_file
             )
 
         # Check that the t0s match what we expect, with the correct units
@@ -881,17 +954,17 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
         if pass_flag:
 
             presummed_packet_waveform_dts, _ = sto.read_object(
-                str(raw_group) + "/waveform/dt", trimmed_file
+                str(raw_group) + "/waveform/dt", processed_file
             )
         else:
 
             presummed_packet_waveform_dts, _ = sto.read_object(
-                str(raw_group) + "/presummed_waveform/dt", trimmed_file
+                str(raw_group) + "/presummed_waveform/dt", processed_file
             )
 
             # Check that the presum_rate is correctly identified
             presum_rate_from_file, _ = sto.read_object(
-                str(raw_group) + "/presum_rate", trimmed_file
+                str(raw_group) + "/presum_rate", processed_file
             )
             assert presum_rate_from_file.nda[0] == presum_rate
         # Check that the dts match what we expect, with the correct units
@@ -908,16 +981,20 @@ def test_data_trimmer_multiple_keys(lgnd_test_data):
             raw_sat_lo = wf_out["t_sat_lo"]
             raw_sat_hi = wf_out["t_sat_hi"]
 
-            trim_sat_lo, _ = sto.read_object(str(raw_group) + "/t_sat_lo", trimmed_file)
+            proc_sat_lo, _ = sto.read_object(
+                str(raw_group) + "/t_sat_lo", processed_file
+            )
 
-            trim_sat_hi, _ = sto.read_object(str(raw_group) + "/t_sat_hi", trimmed_file)
+            proc_sat_hi, _ = sto.read_object(
+                str(raw_group) + "/t_sat_hi", processed_file
+            )
 
-            assert np.array_equal(raw_sat_lo.nda, trim_sat_lo.nda)
-            assert np.array_equal(raw_sat_hi.nda, trim_sat_hi.nda)
-            assert type(trim_sat_lo.nda[0]) == np.uint16
+            assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
+            assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
+            assert type(proc_sat_lo.nda[0]) == np.uint16
 
 
-def test_data_trimmer_all_pass(lgnd_test_data):
+def test_buffer_processor_all_pass(lgnd_test_data):
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
 
@@ -925,43 +1002,51 @@ def test_data_trimmer_all_pass(lgnd_test_data):
         "L200-comm-20220519-phy-geds.orca", "L200-comm-20220519-phy-geds-all-pass.lh5"
     )
 
-    trimmed_file = daq_file.replace(
+    processed_file = daq_file.replace(
         "L200-comm-20220519-phy-geds.orca",
-        "L200-comm-20220519-phy-geds-all-pass_trim.lh5",
+        "L200-comm-20220519-phy-geds-all-pass_proc.lh5",
     )
 
-    dsp_config = """
-    {
-        "/": "pass"
+    proc_out_spec = {
+        "*": {
+            "{name}": {"key_list": ["*"], "out_stream": processed_file, "proc_spec": {}}
+        }
     }
-    """
 
-    build_raw(
-        in_stream=daq_file, out_spec=raw_file, overwrite=True, trim_config=dsp_config
-    )
-    build_raw(in_stream=daq_file, out_spec=raw_file, overwrite=True)
+    raw_out_spec = {
+        "*": {
+            "{name}": {
+                "key_list": ["*"],
+                "out_stream": raw_file,
+            }
+        }
+    }
 
-    # assert filecmp.cmp(raw_file, trimmed_file, shallow=True)
+    build_raw(in_stream=daq_file, out_spec=proc_out_spec, overwrite=True)
+
+    build_raw(in_stream=daq_file, out_spec=raw_out_spec, overwrite=True)
+
+    # assert filecmp.cmp(raw_file, processed_file, shallow=True)
     sto = lgdo.LH5Store()
     raw_tables = lgdo.ls(raw_file)
     for tb in raw_tables:
         raw, _ = sto.read_object(tb, raw_file)
-        trim, _ = sto.read_object(tb, trimmed_file)
+        proc, _ = sto.read_object(tb, processed_file)
         if isinstance(raw, lgdo.Scalar):
             raw_value = raw.value
             raw_attrs = raw.attrs
-            trim_value = trim.value
-            trim_attrs = trim.attrs
-            assert raw_value == trim_value
-            assert raw_attrs == trim_attrs
+            proc_value = proc.value
+            proc_attrs = proc.attrs
+            assert raw_value == proc_value
+            assert raw_attrs == proc_attrs
         else:
             for obj in raw.keys():
                 if not isinstance(raw[obj], lgdo.Table):
                     raw_df = raw.get_dataframe([obj])
-                    trim_df = trim.get_dataframe([obj])
+                    proc_df = proc.get_dataframe([obj])
                 else:
                     for sub_obj in raw[obj].keys():
                         raw_df = raw[obj].get_dataframe([str(sub_obj)])
-                        trim_df = trim[obj].get_dataframe([str(sub_obj)])
+                        proc_df = proc[obj].get_dataframe([str(sub_obj)])
 
-            assert raw_df.equals(trim_df)
+            assert raw_df.equals(proc_df)
