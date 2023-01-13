@@ -109,7 +109,7 @@ class DataStreamer(ABC):
                 key_lists = decoder.get_key_lists()
                 for ii, key_list in enumerate(key_lists):
                     this_name = out_name
-                    if len(key_lists > 1):
+                    if len(key_lists) > 1:
                         if len(key_list) == 1:
                             this_name = f"{out_name}_{key_list[0]}"
                         else:
