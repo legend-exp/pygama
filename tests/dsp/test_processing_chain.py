@@ -127,7 +127,7 @@ def test_processor_variable_array_output(spms_raw_tbl):
     dsp_config = {
         "outputs": ["vt_max_out"],
         "processors": {
-            "vt_max_out, vt_min_out, n_max_out, n_min_out, flag_out": {
+            "vt_max_out, vt_min_out, n_max_out, n_min_out": {
                 "function": "get_multi_local_extrema",
                 "module": "pygama.dsp.processors",
                 "args": [
@@ -141,7 +141,6 @@ def test_processor_variable_array_output(spms_raw_tbl):
                     "vt_min_out(10)",
                     "n_max_out",
                     "n_min_out",
-                    "flag_out",
                 ],
                 "unit": "ADC",
             }

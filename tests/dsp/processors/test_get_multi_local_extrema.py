@@ -6,13 +6,26 @@ import pytest
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.processors import get_multi_local_extrema
 
+#                .
+#               . .
+#              .   .
+#             .     .
+#            .       .
+#       .   .         .   .
+#      . . .           . . .
+#     .   .             .   .
+#    .                       .
+#   .                         .
+# ..                           ..
+# 0123456789012345678901234567890
+#           1         2         3
 wf = np.array([0, 0, 1, 2, 3, 4, 5, 4, 3, 4, 5, 6, 7, 8, 9, 10,
                9, 8, 7, 6, 5, 4, 3, 4, 5, 4, 3, 2, 1, 0, 0])  # fmt: skip
 
 
-# symmetric delta tests (all searches should behave identical)
+# delta_min=delta_max tests (all searches should behave identical)
 
-# test with symmetric delta L->R (dont care about abs. thresholds here)
+# L->R
 def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -20,7 +33,6 @@ def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -34,17 +46,15 @@ def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([np.nan, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
     assert n_min_out[0] == 0
 
 
-# test with symmetric delta L<-R (dont care about abs. thresholds here)
+# L<-R
 def test_get_multi_local_extrema_rtol(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -52,7 +62,6 @@ def test_get_multi_local_extrema_rtol(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -66,17 +75,15 @@ def test_get_multi_local_extrema_rtol(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([np.nan, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
     assert n_min_out[0] == 0
 
 
-# test with symmetric delta L<-c->R (dont care about abs. thresholds here)
+# L<-c->R
 def test_get_multi_local_extrema_both_cons(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -84,7 +91,6 @@ def test_get_multi_local_extrema_both_cons(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -98,17 +104,14 @@ def test_get_multi_local_extrema_both_cons(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([np.nan, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
-    assert n_min_out[0] == 0
 
 
-# test with symmetric delta L<-a->R (dont care about abs. thresholds here)
+# L<-a->R
 def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -116,7 +119,6 @@ def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -130,19 +132,16 @@ def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([np.nan, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
-    assert n_min_out[0] == 0
 
 
-# asymmetric delta test (result should be search direction dependent)
+# delta_min != delta_max (result should be search direction dependent)
 
-# test with asymmetric delta L->R (dont care about abs. thresholds here)
+# L->R
 def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -150,7 +149,6 @@ def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -164,17 +162,15 @@ def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, 24, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([22, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 2
-    assert flout[0] == 0
     assert n_min_out[0] == 1
 
 
-# test with asymmetric delta L<-R (dont care about abs. thresholds here)
+# L<-R
 def test_get_multi_local_extrema_rtol_asym(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -182,7 +178,6 @@ def test_get_multi_local_extrema_rtol_asym(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -196,17 +191,15 @@ def test_get_multi_local_extrema_rtol_asym(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, 6, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([8, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 2
-    assert flout[0] == 0
     assert n_min_out[0] == 1
 
 
-# test with asymmetric delta L<-c->R (dont care about abs. thresholds here)
+# L<-c->R
 def test_get_multi_local_extrema_both_cons_asym(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -214,7 +207,6 @@ def test_get_multi_local_extrema_both_cons_asym(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -228,17 +220,15 @@ def test_get_multi_local_extrema_both_cons_asym(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([np.nan, np.nan, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
     assert n_min_out[0] == 0
 
 
-# test with asymmetric delta L<-a->R (dont care about abs. thresholds here)
+# L<-a->R
 def test_get_multi_local_extrema_both_agro_asym(compare_numba_vs_python):
     max_out = np.zeros(3)
     max_out[:] = np.nan
@@ -246,7 +236,6 @@ def test_get_multi_local_extrema_both_agro_asym(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -260,13 +249,11 @@ def test_get_multi_local_extrema_both_agro_asym(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([6, 15, 24]), equal_nan=True)
     assert np.array_equal(min_out, np.array([8, 22, np.nan]), equal_nan=True)
     assert n_max_out[0] == 3
-    assert flout[0] == 0
     assert n_min_out[0] == 2
 
 
@@ -278,7 +265,6 @@ def test_get_multi_local_extrema_both_agro_asym_abs(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     compare_numba_vs_python(
         get_multi_local_extrema,
@@ -292,13 +278,11 @@ def test_get_multi_local_extrema_both_agro_asym_abs(compare_numba_vs_python):
         min_out,
         n_max_out,
         n_min_out,
-        flout,
     )
 
     assert np.array_equal(max_out, np.array([15, np.nan, np.nan]), equal_nan=True)
     assert np.array_equal(min_out, np.array([8, 22, np.nan]), equal_nan=True)
     assert n_max_out[0] == 1
-    assert flout[0] == 1
     assert n_min_out[0] == 2
 
 
@@ -313,7 +297,6 @@ def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     wf[4] = np.nan
     assert np.isnan(
@@ -329,7 +312,6 @@ def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):
             min_out,
             n_max_out,
             n_min_out,
-            flout,
         )
     )
 
@@ -347,7 +329,6 @@ def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):
             min_out,
             n_max_out,
             n_min_out,
-            flout,
         )
     )
     assert np.isnan(
@@ -363,7 +344,6 @@ def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):
             min_out,
             n_max_out,
             n_min_out,
-            flout,
         )
     )
     assert np.isnan(
@@ -379,7 +359,6 @@ def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):
             min_out,
             n_max_out,
             n_min_out,
-            flout,
         )
     )
 
@@ -393,15 +372,14 @@ def test_get_multi_local_extrema_dsp_fatal():
     min_out[:] = np.nan
     n_min_out = np.zeros(1)
     n_max_out = np.zeros(1)
-    flout = np.zeros(1)
 
     with pytest.raises(DSPFatal):
         get_multi_local_extrema(
-            wf, 3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
     with pytest.raises(DSPFatal):
         inspect.unwrap(get_multi_local_extrema)(
-            wf, 3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     max_out = np.zeros(3)
@@ -411,30 +389,30 @@ def test_get_multi_local_extrema_dsp_fatal():
 
     with pytest.raises(DSPFatal):
         get_multi_local_extrema(
-            wf, -3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, -3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     with pytest.raises(DSPFatal):
         inspect.unwrap(get_multi_local_extrema)(
-            wf, -3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, -3, 1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     with pytest.raises(DSPFatal):
         get_multi_local_extrema(
-            wf, 3, -1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, -1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     with pytest.raises(DSPFatal):
         inspect.unwrap(get_multi_local_extrema)(
-            wf, 3, -1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, -1, 3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     with pytest.raises(DSPFatal):
         get_multi_local_extrema(
-            wf, 3, 1, -3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, 1, -3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )
 
     with pytest.raises(DSPFatal):
         inspect.unwrap(get_multi_local_extrema)(
-            wf, 3, 1, -3, 8, 20, max_out, min_out, n_max_out, n_min_out, flout
+            wf, 3, 1, -3, 8, 20, max_out, min_out, n_max_out, n_min_out
         )

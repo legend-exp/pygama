@@ -33,7 +33,7 @@
       ],
       "unit": ["ADC", "non", "ADC"]
     },
-    "vt_max_candidate_out, vt_min_out, n_max_out, n_min_out, flag_out": {
+    "vt_max_candidate_out, vt_min_out, n_max_out, n_min_out": {
       "function": "get_multi_local_extrema",
       "module": "pygama.dsp.processors.get_multi_local_extrema",
       "args": [
@@ -46,10 +46,9 @@
         "vt_max_candidate_out(20)",
         "vt_min_out(20)",
         "n_max_out",
-        "n_min_out",
-        "flag_out"
+        "n_min_out"
       ],
-      "unit": ["ns", "ns", "none", "none", "none"]
+      "unit": ["ns", "ns", "none", "none"]
     },
     "trigger_pos, no_out": {
       "function": "peak_snr_threshold",
