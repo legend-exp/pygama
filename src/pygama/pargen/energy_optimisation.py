@@ -993,7 +993,7 @@ def event_selection(
 
     dsp_config["outputs"] = cts.get_keys(
         dsp_config["outputs"], list(cut_parameters)
-    ) + ["energy_parameter"]
+    ) + [energy_parameter]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
