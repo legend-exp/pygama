@@ -93,11 +93,11 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                         sys.exit()
                     self.decoded_values[ccc]["waveform"]["wf_len"] = trace_length
 
-    def get_key_list(self) -> list[str]:
-        key_list = []
+    def get_key_lists(self) -> list[str]:
+        key_lists = []
         for key in self.decoded_values.keys():
-            key_list += [key]
-        return key_list
+            key_lists.append([key])
+        return key_lists
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
@@ -344,11 +344,11 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                     else:
                         continue
 
-    def get_key_list(self) -> list[int]:
-        key_list = []
+    def get_key_lists(self) -> list[int]:
+        key_lists = []
         for key in self.decoded_values.keys():
-            key_list += [key]
-        return key_list
+            key_lists.append([key])
+        return key_lists
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
