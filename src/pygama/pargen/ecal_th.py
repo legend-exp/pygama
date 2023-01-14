@@ -116,6 +116,28 @@ def load_data(
     else:
         return energy_dict
 
+def gen_pars_dict(pars, deg, energy_param):
+    if deg == 1:
+        out_dict = {
+            "expression": f"a*{energy_param}+b",
+            "parameters": {"a": pars[0], "b": pars[1]},
+        }
+    elif deg == 0:
+        out_dict = {
+            "expression": f"a*{energy_param}",
+            "parameters": {"a": pars[0]},
+        }
+    elif deg == 2:
+        out_dict = {
+            "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
+            "parameters": {"a": pars[0], "b": pars[1], "c": pars[2]},
+        }
+    else:
+        out_dict = {}
+        log.warning(f"hit_dict not implemented for deg = {deg}")
+
+    return out_dict
+
 
 def energy_cal_th(
     files: list[str],
@@ -242,7 +264,7 @@ def energy_cal_th(
             pk_pars = results["pk_pars"]
             found_peaks = results["got_peaks_locs"]
             fitted_peaks = results["fitted_keV"]
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):
             found_peaks = np.array([])
             fitted_peaks = np.array([])
 
@@ -274,43 +296,44 @@ def energy_cal_th(
                 simplex=True,
                 verbose=False,
             )
-        except np.linalg.LinAlgError:
+        except (np.linalg.LinAlgError, ValueError):
             pars = None
         log.debug("done")
         if pars is None:
             log.info("Calibration failed")
-            pars, cov, results = cal.hpge_E_calibration(
-                uncal_pass[energy_param],
-                glines,
-                guess_keV,
-                deg=deg,
-                range_keV=kev_ranges,
-                funcs=funcs,
-                gof_funcs=gof_funcs,
-                n_events=n_events,
-                allowed_p_val=0,
-                simplex=True,
-                verbose=False,
-            )
-            if deg == 1:
-                hit_dict[f"{energy_param}_cal"] = {
-                    "expression": f"a*{energy_param}+b",
-                    "parameters": {"a": pars[0], "b": pars[1]},
-                }
-            elif deg == 0:
-                hit_dict[f"{energy_param}_cal"] = {
-                    "expression": f"a*{energy_param}",
-                    "parameters": {"a": pars[0]},
-                }
-            elif deg == 2:
-                hit_dict[f"{energy_param}_cal"] = {
-                    "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
-                    "parameters": {"a": pars[0], "b": pars[1], "c": pars[2]},
-                }
-            else:
-                hit_dict[f"{energy_param}_cal"] = {}
-                log.warning(f"hit_dict not implemented for deg = {deg}")
+            try:
+                pars, cov, results = cal.hpge_E_calibration(
+                    uncal_pass[energy_param],
+                    glines,
+                    guess_keV,
+                    deg=deg,
+                    range_keV=kev_ranges,
+                    funcs=funcs,
+                    gof_funcs=gof_funcs,
+                    n_events=n_events,
+                    allowed_p_val=0,
+                    simplex=True,
+                    verbose=False,
+                )
+                if pars is None:
+                    raise ValueError
+            except (np.linalg.LinAlgError, ValueError):
+                pars = np.full(deg+1, np.nan)
 
+                hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
+
+                output_dict[f"{energy_param}_cal"] = {
+                "Qbb_fwhm": np.nan,
+                "Qbb_fwhm_err": np.nan,
+                "2.6_fwhm": np.nan,
+                "2.6_fwhm_err": np.nan,
+                "eres_pars": [np.nan,np.nan],
+                "fitted_peaks": np.nan,
+                "fwhms": np.nan,
+                "peak_fit_pars": np.nan,
+                }
+                continue
+            
             fitted_peaks = results["fitted_keV"]
             fwhms = results["pk_fwhms"][:, 0]
             dfwhms = results["pk_fwhms"][:, 1]
@@ -350,7 +373,7 @@ def energy_cal_th(
                 bounds=param_bounds,
                 absolute_sigma=True,
             )
-
+            hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
             output_dict[f"{energy_param}_cal"] = {
                 "Qbb_fwhm": np.nan,
                 "Qbb_fwhm_err": np.nan,
@@ -363,24 +386,9 @@ def energy_cal_th(
             }
             continue
         log.info(f"Calibration pars are {pars}")
-        if deg == 1:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}+b",
-                "parameters": {"a": pars[0], "b": pars[1]},
-            }
-        elif deg == 0:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}",
-                "parameters": {"a": pars[0]},
-            }
-        elif deg == 2:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
-                "parameters": {"a": pars[0], "b": pars[1], "c": pars[2]},
-            }
-        else:
-            hit_dict[f"{energy_param}_cal"] = {}
-            log.warning(f"hit_dict not implemented for deg = {deg}")
+
+        hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
+
         fitted_peaks = results["fitted_keV"]
         fitted_funcs = []
         fitted_gof_funcs = []
