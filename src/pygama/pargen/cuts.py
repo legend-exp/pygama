@@ -76,7 +76,7 @@ def generate_cuts(
             all_par_array < np.nanpercentile(all_par_array, 99)
         )
         par_array = all_par_array[idxs]
-        counts, start_bins, var = pgh.get_hist(par_array, 1000)
+        counts, start_bins, var = pgh.get_hist(par_array, 100)
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
@@ -84,7 +84,7 @@ def generate_cuts(
                 counts,
                 start_bins,
                 mode_guess=mu,
-                n_bins=50,
+                n_bins=10,
                 cost_func="Least Squares",
                 inflate_errors=False,
                 gof_method="var",
@@ -129,9 +129,9 @@ def generate_cuts(
 
             upper_bound = start_bins[upper_bound_idx]
 
-        if lower_bound < np.nanmin(par_array):
+        if (lower_bound < np.nanmin(par_array)) or (lower_bound > np.nanmax(par_array)):
             lower_bound = np.nanmin(par_array)
-        if upper_bound > np.nanmax(par_array):
+        if (upper_bound > np.nanmax(par_array)) or (upper_bound < np.nanmin(par_array)):
             upper_bound = np.nanmax(par_array)
 
         try:
@@ -152,8 +152,11 @@ def generate_cuts(
                 inflate_errors=False,
                 gof_method="var",
             )
-            mean - pars[0]
+            mean = pars[0]
             std = fwhm / 2.355
+
+            if mean < np.nanmin(par_array) or mean > np.nanmax(par_array):
+                raise IndexError
         except IndexError:
             bin_range = 5000
 
@@ -169,7 +172,7 @@ def generate_cuts(
                 upper_bound_idx = max_idx + bin_range
             upper_bound = start_bins[upper_bound_idx]
             counts, bins, var = pgh.get_hist(
-                par_array, bins=1000, range=(lower_bound, upper_bound)
+                par_array, bins=200, range=(lower_bound, upper_bound)
             )
 
             bin_centres = pgh.get_bin_centers(bins)
@@ -185,8 +188,8 @@ def generate_cuts(
             if "left" in num_sigmas:
                 num_sigmas_left = num_sigmas["left"]
             else:
-                num_sigmas["left"] = -np.inf
-                num_sigmas_left = -np.inf
+                num_sigmas["left"] = np.inf
+                num_sigmas_left = np.inf
             if "right" in num_sigmas:
                 num_sigmas_right = num_sigmas["right"]
             else:
