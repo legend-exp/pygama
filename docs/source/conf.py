@@ -9,7 +9,7 @@ sys.path.insert(0, Path("../../src").resolve().as_posix())
 sys.path.append(Path("extensions").resolve().as_posix())
 
 project = "pygama"
-copyright = "2020, the LEGEND Collaboration"
+copyright = "2023, the LEGEND Collaboration"
 version = get_distribution("pygama").version
 
 extensions = [
