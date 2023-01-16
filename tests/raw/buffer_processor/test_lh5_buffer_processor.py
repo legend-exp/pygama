@@ -20,10 +20,10 @@ def test_lh5_buffer_processor_packet_ids(lgnd_test_data):
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
     raw_file = "/tmp/L200-comm-20220519-phy-geds.lh5"
     proc_out_spec = f"{config_dir}/lh5_buffer_processor_config.json"
-    raw_out_spec = f"{config_dir}/raw_config.json"
+    raw_out_spec = f"{config_dir}/raw_out_spec_no_proc.json"
 
     processed_file = raw_file.replace(
-        "L200-comm-20220519-phy-geds.orca", "L200-comm-20220519-phy-geds_proc.lh5"
+        "L200-comm-20220519-phy-geds.lh5", "L200-comm-20220519-phy-geds_proc.lh5"
     )
     build_raw(in_stream=daq_file, out_spec=raw_out_spec, overwrite=True)
 
@@ -40,6 +40,12 @@ def test_lh5_buffer_processor_packet_ids(lgnd_test_data):
     )
 
     assert np.array_equal(raw_packet_ids.nda, processed_packet_ids.nda)
+
+    processed_presummed_wfs, _ = sto.read_object(
+        str(raw_group) + "/presummed_waveform/values", processed_file
+    )
+    raw_wfs, _ = sto.read_object(str(raw_group) + "/waveform/values", raw_file)
+    assert processed_presummed_wfs.nda[0][0] == np.sum(raw_wfs.nda[0][:4])
 
 
 # check that packet indexes match in verification test
@@ -63,22 +69,23 @@ def test_lh5_buffer_processor_waveform_lengths(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 1000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform"],
+                        "outputs": ["presum_rate", "presummed_waveform"],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/16, period=waveform.period*16, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             }
                         },
                     },
-                    "drop": {"waveform"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                     },
                 },
@@ -122,8 +129,8 @@ def test_lh5_buffer_processor_waveform_lengths(lgnd_test_data):
 
     # Read in the presummed rate from the config file to modify the clock rate later
     presum_rate_string = jsonfile["ch0"]["dsp_config"]["processors"][
-        "presummed_waveform"
-    ]["args"][1]
+        "presum_rate, presummed_waveform"
+    ]["args"][3]
     presum_rate_start_idx = presum_rate_string.find("/") + 1
     presum_rate_end_idx = presum_rate_string.find(",")
     presum_rate = int(presum_rate_string[presum_rate_start_idx:presum_rate_end_idx])
@@ -222,22 +229,23 @@ def test_lh5_buffer_processor_file_size_decrease(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 1000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform"],
+                        "outputs": ["presum_rate", "presummed_waveform"],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/4, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/4, period=waveform.period*4, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             }
                         },
                     },
-                    "drop": {"waveform": "True"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                     },
                 },
@@ -330,22 +338,23 @@ def test_lh5_buffer_processor_separate_name_tables(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 2000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform"],
+                        "outputs": ["presum_rate", "presummed_waveform"],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/8, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/8, period=waveform.period*8, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             }
                         },
                     },
-                    "drop": {"waveform"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                     },
                 },
@@ -357,22 +366,23 @@ def test_lh5_buffer_processor_separate_name_tables(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 1000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform"],
+                        "outputs": ["presum_rate", "presummed_waveform"],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/4, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/4, period=waveform.period*4, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             }
                         },
                     },
-                    "drop": {"waveform"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                     },
                 },
@@ -419,8 +429,8 @@ def test_lh5_buffer_processor_separate_name_tables(lgnd_test_data):
         # Read in the presummed rate from the config file to modify the clock rate later
         group_name = raw_group.split("/raw")[0]
         presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
-            "presummed_waveform"
-        ]["args"][1]
+            "presum_rate, presummed_waveform"
+        ]["args"][3]
         presum_rate_start_idx = presum_rate_string.find("/") + 1
         presum_rate_end_idx = presum_rate_string.find(",")
         presum_rate = int(presum_rate_string[presum_rate_start_idx:presum_rate_end_idx])
@@ -524,14 +534,21 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 2000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform", "t_sat_lo", "t_sat_hi"],
+                        "outputs": [
+                            "presum_rate",
+                            "presummed_waveform",
+                            "t_sat_lo",
+                            "t_sat_hi",
+                        ],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/16, period=waveform.period*16, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             },
@@ -543,9 +560,8 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
                             },
                         },
                     },
-                    "drop": {"waveform"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                         "t_sat_lo": "uint16",
                         "t_sat_hi": "uint16",
@@ -618,8 +634,8 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
             pass_flag = True
         else:
             presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
-                "presummed_waveform"
-            ]["args"][1]
+                "presum_rate, presummed_waveform"
+            ]["args"][3]
             presum_rate_start_idx = presum_rate_string.find("/") + 1
             presum_rate_end_idx = presum_rate_string.find(",")
             presum_rate = int(
@@ -755,14 +771,21 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
                 "proc_spec": {
                     "window": ["waveform", 2000, -1000, "windowed_waveform"],
                     "dsp_config": {
-                        "outputs": ["presummed_waveform", "t_sat_lo", "t_sat_hi"],
+                        "outputs": [
+                            "presum_rate",
+                            "presummed_waveform",
+                            "t_sat_lo",
+                            "t_sat_hi",
+                        ],
                         "processors": {
-                            "presummed_waveform": {
+                            "presum_rate, presummed_waveform": {
                                 "function": "presum",
                                 "module": "pygama.dsp.processors",
                                 "args": [
                                     "waveform",
-                                    "presummed_waveform(len(waveform)/16, 'f')",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/16, period=waveform.period*16, offset=waveform.offset)",
                                 ],
                                 "unit": "ADC",
                             },
@@ -774,9 +797,8 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
                             },
                         },
                     },
-                    "drop": {"waveform"},
-                    "return_type": {
-                        "windowed_waveform/values": "uint16",
+                    "drop": ["waveform"],
+                    "dtype_conv": {
                         "presummed_waveform/values": "uint32",
                         "t_sat_lo": "uint16",
                         "t_sat_hi": "uint16",
@@ -870,8 +892,8 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
             pass_flag = True
         else:
             presum_rate_string = jsonfile[group_name]["dsp_config"]["processors"][
-                "presummed_waveform"
-            ]["args"][1]
+                "presum_rate, presummed_waveform"
+            ]["args"][3]
             presum_rate_start_idx = presum_rate_string.find("/") + 1
             presum_rate_end_idx = presum_rate_string.find(",")
             presum_rate = int(

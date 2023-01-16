@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 import pygama.lgdo as lgdo
+from pygama.dsp.errors import ProcessingChainError
 from pygama.dsp.processing_chain import build_processing_chain as bpc
 from pygama.lgdo import Array, ArrayOfEqualSizedArrays
 
@@ -18,14 +19,21 @@ log = logging.getLogger(__name__)
 
 def buffer_processor(rb: RawBuffer) -> None:
     """
-    Takes in a :class:`.RawBuffer`, performs any of the four processes specified from the :class:`.RawBuffer`'s ``proc_spec`` attribute:
-    - windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
+    Takes in a :class:`.RawBuffer`, performs any processes specified in the :class:`.RawBuffer`'s ``proc_spec`` attribute.
+    Currently implemented attributes:
+
+    - "window" (list): [in_name, start_index, stop_index, out_name]
+    Windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
     arguments, and then updates the rb.lgdo with a name specified by the last argument. If the object is an :func:`pygama.lgdo.WaveformTable`, then
-    the ``t0`` and ``dt`` attributes are updated accordingly.
-    - performs DSP given by the "dsp_config" key in the ``proc_spec``. See :module:`pygama.dsp` for more information on DSP config dictionaries.
+    the ``t0`` attribute is updated accordingly. Although it is possible to use the DSP config to perform windowing, this hard-coded version
+    avoids a conversion to float32.
+    - "dsp_config" (dict): {dsp_config}
+    Performs DSP given by the "dsp_config" key in the ``proc_spec``. See :module:`pygama.dsp.processing_chain.build_processing_chain` for more information on DSP config dictionaries.
     All fields in the output of the DSP are written to the rb.lgdo
-    - drops any requested fields from the rb.lgdo
-    - updates the data types of any field with its requested datatype in ``proc_spec``
+    - "drop" (list): ["waveform", "packet_ids"]
+    Drops any requested fields from the rb.lgdo
+    - "dtype_conv" (dict): {"presummed_waveform/values": "uint32", "t_sat_lo": "uint16"}
+    Updates the data types of any field with its requested datatype in ``proc_spec``
 
 
     Parameters
@@ -60,7 +68,7 @@ def buffer_processor(rb: RawBuffer) -> None:
                         "presummed_waveform": {
                             "function": "presum",
                             "module": "pygama.dsp.processors",
-                            "args": ["waveform", "presummed_waveform(len(waveform)/16, 'f')"],
+                            "args": ["waveform", "presummed_waveform(shape=len(waveform)//16, period=waveform.period*16, offset=waveform.offset, 'f')"],
                             "unit": "ADC"
                             },
                         "t_sat_lo, t_sat_hi": {
@@ -71,11 +79,9 @@ def buffer_processor(rb: RawBuffer) -> None:
                             }
                         }
                 },
-                "drop": {
-                    "waveform"
-                },
-                "return_type": {
-                    "windowed_waveform/values": "uint16",
+                "drop":
+                    ["waveform", "packet_ids"]
+                "dtype_conv": {
                     "presummed_waveform/values": "uint32",
                     "t_sat_lo": "uint16",
                     "t_sat_hi": "uint16",
@@ -88,6 +94,11 @@ def buffer_processor(rb: RawBuffer) -> None:
         },
     }
     """
+    # Check that there is a valid object to process
+    # This is needed if there is a "*" key expansion for decoders in build_raw
+    if isinstance(rb.lgdo, lgdo.Scalar):
+        log.info("Cannot process rb.lgdo of type Scalar")
+        return None
 
     # Perform windowing, if requested
     if "window" in rb.proc_spec.keys():
@@ -98,14 +109,18 @@ def buffer_processor(rb: RawBuffer) -> None:
         process_dsp(rb)
 
     # Cast as requested dtype before writing to the table
-    if "return_type" in rb.proc_spec.keys():
-        process_return_type(rb)
+    if "dtype_conv" in rb.proc_spec.keys():
+        process_dtype_conv(rb)
 
     # Drop any requested columns from the table
     if "drop" in rb.proc_spec.keys():
         for drop_keys in rb.proc_spec["drop"]:
-            rb.lgdo.pop(drop_keys)
-            rb.lgdo.update_datatype()
+            try:
+                rb.lgdo.pop(drop_keys)
+                rb.lgdo.update_datatype()
+            except KeyError:
+                log.info(f"Cannot remove field {drop_keys} from rb.lgdo")
+                return None
 
     return None
 
@@ -126,6 +141,11 @@ def process_window(rb: RawBuffer) -> None:
     ----------
     rb
         A :class:`.RawBuffer` to be processed
+
+    Notes
+    -----
+    This windowing hard-coded; it is done without calling :module:`pygama.dsp.build_dsp` to avoid
+    a conversion to float32.
 
     """
     # Read the window parameters from the proc_spec
@@ -184,7 +204,8 @@ def process_window(rb: RawBuffer) -> None:
         return None
 
     else:
-        raise KeyError(f"{window_in_name} not a valid key for this RawBuffer")
+        log.info(f"{window_in_name} not a valid key for this RawBuffer")
+        return None
 
 
 def window_array_of_arrays(
@@ -199,63 +220,6 @@ def window_array_of_arrays(
         raise TypeError(
             f"Do not know how to window an LGDO of type {type(array_of_arrays)}"
         )
-
-
-def process_presum(
-    rb: RawBuffer, presum_obj: ArrayOfEqualSizedArrays, dsp_dict: dict, proc: str
-) -> lgdo.WaveformTable:
-    r"""
-    Finds the presum rate that was used to perform the DSP and writes this to a table.
-    The name of a valid :func:`pygama.lgdo.WaveformTable` that DSP was performed on is used to extract the original
-    ``dt`` so that they can be updated by the presum rate. Then the presummed table is added to the rb.lgdo
-
-    Parameters
-    ----------
-    rb
-        A :module:`.RawBuffer` containing an rb.lgdo to store the presummed object in
-    presum_obj
-        The :module:`pygama.lgdo.ArrayofEqualSizedArrays` containing the presummed output from the DSP
-    dsp_dict
-        The dictionary that was used to perform the DSP
-    proc
-        The processor name that called :func:`pygama.dsp._processors.presum` in the DSP
-    """
-    # find the presum rate from the dsp_dict
-    presum_rate_string = dsp_dict["processors"][proc]["args"][1]
-    presum_rate_start_idx = presum_rate_string.find("/") + 1
-    presum_rate_end_idx = presum_rate_string.find(",")
-    presum_rate = int(presum_rate_string[presum_rate_start_idx:presum_rate_end_idx])
-
-    # Find the original lgdo field that was used to create the presummed output
-    rb_lgdo_field = dsp_dict["processors"][proc]["args"][0]
-
-    # make sure that this field is a waveform table, then process dts
-    if isinstance(rb.lgdo[rb_lgdo_field], lgdo.WaveformTable):
-        dt = process_presum_dt(rb.lgdo[rb_lgdo_field]["dt"], presum_rate)
-        t0 = rb.lgdo[rb_lgdo_field]["t0"]
-    else:
-        raise TypeError(f"field {rb_lgdo_field} is not a valid lgdo.WaveformTable")
-
-    # Create the new waveform table
-    new_obj = lgdo.WaveformTable(t0=t0, dt=dt, values=presum_obj.nda)
-
-    # Write the presum_rate as an array to the table as a new field
-    presum_rate_array = lgdo.Array(shape=len(t0), dtype=np.uint16, fill_val=presum_rate)
-    rb.lgdo.add_field("presum_rate", presum_rate_array)
-
-    return new_obj
-
-
-def process_presum_dt(dts: Array, presum_rate: int) -> Array:
-    """
-    Multiply a waveform's `dts` by the presumming rate, used for presummed waveforms.
-    """
-    # don't want to modify the original lgdo_table dts
-    copy_dts = copy.deepcopy(dts)
-
-    # change the dt by the presum rate
-    copy_dts.nda *= presum_rate
-    return copy_dts
 
 
 def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
@@ -276,16 +240,6 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     return copy_t0s
 
 
-def process_saturation(n_sat: Array) -> None:
-    r"""
-    If the :func:`saturation` DSP processor is used, the output is stored in floats.
-    However, the output are just the number of times a waveform crosses the saturation,
-    so it can be stored as an unsigned integer.
-    """
-    n_sat.nda = n_sat.nda.astype(np.uint16)
-    return n_sat
-
-
 def process_dsp(rb: RawBuffer) -> None:
     r"""
     Run a provided DSP config from rb.proc_spec using build_processing_chain, and add specified outputs to the
@@ -298,43 +252,52 @@ def process_dsp(rb: RawBuffer) -> None:
     # Load the dsp_dict
     dsp_dict = rb.proc_spec["dsp_config"]
 
-    # execute the processing chain
-    # This checks that the rb.lgdo is a table and that the field_name is present in the table
-    proc_chain, mask, dsp_out = bpc(rb.lgdo, dsp_dict)
+    # Try building the processing chain
+    try:
+        # execute the processing chain
+        # This checks that the rb.lgdo is a table and that the field_name is present in the table
+        proc_chain, mask, dsp_out = bpc(rb.lgdo, dsp_dict)
+    # Allow for exceptions, in the case of "*" key expansion in the build_raw out_spec
+    except ProcessingChainError:
+        log.info("DSP could not be performed")
+        return None
+
     proc_chain.execute()
 
     # For every processor in dsp_dict for this group, create a new entry in the lgdo table with that processor's name
     # If the processor returns a waveform, create a new waveform table and add it to the original lgdo table
     for proc in dsp_out.keys():
-        # Check what DSP routine the processors output is from, and manipulate accordingly
-        for dsp_proc in dsp_dict["processors"].keys():
-            if proc in dsp_proc:
-                # In the case of presumming, change the dts
-                if dsp_dict["processors"][dsp_proc]["function"] == "presum":
-                    new_obj = process_presum(rb, dsp_out[proc], dsp_dict, proc)
-                # In the case of saturation, change the dtype
-                if dsp_dict["processors"][dsp_proc]["function"] == "saturation":
-                    new_obj = process_saturation(dsp_out[proc])
-        rb.lgdo.add_field(proc, new_obj, use_obj_size=True)
+        # # Check what DSP routine the processors output is from, and manipulate accordingly
+        # for dsp_proc in dsp_dict["processors"].keys():
+        #     if proc in dsp_proc:
+        #         # In the case of presumming, change the dts
+        #         if dsp_dict["processors"][dsp_proc]["function"] == "presum":
+        #             new_obj = process_presum(rb, dsp_out[proc], dsp_dict, proc)
+        rb.lgdo.add_field(proc, dsp_out[proc], use_obj_size=True)
 
     return None
 
 
-def process_return_type(rb: RawBuffer) -> None:
+def process_dtype_conv(rb: RawBuffer) -> None:
     """
-    Change the types of fields in an rb.lgdo according to the values specified in the ``proc_spec``'s ``return_type`` dictionary
+    Change the types of fields in an rb.lgdo according to the values specified in the ``proc_spec``'s ``dtype_conv`` list
 
     Notes
     -----
     This assumes that name provided points to an object in the rb.lgdo that has an `nda` attribute
     """
-    type_list = rb.proc_spec["return_type"]
+    type_list = rb.proc_spec["dtype_conv"]
     for return_name in type_list.keys():
         # Take care of nested tables with a for loop
         path = return_name.split("/")
         return_value = rb.lgdo
         for key in path:
-            return_value = return_value[key]
+            try:
+                return_value = return_value[key]
+            # Allow for exceptions in the case of "*" expansion in the build_raw out_spec
+            except KeyError:
+                log.info(f"{key} is not a valid key in the rb.lgdo")
+                return None
 
         # If we have a numpy array as part of the lgdo, recast its type
         if hasattr(return_value, "nda"):

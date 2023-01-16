@@ -110,6 +110,8 @@ class RawBuffer:
         the start and end indices of the slice, and the new name for the sliced object
         - a dictionary of fields to drop
         - a dictionary of new fields and their return datatype
+        these specifications are used to process the data with :meth:`.buffer_processor.buffer_processor.buffer_processor`,
+        refer to the documentation for more details on how the format of `proc_spec` and how the processing is performed.
     """
 
     def __init__(
@@ -269,9 +271,9 @@ class RawBufferLibrary(dict):
                   "out_stream" : "out_stream_str",
                   "out_name" : "out_name_str" // (optional)
                   "proc_spec" : { // (optional)
-                    "windowed": {
-                        "waveform", 10, 100, "windowed_waveform"
-                    }
+                    "windowed":
+                        ["waveform", 10, 100, "windowed_waveform"],
+
                   }
               }
             }
@@ -414,10 +416,7 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
 
 
 def write_to_lh5_and_clear(
-    raw_buffers: list[RawBuffer],
-    lh5_store: LH5Store = None,
-    wo_mode: str = "append",
-    trim_config: dict = None,
+    raw_buffers: list[RawBuffer], lh5_store: LH5Store = None, wo_mode: str = "append"
 ) -> None:
     r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
     them.
@@ -427,13 +426,13 @@ def write_to_lh5_and_clear(
     raw_buffers : list(RawBuffer)
         The list of RawBuffers to be written to file. Note this is not a
         RawBufferList because the RawBuffers may not have the same structure.
+        If a raw_buffer has a `proc_spec` attribute, then :meth:`.buffer_processor.buffer_processor.buffer_processor`
+        is used to process that raw_buffer.
     lh5_store : LH5Store or None
         Allows user to send in a store holding a collection of already open
         files (saves some time opening / closing files)
     wo_mode : str
         write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
-    trim_config
-        A DSP config that, if present, is used to do data trimming
     """
     if lh5_store is None:
         lh5_store = lgdo.LH5Store()
@@ -450,9 +449,9 @@ def write_to_lh5_and_clear(
             if len(group) == 0:
                 group = "/"  # in case out_stream ends with :
 
-        # If a proc_spec if present for this RawBuffer, trim that data and then write to the file!
+        # If a proc_spec if present for this RawBuffer, process that data and then write to the file!
         if rb.proc_spec is not None:
-            # Perform the trimming as requested in the `proc_spec` from `out_spec` in build_raw
+            # Perform the processing as requested in the `proc_spec` from `out_spec` in build_raw
             buffer_processor(rb)
 
         # write if requested...
