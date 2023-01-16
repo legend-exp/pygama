@@ -34,8 +34,8 @@ def lh5_buffer_processor(
     overwrite
         sets whether to overwrite the output file(s) if it (they) already exist.
     out_spec
-        An out_spec for :module:`pygama.raw.build_raw` containing a `proc_spec` dict used for data processing.
-        See :module:`pygama.raw.buffer_processor.buffer_processor` for an example of such an out_spec.
+        An out_spec for :mod:`pygama.raw.build_raw` containing a `proc_spec` dict used for data processing.
+        See :mod:`pygama.raw.buffer_processor.buffer_processor` for an example of such an out_spec.
     proc_file_name
         The path to the processed output file created
             - if None, uses ``{lh5_raw_file_in}_proc.lh5`` as the output filename.

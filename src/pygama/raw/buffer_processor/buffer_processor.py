@@ -18,81 +18,75 @@ log = logging.getLogger(__name__)
 
 
 def buffer_processor(rb: RawBuffer) -> None:
-    """
-    Takes in a :class:`.RawBuffer`, performs any processes specified in the :class:`.RawBuffer`'s ``proc_spec`` attribute.
-    Currently implemented attributes:
+    r"""
+    Takes in a :class:`.RawBuffer`, performs any processes specified in the :class:`.RawBuffer`'s ``proc_spec``
+    attribute. Currently implemented attributes:
 
     - "window" (list): [in_name, start_index, stop_index, out_name]
-    Windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
-    arguments, and then updates the rb.lgdo with a name specified by the last argument. If the object is an :func:`pygama.lgdo.WaveformTable`, then
-    the ``t0`` attribute is updated accordingly. Although it is possible to use the DSP config to perform windowing, this hard-coded version
-    avoids a conversion to float32.
+      Windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
+      arguments, and then updates the rb.lgdo with a name specified by the last argument. If the object is an :func:`pygama.lgdo.WaveformTable`, then
+      the ``t0`` attribute is updated accordingly. Although it is possible to use the DSP config to perform windowing, this hard-coded version
+      avoids a conversion to float32.
     - "dsp_config" (dict): {dsp_config}
-    Performs DSP given by the "dsp_config" key in the ``proc_spec``. See :module:`pygama.dsp.processing_chain.build_processing_chain` for more information on DSP config dictionaries.
-    All fields in the output of the DSP are written to the rb.lgdo
+      Performs DSP given by the "dsp_config" key in the ``proc_spec``. See :mod:`pygama.dsp.processing_chain.build_processing_chain` for more information on DSP config dictionaries.
+      All fields in the output of the DSP are written to the rb.lgdo
     - "drop" (list): ["waveform", "packet_ids"]
-    Drops any requested fields from the rb.lgdo
+      Drops any requested fields from the rb.lgdo
     - "dtype_conv" (dict): {"presummed_waveform/values": "uint32", "t_sat_lo": "uint16"}
-    Updates the data types of any field with its requested datatype in ``proc_spec``
-
+      Updates the data types of any field with its requested datatype in ``proc_spec``
 
     Parameters
     ----------
     rb
         A :class:`.RawBuffer` to be processed, must contain a ``proc_spec`` attribute
 
-
     Notes
     -----
     The original "waveforms" column in the table is deleted if requested! All updates to the rb.lgdo are done in place
+    An example ``proc_spec`` in an :mod:`pygama.raw.build_raw` ``out_spec`` is below
 
+    .. code-block:: json
 
-    Example ``proc_spec`` in an :module:`pygama.raw.build_raw` ``out_spec``
-    -----------------------------------------------------------------------
-
-
-    .. code-block :: json
-
-
-    {
-        "FCEventDecoder" : {
-        "g{key:0>3d}" : {
-            "key_list" : [ [24,64] ],
-            "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds",
-            "proc_spec": {
+        {
+           "FCEventDecoder" : {
+           "g{key:0>3d}" : {
+              "key_list" : [ [24,64] ],
+              "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds",
+              "proc_spec": {
                 "window":
-                    ["waveform", 100, -100, "windowed_waveform"],
+                  ["waveform", 100, -100, "windowed_waveform"],
                 "dsp_config": {
-                    "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
+                  "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
                     "processors": {
-                        "presummed_waveform": {
-                            "function": "presum",
-                            "module": "pygama.dsp.processors",
-                            "args": ["waveform", "presummed_waveform(shape=len(waveform)//16, period=waveform.period*16, offset=waveform.offset, 'f')"],
-                            "unit": "ADC"
-                            },
-                        "t_sat_lo, t_sat_hi": {
-                            "function": "saturation",
-                            "module": "pygama.dsp.processors",
-                            "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
-                            "unit": "ADC"
-                            }
+                      "presummed_waveform": {
+                        "function": "presum",
+                        "module": "pygama.dsp.processors",
+                        "args": ["waveform", "presummed_waveform(shape=len(waveform)//16, period=waveform.period*16, offset=waveform.offset, 'f')"],
+                        "unit": "ADC"
+                        },
+                    "t_sat_lo, t_sat_hi": {
+                        "function": "saturation",
+                        "module": "pygama.dsp.processors",
+                        "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                        "unit": "ADC"
                         }
+                    }
                 },
                 "drop":
-                    ["waveform", "packet_ids"]
+                    ["waveform", "packet_ids"],
                 "dtype_conv": {
                     "presummed_waveform/values": "uint32",
                     "t_sat_lo": "uint16",
                     "t_sat_hi": "uint16",
                 }
-            }
-        },
-        "spms" : {
-            "key_list" : [ [6,23] ],
-            "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
-        },
-    }
+              }
+           },
+           "spms" : {
+             "key_list" : [ [6,23] ],
+             "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
+           }
+        }
+
     """
     # Check that there is a valid object to process
     # This is needed if there is a "*" key expansion for decoders in build_raw
@@ -144,7 +138,7 @@ def process_window(rb: RawBuffer) -> None:
 
     Notes
     -----
-    This windowing hard-coded; it is done without calling :module:`pygama.dsp.build_dsp` to avoid
+    This windowing hard-coded; it is done without calling :mod:`pygama.dsp.build_dsp` to avoid
     a conversion to float32.
 
     """
@@ -224,7 +218,7 @@ def window_array_of_arrays(
 
 def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     """
-    In order for the processed data to work well with :module:`pygama.dsp.build_dsp`, we need
+    In order for the processed data to work well with :mod:`pygama.dsp.build_dsp`, we need
     to keep ``t0`` in its original units.
 
     So we transform ``start_index`` to the units of ``t0`` and add it to every
