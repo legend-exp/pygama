@@ -189,12 +189,13 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             ]
             self.decoded_values[fcid] = copy.deepcopy(self.decoded_values_template)
             self.decoded_values[fcid]["waveform"]["wf_len"] = wf_len
+            log.debug(f"fcid {fcid}: {self.nadc[fcid]} adcs, wf_len = {wf_len}")
 
-    def get_key_list(self) -> list[int]:
-        key_list = []
+    def get_key_lists(self) -> list[list[int]]:
+        key_lists = []
         for fcid, nadc in self.nadc.items():
-            key_list += list(get_key(fcid, np.array(range(nadc))))
-        return key_list
+            key_lists.append(list(get_key(fcid, np.array(range(nadc)))))
+        return key_lists
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
