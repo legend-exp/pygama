@@ -224,12 +224,11 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     So we transform ``start_index`` to the units of ``t0`` and add it to every
     ``t0`` value.
     """
-    # don't want to modify the original lgdo_table dts
-    copy_dts = copy.deepcopy(dts)
+    # don't want to modify the original lgdo_table t0s
     copy_t0s = copy.deepcopy(t0s)
 
     # perform t0+start_index*dt to rewrite the new t0 in terms of sample
-    start_index *= copy_dts.nda
+    start_index *= dts.nda
     copy_t0s.nda += start_index
     return copy_t0s
 

@@ -168,6 +168,10 @@ def test_buffer_processor_waveform_lengths(lgnd_test_data):
             str(raw_group) + "/presummed_waveform/t0", processed_file
         )
 
+        windowed_packet_waveform_dts, _ = sto.read_object(
+            str(raw_group) + "/windowed_waveform/dt", processed_file
+        )
+
         # Check that the t0s match what we expect, with the correct units
         assert np.array_equal(
             raw_packet_waveform_t0s.nda,
@@ -193,6 +197,10 @@ def test_buffer_processor_waveform_lengths(lgnd_test_data):
         # Check that the dts match what we expect, with the correct units
         assert np.array_equal(
             raw_packet_waveform_dts.nda, presummed_packet_waveform_dts.nda / presum_rate
+        )
+
+        assert np.array_equal(
+            raw_packet_waveform_dts.nda, windowed_packet_waveform_dts.nda
         )
 
         # Check that the presum_rate is correctly identified
