@@ -85,15 +85,14 @@ def get_decay_constant(
 
     pz = tau_dict.get("pz")
 
-    counts, bins, var = pgh.get_hist(slopes, bins=500000, range=(-0.01, 0))
+    counts, bins, var = pgh.get_hist(slopes, bins=100000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
         pars, cov = pgf.gauss_mode_width_max(
             counts,
             bins,
-            mode_guess=high_bin,
-            n_bins=10,
+            n_bins=20,
             cost_func="Least Squares",
             inflate_errors=False,
             gof_method="var",
