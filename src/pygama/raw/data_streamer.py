@@ -106,6 +106,7 @@ class DataStreamer(ABC):
                     dec_key = dec_key.removesuffix("Decoder")
                 out_name = rb_lib["*"][0].out_name.format(name=dec_key)
                 out_stream = rb_lib["*"][0].out_stream.format(name=dec_key)
+                proc_spec = rb_lib["*"][0].proc_spec
                 key_lists = decoder.get_key_lists()
                 for ii, key_list in enumerate(key_lists):
                     this_name = out_name
@@ -115,7 +116,10 @@ class DataStreamer(ABC):
                         else:
                             this_name = f"{out_name}_{ii}"
                     rb = RawBuffer(
-                        key_list=key_list, out_stream=out_stream, out_name=this_name
+                        key_list=key_list,
+                        out_stream=out_stream,
+                        out_name=this_name,
+                        proc_spec=proc_spec,
                     )
                     rb_lib[dec_name].append(rb)
 
@@ -142,7 +146,10 @@ class DataStreamer(ABC):
                 for key in rb.key_list:
                     expanded_name = rb.out_name.format(key=key)
                     new_rb = RawBuffer(
-                        key_list=[key], out_stream=rb.out_stream, out_name=expanded_name
+                        key_list=[key],
+                        out_stream=rb.out_stream,
+                        out_name=expanded_name,
+                        proc_spec=rb.proc_spec,
                     )
                     rb_lib[dec_name].append(new_rb)
 
