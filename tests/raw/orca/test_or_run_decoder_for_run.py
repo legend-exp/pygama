@@ -14,7 +14,7 @@ def run_rbkd(orca_stream):
     rbkd[0] = RawBuffer(lgdo=decoder.make_lgdo(size=1))
 
     this_packet = orca_stream.load_packet(skip_unknown_ids=False)
-    orca_stream.close_stream() # avoid leaving file open
+    orca_stream.close_stream()  # avoid leaving file open
 
     # assert correct type for ORRunDecoderForRun
     assert (this_packet[0] >> 18) == 7
@@ -56,7 +56,7 @@ def test_values(run_rbkd):
         tbl = v.lgdo
 
         assert tbl["subrun_number"].nda[loc] == (this_packet[1] & 0xFFFF0000) >> 16
-        
+
         for i, k in enumerate(decoded_values):
             if 0 < i < 7:
                 assert tbl[k].nda[loc] == (this_packet[1] & (1 << (i - 1))) >> (i - 1)
