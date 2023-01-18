@@ -105,7 +105,7 @@ def lh5_buffer_processor(
     if isinstance(out_spec, dict):
         RawBufferLibrary(json_dict=out_spec)
 
-    # Write everything in the raw file to the new file, process appropriately
+    # Write everything in the raw file to the new file, check for proc_spec under either the group name, out_name, or the name
     for tb in lh5_tables:
         lgdo_obj, _ = raw_store.read_object(f"{tb}", lh5_file)
 
@@ -131,9 +131,9 @@ def lh5_buffer_processor(
                         out_name=out_name,
                         proc_spec=out_spec[decoder_name][group_name]["proc_spec"],
                     )
-                    buffer_processor(rb)
+                    tmp_table = buffer_processor(rb)
                     # Update the lgdo_obj to be written to the processed file
-                    lgdo_obj = rb.lgdo
+                    lgdo_obj = tmp_table
                 else:
                     pass
 
@@ -147,9 +147,9 @@ def lh5_buffer_processor(
                         out_name=out_name,
                         proc_spec=out_spec[decoder_name][out_name]["proc_spec"],
                     )
-                    buffer_processor(rb)
+                    tmp_table = buffer_processor(rb)
                     # Update the lgdo_obj to be written to the processed file
-                    lgdo_obj = rb.lgdo
+                    lgdo_obj = tmp_table
                 else:
                     pass
 
@@ -183,9 +183,9 @@ def lh5_buffer_processor(
                             list(out_spec[decoder_name].keys())[0]
                         ]["proc_spec"],
                     )
-                    buffer_processor(rb)
+                    tmp_table = buffer_processor(rb)
                     # Update the lgdo_obj to be written to the processed file
-                    lgdo_obj = rb.lgdo
+                    lgdo_obj = tmp_table
                 else:
                     pass
             else:
