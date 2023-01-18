@@ -36,7 +36,10 @@ keys.
       "FCEventDecoder" : {
         "g{key:0>3d}" : {
           "key_list" : [ [24,64] ],
-          "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds"
+          "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds",
+          "proc_spec": {
+            "window": {"waveform", 10, 100, "windowed_waveform"}
+          }
         },
         "spms" : {
           "key_list" : [ [6,23] ],
@@ -66,6 +69,7 @@ from typing import Union
 
 from pygama import lgdo
 from pygama.lgdo.lh5_store import LH5Store
+from pygama.raw.buffer_processor.buffer_processor import buffer_processor
 
 LGDO = Union[lgdo.Scalar, lgdo.Struct, lgdo.Array, lgdo.VectorOfVectors]
 
@@ -99,6 +103,15 @@ class RawBuffer:
         - socket example: ``198.0.0.100:8000``
     out_name
         the name or identifier of the object in the output stream.
+    proc_spec
+        a dictionary containing the following:
+        - a DSP config file, passed as a dictionary, or as a path to a JSON file
+        - an array containing: the name of an :class:`~.lgdo` object stored in the :class:`.RawBuffer` to be sliced,
+        the start and end indices of the slice, and the new name for the sliced object
+        - a dictionary of fields to drop
+        - a dictionary of new fields and their return datatype
+        these specifications are used to process the data with :meth:`.buffer_processor.buffer_processor.buffer_processor`,
+        refer to the documentation for more details on how the format of `proc_spec` and how the processing is performed.
     """
 
     def __init__(
@@ -107,11 +120,13 @@ class RawBuffer:
         key_list: list[int | str] = None,
         out_stream: str = "",
         out_name: str = "",
+        proc_spec: dict = None,
     ) -> None:
         self.lgdo = lgdo
         self.key_list = [] if key_list is None else key_list
         self.out_stream = out_stream
         self.out_name = out_name
+        self.proc_spec = proc_spec
         self.loc = 0
         self.fill_safety = 1
 
@@ -142,6 +157,8 @@ class RawBuffer:
             + repr(self.loc)
             + ", fill_safety="
             + repr(self.fill_safety)
+            + ", proc_spec="
+            + repr(self.proc_spec)
             + ")"
         )
 
@@ -185,6 +202,10 @@ class RawBufferList(list):
                 rb.key_list = json_dict[name]["key_list"]
             if "out_stream" in json_dict[name]:
                 rb.out_stream = json_dict[name]["out_stream"]
+            if "proc_spec" in json_dict[name]:
+                rb.proc_spec = json_dict[name][
+                    "proc_spec"
+                ]  # If you swap this with the next line, then key expansion doesn't work
             if "out_name" in json_dict[name]:
                 rb.out_name = json_dict[name]["out_name"]
             else:
@@ -249,6 +270,11 @@ class RawBufferLibrary(dict):
                   "key_list" : [ "key1", "key2", "..." ],
                   "out_stream" : "out_stream_str",
                   "out_name" : "out_name_str" // (optional)
+                  "proc_spec" : { // (optional)
+                    "windowed":
+                        ["waveform", 10, 100, "windowed_waveform"],
+
+                  }
               }
             }
 
@@ -400,6 +426,8 @@ def write_to_lh5_and_clear(
     raw_buffers : list(RawBuffer)
         The list of RawBuffers to be written to file. Note this is not a
         RawBufferList because the RawBuffers may not have the same structure.
+        If a raw_buffer has a `proc_spec` attribute, then :meth:`.buffer_processor.buffer_processor.buffer_processor`
+        is used to process that raw_buffer.
     lh5_store : LH5Store or None
         Allows user to send in a store holding a collection of already open
         files (saves some time opening / closing files)
@@ -420,6 +448,12 @@ def write_to_lh5_and_clear(
             group = rb.out_stream[ii + 1 :]
             if len(group) == 0:
                 group = "/"  # in case out_stream ends with :
+
+        # If a proc_spec if present for this RawBuffer, process that data and then write to the file!
+        if rb.proc_spec is not None:
+            # Perform the processing as requested in the `proc_spec` from `out_spec` in build_raw
+            buffer_processor(rb)
+
         # write if requested...
         if filename != "":
             lh5_store.write_object(
