@@ -307,7 +307,7 @@ class LH5Store:
         if datatype == "scalar":
             value = h5f[name][()]
             if elements == "bool":
-                value = np.bool(value)
+                value = np.bool_(value)
             if obj_buf is not None:
                 obj_buf.value = value
                 obj_buf.attrs.update(h5f[name].attrs)
@@ -631,7 +631,7 @@ class LH5Store:
             # special handling for bools
             # (c and Julia store as uint8 so cast to bool)
             if elements == "bool":
-                nda = nda.astype(np.bool)
+                nda = nda.astype(np.bool_)
 
             # Finally, set attributes and return objects
             attrs = h5f[name].attrs
