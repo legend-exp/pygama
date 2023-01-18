@@ -95,11 +95,11 @@ class CompassEventDecoder(DataDecoder):
                     )  # the header is a struct, so we need to return its value
                 )
 
-    def get_key_list(self):
-        key_list = []
+    def get_key_lists(self) -> list[str]:
+        key_lists = []
         for key in self.decoded_values.keys():
-            key_list += [key]
-        return key_list
+            key_lists.append(key)
+        return [key_lists]
 
     def get_decoded_values(self, key=None):
         if key is None:
