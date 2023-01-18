@@ -1,6 +1,6 @@
 ci:
   autoupdate_commit_msg: "chore: update pre-commit hooks"
-  autoupdate_schedule: "monthly"
+  autoupdate_schedule: "quarterly"
   autofix_commit_msg: "style: pre-commit fixes"
 
 exclude: ^(attic|tutorials|src/pygama/math|src/pygama/flow/datagroup.py)
@@ -30,18 +30,18 @@ repos:
   - id: setup-cfg-fmt
 
 - repo: https://github.com/PyCQA/isort
-  rev: "5.10.1"
+  rev: "5.11.4"
   hooks:
   - id: isort
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: "v3.3.0"
+  rev: "v3.3.1"
   hooks:
   - id: pyupgrade
     args: ["--py38-plus"]
 
 - repo: https://github.com/psf/black
-  rev: "22.10.0"
+  rev: "22.12.0"
   hooks:
   - id: black-jupyter
 
@@ -65,12 +65,10 @@ repos:
   - id: flake8
     exclude: ^src/pygama/pargen
     additional_dependencies: [
-      flake8-bugbear,
+      flake8-bugbear>=23.1.17,
       flake8-print,
-      # flake8-docstrings,
       pep8-naming
     ]
-    # args: ["--docstring-convention", "numpy"]
 
 - repo: https://github.com/kynan/nbstripout
   rev: "0.6.1"
@@ -91,7 +89,7 @@ repos:
   - id: codespell
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: "v0.8.0.4"
+  rev: "v0.9.0.2"
   hooks:
   - id: shellcheck
 

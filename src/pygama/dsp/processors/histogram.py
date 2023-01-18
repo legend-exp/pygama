@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 from numba import guvectorize
 
+from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 
@@ -50,6 +51,9 @@ def histogram(
     --------
     .histogram_stats
     """
+
+    if len(weights_out) + 1 != len(borders_out):
+        raise DSPFatal("length borders_out must be exactly 1 + length of weights_out")
 
     weights_out[:] = 0
     borders_out[:] = np.nan
@@ -138,6 +142,9 @@ def histogram_stats(
 
     if np.isnan(weights_in).any():
         return
+
+    if len(weights_in) + 1 != len(edges_in):
+        raise DSPFatal("length edges_in must be exactly 1 + length of weights_in")
 
     # find global maximum search from left to right
     max_index = 0

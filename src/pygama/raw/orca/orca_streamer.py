@@ -35,7 +35,6 @@ class OrcaStreamer(DataStreamer):
         self.header = None
         self.header_decoder = OrcaHeaderDecoder()
         self.decoder_id_dict = {}  # dict of data_id to decoder object
-        self.decoder_name_dict = {}  # dict of name to decoder object
         self.rbl_id_dict = {}  # dict of RawBufferLists for each data_id
 
     # TODO: need to correct for endianness?
@@ -205,9 +204,8 @@ class OrcaStreamer(DataStreamer):
         self.any_full |= self.header_decoder.decode_packet(packet, self.packet_id)
         self.header = self.header_decoder.header
 
-        # instantiate decoders listed in the header AND in the rb_lib (if specified)
-        decoder_names = ["OrcaHeaderDecoder"]
-        decoder_names += self.header.get_decoder_list()
+        # find the names of all decoders listed in the header AND in the rb_lib (if specified)
+        decoder_names = self.header.get_decoder_list()
         if rb_lib is not None and "*" not in rb_lib:
             keep_decoders = []
             for name in decoder_names:
@@ -220,22 +218,23 @@ class OrcaStreamer(DataStreamer):
                     log.warning(
                         f"decoder {name} (requested in rb_lib) not in data description in header"
                     )
-        for name in decoder_names:
-            # handle header decoder specially
-            if name == "OrcaHeaderDecoder":
-                self.decoder_id_dict[0] = self.header_decoder
-                self.decoder_name_dict["OrcaHeaderDecoder"] = 0
-                continue
-            # instantiate other decoders by name
-            if name not in globals():
-                log.warning(
-                    f"no implementation of {name}, corresponding packets will be skipped"
-                )
-                continue
-            decoder = globals()[name]
-            decoder.data_id = self.header.get_data_id(name)
-            self.decoder_id_dict[decoder.data_id] = decoder(header=self.header)
-            self.decoder_name_dict[name] = decoder.data_id
+
+        # get a mapping of data_ids-of-interest to instantiated decoders
+        id_to_dec_name_dict = self.header.get_id_to_decoder_name_dict(
+            shift_data_id=False
+        )
+        instantiated_decoders = {"OrcaHeaderDecoder": self.header_decoder}
+        for data_id in id_to_dec_name_dict.keys():
+            name = id_to_dec_name_dict[data_id]
+            if name not in instantiated_decoders:
+                if name not in globals():
+                    log.warning(
+                        f"no implementation of {name}, corresponding packets will be skipped"
+                    )
+                    continue
+                decoder = globals()[name]
+                instantiated_decoders[name] = decoder(header=self.header)
+            self.decoder_id_dict[data_id] = instantiated_decoders[name]
 
         # initialize the buffers in rb_lib. Store them for fast lookup
         super().open_stream(
@@ -247,9 +246,18 @@ class OrcaStreamer(DataStreamer):
         )
         if rb_lib is None:
             rb_lib = self.rb_lib
-        for name in self.rb_lib.keys():
-            data_id = self.decoder_name_dict[name]
+        good_buffers = []
+        for data_id in self.decoder_id_dict.keys():
+            name = id_to_dec_name_dict[data_id]
+            if name not in self.rb_lib:
+                log.info(f"skipping data from {name}")
+                continue
             self.rbl_id_dict[data_id] = self.rb_lib[name]
+            good_buffers.append(name)
+        # check that we have instantiated decoders for all buffers
+        for key in self.rb_lib:
+            if key not in good_buffers:
+                log.warning(f"buffer for {key} has no decoder")
         log.debug(f"rb_lib = {self.rb_lib}")
 
         # return header raw buffer
@@ -280,8 +288,10 @@ class OrcaStreamer(DataStreamer):
 
             # look up the data id, decoder, and rbl
             data_id = orca_packet.get_data_id(packet, shift=False)
-            log.debug(f"packet {self.packet_id}: data_id = {data_id}")
-            if data_id in self.decoder_id_dict:
+            log.debug(
+                f"packet {self.packet_id}: data_id = {data_id}, decoder = {'None' if data_id not in self.decoder_id_dict else type(self.decoder_id_dict[data_id]).__name__}"
+            )
+            if data_id in self.rbl_id_dict:
                 break
 
         # now decode

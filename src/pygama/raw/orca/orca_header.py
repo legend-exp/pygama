@@ -24,22 +24,10 @@ class OrcaHeader(dict):
             self.update(json.loads(lgdo_scalar.value))
 
     def get_decoder_list(self) -> list[str]:
-        decoder_names = []
-        dd = self["dataDescription"]
-        for class_key in dd.keys():
-            for super_key in dd[class_key].keys():
-                decoder_names.append(dd[class_key][super_key]["decoder"])
-        return decoder_names
+        return list(set(self.get_id_to_decoder_name_dict().values()))
 
-    def get_data_id(self, decoder_name: str) -> int:
-        dd = self["dataDescription"]
-        for class_key in dd.keys():
-            for super_key in dd[class_key].keys():
-                if dd[class_key][super_key]["decoder"] == decoder_name:
-                    return dd[class_key][super_key]["dataId"]
-
-    def get_id_to_object_name_dict(self, shift_data_id: bool = True) -> dict[int, str]:
-        id_dict = {}
+    def get_id_to_decoder_name_dict(self, shift_data_id: bool = True) -> dict[int, str]:
+        id_dict = {0: "OrcaHeaderDecoder"}
         dd = self["dataDescription"]
         for class_key in dd.keys():
             for super_key in dd[class_key].keys():
@@ -49,7 +37,7 @@ class OrcaHeader(dict):
                         data_id = (-data_id) >> 26
                     else:
                         data_id = data_id >> 18
-                id_dict[data_id] = f"{class_key}:{super_key}"
+                id_dict[data_id] = dd[class_key][super_key]["decoder"]
         return id_dict
 
     def get_run_number(self) -> int:
@@ -66,14 +54,11 @@ class OrcaHeader(dict):
 
         crates = self["ObjectInfo"]["Crates"]
         for crate in crates:
-            object_info_dict[crate["CrateNumber"]] = {}
-            cards = crate["Cards"]
-            for card in cards:
+            for card in crate["Cards"]:
                 if card["Class Name"] == orca_class_name:
+                    if crate["CrateNumber"] not in object_info_dict:
+                        object_info_dict[crate["CrateNumber"]] = {}
                     object_info_dict[crate["CrateNumber"]][card["Card"]] = card
-
-        if len(object_info_dict) == 0:
-            raise KeyError(f"no object info for class {orca_class_name}")
 
         return object_info_dict
 
