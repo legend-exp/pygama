@@ -114,11 +114,11 @@ def test_build_cl_and_explodes():
     assert (lgdo.explode([3, 4], [5, 7]) == array_exp).all()
     assert (lgdo.explode(cl, range(len(cl))) == exp).all()
     # explode_arrays
-    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))])
-    assert len(out_arrays) == 2
-    assert (out_arrays[0] == array_exp).all()
-    assert (out_arrays[1] == exp).all()
-    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))], out_arrays=out_arrays)
-    assert len(out_arrays) == 2
-    assert (out_arrays[0] == array_exp).all()
-    assert (out_arrays[1] == exp).all()
+    arrays_out = lgdo.explode_arrays(cl, [array, range(len(cl))])
+    assert len(arrays_out) == 2
+    assert (arrays_out[0] == array_exp).all()
+    assert (arrays_out[1] == exp).all()
+    arrays_out = lgdo.explode_arrays(cl, [array, range(len(cl))], arrays_out=arrays_out)
+    assert len(arrays_out) == 2
+    assert (arrays_out[0] == array_exp).all()
+    assert (arrays_out[1] == exp).all()
