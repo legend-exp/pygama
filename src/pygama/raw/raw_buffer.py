@@ -452,14 +452,14 @@ def write_to_lh5_and_clear(
         # If a proc_spec if present for this RawBuffer, process that data and then write to the file!
         if rb.proc_spec is not None:
             # Perform the processing as requested in the `proc_spec` from `out_spec` in build_raw
-            table_to_write = buffer_processor(rb)
+            lgdo_to_write = buffer_processor(rb)
         else:
-            table_to_write = rb.lgdo
+            lgdo_to_write = rb.lgdo
 
         # write if requested...
         if filename != "":
             lh5_store.write_object(
-                table_to_write,
+                lgdo_to_write,
                 rb.out_name,
                 filename,
                 group=group,
