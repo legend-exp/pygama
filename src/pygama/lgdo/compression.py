@@ -7,6 +7,63 @@ import numpy as np
 from numpy.typing import NDArray
 
 
+def radware_compress(sig_in: NDArray, sig_out: NDArray = None) -> NDArray:
+    """Compress a digital signal with `radware-sigcompress`.
+
+    Parameters
+    ----------
+    sig_in
+        array holding the input signal.
+    sig_out
+        pre-allocated array for the compressed signal.
+
+    See Also
+    --------
+    .radware_decompress_encode
+    """
+    if not sig_out:
+        sig_out = np.empty_like(sig_in)
+
+    max_out_len = 2 * len(sig_in)
+    if len(sig_out) < max_out_len:
+        sig_out.resize(max_out_len)
+
+    outlen = _radware_sigcompress_encode(sig_in, sig_out)
+
+    if outlen < len(sig_in):
+        sig_out.resize(outlen)
+
+    return sig_out
+
+
+def radware_decompress(sig_in: NDArray, sig_out: NDArray = None) -> NDArray:
+    """Decompress a digital signal with `radware-sigcompress`.
+
+    Parameters
+    ----------
+    sig_in
+        array holding the input, compressed signal.
+    sig_out
+        pre-allocated array for the decompressed signal.
+
+    See Also
+    --------
+    .radware_decompress_decode
+    """
+    siglen = sig_in[0]
+    if not sig_out:
+        sig_out = np.empty(siglen)
+    elif len(sig_out) < siglen:
+        sig_out.resize(siglen)
+
+    outlen = _radware_sigcompress_decode(sig_in, sig_out)
+
+    if outlen < len(sig_out):
+        sig_out.resize(outlen)
+
+    return sig_out
+
+
 @numba.jit(nopython=True)
 def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
     """Compress a digital signal.
