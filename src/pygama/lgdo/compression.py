@@ -56,14 +56,16 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
     dd = np.frombuffer(db, dtype=np.uintc)
 
     iso += 1
-    while j < len(sig_in):
+    while j < len(sig_in):  # j = starting index of section of signal
+        # find optimal method and length for compression
+        # of next section of signal
         max1 = min1 = sig_in[j]
         max2 = -16000
         min2 = 16000
         nb1 = nb2 = 2
         nw = 1
         i = j + 1
-        while (i < len(sig_in)) and (i < j + 48):
+        while (i < len(sig_in)) and (i < j + 48):  # FIXME: 48 could be tuned better?
             if max1 < sig_in[i]:
                 max1 = sig_in[i]
             if min1 > sig_in[i]:
@@ -75,11 +77,13 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
                 min2 = ds
             nw += 1
             i += 1
-        if max1 - min1 <= max2 - min2:
+        if max1 - min1 <= max2 - min2:  # use absolute values
             nb2 = 99
             while (max1 - min1) > mask[nb1]:
                 nb1 += 1
-            while (i < len(sig_in)) and (i < j + 128):
+            while (i < len(sig_in)) and (
+                i < j + 128
+            ):  # FIXME: 128 could be tuned better?
                 if max1 < sig_in[i]:
                     max1 = sig_in[i]
                 dd1 = max1 - min1
@@ -91,11 +95,13 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
                     min1 = sig_in[i]
                 nw += 1
                 i += 1
-        else:
+        else:  # use difference values
             nb1 = 99
             while max2 - min2 > mask[nb2]:
                 nb2 += 1
-            while (i < len(sig_in)) and (i < j + 128):
+            while (i < len(sig_in)) and (
+                i < j + 128
+            ):  # FIXME: 128 could be tuned better?
                 ds = sig_in[i] - sig_in[i - 1]
                 if max2 < ds:
                     max2 = ds
@@ -111,13 +117,15 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
 
         if bp > 0:
             iso += 1
+        # do actual compression
         sig_out[iso] = nw
         iso += 1
         bp = 0
         if nb1 <= nb2:
-            sig_out[iso] = nb1
+            # encode absolute values
+            sig_out[iso] = nb1  # number of bits used for encoding
             iso += 1
-            sig_out[iso] = min1
+            sig_out[iso] = min1  # min value used for encoding
             iso += 1
 
             i = iso
@@ -127,7 +135,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
 
             i = j
             while i < j + nw:
-                dd[0] = sig_in[i] - min1
+                dd[0] = sig_in[i] - min1  # value to encode
                 dd[0] = dd[0] << (32 - bp - nb1)
                 sig_out[iso] |= db[1]
                 bp += nb1
@@ -138,11 +146,12 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
                 i += 1
 
         else:
-            sig_out[iso] = nb2 + 32
+            # encode derivative / difference values
+            sig_out[iso] = nb2 + 32  # bits used for encoding, plus flag
             iso += 1
-            sig_out[iso] = sig_in[j]
+            sig_out[iso] = sig_in[j]  # starting signal value
             iso += 1
-            sig_out[iso] = min2
+            sig_out[iso] = min2  # min value used for encoding
             iso += 1
 
             i = iso
@@ -152,7 +161,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
 
             i = j + 1
             while i < j + nw:
-                dd[0] = sig_in[i] - sig_in[i - 1] - min2
+                dd[0] = sig_in[i] - sig_in[i - 1] - min2  # value to encode
                 dd[0] = dd[0] << (32 - bp - nb2)
                 sig_out[iso] |= db[1]
                 bp += nb2
@@ -166,7 +175,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
     if bp > 0:
         iso += 1
 
-    return iso
+    return iso  # number of shorts in decompressed signal data
 
 
 @numba.jit(nopython=True)
@@ -210,7 +219,7 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
 
     sig_len_in = len(sig_in)
     j = isi = iso = bp = 0
-    siglen = np.ushort(sig_in[isi])
+    siglen = np.ushort(sig_in[isi])  # signal length
     isi += 1
     db = np.zeros(2, dtype=np.ushort)
     dd = np.frombuffer(db, dtype=np.uintc)
@@ -218,14 +227,14 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
     while (isi < sig_len_in) and (iso < siglen):
         if bp > 0:
             isi += 1
-        bp = 0
-        nw = sig_in[isi]
+        bp = 0  # bit pointer
+        nw = sig_in[isi]  # number of samples encoded in this chunk
         isi += 1
-        nb = sig_in[isi]
+        nb = sig_in[isi]  # number of bits used in compression
         isi += 1
 
         if nb < 32:
-            min_val = sig_in[isi]
+            min_val = sig_in[isi]  # min value used for encoding
             isi += 1
             db[0] = sig_in[isi]
             i = 0
@@ -244,10 +253,11 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
                 i += 1
         else:
             nb -= 32
-            sig_out[iso] = np.short(sig_in[isi])
+            #  decode derivative / difference values
+            sig_out[iso] = np.short(sig_in[isi])  # starting signal value
             iso += 1
             isi += 1
-            min_val = np.short(sig_in[isi])
+            min_val = np.short(sig_in[isi])  # min value used for encoding
             isi += 1
             db[0] = sig_in[isi]
 
@@ -268,49 +278,6 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
         j += nw
 
     if siglen != iso:
-        raise RuntimeError(f"outlen {iso} != siglen {siglen}")
+        raise RuntimeError("failure: unexpected signal length after decompression")
 
-    return siglen
-
-
-# @numba.jit(nopython=True)
-# def nda_to_vect(ndarray, flattened_data, cumulative_length):
-#     """Turn a numpy array to a VectorOfVectors."""
-#     length = 0
-#     cumulative_length[0] = length
-#     i = 0
-#     for sig_in in ndarray:
-#         sig_len_in = len(sig_in)
-#         sig_out = np.empty(sig_len_in, dtype=np.ushort)
-#         iso = radware_compress(sig_in, sig_out, sig_len_in)
-#         flattened_data[length : length + iso] = sig_out[:iso]
-#         i += 1
-#         length += iso
-#         cumulative_length[i] = length
-
-#     return length
-
-
-# @numba.jit(nopython=True)
-# def vect_to_nda(flattened_data, cumulative_length, nda):
-#     """Turn a VectorOfVectors to a Numpy array"""
-#     i = 0
-#     for idx1, idx2 in zip(cumulative_length[:-1], cumulative_length[1:]):
-#         sig_in = flattened_data[idx1:idx2]
-#         sig_len_in = len(sig_in)
-#         radware_decompress(sig_in, nda[i, :], sig_len_in)
-#         i += 1
-
-#     return None
-
-
-# def empty(flattened_data, cumulative_length):
-#     idx1, idx2 = cumulative_length[0], cumulative_length[1]
-#     sig_in = flattened_data[idx1:idx2]
-#     sig_len_in = len(sig_in)
-#     sig_out = np.empty(sig_in[0], dtype=np.ushort)
-#     r = cumulative_length.size - 1
-#     c = radware_decompress(sig_in, sig_out, sig_len_in)
-#     empty_ndarray = np.empty(r * c, dtype=np.ushort).reshape(r, c)
-
-#     return empty_ndarray
+    return siglen  # number of shorts in decompressed signal data
