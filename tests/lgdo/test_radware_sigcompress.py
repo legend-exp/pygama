@@ -23,11 +23,13 @@ def test_rawdware_sigcompress(lgnd_test_data):
     _radware_sigcompress_encode(wf, enc_wf)
 
     assert (enc_wf != wf).all()
+    assert enc_wf.dtype == np.uint16
 
     dec_wf = np.empty_like(wf)
     _radware_sigcompress_decode(enc_wf, dec_wf)
 
     assert (dec_wf == wf).all()
+    assert dec_wf.dtype == np.uint16
 
     comp_wf = radware_compress(wf)
     assert isinstance(comp_wf, np.ndarray)
@@ -36,6 +38,23 @@ def test_rawdware_sigcompress(lgnd_test_data):
     assert isinstance(decomp_wf, np.ndarray)
 
     assert (decomp_wf == wf).all()
+
+
+def test_rawdware_sigcompress_wftable(lgnd_test_data):
+    store = LH5Store()
+    wft, _ = store.read_object(
+        "/geds/raw/waveform",
+        lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
+        n_rows=100,
+    )
+
+    enc_wft = radware_compress(wft)
+    dec_wft = radware_decompress(enc_wft)
+
+    assert dec_wft.t0 == wft.t0
+    assert dec_wft.dt == wft.dt
+    for wf1, wf2 in zip(dec_wft.values, wft.values):
+        assert (wf1 == wf2).all()
 
 
 def test_rawdware_sigcompress_performance(lgnd_test_data):

@@ -6,60 +6,105 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
+from pygama.lgdo import WaveformTable
 
-def radware_compress(sig_in: NDArray, sig_out: NDArray = None) -> NDArray:
-    """Compress a digital signal with `radware-sigcompress`.
+
+def radware_compress(
+    sig_in: NDArray | WaveformTable, sig_out: NDArray | WaveformTable = None
+) -> NDArray | WaveformTable:
+    """Compress digital signal(s) with `radware-sigcompress`.
 
     Parameters
     ----------
     sig_in
-        array holding the input signal.
+        array or waveform table holding the input signal(s).
     sig_out
-        pre-allocated array for the compressed signal.
+        pre-allocated array or waveform table for the compressed signal(s).
 
     See Also
     --------
-    .radware_decompress_encode
+    ._radware_decompress_encode
     """
-    if not sig_out:
-        sig_out = np.empty_like(sig_in)
+    if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
+        if not sig_out:
+            sig_out = np.empty_like(sig_in)
 
-    max_out_len = 2 * len(sig_in)
-    if len(sig_out) < max_out_len:
-        sig_out.resize(max_out_len)
+        max_out_len = 2 * len(sig_in)
+        if len(sig_out) < max_out_len:
+            sig_out.resize(max_out_len)
 
-    outlen = _radware_sigcompress_encode(sig_in, sig_out)
+        outlen = _radware_sigcompress_encode(sig_in, sig_out)
 
-    if outlen < len(sig_in):
-        sig_out.resize(outlen)
+        if outlen < len(sig_in):
+            sig_out.resize(outlen)
+
+    elif isinstance(sig_in, WaveformTable):
+        if not sig_out:
+            # initialize output table
+            # sig_out.values will be a VectorOfVectors
+            sig_out = WaveformTable(
+                size=len(sig_in),
+                dtype=sig_in.values.dtype,
+                t0=sig_in.t0,
+                dt=sig_in.dt,
+                attrs=sig_in.attrs,
+            )
+
+        for i, wf in enumerate(sig_in.values):
+            sig_out.values.set_vector(i, radware_compress(wf))
+
+    else:
+        raise ValueError(f"Unsupported input signal type ({type(sig_in)})")
 
     return sig_out
 
 
-def radware_decompress(sig_in: NDArray, sig_out: NDArray = None) -> NDArray:
-    """Decompress a digital signal with `radware-sigcompress`.
+def radware_decompress(
+    sig_in: NDArray | WaveformTable, sig_out: NDArray | WaveformTable = None
+) -> NDArray | WaveformTable:
+    """Decompress digital signal(s) with `radware-sigcompress`.
 
     Parameters
     ----------
     sig_in
-        array holding the input, compressed signal.
+        array or waveform table holding the input, compressed signal(s).
     sig_out
-        pre-allocated array for the decompressed signal.
+        pre-allocated array or waveform table for the decompressed signal(s).
 
     See Also
     --------
-    .radware_decompress_decode
+    ._radware_decompress_decode
     """
-    siglen = sig_in[0]
-    if not sig_out:
-        sig_out = np.empty(siglen)
-    elif len(sig_out) < siglen:
-        sig_out.resize(siglen)
+    if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
+        siglen = int(sig_in[0])
+        if not sig_out:
+            sig_out = np.empty(siglen)
+        elif len(sig_out) < siglen:
+            sig_out.resize(siglen)
 
-    outlen = _radware_sigcompress_decode(sig_in, sig_out)
+        outlen = _radware_sigcompress_decode(sig_in, sig_out)
 
-    if outlen < len(sig_out):
-        sig_out.resize(outlen)
+        if outlen < len(sig_out):
+            sig_out.resize(outlen)
+
+    elif isinstance(sig_in, WaveformTable):
+        if not sig_out:
+            # initialize output table
+            # sig_out.values will be a VectorOfVectors because that's the most
+            # general format
+            sig_out = WaveformTable(
+                size=len(sig_in),
+                dtype=sig_in.values.dtype,
+                t0=sig_in.t0,
+                dt=sig_in.dt,
+                attrs=sig_in.attrs,
+            )
+
+        for i, wf in enumerate(sig_in.values):
+            sig_out.values.set_vector(i, radware_decompress(wf))
+
+    else:
+        raise ValueError(f"Unsupported input signal type ({type(sig_in)})")
 
     return sig_out
 
@@ -73,7 +118,8 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
 
     .. [1] `radware-sigcompress source code
        <https://legend-exp.github.io/legend-data-format-specs/dev/data_compression/#radware-sigcompress-1>`_.
-       released under MIT license `[Copyright (c) 2018, David C. Radford <radforddc@ornl.gov>]`.
+       released under MIT license `[Copyright (c) 2018, David C. Radford
+       <radforddc@ornl.gov>]`.
 
     Parameters
     ----------
@@ -122,7 +168,8 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
         nb1 = nb2 = 2
         nw = 1
         i = j + 1
-        while (i < len(sig_in)) and (i < j + 48):  # FIXME: 48 could be tuned better?
+        # FIXME: 48 could be tuned better?
+        while (i < len(sig_in)) and (i < j + 48):
             if max1 < sig_in[i]:
                 max1 = sig_in[i]
             if min1 > sig_in[i]:
