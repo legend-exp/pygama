@@ -69,7 +69,7 @@ from .get_multi_local_extrema import get_multi_local_extrema
 from .histogram import histogram, histogram_stats
 from .linear_slope_fit import linear_slope_fit
 from .log_check import log_check
-from .min_max import min_max
+from .min_max import min_max, min_max_norm
 from .moving_windows import (
     avg_current,
     moving_window_left,
@@ -110,6 +110,7 @@ __all__ = [
     "linear_slope_fit",
     "log_check",
     "min_max",
+    "min_max_norm",
     "avg_current",
     "moving_window_left",
     "moving_window_multi",
