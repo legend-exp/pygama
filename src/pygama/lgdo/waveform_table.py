@@ -114,6 +114,7 @@ class WaveformTable(Table):
             if nda.shape != shape:
                 nda.resize(shape, refcheck=True)
             t0 = Array(nda=nda)
+
         if t0_units is not None:
             t0.attrs["units"] = f"{t0_units}"
 

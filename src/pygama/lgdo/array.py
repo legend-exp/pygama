@@ -89,6 +89,12 @@ class Array(LGDO):
         new_shape = (new_size,) + self.nda.shape[1:]
         self.nda.resize(new_shape, refcheck=True)
 
+    def __eq__(self, other: Array) -> bool:
+        if isinstance(other, Array):
+            return self.attrs == other.attrs and (self.nda == other.nda).all()
+        else:
+            return False
+
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()
         tmp_attrs.pop("datatype")

@@ -5,6 +5,7 @@ variable-length arrays and corresponding utilities.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
@@ -100,6 +101,18 @@ class VectorOfVectors(LGDO):
         """Provides ``__len__`` for this array-like class."""
         return len(self.cumulative_length)
 
+    def __eq__(self, other: VectorOfVectors) -> bool:
+        if isinstance(other, VectorOfVectors):
+            return (
+                (self.flattened_data == other.flattened_data).all()
+                and (self.cumulative_length == other.cumulative_length).all()
+                and self.dtype == other.dtype
+                and self.attrs == other.attrs
+            )
+
+        else:
+            return False
+
     def resize(self, new_size: int) -> None:
         self.cumulative_length.resize(new_size)
 
@@ -140,7 +153,7 @@ class VectorOfVectors(LGDO):
 
         return self.flattened_data.nda[start:end]
 
-    def __iter__(self) -> VectorOfVectors:
+    def __iter__(self) -> Iterator[np.ndarray]:
         self.index = 0
         return self
 

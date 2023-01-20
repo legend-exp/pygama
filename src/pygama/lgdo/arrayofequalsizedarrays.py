@@ -4,6 +4,7 @@ corresponding utilities.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import numpy
@@ -79,3 +80,9 @@ class ArrayOfEqualSizedArrays(Array):
 
     def __len__(self) -> int:
         return len(self.nda)
+
+    def __iter__(self) -> Iterator[numpy.array]:
+        return self.nda.__iter__()
+
+    def __next__(self) -> numpy.ndarray:
+        return self.nda.__next__()
