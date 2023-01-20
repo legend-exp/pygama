@@ -1,0 +1,166 @@
+{
+  "outputs": [
+    "curr",
+    "energies",
+    "trigger_pos",
+    "wf_dplms",
+    "energies_dplms",
+    "trigger_pos_dplms"
+  ],
+  "processors": {
+    "wf_gaus": {
+      "function": "gaussian_filter1d",
+      "module": "pygama.dsp.processors.gaussian_filter1d",
+      "args": ["waveform", "wf_gaus(len(waveform))"],
+      "init_args": ["1", "4.0"],
+      "unit": "ADC"
+    },
+    "curr": {
+      "function": "avg_current",
+      "module": "pygama.dsp.processors.moving_windows",
+      "args": ["wf_gaus", 5, "curr(len(wf_gaus)-5)"],
+      "unit": "ADC"
+    },
+    "hist_weights , hist_borders": {
+      "function": "histogram",
+      "module": "pygama.dsp.processors.histogram",
+      "args": ["curr", "hist_weights(100)", "hist_borders(101)"],
+      "unit": ["none", "ADC"]
+    },
+    "fwhm, idx_out_c, max_out": {
+      "function": "histogram_stats",
+      "module": "pygama.dsp.processors.histogram",
+      "args": [
+        "hist_weights",
+        "hist_borders",
+        "idx_out_c",
+        "max_out",
+        "fwhm",
+        "np.nan"
+      ],
+      "unit": ["ADC", "non", "ADC"]
+    },
+    "vt_max_candidate_out, vt_min_out, n_max_out, n_min_out": {
+      "function": "get_multi_local_extrema",
+      "module": "pygama.dsp.processors.get_multi_local_extrema",
+      "args": [
+        "curr",
+        5,
+        0.1,
+        1,
+        "3*fwhm",
+        0,
+        "vt_max_candidate_out(20)",
+        "vt_min_out(20)",
+        "n_max_out",
+        "n_min_out"
+      ],
+      "unit": ["ns", "ns", "none", "none"]
+    },
+    "trigger_pos, no_out": {
+      "function": "peak_snr_threshold",
+      "module": "pygama.dsp.processors.peak_snr_threshold",
+      "args": [
+        "curr",
+        "vt_max_candidate_out",
+        0.8,
+        10,
+        "trigger_pos",
+        "no_out"
+      ],
+      "unit": ["ns", "none"]
+    },
+    "energies": {
+      "function": "multi_a_filter",
+      "module": "pygama.dsp.processors.multi_a_filter",
+      "args": ["curr", "trigger_pos", "energies"],
+      "unit": ["ADC"]
+    },
+    "bl_mean , bl_std, bl_slope, bl_intercept": {
+      "function": "linear_slope_fit",
+      "module": "pygama.dsp.processors",
+      "args": [
+        "waveform[:50]",
+        "bl_mean",
+        "bl_std",
+        "bl_slope",
+        "bl_intercept"
+      ],
+      "unit": ["ADC", "ADC", "ADC", "ADC"]
+    },
+    "wf_diff": {
+      "function": "avg_current",
+      "module": "pygama.dsp.processors",
+      "args": ["waveform", 1, "wf_diff(len(waveform)-1)"],
+      "unit": "ADC"
+    },
+    "wf_dplms": {
+      "function": "dplms_filter",
+      "module": "pygama.dsp.processors",
+      "args": ["wf_diff", "wf_dplms(len(wf_diff)-49, 'f')"],
+      "unit": "ADC",
+      "init_args": [
+        "db.dplms.noise_matrix",
+        "db.dplms.reference",
+        "50",
+        "0.01",
+        "1",
+        "0",
+        "0"
+      ]
+    },
+    "h_weights , h_borders": {
+      "function": "histogram",
+      "module": "pygama.dsp.processors.histogram",
+      "args": ["wf_dplms", "h_weights(100)", "h_borders(101)"],
+      "unit": ["none", "ADC"]
+    },
+    "fwhm_d, idx_out_d, max_out_d": {
+      "function": "histogram_stats",
+      "module": "pygama.dsp.processors.histogram",
+      "args": [
+        "h_weights",
+        "h_borders",
+        "idx_out_d",
+        "max_out_d",
+        "fwhm_d",
+        "np.nan"
+      ],
+      "unit": ["ADC", "non", "ADC"]
+    },
+    "vt_max_candidate_out_d, vt_min_out_d, n_max_out_d, n_min_out_d": {
+      "function": "get_multi_local_extrema",
+      "module": "pygama.dsp.processors.get_multi_local_extrema",
+      "args": [
+        "wf_dplms",
+        10,
+        "3*fwhm_d",
+        0,
+        "vt_max_candidate_out_d(20)",
+        "vt_min_out_d(20)",
+        "n_max_out_d",
+        "n_min_out_d"
+      ],
+      "unit": ["ns", "ns", "none", "none"]
+    },
+    "trigger_pos_dplms, no_out_d": {
+      "function": "peak_snr_threshold",
+      "module": "pygama.dsp.processors.peak_snr_threshold",
+      "args": [
+        "wf_dplms",
+        "vt_max_candidate_out_d",
+        0.8,
+        10,
+        "trigger_pos_dplms",
+        "no_out_d"
+      ],
+      "unit": ["ns", "none"]
+    },
+    "energies_dplms": {
+      "function": "multi_a_filter",
+      "module": "pygama.dsp.processors.multi_a_filter",
+      "args": ["wf_dplms", "trigger_pos_dplms", "energies_dplms"],
+      "unit": ["ADC"]
+    }
+  }
+}

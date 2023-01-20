@@ -1,3 +1,4 @@
+import logging
 import multiprocessing as mp
 from collections import namedtuple
 from multiprocessing import get_context
@@ -6,6 +7,8 @@ from pprint import pprint
 import numpy as np
 
 from pygama.dsp import build_processing_chain
+
+log = logging.getLogger(__name__)
 
 
 def run_one_dsp(
@@ -132,10 +135,11 @@ class ParGrid:
         return name, parameter, value_str
 
     def print_data(self, indices):
-        print(f"Grid point at indices {indices}:")
+        print_string = f"Grid point at indices {indices}:"
         for i_dim, i_par in enumerate(indices):
             name, parameter, value_str = self.get_data(i_dim, i_par)
-            print(f"{name}.{parameter} = {value_str}")
+            print_string += f"\n {name}.{parameter} = {value_str}"
+        return print_string
 
     def set_dsp_pars(self, db_dict, indices):
         if db_dict is None:
@@ -191,14 +195,12 @@ def run_grid(
 
     grid_values = np.ndarray(shape=grid.get_shape(), dtype="O")
     iii = grid.get_zero_indices()
-    if verbosity > 0:
-        print("starting grid calculations...")
+    log.info("starting grid calculations...")
     while True:
         db_dict = grid.set_dsp_pars(db_dict, iii)
         if verbosity > 1:
             pprint(dsp_config)
-        if verbosity > 0:
-            grid.print_data(iii)
+        log.debug(grid.print_data(iii))
         grid_values[tuple(iii)] = run_one_dsp(
             tb_data,
             dsp_config,
@@ -207,8 +209,7 @@ def run_grid(
             verbosity=verbosity,
             fom_kwargs=fom_kwargs,
         )
-        if verbosity > 0:
-            print("value:", grid_values[tuple(iii)])
+        log.debug("value:", grid_values[tuple(iii)])
         if not grid.iterate_indices(iii):
             break
     return grid_values
@@ -232,11 +233,9 @@ def run_grid_point(
     for index, grid in zip(iii, grids):
         db_dict = grid.set_dsp_pars(db_dict, index)
 
-    if verbosity > 1:
-        pprint(dsp_config)
-    if verbosity > 0:
-        [grid.print_data(iii[i]) for i, grid in enumerate(grids)]
-        print(" ")
+    log.debug(db_dict)
+    for i, grid in enumerate(grids):
+        log.debug(grid.print_data(iii[i]))
     tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict, verbosity=verbosity)
     res = np.ndarray(shape=len(grids), dtype="O")
     if fom_function:
@@ -251,7 +250,7 @@ def run_grid_point(
                     res[i] = fom_function[i](tb_out, verbosity)
                 else:
                     res[i] = fom_function[0](tb_out, verbosity)
-        print("value:", res)
+        log.debug("value:", res)
         out = {"indexes": [tuple(ii) for ii in iii], "results": res}
 
     else:
@@ -271,7 +270,7 @@ def get_grid_points(grid):
 
         for i, gri in enumerate(zip(iii, grid)):
             if not gri[1].iterate_indices(gri[0]):
-                print(f"{i} grid end")
+                log.info(f"{i} grid end")
                 iii[i] = gri[1].get_zero_indices()
                 complete[i] = True
         if all(complete):

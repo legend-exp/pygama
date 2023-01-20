@@ -57,11 +57,14 @@ class DataDecoder:
             "garbage_code", lgdo.Array(shape=garbage_length, dtype="uint32")
         )
 
-    def get_key_list(self) -> list[int | str]:
-        """Overload with list of keys for this decoder, e.g. ``return
-        range(n_channels)``.  The default version works for decoders with
+    def get_key_lists(self) -> list[list[int | str]]:
+        """Return a list of lists of keys available for this decoder.
+        Each list must contain keys that can share a buffer, i.e. decoded_values
+        is exactly the same (including e.g. waveform length) for all keys in the list.
+        Overload with lists of keys for this decoder, e.g. ``return
+        [range(n_channels)]``.  The default version works for decoders with
         single / no keys."""
-        return [None]
+        return [[None]]
 
     def get_decoded_values(self, key: int | str = None) -> dict:
         """Get decoded values (optionally for a given key, typically a channel).

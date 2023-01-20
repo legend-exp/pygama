@@ -93,13 +93,13 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         objs = []
         for obj in gc.get_objects():
             try:
-                if isinstance(obj, ORFlashCamADCWaveformDecoder):
+                if isinstance(obj, ORFlashCamWaveformDecoder):
                     objs.append(obj)
             except ReferenceError:
                 # avoids "weakly-referenced object no longer exists"
                 pass
         if len(objs) != 1:
-            log.warning(f"got {len(objs)} ORFlashCamADCWaveformDecoders in memory!")
+            log.warning(f"got {len(objs)} ORFlashCam Waveform Decoders in memory!")
         else:
             objs[0].assert_nsamples(tbl["nsamples"].nda[ii], tbl["fcid"].nda[ii])
 
@@ -123,7 +123,7 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
         )
 
 
-class ORFlashCamADCWaveformDecoder(OrcaDecoder):
+class ORFlashCamWaveformDecoder(OrcaDecoder):
     """Decoder for FlashCam ADC data written by ORCA."""
 
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
@@ -143,6 +143,9 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         self.nadc = {}  # dict[fcid]
         super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
+        self.ch_orca_mask = 0x00003E00
+        self.ch_orca_shift = 9
+        self.channel_mask = 0x000001FF
 
     def set_header(self, header: OrcaHeader) -> None:
         self.header = header
@@ -156,6 +159,7 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
                 raise ValueError("got fcid=0 unexpectedly!")
 
             obj_info_dict = header.get_object_info("ORFlashCamADCModel")
+            obj_info_dict.update(header.get_object_info("ORFlashCamADCStdModel"))
             self.nadc[fcid] = 0
             for child in info["children"]:
                 # load self.fcid
@@ -164,6 +168,11 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
                     self.fcid[crate] = {}
                 card = child["station"]
                 self.fcid[crate][card] = fcid
+
+                if crate not in obj_info_dict:
+                    raise RuntimeError(f"no crate {crate} in obj_info_dict")
+                if card not in obj_info_dict[crate]:
+                    raise RuntimeError(f"no card {card} in obj_info_dict[{crate}]")
 
                 # load self.nadc
                 self.nadc[fcid] += np.count_nonzero(
@@ -180,17 +189,18 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
             ]
             self.decoded_values[fcid] = copy.deepcopy(self.decoded_values_template)
             self.decoded_values[fcid]["waveform"]["wf_len"] = wf_len
+            log.debug(f"fcid {fcid}: {self.nadc[fcid]} adcs, wf_len = {wf_len}")
 
-    def get_key_list(self) -> list[int]:
-        key_list = []
+    def get_key_lists(self) -> list[list[int]]:
+        key_lists = []
         for fcid, nadc in self.nadc.items():
-            key_list += list(get_key(fcid, np.array(range(nadc))))
-        return key_list
+            key_lists.append(list(get_key(fcid, np.array(range(nadc)))))
+        return key_lists
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
         if key is None:
-            dec_vals_list = self.decoded_values.values()
-            if len(dec_vals_list) >= 0:
+            dec_vals_list = list(self.decoded_values.values())
+            if len(dec_vals_list) > 0:
                 return dec_vals_list[0]
             raise RuntimeError("decoded_values not built")
         fcid = get_fcid(key)
@@ -219,8 +229,8 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
         crate = (packet[2] & 0xF8000000) >> 27
         card = (packet[2] & 0x07C00000) >> 22
         fcid = self.fcid[crate][card]
-        ch_orca = (packet[2] & 0x00003C00) >> 10
-        channel = packet[2] & 0x000003FF
+        ch_orca = (packet[2] & self.ch_orca_mask) >> self.ch_orca_shift
+        channel = packet[2] & self.channel_mask
         key = get_key(fcid, channel)
 
         # get the table for this crate/card/channel
@@ -311,3 +321,11 @@ class ORFlashCamADCWaveformDecoder(OrcaDecoder):
 
         evt_rbkd[key].loc += 1
         return evt_rbkd[key].is_full()
+
+
+class ORFlashCamADCWaveformDecoder(ORFlashCamWaveformDecoder):
+    def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
+        super().__init__(header=header, **kwargs)
+        self.ch_orca_mask = 0x00003C00
+        self.ch_orca_shift = 10
+        self.channel_mask = 0x000003FF

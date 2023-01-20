@@ -40,5 +40,4 @@ class FixedSizeArray(Array):
         )
 
     def datatype_name(self) -> str:
-        """The name for this object's HDF5 datatype attribute."""
         return "fixedsize_array"

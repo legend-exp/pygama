@@ -21,7 +21,22 @@ import pygama.pargen.energy_cal as pgc
 log = logging.getLogger(__name__)
 
 
-def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
+def get_keys(in_data, parameters):
+    out_params = []
+    if isinstance(in_data, dict):
+        possible_keys = in_data.keys()
+    elif isinstance(in_data, list):
+        possible_keys = in_data
+    for param in parameters:
+        for key in possible_keys:
+            if key in param:
+                out_params.append(key)
+    return np.unique(out_params).tolist()
+
+
+def generate_cuts(
+    data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 2
+) -> dict:
     """
     Finds double sided cut boundaries for a file for the parameters specified
 
@@ -34,12 +49,34 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
     """
 
     output_dict = {}
+    if isinstance(data, pd.DataFrame):
+        pass
+    elif isinstance(data, lh5.Table):
+        data = {entry: data[entry].nda for entry in get_keys(data, parameters)}
+        data = pd.DataFrame.from_dict(data)
+    elif isinstance(data, dict):
+        data = pd.DataFrame.from_dict(data)
     for par in parameters.keys():
+        if isinstance(parameters[par], dict):
+            if "Lower Boundary" in list(parameters[par]) or "Upper Boundary" in list(
+                parameters[par]
+            ):
+                output_dict[par] = parameters[par].copy()
+                if "Lower Boundary" not in parameters[par]:
+                    output_dict[par]["Lower Boundary"] = -np.inf
+                if "Upper Boundary" not in parameters[par]:
+                    output_dict[par]["Upper Boundary"] = np.inf
+                continue
         num_sigmas = parameters[par]
-        par_array = data[par]
-        if not isinstance(par_array, np.ndarray):
-            par_array = par_array.nda
-        counts, start_bins, var = pgh.get_hist(par_array, 10**5)
+        try:
+            all_par_array = data[par].to_numpy()
+        except KeyError:
+            all_par_array = data.eval(par).to_numpy()
+        idxs = (all_par_array > np.nanpercentile(all_par_array, 1)) & (
+            all_par_array < np.nanpercentile(all_par_array, 99)
+        )
+        par_array = all_par_array[idxs]
+        counts, start_bins, var = pgh.get_hist(par_array, 1000)
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
@@ -47,17 +84,34 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
                 counts,
                 start_bins,
                 mode_guess=mu,
-                n_bins=10,
+                n_bins=50,
                 cost_func="Least Squares",
                 inflate_errors=False,
                 gof_method="var",
             )
 
-            guess_sig = pars[2]
+            guess_mu, guess_sig, guess_amp = pars
 
-            lower_bound = mu - 10 * guess_sig
+            lower_bound = guess_mu - 10 * guess_sig
 
-            upper_bound = mu + 10 * guess_sig
+            upper_bound = guess_mu + 10 * guess_sig
+
+            if lower_bound < np.nanmin(par_array) or upper_bound > np.nanmax(par_array):
+                pars, cov = pgf.gauss_mode_width_max(
+                    counts,
+                    start_bins,
+                    mode_guess=mu,
+                    n_bins=5,
+                    cost_func="Least Squares",
+                    inflate_errors=False,
+                    gof_method="var",
+                )
+
+            guess_mu, guess_sig, guess_amp = pars
+
+            lower_bound = guess_mu - 10 * guess_sig
+
+            upper_bound = guess_mu + 10 * guess_sig
 
         except:
             bin_range = 1000
@@ -75,15 +129,30 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
 
             upper_bound = start_bins[upper_bound_idx]
 
+        if lower_bound < np.nanmin(par_array):
+            lower_bound = np.nanmin(par_array)
+        if upper_bound > np.nanmax(par_array):
+            upper_bound = np.nanmax(par_array)
+
         try:
             counts, bins, var = pgh.get_hist(
-                par_array, bins=1000, range=(lower_bound, upper_bound)
+                par_array, bins=200, range=(lower_bound, upper_bound)
             )
 
             bin_centres = pgh.get_bin_centers(bins)
 
             fwhm = pgh.get_fwhm(counts, bins)[0]
             mean = float(bin_centres[np.argmax(counts)])
+            pars, cov = pgf.gauss_mode_width_max(
+                counts,
+                bins,
+                mode_guess=mean,
+                n_bins=20,
+                cost_func="Least Squares",
+                inflate_errors=False,
+                gof_method="var",
+            )
+            mean - pars[0]
             std = fwhm / 2.355
         except IndexError:
             bin_range = 5000
@@ -113,15 +182,23 @@ def generate_cuts(data: dict[str, np.ndarray], parameters: list[str]) -> dict:
             num_sigmas_left = num_sigmas
             num_sigmas_right = num_sigmas
         elif isinstance(num_sigmas, dict):
-            num_sigmas_left = num_sigmas["left"]
-            num_sigmas_right = num_sigmas["right"]
+            if "left" in num_sigmas:
+                num_sigmas_left = num_sigmas["left"]
+            else:
+                num_sigmas["left"] = -np.inf
+                num_sigmas_left = -np.inf
+            if "right" in num_sigmas:
+                num_sigmas_right = num_sigmas["right"]
+            else:
+                num_sigmas["right"] = np.inf
+                num_sigmas_right = np.inf
         upper = float((num_sigmas_right * std) + mean)
         lower = float((-num_sigmas_left * std) + mean)
         output_dict[par] = {
-            "Mean Value": mean,
+            "Mean Value": round(mean, rounding),
             "Sigmas Cut": num_sigmas,
-            "Upper Boundary": upper,
-            "Lower Boundary": lower,
+            "Upper Boundary": round(upper, rounding),
+            "Lower Boundary": round(lower, rounding),
         }
     return output_dict
 
@@ -143,14 +220,25 @@ def get_cut_indexes(
 
     indexes = None
     keys = cut_dict.keys()
+    if isinstance(all_data, pd.DataFrame):
+        pass
+    elif isinstance(all_data, lh5.Table):
+        cut_keys = list(cut_dict)
+        cut_keys.append(energy_param)
+        all_data = {
+            entry: all_data[entry].nda for entry in get_keys(all_data, cut_keys)
+        }
+        all_data = pd.DataFrame.from_dict(all_data)
+    elif isinstance(all_data, dict):
+        all_data = pd.DataFrame.from_dict(all_data)
     for cut in keys:
-        data = all_data[cut]
-        if not isinstance(data, np.ndarray):
-            data = data.nda
-
+        try:
+            data = all_data[cut]
+        except KeyError:
+            data = all_data.eval(cut).to_numpy()
         upper = cut_dict[cut]["Upper Boundary"]
         lower = cut_dict[cut]["Lower Boundary"]
-        idxs = (data < upper) & (data > lower)
+        idxs = (data < upper) & (data > lower) & (~np.isnan(data))
         percent = 100 * len(np.where(idxs)[0]) / len(idxs)
         log.info(f"{percent:.2f}% passed {cut} cut")
 
@@ -166,12 +254,16 @@ def get_cut_indexes(
     return indexes
 
 
-def cut_dict_to_hit_dict(cut_dict):
+def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
     out_dict = {}
-    for param in cut_dict:
+    symbols = "/-+*"
+    replacewith = "_"
+    for i, param in enumerate(cut_dict):
 
-        out_dict[f"{param}_cut"] = {
-            "expression": f"(a<{param})&({param}<b)",
+        out_dict[
+            f"{''.join(replacewith  if c in symbols else c for c in param).replace('(','').replace(')','')}_cut"
+        ] = {
+            "expression": f"(a<({param}))&(({param})<b)",
             "parameters": {
                 "a": cut_dict[param]["Lower Boundary"],
                 "b": cut_dict[param]["Upper Boundary"],
@@ -179,9 +271,9 @@ def cut_dict_to_hit_dict(cut_dict):
         }
     quality_cut_exp = ""
     for par in list(cut_dict)[:-1]:
-        quality_cut_exp += f"({par}_cut)&"
-    quality_cut_exp += f"({list(cut_dict)[-1]}_cut)"
-    out_dict["Quality_cuts"] = {"expression": quality_cut_exp, "parameters": {}}
+        quality_cut_exp += f"({''.join(replacewith  if c in symbols else c for c in par).replace('(','').replace(')','')}_cut)&"
+    quality_cut_exp += f"({''.join(replacewith  if c in symbols else c for c in list(cut_dict)[-1]).replace('(','').replace(')','')}_cut)"
+    out_dict[final_cut_field] = {"expression": quality_cut_exp, "parameters": {}}
     return out_dict
 
 
