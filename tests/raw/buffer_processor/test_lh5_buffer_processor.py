@@ -277,7 +277,7 @@ def test_lh5_buffer_processor_file_size_decrease(lgnd_test_data):
             sto.read_object(str(raw_group) + "/waveform/values", raw_file)[0].nda
         )
 
-        # Make sure that we are actually procming the waveforms
+        # Make sure that we are actually processing the waveforms
         raw_packet_waveform_values = sto.read_object(
             str(raw_group) + "/waveform/values", raw_file
         )
@@ -625,8 +625,8 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
         # Read in the presummed rate from the config file to modify the clock rate later
         group_name = raw_group.split("/raw")[0]
         pass_flag = False
-        # If the user passes procming on a group, then the presum_rate is just 1 and there is no windowing
-        # If a group_name is absent from the jsonfile, then that means no procming was performed
+        # If the user passes processing on a group, then the presum_rate is just 1 and there is no windowing
+        # If a group_name is absent from the jsonfile, then that means no processing was performed
         if group_name not in jsonfile.keys():
             presum_rate = 1
             window_start_index = 0
@@ -844,7 +844,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     # Build the raw file
     build_raw(in_stream=daq_file, out_spec=raw_out_spec, overwrite=True)
 
-    # Do the data procming on the raw file
+    # Do the data processing on the raw file
     lh5_buffer_processor(
         lh5_raw_file_in=raw_file, overwrite=True, out_spec=proc_out_spec
     )
@@ -883,8 +883,8 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
         group_name = raw_group.split("/raw")[0]
 
         pass_flag = False
-        # If the user passes procming on a group, then the presum_rate is just 1 and there is no windowing
-        # If the group_name is absent from the jsonfile, then no procming was done
+        # If the user passes processing on a group, then the presum_rate is just 1 and there is no windowing
+        # If the group_name is absent from the jsonfile, then no processing was done
         if group_name not in jsonfile.keys():
             presum_rate = 1
             window_start_index = 0

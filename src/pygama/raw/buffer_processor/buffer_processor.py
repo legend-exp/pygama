@@ -9,7 +9,7 @@ import numpy as np
 import pygama.lgdo as lgdo
 from pygama.dsp.errors import ProcessingChainError
 from pygama.dsp.processing_chain import build_processing_chain as bpc
-from pygama.lgdo import Array, ArrayOfEqualSizedArrays
+from pygama.lgdo import Array, ArrayOfEqualSizedArrays, Table
 
 if TYPE_CHECKING:
     from pygama.raw.raw_buffer import RawBuffer
@@ -17,10 +17,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-def buffer_processor(rb: RawBuffer) -> None:
+def buffer_processor(rb: RawBuffer) -> Table:
     r"""
     Takes in a :class:`.RawBuffer`, performs any processes specified in the :class:`.RawBuffer`'s ``proc_spec``
-    attribute. Currently implemented attributes:
+    attribute, and returns a :class:`pygama.lgdo.Table` with the processed buffer. This `tmp_table` shares columns with the :class:`.RawBuffer`'s lgdo,
+    so no data is copied. Currently implemented attributes:
 
     - "window" (list): [in_name, start_index, stop_index, out_name]
       Windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
@@ -42,7 +43,9 @@ def buffer_processor(rb: RawBuffer) -> None:
 
     Notes
     -----
-    The original "waveforms" column in the table is deleted if requested! All updates to the rb.lgdo are done in place
+    The original "waveforms" column in the table is not written to file if request! All updates are done on the
+    `tmp_table`, which shares the fields with `rb.lgdo` and are done in place. The `tmp_table` is necessary so that
+    the `rb.lgdo` keeps arrays needed by the table in the buffer.
     An example ``proc_spec`` in an :mod:`pygama.raw.build_raw` ``out_spec`` is below
 
     .. code-block:: json
@@ -89,37 +92,39 @@ def buffer_processor(rb: RawBuffer) -> None:
 
     """
     # Check that there is a valid object to process
+    if isinstance(rb.lgdo, lgdo.Table) or isinstance(rb.lgdo, lgdo.Struct):
+        # Create the temporary table that will be written to file
+        rb_table_size = rb.lgdo.size
+        tmp_table = Table(size=rb_table_size)
+        tmp_table.join(other_table=rb.lgdo)
+
     # This is needed if there is a "*" key expansion for decoders in build_raw
-    if isinstance(rb.lgdo, lgdo.Scalar):
-        log.info("Cannot process rb.lgdo of type Scalar")
-        return None
+    # In the worst case, just return an unprocessed rb.lgdo
+    else:
+        log.info(f"Cannot process buffer with an lgdo of type {type(rb.lgdo)}")
+        tmp_table = rb.lgdo
+        return tmp_table
 
     # Perform windowing, if requested
     if "window" in rb.proc_spec.keys():
-        process_window(rb)
+        process_window(rb, tmp_table)
 
     # Read in and perform the DSP routine
     if "dsp_config" in rb.proc_spec.keys():
-        process_dsp(rb)
+        process_dsp(rb, tmp_table)
 
     # Cast as requested dtype before writing to the table
     if "dtype_conv" in rb.proc_spec.keys():
-        process_dtype_conv(rb)
+        process_dtype_conv(rb, tmp_table)
 
     # Drop any requested columns from the table
     if "drop" in rb.proc_spec.keys():
-        for drop_keys in rb.proc_spec["drop"]:
-            try:
-                rb.lgdo.pop(drop_keys)
-                rb.lgdo.update_datatype()
-            except KeyError:
-                log.info(f"Cannot remove field {drop_keys} from rb.lgdo")
-                return None
+        process_drop(rb, tmp_table)
 
-    return None
+    return tmp_table
 
 
-def process_window(rb: RawBuffer) -> None:
+def process_window(rb: RawBuffer, tmp_table: Table) -> None:
     r"""
     Windows arrays of equal sized arrays according to specifications
     given in the rb.proc_spec "window" key.
@@ -135,6 +140,8 @@ def process_window(rb: RawBuffer) -> None:
     ----------
     rb
         A :class:`.RawBuffer` to be processed
+    tmp_table
+        A :class:`pygama.lgdo.Table` that shares columns with the `rb.lgdo`
 
     Notes
     -----
@@ -160,7 +167,7 @@ def process_window(rb: RawBuffer) -> None:
             )
 
             # Window the waveform values
-            array_of_arrays = rb.lgdo[window_in_name].values
+            array_of_arrays = tmp_table[window_in_name].values
             windowed_array_of_arrays = window_array_of_arrays(
                 array_of_arrays, window_start_idx, window_end_idx
             )
@@ -170,16 +177,16 @@ def process_window(rb: RawBuffer) -> None:
                 t0=t0s, dt=rb.lgdo[window_in_name].dt, values=windowed_array_of_arrays
             )
 
-            # add this wf_table to the original table
-            rb.lgdo.add_field(window_out_name, wf_table, use_obj_size=True)
+            # add this wf_table to the temporary table
+            tmp_table.add_field(window_out_name, wf_table, use_obj_size=True)
 
         # otherwise, it's (hopefully) just an array of equal sized arrays
         else:
-            array_of_arrays = rb.lgdo[window_in_name]
+            array_of_arrays = tmp_table[window_in_name]
             windowed_array_of_arrays = window_array_of_arrays(
                 array_of_arrays, window_start_idx, window_end_idx
             )
-            rb.lgdo.add_field(
+            tmp_table.add_field(
                 window_out_name, windowed_array_of_arrays, use_obj_size=True
             )
 
@@ -187,13 +194,13 @@ def process_window(rb: RawBuffer) -> None:
 
     # otherwise, rb.lgdo is some other type and we only process it if the rb.out_name is the same as window_in_name
     elif rb.out_name == window_in_name:
-        array_of_arrays = rb.lgdo
+        array_of_arrays = tmp_table
         windowed_array_of_arrays = window_array_of_arrays(
             array_of_arrays, window_start_idx, window_end_idx
         )
 
         rb.out_name = window_out_name
-        rb.lgdo = windowed_array_of_arrays
+        tmp_table = windowed_array_of_arrays
 
         return None
 
@@ -233,10 +240,17 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     return copy_t0s
 
 
-def process_dsp(rb: RawBuffer) -> None:
+def process_dsp(rb: RawBuffer, tmp_table: Table) -> None:
     r"""
     Run a provided DSP config from rb.proc_spec using build_processing_chain, and add specified outputs to the
     rb.lgdo.
+
+    Parameters
+    ----------
+    rb
+        A :class:`.RawBuffer` that contains a `proc_spec` and an `lgdo` attribute
+    tmp_table
+        A :class:`pygama.lgdo.Table` that is temporarily created to be written to the raw file
 
     Notes
     -----
@@ -261,19 +275,15 @@ def process_dsp(rb: RawBuffer) -> None:
     # If the processor returns a waveform, create a new waveform table and add it to the original lgdo table
     for proc in dsp_out.keys():
         # # Check what DSP routine the processors output is from, and manipulate accordingly
-        # for dsp_proc in dsp_dict["processors"].keys():
-        #     if proc in dsp_proc:
-        #         # In the case of presumming, change the dts
-        #         if dsp_dict["processors"][dsp_proc]["function"] == "presum":
-        #             new_obj = process_presum(rb, dsp_out[proc], dsp_dict, proc)
-        rb.lgdo.add_field(proc, dsp_out[proc], use_obj_size=True)
+        tmp_table.add_field(proc, dsp_out[proc], use_obj_size=True)
 
     return None
 
 
-def process_dtype_conv(rb: RawBuffer) -> None:
+def process_dtype_conv(rb: RawBuffer, tmp_table: Table) -> None:
     """
-    Change the types of fields in an rb.lgdo according to the values specified in the ``proc_spec``'s ``dtype_conv`` list
+    Change the types of fields in an rb.lgdo according to the values specified in the ``proc_spec``'s ``dtype_conv`` list.
+    It operates in place on `tmp_table`.
 
     Notes
     -----
@@ -283,7 +293,7 @@ def process_dtype_conv(rb: RawBuffer) -> None:
     for return_name in type_list.keys():
         # Take care of nested tables with a for loop
         path = return_name.split("/")
-        return_value = rb.lgdo
+        return_value = tmp_table
         for key in path:
             try:
                 return_value = return_value[key]
@@ -299,3 +309,12 @@ def process_dtype_conv(rb: RawBuffer) -> None:
             raise TypeError(f"Cannot recast an object of type {type(return_value)}")
 
     return None
+
+
+def process_drop(rb: RawBuffer, tmp_table: Table) -> None:
+    for drop_keys in rb.proc_spec["drop"]:
+        try:
+            tmp_table.remove_column(drop_keys, delete=False)
+        except KeyError:
+            log.info(f"Cannot remove field {drop_keys} from rb.lgdo")
+            return None
