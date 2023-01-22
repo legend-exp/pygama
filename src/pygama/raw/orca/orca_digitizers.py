@@ -51,6 +51,7 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                 "dt": 10,  # override if a different clock rate is used
                 "dt_units": "ns",
                 "t0_units": "ns",
+                "adc_bit_depth": 16,  # override if a different ADC bit depth is used
             },
         }
         self.decoded_values = {}
@@ -308,6 +309,7 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 "dt": 8,  # override if a different clock rate is used
                 "dt_units": "ns",
                 "t0_units": "ns",
+                "adc_bit_depth": 16,  # override if a different ADC bit depth is used
             },
         }
 

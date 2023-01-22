@@ -124,6 +124,7 @@ class ProcChainVar:
         grid: CoordinateGrid = auto,
         unit: str | Unit = auto,
         is_coord: bool = auto,
+        adc_bit_depth: int = auto,
     ) -> None:
         """
         Parameters
@@ -145,6 +146,8 @@ class ProcChainVar:
         is_coord
             If True, variable represents an array index and can be converted
             into a unitted number using grid
+        adc_bit_depth
+            An integer that stores the ADC bit depth, if the variable is a waveform
         """
         assert isinstance(proc_chain, ProcessingChain) and isinstance(name, str)
         self.proc_chain = proc_chain
@@ -159,6 +162,7 @@ class ProcChainVar:
         self.grid = grid
         self.unit = unit
         self.is_coord = is_coord
+        self.adc_bit_depth = adc_bit_depth
 
         log.debug(f"added variable: {self.description()}")
 
@@ -196,6 +200,9 @@ class ProcChainVar:
                     self._buffer = []
                 elif isinstance(self._buffer, np.ndarray):
                     self._buffer = [(self._buffer, CoordinateGrid(self.unit, 0))]
+
+        elif name == "adc_bit_count" and value is not None:
+            value = int(value)
 
         super().__setattr__(name, value)
 
@@ -259,11 +266,14 @@ class ProcChainVar:
     def offset(self):
         return self.grid.offset if self.grid else None
 
+    def adc_bit_depth(self):
+        return self.adc_bit_depth if self.adc_bit_depth else None
+
     def description(self) -> str:
         return (
             f"{self.name}(shape: {self.shape}, "
             f"dtype: {self.dtype}, grid: {self.grid}, "
-            f"unit: {self.unit}, is_coord: {self.is_coord})"
+            f"unit: {self.unit}, is_coord: {self.is_coord}, adc_bit_depth: {self.adc_bit_depth})"
         )
 
     def update_auto(
@@ -275,6 +285,7 @@ class ProcChainVar:
         is_coord: bool = auto,
         period: period = None,
         offset: offset = 0,
+        adc_bit_depth: adc_bit_depth = None,
     ) -> None:
         """Update any variables set to ``auto``; leave the others alone. Emit a
         message only if anything was updated.
@@ -301,6 +312,9 @@ class ProcChainVar:
             updated = True
         if self.is_coord is auto and is_coord is not auto:
             self.is_coord = is_coord
+            updated = True
+        if self.adc_bit_depth is auto and adc_bit_depth is not auto:
+            self.adc_bit_depth = adc_bit_depth
             updated = True
         if updated:
             log.debug(f"updated variable: {self.description()}")
@@ -367,20 +381,21 @@ class ProcessingChain:
         is_coord: bool = auto,
         period: CoordinateGrid.period = None,
         offset: CoordinateGrid.offset = 0,
+        adc_bit_depth: int = auto,
     ) -> ProcChainVar:
         """Add a named variable containing a block of values or arrays.
 
         Parameters
         ----------
-        name : str
+        name
             name of variable
-        dtype : numpy.dtype or str, optional, default='auto'
+        dtype
             default is ``None``, meaning `dtype` will be deduced later, if
             possible
-        shape : int or tuple, optional, default='auto'
+        shape
             length or shape tuple of element. Default is ``None``, meaning length
             will be deduced later, if possible
-        grid : CoordinateGrid
+        grid
             for variable, containing period and offset
         unit
             unit of variable
@@ -390,8 +405,11 @@ class ProcessingChain:
         offset
             unit with offset of waveform associated with object. Requires a
             `period` to be provided
-        is_coord : bool
+        is_coord
             if ``True``, transform value based on `period` and `offset`
+        adc_bit_depth
+            integer associated with the ADC bit depth if the variable is a waveform
+
         """
         self._validate_name(name, raise_exception=True)
         if name in self._vars_dict:
@@ -411,6 +429,7 @@ class ProcessingChain:
             grid=grid,
             unit=unit,
             is_coord=is_coord,
+            adc_bit_depth=adc_bit_depth,
         )
         self._vars_dict[name] = var
         return var
@@ -1481,6 +1500,7 @@ class LGDOWaveformIOManager(IOManager):
             grid=grid,
             unit=wf_table.values_units,
             is_coord=False,
+            adc_bit_depth=wf_table.values_adc_bit_depth,
         )
 
         if dt_units is None:

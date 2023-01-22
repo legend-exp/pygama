@@ -33,7 +33,7 @@ class WaveformTable(Table):
       waveforms values may be either an LGDO :class:`.ArrayOfEqualSizedArrays`\
       ``<1,1>`` or as an LGDO :class:`.VectorOfVectors` that supports
       waveforms of unequal length. Can optionally be given a ``units``
-      attribute.
+      attribute, as well as an ``adc_bit_depth`` attribute.
 
     Note
     ----
@@ -50,6 +50,7 @@ class WaveformTable(Table):
         dt_units: str = None,
         values: ArrayOfEqualSizedArrays | VectorOfVectors | np.ndarray = None,
         values_units: str = None,
+        values_adc_bit_depth: int = None,
         wf_len: int = None,
         dtype: np.dtype = None,
         attrs: dict[str, Any] = None,
@@ -81,6 +82,8 @@ class WaveformTable(Table):
         values_units
             units for the waveform values. If not ``None`` and `values` is an
             LGDO :class:`.Array`, overrides what's in `values`.
+        values_adc_bit_depth
+            an integer for storing the ADC bit depth used to record this waveform
         wf_len
             The length of the waveforms in each entry of a table. If ``None``
             (the default), unequal lengths are assumed and
@@ -173,6 +176,8 @@ class WaveformTable(Table):
                 values = ArrayOfEqualSizedArrays(dims=(1, 1), nda=nda)
         if values_units is not None:
             values.attrs["units"] = f"{values_units}"
+        if values_adc_bit_depth is not None:
+            values.attrs["adc_bit_depth"] = values_adc_bit_depth
 
         col_dict = {}
         col_dict["t0"] = t0
@@ -188,9 +193,17 @@ class WaveformTable(Table):
     def values_units(self) -> str:
         return self.values.attrs.get("units", None)
 
+    @property
+    def values_adc_bit_depth(self) -> str:
+        return self.values.attrs.get("adc_bit_depth", None)
+
     @values_units.setter
     def values_units(self, units) -> None:
         self.values.attrs["units"] = f"{units}"
+
+    @values_adc_bit_depth.setter
+    def values_adc_bit_depth(self, adc_bit_depth) -> None:
+        self.values.attrs["adc_bit_depth"] = adc_bit_depth
 
     @property
     def wf_len(self) -> int:
