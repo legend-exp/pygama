@@ -1,0 +1,31 @@
+{
+  "*": {
+    "{name}": {
+      "key_list": ["*"],
+      "out_stream": "/tmp/L200-comm-20220519-phy-geds_proc.lh5",
+      "proc_spec": {
+        "window": ["waveform", 1000, -1000, "windowed_waveform"],
+        "dsp_config": {
+          "outputs": ["presum_rate", "presummed_waveform"],
+          "processors": {
+            "presum_rate, presummed_waveform": {
+              "function": "presum",
+              "module": "pygama.dsp.processors",
+              "args": [
+                "waveform",
+                0,
+                "presum_rate",
+                "presummed_waveform(shape=len(waveform)/4, period=waveform.period*4, offset=waveform.offset)"
+              ],
+              "unit": "ADC"
+            }
+          }
+        },
+        "drop": ["waveform"],
+        "dtype_conv": {
+          "presummed_waveform/values": "uint32"
+        }
+      }
+    }
+  }
+}

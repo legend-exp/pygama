@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Union
+from typing import Any
 
 import numexpr as ne
 import numpy as np
@@ -15,11 +15,9 @@ from pandas.io.formats import format as fmt
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.scalar import Scalar
+from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
-
-LGDO = Union[Scalar, Struct, Array, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +83,6 @@ class Table(Struct):
         self.loc = 0
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
         return "table"
 
     def __len__(self) -> int:
