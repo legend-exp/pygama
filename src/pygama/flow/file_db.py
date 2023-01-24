@@ -125,7 +125,7 @@ class FileDB:
     >>> db.to_disk("file_db.lh5")
     """
 
-    def __init__(self, config: str | dict, scan: bool = True) -> None:
+    def __init__(self, config: str | dict, scan: bool = True, sortby: str = "timestamp") -> None:
         """
         Parameters
         ----------
@@ -151,6 +151,7 @@ class FileDB:
             raise ValueError("Bad FileDB configuration value")
 
         self.set_config(config, config_path)
+        self.sortby = sortby
 
         # Set up column names
         fm = string.Formatter()
@@ -213,7 +214,7 @@ class FileDB:
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        scan_dir = self.data_dir + self.tier_dirs[low_tier]
+        scan_dir = os.path.join(self.data_dir, self.tier_dirs[low_tier])
 
         log.info(f"Scanning {scan_dir} with template {template}")
 
@@ -252,10 +253,13 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
         # sort rows according to timestamps
-        log.debug("Sorting database entries according to timestamp")
-        self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
-        self.df.sort_values("_datetime", ignore_index=True, inplace=True)
-        self.df.drop("_datetime", axis=1, inplace=True)
+        log.debug(f"Sorting database entries according to {self.sortby}")
+        if self.sortby == "timestamp": 
+            self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
+            self.df.sort_values("_datetime", ignore_index=True, inplace=True)
+            self.df.drop("_datetime", axis=1, inplace=True)
+        else:
+            self.df.sort_values(self.sortby, ignore_index=True, inplace=True)
 
     def set_file_status(self) -> None:
         """

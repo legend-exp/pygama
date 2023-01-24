@@ -692,10 +692,10 @@ class DataLoader:
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update()
-                progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+                progress_bar.set_postfix(key=self.filedb.df.iloc[file][self.filedb.sortby])
 
             log.debug(
-                f"building entry list for cycle {self.filedb.df.iloc[file]['timestamp']}"
+                f"building entry list for cycle {self.filedb.df.iloc[file][self.filedb.sortby]}"
             )
 
             # this dataframe will be associated with the file and will contain
@@ -1016,10 +1016,10 @@ class DataLoader:
 
                 if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar.update()
-                    progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+                    progress_bar.set_postfix(key=self.filedb.df.iloc[file][self.filedb.sortby])
 
                 log.debug(
-                    f"loading data for cycle key {self.filedb.df.iloc[file]['timestamp']}"
+                    f"loading data for cycle key {self.filedb.df.iloc[file][self.filedb.sortby]}"
                 )
 
                 field_mask = []
