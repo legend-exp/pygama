@@ -155,7 +155,7 @@ def generate_cuts(
             mean = pars[0]
             std = fwhm / 2.355
 
-            if mean < np.nanmin(par_array) or mean > np.nanmax(par_array):
+            if mean < np.nanmin(bins) or mean > np.nanmax(bins):
                 raise IndexError
         except IndexError:
             bin_range = 5000
