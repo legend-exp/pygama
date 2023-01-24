@@ -264,7 +264,7 @@ def energy_cal_th(
             pk_pars = results["pk_pars"]
             found_peaks = results["got_peaks_locs"]
             fitted_peaks = results["fitted_keV"]
-        except (np.linalg.LinAlgError, ValueError):
+        except :
             found_peaks = np.array([])
             fitted_peaks = np.array([])
 
@@ -296,9 +296,8 @@ def energy_cal_th(
                 simplex=True,
                 verbose=False,
             )
-        except (np.linalg.LinAlgError, ValueError):
+        except :
             pars = None
-        log.debug("done")
         if pars is None:
             log.info("Calibration failed")
             try:
@@ -317,7 +316,7 @@ def energy_cal_th(
                 )
                 if pars is None:
                     raise ValueError
-            except (np.linalg.LinAlgError, ValueError):
+            except:
                 pars = np.full(deg+1, np.nan)
 
                 hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
@@ -385,6 +384,7 @@ def energy_cal_th(
                 "peak_fit_pars": np.nan,
             }
             continue
+        log.debug("done")
         log.info(f"Calibration pars are {pars}")
 
         hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
