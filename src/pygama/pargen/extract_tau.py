@@ -92,11 +92,13 @@ def get_decay_constant(
         pars, cov = pgf.gauss_mode_width_max(
             counts,
             bins,
-            n_bins=20,
+            n_bins=10,
             cost_func="Least Squares",
             inflate_errors=False,
             gof_method="var",
         )
+        if np.abs(np.abs(pars[0]-high_bin)/high_bin)>0.05:
+            raise ValueError
         high_bin = pars[0]
     except:
         pass
