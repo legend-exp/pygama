@@ -125,7 +125,7 @@ class FileDB:
     >>> db.to_disk("file_db.lh5")
     """
 
-    def __init__(self, config: str | dict, scan: bool = True, sortby: str = "timestamp") -> None:
+    def __init__(self, config: str | dict, scan: bool = True) -> None:
         """
         Parameters
         ----------
@@ -151,7 +151,6 @@ class FileDB:
             raise ValueError("Bad FileDB configuration value")
 
         self.set_config(config, config_path)
-        self.sortby = sortby
 
         # Set up column names
         fm = string.Formatter()
@@ -192,6 +191,11 @@ class FileDB:
         self.file_format = self.config["file_format"]
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
+        
+        if "sortby" in self.config.keys():
+            self.sortby = self.config["sortby"]
+        else:
+            self.sortby = "timestamp"
 
         # Handle environment variables
         data_dir = os.path.expandvars(self.config["data_dir"])
@@ -478,6 +482,7 @@ class FileDB:
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
             sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
+        
 
         # FIXME: to_hdf() throws this:
         #
