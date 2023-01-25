@@ -42,12 +42,12 @@ def radware_compress(
 
         max_out_len = 2 * sig_in.size
         if len(sig_out) < max_out_len:
-            sig_out.resize(max_out_len)
+            sig_out.resize(max_out_len, refcheck=False)
 
         outlen = _radware_sigcompress_encode(sig_in, sig_out)
 
         if outlen < sig_in.size:
-            sig_out.resize(outlen)
+            sig_out.resize(outlen, refcheck=False)
 
     elif isinstance(sig_in, WaveformTable):
         if not sig_out:
@@ -97,12 +97,12 @@ def radware_decompress(
             # pre-allocate memory
             sig_out = np.empty(siglen, dtype=np.int16)
         elif len(sig_out) < siglen:
-            sig_out.resize(siglen)
+            sig_out.resize(siglen, refcheck=False)
 
         outlen = _radware_sigcompress_decode(sig_in, sig_out)
 
         if outlen < len(sig_out):
-            sig_out.resize(outlen)
+            sig_out.resize(outlen, refcheck=False)
 
     elif isinstance(sig_in, WaveformTable):
         if not sig_out:
