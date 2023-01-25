@@ -17,7 +17,9 @@ def run_rbkd(orca_stream):
     orca_stream.close_stream()  # avoid leaving file open
 
     # assert correct type for ORRunDecoderForRun
-    assert (this_packet[0] >> 18) == 7
+    assert (this_packet[0] >> 18) == orca_stream.header["dataDescription"][
+        "ORRunModel"
+    ]["Run"]["dataId"] >> 18
 
     # assert that it worked and the buffer is full
     assert decoder.decode_packet(packet=this_packet, packet_id=1, rbl=rbkd)
