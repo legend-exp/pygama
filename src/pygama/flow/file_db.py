@@ -218,7 +218,7 @@ class FileDB:
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        scan_dir = os.path.join(self.data_dir, self.tier_dirs[low_tier])
+        scan_dir = os.path.join(self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/"))
 
         log.info(f"Scanning {scan_dir} with template {template}")
 
