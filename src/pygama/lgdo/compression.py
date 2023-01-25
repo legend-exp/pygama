@@ -284,6 +284,9 @@ def _radware_sigcompress_encode(
     if bp > 0:
         iso += 1
 
+    if iso % 2 > 0:
+        iso += 1
+
     return iso  # number of shorts in decompressed signal data
 
 
