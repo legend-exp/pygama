@@ -8,6 +8,11 @@ from numpy.typing import NDArray
 
 from pygama.lgdo import WaveformTable
 
+# fmt: off
+_radware_siggen_mask = np.uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
+                                  2047, 4095, 8191, 16383, 32767, 65535])
+# fmt: on
+
 
 def radware_compress(
     sig_in: NDArray | WaveformTable, sig_out: NDArray | WaveformTable = None
@@ -21,30 +26,36 @@ def radware_compress(
     sig_out
         pre-allocated array or waveform table for the compressed signal(s).
 
+    Returns
+    -------
+    sig_out
+        given pre-allocated structure or structure of unsigned 16-bit integers.
+
     See Also
     --------
     ._radware_decompress_encode
     """
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
         if not sig_out:
-            sig_out = np.empty_like(sig_in)
+            # pre-allocate memory
+            sig_out = np.empty_like(sig_in, dtype=np.uint16)
 
-        max_out_len = 2 * len(sig_in)
+        max_out_len = 2 * sig_in.size
         if len(sig_out) < max_out_len:
             sig_out.resize(max_out_len)
 
         outlen = _radware_sigcompress_encode(sig_in, sig_out)
 
-        if outlen < len(sig_in):
+        if outlen < sig_in.size:
             sig_out.resize(outlen)
 
     elif isinstance(sig_in, WaveformTable):
         if not sig_out:
-            # initialize output table
+            # pre-allocate output table
             # sig_out.values will be a VectorOfVectors
             sig_out = WaveformTable(
-                size=len(sig_in),
-                dtype=sig_in.values.dtype,
+                size=sig_in.size,
+                dtype=np.uint16,
                 t0=sig_in.t0,
                 dt=sig_in.dt,
                 attrs=sig_in.attrs,
@@ -54,7 +65,7 @@ def radware_compress(
             sig_out.values.set_vector(i, radware_compress(wf))
 
     else:
-        raise ValueError(f"Unsupported input signal type ({type(sig_in)})")
+        raise ValueError(f"unsupported input signal type ({type(sig_in)})")
 
     return sig_out
 
@@ -71,6 +82,11 @@ def radware_decompress(
     sig_out
         pre-allocated array or waveform table for the decompressed signal(s).
 
+    Returns
+    -------
+    sig_out
+        given pre-allocated structure or structure of 16-bit integers.
+
     See Also
     --------
     ._radware_decompress_decode
@@ -78,7 +94,8 @@ def radware_decompress(
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
         siglen = int(sig_in[0])
         if not sig_out:
-            sig_out = np.empty(siglen)
+            # pre-allocate memory
+            sig_out = np.empty(siglen, dtype=np.int16)
         elif len(sig_out) < siglen:
             sig_out.resize(siglen)
 
@@ -89,12 +106,12 @@ def radware_decompress(
 
     elif isinstance(sig_in, WaveformTable):
         if not sig_out:
-            # initialize output table
+            # pre-allocate  output table
             # sig_out.values will be a VectorOfVectors because that's the most
             # general format
             sig_out = WaveformTable(
                 size=len(sig_in),
-                dtype=sig_in.values.dtype,
+                dtype=np.int16,
                 t0=sig_in.t0,
                 dt=sig_in.dt,
                 attrs=sig_in.attrs,
@@ -104,13 +121,17 @@ def radware_decompress(
             sig_out.values.set_vector(i, radware_decompress(wf))
 
     else:
-        raise ValueError(f"Unsupported input signal type ({type(sig_in)})")
+        raise ValueError(f"unsupported input signal type ({type(sig_in)})")
 
     return sig_out
 
 
 @numba.jit(nopython=True)
-def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
+def _radware_sigcompress_encode(
+    sig_in: NDArray,
+    sig_out: NDArray,
+    _mask: NDArray[np.uint16] = _radware_siggen_mask,
+) -> np.int32:
     """Compress a digital signal.
 
     Almost literal translations of ``compress_signal()`` from the
@@ -124,42 +145,26 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
     Parameters
     ----------
     sig_in
-        array holding the input signal.
+        array of integers holding the input signal. In the original C code,
+        an array of 16-bit integers was expected.
     sig_out
-        pre-allocated array for the compressed signal.
+        pre-allocated array for the compressed signal. In the original C code,
+        an array of unsigned 16-bit integers was expected.
 
     Returns
     -------
     length
         length of output signal.
     """
-    mask = [
-        0,
-        1,
-        3,
-        7,
-        15,
-        31,
-        63,
-        127,
-        255,
-        511,
-        1023,
-        2047,
-        4095,
-        8191,
-        16383,
-        32767,
-        65535,
-    ]
+    mask = _mask
 
     j = iso = bp = 0
-    sig_out[iso] = len(sig_in)
-    db = np.zeros(2, dtype=np.ushort)
+    sig_out[iso] = sig_in.size
+    db = np.zeros(2, dtype=np.uint16)
     dd = np.frombuffer(db, dtype=np.uintc)
 
     iso += 1
-    while j < len(sig_in):  # j = starting index of section of signal
+    while j < sig_in.size:  # j = starting index of section of signal
         # find optimal method and length for compression
         # of next section of signal
         max1 = min1 = sig_in[j]
@@ -169,7 +174,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
         nw = 1
         i = j + 1
         # FIXME: 48 could be tuned better?
-        while (i < len(sig_in)) and (i < j + 48):
+        while (i < sig_in.size) and (i < j + 48):
             if max1 < sig_in[i]:
                 max1 = sig_in[i]
             if min1 > sig_in[i]:
@@ -185,7 +190,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
             nb2 = 99
             while (max1 - min1) > mask[nb1]:
                 nb1 += 1
-            while (i < len(sig_in)) and (
+            while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
                 if max1 < sig_in[i]:
@@ -203,7 +208,7 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
             nb1 = 99
             while max2 - min2 > mask[nb2]:
                 nb2 += 1
-            while (i < len(sig_in)) and (
+            while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
                 ds = sig_in[i] - sig_in[i - 1]
@@ -283,7 +288,11 @@ def _radware_sigcompress_encode(sig_in: NDArray, sig_out: NDArray) -> int:
 
 
 @numba.jit(nopython=True)
-def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
+def _radware_sigcompress_decode(
+    sig_in: NDArray,
+    sig_out: NDArray,
+    _mask: NDArray[np.uint16] = _radware_siggen_mask,
+) -> np.int32:
     """Deompress a digital signal.
 
     Almost literal translations of ``decompress_signal()`` from the
@@ -292,40 +301,24 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
     Parameters
     ----------
     sig_in
-        array holding the input, compressed signal.
+        array holding the input, compressed signal. In the original code, an
+        array of 16-bit unsigned integers was expected.
     sig_out
-        pre-allocated array for the decompressed signal.
+        pre-allocated array for the decompressed signal. In the original code,
+        an array of 16-bit integers was expected.
 
     Returns
     -------
     length
         length of output signal.
     """
-    mask = [
-        0,
-        1,
-        3,
-        7,
-        15,
-        31,
-        63,
-        127,
-        255,
-        511,
-        1023,
-        2047,
-        4095,
-        8191,
-        16383,
-        32767,
-        65535,
-    ]
+    mask = _mask
 
-    sig_len_in = len(sig_in)
+    sig_len_in = sig_in.size
     j = isi = iso = bp = 0
-    siglen = np.ushort(sig_in[isi])  # signal length
+    siglen = np.uint16(sig_in[isi])  # signal length
     isi += 1
-    db = np.zeros(2, dtype=np.ushort)
+    db = np.zeros(2, dtype=np.uint16)
     dd = np.frombuffer(db, dtype=np.uintc)
 
     while (isi < sig_len_in) and (iso < siglen):
@@ -358,10 +351,10 @@ def _radware_sigcompress_decode(sig_in: NDArray, sig_out: NDArray) -> int:
         else:
             nb -= 32
             #  decode derivative / difference values
-            sig_out[iso] = np.short(sig_in[isi])  # starting signal value
+            sig_out[iso] = np.int16(sig_in[isi])  # starting signal value
             iso += 1
             isi += 1
-            min_val = np.short(sig_in[isi])  # min value used for encoding
+            min_val = np.int16(sig_in[isi])  # min value used for encoding
             isi += 1
             db[0] = sig_in[isi]
 

@@ -17,25 +17,27 @@ def test_rawdware_sigcompress(lgnd_test_data):
         n_rows=1,
     )
 
-    wf = obj["values"].nda[0]
+    wf = obj["values"].nda[0].astype(np.uint16)
 
-    enc_wf = np.empty_like(wf)
+    enc_wf = np.empty_like(wf, dtype=np.uint16)
     _radware_sigcompress_encode(wf, enc_wf)
 
-    assert (enc_wf != wf).all()
     assert enc_wf.dtype == np.uint16
+    assert (enc_wf != wf).all()
 
-    dec_wf = np.empty_like(wf)
+    dec_wf = np.empty_like(wf, dtype=np.int16)
     _radware_sigcompress_decode(enc_wf, dec_wf)
 
+    assert dec_wf.dtype == np.int16
     assert (dec_wf == wf).all()
-    assert dec_wf.dtype == np.uint16
 
     comp_wf = radware_compress(wf)
     assert isinstance(comp_wf, np.ndarray)
+    assert comp_wf.dtype == np.uint16
 
     decomp_wf = radware_decompress(comp_wf)
     assert isinstance(decomp_wf, np.ndarray)
+    assert decomp_wf.dtype == np.int16
 
     assert (decomp_wf == wf).all()
 
@@ -54,7 +56,7 @@ def test_rawdware_sigcompress_wftable(lgnd_test_data):
     assert dec_wft.t0 == wft.t0
     assert dec_wft.dt == wft.dt
     for wf1, wf2 in zip(dec_wft.values, wft.values):
-        assert (wf1 == wf2).all()
+        assert (wf1.astype(np.uint16) == wf2).all()
 
 
 def test_rawdware_sigcompress_performance(lgnd_test_data):
