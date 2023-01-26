@@ -938,7 +938,7 @@ def event_selection(
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
     Euc_min = threshold / guess_keV * 0.6
     Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 1 / guess_keV
+    dEuc = 1  # / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
         hist,
@@ -993,7 +993,7 @@ def event_selection(
 
     dsp_config["outputs"] = cts.get_keys(
         dsp_config["outputs"], list(cut_parameters)
-    ) + ["energy_parameter"]
+    ) + [energy_parameter]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
