@@ -191,7 +191,7 @@ class FileDB:
         self.file_format = self.config["file_format"]
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
-        
+
         if "sortby" in self.config.keys():
             self.sortby = self.config["sortby"]
         else:
@@ -218,7 +218,9 @@ class FileDB:
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        scan_dir = os.path.join(self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/"))
+        scan_dir = os.path.join(
+            self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/")
+        )
 
         log.info(f"Scanning {scan_dir} with template {template}")
 
@@ -258,7 +260,7 @@ class FileDB:
 
         # sort rows according to timestamps
         log.debug(f"Sorting database entries according to {self.sortby}")
-        if self.sortby == "timestamp": 
+        if self.sortby == "timestamp":
             self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
             self.df.sort_values("_datetime", ignore_index=True, inplace=True)
             self.df.drop("_datetime", axis=1, inplace=True)
@@ -482,7 +484,6 @@ class FileDB:
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
             sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
-        
 
         # FIXME: to_hdf() throws this:
         #

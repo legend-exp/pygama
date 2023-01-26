@@ -15,7 +15,7 @@ def lgdo_vov():
 
 
 def test_init(lgdo_vov):
-    lol = [[1,2], [3,4,5], [2], [4,8,9,7], [5,3,1]]
+    lol = [[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]]
     test = lgdo.VectorOfVectors(listoflists=lol)
     assert (test.flattened_data.nda == lgdo_vov.flattened_data.nda).all()
     assert (test.cumulative_length.nda == lgdo_vov.cumulative_length.nda).all()
@@ -75,6 +75,7 @@ def test_set_vector(lgdo_vov):
 
     for i in range(len(desired)):
         assert (desired[i] == list(lgdo_vov)[i]).all()
+
 
 def test_iter(lgdo_vov):
     desired = [

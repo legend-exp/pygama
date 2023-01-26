@@ -32,6 +32,7 @@ def test_simple_load(test_dl):
     assert isinstance(data, lgdo.Table)
     assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
 
+
 def test_load_wfs(test_dl):
     test_dl.set_files("all")
     test_dl.set_output(columns=["waveform"], fmt="lgdo.Table")
@@ -42,7 +43,15 @@ def test_load_wfs(test_dl):
     test_dl.set_output(columns=["waveform"], fmt="pd.DataFrame")
     data = test_dl.load()
     assert isinstance(data, pd.DataFrame)
-    assert list(data.keys()) == ["hit_table", "hit_idx", "file", "waveform_t0", "waveform_dt", "waveform_values"]
+    assert list(data.keys()) == [
+        "hit_table",
+        "hit_idx",
+        "file",
+        "waveform_t0",
+        "waveform_dt",
+        "waveform_values",
+    ]
+
 
 def test_no_merge(test_dl):
     test_dl.set_files("all")

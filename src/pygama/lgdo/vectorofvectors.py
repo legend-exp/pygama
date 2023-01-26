@@ -49,7 +49,7 @@ class VectorOfVectors(LGDO):
             allocated based on the first element of `shape_guess`.
         listoflists
             To create a VectorOfVectors out of a list of lists. Takes priority over
-            flattened_data and cumulative_length. 
+            flattened_data and cumulative_length.
         shape_guess
             A NumPy-format shape specification, required if either of
             `flattened_data` or `cumulative_length` are not supplied.  The
@@ -67,8 +67,10 @@ class VectorOfVectors(LGDO):
             cum_length = []
             for vec in listoflists:
                 cum_length.append(len(vec))
-            self.flattened_data = Array(nda=np.array([item for sublist in listoflists for item in sublist]))
-            self.cumulative_length = Array(nda=np.cumsum(cum_length) )
+            self.flattened_data = Array(
+                nda=np.array([item for sublist in listoflists for item in sublist])
+            )
+            self.cumulative_length = Array(nda=np.cumsum(cum_length))
             if dtype is not None:
                 self.dtype = np.dtype(dtype)
             else:
