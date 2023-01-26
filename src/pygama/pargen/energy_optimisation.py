@@ -1346,7 +1346,7 @@ class BayesianOptimizer:
                 method="L-BFGS-B",
             )
             if response.fun < min_ei:
-                min_ei = response.fun[0]
+                min_ei = response.fun
                 x_optimal = [
                     y.round(dim.rounding) for y, dim in zip(response.x, self.dims)
                 ]
