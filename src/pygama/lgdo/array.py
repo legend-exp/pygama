@@ -5,6 +5,7 @@ corresponding utilities.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
@@ -89,11 +90,20 @@ class Array(LGDO):
         new_shape = (new_size,) + self.nda.shape[1:]
         self.nda.resize(new_shape, refcheck=True)
 
+    def __getitem__(self, key):
+        return self.nda[key]
+
+    def __setitem__(self, key, value):
+        return self.nda.__setitem__(key, value)
+
     def __eq__(self, other: Array) -> bool:
         if isinstance(other, Array):
             return self.attrs == other.attrs and (self.nda == other.nda).all()
         else:
             return False
+
+    def __iter__(self) -> Iterator:
+        yield from self.nda
 
     def __str__(self) -> str:
         tmp_attrs = self.attrs.copy()

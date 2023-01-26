@@ -8,8 +8,8 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 
+import numba
 import numpy as np
-from numba import njit
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
@@ -33,6 +33,7 @@ class VectorOfVectors(LGDO):
         cumulative_length: Array = None,
         shape_guess: tuple[int, int] = None,
         dtype: np.dtype = None,
+        fill_val: int | float = None,
         attrs: dict[str, Any] = None,
     ) -> None:
         """
@@ -60,7 +61,7 @@ class VectorOfVectors(LGDO):
         attrs
             A set of user attributes to be carried along with this LGDO.
         """
-        if cumulative_length is None:
+        if cumulative_length is None and shape_guess is not None:
             self.cumulative_length = Array(
                 shape=(shape_guess[0],), dtype="uint32", fill_val=0
             )
@@ -69,12 +70,15 @@ class VectorOfVectors(LGDO):
                 self.cumulative_length = cumulative_length
             else:
                 self.cumulative_length = Array(cumulative_length)
+
         if flattened_data is None:
             length = np.prod(shape_guess)
             if dtype is None:
                 raise ValueError("flattened_data and dtype cannot both be None!")
             else:
-                self.flattened_data = Array(shape=(length,), dtype=dtype)
+                self.flattened_data = Array(
+                    shape=(length,), dtype=dtype, fill_val=fill_val
+                )
                 self.dtype = np.dtype(dtype)
         else:
             if isinstance(flattened_data, Array):
@@ -86,9 +90,7 @@ class VectorOfVectors(LGDO):
             else:
                 self.dtype = np.dtype(dtype)
 
-        self.attrs = {} if attrs is None else dict(attrs)
-
-        super().__init__()
+        super().__init__(attrs)
 
     def datatype_name(self) -> str:
         return "array"
@@ -98,7 +100,6 @@ class VectorOfVectors(LGDO):
         return "array<1>{array<1>{" + et + "}}"
 
     def __len__(self) -> int:
-        """Provides ``__len__`` for this array-like class."""
         return len(self.cumulative_length)
 
     def __eq__(self, other: VectorOfVectors) -> bool:
@@ -139,6 +140,9 @@ class VectorOfVectors(LGDO):
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
 
+    def __setitem__(self, i_vec: int, nda: np.ndarray) -> None:
+        return self.set_vector(i_vec, nda)
+
     def get_vector(self, i_vec: int) -> np.ndarray:
         """Get vector at index `i_vec`."""
         if i_vec >= len(self.cumulative_length) or i_vec < 0:
@@ -153,26 +157,19 @@ class VectorOfVectors(LGDO):
 
         return self.flattened_data.nda[start:end]
 
+    def __getitem__(self, i_vec: int) -> list:
+        stop = self.cumulative_length[i_vec]
+        if i_vec == 0:
+            return self.flattened_data[0:stop]
+        else:
+            return self.flattened_data[self.cumulative_length[i_vec - 1] : stop]
+
     def __iter__(self) -> Iterator[np.ndarray]:
-        self.index = 0
-        return self
-
-    def __next__(self) -> np.ndarray:
-        try:
-            if self.index == 0:
-                start = 0
-                end = self.cumulative_length.nda[0]
+        for i, stop in enumerate(self.cumulative_length):
+            if i == 0:
+                yield self.flattened_data[0:stop]
             else:
-                start = self.cumulative_length.nda[self.index - 1]
-                end = self.cumulative_length.nda[self.index]
-            result = self.flattened_data.nda[start:end]
-        except IndexError:
-            raise StopIteration
-        self.index += 1
-        return result
-
-    def __getitem__(self, index: int) -> list:
-        return list(self)[index]
+                yield self.flattened_data[self.cumulative_length[i - 1] : stop]
 
     def __str__(self) -> str:
         string = ""
@@ -269,7 +266,7 @@ def build_cl(
     return _nb_build_cl(sorted_array_in, cumulative_length_out)
 
 
-@njit
+@numba.njit
 def _nb_build_cl(
     sorted_array_in: np.ndarray, cumulative_length_out: np.ndarray
 ) -> np.ndarray:
@@ -326,7 +323,7 @@ def explode_cl(
     return _nb_explode_cl(cumulative_length, array_out)
 
 
-@njit
+@numba.njit
 def _nb_explode_cl(cumulative_length: np.ndarray, array_out: np.ndarray) -> np.ndarray:
     """numbified inner loop for explode_cl"""
     out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
@@ -382,7 +379,7 @@ def explode(
     return nb_explode(cumulative_length, array_in, array_out)
 
 
-@njit
+@numba.njit
 def nb_explode(
     cumulative_length: np.ndarray, array_in: np.ndarray, array_out: np.ndarray
 ) -> np.ndarray:

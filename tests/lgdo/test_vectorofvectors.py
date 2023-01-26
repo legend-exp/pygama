@@ -15,7 +15,8 @@ def lgdo_vov():
 
 
 def test_init(lgdo_vov):
-    pass
+    vov = lgdo.VectorOfVectors(shape_guess=(10, 20), dtype="int32", fill_val=2)
+    assert vov.flattened_data == lgdo.Array(shape=(10 * 20,), fill_val=2, dtype="int32")
 
 
 def test_datatype_name(lgdo_vov):
@@ -65,6 +66,19 @@ def test_set_vector(lgdo_vov):
     desired = [
         np.zeros(2),
         np.array([3, 4, 5]),
+        np.array([2]),
+        np.array([4, 8, 9, 7]),
+        np.array([5, 3, 1]),
+    ]
+
+    for i in range(len(desired)):
+        assert (desired[i] == list(lgdo_vov)[i]).all()
+
+    lgdo_vov.set_vector(1, np.zeros(3))
+
+    desired = [
+        np.zeros(2),
+        np.zeros(3),
         np.array([2]),
         np.array([4, 8, 9, 7]),
         np.array([5, 3, 1]),

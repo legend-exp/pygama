@@ -19,6 +19,11 @@ functions. The basic data object classes are:
   Implemented as a pair of :class:`.Array`: :attr:`flattened_data` holding the
   raw data, and :attr:`cumulative_length` whose ith element is the sum of the
   lengths of the vectors with ``index <= i``
+* :class:`.VectorOfEncodedVectors`: a variable length array of variable length
+  *encoded* arrays. Implemented as a :class:`.VectorOfVectors`
+  :attr:`encoded_data` holding the encoded vectors and an :class:`.Array`
+  :attr:`decoded_size` specifying the size of each decoded vector. Mainly used
+  to represent a list of compressed waveforms.
 * :class:`.Struct`: a dictionary containing LGDO objects. Derives from
   :class:`dict`
 * :class:`.Table`: a :class:`.Struct` whose elements ("columns") are all array
@@ -38,6 +43,7 @@ from pygama.lgdo.lh5_store import LH5Iterator, LH5Store, load_dfs, load_nda, ls,
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
+from pygama.lgdo.vectorofencodedvectors import VectorOfEncodedVectors
 from pygama.lgdo.vectorofvectors import (
     VectorOfVectors,
     build_cl,
@@ -56,6 +62,7 @@ __all__ = [
     "Struct",
     "Table",
     "VectorOfVectors",
+    "VectorOfEncodedVectors",
     "WaveformTable",
     "LH5Iterator",
     "LH5Store",

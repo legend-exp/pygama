@@ -28,6 +28,15 @@ def test_representations():
             cumulative_length=lgdo.Array(np.array([5, 12, 34, 49, 150])),
             attrs={"unit": "ns"},
         ),
+        "VectorOfEncodedVectors": lgdo.VectorOfEncodedVectors(
+            encoded_data=lgdo.VectorOfVectors(
+                flattened_data=lgdo.Array(np.random.rand(1000)),
+                cumulative_length=lgdo.Array(np.array([5, 12, 34, 49, 150])),
+                attrs={"unit": "ns"},
+            ),
+            decoded_size=lgdo.Array(shape=5, fill_val=56),
+            attrs={"codec": "radware-sigcompress", "codec_shift": 123},
+        ),
         "Table": lgdo.Table(
             col_dict={
                 "first": lgdo.Array(np.random.rand(100), attrs={"unit": "ns"}),

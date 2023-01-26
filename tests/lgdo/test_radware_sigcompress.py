@@ -66,12 +66,16 @@ def test_rawdware_sigcompress_performance(lgnd_test_data):
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
     )
 
-    mean = 0
+    sum = 0
     for wf in obj["values"].nda:
         comp_wf = radware_compress(wf)
-        mean += len(comp_wf) / len(wf)
+        sum += len(comp_wf) / len(wf)
 
-    print(100 * (1 - mean / len(obj)))  # noqa: T201
+    print(  # noqa: T201
+        "number of samples in compressed wf:",
+        100 * (1 - sum / len(obj)),
+        "% of the original",
+    )
 
 
 def test_rawdware_sigcompress_special_cases():
