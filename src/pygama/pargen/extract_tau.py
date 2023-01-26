@@ -97,7 +97,7 @@ def get_decay_constant(
             inflate_errors=False,
             gof_method="var",
         )
-        if np.abs(np.abs(pars[0]-high_bin)/high_bin)>0.05:
+        if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
             raise ValueError
         high_bin = pars[0]
     except:

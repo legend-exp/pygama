@@ -116,6 +116,7 @@ def load_data(
     else:
         return energy_dict
 
+
 def gen_pars_dict(pars, deg, energy_param):
     if deg == 1:
         out_dict = {
@@ -264,7 +265,7 @@ def energy_cal_th(
             pk_pars = results["pk_pars"]
             found_peaks = results["got_peaks_locs"]
             fitted_peaks = results["fitted_keV"]
-        except :
+        except:
             found_peaks = np.array([])
             fitted_peaks = np.array([])
 
@@ -296,7 +297,7 @@ def energy_cal_th(
                 simplex=True,
                 verbose=False,
             )
-        except :
+        except:
             pars = None
         if pars is None:
             log.info("Calibration failed")
@@ -317,22 +318,22 @@ def energy_cal_th(
                 if pars is None:
                     raise ValueError
             except:
-                pars = np.full(deg+1, np.nan)
+                pars = np.full(deg + 1, np.nan)
 
                 hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
 
                 output_dict[f"{energy_param}_cal"] = {
-                "Qbb_fwhm": np.nan,
-                "Qbb_fwhm_err": np.nan,
-                "2.6_fwhm": np.nan,
-                "2.6_fwhm_err": np.nan,
-                "eres_pars": [np.nan,np.nan],
-                "fitted_peaks": np.nan,
-                "fwhms": np.nan,
-                "peak_fit_pars": np.nan,
+                    "Qbb_fwhm": np.nan,
+                    "Qbb_fwhm_err": np.nan,
+                    "2.6_fwhm": np.nan,
+                    "2.6_fwhm_err": np.nan,
+                    "eres_pars": [np.nan, np.nan],
+                    "fitted_peaks": np.nan,
+                    "fwhms": np.nan,
+                    "peak_fit_pars": np.nan,
                 }
                 continue
-            
+
             fitted_peaks = results["fitted_keV"]
             fwhms = results["pk_fwhms"][:, 0]
             dfwhms = results["pk_fwhms"][:, 1]
