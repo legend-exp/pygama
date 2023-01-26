@@ -209,7 +209,11 @@ class Table(Struct):
             cols = self.keys()
         for col in cols:
             if isinstance(self[col], Table):
-                df = df.join(self[col].get_dataframe(prefix=f"{prefix}{col}_"))
+                sub_df = self[col].get_dataframe(prefix=f"{prefix}{col}_")
+                if df.empty:
+                    df = sub_df
+                else:
+                    df = df.join(sub_df)
             else:
                 if isinstance(self[col], VectorOfVectors):
                     column = self[col].to_aoesa()
