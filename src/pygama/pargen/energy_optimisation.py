@@ -1290,9 +1290,9 @@ class BayesianOptimizer:
         mean_y = self.gauss_pr.predict(self.x_init)
         min_mean_y = np.min(mean_y)
         z = (mean_y_new[0] - min_mean_y - 1) / (sigma_y_new[0] + 1e-9)
-        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(
-            z
-        ) + sigma_y_new[0] * norm.pdf(z)
+        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(z) + sigma_y_new[
+            0
+        ] * norm.pdf(z)
         return exp_imp
 
     def _get_ucb(self, x_new):
@@ -1308,7 +1308,6 @@ class BayesianOptimizer:
             np.array([x_new]), return_std=True
         )
         return mean_y_new[0] - self.lambda_param * sigma_y_new[0]
-
 
     def _get_next_probable_point(self):
         min_ei = float(sys.maxsize)
@@ -1410,8 +1409,14 @@ class BayesianOptimizer:
             )
             self.prev_x = self.current_x
 
-        self.best_samples_ = pd.concat([self.best_samples_,
-            pd.DataFrame({"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei})], ignore_index=True
+        self.best_samples_ = pd.concat(
+            [
+                self.best_samples_,
+                pd.DataFrame(
+                    {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
+                ),
+            ],
+            ignore_index=True,
         )
 
     def get_best_vals(self):
