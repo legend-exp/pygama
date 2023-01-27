@@ -876,7 +876,7 @@ class DataLoader:
             child = self.tcms[tcm_level]["child"]
             load_levels = [parent, child]
 
-        def explode_evt_cols(el, tier_table):
+        def explode_evt_cols(el: pd.DataFrame, tier_table: lgdo.Table):
             # Explode columns from "evt"-style levels, untested
             # Will only work if column has an "nda" attribute
             cum_length = build_cl(el[f"{child}_idx"])
@@ -887,7 +887,7 @@ class DataLoader:
             tier_table.update(zip(tier_table.keys(), exp_cols))
             return tier_table
 
-        def fill_col_dict(tier_table, col_dict, tcm_idx):
+        def fill_col_dict(tier_table: lgdo.Table, col_dict: dict, tcm_idx: list | pd.RangeIndex):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
             for col in tier_table.keys():
@@ -922,7 +922,7 @@ class DataLoader:
                     )
             return col_dict
 
-        def dict_to_table(col_dict):
+        def dict_to_table(col_dict: dict):
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
