@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import numpy as np
+import pytest
 
 from pygama.lgdo import LH5Store
 from pygama.lgdo.compression import (
@@ -8,32 +11,66 @@ from pygama.lgdo.compression import (
     radware_decompress,
 )
 
+config_dir = Path(__file__).parent / "sigcompress"
 
-def test_rawdware_sigcompress(lgnd_test_data):
+
+@pytest.fixture()
+def wftable(lgnd_test_data):
     store = LH5Store()
-    obj, _ = store.read_object(
+    wft, _ = store.read_object(
         "/geds/raw/waveform",
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
-        n_rows=1,
     )
+    return wft
 
-    wf = obj["values"].nda[0].astype(np.uint16)
 
-    enc_wf = np.empty_like(wf, dtype=np.uint16)
-    _radware_sigcompress_encode(wf, enc_wf)
+def test_rawdware_sigcompress_original(wftable):
+    wf = wftable.values.nda[0].astype(np.int16)
 
+    enc_wf = np.zeros(len(wf), dtype=np.uint16)
+    nsig = _radware_sigcompress_encode(wf, enc_wf)
+
+    assert enc_wf[0] == len(wf)
     assert enc_wf.dtype == np.uint16
     assert (enc_wf != wf).all()
 
+    # compare to result of original C code
+    enc_wf_c = np.empty(0, dtype="uint16")
+    nsig_c = 0
+    with open(config_dir / "LDQTA_r117_20200110T105115Z_cal_geds_raw-0.dat") as f:
+        first = True
+        for line in f.readlines():
+            if first:
+                nsig_c = int(line)
+                first = False
+            else:
+                enc_wf_c = np.append(enc_wf_c, np.uint16(line))
+
+    assert nsig_c == nsig
+    assert len(enc_wf) == len(enc_wf_c)
+    assert (enc_wf == enc_wf_c).all()
+
+    # now check if decompressed is same as the original
     dec_wf = np.empty_like(wf, dtype=np.int16)
     _radware_sigcompress_decode(enc_wf, dec_wf)
 
     assert dec_wf.dtype == np.int16
     assert (dec_wf == wf).all()
 
+
+def test_rawdware_sigcompress(wftable):
+    wf = wftable.values.nda[0].astype(np.int16)
+
+    enc_wf = np.zeros(len(wf), dtype=np.uint16)
+    nsig = _radware_sigcompress_encode(wf, enc_wf)
+
     comp_wf = radware_compress(wf)
     assert isinstance(comp_wf, np.ndarray)
     assert comp_wf.dtype == np.uint16
+
+    # check that the resizing works as expected
+    assert len(comp_wf) == nsig
+    assert (comp_wf == enc_wf[:nsig]).all()
 
     decomp_wf = radware_decompress(comp_wf)
     assert isinstance(decomp_wf, np.ndarray)
@@ -42,20 +79,13 @@ def test_rawdware_sigcompress(lgnd_test_data):
     assert (decomp_wf == wf).all()
 
 
-def test_rawdware_sigcompress_wftable(lgnd_test_data):
-    store = LH5Store()
-    wft, _ = store.read_object(
-        "/geds/raw/waveform",
-        lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
-        n_rows=100,
-    )
-
-    enc_wft = radware_compress(wft)
+def test_rawdware_sigcompress_wftable(wftable):
+    enc_wft = radware_compress(wftable)
     dec_wft = radware_decompress(enc_wft)
 
-    assert dec_wft.t0 == wft.t0
-    assert dec_wft.dt == wft.dt
-    for wf1, wf2 in zip(dec_wft.values, wft.values):
+    assert dec_wft.t0 == wftable.t0
+    assert dec_wft.dt == wftable.dt
+    for wf1, wf2 in zip(dec_wft.values, wftable.values):
         assert (wf1.astype(np.uint16) == wf2).all()
 
 
