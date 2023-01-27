@@ -191,7 +191,7 @@ class FileDB:
         self.file_format = self.config["file_format"]
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
-        
+
         self.sortby = self.config.get("sortby", "timestamp")
 
         # Handle environment variables
