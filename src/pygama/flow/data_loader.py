@@ -888,7 +888,9 @@ class DataLoader:
             tier_table.update(zip(tier_table.keys(), exp_cols))
             return tier_table
 
-        def fill_col_dict(tier_table: lgdo.Table, col_dict: dict, tcm_idx: list | pd.RangeIndex):
+        def fill_col_dict(
+            tier_table: lgdo.Table, col_dict: dict, tcm_idx: list | pd.RangeIndex
+        ):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
             for col in tier_table.keys():
