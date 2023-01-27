@@ -1533,7 +1533,7 @@ class BayesianOptimizer:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
             for i, point in enumerate(points):
-                ys[i] = self._acquisition_function(np.array([point]).reshape(1, -1)[0])
+                ys[i] = self.acq_function(np.array([point]).reshape(1, -1)[0])
             fig = plt.figure()
             plt.plot(points, ys)
             plt.scatter(np.array(self.x_init), np.array(self.y_init))
@@ -1575,7 +1575,7 @@ class BayesianOptimizer:
 
             j = 0
             for i, _ in np.ndenumerate(out_grid):
-                out_grid[i] = self._acquisition_function(points[j])
+                out_grid[i] = self.acq_function(points[j])
                 j += 1
 
             fig = plt.figure()
