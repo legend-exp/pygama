@@ -22,8 +22,7 @@ from pygama.lgdo import (
     LH5Store,
     Struct,
     Table,
-    WaveformTable,
-    VectorOfVectors
+    VectorOfVectors,
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
@@ -692,7 +691,9 @@ class DataLoader:
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update()
-                progress_bar.set_postfix(key=self.filedb.df.iloc[file][self.filedb.sortby])
+                progress_bar.set_postfix(
+                    key=self.filedb.df.iloc[file][self.filedb.sortby]
+                )
 
             log.debug(
                 f"building entry list for cycle {self.filedb.df.iloc[file][self.filedb.sortby]}"
@@ -894,13 +895,13 @@ class DataLoader:
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
-                        col_dict[col] = [[]]*table_length 
+                        col_dict[col] = [[]] * table_length
                     for i, idx in enumerate(tcm_idx):
                         col_dict[col][idx] = tier_table[col].nda[i]
                 elif isinstance(tier_table[col], VectorOfVectors):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
-                        col_dict[col] = [[]]*table_length
+                        col_dict[col] = [[]] * table_length
                     for i, idx in enumerate(tcm_idx):
                         col_dict[col][idx] = tier_table[col][i]
                 elif isinstance(tier_table[col], Array):
@@ -914,7 +915,9 @@ class DataLoader:
                 elif isinstance(tier_table[col], Table):
                     if col not in col_dict.keys():
                         col_dict[col] = {}
-                    col_dict[col] = fill_col_dict(tier_table[col], col_dict[col], tcm_idx)
+                    col_dict[col] = fill_col_dict(
+                        tier_table[col], col_dict[col], tcm_idx
+                    )
                 else:
                     log.warning(
                         f"not sure how to handle column {col} "
@@ -985,7 +988,7 @@ class DataLoader:
                         [idx for idx_list in el_idx for idx in idx_list],
                     )
             # Convert col_dict to lgdo.Table
-            
+
             f_table = dict_to_table(col_dict=col_dict)
 
             if output_file:
@@ -1016,7 +1019,9 @@ class DataLoader:
 
                 if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar.update()
-                    progress_bar.set_postfix(key=self.filedb.df.iloc[file][self.filedb.sortby])
+                    progress_bar.set_postfix(
+                        key=self.filedb.df.iloc[file][self.filedb.sortby]
+                    )
 
                 log.debug(
                     f"loading data for cycle key {self.filedb.df.iloc[file][self.filedb.sortby]}"
@@ -1075,9 +1080,8 @@ class DataLoader:
                         col_dict = fill_col_dict(tier_table, col_dict, tcm_idx)
                         # end tb loop
 
-
                 # Convert col_dict to lgdo.Table
-                f_table = dict_to_table(col_dict) 
+                f_table = dict_to_table(col_dict)
 
                 if in_memory:
                     load_out[file] = f_table
