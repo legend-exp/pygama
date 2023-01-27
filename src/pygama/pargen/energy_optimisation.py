@@ -1283,51 +1283,32 @@ class BayesianOptimizer:
 
     def _get_expected_improvement(self, x_new):
 
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
-
-        # Using estimates from Gaussian surrogate instead of actual function for
-        # entire prior distribution to avoid cost
 
         mean_y = self.gauss_pr.predict(self.x_init)
         min_mean_y = np.min(mean_y)
-        z = (mean_y_new - min_mean_y - self.eta_param) / (sigma_y_new + 1e-9)  #
-        exp_imp = (mean_y_new - min_mean_y - self.eta_param) * norm.cdf(
+        z = (mean_y_new[0] - min_mean_y - 1) / (sigma_y_new[0] + 1e-9)
+        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(
             z
-        ) + sigma_y_new * norm.pdf(z)
+        ) + sigma_y_new[0] * norm.pdf(z)
         return exp_imp
 
     def _get_ucb(self, x_new):
 
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
-
-        return mean_y_new + self.lambda_param * sigma_y_new
+        return mean_y_new[0] + self.lambda_param * sigma_y_new[0]
 
     def _get_lcb(self, x_new):
 
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
+        return mean_y_new[0] - self.lambda_param * sigma_y_new[0]
 
-        return mean_y_new - self.lambda_param * sigma_y_new
-
-    def _acquisition_function(self, x):
-        return self.acq_function(x)
 
     def _get_next_probable_point(self):
         min_ei = float(sys.maxsize)
@@ -1340,7 +1321,7 @@ class BayesianOptimizer:
         )
         for x_start in rands:
             response = minimize(
-                fun=self._acquisition_function,
+                fun=self.acq_function,
                 x0=x_start,
                 bounds=[(dim.min_val, dim.max_val) for dim in self.dims],
                 method="L-BFGS-B",
@@ -1429,8 +1410,8 @@ class BayesianOptimizer:
             )
             self.prev_x = self.current_x
 
-        self.best_samples_ = self.best_samples_.append(
-            {"y": self.y_min, "ei": self.optimal_ei}, ignore_index=True
+        self.best_samples_ = pd.concat([self.best_samples_,
+            pd.DataFrame({"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei})], ignore_index=True
         )
 
     def get_best_vals(self):
