@@ -192,10 +192,7 @@ class FileDB:
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
         
-        if "sortby" in self.config.keys():
-            self.sortby = self.config["sortby"]
-        else:
-            self.sortby = "timestamp"
+        self.sortby = self.config.get(key="sortby", value="timestamp")
 
         # Handle environment variables
         data_dir = os.path.expandvars(self.config["data_dir"])
