@@ -23,7 +23,7 @@ from pygama.lgdo import (
     Struct,
     Table,
     VectorOfVectors,
-    WaveformTable
+    WaveformTable,
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
@@ -928,7 +928,7 @@ class DataLoader:
                     )
             return col_dict
 
-        def dict_to_table(col_dict: dict):                
+        def dict_to_table(col_dict: dict):
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
@@ -942,7 +942,9 @@ class DataLoader:
                     nda = np.array(col_dict[col])
                     col_dict[col] = Array(nda=nda)
             if set(col_dict.keys()) == {"t0", "dt", "values"}:
-                return WaveformTable(t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"])
+                return WaveformTable(
+                    t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]
+                )
             else:
                 return Table(col_dict=col_dict)
 
