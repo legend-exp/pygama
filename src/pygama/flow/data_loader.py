@@ -23,6 +23,7 @@ from pygama.lgdo import (
     Struct,
     Table,
     VectorOfVectors,
+    WaveformTable
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
@@ -877,7 +878,7 @@ class DataLoader:
             child = self.tcms[tcm_level]["child"]
             load_levels = [parent, child]
 
-        def explode_evt_cols(el: pd.DataFrame, tier_table: lgdo.Table):
+        def explode_evt_cols(el: pd.DataFrame, tier_table: Table):
             # Explode columns from "evt"-style levels, untested
             # Will only work if column has an "nda" attribute
             cum_length = build_cl(el[f"{child}_idx"])
@@ -889,7 +890,7 @@ class DataLoader:
             return tier_table
 
         def fill_col_dict(
-            tier_table: lgdo.Table, col_dict: dict, tcm_idx: list | pd.RangeIndex
+            tier_table: Table, col_dict: dict, tcm_idx: list | pd.RangeIndex
         ):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
@@ -927,7 +928,7 @@ class DataLoader:
                     )
             return col_dict
 
-        def dict_to_table(col_dict: dict):
+        def dict_to_table(col_dict: dict):                
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
@@ -940,7 +941,10 @@ class DataLoader:
                 else:
                     nda = np.array(col_dict[col])
                     col_dict[col] = Array(nda=nda)
-            return Table(col_dict=col_dict)
+            if set(col_dict.keys()) == {"t0", "dt", "values"}:
+                return WaveformTable(t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"])
+            else:
+                return Table(col_dict=col_dict)
 
         sto = LH5Store()
 
