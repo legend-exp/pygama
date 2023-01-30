@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pygama.lgdo import LH5Store
+from pygama.lgdo import LH5Store, VectorOfEncodedVectors, VectorOfVectors
 from pygama.lgdo.compression import (
     _radware_sigcompress_decode,
     _radware_sigcompress_encode,
@@ -79,14 +79,20 @@ def test_rawdware_sigcompress(wftable):
     assert (decomp_wf == wf).all()
 
 
-def test_rawdware_sigcompress_wftable(wftable):
-    enc_wft = radware_compress(wftable)
-    dec_wft = radware_decompress(enc_wft)
+def test_rawdware_sigcompress_aoesa(wftable):
+    enc_vov = radware_compress(wftable.values)
 
-    assert dec_wft.t0 == wftable.t0
-    assert dec_wft.dt == wftable.dt
-    for wf1, wf2 in zip(dec_wft.values, wftable.values):
-        assert (wf1.astype(np.uint16) == wf2).all()
+    assert isinstance(enc_vov, VectorOfEncodedVectors)
+    # test only first waveform
+    assert isinstance(enc_vov[0], tuple)
+    assert (enc_vov[0][0] == radware_compress(wftable.values[0])).all()
+    assert enc_vov[0][1] == len(wftable.values[0])
+
+    dec_vov = radware_decompress(enc_vov)
+    assert isinstance(dec_vov, VectorOfVectors)
+
+    for wf1, wf2 in zip(dec_vov, wftable.values):
+        assert (wf1 == wf2).all()
 
 
 def test_rawdware_sigcompress_performance(lgnd_test_data):

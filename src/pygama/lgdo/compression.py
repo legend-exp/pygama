@@ -6,7 +6,8 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
-from pygama.lgdo import WaveformTable
+from . import ArrayOfEqualSizedArrays, VectorOfEncodedVectors, VectorOfVectors
+from . import lgdo_utils as utils
 
 # fmt: off
 _radware_siggen_mask = np.uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
@@ -15,16 +16,17 @@ _radware_siggen_mask = np.uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
 
 
 def radware_compress(
-    sig_in: NDArray | WaveformTable, sig_out: NDArray | WaveformTable = None
-) -> NDArray | WaveformTable:
+    sig_in: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays,
+    sig_out: NDArray | VectorOfEncodedVectors = None,
+) -> NDArray | VectorOfEncodedVectors:
     """Compress digital signal(s) with `radware-sigcompress`.
 
     Parameters
     ----------
     sig_in
-        array or waveform table holding the input signal(s).
+        array or array of arrays holding the input signal(s).
     sig_out
-        pre-allocated array or waveform table for the compressed signal(s).
+        pre-allocated array or array of arrays for the compressed signal(s).
 
     Returns
     -------
@@ -42,27 +44,28 @@ def radware_compress(
 
         max_out_len = 2 * sig_in.size
         if len(sig_out) < max_out_len:
-            sig_out.resize(max_out_len, refcheck=False)
+            sig_out.resize(max_out_len, refcheck=True)
 
         outlen = _radware_sigcompress_encode(sig_in, sig_out)
 
         if outlen < sig_in.size:
-            sig_out.resize(outlen, refcheck=False)
+            sig_out.resize(outlen, refcheck=True)
 
-    elif isinstance(sig_in, WaveformTable):
+    # TODO: different actions if ArrayOfEqualSizedArrays
+    elif isinstance(sig_in, (VectorOfVectors, ArrayOfEqualSizedArrays)):
         if not sig_out:
-            # pre-allocate output table
-            # sig_out.values will be a VectorOfVectors
-            sig_out = WaveformTable(
-                size=sig_in.size,
-                dtype=np.uint16,
-                t0=sig_in.t0,
-                dt=sig_in.dt,
-                attrs=sig_in.attrs,
+            # pre-allocate output structure
+            sig_out = VectorOfEncodedVectors(
+                encoded_data=VectorOfVectors(
+                    shape_guess=(len(sig_in), 1), dtype="uint16"
+                ),
+                attrs={"codec": "radware_sigcompress", "codec_shift": 0},
             )
+        elif not isinstance(sig_out, VectorOfEncodedVectors):
+            raise ValueError("sig_out must be a VectorOfEncodedVectors")
 
-        for i, wf in enumerate(sig_in.values):
-            sig_out.values.set_vector(i, radware_compress(wf))
+        for i, wf in enumerate(sig_in):
+            sig_out[i] = (radware_compress(wf), len(wf))
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
@@ -71,8 +74,9 @@ def radware_compress(
 
 
 def radware_decompress(
-    sig_in: NDArray | WaveformTable, sig_out: NDArray | WaveformTable = None
-) -> NDArray | WaveformTable:
+    sig_in: NDArray | VectorOfEncodedVectors,
+    sig_out: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays = None,
+) -> NDArray | VectorOfVectors | ArrayOfEqualSizedArrays:
     """Decompress digital signal(s) with `radware-sigcompress`.
 
     Parameters
@@ -104,21 +108,20 @@ def radware_decompress(
         if outlen < len(sig_out):
             sig_out.resize(outlen, refcheck=False)
 
-    elif isinstance(sig_in, WaveformTable):
+    elif isinstance(sig_in, VectorOfEncodedVectors):
         if not sig_out:
-            # pre-allocate  output table
-            # sig_out.values will be a VectorOfVectors because that's the most
+            # pre-allocate output structure
+            # sig_out will be a VectorOfVectors for now because that's the most
             # general format
-            sig_out = WaveformTable(
-                size=len(sig_in),
-                dtype=np.int16,
-                t0=sig_in.t0,
-                dt=sig_in.dt,
-                attrs=sig_in.attrs,
+            sig_out = utils.copy(sig_in.encoded_data)
+
+        elif not isinstance(sig_out, (VectorOfVectors, ArrayOfEqualSizedArrays)):
+            raise ValueError(
+                "sig_out must be a ArrayOfEqualSizedArrays or VectorOfVectors"
             )
 
-        for i, wf in enumerate(sig_in.values):
-            sig_out.values.set_vector(i, radware_decompress(wf))
+        for i, wf in enumerate(sig_in):
+            sig_out[i] = radware_decompress(wf[0])
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
