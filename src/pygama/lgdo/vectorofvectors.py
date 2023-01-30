@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 from numba import njit
+import itertools
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
@@ -64,17 +65,20 @@ class VectorOfVectors(LGDO):
             A set of user attributes to be carried along with this LGDO.
         """
         if listoflists is not None:
-            cum_length = []
-            for vec in listoflists:
-                cum_length.append(len(vec))
+            cl_nda = np.cumsum([len(l) for l in listoflists])
+            if dtype is None:
+                if len(cl_nda) == 0 or cl_nda[-1] == 0:
+                    raise ValueError("listoflists can't be empty with dtype=None!")
+                else:
+                    # Set dtype from the first element in the list
+                    # Find it efficiently, allowing for zero-length lists as some of the entries
+                    first_element = next(itertools.chain.from_iterable(listoflists))
+                    dtype = type(first_element)
+            self.dtype = np.dtype(dtype)
+            self.cumulative_length = Array(nda=cl_nda)
             self.flattened_data = Array(
-                nda=np.array([item for sublist in listoflists for item in sublist])
+                nda=np.fromiter(itertools.chain.from_iterable(listoflists), dtype=self.dtype)
             )
-            self.cumulative_length = Array(nda=np.cumsum(cum_length))
-            if dtype is not None:
-                self.dtype = np.dtype(dtype)
-            else:
-                self.dtype = self.flattened_data.dtype
         else:
             if cumulative_length is None:
                 self.cumulative_length = Array(
