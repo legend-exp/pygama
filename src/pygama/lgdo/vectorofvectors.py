@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 from numba import njit
+import itertools
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
@@ -30,6 +31,7 @@ class VectorOfVectors(LGDO):
         self,
         flattened_data: Array = None,
         cumulative_length: Array = None,
+        listoflists: list = None,
         shape_guess: tuple[int, int] = None,
         dtype: np.dtype = None,
         attrs: dict[str, Any] = None,
@@ -46,6 +48,9 @@ class VectorOfVectors(LGDO):
             `cumulative_length`. Should be `dtype` :any:`numpy.uint32`. If
             `cumulative_length` is ``None``, an internal `cumulative_length` is
             allocated based on the first element of `shape_guess`.
+        listoflists
+            To create a VectorOfVectors out of a list of lists. Takes priority over
+            flattened_data and cumulative_length.
         shape_guess
             A NumPy-format shape specification, required if either of
             `flattened_data` or `cumulative_length` are not supplied.  The
@@ -55,35 +60,51 @@ class VectorOfVectors(LGDO):
             of `flattened_data` if it was not supplied.
         dtype
             Sets the type of data stored in `flattened_data`. Required if
-            `flattened_data` is ``None``.
+            `flattened_data` and `listoflists` are ``None``.
         attrs
             A set of user attributes to be carried along with this LGDO.
         """
-        if cumulative_length is None:
-            self.cumulative_length = Array(
-                shape=(shape_guess[0],), dtype="uint32", fill_val=0
+        if listoflists is not None:
+            cl_nda = np.cumsum([len(l) for l in listoflists])
+            if dtype is None:
+                if len(cl_nda) == 0 or cl_nda[-1] == 0:
+                    raise ValueError("listoflists can't be empty with dtype=None!")
+                else:
+                    # Set dtype from the first element in the list
+                    # Find it efficiently, allowing for zero-length lists as some of the entries
+                    first_element = next(itertools.chain.from_iterable(listoflists))
+                    dtype = type(first_element)
+            self.dtype = np.dtype(dtype)
+            self.cumulative_length = Array(nda=cl_nda)
+            self.flattened_data = Array(
+                nda=np.fromiter(itertools.chain.from_iterable(listoflists), dtype=self.dtype)
             )
         else:
-            if isinstance(cumulative_length, Array):
-                self.cumulative_length = cumulative_length
+            if cumulative_length is None:
+                self.cumulative_length = Array(
+                    shape=(shape_guess[0],), dtype="uint32", fill_val=0
+                )
             else:
-                self.cumulative_length = Array(cumulative_length)
-        if flattened_data is None:
-            length = np.prod(shape_guess)
-            if dtype is None:
-                raise ValueError("flattened_data and dtype cannot both be None!")
+                if isinstance(cumulative_length, Array):
+                    self.cumulative_length = cumulative_length
+                else:
+                    self.cumulative_length = Array(cumulative_length)
+            if flattened_data is None:
+                length = np.prod(shape_guess)
+                if dtype is None:
+                    raise ValueError("flattened_data and dtype cannot both be None!")
+                else:
+                    self.flattened_data = Array(shape=(length,), dtype=dtype)
+                    self.dtype = np.dtype(dtype)
             else:
-                self.flattened_data = Array(shape=(length,), dtype=dtype)
-                self.dtype = np.dtype(dtype)
-        else:
-            if isinstance(flattened_data, Array):
-                self.flattened_data = flattened_data
-            else:
-                self.flattened_data = Array(flattened_data)
-            if dtype is None:
-                self.dtype = self.flattened_data.dtype
-            else:
-                self.dtype = np.dtype(dtype)
+                if isinstance(flattened_data, Array):
+                    self.flattened_data = flattened_data
+                else:
+                    self.flattened_data = Array(flattened_data)
+                if dtype is None:
+                    self.dtype = self.flattened_data.dtype
+                else:
+                    self.dtype = np.dtype(dtype)
 
         self.attrs = {} if attrs is None else dict(attrs)
 
