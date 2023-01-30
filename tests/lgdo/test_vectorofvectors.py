@@ -136,3 +136,7 @@ def test_build_cl_and_explodes():
     assert len(arrays_out) == 2
     assert (arrays_out[0] == array_exp).all()
     assert (arrays_out[1] == exp).all()
+
+
+def test_copy(lgdo_vov):
+    assert lgdo_vov == lgdo.copy(lgdo_vov)

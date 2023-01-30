@@ -11,10 +11,10 @@ from typing import Any
 import numba
 import numpy as np
 
+import pygama.lgdo.lgdo_utils as utils
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.lgdo import LGDO
-from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
@@ -96,10 +96,11 @@ class VectorOfVectors(LGDO):
         return "array"
 
     def form_datatype(self) -> str:
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return "array<1>{array<1>{" + et + "}}"
 
     def __len__(self) -> int:
+        """Return the number of stored vectors."""
         return len(self.cumulative_length)
 
     def __eq__(self, other: VectorOfVectors) -> bool:

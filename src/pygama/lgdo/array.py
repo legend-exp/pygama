@@ -10,8 +10,8 @@ from typing import Any
 
 import numpy as np
 
+import pygama.lgdo.lgdo_utils as utils
 from pygama.lgdo.lgdo import LGDO
-from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class Array(LGDO):
     def form_datatype(self) -> str:
         dt = self.datatype_name()
         nd = str(len(self.nda.shape))
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:

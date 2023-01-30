@@ -9,6 +9,8 @@ import os
 
 import numpy as np
 
+from .. import lgdo
+
 log = logging.getLogger(__name__)
 
 
@@ -56,6 +58,22 @@ def get_element_type(obj: object) -> str:
     )
 
 
+def copy(obj: lgdo.LGDO) -> lgdo.LGDO:
+    """Return a copy of an LGDO."""
+    if isinstance(obj, lgdo.Array):
+        return lgdo.Array(np.copy(obj.nda), attrs=dict(obj.attrs))
+
+    if isinstance(obj, lgdo.VectorOfVectors):
+        return lgdo.VectorOfVectors(
+            flattened_data=copy(obj.flattened_data),
+            cumulative_length=copy(obj.cumulative_length),
+            attrs=dict(obj.attrs),
+        )
+
+    else:
+        raise ValueError(f"copy of {type(obj)} not supported")
+
+
 def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]]:
     """Parse datatype string and return type, dimensions and elements.
 
@@ -96,10 +114,10 @@ def expand_path(path: str, list: bool = False) -> str | list:
     Parameters
     ----------
     path
-        name of path, which may include environment variables and wildcards
+        name of path, which may include environment variables and wildcards.
     list
-        if True, return a list. If False, return a string; if False and a
-        unique file is not found, raise an Exception
+        if ``True``, return a list. If ``False``, return a string; if ``False``
+        and a unique file is not found, raise an exception.
 
     Returns
     -------

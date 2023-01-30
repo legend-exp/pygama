@@ -9,8 +9,8 @@ from typing import Any
 
 import numpy
 
+import pygama.lgdo.lgdo_utils as utils
 from pygama.lgdo.array import Array
-from pygama.lgdo.lgdo_utils import get_element_type
 
 
 class ArrayOfEqualSizedArrays(Array):
@@ -75,7 +75,7 @@ class ArrayOfEqualSizedArrays(Array):
         nd = str(len(self.nda.shape))
         if self.dims is not None:
             nd = ",".join([str(i) for i in self.dims])
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:

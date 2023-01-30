@@ -24,3 +24,9 @@ def test_resize():
     array = lgdo.Array(nda=np.array([1, 2, 3, 4]))
     array.resize(3)
     assert (array.nda == np.array([1, 2, 3])).all()
+
+
+def test_copy():
+    a1 = lgdo.Array(nda=np.array([1, 2, 3, 4]))
+    a2 = lgdo.copy(a1)
+    assert a1 == a2
