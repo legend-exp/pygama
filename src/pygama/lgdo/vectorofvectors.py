@@ -65,7 +65,7 @@ class VectorOfVectors(LGDO):
             A set of user attributes to be carried along with this LGDO.
         """
         if listoflists is not None:
-            cl_nda = np.cumsum([len(l) for l in listoflists])
+            cl_nda = np.cumsum([len(ll) for ll in listoflists])
             if dtype is None:
                 if len(cl_nda) == 0 or cl_nda[-1] == 0:
                     raise ValueError("listoflists can't be empty with dtype=None!")
