@@ -58,10 +58,24 @@ def get_element_type(obj: object) -> str:
     )
 
 
-def copy(obj: lgdo.LGDO) -> lgdo.LGDO:
-    """Return a copy of an LGDO."""
+def copy(obj: lgdo.LGDO, dtype: np.dtype = None) -> lgdo.LGDO:
+    """Return a copy of an LGDO.
+
+    Parameters
+    ----------
+    obj
+        the LGDO to be copied.
+    dtype
+        NumPy dtype to be used for the copied object.
+
+    """
+    if dtype is None:
+        dtype = obj.dtype
+
     if isinstance(obj, lgdo.Array):
-        return lgdo.Array(np.copy(obj.nda), attrs=dict(obj.attrs))
+        return lgdo.Array(
+            np.array(obj.nda, dtype=dtype, copy=True), attrs=dict(obj.attrs)
+        )
 
     if isinstance(obj, lgdo.VectorOfVectors):
         return lgdo.VectorOfVectors(
