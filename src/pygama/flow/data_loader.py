@@ -906,7 +906,7 @@ class DataLoader:
             for col in tier_table.keys():
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
-                    if self.aoesa_to_vov:  # conver to VectorOfVectors
+                    if self.aoesa_to_vov:  # convert to VectorOfVectors
                         if col not in col_dict.keys():
                             col_dict[col] = [[]] * table_length
                         for i, idx in enumerate(tcm_idx):
@@ -919,7 +919,7 @@ class DataLoader:
                             )
                         try:
                             col_dict[col][tcm_idx] = tier_table[col].nda
-                        except:
+                        except BaseException:
                             raise ValueError(
                                 f"self.aoesa_to_vov is False but {col} is a jagged array"
                             )
