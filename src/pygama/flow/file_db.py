@@ -192,6 +192,8 @@ class FileDB:
         self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
 
+        self.sortby = self.config.get("sortby", "timestamp")
+
         # Handle environment variables
         data_dir = os.path.expandvars(self.config["data_dir"])
 
@@ -213,7 +215,9 @@ class FileDB:
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        scan_dir = self.data_dir + self.tier_dirs[low_tier]
+        scan_dir = os.path.join(
+            self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/")
+        )
 
         log.info(f"Scanning {scan_dir} with template {template}")
 
@@ -252,10 +256,13 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
         # sort rows according to timestamps
-        log.debug("Sorting database entries according to timestamp")
-        self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
-        self.df.sort_values("_datetime", ignore_index=True, inplace=True)
-        self.df.drop("_datetime", axis=1, inplace=True)
+        log.debug(f"Sorting database entries according to {self.sortby}")
+        if self.sortby == "timestamp":
+            self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
+            self.df.sort_values("_datetime", ignore_index=True, inplace=True)
+            self.df.drop("_datetime", axis=1, inplace=True)
+        else:
+            self.df.sort_values(self.sortby, ignore_index=True, inplace=True)
 
     def set_file_status(self) -> None:
         """
