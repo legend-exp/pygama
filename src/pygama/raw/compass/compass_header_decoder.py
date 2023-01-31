@@ -39,8 +39,7 @@ class CompassHeaderDecoder(DataDecoder):
             A dict containing the header information, as well as the important config information
             of wf_len and num_enabled_channels
         """
-        config_struct = compass_config_to_struct(config_file, wf_len)
-        self.config = config_struct
+        self.config = compass_config_to_struct(config_file, wf_len)
 
         config_names = [
             "energy_channels",  # energy is given in channels (0: false, 1: true)
