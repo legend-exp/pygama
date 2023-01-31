@@ -67,6 +67,8 @@ class CompassHeaderDecoder(DataDecoder):
         return self.config
 
     def make_lgdo(self, key: int = None, size: int = None) -> lgdo.Struct:
+        if self.config is None:
+            raise RuntimeError('self.config still None, need to decode header before calling make_lgdo')
         return self.config  # self.config is already an lgdo, namely it is a struct
 
     def buffer_is_full(self, rb: RawBuffer) -> bool:
