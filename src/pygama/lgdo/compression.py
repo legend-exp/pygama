@@ -6,14 +6,15 @@ import logging
 
 import numba
 import numpy as np
+from numpy import int16, int32, ubyte, uint16, uintc
 from numpy.typing import NDArray
 
 from . import ArrayOfEqualSizedArrays, VectorOfEncodedVectors, VectorOfVectors
 from . import lgdo_utils as utils
 
 # fmt: off
-_radware_siggen_mask = np.uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
-                                  2047, 4095, 8191, 16383, 32767, 65535])
+_radware_siggen_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
+                               2047, 4095, 8191, 16383, 32767, 65535])
 # fmt: on
 
 log = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ log = logging.getLogger(__name__)
 def radware_compress(
     sig_in: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays,
     sig_out: NDArray | VectorOfEncodedVectors = None,
-    shift: np.int32 = -32768,
+    shift: int32 = -32768,
 ) -> NDArray | VectorOfEncodedVectors:
     """Compress digital signal(s) with `radware-sigcompress`.
 
@@ -47,9 +48,9 @@ def radware_compress(
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
         if not sig_out:
             # pre-allocate memory
-            sig_out = np.empty_like(sig_in, dtype=np.uint16)
+            sig_out = np.empty_like(sig_in, dtype=uint16)
 
-        if sig_out.dtype != np.uint16:
+        if sig_out.dtype != uint16:
             raise ValueError("sig_out must be of type uint16")
 
         max_out_len = 2 * sig_in.size
@@ -67,7 +68,7 @@ def radware_compress(
             # pre-allocate output structure
             sig_out = VectorOfEncodedVectors(
                 encoded_data=VectorOfVectors(
-                    shape_guess=(len(sig_in), 1), dtype=np.uint16
+                    shape_guess=(len(sig_in), 1), dtype=uint16
                 ),
                 attrs={"codec": "radware_sigcompress", "codec_shift": shift},
             )
@@ -86,7 +87,7 @@ def radware_compress(
 def radware_decompress(
     sig_in: NDArray | VectorOfEncodedVectors,
     sig_out: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays = None,
-    shift: np.int32 = -32768,
+    shift: int32 = -32768,
     warn: bool = True,
 ) -> NDArray | VectorOfVectors | ArrayOfEqualSizedArrays:
     """Decompress digital signal(s) with `radware-sigcompress`.
@@ -110,15 +111,11 @@ def radware_decompress(
     --------
     ._radware_decompress_decode
     """
-    if (
-        isinstance(sig_in, np.ndarray)
-        and sig_in.ndim == 1
-        and sig_in.dtype == np.uint16
-    ):
+    if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1 and sig_in.dtype == uint16:
         siglen = int(sig_in[0])
         if not sig_out:
             # pre-allocate memory, use safe int32
-            sig_out = np.empty(siglen, dtype=np.int32)
+            sig_out = np.empty(siglen, dtype=int32)
         elif len(sig_out) < siglen:
             sig_out.resize(siglen, refcheck=False)
 
@@ -132,7 +129,7 @@ def radware_decompress(
             # pre-allocate output structure
             # sig_out will be a VectorOfVectors for now because that's the most
             # general format
-            sig_out = utils.copy(sig_in.encoded_data, dtype=np.int32)
+            sig_out = utils.copy(sig_in.encoded_data, dtype=int32)
 
         elif not isinstance(sig_out, (VectorOfVectors, ArrayOfEqualSizedArrays)):
             raise ValueError(
@@ -161,22 +158,22 @@ def radware_decompress(
 
 
 @numba.jit()
-def _set_hton_u16(a: NDArray[np.ubyte], i: int, x: int) -> int:
+def _set_hton_u16(a: NDArray[ubyte], i: int, x: int) -> int:
     """Store an unsigned 16-bit integer value in an array of unsigned 8-bit integers.
 
     The first two most significant bytes from `x` are stored contiguously in
     `a` with big-endian order.
     """
-    x_u16 = np.uint16(x)
+    x_u16 = uint16(x)
     i_1 = i * 2
     i_2 = i_1 + 1
-    a[i_1] = np.ubyte(x_u16 >> 8)
-    a[i_2] = np.ubyte(x_u16 >> 0)
+    a[i_1] = ubyte(x_u16 >> 8)
+    a[i_2] = ubyte(x_u16 >> 0)
     return x
 
 
 @numba.jit()
-def _get_hton_u16(a: NDArray[np.ubyte], i: int) -> np.uint16:
+def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     """Read unsigned 16-bit integer values from an array of unsigned 8-bit integers.
 
     The first two most significant bytes of the values must be stored
@@ -184,16 +181,16 @@ def _get_hton_u16(a: NDArray[np.ubyte], i: int) -> np.uint16:
     """
     i_1 = i * 2
     i_2 = i_1 + 1
-    return np.uint16(a[i_1] << 8 | a[i_2])
+    return uint16(a[i_1] << 8 | a[i_2])
 
 
 @numba.jit()
 def _radware_sigcompress_encode(
-    sig_in: NDArray[np.uint16],
+    sig_in: NDArray[uint16],
     sig_out: NDArray,
-    shift: np.int32 = -32768,
-    _mask: NDArray[np.uint16] = _radware_siggen_mask,
-) -> np.int32:
+    shift: int32 = -32768,
+    _mask: NDArray[uint16] = _radware_siggen_mask,
+) -> int32:
     """Compress a digital signal.
 
     Shifts the signal values by ``+shift`` and internally interprets the result
@@ -226,27 +223,27 @@ def _radware_sigcompress_encode(
 
     j = iso = bp = 0
     sig_out[iso] = sig_in.size
-    db = np.zeros(2, dtype=np.uint16)
-    dd = np.frombuffer(db, dtype=np.uintc)
+    db = np.zeros(2, dtype=uint16)
+    dd = np.frombuffer(db, dtype=uintc)
 
     iso += 1
     while j < sig_in.size:  # j = starting index of section of signal
         # find optimal method and length for compression
         # of next section of signal
-        max1 = min1 = np.int16(sig_in[j] + shift)
-        max2 = np.int16(-16000)
-        min2 = np.int16(16000)
+        max1 = min1 = int16(sig_in[j] + shift)
+        max2 = int16(-16000)
+        min2 = int16(16000)
         nb1 = nb2 = 2
         nw = 1
         i = j + 1
         # FIXME: 48 could be tuned better?
         while (i < sig_in.size) and (i < j + 48):
-            sig_in_i = np.int16(sig_in[i] + shift)
+            sig_in_i = int16(sig_in[i] + shift)
             if max1 < sig_in_i:
                 max1 = sig_in_i
             if min1 > sig_in_i:
                 min1 = sig_in_i
-            ds = np.int16(sig_in[i] - sig_in[i - 1])
+            ds = int16(sig_in[i] - sig_in[i - 1])
             if max2 < ds:
                 max2 = ds
             if min2 > ds:
@@ -260,7 +257,7 @@ def _radware_sigcompress_encode(
             while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
-                sig_in_i = np.int16(sig_in[i] + shift)
+                sig_in_i = int16(sig_in[i] + shift)
                 if max1 < sig_in_i:
                     max1 = sig_in_i
                 dd1 = max1 - min1
@@ -279,7 +276,7 @@ def _radware_sigcompress_encode(
             while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
-                ds = np.int16(sig_in[i] - sig_in[i - 1])
+                ds = int16(sig_in[i] - sig_in[i - 1])
                 if max2 < ds:
                     max2 = ds
                 dd2 = max2 - min2
@@ -312,7 +309,7 @@ def _radware_sigcompress_encode(
 
             i = j
             while i < j + nw:
-                dd[0] = np.int16(sig_in[i] + shift) - min1  # value to encode
+                dd[0] = int16(sig_in[i] + shift) - min1  # value to encode
                 dd[0] = dd[0] << (32 - bp - nb1)
                 sig_out[iso] |= db[1]
                 bp += nb1
@@ -360,11 +357,11 @@ def _radware_sigcompress_encode(
 
 @numba.jit()
 def _radware_sigcompress_decode(
-    sig_in: NDArray[np.uint16],
+    sig_in: NDArray[uint16],
     sig_out: NDArray,
-    shift: np.int32 = -32768,
-    _mask: NDArray[np.uint16] = _radware_siggen_mask,
-) -> np.int32:
+    shift: int32 = -32768,
+    _mask: NDArray[uint16] = _radware_siggen_mask,
+) -> int32:
     """Deompress a digital signal.
 
     After decoding, the signal values are shifted by ``-shift`` to restore the
@@ -391,10 +388,10 @@ def _radware_sigcompress_decode(
 
     sig_len_in = sig_in.size
     j = isi = iso = bp = 0
-    siglen = np.uint16(sig_in[isi])  # signal length
+    siglen = uint16(sig_in[isi])  # signal length
     isi += 1
-    db = np.zeros(2, dtype=np.uint16)
-    dd = np.frombuffer(db, dtype=np.uintc)
+    db = np.zeros(2, dtype=uint16)
+    dd = np.frombuffer(db, dtype=uintc)
 
     while (isi < sig_len_in) and (iso < siglen):
         if bp > 0:
@@ -420,17 +417,17 @@ def _radware_sigcompress_decode(
                     dd[0] = dd[0] << (bp + nb)
                 else:
                     dd[0] = dd[0] << nb
-                sig_out[iso] = np.int16((db[1] & mask[nb]) + min_val) - shift
+                sig_out[iso] = int16((db[1] & mask[nb]) + min_val) - shift
                 iso += 1
                 bp += nb
                 i += 1
         else:
             nb -= 32
             #  decode derivative / difference values
-            sig_out[iso] = np.int16(sig_in[isi]) - shift  # starting signal value
+            sig_out[iso] = int16(sig_in[isi]) - shift  # starting signal value
             iso += 1
             isi += 1
-            min_val = np.int16(sig_in[isi])  # min value used for encoding
+            min_val = int16(sig_in[isi])  # min value used for encoding
             isi += 1
             db[0] = sig_in[isi]
 
@@ -446,7 +443,7 @@ def _radware_sigcompress_decode(
                 else:
                     dd[0] = dd[0] << nb
                 sig_out[iso] = (
-                    np.int16((db[1] & mask[nb]) + min_val + sig_out[iso - 1] + shift)
+                    int16((db[1] & mask[nb]) + min_val + sig_out[iso - 1] + shift)
                     - shift
                 )
                 iso += 1
