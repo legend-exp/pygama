@@ -325,7 +325,11 @@ class DataLoader:
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
     def set_output(
-        self, fmt: str = None, merge_files: bool = None, columns: list = None, aoesa_to_vov: bool = None
+        self,
+        fmt: str = None,
+        merge_files: bool = None,
+        columns: list = None,
+        aoesa_to_vov: bool = None,
     ) -> None:
         """
         Set the parameters for the output format of load
@@ -902,20 +906,23 @@ class DataLoader:
             for col in tier_table.keys():
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
-                    if self.aoesa_to_vov: # conver to VectorOfVectors
+                    if self.aoesa_to_vov:  # conver to VectorOfVectors
                         if col not in col_dict.keys():
                             col_dict[col] = [[]] * table_length
                         for i, idx in enumerate(tcm_idx):
                             col_dict[col][idx] = tier_table[col].nda[i]
-                    else: # Try to make AoESA, raise error otherwise
+                    else:  # Try to make AoESA, raise error otherwise
                         if col not in col_dict.keys():
                             col_dict[col] = np.empty(
-                                (table_length, len(tier_table[col].nda[0])), 
-                                dtype=tier_table[col].dtype)
+                                (table_length, len(tier_table[col].nda[0])),
+                                dtype=tier_table[col].dtype,
+                            )
                         try:
                             col_dict[col][tcm_idx] = tier_table[col].nda
                         except:
-                            raise ValueError(f"self.aoesa_to_vov is False but {col} is a jagged array")
+                            raise ValueError(
+                                f"self.aoesa_to_vov is False but {col} is a jagged array"
+                            )
                 elif isinstance(tier_table[col], VectorOfVectors):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
