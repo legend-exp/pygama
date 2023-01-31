@@ -101,7 +101,7 @@ def build_raw(
                 in_stream_type = "FlashCam"
             elif OrcaStreamer.is_orca_stream(in_stream):
                 in_stream_type = "ORCA"
-            elif ext == "bin" or ext == "BIN":
+            elif compass_config_file is not None or ext == "bin" or ext == "BIN":
                 in_stream_type = "Compass"
             else:
                 raise RuntimeError(
