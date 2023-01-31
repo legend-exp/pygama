@@ -138,12 +138,13 @@ class DataDecoder:
             # get datatype for complex objects
             datatype = attrs.pop("datatype")
 
-            # waveforms: must have attributes t0_units, dt, dt_units, wf_len
+            # waveforms: must have attributes t0_units, dt, dt_units, wf_len, adc_bit_depth
             if datatype == "waveform":
                 t0_units = attrs.pop("t0_units")
                 dt = attrs.pop("dt")
                 dt_units = attrs.pop("dt_units")
                 wf_len = attrs.pop("wf_len")
+                adc_bit_depth = attrs.pop("adc_bit_depth")
                 wf_table = lgdo.WaveformTable(
                     size=size,
                     t0=0,
@@ -151,6 +152,7 @@ class DataDecoder:
                     dt=dt,
                     dt_units=dt_units,
                     wf_len=wf_len,
+                    values_adc_bit_depth=adc_bit_depth,
                     dtype=dtype,
                     attrs=attrs,
                 )

@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 from pygama import lgdo
@@ -84,6 +85,48 @@ def test_processor_dtype_arg(geds_raw_tbl):
     proc_chain.execute(0, 1)
 
 
+def test_processor_adc_bit_depth_attribute(spms_raw_tbl):
+    adc_dsp_config = {
+        "outputs": ["windowed_waveform"],
+        "processors": {
+            "windowed_waveform": {
+                "function": "windower",
+                "module": "pygama.dsp.processors",
+                "args": [
+                    "waveform",
+                    "waveform.adc_bit_depth",
+                    "windowed_waveform(len(waveform)-waveform.adc_bit_depth)",
+                ],
+                "unit": "ADC",
+            },
+        },
+    }
+    proc_chain, _, adc_tbl_out = build_processing_chain(spms_raw_tbl, adc_dsp_config)
+    proc_chain.execute(0, 1)
+
+    assert list(adc_tbl_out.keys()) == ["windowed_waveform"]
+
+    no_adc_dsp_config = {
+        "outputs": ["windowed_waveform"],
+        "processors": {
+            "windowed_waveform": {
+                "function": "windower",
+                "module": "pygama.dsp.processors",
+                "args": ["waveform", 16, "windowed_waveform(len(waveform)-16)"],
+                "unit": "ADC",
+            },
+        },
+    }
+    proc_chain, _, no_adc_tbl_out = build_processing_chain(
+        spms_raw_tbl, no_adc_dsp_config
+    )
+    proc_chain.execute(0, 1)
+
+    assert np.array_equal(
+        adc_tbl_out["windowed_waveform"].nda, no_adc_tbl_out["windowed_waveform"].nda
+    )
+
+
 def test_scipy_gauss_filter(geds_raw_tbl):
     dsp_config = {
         "outputs": ["wf_gaus"],
@@ -107,7 +150,7 @@ def test_scipy_gauss_filter(geds_raw_tbl):
     proc_chain.execute(0, 1)
 
 
-def test_histogram_processor_fixed_witdth(spms_raw_tbl):
+def test_histogram_processor_fixed_width(spms_raw_tbl):
     dsp_config = {
         "outputs": ["hist_weights", "hist_borders"],
         "processors": {

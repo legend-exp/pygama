@@ -109,3 +109,4 @@ def test_values(event_rbkd, fcio_obj):
         assert tbl["waveform"]["t0"].nda[loc] == 0
         assert tbl["waveform"]["dt"].nda[loc] == 16
         assert np.array_equal(tbl["waveform"]["values"].nda[loc], fc.traces[ch])
+        assert tbl["waveform"]["values"].attrs["adc_bit_depth"] == 16
