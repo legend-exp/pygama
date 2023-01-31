@@ -160,7 +160,34 @@ def radware_decompress(
     return sig_out
 
 
-@numba.jit(nopython=True)
+@numba.jit()
+def _set_hton_u16(a: NDArray[np.ubyte], i: int, x: int) -> int:
+    """Store an unsigned 16-bit integer value in an array of unsigned 8-bit integers.
+
+    The first two most significant bytes from `x` are stored contiguously in
+    `a` with big-endian order.
+    """
+    x_u16 = np.uint16(x)
+    i_1 = i * 2
+    i_2 = i_1 + 1
+    a[i_1] = np.ubyte(x_u16 >> 8)
+    a[i_2] = np.ubyte(x_u16 >> 0)
+    return x
+
+
+@numba.jit()
+def _get_hton_u16(a: NDArray[np.ubyte], i: int) -> np.uint16:
+    """Read unsigned 16-bit integer values from an array of unsigned 8-bit integers.
+
+    The first two most significant bytes of the values must be stored
+    contiguously in `a` with big-endian order.
+    """
+    i_1 = i * 2
+    i_2 = i_1 + 1
+    return np.uint16(a[i_1] << 8 | a[i_2])
+
+
+@numba.jit()
 def _radware_sigcompress_encode(
     sig_in: NDArray[np.uint16],
     sig_out: NDArray,
@@ -331,7 +358,7 @@ def _radware_sigcompress_encode(
     return iso  # number of shorts in decompressed signal data
 
 
-@numba.jit(nopython=True)
+@numba.jit()
 def _radware_sigcompress_decode(
     sig_in: NDArray[np.uint16],
     sig_out: NDArray,
