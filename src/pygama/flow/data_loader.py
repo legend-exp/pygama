@@ -22,6 +22,7 @@ from pygama.lgdo import (
     LH5Store,
     Struct,
     Table,
+    VectorOfVectors,
     WaveformTable,
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
@@ -124,6 +125,7 @@ class DataLoader:
         self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.aoesa_to_vov = False
         self.data = None
 
         if isinstance(filedb, FileDB):
@@ -323,7 +325,11 @@ class DataLoader:
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
     def set_output(
-        self, fmt: str = None, merge_files: bool = None, columns: list = None
+        self,
+        fmt: str = None,
+        merge_files: bool = None,
+        columns: list = None,
+        aoesa_to_vov: bool = None,
     ) -> None:
         """
         Set the parameters for the output format of load
@@ -337,6 +343,7 @@ class DataLoader:
             one table.
         columns
             The columns that should be copied into the output.
+        aoesa_to_vov
 
         Example
         -------
@@ -351,6 +358,8 @@ class DataLoader:
             self.merge_files = merge_files
         if columns is not None:
             self.output_columns = columns
+        if aoesa_to_vov is not None:
+            self.aoesa_to_vov = aoesa_to_vov
 
     def reset(self):
         """Resets all fields to their default values, as if this is a newly
@@ -362,6 +371,7 @@ class DataLoader:
         self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.aoesa_to_vov = False
         self.data = None
 
     # ------------- Applying Cuts/Loading Data --------------#
@@ -691,10 +701,12 @@ class DataLoader:
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update()
-                progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+                progress_bar.set_postfix(
+                    key=self.filedb.df.iloc[file][self.filedb.sortby]
+                )
 
             log.debug(
-                f"building entry list for cycle {self.filedb.df.iloc[file]['timestamp']}"
+                f"building entry list for cycle {self.filedb.df.iloc[file][self.filedb.sortby]}"
             )
 
             # this dataframe will be associated with the file and will contain
@@ -875,7 +887,7 @@ class DataLoader:
             child = self.tcms[tcm_level]["child"]
             load_levels = [parent, child]
 
-        def explode_evt_cols(el, tier_table):
+        def explode_evt_cols(el: pd.DataFrame, tier_table: Table):
             # Explode columns from "evt"-style levels, untested
             # Will only work if column has an "nda" attribute
             cum_length = build_cl(el[f"{child}_idx"])
@@ -886,11 +898,38 @@ class DataLoader:
             tier_table.update(zip(tier_table.keys(), exp_cols))
             return tier_table
 
-        def fill_col_dict(tier_table, col_dict, tcm_idx):
+        def fill_col_dict(
+            tier_table: Table, col_dict: dict, tcm_idx: list | pd.RangeIndex
+        ):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
             for col in tier_table.keys():
-                if isinstance(tier_table[col], Array):
+                if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
+                    # Allocate memory for column for all channels
+                    if self.aoesa_to_vov:  # convert to VectorOfVectors
+                        if col not in col_dict.keys():
+                            col_dict[col] = [[]] * table_length
+                        for i, idx in enumerate(tcm_idx):
+                            col_dict[col][idx] = tier_table[col].nda[i]
+                    else:  # Try to make AoESA, raise error otherwise
+                        if col not in col_dict.keys():
+                            col_dict[col] = np.empty(
+                                (table_length, len(tier_table[col].nda[0])),
+                                dtype=tier_table[col].dtype,
+                            )
+                        try:
+                            col_dict[col][tcm_idx] = tier_table[col].nda
+                        except BaseException:
+                            raise ValueError(
+                                f"self.aoesa_to_vov is False but {col} is a jagged array"
+                            )
+                elif isinstance(tier_table[col], VectorOfVectors):
+                    # Allocate memory for column for all channels
+                    if col not in col_dict.keys():
+                        col_dict[col] = [[]] * table_length
+                    for i, idx in enumerate(tcm_idx):
+                        col_dict[col][idx] = tier_table[col][i]
+                elif isinstance(tier_table[col], Array):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
                         col_dict[col] = np.empty(
@@ -898,44 +937,41 @@ class DataLoader:
                             dtype=tier_table[col].dtype,
                         )
                     col_dict[col][tcm_idx] = tier_table[col].nda
-
-                elif isinstance(tier_table[col], WaveformTable):
-                    wf_table = tier_table[col]
-                    if isinstance(
-                        wf_table["values"],
-                        ArrayOfEqualSizedArrays,
-                    ):
-                        # Allocate memory for columns for all channels
-                        if "wf_dt" not in col_dict.keys():
-                            col_dict["wf_t0"] = np.empty(
-                                table_length,
-                                dtype=wf_table["t0"].dtype,
-                            )
-                            col_dict["wf_dt"] = np.empty(
-                                table_length,
-                                dtype=wf_table["dt"].dtype,
-                            )
-                            col_dict["wf_values"] = np.empty(
-                                (
-                                    table_length,
-                                    wf_table["values"].nda.shape[1],
-                                ),
-                                dtype=wf_table["values"].dtype,
-                            )
-                        col_dict["wf_t0"][tcm_idx] = wf_table["t0"].nda
-                        col_dict["wf_dt"][tcm_idx] = wf_table["dt"].nda
-                        col_dict["wf_values"][tcm_idx] = wf_table["values"].nda
-                    else:  # wf_values is a VectorOfVectors
-                        log.warning(
-                            "not sure how to handle waveforms with values "
-                            f"of type {type(tier_table[col]['values'])} yet"
-                        )
+                elif isinstance(tier_table[col], Table):
+                    if col not in col_dict.keys():
+                        col_dict[col] = {}
+                    col_dict[col] = fill_col_dict(
+                        tier_table[col], col_dict[col], tcm_idx
+                    )
                 else:
                     log.warning(
                         f"not sure how to handle column {col} "
                         f"of type {type(tier_table[col])} yet"
                     )
             return col_dict
+
+        def dict_to_table(col_dict: dict):
+            for col in col_dict.keys():
+                if isinstance(col_dict[col], list):
+                    if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
+                        col_dict[col] = VectorOfVectors(listoflists=col_dict[col])
+                    else:
+                        nda = np.array(col_dict[col])
+                        col_dict[col] = Array(nda=nda)
+                elif isinstance(col_dict[col], dict):
+                    col_dict[col] = dict_to_table(col_dict=col_dict[col])
+                else:
+                    nda = np.array(col_dict[col])
+                    if len(nda.shape) == 2:
+                        col_dict[col] = ArrayOfEqualSizedArrays(nda=nda)
+                    else:
+                        col_dict[col] = Array(nda=nda)
+            if set(col_dict.keys()) == {"t0", "dt", "values"}:
+                return WaveformTable(
+                    t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]
+                )
+            else:
+                return Table(col_dict=col_dict)
 
         sto = LH5Store()
 
@@ -985,10 +1021,8 @@ class DataLoader:
                         [idx for idx_list in el_idx for idx in idx_list],
                     )
             # Convert col_dict to lgdo.Table
-            for col in col_dict.keys():
-                nda = np.array(col_dict[col])
-                col_dict[col] = Array(nda=nda)
-            f_table = Table(col_dict=col_dict)
+
+            f_table = dict_to_table(col_dict=col_dict)
 
             if output_file:
                 sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
@@ -1018,10 +1052,12 @@ class DataLoader:
 
                 if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar.update()
-                    progress_bar.set_postfix(key=self.filedb.df.iloc[file]["timestamp"])
+                    progress_bar.set_postfix(
+                        key=self.filedb.df.iloc[file][self.filedb.sortby]
+                    )
 
                 log.debug(
-                    f"loading data for cycle key {self.filedb.df.iloc[file]['timestamp']}"
+                    f"loading data for cycle key {self.filedb.df.iloc[file][self.filedb.sortby]}"
                 )
 
                 field_mask = []
@@ -1078,10 +1114,7 @@ class DataLoader:
                         # end tb loop
 
                 # Convert col_dict to lgdo.Table
-                for col in col_dict.keys():
-                    nda = np.array(col_dict[col])
-                    col_dict[col] = Array(nda=nda)
-                f_table = Table(col_dict=col_dict)
+                f_table = dict_to_table(col_dict)
 
                 if in_memory:
                     load_out[file] = f_table

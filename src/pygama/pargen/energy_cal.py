@@ -580,7 +580,7 @@ def hpge_fit_E_peaks(
                 )
 
             csqr = pgf.goodness_of_fit(
-                hist, bins, None, gof_func_i, pars_i, method="LR"
+                hist, bins, None, gof_func_i, pars_i, method="Pearson"
             )
             p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
 
