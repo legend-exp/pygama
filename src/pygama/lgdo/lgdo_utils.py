@@ -79,7 +79,7 @@ def copy(obj: lgdo.LGDO, dtype: np.dtype = None) -> lgdo.LGDO:
 
     if isinstance(obj, lgdo.VectorOfVectors):
         return lgdo.VectorOfVectors(
-            flattened_data=copy(obj.flattened_data),
+            flattened_data=copy(obj.flattened_data, dtype=dtype),
             cumulative_length=copy(obj.cumulative_length),
             attrs=dict(obj.attrs),
         )
