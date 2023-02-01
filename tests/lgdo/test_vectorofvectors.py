@@ -18,6 +18,10 @@ def test_init(lgdo_vov):
     vov = lgdo.VectorOfVectors(shape_guess=(10, 20), dtype="int32", fill_val=2)
     assert vov.flattened_data == lgdo.Array(shape=(10 * 20,), fill_val=2, dtype="int32")
 
+    lol = [[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]]
+    test = lgdo.VectorOfVectors(listoflists=lol)
+    assert test == lgdo_vov
+
 
 def test_datatype_name(lgdo_vov):
     assert lgdo_vov.datatype_name() == "array"
