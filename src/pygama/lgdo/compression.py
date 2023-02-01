@@ -6,7 +6,7 @@ import logging
 
 import numba
 import numpy as np
-from numpy import int16, int32, ubyte, uint16, uintc
+from numpy import int16, int32, ubyte, uint16, uint32
 from numpy.typing import NDArray
 
 from . import ArrayOfEqualSizedArrays, VectorOfEncodedVectors, VectorOfVectors
@@ -22,9 +22,9 @@ log = logging.getLogger(__name__)
 
 def radware_compress(
     sig_in: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays,
-    sig_out: NDArray | VectorOfEncodedVectors = None,
+    sig_out: NDArray[ubyte] | VectorOfEncodedVectors = None,
     shift: int32 = -32768,
-) -> NDArray | VectorOfEncodedVectors:
+) -> NDArray[ubyte] | VectorOfEncodedVectors:
     """Compress digital signal(s) with `radware-sigcompress`.
 
     Parameters
@@ -39,27 +39,31 @@ def radware_compress(
     Returns
     -------
     sig_out
-        given pre-allocated structure or structure of unsigned 16-bit integers.
+        given pre-allocated `sig_out` structure or new structure of unsigned
+        8-bit integers.
 
     See Also
     --------
     ._radware_decompress_encode
     """
+    if len(sig_in) == 0:
+        return sig_in
+
+    max_out_len = 2 * len(sig_in)
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
         if not sig_out:
-            # pre-allocate memory
-            sig_out = np.empty_like(sig_in, dtype=uint16)
+            # pre-allocate ubyte (uint8) array
+            sig_out = np.empty(max_out_len, dtype=ubyte)
 
-        if sig_out.dtype != uint16:
-            raise ValueError("sig_out must be of type uint16")
+        if sig_out.dtype != ubyte:
+            raise ValueError("sig_out must be of type ubyte")
 
-        max_out_len = 2 * sig_in.size
         if len(sig_out) < max_out_len:
             sig_out.resize(max_out_len, refcheck=True)
 
         outlen = _radware_sigcompress_encode(sig_in, sig_out, shift=shift)
 
-        if outlen < sig_in.size:
+        if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
     # TODO: different actions if ArrayOfEqualSizedArrays
@@ -67,9 +71,7 @@ def radware_compress(
         if not sig_out:
             # pre-allocate output structure
             sig_out = VectorOfEncodedVectors(
-                encoded_data=VectorOfVectors(
-                    shape_guess=(len(sig_in), 1), dtype=uint16
-                ),
+                encoded_data=VectorOfVectors(shape_guess=(max_out_len, 1), dtype=ubyte),
                 attrs={"codec": "radware_sigcompress", "codec_shift": shift},
             )
         elif not isinstance(sig_out, VectorOfEncodedVectors):
@@ -85,7 +87,7 @@ def radware_compress(
 
 
 def radware_decompress(
-    sig_in: NDArray | VectorOfEncodedVectors,
+    sig_in: NDArray[ubyte] | VectorOfEncodedVectors,
     sig_out: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays = None,
     shift: int32 = -32768,
     warn: bool = True,
@@ -105,14 +107,17 @@ def radware_decompress(
     Returns
     -------
     sig_out
-        given pre-allocated structure or structure of integers.
+        given pre-allocated structure or new structure of integers.
 
     See Also
     --------
     ._radware_decompress_decode
     """
-    if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1 and sig_in.dtype == uint16:
-        siglen = int(sig_in[0])
+    if len(sig_in) == 0:
+        return sig_in
+
+    if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1 and sig_in.dtype == ubyte:
+        siglen = _get_hton_u16(sig_in, 0)
         if not sig_out:
             # pre-allocate memory, use safe int32
             sig_out = np.empty(siglen, dtype=int32)
@@ -129,6 +134,7 @@ def radware_decompress(
             # pre-allocate output structure
             # sig_out will be a VectorOfVectors for now because that's the most
             # general format
+            # FIXME: too large?
             sig_out = utils.copy(sig_in.encoded_data, dtype=int32)
 
         elif not isinstance(sig_out, (VectorOfVectors, ArrayOfEqualSizedArrays)):
@@ -148,6 +154,7 @@ def radware_decompress(
             elif shift is None:
                 shift = sig_in.attrs["codec_shift"]
 
+        # TODO: make this more efficient
         for i, wf in enumerate(sig_in):
             sig_out[i] = radware_decompress(wf[0], shift=shift)
 
@@ -157,7 +164,7 @@ def radware_decompress(
     return sig_out
 
 
-@numba.jit()
+@numba.jit
 def _set_hton_u16(a: NDArray[ubyte], i: int, x: int) -> int:
     """Store an unsigned 16-bit integer value in an array of unsigned 8-bit integers.
 
@@ -172,7 +179,7 @@ def _set_hton_u16(a: NDArray[ubyte], i: int, x: int) -> int:
     return x
 
 
-@numba.jit()
+@numba.jit
 def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     """Read unsigned 16-bit integer values from an array of unsigned 8-bit integers.
 
@@ -184,7 +191,27 @@ def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     return uint16(a[i_1] << 8 | a[i_2])
 
 
-@numba.jit()
+@numba.jit
+def _get_high_u16(x: uint32) -> uint16:
+    return uint16(x >> 16)
+
+
+@numba.jit
+def _set_high_u16(x: uint32, y: uint16) -> uint32:
+    return uint32(x & 0x0000FFFF | (y << 16))
+
+
+@numba.jit
+def _get_low_u16(x: uint32) -> uint16:
+    return uint16(x >> 0)
+
+
+@numba.jit
+def _set_low_u16(x: uint32, y: uint16) -> uint32:
+    return uint32(x & 0xFFFF0000 | (y << 0))
+
+
+@numba.jit
 def _radware_sigcompress_encode(
     sig_in: NDArray[uint16],
     sig_out: NDArray,
@@ -211,39 +238,40 @@ def _radware_sigcompress_encode(
         array of integers holding the input signal. In the original C code,
         an array of 16-bit integers was expected.
     sig_out
-        pre-allocated array for the compressed signal. In the original C code,
+        pre-allocated array for the encoded signal. In the original C code,
         an array of unsigned 16-bit integers was expected.
 
     Returns
     -------
     length
-        length of output signal.
+        number of bytes in the encoded signal
     """
     mask = _mask
 
     j = iso = bp = 0
-    sig_out[iso] = sig_in.size
-    db = np.zeros(2, dtype=uint16)
-    dd = np.frombuffer(db, dtype=uintc)
+    dd = uint32(0)
+    _set_hton_u16(sig_out, iso, sig_in.size)
 
     iso += 1
     while j < sig_in.size:  # j = starting index of section of signal
         # find optimal method and length for compression
         # of next section of signal
-        max1 = min1 = int16(sig_in[j] + shift)
-        max2 = int16(-16000)
-        min2 = int16(16000)
+        si_j = int16(sig_in[j] + shift)
+        max1 = min1 = si_j
+        max2 = int32(-16000)
+        min2 = int32(16000)
         nb1 = nb2 = 2
         nw = 1
         i = j + 1
         # FIXME: 48 could be tuned better?
         while (i < sig_in.size) and (i < j + 48):
-            sig_in_i = int16(sig_in[i] + shift)
-            if max1 < sig_in_i:
-                max1 = sig_in_i
-            if min1 > sig_in_i:
-                min1 = sig_in_i
-            ds = int16(sig_in[i] - sig_in[i - 1])
+            si_i = int16(sig_in[i] + shift)
+            si_im1 = int16(sig_in[i - 1] + shift)
+            if max1 < si_i:
+                max1 = si_i
+            if min1 > si_i:
+                min1 = si_i
+            ds = si_i - si_im1
             if max2 < ds:
                 max2 = ds
             if min2 > ds:
@@ -257,16 +285,16 @@ def _radware_sigcompress_encode(
             while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
-                sig_in_i = int16(sig_in[i] + shift)
-                if max1 < sig_in_i:
-                    max1 = sig_in_i
+                si_i = int16(sig_in[i] + shift)
+                if max1 < si_i:
+                    max1 = si_i
                 dd1 = max1 - min1
-                if min1 > sig_in_i:
-                    dd1 = max1 - sig_in_i
+                if min1 > si_i:
+                    dd1 = max1 - si_i
                 if dd1 > mask[nb1]:
                     break
-                if min1 > sig_in_i:
-                    min1 = sig_in_i
+                if min1 > si_i:
+                    min1 = si_i
                 nw += 1
                 i += 1
         else:  # use difference values
@@ -276,7 +304,9 @@ def _radware_sigcompress_encode(
             while (i < sig_in.size) and (
                 i < j + 128
             ):  # FIXME: 128 could be tuned better?
-                ds = int16(sig_in[i] - sig_in[i - 1])
+                si_i = int16(sig_in[i] + shift)
+                si_im1 = int16(sig_in[i - 1] + shift)
+                ds = si_i - si_im1
                 if max2 < ds:
                     max2 = ds
                 dd2 = max2 - min2
@@ -292,56 +322,62 @@ def _radware_sigcompress_encode(
         if bp > 0:
             iso += 1
         # do actual compression
-        sig_out[iso] = nw
+        _set_hton_u16(sig_out, iso, nw)
         iso += 1
         bp = 0
         if nb1 <= nb2:
             # encode absolute values
-            sig_out[iso] = nb1  # number of bits used for encoding
+            _set_hton_u16(sig_out, iso, nb1)
             iso += 1
-            sig_out[iso] = min1  # min value used for encoding
+            _set_hton_u16(sig_out, iso, uint16(min1))
             iso += 1
 
             i = iso
             while i <= (iso + nw * nb1 / 16):
-                sig_out[i] = 0
+                _set_hton_u16(sig_out, i, 0)
                 i += 1
 
             i = j
             while i < j + nw:
-                dd[0] = int16(sig_in[i] + shift) - min1  # value to encode
-                dd[0] = dd[0] << (32 - bp - nb1)
-                sig_out[iso] |= db[1]
+                dd = int16(sig_in[i] + shift) - min1  # value to encode
+                dd = dd << (32 - bp - nb1)
+                _set_hton_u16(
+                    sig_out, iso, _get_hton_u16(sig_out, iso) | _get_high_u16(dd)
+                )
                 bp += nb1
                 if bp > 15:
                     iso += 1
-                    sig_out[iso] = db[0]
+                    _set_hton_u16(sig_out, iso, _get_low_u16(dd))
                     bp -= 16
                 i += 1
 
         else:
             # encode derivative / difference values
-            sig_out[iso] = nb2 + 32  # bits used for encoding, plus flag
+            _set_hton_u16(sig_out, iso, nb2 + 32)  # bits used for encoding, plus flag
             iso += 1
-            sig_out[iso] = sig_in[j] + shift  # starting signal value
+            _set_hton_u16(sig_out, iso, int16(si_j))  # starting signal value
             iso += 1
-            sig_out[iso] = min2  # min value used for encoding
+            _set_hton_u16(sig_out, iso, int16(min2))  # min value used for encoding
             iso += 1
 
             i = iso
             while i <= iso + nw * nb2 / 16:
-                sig_out[i] = 0
+                _set_hton_u16(sig_out, i, 0)
                 i += 1
 
             i = j + 1
             while i < j + nw:
-                dd[0] = sig_in[i] - sig_in[i - 1] - min2  # value to encode
-                dd[0] = dd[0] << (32 - bp - nb2)
-                sig_out[iso] |= db[1]
+                si_i = int16(sig_in[i] + shift)
+                si_im1 = int16(sig_in[i - 1] + shift)
+                dd = si_i - si_im1 - min2
+                dd = dd << (32 - bp - nb2)
+                _set_hton_u16(
+                    sig_out, iso, _get_hton_u16(sig_out, iso) | _get_high_u16(dd)
+                )
                 bp += nb2
                 if bp > 15:
                     iso += 1
-                    sig_out[iso] = db[0]
+                    _set_hton_u16(sig_out, iso, _get_low_u16(dd))
                     bp -= 16
                 i += 1
         j += nw
@@ -352,10 +388,10 @@ def _radware_sigcompress_encode(
     if iso % 2 > 0:
         iso += 1
 
-    return iso  # number of shorts in decompressed signal data
+    return 2 * iso  # number of bytes in compressed signal data
 
 
-@numba.jit()
+@numba.jit
 def _radware_sigcompress_decode(
     sig_in: NDArray[uint16],
     sig_out: NDArray,
@@ -386,64 +422,72 @@ def _radware_sigcompress_decode(
     """
     mask = _mask
 
-    sig_len_in = sig_in.size
+    sig_len_in = int(sig_in.size / 2)
     j = isi = iso = bp = 0
-    siglen = uint16(sig_in[isi])  # signal length
+    siglen = int16(_get_hton_u16(sig_in, isi))  # signal length
     isi += 1
-    db = np.zeros(2, dtype=uint16)
-    dd = np.frombuffer(db, dtype=uintc)
+    dd = uint32(0)
 
     while (isi < sig_len_in) and (iso < siglen):
         if bp > 0:
             isi += 1
         bp = 0  # bit pointer
-        nw = sig_in[isi]  # number of samples encoded in this chunk
+        nw = _get_hton_u16(sig_in, isi)  # number of samples encoded in this chunk
         isi += 1
-        nb = sig_in[isi]  # number of bits used in compression
+        nb = _get_hton_u16(sig_in, isi)  # number of bits used in compression
         isi += 1
 
         if nb < 32:
-            min_val = sig_in[isi]  # min value used for encoding
+            # decode absolute values
+            min_val = int16(_get_hton_u16(sig_in, isi))  # min value used for encoding
             isi += 1
-            db[0] = sig_in[isi]
+            dd = _set_low_u16(dd, _get_hton_u16(sig_in, isi))
             i = 0
             while (i < nw) and (iso < siglen):
                 if (bp + nb) > 15:
                     bp -= 16
-                    db[1] = sig_in[isi]
+                    dd = _set_high_u16(dd, _get_hton_u16(sig_in, isi))
                     isi += 1
                     if isi < sig_len_in:
-                        db[0] = sig_in[isi]
-                    dd[0] = dd[0] << (bp + nb)
+                        dd = _set_low_u16(dd, _get_hton_u16(sig_in, isi))
+                    dd = dd << (bp + nb)
                 else:
-                    dd[0] = dd[0] << nb
-                sig_out[iso] = int16((db[1] & mask[nb]) + min_val) - shift
+                    dd = dd << nb
+                sig_out[iso] = (_get_high_u16(dd) & mask[nb]) + min_val - shift
                 iso += 1
                 bp += nb
                 i += 1
         else:
             nb -= 32
             #  decode derivative / difference values
-            sig_out[iso] = int16(sig_in[isi]) - shift  # starting signal value
+            sig_out[iso] = (
+                int16(_get_hton_u16(sig_in, isi)) - shift
+            )  # starting signal value
             iso += 1
             isi += 1
-            min_val = int16(sig_in[isi])  # min value used for encoding
+            min_val = int16(_get_hton_u16(sig_in, isi))  # min value used for encoding
             isi += 1
-            db[0] = sig_in[isi]
+            if isi < sig_len_in:
+                dd = _set_low_u16(dd, _get_hton_u16(sig_in, isi))
 
             i = 1
             while (i < nw) and (iso < siglen):
                 if (bp + nb) > 15:
                     bp -= 16
-                    db[1] = sig_in[isi]
+                    dd = _set_high_u16(dd, _get_hton_u16(sig_in, isi))
                     isi += 1
                     if isi < sig_len_in:
-                        db[0] = sig_in[isi]
-                    dd[0] = dd[0] << (bp + nb)
+                        dd = _set_low_u16(dd, _get_hton_u16(sig_in, isi))
+                    dd = dd << (bp + nb)
                 else:
-                    dd[0] = dd[0] << nb
+                    dd = dd << nb
                 sig_out[iso] = (
-                    int16((db[1] & mask[nb]) + min_val + sig_out[iso - 1] + shift)
+                    int16(
+                        (_get_high_u16(dd) & mask[nb])
+                        + min_val
+                        + sig_out[iso - 1]
+                        + shift
+                    )
                     - shift
                 )
                 iso += 1
