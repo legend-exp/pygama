@@ -158,7 +158,7 @@ def test_performance(lgnd_test_data):
 
     print(  # noqa: T201
         "number of bytes in compressed wf:",
-        100 * (1 - sum / len(obj)),
+        100 * sum / len(obj),
         "% of the original",
     )
 
