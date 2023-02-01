@@ -125,7 +125,18 @@ class VectorOfEncodedVectors(LGDO):
             if pos != 0:
                 string += " "
 
-            string += np.array2string(vec, prefix=" ") + f" decoded_size = {size}"
+            string += (
+                np.array2string(
+                    vec,
+                    prefix=" ",
+                    formatter={
+                        "int": lambda x, vec=vec: f"0x{x:02x}"
+                        if vec.dtype == np.ubyte
+                        else str(x)
+                    },
+                )
+                + f" decoded_size = {size}"
+            )
 
             if pos < len(self.encoded_data.cumulative_length):
                 string += ",\n"
@@ -143,7 +154,11 @@ class VectorOfEncodedVectors(LGDO):
 
     def __repr__(self) -> str:
         npopt = np.get_printoptions()
-        np.set_printoptions(threshold=5, edgeitems=2, linewidth=100)
+        np.set_printoptions(
+            threshold=5,
+            edgeitems=2,
+            linewidth=100,
+        )
         out = (
             "VectorOfEncodedVectors(encoded_data="
             + repr(self.encoded_data)

@@ -117,6 +117,12 @@ class Array(LGDO):
         return (
             self.__class__.__name__
             + "("
-            + np.array2string(self.nda, prefix=self.__class__.__name__ + " ")
+            + np.array2string(
+                self.nda,
+                prefix=self.__class__.__name__ + " ",
+                formatter={
+                    "int": lambda x: f"0x{x:02x}" if self.dtype == np.ubyte else str(x)
+                },
+            )
             + f", attrs={repr(self.attrs)})"
         )

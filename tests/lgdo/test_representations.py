@@ -30,7 +30,9 @@ def test_representations():
         ),
         "VectorOfEncodedVectors": lgdo.VectorOfEncodedVectors(
             encoded_data=lgdo.VectorOfVectors(
-                flattened_data=lgdo.Array(np.random.rand(1000)),
+                flattened_data=lgdo.Array(
+                    np.random.randint(255, size=1000, dtype="ubyte")
+                ),
                 cumulative_length=lgdo.Array(np.array([5, 12, 34, 49, 150])),
                 attrs={"unit": "ns"},
             ),
@@ -63,9 +65,9 @@ def test_representations():
     }
 
     for k, it in objs.items():
-        print(f">>> {k}")  # noqa: T201
+        print(f">>> {k} (__repr__)")  # noqa: T201
         print(repr(it))  # noqa: T201
         print()  # noqa: T201
-        print(f">>> print({k})")  # noqa: T201
+        print(f">>> print({k}) (__str__)")  # noqa: T201
         print(it)  # noqa: T201
         print()  # noqa: T201
