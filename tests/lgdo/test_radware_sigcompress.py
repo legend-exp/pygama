@@ -154,10 +154,10 @@ def test_performance(lgnd_test_data):
     sum = 0
     for wf in obj["values"].nda:
         comp_wf = radware_compress(wf)
-        sum += len(comp_wf) / len(wf)
+        sum += len(comp_wf) / len(wf) / 2
 
     print(  # noqa: T201
-        "number of samples in compressed wf:",
+        "number of bytes in compressed wf:",
         100 * (1 - sum / len(obj)),
         "% of the original",
     )
