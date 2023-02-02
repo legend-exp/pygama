@@ -123,7 +123,7 @@ def build_dsp(
         if (
             "raw" not in tb
             and not isinstance(
-                raw_store.gimme_file(lh5_file, "r")[f"{tb}"], h5py.Dataset
+                raw_store.gimme_file(lh5_file, "r")[tb], h5py.Dataset
             )
             and lh5.ls(lh5_file, f"{tb}/raw")
         ):
