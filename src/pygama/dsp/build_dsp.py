@@ -122,7 +122,9 @@ def build_dsp(
     for i, tb in enumerate(lh5_tables):
         if (
             "raw" not in tb
-            and not isinstance(raw_store.gimme_file(lh5_file, "r")[f"{tb}"],h5py.Dataset)
+            and not isinstance(
+                raw_store.gimme_file(lh5_file, "r")[f"{tb}"], h5py.Dataset
+            )
             and lh5.ls(lh5_file, f"{tb}/raw")
         ):
             lh5_tables[i] = f"{tb}/raw"
