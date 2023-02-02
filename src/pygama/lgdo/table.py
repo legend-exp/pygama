@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Union
+from typing import Any
 
 import numexpr as ne
 import numpy as np
@@ -15,11 +15,9 @@ from pandas.io.formats import format as fmt
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.scalar import Scalar
+from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.vectorofvectors import VectorOfVectors
-
-LGDO = Union[Scalar, Struct, Array, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 
@@ -85,7 +83,6 @@ class Table(Struct):
         self.loc = 0
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
         return "table"
 
     def __len__(self) -> int:
@@ -188,7 +185,9 @@ class Table(Struct):
         for name in cols:
             self.add_column(name, other_table[name], do_warn=do_warn)
 
-    def get_dataframe(self, cols: list[str] = None, copy: bool = False) -> pd.DataFrame:
+    def get_dataframe(
+        self, cols: list[str] = None, copy: bool = False, prefix: str = ""
+    ) -> pd.DataFrame:
         """Get a :class:`pandas.DataFrame` from the data in the table.
 
         Notes
@@ -203,20 +202,30 @@ class Table(Struct):
         copy
             When ``True``, the dataframe allocates new memory and copies data
             into it. Otherwise, the raw ``nda``'s from the table are used directly.
+        prefix
+            The prefix to be added to the column names. Used when recursively getting the
+            dataframe of a Table inside this Table
         """
         df = pd.DataFrame(copy=copy)
         if cols is None:
             cols = self.keys()
         for col in cols:
-            if isinstance(self[col], VectorOfVectors):
-                column = self[col].to_aoesa()
+            if isinstance(self[col], Table):
+                sub_df = self[col].get_dataframe(prefix=f"{prefix}{col}_")
+                if df.empty:
+                    df = sub_df
+                else:
+                    df = df.join(sub_df)
             else:
-                column = self[col]
+                if isinstance(self[col], VectorOfVectors):
+                    column = self[col].to_aoesa()
+                else:
+                    column = self[col]
 
-            if not hasattr(column, "nda"):
-                raise ValueError(f"column {col} does not have an nda")
-            else:
-                df[col] = column.nda.tolist()
+                if not hasattr(column, "nda"):
+                    raise ValueError(f"column {col} does not have an nda")
+                else:
+                    df[prefix + col] = column.nda.tolist()
 
         return df
 

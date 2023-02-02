@@ -96,6 +96,7 @@ def load_data(
         energy_dict = {"timestamp": df["timestamp"][ids].to_numpy()}
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(hit_dict).get_dataframe()
+        cut_parameters = cts.get_keys(table, cut_parameters)
 
         for param in energy_params:
             if param in df:
@@ -116,6 +117,29 @@ def load_data(
         return energy_dict
 
 
+def gen_pars_dict(pars, deg, energy_param):
+    if deg == 1:
+        out_dict = {
+            "expression": f"a*{energy_param}+b",
+            "parameters": {"a": pars[0], "b": pars[1]},
+        }
+    elif deg == 0:
+        out_dict = {
+            "expression": f"a*{energy_param}",
+            "parameters": {"a": pars[0]},
+        }
+    elif deg == 2:
+        out_dict = {
+            "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
+            "parameters": {"a": pars[0], "b": pars[1], "c": pars[2]},
+        }
+    else:
+        out_dict = {}
+        log.warning(f"hit_dict not implemented for deg = {deg}")
+
+    return out_dict
+
+
 def energy_cal_th(
     files: list[str],
     energy_params: list[str],
@@ -123,7 +147,7 @@ def energy_cal_th(
     cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     lh5_path: str = "dsp",
     display: int = 0,
-    guess_keV: float = None,
+    guess_keV: float | None = None,
     threshold: int = 0,
     p_val: float = 0,
     n_events: int = 15000,
@@ -215,30 +239,35 @@ def energy_cal_th(
     ]
     output_dict = {}
     for energy_param in energy_params:
-
         kev_ranges = range_keV.copy()
         if guess_keV is None:
             guess_keV = 2620 / np.nanpercentile(
                 uncal_pass[energy_param][uncal_pass[energy_param] > threshold], 99
             )
-        log.debug(f"Find peaks and compute calibration curve for {energy_param}")
 
-        pars, cov, results = cal.hpge_E_calibration(
-            uncal_pass[energy_param],
-            glines,
-            guess_keV,
-            deg=deg,
-            range_keV=range_keV,
-            funcs=funcs,
-            gof_funcs=gof_funcs,
-            n_events=n_events,
-            allowed_p_val=p_val,
-            simplex=True,
-            verbose=False,
-        )
-        pk_pars = results["pk_pars"]
-        found_peaks = results["got_peaks_locs"]
-        fitted_peaks = results["fitted_keV"]
+        log.debug(f"Find peaks and compute calibration curve for {energy_param}")
+        log.debug(f"Guess is {guess_keV:.3f}")
+
+        try:
+            pars, cov, results = cal.hpge_E_calibration(
+                uncal_pass[energy_param],
+                glines,
+                guess_keV,
+                deg=deg,
+                range_keV=range_keV,
+                funcs=funcs,
+                gof_funcs=gof_funcs,
+                n_events=n_events,
+                allowed_p_val=p_val,
+                simplex=True,
+                verbose=False,
+            )
+            pk_pars = results["pk_pars"]
+            found_peaks = results["got_peaks_locs"]
+            fitted_peaks = results["fitted_keV"]
+        except:
+            found_peaks = np.array([])
+            fitted_peaks = np.array([])
 
         for i, peak in enumerate(glines):
             if peak not in fitted_peaks:
@@ -254,42 +283,113 @@ def energy_cal_th(
             except:
                 pass
 
-        pars, cov, results = cal.hpge_E_calibration(
-            uncal_pass[energy_param],
-            glines,
-            guess_keV,
-            deg=deg,
-            range_keV=kev_ranges,
-            funcs=funcs,
-            gof_funcs=gof_funcs,
-            n_events=n_events,
-            allowed_p_val=p_val,
-            simplex=True,
-            verbose=False,
-        )
-        log.debug("done")
+        try:
+            pars, cov, results = cal.hpge_E_calibration(
+                uncal_pass[energy_param],
+                glines,
+                guess_keV,
+                deg=deg,
+                range_keV=kev_ranges,
+                funcs=funcs,
+                gof_funcs=gof_funcs,
+                n_events=n_events,
+                allowed_p_val=p_val,
+                simplex=True,
+                verbose=False,
+            )
+        except:
+            pars = None
         if pars is None:
             log.info("Calibration failed")
+            try:
+                pars, cov, results = cal.hpge_E_calibration(
+                    uncal_pass[energy_param],
+                    glines,
+                    guess_keV,
+                    deg=deg,
+                    range_keV=kev_ranges,
+                    funcs=funcs,
+                    gof_funcs=gof_funcs,
+                    n_events=n_events,
+                    allowed_p_val=0,
+                    simplex=True,
+                    verbose=False,
+                )
+                if pars is None:
+                    raise ValueError
+            except:
+                pars = np.full(deg + 1, np.nan)
+
+                hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
+
+                output_dict[f"{energy_param}_cal"] = {
+                    "Qbb_fwhm": np.nan,
+                    "Qbb_fwhm_err": np.nan,
+                    "2.6_fwhm": np.nan,
+                    "2.6_fwhm_err": np.nan,
+                    "eres_pars": [np.nan, np.nan],
+                    "fitted_peaks": np.nan,
+                    "fwhms": np.nan,
+                    "peak_fit_pars": np.nan,
+                }
+                continue
+
+            fitted_peaks = results["fitted_keV"]
+            fwhms = results["pk_fwhms"][:, 0]
+            dfwhms = results["pk_fwhms"][:, 1]
+
+            #####
+            # Remove the Tl SEP and DEP from calibration if found
+            fwhm_peaks = np.array([], dtype=np.float32)
+            all_peaks = np.array([], dtype=np.float32)
+            indexes = []
+            for i, peak in enumerate(fitted_peaks):
+                all_peaks = np.append(all_peaks, peak)
+                if peak == 2103.53:
+                    log.info(f"Tl SEP found at index {i}")
+                    indexes.append(i)
+                    continue
+                elif peak == 1592.53:
+                    log.info(f"Tl DEP found at index {i}")
+                    indexes.append(i)
+                    continue
+                elif np.isnan(dfwhms[i]):
+                    log.info(f"{peak} failed")
+                    indexes.append(i)
+                    continue
+                else:
+                    fwhm_peaks = np.append(fwhm_peaks, peak)
+            fit_fwhms = np.delete(fwhms, [indexes])
+            fit_dfwhms = np.delete(dfwhms, [indexes])
+            #####
+            param_guess = [0.2, 0.001]
+            param_bounds = (0, [10.0, 1.0])
+            fit_pars, fit_covs = curve_fit(
+                fwhm_slope,
+                fwhm_peaks,
+                fit_fwhms,
+                sigma=fit_dfwhms,
+                p0=param_guess,
+                bounds=param_bounds,
+                absolute_sigma=True,
+            )
+            hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
+            output_dict[f"{energy_param}_cal"] = {
+                "Qbb_fwhm": np.nan,
+                "Qbb_fwhm_err": np.nan,
+                "2.6_fwhm": np.nan,
+                "2.6_fwhm_err": np.nan,
+                "eres_pars": fit_pars.tolist(),
+                "fitted_peaks": np.nan,
+                "fwhms": np.nan,
+                "peak_fit_pars": np.nan,
+            }
             continue
+        log.debug("done")
         log.info(f"Calibration pars are {pars}")
-        if deg == 1:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}+b",
-                "parameters": {"a": pars[0], "b": pars[1]},
-            }
-        elif deg == 0:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}",
-                "parameters": {"a": pars[0]},
-            }
-        elif deg == 2:
-            hit_dict[f"{energy_param}_cal"] = {
-                "expression": f"a*{energy_param}**2 +b*{energy_param}+c",
-                "parameters": {"a": pars[0], "b": pars[1], "c": pars[2]},
-            }
-        else:
-            hit_dict[f"{energy_param}_cal"] = {}
-            log.warning(f"hit_dict not implemented for deg = {deg}")
+
+        hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
+
         fitted_peaks = results["fitted_keV"]
         fitted_funcs = []
         fitted_gof_funcs = []

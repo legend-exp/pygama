@@ -85,19 +85,20 @@ def get_decay_constant(
 
     pz = tau_dict.get("pz")
 
-    counts, bins, var = pgh.get_hist(slopes[idxs], bins=50000, range=(-0.01, 0))
+    counts, bins, var = pgh.get_hist(slopes, bins=100000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
         pars, cov = pgf.gauss_mode_width_max(
             counts,
             bins,
-            mode_guess=high_bin,
             n_bins=10,
             cost_func="Least Squares",
             inflate_errors=False,
             gof_method="var",
         )
+        if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
+            raise ValueError
         high_bin = pars[0]
     except:
         pass
@@ -147,7 +148,7 @@ def get_decay_constant(
 def fom_dpz(tb_data, verbosity=0, rand_arg=None):
 
     std = tb_data["pz_std"].nda
-    counts, start_bins, var = pgh.get_hist(std, 10**5)
+    counts, start_bins, var = pgh.get_hist(std, dx=0.1, range=(0, 400))
     max_idx = np.argmax(counts)
     mu = start_bins[max_idx]
     try:
@@ -245,6 +246,7 @@ def dsp_preprocess_decay_const(
     log.debug("Generated Cuts:", cut_dict)
     idxs = cts.get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
+    log.debug(f"{len(idxs)} events passed cuts")
     slopes = tb_out["tail_slope"].nda
     log.debug("Calculating pz constant")
     if display > 0:
@@ -266,8 +268,8 @@ def dsp_preprocess_decay_const(
         wfs = tb_out[wf_plot]["values"].nda[idxs]
         wf_idxs = np.random.choice(len(wfs), 100)
         if norm_param is not None:
-            means = tb_out[norm_param].nda[idxs]
-            wfs = np.divide(wfs[wf_idxs], np.reshape(means[wf_idxs], (len(wf_idxs), 1)))
+            means = tb_out[norm_param].nda[idxs][wf_idxs]
+            wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
         else:
             wfs = wfs[wf_idxs]
         fig2 = plt.figure()

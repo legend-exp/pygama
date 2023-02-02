@@ -9,12 +9,13 @@ from typing import Any
 
 import numpy as np
 
+from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
 
-class Array:
+class Array(LGDO):
     r"""Holds an :class:`numpy.ndarray` and attributes.
 
     :class:`Array` (and the other various array types) holds an `nda` instead
@@ -28,7 +29,6 @@ class Array:
       standard, reusable, and (we expect) performant Python.
     - It allows the first axis of the `nda` to be treated as "special" for storage
       in :class:`.Table`\ s.
-
     """
 
     def __init__(
@@ -70,25 +70,12 @@ class Array:
         self.nda = nda
         self.dtype = self.nda.dtype
 
-        self.attrs = {} if attrs is None else dict(attrs)
-
-        if "datatype" in self.attrs:
-            if self.attrs["datatype"] != self.form_datatype():
-                raise RuntimeError(
-                    "datatype does not match nda! "
-                    f'datatype: {self.attrs["datatype"]} '
-                    f"form_datatype(): {self.form_datatype()} "
-                    f"dtype: {self.dtype}"
-                )
-        else:
-            self.attrs["datatype"] = self.form_datatype()
+        super().__init__(attrs)
 
     def datatype_name(self) -> str:
-        """The name for this LGDO's datatype attribute."""
         return "array"
 
     def form_datatype(self) -> str:
-        """Return this LGDO's datatype attribute string."""
         dt = self.datatype_name()
         nd = str(len(self.nda.shape))
         et = get_element_type(self)

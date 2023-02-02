@@ -57,9 +57,9 @@ def load_aoe(
             param_dict[param] = df[param].to_numpy()
         else:
             param_dict.update(lh5.load_nda(files, [param], lh5_path))
-    if "Cal_cuts" in df.keys():
+    if cut_field in df.keys():
         for entry in param_dict:
-            param_dict[entry] = param_dict[entry][df["Cal_cuts"].to_numpy()]
+            param_dict[entry] = param_dict[entry][df[cut_field].to_numpy()]
 
     aoe = np.divide(param_dict["A_max"], param_dict[energy_param])
     return aoe, param_dict[cal_energy_param], param_dict["dt_eff"]
@@ -273,15 +273,23 @@ def AoEcorrection(
         aoe_tmp = aoe[
             (energy > band) & (energy < band + comptBands_width) & (aoe > 0)
         ]  # [:20000]
-        pars, errs = unbinned_aoe_fit(aoe_tmp, display=display)
-        compt_aoe[i] = pars[2]
-        aoe_sigmas[i] = pars[3]
-        compt_aoe_err[i] = errs[2]
-        aoe_sigmas_err[i] = errs[3]
-        ratio[i] = pars[0] / pars[1]
-        ratio_err[i] = ratio[i] * np.sqrt(
-            (errs[0] / pars[0]) ** 2 + (errs[1] / pars[1]) ** 2
-        )
+        try:
+            pars, errs = unbinned_aoe_fit(aoe_tmp, display=display)
+            compt_aoe[i] = pars[2]
+            aoe_sigmas[i] = pars[3]
+            compt_aoe_err[i] = errs[2]
+            aoe_sigmas_err[i] = errs[3]
+            ratio[i] = pars[0] / pars[1]
+            ratio_err[i] = ratio[i] * np.sqrt(
+                (errs[0] / pars[0]) ** 2 + (errs[1] / pars[1]) ** 2
+            )
+        except:
+            compt_aoe[i] = np.nan
+            aoe_sigmas[i] = np.nan
+            compt_aoe_err[i] = np.nan
+            aoe_sigmas_err[i] = np.nan
+            ratio[i] = np.nan
+            ratio_err[i] = np.nan
 
         if display > 0:
             if np.isnan(errs[2]) | np.isnan(errs[3]) | (errs[2] == 0) | (errs[3] == 0):

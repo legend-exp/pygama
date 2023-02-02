@@ -85,7 +85,7 @@ def test_join():
 
 
 def test_get_dataframe():
-    tbl = Table(3)
+    tbl = Table(4)
     tbl.add_column("a", lgdo.Array(np.array([1, 2, 3])))
     tbl.add_column("b", lgdo.Array(np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])))
     tbl.add_column(
@@ -95,9 +95,18 @@ def test_get_dataframe():
             cumulative_length=lgdo.Array(np.array([3, 4, 7])),
         ),
     )
+    tbl.add_column(
+        "d",
+        lgdo.Table(
+            col_dict={
+                "a": lgdo.Array(np.array([2, 4, 6, 8])),
+                "b": lgdo.Array(np.array([[1, 1], [2, 4], [3, 9], [4, 16]])),
+            }
+        ),
+    )
     df = tbl.get_dataframe()
     assert isinstance(df, pd.DataFrame)
-    assert list(df.keys()) == ["a", "b", "c"]
+    assert list(df.keys()) == ["a", "b", "c", "d_a", "d_b"]
 
 
 def test_remove_column():

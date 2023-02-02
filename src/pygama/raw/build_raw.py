@@ -12,6 +12,7 @@ from tqdm import tqdm
 from pygama import lgdo
 from pygama.math.utils import sizeof_fmt
 
+from .compass.compass_streamer import CompassStreamer
 from .fc.fc_streamer import FCStreamer
 from .orca.orca_streamer import OrcaStreamer
 from .raw_buffer import RawBufferLibrary, write_to_lh5_and_clear
@@ -26,6 +27,7 @@ def build_raw(
     buffer_size: int = 8192,
     n_max: int = np.inf,
     overwrite: bool = False,
+    compass_config_file: str = None,
     **kwargs,
 ) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
@@ -65,6 +67,13 @@ def build_raw(
     overwrite
         sets whether to overwrite the output file(s) if it (they) already exist.
 
+    compass_config_file
+        Specification of config file, used for decoding CoMPASS files
+
+        - if None, CompassDecoder will sacrifice the first packet to determine waveform length
+        - if a str ending in ``.json``, interpreted as a filename containing
+          json-shorthand for the output specification (see :mod:`.compass.compass_event_decoder`).
+
     **kwargs
         sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
     """
@@ -92,6 +101,8 @@ def build_raw(
                 in_stream_type = "FlashCam"
             elif OrcaStreamer.is_orca_stream(in_stream):
                 in_stream_type = "ORCA"
+            elif compass_config_file is not None or ext == "bin" or ext == "BIN":
+                in_stream_type = "Compass"
             else:
                 raise RuntimeError(
                     f"unknown file extension {ext}. Specify in_stream_type"
@@ -157,10 +168,10 @@ def build_raw(
         streamer = OrcaStreamer()
     elif in_stream_type == "FlashCam":
         streamer = FCStreamer()
+    elif in_stream_type == "Compass":
+        streamer = CompassStreamer(compass_config_file)
     elif in_stream_type == "LlamaDaq":
         raise NotImplementedError("LlamaDaq streaming not yet implemented")
-    elif in_stream_type == "Compass":
-        raise NotImplementedError("Compass streaming not yet implemented")
     elif in_stream_type == "MGDO":
         raise NotImplementedError("MGDO streaming not yet implemented")
     else:
