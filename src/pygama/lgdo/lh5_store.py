@@ -25,6 +25,7 @@ from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
 from pygama.lgdo.scalar import Scalar
 from pygama.lgdo.struct import Struct
 from pygama.lgdo.table import Table
+from pygama.lgdo.vectorofencodedvectors import VectorOfEncodedVectors
 from pygama.lgdo.vectorofvectors import VectorOfVectors
 from pygama.lgdo.waveform_table import WaveformTable
 
@@ -441,6 +442,49 @@ class LH5Store:
                     )
                 return obj_buf, n_rows_read
 
+        # VectorOfEncodedVectors
+        # read out vector of vectors of different size
+        if elements.startswith("encoded_array"):
+            if obj_buf is not None and not isinstance(obj_buf, VectorOfEncodedVectors):
+                raise ValueError(
+                    f"obj_buf for '{name}' not a LGDO VectorOfEncodedVectors"
+                )
+
+            # read out encoded_data
+            encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
+            encoded_data, n_rows_read = self.read_object(
+                f"{name}/encoded_data",
+                h5f,
+                start_row=start_row,
+                n_rows=n_rows,
+                idx=idx,
+                obj_buf=encoded_data_buf,
+                obj_buf_start=obj_buf_start,
+            )
+
+            # read out encoded_data
+            decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
+            decoded_size, n_rows_read = self.read_object(
+                f"{name}/decoded_size",
+                h5f,
+                start_row=start_row,
+                n_rows=n_rows,
+                idx=idx,
+                obj_buf=decoded_size_buf,
+                obj_buf_start=obj_buf_start,
+            )
+
+            if obj_buf is not None:
+                return obj_buf, n_rows_read
+            return (
+                VectorOfEncodedVectors(
+                    encoded_data=encoded_data,
+                    decoded_size=decoded_size,
+                    attrs=h5f[name].attrs,
+                ),
+                n_rows_read,
+            )
+
         # VectorOfVectors
         # read out vector of vectors of different size
         if elements.startswith("array"):
@@ -753,6 +797,26 @@ class LH5Store:
             ds = group.create_dataset(name, shape=(), data=obj.value)
             ds.attrs.update(obj.attrs)
             return
+
+        # vector of encoded vectors
+        elif isinstance(obj, VectorOfEncodedVectors):
+            group = self.gimme_group(
+                name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
+            )
+            for o, field in [
+                (obj.encoded_data, "encoded_data"),
+                (obj.decoded_size, "decoded_size"),
+            ]:
+                self.write_object(
+                    o,
+                    field,
+                    lh5_file,
+                    group=group,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    wo_mode=wo_mode,
+                    write_start=write_start,
+                )
 
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):

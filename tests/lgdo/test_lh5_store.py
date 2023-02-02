@@ -110,6 +110,19 @@ def lh5_file():
         ),
     )
 
+    struct.add_field(
+        "voev",
+        lgdo.VectorOfEncodedVectors(
+            encoded_data=lgdo.VectorOfVectors(
+                flattened_data=lgdo.Array(
+                    nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1])
+                ),
+                cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
+            ),
+            decoded_size=lgdo.Array(shape=5, fill_val=6),
+        ),
+    )
+
     col_dict = {
         "a": lgdo.Array(nda=np.array([1, 2, 3, 4])),
         "b": lgdo.Array(nda=np.array([5, 6, 7, 8])),
@@ -194,6 +207,32 @@ def test_read_vov_fancy_idx(lh5_file):
     assert n_rows == 2
 
 
+def test_read_voev(lh5_file):
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/data/struct/voev", lh5_file)
+    assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
+
+    desired = [np.array([3, 4, 5]), np.array([2]), np.array([4, 8, 9, 7])]
+
+    for i in range(len(desired)):
+        assert (desired[i] == lh5_obj[i][0]).all()
+
+    assert n_rows == 3
+
+
+def test_read_voev_fancy_idx(lh5_file):
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/data/struct_full/voev", lh5_file, idx=[0, 2])
+    assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
+
+    desired = [np.array([1, 2]), np.array([2])]
+
+    for i in range(len(desired)):
+        assert (desired[i] == lh5_obj[i][0]).all()
+
+    assert n_rows == 2
+
+
 def test_read_aoesa(lh5_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object("/data/struct/aoesa", lh5_file)
@@ -230,7 +269,7 @@ def test_read_with_field_mask(lh5_file):
     assert list(lh5_obj.keys()) == ["array"]
 
     lh5_obj, n_rows = store.read_object(
-        "/data/struct_full", lh5_file, field_mask={"vov": False}
+        "/data/struct_full", lh5_file, field_mask={"vov": False, "voev": False}
     )
     assert list(lh5_obj.keys()) == ["scalar", "array", "aoesa", "table"]
 
