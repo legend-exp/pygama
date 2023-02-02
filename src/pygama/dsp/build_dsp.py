@@ -120,7 +120,11 @@ def build_dsp(
 
     # check if group points to raw data; sometimes 'raw' is nested, e.g g024/raw
     for i, tb in enumerate(lh5_tables):
-        if "raw" not in tb and lh5.ls(lh5_file, f"{tb}/raw"):
+        if (
+            "raw" not in tb
+            and not isinstance(raw_store.gimme_file(lh5_file, "r")[tb], h5py.Dataset)
+            and lh5.ls(lh5_file, f"{tb}/raw")
+        ):
             lh5_tables[i] = f"{tb}/raw"
         elif not lh5.ls(lh5_file, tb):
             del lh5_tables[i]
