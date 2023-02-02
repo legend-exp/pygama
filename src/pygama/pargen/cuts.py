@@ -76,42 +76,20 @@ def generate_cuts(
             all_par_array < np.nanpercentile(all_par_array, 99)
         )
         par_array = all_par_array[idxs]
-        counts, start_bins, var = pgh.get_hist(par_array, 100)
+        bin_width = (np.nanpercentile(par_array, 70)- np.nanpercentile(par_array, 50))/5
+        
+        counts, start_bins, var = pgh.get_hist(par_array, 
+                                               range=(np.nanmin(par_array), np.nanmax(par_array)),
+                                               dx=bin_width)
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
-            pars, cov = pgf.gauss_mode_width_max(
-                counts,
-                start_bins,
-                mode_guess=mu,
-                n_bins=10,
-                cost_func="Least Squares",
-                inflate_errors=False,
-                gof_method="var",
-            )
+            fwhm = pgh.get_fwhm(counts, start_bins)[0]
+            guess_sig = fwhm/2.355
 
-            guess_mu, guess_sig, guess_amp = pars
+            lower_bound = mu - 10 * guess_sig
 
-            lower_bound = guess_mu - 10 * guess_sig
-
-            upper_bound = guess_mu + 10 * guess_sig
-
-            if lower_bound < np.nanmin(par_array) or upper_bound > np.nanmax(par_array):
-                pars, cov = pgf.gauss_mode_width_max(
-                    counts,
-                    start_bins,
-                    mode_guess=mu,
-                    n_bins=5,
-                    cost_func="Least Squares",
-                    inflate_errors=False,
-                    gof_method="var",
-                )
-
-            guess_mu, guess_sig, guess_amp = pars
-
-            lower_bound = guess_mu - 10 * guess_sig
-
-            upper_bound = guess_mu + 10 * guess_sig
+            upper_bound = mu + 10 * guess_sig
 
         except:
             bin_range = 1000
