@@ -1062,6 +1062,7 @@ def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
 def show(
     lh5_file: str | h5py.Group,
     lh5_group: str = "/",
+    attrs: bool = False,
     indent: str = "",
     header: bool = True,
 ) -> None:
@@ -1073,6 +1074,8 @@ def show(
         the LH5 file.
     lh5_group
         print only contents of this HDF5 group.
+    attrs
+        print the HDF5 attributes too.
     indent
         indent the diagram with this string.
     header
@@ -1118,9 +1121,13 @@ def show(
     while True:
         val = lh5_file[key]
         # we want to print the LGDO datatype
-        attr = val.attrs.get("datatype", default="no datatype")
-        if attr == "no datatype" and isinstance(val, h5py.Group):
-            attr = "HDF5 group"
+        dtype = val.attrs.get("datatype", default="no datatype")
+        if dtype == "no datatype" and isinstance(val, h5py.Group):
+            dtype = "HDF5 group"
+
+        attrs_d = dict(val.attrs)
+        attrs_d.pop("datatype", "")
+        attrs = "── " + str(attrs_d) if attrs_d else ""
 
         # is this the last key?
         killme = False
@@ -1132,7 +1139,7 @@ def show(
         else:
             char = "├──"
 
-        print(f"{indent}{char} \033[1m{key}\033[0m · {attr}")  # noqa: T201
+        print(f"{indent}{char} \033[1m{key}\033[0m · {dtype} {attrs}")  # noqa: T201
 
         # if it's a group, call this function recursively
         if isinstance(val, h5py.Group):
