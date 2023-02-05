@@ -18,16 +18,17 @@ import numba as nb
 import numpy as np
 import pandas as pd
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofencodedvectors import VectorOfEncodedVectors
-from pygama.lgdo.vectorofvectors import VectorOfVectors
-from pygama.lgdo.waveform_table import WaveformTable
+from . import compression as compress
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .fixedsizearray import FixedSizeArray
+from .lgdo_utils import expand_path, parse_datatype
+from .scalar import Scalar
+from .struct import Struct
+from .table import Table
+from .vectorofencodedvectors import VectorOfEncodedVectors
+from .vectorofvectors import VectorOfVectors
+from .waveform_table import WaveformTable
 
 LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
@@ -165,6 +166,7 @@ class LH5Store:
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         obj_buf: LGDO = None,
         obj_buf_start: int = 0,
+        decompress: bool = True,
     ) -> tuple[LGDO, int]:
         """Read LH5 object data from a file.
 
@@ -210,6 +212,10 @@ class LH5Store:
         obj_buf_start
             Start location in ``obj_buf`` for read. For concatenating data to
             array-like objects.
+        decompress
+            Decompress data encoded with pygama's compression routines right
+            after reading. The option has no effect on data encoded with HDF5
+            built-in filters, which is always decompressed upstream by HDF5.
 
         Returns
         -------
@@ -260,16 +266,15 @@ class LH5Store:
                 obj_buf_start += n_rows_read_i
             return obj_buf, n_rows_read
 
-        # start read from single file. fail if the object is not found
-        log.debug(
-            f"reading '{name}' from {lh5_file}"
-            + (f" with field mask {field_mask}" if field_mask else "")
-        )
-
         # get the file from the store
         h5f = self.gimme_file(lh5_file, "r")
         if not h5f or name not in h5f:
-            raise KeyError(f"'{name}' not in {lh5_file}")
+            raise KeyError(f"'{name}' not in {h5f.filename}")
+
+        log.debug(
+            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress = {decompress}, "
+            + (f" with field mask {field_mask}" if field_mask else "")
+        )
 
         # make idx a proper tuple if it's not one already
         if not (isinstance(idx, tuple) and len(idx) == 1):
@@ -366,6 +371,7 @@ class LH5Store:
             for field in elements:
                 if not field_mask[field]:
                     continue
+
                 fld_buf = None
                 if obj_buf is not None:
                     if not isinstance(obj_buf, Table) or field not in obj_buf:
@@ -375,6 +381,7 @@ class LH5Store:
 
                     else:
                         fld_buf = obj_buf[field]
+
                 col_dict[field], n_rows_read = self.read_object(
                     name + "/" + field,
                     h5f,
@@ -386,7 +393,9 @@ class LH5Store:
                 )
                 if obj_buf is not None and obj_buf_start + n_rows_read > len(obj_buf):
                     obj_buf.resize(obj_buf_start + n_rows_read)
+
                 rows_read.append(n_rows_read)
+
             # warn if all columns don't read in the same number of rows
             if len(rows_read) > 0:
                 n_rows_read = rows_read[0]
@@ -397,7 +406,7 @@ class LH5Store:
             for n in rows_read[1:]:
                 if n != n_rows_read:
                     log.warning(
-                        f"Table '{name}' got strange n_rows_read = {n}, {n_rows_read} was expected"
+                        f"Table '{name}' got strange n_rows_read = {n}, {n_rows_read} was expected ({rows_read})"
                     )
 
             # modify datatype in attrs if a field_mask was used
@@ -419,8 +428,17 @@ class LH5Store:
                     and "dt" in col_dict
                     and "values" in col_dict
                 ):
+
+                    values = col_dict["values"]
+                    # eventually decompress waveform values
+                    if (
+                        isinstance(col_dict["values"], VectorOfEncodedVectors)
+                        and decompress
+                    ):
+                        values = compress.decode_array(values)
+
                     table = WaveformTable(
-                        t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]
+                        t0=col_dict["t0"], dt=col_dict["dt"], values=values
                     )
                 else:
                     table = Table(col_dict=col_dict, attrs=attrs)
@@ -445,6 +463,7 @@ class LH5Store:
         # VectorOfEncodedVectors
         # read out vector of vectors of different size
         if elements.startswith("encoded_array"):
+            # TODO: do we want to decompress VectorOfEncodedVectors on the fly?
             if obj_buf is not None and not isinstance(obj_buf, VectorOfEncodedVectors):
                 raise ValueError(
                     f"obj_buf for '{name}' not a LGDO VectorOfEncodedVectors"
@@ -710,6 +729,7 @@ class LH5Store:
         n_rows: int = None,
         wo_mode: str = "append",
         write_start: int = 0,
+        compression: str = None,
     ) -> None:
         """Write an LGDO into an LH5 file.
 
@@ -743,7 +763,17 @@ class LH5Store:
         write_start
             row in the output file (if already existing) to start overwriting
             from.
+        compression
+            waveform compression algorithm.
+        compression_opts
+            additional options passed to the waveform compressor.
         """
+        log.debug(
+            f"writing {repr(obj)}[{start_row}:{n_rows}] as "
+            f"{lh5_file}:{group}/{name}[{write_start}:], "
+            f"mode = {wo_mode}, compression = {compression}"
+        )
+
         if wo_mode == "write_safe":
             wo_mode = "w"
         if wo_mode == "append":
@@ -755,6 +785,9 @@ class LH5Store:
             write_start = 0
         if wo_mode != "w" and wo_mode != "a" and wo_mode != "o" and wo_mode != "of":
             raise ValueError(f"unknown wo_mode '{wo_mode}'")
+
+        if compression is not None and not isinstance(compression, str):
+            raise ValueError("compression: string expected")
 
         # "mode" is for the h5df.File and wo_mode is for this function
         # In hdf5, 'a' is really "modify" -- in addition to appending, you can
@@ -772,8 +805,20 @@ class LH5Store:
                 name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
             )
             for field in obj.keys():
+                # eventually compress waveform table values before writing
+                obj_fld = None
+                if (
+                    isinstance(obj, WaveformTable)
+                    and field == "values"
+                    and not isinstance(obj.values, VectorOfEncodedVectors)
+                    and compression is not None
+                ):
+                    obj_fld = compress.encode_array(obj[field], encoder=compression)
+                else:
+                    obj_fld = obj[field]
+
                 self.write_object(
-                    obj[field],
+                    obj_fld,
                     field,
                     lh5_file,
                     group=group,
@@ -861,7 +906,8 @@ class LH5Store:
             # Add offset to obj.cumulative_length itself to avoid memory allocation.
             # Then subtract it off after writing! (otherwise it will be changed
             # upon return)
-            obj.cumulative_length.nda += offset
+            cl_dtype = obj.cumulative_length.nda.dtype.type
+            obj.cumulative_length.nda += cl_dtype(offset)
 
             self.write_object(
                 obj.cumulative_length,
@@ -873,7 +919,7 @@ class LH5Store:
                 wo_mode=wo_mode,
                 write_start=write_start,
             )
-            obj.cumulative_length.nda -= offset
+            obj.cumulative_length.nda -= cl_dtype(offset)
 
             return
 
@@ -948,7 +994,7 @@ class LH5Store:
                     rows_read = n_rows_read
                 elif rows_read != n_rows_read:
                     log.warning(
-                        f"table '{name}' got strange n_rows_read = {rows_read}, "
+                        f"'{field}' field in table '{name}' has {rows_read} rows, "
                         f"{n_rows_read} was expected"
                     )
             return rows_read
@@ -956,6 +1002,10 @@ class LH5Store:
         # length of vector of vectors is the length of its cumulative_length
         if elements.startswith("array"):
             return self.read_n_rows(f"{name}/cumulative_length", h5f)
+
+        # length of vector of encoded vectors is the length of its decoded_size
+        if elements.startswith("encoded_array"):
+            return self.read_n_rows(f"{name}/decoded_size", h5f)
 
         # return array length (without reading the array!)
         if "array" in datatype:

@@ -5,6 +5,7 @@ import pytest
 
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
+from pygama.lgdo import compression
 from pygama.lgdo.lh5_store import LH5Store
 
 
@@ -94,7 +95,7 @@ def lh5_file():
     store = LH5Store()
 
     struct = lgdo.Struct()
-    struct.add_field("scalar", lgdo.Scalar(value=10))
+    struct.add_field("scalar", lgdo.Scalar(value=10, attrs={"sth": 1}))
     struct.add_field("array", lgdo.Array(nda=np.array([1, 2, 3, 4, 5])))
     struct.add_field(
         "aoesa",
@@ -107,6 +108,7 @@ def lh5_file():
                 nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1])
             ),
             cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
+            attrs={"myattr": 2},
         ),
     )
 
@@ -124,11 +126,33 @@ def lh5_file():
     )
 
     col_dict = {
-        "a": lgdo.Array(nda=np.array([1, 2, 3, 4])),
+        "a": lgdo.Array(nda=np.array([1, 2, 3, 4]), attrs={"attr": 9}),
         "b": lgdo.Array(nda=np.array([5, 6, 7, 8])),
     }
 
-    struct.add_field("table", lgdo.Table(col_dict=col_dict))
+    struct.add_field("table", lgdo.Table(col_dict=col_dict, attrs={"stuff": 5}))
+
+    struct.add_field(
+        "wftable",
+        lgdo.WaveformTable(
+            t0=lgdo.Array(np.zeros(10)),
+            dt=lgdo.Array(np.full(10, fill_value=1)),
+            values=lgdo.ArrayOfEqualSizedArrays(
+                shape=(10, 1000), dtype=np.uint16, fill_val=100, attrs={"custom": 8}
+            ),
+        ),
+    )
+
+    struct.add_field(
+        "wftable_enc",
+        lgdo.WaveformTable(
+            t0=lgdo.Array(np.zeros(10)),
+            dt=lgdo.Array(np.full(10, fill_value=1)),
+            values=compression.encode_array(
+                struct["wftable"].values, encoder="radware_sigcompress"
+            ),
+        ),
+    )
 
     store.write_object(
         struct,
@@ -161,6 +185,7 @@ def test_read_scalar(lh5_file):
     assert isinstance(lh5_obj, lgdo.Scalar)
     assert lh5_obj.value == 10
     assert n_rows == 1
+    assert lh5_obj.attrs["sth"] == 1
 
 
 def test_read_array(lh5_file):
@@ -192,6 +217,7 @@ def test_read_vov(lh5_file):
         assert (desired[i] == list(lh5_obj)[i]).all()
 
     assert n_rows == 3
+    assert lh5_obj.attrs["myattr"] == 2
 
 
 def test_read_vov_fancy_idx(lh5_file):
@@ -218,6 +244,10 @@ def test_read_voev(lh5_file):
         assert (desired[i] == lh5_obj[i][0]).all()
 
     assert n_rows == 3
+
+    lh5_obj, n_rows = store.read_object("/data/struct/voev", [lh5_file, lh5_file])
+    assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
+    assert n_rows == 6
 
 
 def test_read_voev_fancy_idx(lh5_file):
@@ -248,6 +278,45 @@ def test_read_table(lh5_file):
 
     lh5_obj, n_rows = store.read_object("/data/struct/table", [lh5_file, lh5_file])
     assert n_rows == 6
+    assert lh5_obj.attrs["stuff"] == 5
+    assert lh5_obj["a"].attrs["attr"] == 9
+
+
+def test_read_wftable(lh5_file):
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/data/struct/wftable", lh5_file)
+    assert isinstance(lh5_obj, lgdo.WaveformTable)
+    assert n_rows == 3
+
+    lh5_obj, n_rows = store.read_object("/data/struct/wftable", [lh5_file, lh5_file])
+    assert n_rows == 6
+    assert lh5_obj.values.attrs["custom"] == 8
+
+
+def test_read_wftable_encoded(lh5_file):
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/wftable_enc", lh5_file, decompress=False
+    )
+    assert isinstance(lh5_obj, lgdo.WaveformTable)
+    assert isinstance(lh5_obj.values, lgdo.VectorOfEncodedVectors)
+    assert n_rows == 3
+    assert lh5_obj.values.attrs["codec"] == "radware_sigcompress"
+    assert "codec_shift" in lh5_obj.values.attrs
+
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/wftable_enc", lh5_file, decompress=True
+    )
+    assert isinstance(lh5_obj, lgdo.WaveformTable)
+    assert isinstance(lh5_obj.values, lgdo.VectorOfVectors)
+    assert n_rows == 3
+
+    # FIXME: problem with VectorOfEncodedVectors buffer
+    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=False)
+    # assert n_rows == 6
+
+    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=True)
+    # assert n_rows == 6
 
 
 def test_read_with_field_mask(lh5_file):
@@ -271,7 +340,14 @@ def test_read_with_field_mask(lh5_file):
     lh5_obj, n_rows = store.read_object(
         "/data/struct_full", lh5_file, field_mask={"vov": False, "voev": False}
     )
-    assert list(lh5_obj.keys()) == ["scalar", "array", "aoesa", "table"]
+    assert list(lh5_obj.keys()) == [
+        "scalar",
+        "array",
+        "aoesa",
+        "table",
+        "wftable",
+        "wftable_enc",
+    ]
 
 
 def test_read_lgnd_array(lgnd_file):
@@ -357,3 +433,27 @@ def test_read_lgnd_waveform_table_fancy_idx(lgnd_file):
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert len(lh5_obj) == 19
+
+
+@pytest.fixture(scope="module")
+def enc_lgnd_file(lgnd_file):
+    store = LH5Store()
+    wft, n_rows = store.read_object("/geds/raw/waveform", lgnd_file)
+    store.write_object(
+        wft,
+        "/geds/raw/waveform",
+        "/tmp/tmp-pygama-compressed-wfs.lh5",
+        wo_mode="overwrite_file",
+        compression="radware_sigcompress",
+    )
+    return "/tmp/tmp-pygama-compressed-wfs.lh5"
+
+
+def test_write_compressed_lgnd_waveform_table(enc_lgnd_file):
+    pass
+
+
+def test_read_compressed_lgnd_waveform_table(lgnd_file, enc_lgnd_file):
+    store = LH5Store()
+    wft, _ = store.read_object("/geds/raw/waveform", enc_lgnd_file)
+    assert isinstance(wft.values, lgdo.VectorOfVectors)
