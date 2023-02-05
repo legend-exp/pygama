@@ -6,6 +6,7 @@ import pytest
 import pygama.lgdo as lgdo
 import pygama.lgdo.lh5_store as lh5
 from pygama.lgdo import compression
+from pygama.lgdo.compression import RadwareSigcompress
 from pygama.lgdo.lh5_store import LH5Store
 
 
@@ -149,7 +150,7 @@ def lh5_file():
             t0=lgdo.Array(np.zeros(10)),
             dt=lgdo.Array(np.full(10, fill_value=1)),
             values=compression.encode_array(
-                struct["wftable"].values, encoder="radware_sigcompress"
+                struct["wftable"].values, encoder=RadwareSigcompress(codec_shift=-32768)
             ),
         ),
     )
@@ -296,7 +297,7 @@ def test_read_wftable(lh5_file):
 def test_read_wftable_encoded(lh5_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object(
-        "/data/struct/wftable_enc", lh5_file, decompress=False
+        "/data/struct/wftable_enc", lh5_file, wfdecompress=False
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert isinstance(lh5_obj.values, lgdo.VectorOfEncodedVectors)
@@ -305,17 +306,17 @@ def test_read_wftable_encoded(lh5_file):
     assert "codec_shift" in lh5_obj.values.attrs
 
     lh5_obj, n_rows = store.read_object(
-        "/data/struct/wftable_enc", lh5_file, decompress=True
+        "/data/struct/wftable_enc", lh5_file, wfdecompress=True
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert isinstance(lh5_obj.values, lgdo.VectorOfVectors)
     assert n_rows == 3
 
     # FIXME: problem with VectorOfEncodedVectors buffer
-    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=False)
+    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], wfdecompress=False)
     # assert n_rows == 6
 
-    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=True)
+    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], wfdecompress=True)
     # assert n_rows == 6
 
 
@@ -444,7 +445,7 @@ def enc_lgnd_file(lgnd_file):
         "/geds/raw/waveform",
         "/tmp/tmp-pygama-compressed-wfs.lh5",
         wo_mode="overwrite_file",
-        compression="radware_sigcompress",
+        wfcompressor=RadwareSigcompress(codec_shift=-32768),
     )
     return "/tmp/tmp-pygama-compressed-wfs.lh5"
 

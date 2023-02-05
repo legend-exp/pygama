@@ -21,6 +21,7 @@ import pandas as pd
 from . import compression as compress
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .compression import WaveformCodec
 from .fixedsizearray import FixedSizeArray
 from .lgdo_utils import expand_path, parse_datatype
 from .scalar import Scalar
@@ -166,7 +167,7 @@ class LH5Store:
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         obj_buf: LGDO = None,
         obj_buf_start: int = 0,
-        decompress: bool = True,
+        wfdecompress: bool = True,
     ) -> tuple[LGDO, int]:
         """Read LH5 object data from a file.
 
@@ -212,7 +213,7 @@ class LH5Store:
         obj_buf_start
             Start location in ``obj_buf`` for read. For concatenating data to
             array-like objects.
-        decompress
+        wfdecompress
             Decompress data encoded with pygama's compression routines right
             after reading. The option has no effect on data encoded with HDF5
             built-in filters, which is always decompressed upstream by HDF5.
@@ -227,6 +228,9 @@ class LH5Store:
             ``table.loc``.
         """
         # Handle list-of-files recursively
+        # FIXME: wfdecompression breaks reading from multiple files, as the
+        # buffer type changes (VectorOfEncodedVectors -> VectorOfVectors) after
+        # reading the first file
         if not isinstance(lh5_file, (str, h5py._hl.files.File)):
             lh5_file = list(lh5_file)
             n_rows_read = 0
@@ -272,7 +276,7 @@ class LH5Store:
             raise KeyError(f"'{name}' not in {h5f.filename}")
 
         log.debug(
-            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress = {decompress}, "
+            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress wfs = {wfdecompress}, "
             + (f" with field mask {field_mask}" if field_mask else "")
         )
 
@@ -433,7 +437,7 @@ class LH5Store:
                     # eventually decompress waveform values
                     if (
                         isinstance(col_dict["values"], VectorOfEncodedVectors)
-                        and decompress
+                        and wfdecompress
                     ):
                         values = compress.decode_array(values)
 
@@ -729,7 +733,7 @@ class LH5Store:
         n_rows: int = None,
         wo_mode: str = "append",
         write_start: int = 0,
-        compression: str = None,
+        wfcompressor: WaveformCodec = None,
     ) -> None:
         """Write an LGDO into an LH5 file.
 
@@ -763,15 +767,13 @@ class LH5Store:
         write_start
             row in the output file (if already existing) to start overwriting
             from.
-        compression
+        wfcompressor
             waveform compression algorithm.
-        compression_opts
-            additional options passed to the waveform compressor.
         """
         log.debug(
             f"writing {repr(obj)}[{start_row}:{n_rows}] as "
             f"{lh5_file}:{group}/{name}[{write_start}:], "
-            f"mode = {wo_mode}, compression = {compression}"
+            f"mode = {wo_mode}, wf compression = {wfcompressor}"
         )
 
         if wo_mode == "write_safe":
@@ -786,8 +788,8 @@ class LH5Store:
         if wo_mode != "w" and wo_mode != "a" and wo_mode != "o" and wo_mode != "of":
             raise ValueError(f"unknown wo_mode '{wo_mode}'")
 
-        if compression is not None and not isinstance(compression, str):
-            raise ValueError("compression: string expected")
+        if wfcompressor is not None and not isinstance(wfcompressor, WaveformCodec):
+            raise ValueError("compression: WaveformCodec object expected")
 
         # "mode" is for the h5df.File and wo_mode is for this function
         # In hdf5, 'a' is really "modify" -- in addition to appending, you can
@@ -811,9 +813,9 @@ class LH5Store:
                     isinstance(obj, WaveformTable)
                     and field == "values"
                     and not isinstance(obj.values, VectorOfEncodedVectors)
-                    and compression is not None
+                    and wfcompressor is not None
                 ):
-                    obj_fld = compress.encode_array(obj[field], encoder=compression)
+                    obj_fld = compress.encode_array(obj[field], encoder=wfcompressor)
                 else:
                     obj_fld = obj[field]
 

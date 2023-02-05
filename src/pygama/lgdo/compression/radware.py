@@ -1,6 +1,6 @@
-"""Data compression utilities."""
-
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numba
 import numpy as np
@@ -10,10 +10,17 @@ from numpy.typing import NDArray
 from pygama import lgdo
 from pygama.lgdo import lgdo_utils as utils
 
+from .base import WaveformCodec
+
 # fmt: off
 _radware_sigcompress_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
                                    2047, 4095, 8191, 16383, 32767, 65535])
 # fmt: on
+
+
+@dataclass(frozen=True, kw_only=True)
+class RadwareSigcompress(WaveformCodec):
+    codec_shift: int = 0
 
 
 def encode(
