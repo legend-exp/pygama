@@ -1,16 +1,15 @@
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 from pygama.lgdo import LH5Store, VectorOfEncodedVectors, VectorOfVectors
-from pygama.lgdo.compression import (
+from pygama.lgdo.compression.radware import (
     _get_hton_u16,
     _radware_sigcompress_decode,
     _radware_sigcompress_encode,
     _set_hton_u16,
-    radware_compress,
-    radware_decompress,
+    decode,
+    encode,
 )
 
 config_dir = Path(__file__).parent / "sigcompress"
@@ -27,16 +26,6 @@ def read_sigcompress_c_output(filename: str):
             enc_wf_c = np.append(enc_wf_c, np.uint16(line))
 
     return (nsig_c, shift, enc_wf_c)
-
-
-@pytest.fixture()
-def wftable(lgnd_test_data):
-    store = LH5Store()
-    wft, _ = store.read_object(
-        "/geds/raw/waveform",
-        lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
-    )
-    return wft
 
 
 _get = _get_hton_u16
@@ -96,11 +85,12 @@ def test_core_vs_original(wftable):
 def test_wrapper(wftable):
     wf = wftable.values.nda[0]  # uint16
 
+    shift = 0
     enc_wf = np.empty(2 * len(wf), dtype=np.ubyte)
-    nsig = _radware_sigcompress_encode(wf, enc_wf)
+    nsig = _radware_sigcompress_encode(wf, enc_wf, shift=shift)
 
     # test if the wrapper gives the same result
-    comp_wf = radware_compress(wf)
+    comp_wf = encode(wf)
     assert isinstance(comp_wf, np.ndarray)
     assert comp_wf.dtype == np.ubyte
 
@@ -109,7 +99,7 @@ def test_wrapper(wftable):
     assert np.array_equal(comp_wf, enc_wf[:nsig])
 
     # check if encoding was lossless
-    decomp_wf = radware_decompress(comp_wf)
+    decomp_wf = decode(comp_wf, shift=shift)
     assert isinstance(decomp_wf, np.ndarray)
     assert decomp_wf.dtype == np.int32
 
@@ -121,22 +111,26 @@ def test_must_shift_wf(wftable):
 
     # this wf should have samples that don't fit in the int16 range
     assert (wf > np.iinfo("int16").max).any()
-    comp_wf = radware_compress(wf)
-    decomp_wf = radware_decompress(comp_wf)
+
+    shift = -32768
+    comp_wf = encode(wf, shift=shift)
+    decomp_wf = decode(comp_wf, shift=shift)
     assert np.array_equal(decomp_wf, wf)
 
 
 def test_aoesa(wftable):
-    enc_vov = radware_compress(wftable.values)
+    shift = -32768
+    enc_vov = encode(wftable.values, shift=shift)
 
     assert isinstance(enc_vov, VectorOfEncodedVectors)
     assert enc_vov.encoded_data.dtype == np.ubyte
+    assert len(wftable.values) == len(enc_vov)
     # test only first waveform
     assert isinstance(enc_vov[0], tuple)
-    assert np.array_equal(enc_vov[0][0], radware_compress(wftable.values[0]))
+    assert np.array_equal(enc_vov[0][0], encode(wftable.values[0], shift=shift))
     assert enc_vov[0][1] == len(wftable.values[0])
 
-    dec_vov = radware_decompress(enc_vov)
+    dec_vov = decode(enc_vov, shift=shift)
     assert isinstance(dec_vov, VectorOfVectors)
     assert dec_vov.dtype == np.int32
 
@@ -153,7 +147,7 @@ def test_performance(lgnd_test_data):
 
     sum = 0
     for wf in obj["values"].nda:
-        comp_wf = radware_compress(wf)
+        comp_wf = encode(wf)
         sum += len(comp_wf) / len(wf) / 2
 
     print(  # noqa: T201
@@ -192,9 +186,9 @@ def test_special_wfs():
                            12069, 18732, 9513, 13636, 10268, 22559, 9017,
                            12032, 0])
 
-    enc_wf = radware_compress(wf, shift=0)
+    enc_wf = encode(wf, shift=0)
     assert np.array_equal(_to_u16(enc_wf), enc_wf_exp)
-    assert np.array_equal(radware_decompress(enc_wf, shift=0), wf)
+    assert np.array_equal(decode(enc_wf, shift=0), wf)
 
     wf = np.array([107, 105, 113, 112, 105, 91, 119, 126, 110, 117, 105, 98,
                    129, 91, 112, 102, -33, 213, -54, 312, 107, 97, 107, 123,
@@ -215,9 +209,9 @@ def test_special_wfs():
                            15908, 10550, 12847, 9545, 11301, 10549, 17448,
                            7256, 7971, 14639])
 
-    enc_wf = radware_compress(wf, shift=0)
+    enc_wf = encode(wf, shift=0)
     assert np.array_equal(_to_u16(enc_wf), enc_wf_exp)
-    assert np.array_equal(radware_decompress(enc_wf, shift=0), wf)
+    assert np.array_equal(decode(enc_wf, shift=0), wf)
 
     wf = np.array([-18257, -18258, -18259, -18250, -18247, -18237, -18236, -18242, -18242, -18240,
                    -18245, -18246, -18250, -18247, -18245, -18241, -18247, -18247, -18245, -18245,
@@ -320,8 +314,8 @@ def test_special_wfs():
                    -19214, -19214, -19211, -19209, -19206, -19202, -19199, -19205, -19212, -19208,
                    -19207, -19210, -19209, -19210, -19207, -19209, -19209, -19206, -19209, -19214])
 
-    enc_wf = radware_compress(wf, shift=0)
-    assert np.array_equal(radware_decompress(enc_wf, shift=0), wf)
+    enc_wf = encode(wf, shift=0)
+    assert np.array_equal(decode(enc_wf, shift=0), wf)
 
     wf = np.array([-17947, -17943, -17940, -17936, -17931, -17933, -17930, -17923, -17929, -17932,
                    -17934, -17929, -17927, -17926, -17924, -17925, -17930, -17934, -17938, -17948,
@@ -424,8 +418,8 @@ def test_special_wfs():
                    -19145, -19146, -19151, -19154, -19149, -19143, -19143, -19139, -19134, -19129,
                    -19132, -19135, -19135, -19127, -19126, -19128, -19134, -19134, -19132, -19141])
 
-    enc_wf = radware_compress(wf, shift=0)
-    assert np.array_equal(radware_decompress(enc_wf, shift=0), wf)
+    enc_wf = encode(wf, shift=0)
+    assert np.array_equal(decode(enc_wf, shift=0), wf)
 
     wf = np.array([14941, 14935, 14935, 14927, 14921, 14924, 14930, 14935, 14938, 14940, 14942,
                    14940, 14938, 14936, 14935, 14932, 14928, 14929, 14927, 14926, 14934, 14934,
@@ -519,8 +513,8 @@ def test_special_wfs():
                    10625, 10623, 10621, 10622, 10623, 10621, 10630, 10638, 10637, 10637, 10637,
                    10628, 10619, 10607, 10602, 10605, 10615, 10625, 10637, 10649, 10666])
 
-    enc_wf = radware_compress(wf, shift=0)
-    assert np.array_equal(radware_decompress(enc_wf, shift=0), wf)
+    enc_wf = encode(wf, shift=0)
+    assert np.array_equal(decode(enc_wf, shift=0), wf)
 
     wf = np.array([-17745, -17759, -17771, -17778, -17772, -17763, -17756, -17762, -17779, -17796,
                    -17802, -17799, -17786, -17770, -17756, -17746, -17743, -17744, -17750, -17742,
@@ -624,12 +618,12 @@ def test_special_wfs():
                    -17833])
 
     # FIXME encoding is broken for this one
-    # enc_wf = radware_compress(wf, shift=0)
+    # enc_wf = encode(wf, shift=0)
 
     # (nsig_c, shift, enc_wf_c) = read_sigcompress_c_output(config_dir / "special.dat")
     # assert shift == 0
     # assert np.array_equal(enc_wf, enc_wf_c)
 
-    # dec_wf = radware_decompress(enc_wf, shift=0)
+    # dec_wf = decode(enc_wf, shift=0)
     # assert np.array_equal(dec_wf, wf)
     # fmt: on

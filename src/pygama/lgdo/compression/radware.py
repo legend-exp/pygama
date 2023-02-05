@@ -2,30 +2,29 @@
 
 from __future__ import annotations
 
-import logging
-
 import numba
 import numpy as np
 from numpy import int16, int32, ubyte, uint16, uint32
 from numpy.typing import NDArray
 
-from . import ArrayOfEqualSizedArrays, VectorOfEncodedVectors, VectorOfVectors
-from . import lgdo_utils as utils
+from pygama import lgdo
+from pygama.lgdo import lgdo_utils as utils
 
 # fmt: off
-_radware_siggen_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
-                               2047, 4095, 8191, 16383, 32767, 65535])
+_radware_sigcompress_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
+                                   2047, 4095, 8191, 16383, 32767, 65535])
 # fmt: on
 
-log = logging.getLogger(__name__)
 
-
-def radware_compress(
-    sig_in: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays,
-    sig_out: NDArray[ubyte] | VectorOfEncodedVectors = None,
-    shift: int32 = -32768,
-) -> NDArray[ubyte] | VectorOfEncodedVectors:
+def encode(
+    sig_in: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays,
+    sig_out: NDArray[ubyte] | lgdo.VectorOfEncodedVectors = None,
+    shift: int32 = 0,
+) -> NDArray[ubyte] | lgdo.VectorOfEncodedVectors:
     """Compress digital signal(s) with `radware-sigcompress`.
+
+    Wraps :func:`._radware_sigcompress_encode` and adds support for encoding
+    LGDOs.
 
     Parameters
     ----------
@@ -44,7 +43,7 @@ def radware_compress(
 
     See Also
     --------
-    ._radware_decompress_encode
+    ._radware_sigcompress_encode
     """
     if len(sig_in) == 0:
         return sig_in
@@ -67,18 +66,20 @@ def radware_compress(
             sig_out.resize(outlen, refcheck=True)
 
     # TODO: different actions if ArrayOfEqualSizedArrays
-    elif isinstance(sig_in, (VectorOfVectors, ArrayOfEqualSizedArrays)):
+    elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
         if not sig_out:
             # pre-allocate output structure
-            sig_out = VectorOfEncodedVectors(
-                encoded_data=VectorOfVectors(shape_guess=(max_out_len, 1), dtype=ubyte),
-                attrs={"codec": "radware_sigcompress", "codec_shift": shift},
+            sig_out = lgdo.VectorOfEncodedVectors(
+                encoded_data=lgdo.VectorOfVectors(
+                    shape_guess=(len(sig_in), 1), dtype=ubyte
+                ),
             )
-        elif not isinstance(sig_out, VectorOfEncodedVectors):
+        elif not isinstance(sig_out, lgdo.VectorOfEncodedVectors):
             raise ValueError("sig_out must be a VectorOfEncodedVectors")
 
+        # TODO: make this more efficient
         for i, wf in enumerate(sig_in):
-            sig_out[i] = (radware_compress(wf, shift=shift), len(wf))
+            sig_out[i] = (encode(wf, shift=shift), len(wf))
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
@@ -86,13 +87,15 @@ def radware_compress(
     return sig_out
 
 
-def radware_decompress(
-    sig_in: NDArray[ubyte] | VectorOfEncodedVectors,
-    sig_out: NDArray | VectorOfVectors | ArrayOfEqualSizedArrays = None,
-    shift: int32 = -32768,
-    warn: bool = True,
-) -> NDArray | VectorOfVectors | ArrayOfEqualSizedArrays:
+def decode(
+    sig_in: NDArray[ubyte] | lgdo.VectorOfEncodedVectors,
+    sig_out: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays = None,
+    shift: int32 = 0,
+) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
     """Decompress digital signal(s) with `radware-sigcompress`.
+
+    Wraps :func:`._radware_sigcompress_decode` and adds support for decoding
+    LGDOs.
 
     Parameters
     ----------
@@ -111,7 +114,7 @@ def radware_decompress(
 
     See Also
     --------
-    ._radware_decompress_decode
+    ._radware_sigcompress_decode
     """
     if len(sig_in) == 0:
         return sig_in
@@ -129,7 +132,7 @@ def radware_decompress(
         if outlen < len(sig_out):
             sig_out.resize(outlen, refcheck=False)
 
-    elif isinstance(sig_in, VectorOfEncodedVectors):
+    elif isinstance(sig_in, lgdo.VectorOfEncodedVectors):
         if not sig_out:
             # pre-allocate output structure
             # sig_out will be a VectorOfVectors for now because that's the most
@@ -137,26 +140,16 @@ def radware_decompress(
             # FIXME: too large?
             sig_out = utils.copy(sig_in.encoded_data, dtype=int32)
 
-        elif not isinstance(sig_out, (VectorOfVectors, ArrayOfEqualSizedArrays)):
+        elif not isinstance(
+            sig_out, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)
+        ):
             raise ValueError(
                 "sig_out must be a ArrayOfEqualSizedArrays or VectorOfVectors"
             )
 
-        if "codec_shift" in sig_in.attrs and isinstance(
-            sig_in.attrs["codec_shift"], int
-        ):
-            if sig_in.attrs["codec_shift"] != shift and warn:
-                log.warning(
-                    f"shift = {shift} != attrs['codec_shift'] = {sig_in.attrs['codec_shift']}. "
-                    "The decoded waveform will not correspond to the one originally encoded. "
-                    "If you know what you are doing. Suppress this warning by setting warn=False"
-                )
-            elif shift is None:
-                shift = sig_in.attrs["codec_shift"]
-
         # TODO: make this more efficient
         for i, wf in enumerate(sig_in):
-            sig_out[i] = radware_decompress(wf[0], shift=shift)
+            sig_out[i] = decode(wf[0], shift=shift)
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
@@ -215,8 +208,8 @@ def _set_low_u16(x: uint32, y: uint16) -> uint32:
 def _radware_sigcompress_encode(
     sig_in: NDArray[uint16],
     sig_out: NDArray,
-    shift: int32 = -32768,
-    _mask: NDArray[uint16] = _radware_siggen_mask,
+    shift: int32,
+    _mask: NDArray[uint16] = _radware_sigcompress_mask,
 ) -> int32:
     """Compress a digital signal.
 
@@ -395,8 +388,8 @@ def _radware_sigcompress_encode(
 def _radware_sigcompress_decode(
     sig_in: NDArray[uint16],
     sig_out: NDArray,
-    shift: int32 = -32768,
-    _mask: NDArray[uint16] = _radware_siggen_mask,
+    shift: int32,
+    _mask: NDArray[uint16] = _radware_sigcompress_mask,
 ) -> int32:
     """Deompress a digital signal.
 
