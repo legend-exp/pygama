@@ -18,7 +18,7 @@ _radware_sigcompress_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
 # fmt: on
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class RadwareSigcompress(WaveformCodec):
     codec_shift: int = 0
     """Offset added to the input waveform before encoding."""

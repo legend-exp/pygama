@@ -4,7 +4,7 @@ import re
 from dataclasses import asdict, dataclass
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class WaveformCodec:
     """Base class identifying a waveform compression algorithm.
 
