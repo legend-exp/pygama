@@ -4,7 +4,7 @@ from pygama.lgdo.compression import RadwareSigcompress
 
 def test_encode_decode_array(wftable):
     result = compression.encode_array(
-        wftable.values, encoder=RadwareSigcompress(codec_shift=-32768)
+        wftable.values, codec=RadwareSigcompress(codec_shift=-32768)
     )
     assert isinstance(result, VectorOfEncodedVectors)
     assert len(result) == len(wftable)

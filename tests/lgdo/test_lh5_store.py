@@ -150,7 +150,7 @@ def lh5_file():
             t0=lgdo.Array(np.zeros(10)),
             dt=lgdo.Array(np.full(10, fill_value=1)),
             values=compression.encode_array(
-                struct["wftable"].values, encoder=RadwareSigcompress(codec_shift=-32768)
+                struct["wftable"].values, codec=RadwareSigcompress(codec_shift=-32768)
             ),
         ),
     )

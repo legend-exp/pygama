@@ -816,7 +816,7 @@ class LH5Store:
                     and not isinstance(obj.values, VectorOfEncodedVectors)
                     and wfcompressor is not None
                 ):
-                    obj_fld = compress.encode_array(obj[field], encoder=wfcompressor)
+                    obj_fld = compress.encode_array(obj[field], codec=wfcompressor)
                 else:
                     obj_fld = obj[field]
 
