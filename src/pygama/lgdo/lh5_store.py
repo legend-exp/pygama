@@ -768,7 +768,8 @@ class LH5Store:
             row in the output file (if already existing) to start overwriting
             from.
         wfcompressor
-            waveform compression algorithm.
+            compression algorithm to be used to compress waveforms before
+            writing to disk, see :mod:`.lgdo.compression`.
         """
         log.debug(
             f"writing {repr(obj)}[{start_row}:{n_rows}] as "

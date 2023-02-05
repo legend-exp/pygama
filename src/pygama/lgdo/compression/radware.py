@@ -21,6 +21,7 @@ _radware_sigcompress_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
 @dataclass(frozen=True, kw_only=True)
 class RadwareSigcompress(WaveformCodec):
     codec_shift: int = 0
+    """Offset added to the input waveform before encoding."""
 
 
 def encode(
@@ -31,14 +32,21 @@ def encode(
     """Compress digital signal(s) with `radware-sigcompress`.
 
     Wraps :func:`._radware_sigcompress_encode` and adds support for encoding
-    LGDOs.
+    LGDO arrays. Resizes the encoded array to its actual length.
+
+    Note
+    ----
+    The compression algorithm internally interprets the input waveform values as
+    16-bit integers. Make sure that your signal can be safely cast to such a
+    numeric type. If not, you may want to apply a `shift` to the waveform.
 
     Parameters
     ----------
     sig_in
-        array or array of arrays holding the input signal(s).
+        array(s) holding the input signal(s).
     sig_out
-        pre-allocated array or array of arrays for the compressed signal(s).
+        pre-allocated unsigned 8-bit integer array(s) for the compressed
+        signal(s). If not provided, a new one will be allocated.
     shift
         value to be added to `sig_in` before compression.
 
@@ -102,22 +110,23 @@ def decode(
     """Decompress digital signal(s) with `radware-sigcompress`.
 
     Wraps :func:`._radware_sigcompress_decode` and adds support for decoding
-    LGDOs.
+    LGDOs. Resizes the decoded signals to their actual length.
 
     Parameters
     ----------
     sig_in
-        array or waveform table holding the input, compressed signal(s).
+        array(s) holding the input, compressed signal(s).
     sig_out
-        pre-allocated array or waveform table for the decompressed signal(s).
+        pre-allocated array(s) for the decompressed signal(s).  If not
+        provided, will allocate a 32-bit integer array(s) structure.
     shift
-        the value the original waveform was shifted before compression.  The
-        value is subtracted from samples in `sig_out` right after decoding.
+        the value the original signal(s) was shifted before compression.  The
+        value is *subtracted* from samples in `sig_out` right after decoding.
 
     Returns
     -------
     sig_out
-        given pre-allocated structure or new structure of integers.
+        given pre-allocated structure or new structure of 32-bit integers.
 
     See Also
     --------
@@ -213,19 +222,27 @@ def _set_low_u16(x: uint32, y: uint16) -> uint32:
 
 @numba.jit
 def _radware_sigcompress_encode(
-    sig_in: NDArray[uint16],
-    sig_out: NDArray,
+    sig_in: NDArray,
+    sig_out: NDArray[ubyte],
     shift: int32,
     _mask: NDArray[uint16] = _radware_sigcompress_mask,
 ) -> int32:
     """Compress a digital signal.
 
     Shifts the signal values by ``+shift`` and internally interprets the result
-    as :any:`numpy.int16`. Shifted signals must be representable as
-    :any:`numpy.int16`.
+    as :any:`numpy.int16`. Shifted signals must be therefore representable as
+    :any:`numpy.int16`, for lossless compression.
 
     Almost literal translations of ``compress_signal()`` from the
-    `radware-sigcompress` v1.0 C-code by David Radford [1]_.
+    `radware-sigcompress` v1.0 C-code by David Radford [1]_. Summary of
+    changes:
+
+    - Shift the input signal by `shift` before encoding.
+    - Store encoded, :class:`numpy.uint16` signal as an array of bytes
+      (:class:`numpy.ubyte`), in big-endian ordering.
+    - Declare mask globally to avoid extra memory allocation.
+    - Apply just-in-time compilation with Numba.
+    - Add a couple of missing array boundary checks.
 
     .. [1] `radware-sigcompress source code
        <https://legend-exp.github.io/legend-data-format-specs/dev/data_compression/#radware-sigcompress-1>`_.
@@ -238,8 +255,8 @@ def _radware_sigcompress_encode(
         array of integers holding the input signal. In the original C code,
         an array of 16-bit integers was expected.
     sig_out
-        pre-allocated array for the encoded signal. In the original C code,
-        an array of unsigned 16-bit integers was expected.
+        pre-allocated array for the unsigned 8-bit encoded signal. In the
+        original C code, an array of unsigned 16-bit integers was expected.
 
     Returns
     -------
@@ -393,7 +410,7 @@ def _radware_sigcompress_encode(
 
 @numba.jit
 def _radware_sigcompress_decode(
-    sig_in: NDArray[uint16],
+    sig_in: NDArray[ubyte],
     sig_out: NDArray,
     shift: int32,
     _mask: NDArray[uint16] = _radware_sigcompress_mask,
@@ -401,10 +418,12 @@ def _radware_sigcompress_decode(
     """Deompress a digital signal.
 
     After decoding, the signal values are shifted by ``-shift`` to restore the
-    original waveform. The dtype of `sig_out` must be large enough.
+    original waveform. The dtype of `sig_out` must be large enough to contain it.
 
     Almost literal translations of ``decompress_signal()`` from the
-    `radware-sigcompress` v1.0 C-code by David Radford [1]_.
+    `radware-sigcompress` v1.0 C-code by David Radford [1]_. See
+    :func:`._radware_sigcompress_encode` for a list of changes to the original
+    algorithm.
 
     Parameters
     ----------
@@ -418,7 +437,7 @@ def _radware_sigcompress_decode(
     Returns
     -------
     length
-        length of output signal.
+        length of output, decompressed signal.
     """
     mask = _mask
 
