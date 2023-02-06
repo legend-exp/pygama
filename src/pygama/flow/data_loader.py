@@ -125,6 +125,7 @@ class DataLoader:
         self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.aoesa_to_vov = False
         self.data = None
 
         if isinstance(filedb, FileDB):
@@ -324,7 +325,11 @@ class DataLoader:
             # TODO Parse strings to match column names so you don't have to specify which level it is
 
     def set_output(
-        self, fmt: str = None, merge_files: bool = None, columns: list = None
+        self,
+        fmt: str = None,
+        merge_files: bool = None,
+        columns: list = None,
+        aoesa_to_vov: bool = None,
     ) -> None:
         """
         Set the parameters for the output format of load
@@ -338,6 +343,7 @@ class DataLoader:
             one table.
         columns
             The columns that should be copied into the output.
+        aoesa_to_vov
 
         Example
         -------
@@ -352,6 +358,8 @@ class DataLoader:
             self.merge_files = merge_files
         if columns is not None:
             self.output_columns = columns
+        if aoesa_to_vov is not None:
+            self.aoesa_to_vov = aoesa_to_vov
 
     def reset(self):
         """Resets all fields to their default values, as if this is a newly
@@ -363,6 +371,7 @@ class DataLoader:
         self.merge_files = True
         self.output_format = "lgdo.Table"
         self.output_columns = None
+        self.aoesa_to_vov = False
         self.data = None
 
     # ------------- Applying Cuts/Loading Data --------------#
@@ -897,10 +906,23 @@ class DataLoader:
             for col in tier_table.keys():
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
-                    if col not in col_dict.keys():
-                        col_dict[col] = [[]] * table_length
-                    for i, idx in enumerate(tcm_idx):
-                        col_dict[col][idx] = tier_table[col].nda[i]
+                    if self.aoesa_to_vov:  # convert to VectorOfVectors
+                        if col not in col_dict.keys():
+                            col_dict[col] = [[]] * table_length
+                        for i, idx in enumerate(tcm_idx):
+                            col_dict[col][idx] = tier_table[col].nda[i]
+                    else:  # Try to make AoESA, raise error otherwise
+                        if col not in col_dict.keys():
+                            col_dict[col] = np.empty(
+                                (table_length, len(tier_table[col].nda[0])),
+                                dtype=tier_table[col].dtype,
+                            )
+                        try:
+                            col_dict[col][tcm_idx] = tier_table[col].nda
+                        except BaseException:
+                            raise ValueError(
+                                f"self.aoesa_to_vov is False but {col} is a jagged array"
+                            )
                 elif isinstance(tier_table[col], VectorOfVectors):
                     # Allocate memory for column for all channels
                     if col not in col_dict.keys():
@@ -940,7 +962,10 @@ class DataLoader:
                     col_dict[col] = dict_to_table(col_dict=col_dict[col])
                 else:
                     nda = np.array(col_dict[col])
-                    col_dict[col] = Array(nda=nda)
+                    if len(nda.shape) == 2:
+                        col_dict[col] = ArrayOfEqualSizedArrays(nda=nda)
+                    else:
+                        col_dict[col] = Array(nda=nda)
             if set(col_dict.keys()) == {"t0", "dt", "values"}:
                 return WaveformTable(
                     t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]

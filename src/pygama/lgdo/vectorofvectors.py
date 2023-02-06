@@ -4,12 +4,12 @@ variable-length arrays and corresponding utilities.
 """
 from __future__ import annotations
 
+import itertools
 import logging
 from typing import Any
 
 import numpy as np
 from numba import njit
-import itertools
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
@@ -65,7 +65,7 @@ class VectorOfVectors(LGDO):
             A set of user attributes to be carried along with this LGDO.
         """
         if listoflists is not None:
-            cl_nda = np.cumsum([len(l) for l in listoflists])
+            cl_nda = np.cumsum([len(ll) for ll in listoflists])
             if dtype is None:
                 if len(cl_nda) == 0 or cl_nda[-1] == 0:
                     raise ValueError("listoflists can't be empty with dtype=None!")
@@ -77,7 +77,9 @@ class VectorOfVectors(LGDO):
             self.dtype = np.dtype(dtype)
             self.cumulative_length = Array(nda=cl_nda)
             self.flattened_data = Array(
-                nda=np.fromiter(itertools.chain.from_iterable(listoflists), dtype=self.dtype)
+                nda=np.fromiter(
+                    itertools.chain.from_iterable(listoflists), dtype=self.dtype
+                )
             )
         else:
             if cumulative_length is None:

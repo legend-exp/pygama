@@ -135,6 +135,72 @@ def test_build_raw_orca_out_spec(lgnd_test_data):
     )
 
 
+def test_build_raw_compass(lgnd_test_data):
+    build_raw(
+        in_stream=lgnd_test_data.get_path("compass/compass_test_data.BIN"),
+        overwrite=True,
+        compass_config_file=lgnd_test_data.get_path(
+            "compass/compass_test_data_settings.xml"
+        ),
+    )
+
+    assert lgnd_test_data.get_path("compass/compass_test_data.lh5") != ""
+
+    out_file = "/tmp/compass_test_data.lh5"
+
+    build_raw(
+        in_stream=lgnd_test_data.get_path("compass/compass_test_data.BIN"),
+        out_spec=out_file,
+        overwrite=True,
+        compass_config_file=lgnd_test_data.get_path(
+            "compass/compass_test_data_settings.xml"
+        ),
+    )
+
+    assert os.path.exists("/tmp/compass_test_data.lh5")
+
+
+def test_build_raw_compass_out_spec(lgnd_test_data):
+    out_file = "/tmp/compass_test_data.lh5"
+    out_spec = {
+        "CompassEventDecoder": {"spms": {"key_list": [[0, 1]], "out_stream": out_file}}
+    }
+
+    build_raw(
+        in_stream=lgnd_test_data.get_path("compass/compass_test_data.BIN"),
+        out_spec=out_spec,
+        n_max=10,
+        overwrite=True,
+        compass_config_file=lgnd_test_data.get_path(
+            "compass/compass_test_data_settings.xml"
+        ),
+    )
+
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/spms", out_file)
+    assert n_rows == 10
+    assert (lh5_obj["channel"].nda == [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]).all()
+
+
+def test_build_raw_compass_out_spec_no_config(lgnd_test_data):
+    out_file = "/tmp/compass_test_data.lh5"
+    out_spec = {
+        "CompassEventDecoder": {"spms": {"key_list": [[0, 1]], "out_stream": out_file}}
+    }
+
+    build_raw(
+        in_stream=lgnd_test_data.get_path("compass/compass_test_data.BIN"),
+        out_spec=out_spec,
+        n_max=10,
+        overwrite=True,
+    )
+
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/spms", out_file)
+    assert n_rows == 10
+    assert (lh5_obj["channel"].nda == [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]).all()
+
+
 def test_build_raw_overwrite(lgnd_test_data):
     with pytest.raises(FileExistsError):
         build_raw(
