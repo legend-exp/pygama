@@ -32,7 +32,8 @@ _get = _get_hton_u16
 
 
 def _to_u16(a):
-    out = np.empty(int(len(a) / 2))
+    assert len(a) % 2 == 0
+    out = np.empty(int(len(a) / 2), dtype=np.uint16)
     for i in range(int(len(a) / 2)):
         out[i] = _get_hton_u16(a, i)
     return out
@@ -516,6 +517,7 @@ def test_special_wfs():
     enc_wf = encode(wf, shift=0)
     assert np.array_equal(decode(enc_wf, shift=0), wf)
 
+    # this waveform has first derivative values that cannot be represented as int16
     wf = np.array([-17745, -17759, -17771, -17778, -17772, -17763, -17756, -17762, -17779, -17796,
                    -17802, -17799, -17786, -17770, -17756, -17746, -17743, -17744, -17750, -17742,
                    -17723, -17708, -17698, -17698, -17702, -17718, -17739, -17756, -17771, -17777,
@@ -617,13 +619,12 @@ def test_special_wfs():
                    -17658, -17669, -17683, -17702, -17727, -17756, -17785, -17817, -17838, -17839,
                    -17833])
 
-    # FIXME encoding is broken for this one
-    # enc_wf = encode(wf, shift=0)
+    enc_wf = encode(wf, shift=0)
 
-    # (nsig_c, shift, enc_wf_c) = read_sigcompress_c_output(config_dir / "special.dat")
-    # assert shift == 0
-    # assert np.array_equal(enc_wf, enc_wf_c)
+    (nsig_c, shift, enc_wf_c) = read_sigcompress_c_output(config_dir / "special-wf-clipped.dat")
+    assert shift == 0
+    assert np.array_equal(_to_u16(enc_wf), enc_wf_c)
 
-    # dec_wf = decode(enc_wf, shift=0)
-    # assert np.array_equal(dec_wf, wf)
+    dec_wf = decode(enc_wf, shift=0)
+    assert np.array_equal(dec_wf, wf)
     # fmt: on

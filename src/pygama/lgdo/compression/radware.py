@@ -233,6 +233,12 @@ def _radware_sigcompress_encode(
     as :any:`numpy.int16`. Shifted signals must be therefore representable as
     :any:`numpy.int16`, for lossless compression.
 
+    Note
+    ----
+    The algorithm also computes the first derivative of the input signal, which
+    cannot always be represented as a 16-bit integer. In such cases, overflows
+    occur, but they seem to be innocuous.
+
     Almost literal translations of ``compress_signal()`` from the
     `radware-sigcompress` v1.0 C-code by David Radford [1]_. Summary of
     changes:
@@ -265,8 +271,10 @@ def _radware_sigcompress_encode(
     """
     mask = _mask
 
-    j = iso = bp = 0
+    i = j = max1 = max2 = min1 = min2 = ds = int16(0)
+    nb1 = nb2 = iso = nw = bp = dd1 = dd2 = int16(0)
     dd = uint32(0)
+
     _set_hton_u16(sig_out, iso, sig_in.size)
 
     iso += 1
@@ -441,11 +449,12 @@ def _radware_sigcompress_decode(
     """
     mask = _mask
 
+    i = j = min_val = nb = isi = iso = nw = bp = int16(0)
+    dd = uint32(0)
+
     sig_len_in = int(sig_in.size / 2)
-    j = isi = iso = bp = 0
     siglen = int16(_get_hton_u16(sig_in, isi))  # signal length
     isi += 1
-    dd = uint32(0)
 
     while (isi < sig_len_in) and (iso < siglen):
         if bp > 0:
