@@ -84,7 +84,6 @@ def encode(
         if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
-    # TODO: different actions if ArrayOfEqualSizedArrays
     elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
         if not sig_out:
             # pre-allocate output structure
@@ -211,22 +210,22 @@ def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     return uint16(a[i_1] << 8 | a[i_2])
 
 
-@numba.jit
+@numba.jit("uint16(uint32)")
 def _get_high_u16(x: uint32) -> uint16:
     return uint16(x >> 16)
 
 
-@numba.jit
+@numba.jit("uint32(uint32, uint16)")
 def _set_high_u16(x: uint32, y: uint16) -> uint32:
     return uint32(x & 0x0000FFFF | (y << 16))
 
 
-@numba.jit
+@numba.jit("uint16(uint32)")
 def _get_low_u16(x: uint32) -> uint16:
     return uint16(x >> 0)
 
 
-@numba.jit
+@numba.jit("uint32(uint32, uint16)")
 def _set_low_u16(x: uint32, y: uint16) -> uint32:
     return uint32(x & 0xFFFF0000 | (y << 0))
 
