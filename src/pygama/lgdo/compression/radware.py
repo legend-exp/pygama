@@ -63,6 +63,8 @@ def encode(
     if len(sig_in) == 0:
         return sig_in
 
+    # the encoded signal is an array of bytes -> twice as long as a uint16
+    # array
     max_out_len = 2 * len(sig_in)
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
         if not sig_out:
@@ -72,11 +74,13 @@ def encode(
         if sig_out.dtype != ubyte:
             raise ValueError("sig_out must be of type ubyte")
 
+        # resize the (user) pre-allocated array if too short
         if len(sig_out) < max_out_len:
             sig_out.resize(max_out_len, refcheck=True)
 
         outlen = _radware_sigcompress_encode(sig_in, sig_out, shift=shift)
 
+        # resize the encoded signal to its actual length
         if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
@@ -84,9 +88,16 @@ def encode(
     elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
         if not sig_out:
             # pre-allocate output structure
+            if isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
+                max_out_len = 2 * sig_in.nda.shape[1]
+            else:
+                max_out_len = (
+                    2 * len(sig_in.flattened_data) / len(sig_in.cumulative_length)
+                )
+
             sig_out = lgdo.VectorOfEncodedVectors(
                 encoded_data=lgdo.VectorOfVectors(
-                    shape_guess=(len(sig_in), 1), dtype=ubyte
+                    shape_guess=(len(sig_in), max_out_len), dtype=ubyte
                 ),
             )
         elif not isinstance(sig_out, lgdo.VectorOfEncodedVectors):
