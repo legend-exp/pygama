@@ -100,7 +100,7 @@ class LH5Store:
 
     def gimme_group(
         self,
-        group: str,
+        group: str | h5py.Group,
         base_group: h5py.Group,
         grp_attrs: dict[str, Any] = None,
         overwrite: bool = False,
@@ -807,6 +807,14 @@ class LH5Store:
             group = self.gimme_group(
                 name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
             )
+            # If the mode is overwrite, then we need to peek into the file's table's existing fields
+            # If we are writing a new table to the group that does not contain an old field, we should delete that old field from the file
+            if wo_mode == "o":
+                # Find the old keys in the group that are not present in the new table's keys, then delete them
+                for key in list(set(group.keys()) - set(obj.keys())):
+                    log.debug(f"{key} is not present in new table, deleting field")
+                    del group[key]
+
             for field in obj.keys():
                 # eventually compress waveform table values before writing
                 obj_fld = None
