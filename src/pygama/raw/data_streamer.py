@@ -273,7 +273,7 @@ class DataStreamer(ABC):
                 elif rb.is_full():
                     list_of_rbs.append(rb)
         if not still_has_data:
-            log.debug(f'decoding complete. flushing {len(list_of_rbs)} buffers')
+            log.debug(f"decoding complete. flushing {len(list_of_rbs)} buffers")
         return list_of_rbs
 
     @abstractmethod
