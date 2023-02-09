@@ -77,9 +77,10 @@ class OrcaStreamer(DataStreamer):
         n_bytes_read = self.in_stream.readinto(self.buffer[1:n_words])
         self.n_bytes_read += n_bytes_read
         if n_bytes_read != (n_words - 1) * 4:
-            raise RuntimeError(
-                f"only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected."
+            log.error(
+                f"only got {n_bytes_read} bytes for packet read when {(n_words-1)*4} were expected. Flushing all buffers and quitting..."
             )
+            return None
 
         # return just the packet
         return self.buffer[:n_words]
@@ -113,20 +114,30 @@ class OrcaStreamer(DataStreamer):
 
         # that read should have succeeded
         if len(first_bytes) != 12:
+            log.debug(f"first 12B read only returned {first_bytes}B: not orca")
             return False
 
         # first 14 bits should be zero
         uints = np.frombuffer(first_bytes, dtype="uint32")
         if (uints[0] & 0xFFFC0000) != 0:
+            log.debug(
+                f"first fourteen bits non-zero ({uints[0] & 0xFFFC0000}): not orca"
+            )
             return False
 
         # xml header length should fit within header packet length
         pad = uints[0] * 4 - 8 - uints[1]
         if pad < 0 or pad > 3:
+            log.debug(
+                f"header length = {uints[1]}B doesn't fit right within header packet length = {uints[0]*4-8}B: not orca"
+            )
             return False
 
         # last 4 chars should be '<?xm'
         if first_bytes[8:].decode() != "<?xm":
+            log.debug(
+                f"last 4 chars of first 12 bytes = {first_bytes[8:].decode()} != '<?xm': not orca"
+            )
             return False
 
         # it must be an orca stream
