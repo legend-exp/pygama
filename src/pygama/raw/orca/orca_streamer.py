@@ -120,18 +120,24 @@ class OrcaStreamer(DataStreamer):
         # first 14 bits should be zero
         uints = np.frombuffer(first_bytes, dtype="uint32")
         if (uints[0] & 0xFFFC0000) != 0:
-            log.debug(f"first fourteen bits non-zero ({uints[0] & 0xFFFC0000}): not orca")
+            log.debug(
+                f"first fourteen bits non-zero ({uints[0] & 0xFFFC0000}): not orca"
+            )
             return False
 
         # xml header length should fit within header packet length
         pad = uints[0] * 4 - 8 - uints[1]
         if pad < 0 or pad > 3:
-            log.debug(f"header length = {uints[1]}B doesn't fit right within header packet legnth = {uints[0]*4-8}B: not orca")
+            log.debug(
+                f"header length = {uints[1]}B doesn't fit right within header packet legnth = {uints[0]*4-8}B: not orca"
+            )
             return False
 
         # last 4 chars should be '<?xm'
         if first_bytes[8:].decode() != "<?xm":
-            log.debug(f"last 4 chars of first 12 bytes = {first_bytes[8:].decode()} != '<?xm': not orca")
+            log.debug(
+                f"last 4 chars of first 12 bytes = {first_bytes[8:].decode()} != '<?xm': not orca"
+            )
             return False
 
         # it must be an orca stream

@@ -90,7 +90,7 @@ def build_raw(
     # try to guess the input stream type if it's not provided
     if in_stream_type is None:
         i_ext = in_stream.split("/")[-1].rfind(".")
-        if compass_config_file is not None: # skip right away if compass
+        if compass_config_file is not None:  # skip right away if compass
             in_stream_type = "Compass"
         elif i_ext != -1:
             ext = in_stream.split("/")[-1][i_ext + 1 :]
@@ -105,7 +105,7 @@ def build_raw(
                     f"unknown file extension {ext}. Specify in_stream_type"
                 )
         else:
-            if OrcaStreamer.is_orca_stream(in_stream): # orca default is no ext
+            if OrcaStreamer.is_orca_stream(in_stream):  # orca default is no ext
                 in_stream_type = "ORCA"
             else:
                 raise RuntimeError("unknown file type. Specify in_stream_type")
