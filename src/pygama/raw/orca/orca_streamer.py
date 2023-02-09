@@ -126,7 +126,7 @@ class OrcaStreamer(DataStreamer):
         # xml header length should fit within header packet length
         pad = uints[0] * 4 - 8 - uints[1]
         if pad < 0 or pad > 3:
-            log.debug(f"header length = {uints[1]}B doesn't fit right within header packet legnth = {uints[0]*4-8}B: not orca")
+            log.debug(f"header length = {uints[1]}B doesn't fit right within header packet length = {uints[0]*4-8}B: not orca")
             return False
 
         # last 4 chars should be '<?xm'
