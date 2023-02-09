@@ -1,3 +1,6 @@
+import logging
+import os
+
 import h5py
 import numpy as np
 import pandas as pd
@@ -318,3 +321,170 @@ def test_read_lgnd_waveform_table_fancy_idx(lgnd_file):
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert len(lh5_obj) == 19
+
+
+# First test that we can overwrite a table with the same name without deleting the original field
+def test_write_object_overwrite_table_no_deletion(caplog):
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
+
+    if os.path.exists("/tmp/write_object_overwrite_test.lh5"):
+        os.remove("/tmp/write_object_overwrite_test.lh5")
+
+    tb1 = lh5.Table(col_dict={"dset1": lh5.Array(np.zeros(10))})
+    tb2 = lh5.Table(
+        col_dict={"dset1": lh5.Array(np.ones(10))}
+    )  # Same field name, different values
+    store = LH5Store()
+    store.write_object(tb1, "my_group", "/tmp/write_object_overwrite_test.lh5")
+    store.write_object(
+        tb2, "my_group", "/tmp/write_object_overwrite_test.lh5", wo_mode="overwrite"
+    )  # Now, try to overwrite the same field
+
+    # If the old field is deleted from the file before writing the new field, then we would get an extra debug statement
+    assert "dset1 is not present in new table, deleting field" not in [
+        rec.message for rec in caplog.records
+    ]
+
+    # Now, check that the data were overwritten
+    tb_dat, _ = store.read_object("my_group", "/tmp/write_object_overwrite_test.lh5")
+    assert np.array_equal(tb_dat["dset1"].nda, np.ones(10))
+
+
+# Second: test that when we overwrite a table with fields with a different name, we delete the original field
+def test_write_object_overwrite_table_with_deletion(caplog):
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
+
+    if os.path.exists("/tmp/write_object_overwrite_test.lh5"):
+        os.remove("/tmp/write_object_overwrite_test.lh5")
+
+    tb1 = lh5.Table(col_dict={"dset1": lh5.Array(np.zeros(10))})
+    tb2 = lh5.Table(
+        col_dict={"dset2": lh5.Array(np.ones(10))}
+    )  # Same field name, different values
+    store = LH5Store()
+    store.write_object(tb1, "my_group", "/tmp/write_object_overwrite_test.lh5")
+    store.write_object(
+        tb2, "my_group", "/tmp/write_object_overwrite_test.lh5", wo_mode="overwrite"
+    )  # Now, try to overwrite with a different field
+
+    # If the old field is deleted from the file before writing the new field, then we would get a debug statement
+    assert [rec.message for rec in caplog.records][
+        2
+    ] == "dset1 is not present in new table, deleting field"
+
+    # Now, check that the data were overwritten
+    tb_dat, _ = store.read_object("my_group", "/tmp/write_object_overwrite_test.lh5")
+    assert np.array_equal(tb_dat["dset2"].nda, np.ones(10))
+
+    # Also make sure that the first table's fields aren't lurking around the lh5 file!
+    with h5py.File("/tmp/write_object_overwrite_test.lh5", "r") as lh5file:
+        assert "dset1" not in list(lh5file["my_group"].keys())
+
+
+# Third: test that when we overwrite other LGDO classes
+def test_write_object_overwrite_lgdo(caplog):
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
+
+    # Start with an lgdo.WaveformTable
+    if os.path.exists("/tmp/write_object_overwrite_test.lh5"):
+        os.remove("/tmp/write_object_overwrite_test.lh5")
+
+    tb1 = lh5.WaveformTable(
+        t0=np.zeros(10),
+        t0_units="ns",
+        dt=np.zeros(10),
+        dt_units="ns",
+        values=np.zeros((10, 10)),
+        values_units="ADC",
+    )
+    tb2 = lh5.WaveformTable(
+        t0=np.ones(10),
+        t0_units="ns",
+        dt=np.ones(10),
+        dt_units="ns",
+        values=np.ones((10, 10)),
+        values_units="ADC",
+    )  # Same field name, different values
+    store = LH5Store()
+    store.write_object(
+        tb1, "my_table", "/tmp/write_object_overwrite_test.lh5", group="my_group"
+    )
+    store.write_object(
+        tb2,
+        "my_table",
+        "/tmp/write_object_overwrite_test.lh5",
+        wo_mode="overwrite",
+        group="my_group",
+    )
+
+    # If the old field is deleted from the file before writing the new field, then we would get a debug statement
+    assert "my_table is not present in new table, deleting field" not in [
+        rec.message for rec in caplog.records
+    ]
+
+    # Now, check that the data were overwritten
+    tb_dat, _ = store.read_object(
+        "my_group/my_table", "/tmp/write_object_overwrite_test.lh5"
+    )
+    assert np.array_equal(tb_dat["values"].nda, np.ones((10, 10)))
+
+    # Now try overwriting an array, and test the write_start argument
+    array1 = lh5.Array(nda=np.zeros(10))
+    array2 = lh5.Array(nda=np.ones(20))
+    store = LH5Store()
+    store.write_object(array1, "my_array", "/tmp/write_object_overwrite_test.lh5")
+    store.write_object(
+        array2,
+        "my_array",
+        "/tmp/write_object_overwrite_test.lh5",
+        wo_mode="overwrite",
+        write_start=5,
+    )
+
+    # Now, check that the data were overwritten
+    array_dat, _ = store.read_object("my_array", "/tmp/write_object_overwrite_test.lh5")
+    expected_out_array = np.append(np.zeros(5), np.ones(20))
+
+    assert np.array_equal(array_dat.nda, expected_out_array)
+
+    # Now try overwriting a scalar
+    scalar1 = lh5.Scalar(0)
+    scalar2 = lh5.Scalar(1)
+    store = LH5Store()
+    store.write_object(scalar1, "my_scalar", "/tmp/write_object_overwrite_test.lh5")
+    store.write_object(
+        scalar2,
+        "my_scalar",
+        "/tmp/write_object_overwrite_test.lh5",
+        wo_mode="overwrite",
+    )
+
+    # Now, check that the data were overwritten
+    scalar_dat, _ = store.read_object(
+        "my_scalar", "/tmp/write_object_overwrite_test.lh5"
+    )
+
+    assert scalar_dat.value == 1
+
+    # Finally, try overwriting a vector of vectors
+    vov1 = lh5.VectorOfVectors(listoflists=[np.zeros(1), np.ones(2), np.zeros(3)])
+    vov2 = lh5.VectorOfVectors(listoflists=[np.ones(1), np.zeros(2), np.ones(3)])
+    store = LH5Store()
+    store.write_object(vov1, "my_vector", "/tmp/write_object_overwrite_test.lh5")
+    store.write_object(
+        vov2,
+        "my_vector",
+        "/tmp/write_object_overwrite_test.lh5",
+        wo_mode="overwrite",
+        write_start=1,
+    )  # start overwriting the second list of lists
+
+    vector_dat, _ = store.read_object(
+        "my_vector", "/tmp/write_object_overwrite_test.lh5"
+    )
+
+    assert np.array_equal(vector_dat.cumulative_length.nda, [1, 2, 4, 7])
+    assert np.array_equal(vector_dat.flattened_data.nda, [0, 1, 0, 0, 1, 1, 1])
