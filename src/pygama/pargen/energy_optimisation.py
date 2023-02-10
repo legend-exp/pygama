@@ -674,7 +674,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
 
     # Make sure fit isn't based on only a few points
     if len(fwhms) < 10:
-        log.error("less than 10 fits successful")
+        log.warning("less than 10 fits successful")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -723,7 +723,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             plt.show()
 
     except:
-        log.error("alpha fit failed")
+        log.warning("alpha fit failed")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -735,7 +735,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
         }
 
     if np.isnan(fit_vals).all():
-        log.error("alpha fit all nan")
+        log.warning("alpha fit all nan")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -791,7 +791,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
                 display=display,
             )
         if np.isnan(final_fwhm) or np.isnan(final_err):
-            log.error(f"final fit failed, alpha was {alpha}")
+            log.warning(f"final fit failed, alpha was {alpha}")
         return {
             "fwhm": final_fwhm,
             "fwhm_err": final_err,
@@ -1043,6 +1043,10 @@ def event_selection(
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
+        if len(peak_ids[final_mask]) < 0.5*n_events:
+            log.warning("Less than half number of specified events found")
+        elif len(peak_ids[final_mask]) < 0.1*n_events:
+            log.error("Less than 10% number of specified events found")
 
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
