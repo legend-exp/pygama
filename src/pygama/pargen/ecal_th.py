@@ -300,7 +300,7 @@ def energy_cal_th(
         except:
             pars = None
         if pars is None:
-            log.info("Calibration failed")
+            log.error(f"Calibration failed for {energy_param}, trying with 0 p_val")
             try:
                 pars, cov, results = cal.hpge_E_calibration(
                     uncal_pass[energy_param],
@@ -318,6 +318,7 @@ def energy_cal_th(
                 if pars is None:
                     raise ValueError
             except:
+                log.error(f"Calibration failed completely for {energy_param} even with 0 p_val")
                 pars = np.full(deg + 1, np.nan)
 
                 hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
@@ -362,17 +363,23 @@ def energy_cal_th(
             fit_fwhms = np.delete(fwhms, [indexes])
             fit_dfwhms = np.delete(dfwhms, [indexes])
             #####
-            param_guess = [0.2, 0.001]
+            param_guess = [2, 0.001]
             param_bounds = (0, [10.0, 1.0])
-            fit_pars, fit_covs = curve_fit(
-                fwhm_slope,
-                fwhm_peaks,
-                fit_fwhms,
-                sigma=fit_dfwhms,
-                p0=param_guess,
-                bounds=param_bounds,
-                absolute_sigma=True,
-            )
+            try:
+                fit_pars, fit_covs = curve_fit(
+                    fwhm_slope,
+                    fwhm_peaks,
+                    fit_fwhms,
+                    sigma=fit_dfwhms,
+                    p0=param_guess,
+                    bounds=param_bounds,
+                    absolute_sigma=True,
+                )
+            except RuntimeError:
+                log.error(f"FWHM fit failed for {energy_param}")
+                fit_pars = np.array([np.nan,np.nan])
+
+
             hit_dict[f"{energy_param}_cal"] = gen_pars_dict(pars, deg, energy_param)
             output_dict[f"{energy_param}_cal"] = {
                 "Qbb_fwhm": np.nan,
@@ -449,29 +456,35 @@ def energy_cal_th(
             log.info(
                 f"FWHM of {peak} keV peak is: {fit_fwhms[i]:1.2f} +- {fit_dfwhms[i]:1.2f} keV"
             )
-        param_guess = [0.2, 0.001]
+        param_guess = [1.5, 0.002]
         param_bounds = (0, [10.0, 1.0])
-        fit_pars, fit_covs = curve_fit(
-            fwhm_slope,
-            fwhm_peaks,
-            fit_fwhms,
-            sigma=fit_dfwhms,
-            p0=param_guess,
-            bounds=param_bounds,
-            absolute_sigma=True,
-        )
-
-        rng = np.random.default_rng(1)
-        pars_b = rng.multivariate_normal(fit_pars, fit_covs, size=1000)
-        fits = np.array([fwhm_slope(fwhm_peaks, *par_b) for par_b in pars_b])
-        qbb_vals = np.array([fwhm_slope(2039.0, *par_b) for par_b in pars_b])
-        qbb_err = np.nanstd(qbb_vals)
-
-        log.info(f"FWHM curve fit: {fit_pars}")
-        predicted_fwhms = fwhm_slope(fwhm_peaks, *fit_pars)
-        log.info(f"FWHM fit values: {predicted_fwhms}")
-        fit_qbb = fwhm_slope(2039.0, *fit_pars)
-        log.info(f"FWHM energy resolution at Qbb: {fit_qbb:1.2f} +- {qbb_err:1.2f} keV")
+        try:
+            fit_pars, fit_covs = curve_fit(
+                fwhm_slope,
+                fwhm_peaks,
+                fit_fwhms,
+                sigma=fit_dfwhms,
+                p0=param_guess,
+                bounds=param_bounds,
+                absolute_sigma=True,
+            )
+            rng = np.random.default_rng(1)
+            pars_b = rng.multivariate_normal(fit_pars, fit_covs, size=1000)
+            fits = np.array([fwhm_slope(fwhm_peaks, *par_b) for par_b in pars_b])
+            qbb_vals = np.array([fwhm_slope(2039.0, *par_b) for par_b in pars_b])
+            qbb_err = np.nanstd(qbb_vals)
+            predicted_fwhms = fwhm_slope(fwhm_peaks, *fit_pars)
+            fit_qbb = fwhm_slope(2039.0, *fit_pars)
+            log.info(f"FWHM curve fit: {fit_pars}")
+            log.info(f"FWHM fit values: {predicted_fwhms}")
+            log.info(f"FWHM energy resolution at Qbb: {fit_qbb:1.2f} +- {qbb_err:1.2f} keV")
+        except RuntimeError:
+            fit_pars = np.array([np.nan,np.nan])
+            fit_covs = np.array([[ np.nan, np.nan],
+                                [np.nan,  np.nan]])
+            fit_qbb = np.nan
+            qbb_err=np.nan
+            log.error("FWHM fit failed to converge")
 
         if display > 0:
             plot_dict_param = {}
@@ -656,12 +669,18 @@ def energy_cal_th(
                 label=f"Qbb fwhm: {fit_qbb:1.2f} +- {qbb_err:1.2f} keV",
             )
             ax1.legend(loc="upper left", frameon=False)
-            ax1.set_ylim(
+            if np.isnan(fit_pars).all():
                 [
-                    0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)),
-                    1.1 * np.nanmax(fwhm_slope(fwhm_slope_bins, *fit_pars)),
-                ]
-            )
+                        0.9 * np.nanmin(fit_fwhms),
+                        1.1 * np.nanmax(fit_fwhms),
+                    ]
+            else:
+                ax1.set_ylim(
+                    [
+                        0.9 * np.nanmin(fwhm_slope(fwhm_slope_bins, *fit_pars)),
+                        1.1 * np.nanmax(fwhm_slope(fwhm_slope_bins, *fit_pars)),
+                    ]
+                )
             ax1.set_xlim([200, 2700])
             ax1.grid()
             ax1.set_ylabel("FWHM energy resolution (keV)")
