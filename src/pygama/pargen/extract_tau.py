@@ -114,13 +114,13 @@ def get_decay_constant(
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
-        bins = 10000  # change if needed
+        bins = np.linspace(-0.01,0,100000)  # change if needed
         counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
         plot_max = np.argmax(counts)
-        in_min = plot_max - 10
+        in_min = plot_max - 20
         if in_min < 0:
             in_min = 0
-        in_max = plot_max + 11
+        in_max = plot_max + 21
         if in_max >= len(bins):
             in_min = len(bins) - 1
         plt.xlabel("Slope")
@@ -132,6 +132,7 @@ def get_decay_constant(
             bins=200,
             histtype="step",
         )
+        axins.axvline(high_bin,color="red")
         axins.set_xlim(bins[in_min], bins[in_max])
         labels = ax.get_xticklabels()
         ax.set_xticklabels(labels=labels, rotation=45)
