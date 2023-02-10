@@ -382,6 +382,41 @@ def test_write_object_overwrite_table_with_deletion(caplog):
     with h5py.File("/tmp/write_object_overwrite_test.lh5", "r") as lh5file:
         assert "dset1" not in list(lh5file["my_group"].keys())
 
+    # Make sure the same behavior happens when we nest the table in a group
+    if os.path.exists("/tmp/write_object_overwrite_test.lh5"):
+        os.remove("/tmp/write_object_overwrite_test.lh5")
+
+    tb1 = lh5.Table(col_dict={"dset1": lh5.Array(np.zeros(10))})
+    tb2 = lh5.Table(
+        col_dict={"dset2": lh5.Array(np.ones(10))}
+    )  # Same field name, different values
+    store = LH5Store()
+    store.write_object(
+        tb1, "my_table", "/tmp/write_object_overwrite_test.lh5", group="my_group"
+    )
+    store.write_object(
+        tb2,
+        "my_table",
+        "/tmp/write_object_overwrite_test.lh5",
+        group="my_group",
+        wo_mode="overwrite",
+    )  # Now, try to overwrite with a different field
+
+    # If the old field is deleted from the file before writing the new field, then we would get a debug statement
+    assert [rec.message for rec in caplog.records][
+        2
+    ] == "dset1 is not present in new table, deleting field"
+
+    # Now, check that the data were overwritten
+    tb_dat, _ = store.read_object(
+        "my_group/my_table", "/tmp/write_object_overwrite_test.lh5"
+    )
+    assert np.array_equal(tb_dat["dset2"].nda, np.ones(10))
+
+    # Also make sure that the first table's fields aren't lurking around the lh5 file!
+    with h5py.File("/tmp/write_object_overwrite_test.lh5", "r") as lh5file:
+        assert "dset1" not in list(lh5file["my_group/my_table"].keys())
+
 
 # Third: test that when we overwrite other LGDO classes
 def test_write_object_overwrite_lgdo(caplog):
@@ -488,3 +523,105 @@ def test_write_object_overwrite_lgdo(caplog):
 
     assert np.array_equal(vector_dat.cumulative_length.nda, [1, 2, 4, 7])
     assert np.array_equal(vector_dat.flattened_data.nda, [0, 1, 0, 0, 1, 1, 1])
+
+
+# Test that when we try to overwrite an existing column in a table we fail
+def test_write_object_append_column():
+    # Try to append an array to a table
+    if os.path.exists("/tmp/write_object_append_column_test.lh5"):
+        os.remove("/tmp/write_object_append_column_test.lh5")
+
+    array1 = lh5.Array(np.zeros(10))
+    tb1 = lh5.Table(col_dict={"dset1`": lh5.Array(np.ones(10))})
+    store = LH5Store()
+    store.write_object(array1, "my_table", "/tmp/write_object_append_column_test.lh5")
+    with pytest.raises(RuntimeError) as exc_info:
+        store.write_object(
+            tb1,
+            "my_table",
+            "/tmp/write_object_append_column_test.lh5",
+            wo_mode="append_column",
+        )  # Now, try to append a column to an array
+
+    assert exc_info.type is RuntimeError
+    assert (
+        exc_info.value.args[0] == "Trying to append columns to an object of type array"
+    )
+
+    # Try to append a table that has a same key as the old table
+    if os.path.exists("/tmp/write_object_append_column_test.lh5"):
+        os.remove("/tmp/write_object_append_column_test.lh5")
+
+    tb1 = lh5.Table(
+        col_dict={"dset1": lh5.Array(np.zeros(10)), "dset2": lh5.Array(np.zeros(10))}
+    )
+    tb2 = lh5.Table(
+        col_dict={"dset2": lh5.Array(np.ones(10))}
+    )  # Same field name, different values
+    store = LH5Store()
+    store.write_object(tb1, "my_table", "/tmp/write_object_append_column_test.lh5")
+    with pytest.raises(ValueError) as exc_info:
+        store.write_object(
+            tb2,
+            "my_table",
+            "/tmp/write_object_append_column_test.lh5",
+            wo_mode="append_column",
+        )  # Now, try to append a column with a same field
+
+    assert exc_info.type is ValueError
+    assert (
+        exc_info.value.args[0]
+        == "Can't append ['dset2'] column(s) to a table with the same field(s)"
+    )
+
+    # try appending a column that is larger than one that exists
+    if os.path.exists("/tmp/write_object_append_column_test.lh5"):
+        os.remove("/tmp/write_object_append_column_test.lh5")
+
+    tb1 = lh5.Table(col_dict={"dset1": lh5.Array(np.zeros(10))})
+    tb2 = lh5.Table(
+        col_dict={"dset2": lh5.Array(np.ones(20))}
+    )  # different field name, different size
+    store = LH5Store()
+    store.write_object(tb1, "my_table", "/tmp/write_object_append_column_test.lh5")
+    with pytest.raises(ValueError) as exc_info:
+        store.write_object(
+            tb2,
+            "my_table",
+            "/tmp/write_object_append_column_test.lh5",
+            wo_mode="append_column",
+        )  # Now, try to append a column with a different field size
+
+    assert exc_info.type is ValueError
+    assert (
+        exc_info.value.args[0]
+        == "Table sizes don't match. Trying to append column of size 20 to a table of size 10."
+    )
+
+    # Finally successfully append a column
+    if os.path.exists("/tmp/write_object_append_column_test.lh5"):
+        os.remove("/tmp/write_object_append_column_test.lh5")
+
+    tb1 = lh5.Table(col_dict={"dset1": lh5.Array(np.zeros(10))})
+    tb2 = lh5.Table(
+        col_dict={"dset2": lh5.Array(np.ones(10))}
+    )  # different field name, different size
+    store = LH5Store()
+    store.write_object(
+        tb1, "my_table", "/tmp/write_object_append_column_test.lh5", group="my_group"
+    )
+    store.write_object(
+        tb2,
+        "my_table",
+        "/tmp/write_object_append_column_test.lh5",
+        group="my_group",
+        wo_mode="append_column",
+    )
+
+    # Now, check that the data were appended
+    tb_dat, _ = store.read_object(
+        "my_group/my_table", "/tmp/write_object_append_column_test.lh5"
+    )
+    assert isinstance(tb_dat, lgdo.table.Table)
+    assert np.array_equal(tb_dat["dset1"].nda, np.zeros(10))
+    assert np.array_equal(tb_dat["dset2"].nda, np.ones(10))
