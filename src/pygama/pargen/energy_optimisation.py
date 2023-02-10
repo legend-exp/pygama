@@ -1687,6 +1687,8 @@ def run_optimisation(
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results
+        if np.isnan(results_dict["y_val"]):
+            log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
         out_results_list.append(results_dict)
 
     return out_param_dict, out_results_list
