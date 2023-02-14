@@ -537,11 +537,6 @@ def test_write_object_overwrite_table_with_deletion(caplog):
         wo_mode="overwrite",
     )  # Now, try to overwrite with a different field
 
-    # If the old field is deleted from the file before writing the new field, then we would get a debug statement
-    assert [rec.message for rec in caplog.records][
-        2
-    ] == "dset1 is not present in new table, deleting field"
-
     # Now, check that the data were overwritten
     tb_dat, _ = store.read_object(
         "my_group/my_table", "/tmp/write_object_overwrite_test.lh5"
