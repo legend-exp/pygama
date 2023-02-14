@@ -118,7 +118,7 @@ class LH5Store:
         grp_attrs
             HDF5 group attributes.
         overwrite
-            whether overwrite group attributes, ignored is `grp_attrs` is
+            whether overwrite group attributes, ignored if `grp_attrs` is
             ``None``.
         """
         if not isinstance(group, h5py.Group):
@@ -764,6 +764,10 @@ class LH5Store:
               end of array is the same as ``append``.
             - ``overwrite_file`` or ``of``: delete file if present prior to
               writing to it. `write_start` should be 0 (its ignored).
+            - ``append_column`` or ``ac``: append columns from an :class:`~.lgdo.table.Table`
+              `obj` only if there is an existing :class:`~.lgdo.table.Table` in the `lh5_file` with
+              the same `name` and :class:`~.lgdo.table.Table.size`. If the sizes don't match,
+              or if there are matching fields, it errors out.
         write_start
             row in the output file (if already existing) to start overwriting
             from.
@@ -786,7 +790,9 @@ class LH5Store:
         if wo_mode == "overwrite_file":
             wo_mode = "of"
             write_start = 0
-        if wo_mode != "w" and wo_mode != "a" and wo_mode != "o" and wo_mode != "of":
+        if wo_mode == "append_column":
+            wo_mode = "ac"
+        if wo_mode not in ["w", "a", "o", "of", "ac"]:
             raise ValueError(f"unknown wo_mode '{wo_mode}'")
 
         if wfcompressor is not None and not isinstance(wfcompressor, WaveformCodec):
@@ -804,8 +810,38 @@ class LH5Store:
 
         # struct or table or waveform table
         if isinstance(obj, Struct):
+            # In order to append a column, we need to update the `table{old_fields}` value in `group.attrs['datatype"]` to include the new fields.
+            # One way to do this is to override `obj.attrs["datatype"]` to include old and new fields. Then we can write the fields to the table as normal.
+            if wo_mode == "ac":
+                old_group = self.gimme_group(name, group)
+                datatype, shape, fields = parse_datatype(old_group.attrs["datatype"])
+                if datatype not in ["table", "struct"]:
+                    raise RuntimeError(
+                        f"Trying to append columns to an object of type {datatype}"
+                    )
+
+                # If the mode is `append_column`, make sure we aren't appending a table that has a column of the same name as in the existing table
+                # Also make sure that the field we are adding has the same size
+                if len(list(set(fields).intersection(set(obj.keys())))) != 0:
+                    raise ValueError(
+                        f"Can't append {list(set(fields).intersection(set(obj.keys())))} column(s) to a table with the same field(s)"
+                    )
+                # It doesn't matter what key we access, as all fields in the old table have the same size
+                if old_group[list(old_group.keys())[0]].size != obj.size:
+                    raise ValueError(
+                        f"Table sizes don't match. Trying to append column of size {obj.size} to a table of size {old_group[list(old_group.keys())[0]].size}."
+                    )
+
+                # Now we can append the obj.keys() to the old fields, and then update obj.attrs.
+                fields.extend(list(obj.keys()))
+                obj.attrs.pop("datatype")
+                obj.attrs["datatype"] = "table" + "{" + ",".join(fields) + "}"
+
             group = self.gimme_group(
-                name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
+                name,
+                group,
+                grp_attrs=obj.attrs,
+                overwrite=(wo_mode in ["o", "ac"]),
             )
             # If the mode is overwrite, then we need to peek into the file's table's existing fields
             # If we are writing a new table to the group that does not contain an old field, we should delete that old field from the file
