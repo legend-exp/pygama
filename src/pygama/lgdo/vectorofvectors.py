@@ -14,8 +14,9 @@ import numpy as np
 
 import pygama.lgdo.lgdo_utils as utils
 from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from pygama.lgdo.lgdo import LGDO
+
+from . import arrayofequalsizedarrays as aoesa
 
 log = logging.getLogger(__name__)
 
@@ -232,7 +233,7 @@ class VectorOfVectors(LGDO):
         np.set_printoptions(**npopt)
         return out
 
-    def to_aoesa(self) -> ArrayOfEqualSizedArrays:
+    def to_aoesa(self) -> aoesa.ArrayOfEqualSizedArrays:
         """Convert to :class:`ArrayOfEqualSizedArrays`, padding with NaNs"""
         ind_lengths = np.diff(self.cumulative_length.nda, prepend=0)
         arr_len = np.max(ind_lengths)
@@ -242,7 +243,7 @@ class VectorOfVectors(LGDO):
             nda[i, : ind_lengths[i]] = self[i]
         attrs = dict(self.attrs)
         attrs.pop("datatype", None)
-        return ArrayOfEqualSizedArrays(nda=nda, attrs=attrs)
+        return aoesa.ArrayOfEqualSizedArrays(nda=nda, attrs=attrs)
 
 
 def build_cl(

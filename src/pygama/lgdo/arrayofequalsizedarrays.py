@@ -7,10 +7,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-import numpy
+import numpy as np
 
-import pygama.lgdo.lgdo_utils as utils
-from pygama.lgdo.array import Array
+from . import lgdo_utils as utils
+from . import vectorofvectors as vov
+from .array import Array
 
 
 class ArrayOfEqualSizedArrays(Array):
@@ -23,9 +24,9 @@ class ArrayOfEqualSizedArrays(Array):
     def __init__(
         self,
         dims: tuple[int, ...] = None,
-        nda: numpy.ndarray = None,
+        nda: np.ndarray = None,
         shape: tuple[int, ...] = (),
-        dtype: numpy.dtype = None,
+        dtype: np.dtype = None,
         fill_val: int | float = None,
         attrs: dict[str, Any] = None,
     ) -> None:
@@ -81,8 +82,46 @@ class ArrayOfEqualSizedArrays(Array):
     def __len__(self) -> int:
         return len(self.nda)
 
-    def __iter__(self) -> Iterator[numpy.array]:
+    def __iter__(self) -> Iterator[np.array]:
         return self.nda.__iter__()
 
-    def __next__(self) -> numpy.ndarray:
+    def __next__(self) -> np.ndarray:
         return self.nda.__next__()
+
+    def to_vov(self, cumulative_length: np.ndarray = None) -> vov.VectorOfVectors:
+        """Convert (and eventually resize) to :class:`.vectorofvectors.VectorOfVectors`.
+
+        Parameters
+        ----------
+        cumulative_length
+            cumulative length array of the output vector of vectors. Each
+            vector in the output is filled with values found in the
+            :class:`ArrayOfEqualSizedArrays`, starting from the first index. if
+            ``None``, use all of the original 2D array and make vectors of
+            equal size.
+        """
+        attrs = dict(self.attrs)
+        attrs.pop("datatype", None)
+
+        if cumulative_length is None:
+            return vov.VectorOfVectors(
+                self.nda.flatten(),
+                (np.arange(self.nda.shape[0]) + 1) * self.nda.shape[1],
+                attrs=attrs,
+            )
+
+        if not isinstance(cumulative_length, np.ndarray):
+            cumulative_length = np.array(cumulative_length)
+
+        # https://stackoverflow.com/questions/12589923/slicing-numpy-array-with-another-array
+        nda_flat = self.nda.flatten()
+        indices = np.arange(nda_flat.size)
+        start = np.arange(self.nda.shape[0]) * self.nda.shape[1]
+        end = start + np.diff(cumulative_length, prepend=0)
+        mask = (indices < start[:, None]) | (indices >= end[:, None])
+        strided = np.lib.stride_tricks.as_strided(
+            nda_flat, mask.shape, (0, nda_flat.strides[0])
+        )
+        flattened_data = np.ma.array(strided, mask=mask)[~mask].data
+
+        return vov.VectorOfVectors(flattened_data, cumulative_length, attrs=attrs)
