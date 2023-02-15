@@ -44,9 +44,11 @@ def generate_tcm_cols(
     window_ref
         when testing one datum for inclusion in a cluster, test if it is within
         `coin_window` of
+
         - ``"first"`` -- the first element in the cluster (rigid window width)
         - ``"last"`` -- the last element in the cluster (window grows until two
           data are separated by more than coin_window)
+
     array_ids
         if provided, use `array_ids` in place of "index in coin_data" as the
         integer corresponding to each element of `coin_data` (e.g. a channel
