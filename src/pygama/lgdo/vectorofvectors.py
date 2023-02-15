@@ -240,7 +240,9 @@ class VectorOfVectors(LGDO):
         nda.fill(np.nan)
         for i in range(len(self.cumulative_length)):
             nda[i, : ind_lengths[i]] = self[i]
-        return ArrayOfEqualSizedArrays(nda=nda)
+        attrs = dict(self.attrs)
+        attrs.pop("datatype", None)
+        return ArrayOfEqualSizedArrays(nda=nda, attrs=attrs)
 
 
 def build_cl(
