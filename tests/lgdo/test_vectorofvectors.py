@@ -61,7 +61,20 @@ def test_aoesa(lgdo_vov):
         ]
     )
     assert isinstance(arr, lgdo.ArrayOfEqualSizedArrays)
+    assert arr.dtype == np.float64
     assert np.array_equal(arr.nda, desired, True)
+
+    vov = lgdo.VectorOfVectors(
+        flattened_data=lgdo.Array(
+            nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1], dtype="int16")
+        ),
+        cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
+    )
+    aoesa = vov.to_aoesa()
+    assert aoesa.dtype == np.float64
+
+    aoesa = vov.to_aoesa(preserve_dtype=True)
+    assert aoesa.dtype == np.int16
 
 
 def test_set_vector(lgdo_vov):
