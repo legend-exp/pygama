@@ -41,8 +41,16 @@ def load_data(
 
     pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
     if len(pulser_props) > 0:
-        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
-        ids = ~(out_df.isPulser == 1)
+        final_mask = None
+        for entry in pulser_props:
+            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                df.daqenergy.values > entry[0] - entry[1]
+            )
+            if final_mask is None:
+                final_mask = e_cut 
+            else:
+                final_mask = final_mask | e_cut 
+        ids = ~(final_mask)
         log.debug(f"pulser found: {pulser_props}")
     else:
         log.debug("no_pulser")
