@@ -1274,7 +1274,7 @@ def cal_aoe(
                 "AoE_Low_Cut": {
                     "expression": "AoE_Classifier>a",
                     "parameters": {"a": cut},
-                }
+                },
                 "AoE_Double_Sided_Cut": {
                     "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
                     "parameters": {"a": cut, "b": aoe_high_cut},
