@@ -54,8 +54,16 @@ def load_data(
     if display > 0:
         plot_dict = {}
     if len(pulser_props) > 0:
-        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
-        ids = ~(out_df.isPulser == 1)
+        final_mask = None
+        for entry in pulser_props:
+            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                df.daqenergy.values > entry[0] - entry[1]
+            )
+            if final_mask is None:
+                final_mask = e_cut 
+            else:
+                final_mask = final_mask | e_cut 
+        ids = ~(final_mask)
         log.debug(f"pulser found: {pulser_props}")
 
         if display > 0:
@@ -364,7 +372,7 @@ def energy_cal_th(
             fit_dfwhms = np.delete(dfwhms, [indexes])
             #####
             param_guess = [2, 0.001]
-            param_bounds = (0, [10.0, 1.0])
+            param_bounds = (0, np.inf)
             try:
                 fit_pars, fit_covs = curve_fit(
                     fwhm_slope,
@@ -457,7 +465,7 @@ def energy_cal_th(
                 f"FWHM of {peak} keV peak is: {fit_fwhms[i]:1.2f} +- {fit_dfwhms[i]:1.2f} keV"
             )
         param_guess = [1.5, 0.002]
-        param_bounds = (0, [10.0, 1.0])
+        param_bounds = (0, np.inf)
         try:
             fit_pars, fit_covs = curve_fit(
                 fwhm_slope,
@@ -475,6 +483,11 @@ def energy_cal_th(
             qbb_err = np.nanstd(qbb_vals)
             predicted_fwhms = fwhm_slope(fwhm_peaks, *fit_pars)
             fit_qbb = fwhm_slope(2039.0, *fit_pars)
+
+            if 2614.50 not in fwhm_peaks:
+                fit_qbb = np.nan
+                qbb_err = np.nan
+
             log.info(f"FWHM curve fit: {fit_pars}")
             log.info(f"FWHM fit values: {predicted_fwhms}")
             log.info(f"FWHM energy resolution at Qbb: {fit_qbb:1.2f} +- {qbb_err:1.2f} keV")
