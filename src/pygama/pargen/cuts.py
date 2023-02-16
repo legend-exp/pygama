@@ -290,7 +290,7 @@ def find_pulser_properties(df, energy="daqenergy"):
                     & (time_since_last < np.percentile(time_since_last, 99.9))
                 ]
 
-                bins = np.arange(0.1, 5, 0.0001)
+                bins = np.arange(0.1, 5, 0.001)
                 bcs = pgh.get_bin_centers(bins)
                 hist, bins, var = pgh.get_hist(tsl, bins=bins)
 
