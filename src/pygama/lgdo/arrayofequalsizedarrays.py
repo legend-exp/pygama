@@ -113,15 +113,9 @@ class ArrayOfEqualSizedArrays(Array):
         if not isinstance(cumulative_length, np.ndarray):
             cumulative_length = np.array(cumulative_length)
 
-        # https://stackoverflow.com/questions/12589923/slicing-numpy-array-with-another-array
-        nda_flat = self.nda.flatten()
-        indices = np.arange(nda_flat.size)
-        start = np.arange(self.nda.shape[0]) * self.nda.shape[1]
-        end = start + np.diff(cumulative_length, prepend=0)
-        mask = (indices < start[:, None]) | (indices >= end[:, None])
-        strided = np.lib.stride_tricks.as_strided(
-            nda_flat, mask.shape, (0, nda_flat.strides[0])
-        )
-        flattened_data = np.ma.array(strided, mask=mask)[~mask].data
+        flattened_data = self.nda[
+            np.arange(self.nda.shape[1])
+            < np.diff(cumulative_length, prepend=0)[:, None]
+        ]
 
         return vov.VectorOfVectors(flattened_data, cumulative_length, attrs=attrs)
