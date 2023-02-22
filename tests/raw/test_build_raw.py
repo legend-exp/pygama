@@ -46,7 +46,7 @@ def test_build_raw_wfcompress(lgnd_test_data):
     build_raw(
         in_stream=lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio"),
         out_spec=out_file,
-        wfcompressor=RadwareSigcompress(codec_shift=-32767),
+        wfcompressor=RadwareSigcompress(codec_shift=-32768),
         overwrite=True,
     )
 

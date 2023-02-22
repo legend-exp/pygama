@@ -145,10 +145,9 @@ class VectorOfEncodedVectors(LGDO):
 
         string = f"[{string}]"
 
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
-        if len(tmp_attrs) > 0:
-            string += f" with attrs={tmp_attrs}"
+        attrs = self.getattrs()
+        if len(attrs) > 0:
+            string += f" with attrs={attrs}"
 
         return string
 

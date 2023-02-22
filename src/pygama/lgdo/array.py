@@ -106,11 +106,10 @@ class Array(LGDO):
         yield from self.nda
 
     def __str__(self) -> str:
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
+        attrs = self.getattrs()
         string = str(self.nda)
-        if len(tmp_attrs) > 0:
-            string += f" with attrs={tmp_attrs}"
+        if attrs:
+            string += f" with attrs={attrs}"
         return string
 
     def __repr__(self) -> str:

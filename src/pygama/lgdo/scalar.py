@@ -43,9 +43,8 @@ class Scalar(LGDO):
         return self.datatype_name()
 
     def __str__(self) -> str:
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
-        return f"{str(self.value)} with attrs={repr(tmp_attrs)}"
+        attrs = self.getattrs()
+        return f"{str(self.value)} with attrs={repr(attrs)}"
 
     def __repr__(self) -> str:
         return (

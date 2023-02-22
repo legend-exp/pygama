@@ -252,9 +252,8 @@ class VectorOfVectors(LGDO):
 
         for i in range(len(self.cumulative_length)):
             nda[i, : ind_lengths[i]] = self[i]
-        attrs = dict(self.attrs)
-        attrs.pop("datatype", None)
-        return aoesa.ArrayOfEqualSizedArrays(nda=nda, attrs=attrs)
+
+        return aoesa.ArrayOfEqualSizedArrays(nda=nda, attrs=self.getattrs())
 
 
 def build_cl(

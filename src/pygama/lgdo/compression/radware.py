@@ -77,6 +77,7 @@ def encode(
             raise ValueError("sig_out must be of type ubyte")
 
         # resize the (user) pre-allocated array if too short
+        # TODO: really?
         if len(sig_out) < max_out_len:
             sig_out.resize(max_out_len, refcheck=True)
 

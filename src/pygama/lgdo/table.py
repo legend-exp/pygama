@@ -337,14 +337,12 @@ class Table(Struct):
 
         string += "\n"
         for k, v in self.items():
-            tmp_attrs = v.attrs.copy()
-            tmp_attrs.pop("datatype")
-            if tmp_attrs:
-                string += f"\nwith attrs['{k}']={tmp_attrs}"
+            attrs = v.getattrs()
+            if attrs:
+                string += f"\nwith attrs['{k}']={attrs}"
 
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
-        if tmp_attrs:
-            string += f"\nwith attrs={tmp_attrs}"
+        attrs = self.getattrs()
+        if attrs:
+            string += f"\nwith attrs={attrs}"
 
         return string

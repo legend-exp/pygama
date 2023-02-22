@@ -100,13 +100,12 @@ class ArrayOfEqualSizedArrays(Array):
             ``None``, use all of the original 2D array and make vectors of
             equal size.
         """
-        attrs = dict(self.attrs)
-        attrs.pop("datatype", None)
+        attrs = self.getattrs()
 
         if cumulative_length is None:
             return vov.VectorOfVectors(
                 self.nda.flatten(),
-                (np.arange(self.nda.shape[0]) + 1) * self.nda.shape[1],
+                (np.arange(self.nda.shape[0], dtype="uint32") + 1) * self.nda.shape[1],
                 attrs=attrs,
             )
 
