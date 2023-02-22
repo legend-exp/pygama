@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pygama import lgdo
+from pygama.lgdo.compression import WaveformCodec
 from pygama.math.utils import sizeof_fmt
 
 from .compass.compass_streamer import CompassStreamer
@@ -28,6 +29,7 @@ def build_raw(
     n_max: int = np.inf,
     overwrite: bool = False,
     compass_config_file: str = None,
+    wfcompressor: WaveformCodec = None,
     **kwargs,
 ) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
@@ -74,10 +76,13 @@ def build_raw(
         - if a str ending in ``.json``, interpreted as a filename containing
           json-shorthand for the output specification (see :mod:`.compass.compass_event_decoder`).
 
-    **kwargs
-        sent to :class:`.RawBufferLibrary` generation as `kw_dict`.
-    """
+    wfcompressor
+        compression algorithm to be used to compress waveforms before
+        writing to disk, see :meth:`.lgdo.lh5_store.LH5Store.write_object`.
 
+    **kwargs
+        sent to :class:`.RawBufferLibrary` generation as `kw_dict` argument.
+    """
     # convert any environment variables in in_stream so that we can check for readability
     in_stream = os.path.expandvars(in_stream)
     # later: fix if in_stream is not a file
@@ -218,26 +223,32 @@ def build_raw(
 
     # Write header data
     lh5_store = lgdo.LH5Store(keep_open=True)
-    write_to_lh5_and_clear(header_data, lh5_store)
+    write_to_lh5_and_clear(header_data, lh5_store, wfcompressor=wfcompressor)
 
     # Now loop through the data
     n_bytes_last = streamer.n_bytes_read
     while True:
         chunk_list = streamer.read_chunk()
+
         if log.getEffectiveLevel() <= logging.INFO and n_max == np.inf:
             progress_bar.update(streamer.n_bytes_read - n_bytes_last)
             n_bytes_last = streamer.n_bytes_read
+
         if len(chunk_list) == 0:
             break
+
         n_read = 0
         for rb in chunk_list:
             if rb.loc > n_max:
                 rb.loc = n_max
             n_max -= rb.loc
             n_read += rb.loc
+
         if log.getEffectiveLevel() <= logging.INFO and n_max < np.inf:
             progress_bar.update(n_read)
-        write_to_lh5_and_clear(chunk_list, lh5_store)
+
+        write_to_lh5_and_clear(chunk_list, lh5_store, wfcompressor=wfcompressor)
+
         if n_max <= 0:
             break
 

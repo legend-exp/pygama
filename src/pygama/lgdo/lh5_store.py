@@ -778,7 +778,7 @@ class LH5Store:
         log.debug(
             f"writing {repr(obj)}[{start_row}:{n_rows}] as "
             f"{lh5_file}:{group}/{name}[{write_start}:], "
-            f"mode = {wo_mode}, wf compression = {wfcompressor}"
+            f"mode = {wo_mode}, waveform compressor = {wfcompressor}"
         )
 
         if wo_mode == "write_safe":
@@ -873,6 +873,7 @@ class LH5Store:
                     n_rows=n_rows,
                     wo_mode=wo_mode,
                     write_start=write_start,
+                    wfcompressor=wfcompressor,
                 )
             return
 
