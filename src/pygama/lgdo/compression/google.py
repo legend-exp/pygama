@@ -313,8 +313,8 @@ def unsigned_varint_array_encode(
 ) -> None:
     """Encode an array of unsigned integer numbers.
 
-    Stores the number of bytes written in the first element of `sig_out`. The
-    actual encoded data is found in ``sig_out[1:sig_out[0]]``.
+    The number of bytes written is stored in `nbytes`. The actual encoded data
+    is found in ``sig_out[:nbytes]``.
 
     Parameters
     ----------
@@ -322,6 +322,8 @@ def unsigned_varint_array_encode(
         the input array of integers.
     sig_out
         pre-allocated array for the output encoded data.
+    nbytes
+        pre-allocated output array holding the number of bytes written.
 
     See Also
     --------
@@ -353,8 +355,14 @@ def unsigned_varint_array_decode(
     ----------
     sig_in
         the array of varints.
+    nbytes
+        the number of bytes to read from `sig_in`, stored in the first index of
+        this array.
     sig_out
         pre-allocated array for the output decoded integers.
+    siglen
+        the length of the decoded array, stored in the first index of this
+        array.
 
     See Also
     --------
