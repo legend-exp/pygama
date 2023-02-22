@@ -29,13 +29,14 @@ class GoogleProtobuf(WaveformCodec):
 
 def encode(
     sig_in: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays,
-    sig_out: NDArray[ubyte] | lgdo.VectorOfEncodedVectors = None,
+    sig_out: NDArray[ubyte] = None,
     zigzag: bool = False,
 ) -> (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors:
-    """Compress digital signal(s) with Google's Protobuf encoding.
+    """Compress digital signal(s) with Google's Protobuf Varint encoding.
 
     Wraps :func:`.unsigned_varint_array_encode` and adds support for encoding
-    LGDOs.
+    LGDOs. Because of the current implementation, providing a pre-allocated
+    :class:`.VectorOfEncodedVectors` as `sig_out` is not possible.
 
     Parameters
     ----------
@@ -51,7 +52,9 @@ def encode(
     -------
     sig_out, nbytes
         given pre-allocated `sig_out` structure or new structure of unsigned
-        8-bit integers, plus ...
+        8-bit integers, plus the number of bytes (length) of the encoded
+        signal. If `sig_in` is an :class:`.LGDO`, only a newly allocated
+        :class:`.VectorOfEncodedVectors` is returned.
 
     See Also
     --------
@@ -127,13 +130,14 @@ def encode(
 
 def decode(
     sig_in: (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors,
-    sig_out: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays = None,
+    sig_out: NDArray = None,
     zigzag: bool = False,
 ) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
     """Deompress digital signal(s) with Google's Protobuf encoding.
 
     Wraps :func:`.unsigned_varint_array_decode` and adds support for decoding
-    LGDOs. Resizes the decoded signals to their actual length.
+    LGDOs. Because of the current implementation, providing a pre-allocated
+    :class:`.LGDO` as `sig_out` is not possible.
 
     Parameters
     ----------
