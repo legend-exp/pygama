@@ -933,7 +933,7 @@ def event_selection(
                 final_mask = e_cut 
             else:
                 final_mask = final_mask | e_cut 
-        ids = ~(final_mask)
+        ids = final_mask
         log.debug(f"pulser found: {pulser_props}")
     else:
         log.debug("no_pulser")
