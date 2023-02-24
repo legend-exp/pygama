@@ -56,8 +56,8 @@ def load_data(
     if len(pulser_props) > 0:
         final_mask = None
         for entry in pulser_props:
-            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
-                df.daqenergy.values > entry[0] - entry[1]
+            e_cut = (df.trapTmax.values < entry[0] + entry[1]) & (
+                df.trapTmax.values > entry[0] - entry[1]
             )
             if final_mask is None:
                 final_mask = e_cut 
@@ -210,6 +210,7 @@ def energy_cal_th(
         log.debug(f"{events_pqc} events pass")
 
     glines = [
+        238.632,
         583.191,
         727.330,
         860.564,
@@ -219,6 +220,7 @@ def energy_cal_th(
         2614.50,
     ]  # gamma lines used for calibration
     range_keV = [
+        (8, 8),
         (20, 20),
         (30, 30),
         (30, 30),
@@ -228,6 +230,7 @@ def energy_cal_th(
         (60, 60),
     ]  # side bands width
     funcs = [
+        pgf.extended_gauss_step_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
@@ -237,6 +240,7 @@ def energy_cal_th(
         pgf.extended_radford_pdf,
     ]
     gof_funcs = [
+        pgf.gauss_step_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
@@ -562,7 +566,8 @@ def energy_cal_th(
             fig1 = plt.figure()
             range_adu = 5 / pars[0]  # 10keV window around peak in adu
             for i, peak in enumerate(mus):
-                plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
+                #plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
+                plt.subplot(3, 3, i + 1)
                 binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
                 bin_cs = (binning[1:] + binning[:-1]) / 2
                 energies = uncal_pass[energy_param][
