@@ -23,14 +23,24 @@ def test_zigzag():
 
 
 def test_varint_encoding():
-    encx = np.empty(10, dtype="ubyte")
-    pos = google.unsigned_varint_encode(1, encx)
-    assert _to_bin(encx[:pos]) == ["00000001"]
-    assert google.unsigned_varint_decode(encx[:pos]) == (1, 1)
+    # import varint varint
+    # >>> ["{0:08b}".format(b) for b in varint.encode(x)]
+    expected = {
+        1: ["00000001"],
+        5: ["00000101"],
+        127: ["01111111"],
+        128: ["10000000", "00000001"],
+        150: ["10010110", "00000001"],
+        7896: ["11011000", "00111101"],
+        8192: ["10000000", "01000000"],
+        268435455: ["11111111", "11111111", "11111111", "01111111"],
+    }
 
-    pos = google.unsigned_varint_encode(150, encx)
-    assert _to_bin(encx[:pos]) == ["10010110", "00000001"]
-    assert google.unsigned_varint_decode(encx[:pos]) == (150, 2)
+    for x, varint in expected.items():
+        encx = np.empty(10, dtype="ubyte")
+        pos = google.unsigned_varint_encode(x, encx)
+        assert _to_bin(encx[:pos]) == varint
+        assert google.unsigned_varint_decode(encx[:pos]) == (x, len(varint))
 
 
 def test_varint_encode_decode_equality():
