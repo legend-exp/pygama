@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..lgdo import LGDO
-from . import radware
+from . import google, radware
 from .base import WaveformCodec
 
 
@@ -19,10 +19,13 @@ def encode_array(obj: LGDO, codec: WaveformCodec) -> LGDO:
     """
     if isinstance(codec, radware.RadwareSigcompress):
         enc_obj = radware.encode(obj, shift=codec.codec_shift)
-        enc_obj.attrs |= codec.asdict()
-        return enc_obj
+    elif isinstance(codec, google.GoogleProtobuf):
+        enc_obj = google.encode(obj, zigzag=codec.zigzag)
     else:
         raise ValueError(f"'{codec}' not supported")
+
+    enc_obj.attrs |= codec.asdict()
+    return enc_obj
 
 
 def decode_array(obj: LGDO) -> LGDO:
@@ -45,11 +48,8 @@ def decode_array(obj: LGDO) -> LGDO:
     codec = obj.attrs["codec"]
 
     if codec == "radware_sigcompress":
-        if "codec_shift" in obj.attrs:
-            return radware.decode(obj, shift=int(obj.attrs["codec_shift"]))
-        else:
-            raise RuntimeError(
-                "object does not carry any 'codec_shift' attribute, needed to radware_decode"
-            )
+        return radware.decode(obj, shift=int(obj.attrs.get("codec_shift", 0)))
+    elif codec == "google_protobuf":
+        return google.decode(obj, zigzag=obj.attrs.get("zigzag", False))
     else:
         raise ValueError(f"'{codec}' not supported")
