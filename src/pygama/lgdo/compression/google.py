@@ -23,7 +23,7 @@ log = logging.getLogger(__name__)
 class GoogleProtobuf(WaveformCodec):
     """Google's Protocol Buffers variable-width integer (*varint*) encoding `[ref] <https://protobuf.dev/programming-guides/encoding>`_."""
 
-    zigzag: bool = True
+    zigzag: bool = False
     """Enable ZigZag encoding."""
 
 
