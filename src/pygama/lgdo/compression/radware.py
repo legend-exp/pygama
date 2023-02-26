@@ -176,7 +176,6 @@ def decode(
                 "sig_out must be a ArrayOfEqualSizedArrays or VectorOfVectors"
             )
 
-        # TODO: make this more efficient
         for i, wf in enumerate(sig_in):
             sig_out[i] = decode(wf[0], shift=shift)
 

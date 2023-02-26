@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..lgdo import LGDO
-from . import google, radware
+from . import radware, varlen
 from .base import WaveformCodec
 
 
@@ -19,8 +19,8 @@ def encode_array(obj: LGDO, codec: WaveformCodec) -> LGDO:
     """
     if isinstance(codec, radware.RadwareSigcompress):
         enc_obj = radware.encode(obj, shift=codec.codec_shift)
-    elif isinstance(codec, google.GoogleProtobuf):
-        enc_obj = google.encode(obj, zigzag=codec.zigzag)
+    elif isinstance(codec, varlen.ULEB128ZigZagDiff):
+        enc_obj = varlen.encode(obj)
     else:
         raise ValueError(f"'{codec}' not supported")
 
@@ -49,7 +49,7 @@ def decode_array(obj: LGDO) -> LGDO:
 
     if codec == "radware_sigcompress":
         return radware.decode(obj, shift=int(obj.attrs.get("codec_shift", 0)))
-    elif codec == "google_protobuf":
-        return google.decode(obj, zigzag=obj.attrs.get("zigzag", False))
+    elif codec == "uleb128_zigzag_diff":
+        return varlen.decode(obj)
     else:
         raise ValueError(f"'{codec}' not supported")

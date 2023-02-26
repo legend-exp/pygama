@@ -1,7 +1,5 @@
-"""Google's data encoding algorithms.
+"""Variable-length code compression algorithms."""
 
-Full specification at <https://protobuf.dev/programming-guides/encoding>.
-"""
 from __future__ import annotations
 
 import logging
@@ -20,19 +18,21 @@ log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class GoogleProtobuf(WaveformCodec):
-    """Google's Protocol Buffers variable-width integer (*varint*) encoding `[ref] <https://protobuf.dev/programming-guides/encoding>`_."""
+class ULEB128ZigZagDiff(WaveformCodec):
+    """ZigZag[3]_ encoding followed by Unsigned Little Endian Base 128 (ULEB128)[4]_ encoding of array differences.
 
-    zigzag: bool = False
-    """Enable ZigZag encoding."""
+    .. [3] https://wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+    .. [4] https://wikipedia.org/wiki/LEB128#Unsigned_LEB128
+    """
+
+    codec: str = "uleb128_zigzag_diff"
 
 
 def encode(
     sig_in: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays,
     sig_out: NDArray[ubyte] = None,
-    zigzag: bool = False,
 ) -> (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors:
-    """Compress digital signal(s) with Google's Protobuf Varint encoding.
+    """Compress digital signal(s) with a variable-length encoding of its derivative.
 
     Wraps :func:`.unsigned_varint_array_encode` and adds support for encoding
     LGDOs. Because of the current implementation, providing a pre-allocated
@@ -45,8 +45,6 @@ def encode(
     sig_out
         pre-allocated unsigned 8-bit integer array(s) for the compressed
         signal(s). If not provided, a new one will be allocated.
-    zigzag
-        whether to apply ZigZag encoding for signed integers.
 
     Returns
     -------
@@ -79,9 +77,9 @@ def encode(
         # nbytes has one dimension less (the last one)
         nbytes = np.empty(s[:-1], dtype=uint32)
 
-        # might want to zig-zag before making varints
+        # zig-zag before making varints
         unsigned_varint_array_encode(
-            zigzag_encode(sig_in) if zigzag else sig_in, sig_out, nbytes
+            zigzag_encode(np.diff(sig_in, prepend=0)), sig_out, nbytes
         )
 
         return sig_out, nbytes
@@ -89,7 +87,7 @@ def encode(
     elif isinstance(sig_in, lgdo.VectorOfVectors):
         # convert VectorOfVectors to ArrayOfEqualSizedArrays so it can be
         # directly passed to the low-level encoding routine
-        return encode(sig_in.to_aoesa(), sig_out, zigzag=zigzag)
+        return encode(sig_in.to_aoesa(), sig_out)
 
     elif isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
         if sig_out:
@@ -101,7 +99,7 @@ def encode(
             )
 
         # encode the internal numpy array
-        sig_out_nda, nbytes = encode(sig_in.nda, zigzag=zigzag)
+        sig_out_nda, nbytes = encode(sig_in.nda)
 
         # build the encoded LGDO
         encoded_data = lgdo.ArrayOfEqualSizedArrays(nda=sig_out_nda).to_vov(
@@ -121,7 +119,7 @@ def encode(
 
     elif isinstance(sig_in, lgdo.Array):
         # encode the internal numpy array
-        sig_out_nda, nbytes = encode(sig_in.nda, sig_out, zigzag=zigzag)
+        sig_out_nda, nbytes = encode(sig_in.nda, sig_out)
         return lgdo.Array(sig_out_nda), nbytes
 
     else:
@@ -131,9 +129,8 @@ def encode(
 def decode(
     sig_in: (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors,
     sig_out: NDArray = None,
-    zigzag: bool = False,
 ) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
-    """Deompress digital signal(s) with Google's Protobuf encoding.
+    """Deompress digital signal(s) with a variable-length encoding of its derivative.
 
     Wraps :func:`.unsigned_varint_array_decode` and adds support for decoding
     LGDOs. Because of the current implementation, providing a pre-allocated
@@ -147,8 +144,6 @@ def decode(
     sig_out
         pre-allocated array(s) for the decompressed signal(s).  If not
         provided, will allocate a 32-bit integer array(s) structure.
-    zigzag
-        whether to apply ZigZag decoding after varint decoding.
 
     Returns
     -------
@@ -174,8 +169,7 @@ def decode(
         # call low-level routine
         unsigned_varint_array_decode(sig_in[0], sig_in[1], sig_out, siglen)
 
-        if zigzag:
-            sig_out = zigzag_decode(sig_out)
+        np.cumsum(zigzag_decode(sig_out), axis=-1, out=sig_out)
 
         return sig_out, siglen
 
@@ -196,7 +190,6 @@ def decode(
         # can now decode on the 2D matrix together with number of bytes to read per row
         sig_out, siglen = decode(
             (sig_in.encoded_data.to_aoesa(preserve_dtype=True).nda, nbytes),
-            zigzag=zigzag,
         )
 
         # sanity check
