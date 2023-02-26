@@ -19,10 +19,10 @@ log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ULEB128ZigZagDiff(WaveformCodec):
-    """ZigZag[3]_ encoding followed by Unsigned Little Endian Base 128 (ULEB128)[4]_ encoding of array differences.
+    """ZigZag [#WikiZZ]_ encoding followed by Unsigned Little Endian Base 128 (ULEB128) [#WikiULEB128]_ encoding of array differences.
 
-    .. [3] https://wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
-    .. [4] https://wikipedia.org/wiki/LEB128#Unsigned_LEB128
+    .. [#WikiZZ] https://wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+    .. [#WikiULEB128] https://wikipedia.org/wiki/LEB128#Unsigned_LEB128
     """
 
     codec: str = "uleb128_zigzag_diff"
@@ -78,9 +78,8 @@ def encode(
         nbytes = np.empty(s[:-1], dtype=uint32)
 
         # zig-zag before making varints
-        unsigned_varint_array_encode(
-            zigzag_encode(np.diff(sig_in, prepend=0)), sig_out, nbytes
-        )
+        zigzag_encode(np.diff(sig_in, prepend=0), out=sig_in)
+        unsigned_varint_array_encode(sig_in, sig_out, nbytes)
 
         return sig_out, nbytes
 
