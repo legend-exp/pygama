@@ -899,11 +899,16 @@ class DataLoader:
             return tier_table
 
         def fill_col_dict(
-            tier_table: Table, col_dict: dict, tcm_idx: list | pd.RangeIndex
+            tier_table: Table, col_dict: dict, attr_dict: dict, tcm_idx: list | pd.RangeIndex
         ):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
             for col in tier_table.keys():
+                if col not in attr_dict.keys():
+                    attr_dict[col] = tier_table[col].attrs
+                else:
+                    if attr_dict[col] != tier_table[col].attrs:
+                        raise ValueError(f"{col} attributes are inconsistent across data")
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
                     if self.aoesa_to_vov:  # convert to VectorOfVectors
@@ -940,35 +945,36 @@ class DataLoader:
                 elif isinstance(tier_table[col], Table):
                     if col not in col_dict.keys():
                         col_dict[col] = {}
-                    col_dict[col] = fill_col_dict(
-                        tier_table[col], col_dict[col], tcm_idx
+                    col_dict[col], attr_dict[col] = fill_col_dict(
+                        tier_table[col], col_dict[col], attr_dict[col], tcm_idx
                     )
                 else:
                     log.warning(
                         f"not sure how to handle column {col} "
                         f"of type {type(tier_table[col])} yet"
                     )
-            return col_dict
+            return col_dict, attr_dict
 
-        def dict_to_table(col_dict: dict):
+        def dict_to_table(col_dict: dict, attr_dict: dict):
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
-                        col_dict[col] = VectorOfVectors(listoflists=col_dict[col])
+                        col_dict[col] = VectorOfVectors(listoflists=col_dict[col], attrs=attr_dict[col])
                     else:
                         nda = np.array(col_dict[col])
-                        col_dict[col] = Array(nda=nda)
+                        col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
                 elif isinstance(col_dict[col], dict):
-                    col_dict[col] = dict_to_table(col_dict=col_dict[col])
+                    col_dict[col] = dict_to_table(col_dict=col_dict[col], attr_dict=attr_dict[col])
                 else:
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
-                        col_dict[col] = ArrayOfEqualSizedArrays(nda=nda)
+                        col_dict[col] = ArrayOfEqualSizedArrays(nda=nda, attrs=attr_dict[col], dims=(1,1))
                     else:
-                        col_dict[col] = Array(nda=nda)
+                        col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
+                attr_dict.pop(col)
             if set(col_dict.keys()) == {"t0", "dt", "values"}:
                 return WaveformTable(
-                    t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]
+                    t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"], attrs=attr_dict
                 )
             else:
                 return Table(col_dict=col_dict)
@@ -984,6 +990,9 @@ class DataLoader:
 
             col_tiers = self.get_tiers_for_col(field_mask)
             col_dict = entry_list.to_dict("list")
+            attr_dict = {}
+            for key in col_dict:
+                attr_dict[key] = None
             table_length = len(entry_list)
 
             for tb, level in product(tables, load_levels):
@@ -1015,14 +1024,15 @@ class DataLoader:
                     if level == child:
                         explode_evt_cols(entry_list, tier_table)
 
-                    col_dict = fill_col_dict(
+                    col_dict, attr_dict = fill_col_dict(
                         tier_table,
                         col_dict,
-                        [idx for idx_list in el_idx for idx in idx_list],
+                        attr_dict,
+                        [idx for idx_list in el_idx for idx in idx_list]
                     )
             # Convert col_dict to lgdo.Table
 
-            f_table = dict_to_table(col_dict=col_dict)
+            f_table = dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
                 sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
@@ -1068,6 +1078,9 @@ class DataLoader:
 
                 col_tiers = self.get_tiers_for_col(field_mask)
                 col_dict = f_entries.to_dict("list")
+                attr_dict = {}
+                for key in col_dict:
+                    attr_dict[key] = None
                 table_length = len(f_entries)
 
                 log.debug(f"will load new columns {field_mask}")
@@ -1110,11 +1123,11 @@ class DataLoader:
                         if level == child:
                             explode_evt_cols(f_entries, tier_table)
 
-                        col_dict = fill_col_dict(tier_table, col_dict, tcm_idx)
+                        col_dict, attr_dict = fill_col_dict(tier_table, col_dict, attr_dict, tcm_idx)
                         # end tb loop
 
                 # Convert col_dict to lgdo.Table
-                f_table = dict_to_table(col_dict)
+                f_table = dict_to_table(col_dict, attr_dict)
 
                 if in_memory:
                     load_out[file] = f_table
