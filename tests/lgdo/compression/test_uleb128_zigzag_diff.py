@@ -38,46 +38,55 @@ def test_varint_encoding():
 
     for x, varint in expected.items():
         encx = np.empty(10, dtype="ubyte")
-        pos = varlen.unsigned_varint_encode(x, encx)
+        pos = varlen.uleb128_encode(x, encx)
         assert _to_bin(encx[:pos]) == varint
-        assert varlen.unsigned_varint_decode(encx[:pos]) == (x, len(varint))
+        assert varlen.uleb128_decode(encx[:pos]) == (x, len(varint))
 
 
 def test_varint_encode_decode_equality():
     for x in [1, 3856, 234, 11, 93645, 2, 45]:
         encx = np.empty(100, dtype="ubyte")
-        pos = varlen.unsigned_varint_encode(x, encx)
-        assert varlen.unsigned_varint_decode(encx[:pos])[0] == x
+        pos = varlen.uleb128_encode(x, encx)
+        assert varlen.uleb128_decode(encx[:pos])[0] == x
 
 
-def test_varint_array_encode_decode_equality():
+def test_uleb128zzdiff_encode_decode_equality():
     sig_in = np.array([1, 3856, 234, 11, 93645, 2, 45], dtype="uint32")
     sig_out = np.empty(100, dtype="ubyte")
     nbytes = np.empty(1, dtype="uint32")
 
-    varlen.unsigned_varint_array_encode(sig_in, sig_out, nbytes)
+    varlen.uleb128_zigzag_diff_array_encode(sig_in, sig_out, nbytes)
+
+    encx = np.empty(10, dtype="ubyte")
+    offset = 0
+    last = 0
+    for s in sig_in:
+        pos = varlen.uleb128_encode(varlen.zigzag_encode(int(s) - last), encx)
+        assert np.array_equal(sig_out[offset : offset + pos], encx[:pos])
+        offset += pos
+        last = s
 
     sig_in_dec = np.empty(100, dtype="uint32")
     siglen = np.empty(1, dtype="uint32")
-    varlen.unsigned_varint_array_decode(sig_out, nbytes, sig_in_dec, siglen)
+    varlen.uleb128_zigzag_diff_array_decode(sig_out, nbytes, sig_in_dec, siglen)
     assert np.array_equal(sig_in, sig_in_dec[0 : siglen[0]])
 
 
-def test_varint_array_encode_decode_2dmatrix_equality():
+def test_uleb128zzdiff_encode_decode_2dmatrix_equality():
     sig_in = np.random.randint(0, 10000, (10, 1000), dtype="uint32")
     sig_out = np.empty((10, 1000 * 4), dtype="ubyte")
     nbytes = np.empty(10, dtype="uint32")
 
-    varlen.unsigned_varint_array_encode(sig_in, sig_out, nbytes)
+    varlen.uleb128_zigzag_diff_array_encode(sig_in, sig_out, nbytes)
 
     sig_in_dec = np.empty((10, 1000), dtype="uint32")
     siglen = np.empty(10, dtype="uint32")
-    varlen.unsigned_varint_array_decode(sig_out, nbytes, sig_in_dec, siglen)
+    varlen.uleb128_zigzag_diff_array_decode(sig_out, nbytes, sig_in_dec, siglen)
 
     assert np.array_equal(sig_in, sig_in_dec)
 
 
-def test_varint_array_encode_decode_wrapper_2dmatrix_equality():
+def test_uleb128zzdiff_encode_decode_wrapper_2dmatrix_equality():
     sig_in = np.random.randint(0, 10000, (10, 1000), dtype="uint32")
     sig_in_dec, siglen = varlen.decode(varlen.encode(sig_in))
     assert np.array_equal(siglen, np.full(10, 1000))
@@ -90,7 +99,7 @@ def test_varint_array_encode_decode_wrapper_2dmatrix_equality():
     assert np.array_equal(sig_in, sig_in_dec)
 
 
-def test_encode_decode_lgdo_aoesa(wftable):
+def test_uleb128zzdiff_encode_decode_lgdo_aoesa(wftable):
     voev = varlen.encode(wftable.values)
     assert isinstance(voev, VectorOfEncodedVectors)
     assert np.array_equal(voev.decoded_size, np.full(len(wftable), wftable.wf_len))

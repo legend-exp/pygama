@@ -34,7 +34,7 @@ def encode(
 ) -> (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors:
     """Compress digital signal(s) with a variable-length encoding of its derivative.
 
-    Wraps :func:`.unsigned_varint_array_encode` and adds support for encoding
+    Wraps :func:`uleb128_zigzag_diff_array_encode` and adds support for encoding
     LGDOs. Because of the current implementation, providing a pre-allocated
     :class:`.VectorOfEncodedVectors` as `sig_out` is not possible.
 
@@ -56,7 +56,7 @@ def encode(
 
     See Also
     --------
-    .unsigned_varint_array_encode
+    uleb128_zigzag_diff_array_encode
     """
     if len(sig_in) == 0:
         return sig_in
@@ -77,9 +77,7 @@ def encode(
         # nbytes has one dimension less (the last one)
         nbytes = np.empty(s[:-1], dtype=uint32)
 
-        # zig-zag before making varints
-        zigzag_encode(np.diff(sig_in, prepend=0), out=sig_in)
-        unsigned_varint_array_encode(sig_in, sig_out, nbytes)
+        uleb128_zigzag_diff_array_encode(sig_in, sig_out, nbytes)
 
         return sig_out, nbytes
 
@@ -131,7 +129,7 @@ def decode(
 ) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
     """Deompress digital signal(s) with a variable-length encoding of its derivative.
 
-    Wraps :func:`.unsigned_varint_array_decode` and adds support for decoding
+    Wraps :func:`uleb128_zigzag_diff_array_decode` and adds support for decoding
     LGDOs. Because of the current implementation, providing a pre-allocated
     :class:`.LGDO` as `sig_out` is not possible.
 
@@ -151,7 +149,7 @@ def decode(
 
     See Also
     --------
-    ._radware_sigcompress_decode
+    uleb128_zigzag_diff_array_decode
     """
     if len(sig_in) == 0:
         return sig_in
@@ -166,9 +164,7 @@ def decode(
         s = sig_in[0].shape
         siglen = np.empty(s[:-1], dtype=uint32)
         # call low-level routine
-        unsigned_varint_array_decode(sig_in[0], sig_in[1], sig_out, siglen)
-
-        np.cumsum(zigzag_decode(sig_out), axis=-1, out=sig_out)
+        uleb128_zigzag_diff_array_decode(sig_in[0], sig_in[1], sig_out, siglen)
 
         return sig_out, siglen
 
@@ -194,7 +190,6 @@ def decode(
         # sanity check
         assert np.array_equal(sig_in.decoded_size, siglen)
 
-        # TODO: attributes
         return lgdo.ArrayOfEqualSizedArrays(
             nda=sig_out, attrs=sig_in.getattrs()
         ).to_vov(np.cumsum(siglen, dtype=uint32))
@@ -203,36 +198,23 @@ def decode(
         raise ValueError("unsupported input signal type")
 
 
-@numba.vectorize(
-    [
-        "uint8(int8)",
-        "uint16(int16)",
-        "uint32(int32)",
-        "uint64(int64)",
-    ]
-)
+@numba.vectorize(["uint64(int64)", "uint32(int32)", "uint16(int16)"])
 def zigzag_encode(x: int | NDArray[int]) -> int | NDArray[int]:
-    """ZigZag-encode integer numbers."""
+    """ZigZag-encode [#WikiZZ]_ signed integer numbers."""
     return (x >> 31) ^ (x << 1)
 
 
-@numba.vectorize(
-    [
-        "int8(uint8)",
-        "int16(uint16)",
-        "int32(uint32)",
-        "int64(uint64)",
-    ]
-)
+@numba.vectorize(["int64(uint64)", "int32(uint32)", "int16(uint16)"])
 def zigzag_decode(x: int | NDArray[int]) -> int | NDArray[int]:
-    """ZigZag-decode integer numbers."""
+    """ZigZag-decode [#WikiZZ]_ signed integer numbers."""
     return (x >> 1) ^ -(x & 1)
 
 
-@numba.jit
-def unsigned_varint_encode(x: int, encx: NDArray[ubyte]) -> int:
-    """Compute the varint representation of an unsigned integer number.
+@numba.jit(["uint32(int64, byte[:])"])
+def uleb128_encode(x: int, encx: NDArray[ubyte]) -> int:
+    """Compute a variable-length representation of an unsigned integer.
 
+    Implements the Unsigned Little Endian Base-128 encoding [#WikiULEB128]_.
     Only positive numbers are expected, as no *two’s complement* is applied.
 
     Parameters
@@ -261,10 +243,11 @@ def unsigned_varint_encode(x: int, encx: NDArray[ubyte]) -> int:
     return i + 1
 
 
-@numba.jit
-def unsigned_varint_decode(encx: NDArray[ubyte]) -> (int, int):
-    """Decode a varint into an unsigned integer number.
+@numba.jit(["UniTuple(uint32, 2)(byte[:])"])
+def uleb128_decode(encx: NDArray[ubyte]) -> (int, int):
+    """Decode a variable-length integer into an unsigned integer.
 
+    Implements the Unsigned Little Endian Base-128 decoding [#WikiULEB128]_.
     Only encoded positive numbers are expected, as no *two’s complement* is
     applied.
 
@@ -281,8 +264,7 @@ def unsigned_varint_decode(encx: NDArray[ubyte]) -> (int, int):
     if len(encx) <= 0:
         raise ValueError("input bytes array is empty")
 
-    x = 0
-    pos = 0
+    x = pos = uint32(0)
     for b in encx:
         x = x | ((b & 0x7F) << pos)
         if (b & 0x80) == 0:
@@ -304,30 +286,41 @@ def unsigned_varint_decode(encx: NDArray[ubyte]) -> (int, int):
     ],
     "(n),(m),()",
 )
-def unsigned_varint_array_encode(
+def uleb128_zigzag_diff_array_encode(
     sig_in: NDArray[int], sig_out: NDArray[ubyte], nbytes: int
 ) -> None:
     """Encode an array of unsigned integer numbers.
 
-    The number of bytes written is stored in `nbytes`. The actual encoded data
-    is found in ``sig_out[:nbytes]``.
+    The algorithm computes the derivative (prepending 0 first) of `sig_in`,
+    maps it to positive numbers by applying :func:`zigzag_encode` and finally
+    computes its variable-length binary representation with
+    :func:`uleb128_encode`.
+
+    The encoded data is stored in `sig_out` as an array of bytes. The number of
+    bytes written is stored in `nbytes`. The actual encoded data can therefore
+    be found in ``sig_out[:nbytes]``.
 
     Parameters
     ----------
     sig_in
-        the input array of integers.
+        the input array of unsigned integers.
     sig_out
-        pre-allocated array for the output encoded data.
+        pre-allocated bytes array for the output encoded data.
     nbytes
-        pre-allocated output array holding the number of bytes written.
+        pre-allocated output array holding the number of bytes written (stored
+        in the first index).
 
     See Also
     --------
-    .unsigned_varint_encode, .unsigned_varint_array_decode
+    .uleb128_zigzag_diff_array_decode
     """
-    pos = 0
+    pos = uint32(0)
+    last = int(0)
     for s in sig_in:
-        pos += unsigned_varint_encode(s, sig_out[pos:])
+        zzdiff = zigzag_encode(int(s - last))
+        pos += uleb128_encode(zzdiff, sig_out[pos:])
+        last = s
+
     nbytes[0] = pos
 
 
@@ -339,39 +332,46 @@ def unsigned_varint_array_encode(
     ],
     "(n),(),(m),()",
 )
-def unsigned_varint_array_decode(
+def uleb128_zigzag_diff_array_decode(
     sig_in: NDArray[ubyte],
     nbytes: int,
     sig_out: NDArray[int],
     siglen: int,
 ) -> None:
-    """Decode an array of varints, as returned by :func:`.unsigned_varint_array_encode`.
+    """Decode an array of variable-length integers.
+
+    The algorithm inverts :func:`.uleb128_zigzag_diff_array_encode` by decoding
+    the variable-length binary data in `sig_in` with :func:`uleb128_decode`,
+    then reconstructing the original signal derivative with
+    :func:`zigzag_decode` and finally computing its cumulative (i.e. the
+    original signal).
 
     Parameters
     ----------
     sig_in
-        the array of varints.
+        the array of bytes encoding the variable-length integers.
     nbytes
-        the number of bytes to read from `sig_in`, stored in the first index of
-        this array.
+        the number of bytes to read from `sig_in` (stored in the first index of
+        this array).
     sig_out
-        pre-allocated array for the output decoded integers.
+        pre-allocated array for the output decoded signal.
     siglen
-        the length of the decoded array, stored in the first index of this
-        array.
+        the length of the decoded signal, (stored in the first index of this
+        array).
 
     See Also
     --------
-    .unsigned_varint_decode, .unsigned_varint_array_encode
+    .uleb128_zigzag_diff_array_encode
     """
     if len(sig_in) <= 0:
         raise ValueError("input bytes array is empty")
 
     _nbytes = min(nbytes[0], len(sig_in))
-    pos = i = 0
+    pos = i = last = uint32(0)
     while pos < _nbytes:
-        x, nread = unsigned_varint_decode(sig_in[pos:])
-        pos += nread
-        sig_out[i] = x
+        x, nread = uleb128_decode(sig_in[pos:])
+        sig_out[i] = last = zigzag_decode(x) + last
         i += 1
+        pos += nread
+
     siglen[0] = i
