@@ -167,33 +167,20 @@ class VectorOfVectors(LGDO):
     def __setitem__(self, i_vec: int, nda: np.ndarray) -> None:
         return self.set_vector(i_vec, nda)
 
-    def get_vector(self, i_vec: int) -> np.ndarray:
-        """Get vector at index `i_vec`."""
-        if i_vec >= len(self.cumulative_length) or i_vec < 0:
-            raise IndexError
-
-        if i_vec == 0:
-            start = 0
-            end = self.cumulative_length.nda[0]
-        else:
-            start = self.cumulative_length.nda[i_vec - 1]
-            end = self.cumulative_length.nda[i_vec]
-
-        return self.flattened_data.nda[start:end]
-
-    def __getitem__(self, i_vec: int) -> list:
-        stop = self.cumulative_length[i_vec]
-        if i_vec == 0:
+    def __getitem__(self, i: int) -> list:
+        """Return vector at index `i`."""
+        stop = self.cumulative_length[i]
+        if i == 0:
             return self.flattened_data[0:stop]
         else:
-            return self.flattened_data[self.cumulative_length[i_vec - 1] : stop]
+            return self.flattened_data[self.cumulative_length[i - 1] : stop]
 
     def __iter__(self) -> Iterator[np.ndarray]:
-        for i, stop in enumerate(self.cumulative_length):
-            if i == 0:
+        for j, stop in enumerate(self.cumulative_length):
+            if j == 0:
                 yield self.flattened_data[0:stop]
             else:
-                yield self.flattened_data[self.cumulative_length[i - 1] : stop]
+                yield self.flattened_data[self.cumulative_length[j - 1] : stop]
 
     def __str__(self) -> str:
         string = ""

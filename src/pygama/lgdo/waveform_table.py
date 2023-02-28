@@ -245,15 +245,10 @@ class WaveformTable(Table):
         string = ""
 
         for i in range(self.size):
-            if isinstance(self.values, VectorOfVectors):
-                string += f"{self.values.get_vector(i)}"
-            else:
-                string += f"{self.values.nda[i]}"
-
-            string += f", dt={self.dt.nda[i]}"
+            string += f"{self.values[i]}, dt={self.dt[i]}"
             if self.dt_units:
                 string += f" {self.dt_units}"
-            string += f", t0={self.t0.nda[i]}"
+            string += f", t0={self.t0[i]}"
             if self.t0_units:
                 string += f" {self.t0_units}"
             if i < self.size - 1:

@@ -108,12 +108,9 @@ class VectorOfEncodedVectors(LGDO):
     def __setitem__(self, i_vec: int, value: tuple[np.ndarray, int]) -> None:
         return self.set_vector(i_vec, value[0], value[1])
 
-    def get_vector(self, i_vec: int) -> tuple[np.ndarray, int]:
-        """Get vector at index `i_vec`."""
-        return (self.encoded_data.get_vector(i_vec), self.decoded_size[i_vec])
-
-    def __getitem__(self, i_vec: int) -> tuple[np.ndarray, int]:
-        return self.get_vector(i_vec)
+    def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
+        """Return vector at index `i`."""
+        return (self.encoded_data[i], self.decoded_size[i])
 
     def __iter__(self) -> Iterator[tuple[np.ndarray, int]]:
         yield from zip(self.encoded_data, self.decoded_size)

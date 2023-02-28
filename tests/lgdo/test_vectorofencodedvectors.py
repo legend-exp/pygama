@@ -45,8 +45,8 @@ def test_set_get_vector():
     assert (voev[5][0] == np.array([1, 2, 3])).all()
     assert voev[5][1] == 7
 
-    assert (voev.get_vector(5)[0] == np.array([1, 2, 3])).all()
-    assert voev.get_vector(5)[1] == 7
+    assert (voev[5][0] == np.array([1, 2, 3])).all()
+    assert voev[5][1] == 7
 
     voev[6] = (np.array([1, 2, 3]), 7)
     assert (voev[6][0] == np.array([1, 2, 3])).all()
