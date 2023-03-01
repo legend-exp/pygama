@@ -12,15 +12,28 @@ def lgdo_vov():
         ),
         cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
     )
+    # [1 2]
+    # [3 4 5]
+    # [2]
+    # [4 8 9 7]
+    # [5 3 1]
 
 
 def test_init(lgdo_vov):
+    assert len(lgdo.VectorOfVectors(dtype="ubyte")) == 0
+
     vov = lgdo.VectorOfVectors(shape_guess=(10, 20), dtype="int32", fill_val=2)
     assert vov.flattened_data == lgdo.Array(shape=(10 * 20,), fill_val=2, dtype="int32")
 
-    lol = [[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]]
-    test = lgdo.VectorOfVectors(listoflists=lol)
+    test = lgdo.VectorOfVectors([[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]])
     assert test == lgdo_vov
+    assert len(test) == 5
+
+    vov = lgdo.VectorOfVectors(
+        cumulative_length=np.array([5, 10, 15], dtype="uint32"), dtype="ubyte"
+    )
+    assert len(vov.flattened_data) == 15
+    assert len(vov[-1]) == 5
 
 
 def test_datatype_name(lgdo_vov):
@@ -41,12 +54,34 @@ def test_values(lgdo_vov):
     ]
 
     for i in range(len(desired)):
-        assert (desired[i] == list(lgdo_vov)[i]).all()
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+    assert np.array_equal(lgdo_vov[-1], desired[-1])
+    assert np.array_equal(lgdo_vov[-2], desired[-2])
+
+    vov = lgdo.VectorOfVectors([[1, 2]], dtype="uint32")
+    assert np.array_equal(vov[-1], [1, 2])
 
 
 def test_resize(lgdo_vov):
     lgdo_vov.resize(3)
     assert len(lgdo_vov.cumulative_length) == 3
+    assert len(lgdo_vov.flattened_data) == lgdo_vov.cumulative_length[-1]
+
+    desired = [np.array([1, 2]), np.array([3, 4, 5]), np.array([2])]
+
+    for i in range(len(lgdo_vov)):
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+    lgdo_vov.resize(5)
+    assert len(lgdo_vov) == 5
+    assert len(lgdo_vov[3]) == 0
+    assert len(lgdo_vov[4]) == 0
+    assert lgdo_vov == lgdo.VectorOfVectors([[1, 2], [3, 4, 5], [2], [], []])
+
+    vov = lgdo.VectorOfVectors(dtype="i")
+    vov.resize(3)
+    assert vov == lgdo.VectorOfVectors([[], [], []], dtype="i")
 
 
 def test_aoesa(lgdo_vov):
@@ -78,7 +113,7 @@ def test_aoesa(lgdo_vov):
 
 
 def test_set_vector(lgdo_vov):
-    lgdo_vov.set_vector(0, np.zeros(2))
+    lgdo_vov[0] = np.zeros(2)
 
     desired = [
         np.zeros(2),
@@ -89,9 +124,12 @@ def test_set_vector(lgdo_vov):
     ]
 
     for i in range(len(desired)):
-        assert (desired[i] == list(lgdo_vov)[i]).all()
+        assert np.array_equal(desired[i], lgdo_vov[i])
 
-    lgdo_vov.set_vector(1, np.zeros(3))
+    with pytest.raises(ValueError):
+        lgdo_vov[0] = np.zeros(3)
+
+    lgdo_vov[1] = np.zeros(3)
 
     desired = [
         np.zeros(2),
@@ -102,7 +140,68 @@ def test_set_vector(lgdo_vov):
     ]
 
     for i in range(len(desired)):
-        assert (desired[i] == list(lgdo_vov)[i]).all()
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+
+def test_append(lgdo_vov):
+    lgdo_vov.append(np.zeros(3))
+    assert np.array_equal(lgdo_vov[-1], np.zeros(3))
+
+    vov = lgdo.VectorOfVectors(dtype="int64")
+    vov.append(np.zeros(3))
+    assert vov == lgdo.VectorOfVectors([[0, 0, 0]])
+
+
+def test_insert(lgdo_vov):
+    lgdo_vov.insert(2, np.zeros(3))
+    assert lgdo_vov == lgdo.VectorOfVectors(
+        [
+            [1, 2],
+            [3, 4, 5],
+            [0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+
+def test_replace(lgdo_vov):
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(3))
+    assert vov == lgdo.VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(2))
+    assert vov == lgdo.VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(4))
+    assert vov == lgdo.VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
 
 
 def test_iter(lgdo_vov):

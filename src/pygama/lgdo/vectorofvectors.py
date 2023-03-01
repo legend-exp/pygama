@@ -31,9 +31,9 @@ class VectorOfVectors(LGDO):
 
     def __init__(
         self,
+        listoflists: list = None,
         flattened_data: Array = None,
         cumulative_length: Array = None,
-        listoflists: list = None,
         shape_guess: tuple[int, int] = None,
         dtype: np.dtype = None,
         fill_val: int | float = None,
@@ -42,30 +42,32 @@ class VectorOfVectors(LGDO):
         """
         Parameters
         ----------
+        listoflists
+            create a VectorOfVectors out of a Python list of lists. Takes
+            priority over `flattened_data` and `cumulative_length`.
         flattened_data
-            If not ``None``, used as the internal memory array for
-            `flattened_data`.  Otherwise, an internal `flattened_data` is
-            allocated based on `shape_guess` and `dtype`.
+            if not ``None``, used as the internal array for
+            `self.flattened_data`.  Otherwise, an internal `flattened_data` is
+            allocated based on `cumulative_length` (or `shape_guess`) and `dtype`.
         cumulative_length
-            If not ``None``, used as the internal memory array for
-            `cumulative_length`. Should be `dtype` :any:`numpy.uint32`. If
+            if not ``None``, used as the internal array for
+            `self.cumulative_length`. Should be `dtype` :any:`numpy.uint32`. If
             `cumulative_length` is ``None``, an internal `cumulative_length` is
             allocated based on the first element of `shape_guess`.
-        listoflists
-            To create a VectorOfVectors out of a list of lists. Takes priority over
-            flattened_data and cumulative_length.
         shape_guess
-            A NumPy-format shape specification, required if either of
+            a NumPy-format shape specification, required if either of
             `flattened_data` or `cumulative_length` are not supplied.  The
             first element should not be a guess and sets the number of vectors
             to be stored. The second element is a guess or approximation of the
             typical length of a stored vector, used to set the initial length
             of `flattened_data` if it was not supplied.
         dtype
-            Sets the type of data stored in `flattened_data`. Required if
+            sets the type of data stored in `flattened_data`. Required if
             `flattened_data` and `listoflists` are ``None``.
+        fill_val
+            fill all of `self.flattened_data` with this value.
         attrs
-            A set of user attributes to be carried along with this LGDO.
+            a set of user attributes to be carried along with this LGDO.
         """
         if listoflists is not None:
             cl_nda = np.cumsum([len(ll) for ll in listoflists])
@@ -77,41 +79,57 @@ class VectorOfVectors(LGDO):
                     # Find it efficiently, allowing for zero-length lists as some of the entries
                     first_element = next(itertools.chain.from_iterable(listoflists))
                     dtype = type(first_element)
+
             self.dtype = np.dtype(dtype)
-            self.cumulative_length = Array(nda=cl_nda)
+            self.cumulative_length = Array(cl_nda)
             self.flattened_data = Array(
-                nda=np.fromiter(
+                np.fromiter(
                     itertools.chain.from_iterable(listoflists), dtype=self.dtype
                 )
             )
+
         else:
             if cumulative_length is None:
-                self.cumulative_length = Array(
-                    shape=(shape_guess[0],), dtype="uint32", fill_val=0
-                )
-            else:
-                if isinstance(cumulative_length, Array):
-                    self.cumulative_length = cumulative_length
+                if shape_guess is None:
+                    # just make an empty vector
+                    self.cumulative_length = Array(np.empty((0,), dtype="uint32"))
                 else:
-                    self.cumulative_length = Array(cumulative_length)
+                    # initialiye based on shape_guess
+                    self.cumulative_length = Array(
+                        np.arange(
+                            shape_guess[1],
+                            np.prod(shape_guess) + 1,
+                            shape_guess[1],
+                            dtype="uint32",
+                        )
+                    )
+            else:
+                self.cumulative_length = Array(cumulative_length)
+
             if flattened_data is None:
-                length = np.prod(shape_guess)
                 if dtype is None:
                     raise ValueError("flattened_data and dtype cannot both be None!")
+
+                length = 0
+                if cumulative_length is None:
+                    if shape_guess is None:
+                        # just make an empty vector
+                        length = 0
+                    else:
+                        # use shape_guess
+                        length = np.prod(shape_guess)
                 else:
-                    self.flattened_data = Array(
-                        shape=(length,), dtype=dtype, fill_val=fill_val
-                    )
-                    self.dtype = np.dtype(dtype)
+                    # use cumulative_length
+                    length = cumulative_length[-1]
+
+                self.flattened_data = Array(
+                    shape=(length,), dtype=dtype, fill_val=fill_val
+                )
             else:
-                if isinstance(flattened_data, Array):
-                    self.flattened_data = flattened_data
-                else:
-                    self.flattened_data = Array(flattened_data)
-                if dtype is None:
-                    self.dtype = self.flattened_data.dtype
-                else:
-                    self.dtype = np.dtype(dtype)
+                self.flattened_data = Array(flattened_data)
+
+            # finally set dtype
+            self.dtype = self.flattened_data.dtype
 
         super().__init__(attrs)
 
@@ -129,8 +147,8 @@ class VectorOfVectors(LGDO):
     def __eq__(self, other: VectorOfVectors) -> bool:
         if isinstance(other, VectorOfVectors):
             return (
-                (self.flattened_data == other.flattened_data).all()
-                and (self.cumulative_length == other.cumulative_length).all()
+                self.flattened_data == other.flattened_data
+                and self.cumulative_length == other.cumulative_length
                 and self.dtype == other.dtype
                 and self.attrs == other.attrs
             )
@@ -138,8 +156,117 @@ class VectorOfVectors(LGDO):
         else:
             return False
 
+    def __getitem__(self, i: int) -> list:
+        """Return vector at index `i`."""
+        stop = self.cumulative_length[i]
+        if i == 0 or i == -len(self):
+            return self.flattened_data[0:stop]
+        else:
+            return self.flattened_data[self.cumulative_length[i - 1] : stop]
+
     def resize(self, new_size: int) -> None:
+        """Resize vector along the first axis."""
+
+        vidx = self.cumulative_length
+        old_s = len(self)
+        dlen = new_size - old_s
+        csum = vidx[-1] if len(self) > 0 else 0
+
+        # don't waste resources
+        if dlen == 0:
+            return
+
+        # first resize the cumulative length
         self.cumulative_length.resize(new_size)
+
+        # if new_size > size, new elements are filled with zeros, let's fix
+        # that
+        if dlen > 0:
+            self.cumulative_length[old_s:] = csum
+        else:
+            # if dlen > 0 this has no effect
+            self.flattened_data.resize(self.cumulative_length[-1])
+
+    def append(self, new) -> None:
+        """Append a vector at the end."""
+        # first extend cumulative_length by +1
+        self.cumulative_length.resize(len(self) + 1)
+        # set it at the right value
+        newlen = self.cumulative_length[-2] + len(new) if len(self) > 1 else len(new)
+        self.cumulative_length[-1] = newlen
+        # then resize flattened_data to accommodate the new vector
+        self.flattened_data.resize(len(self.flattened_data) + len(new))
+        # finally set it
+        self[-1] = new
+
+    def insert(self, i, new) -> int:
+        """Insert a vector at index `i`.
+
+        ``self.flattened_data`` (and therefore ``self.cumulative_length``) is
+        resized in order to accommodate the new element.
+
+        Warning
+        -------
+        This method involves a significant amount of memory re-allocation and
+        is expected to perform poorly on large vectors.
+        """
+        if i >= len(self):
+            raise IndexError(
+                f"index {i} is out of bounds for vector owith size {len(self)}"
+            )
+
+        self.flattened_data = Array(
+            np.insert(self.flattened_data, self.cumulative_length[i] - 1, new)
+        )
+        self.cumulative_length = Array(
+            np.insert(self.cumulative_length, i, self.cumulative_length[i - 1])
+        )
+        self.cumulative_length[i:] += len(new) - len(self[i])
+
+    def replace(self, i, new) -> None:
+        """Replace the vector at index `i` with `new`.
+
+        ``self.flattened_data`` (and therefore ``self.cumulative_length``) is
+        resized, if the length of `new` is different from the vector currently
+        at index `i`.
+
+        Warning
+        -------
+        This method involves a significant amount of memory re-allocation and
+        is expected to perform poorly on large vectors.
+        """
+        if i >= len(self):
+            raise IndexError(
+                f"index {i} is out of bounds for vector with size {len(self)}"
+            )
+
+        vidx = self.cumulative_length
+        dlen = len(new) - len(self[i])
+
+        if dlen == 0:
+            # don't waste resources
+            self[i] = new
+        elif dlen < 0:
+            start = vidx[i - 1]
+            stop = start + len(new)
+            # set the already allocated indices
+            self.flattened_data[start:stop] = new
+            # then delete the extra indices
+            self.flattened_data = Array(
+                np.delete(self.flattened_data, np.s_[stop : vidx[i]])
+            )
+        else:
+            # set the already allocated indices
+            self.flattened_data[vidx[i - 1] : vidx[i]] = new[: len(self[i])]
+            # then insert the remaining
+            self.flattened_data = Array(
+                np.insert(self.flattened_data, vidx[i], new[len(self[i]) :])
+            )
+
+        vidx[i:] += dlen
+
+    def __setitem__(self, i: int, new: np.ndarray) -> None:
+        self.__getitem__(i)[:] = new
 
     def set_vector(self, i_vec: int, nda: np.ndarray) -> None:
         """Insert vector `nda` at location `i_vec`.
@@ -163,17 +290,6 @@ class VectorOfVectors(LGDO):
             )
         self.flattened_data.nda[start:end] = nda
         self.cumulative_length.nda[i_vec] = end
-
-    def __setitem__(self, i_vec: int, nda: np.ndarray) -> None:
-        return self.set_vector(i_vec, nda)
-
-    def __getitem__(self, i: int) -> list:
-        """Return vector at index `i`."""
-        stop = self.cumulative_length[i]
-        if i == 0:
-            return self.flattened_data[0:stop]
-        else:
-            return self.flattened_data[self.cumulative_length[i - 1] : stop]
 
     def __iter__(self) -> Iterator[np.ndarray]:
         for j, stop in enumerate(self.cumulative_length):

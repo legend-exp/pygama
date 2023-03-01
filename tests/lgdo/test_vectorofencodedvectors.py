@@ -35,21 +35,19 @@ def test_resize():
 
 def test_set_get_vector():
     voev = VectorOfEncodedVectors(
-        encoded_data=VectorOfVectors(
-            shape_guess=(100, 1000), dtype="uint16", fill_val=0
-        ),
+        encoded_data=VectorOfVectors(shape_guess=(100, 3), dtype="uint16", fill_val=0),
         decoded_size=Array(shape=100),
         attrs={"sth": 1},
     )
-    voev.set_vector(5, np.array([1, 2, 3]), 7)
-    assert (voev[5][0] == np.array([1, 2, 3])).all()
+    voev[5] = (np.array([1, 2, 3]), 7)
+    assert np.array_equal(voev[5][0], np.array([1, 2, 3]))
     assert voev[5][1] == 7
 
-    assert (voev[5][0] == np.array([1, 2, 3])).all()
+    assert np.array_equal(voev[5][0], np.array([1, 2, 3]))
     assert voev[5][1] == 7
 
     voev[6] = (np.array([1, 2, 3]), 7)
-    assert (voev[6][0] == np.array([1, 2, 3])).all()
+    assert np.array_equal(voev[6][0], np.array([1, 2, 3]))
     assert voev[6][1] == 7
 
 

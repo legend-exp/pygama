@@ -8,7 +8,6 @@ from numpy import int16, int32, ubyte, uint16, uint32
 from numpy.typing import NDArray
 
 from pygama import lgdo
-from pygama.lgdo import lgdo_utils as utils
 
 from .base import WaveformCodec
 
@@ -76,38 +75,26 @@ def encode(
         if sig_out.dtype != ubyte:
             raise ValueError("sig_out must be of type ubyte")
 
-        # resize the (user) pre-allocated array if too short
-        # TODO: really?
-        if len(sig_out) < max_out_len:
-            sig_out.resize(max_out_len, refcheck=True)
-
         outlen = _radware_sigcompress_encode(sig_in, sig_out, shift=shift)
 
-        # resize the encoded signal to its actual length
+        # resize (down) the encoded signal to its actual length
         if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
     elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
         if not sig_out:
             # pre-allocate output structure
-            if isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
-                max_out_len = 2 * sig_in.nda.shape[1]
-            else:
-                max_out_len = (
-                    2 * len(sig_in.flattened_data) / len(sig_in.cumulative_length)
-                )
-
             sig_out = lgdo.VectorOfEncodedVectors(
-                encoded_data=lgdo.VectorOfVectors(
-                    shape_guess=(len(sig_in), max_out_len), dtype=ubyte
-                ),
+                encoded_data=lgdo.VectorOfVectors(dtype=ubyte),
             )
         elif not isinstance(sig_out, lgdo.VectorOfEncodedVectors):
             raise ValueError("sig_out must be a VectorOfEncodedVectors")
 
-        # TODO: make this more efficient
         for i, wf in enumerate(sig_in):
-            sig_out[i] = (encode(wf, shift=shift), len(wf))
+            if len(sig_out) <= i:
+                sig_out.append((encode(wf, shift=shift), len(wf)))
+            else:
+                sig_out.replace(i, (encode(wf, shift=shift), len(wf)))
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
@@ -166,8 +153,9 @@ def decode(
             # pre-allocate output structure
             # sig_out will be a VectorOfVectors for now because that's the most
             # general format
-            # FIXME: too large?
-            sig_out = utils.copy(sig_in.encoded_data, dtype=int32)
+            sig_out = lgdo.VectorOfVectors(
+                cumulative_length=np.cumsum(sig_in.decoded_size), dtype=int32
+            )
 
         elif not isinstance(
             sig_out, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)
@@ -177,7 +165,7 @@ def decode(
             )
 
         for i, wf in enumerate(sig_in):
-            sig_out[i] = decode(wf[0], shift=shift)
+            sig_out.replace(i, decode(wf[0], shift=shift))
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")

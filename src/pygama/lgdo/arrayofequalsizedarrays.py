@@ -104,8 +104,9 @@ class ArrayOfEqualSizedArrays(Array):
 
         if cumulative_length is None:
             return vov.VectorOfVectors(
-                self.nda.flatten(),
-                (np.arange(self.nda.shape[0], dtype="uint32") + 1) * self.nda.shape[1],
+                flattened_data=self.nda.flatten(),
+                cumulative_length=(np.arange(self.nda.shape[0], dtype="uint32") + 1)
+                * self.nda.shape[1],
                 attrs=attrs,
             )
 
@@ -117,4 +118,8 @@ class ArrayOfEqualSizedArrays(Array):
             < np.diff(cumulative_length, prepend=0)[:, None]
         ]
 
-        return vov.VectorOfVectors(flattened_data, cumulative_length, attrs=attrs)
+        return vov.VectorOfVectors(
+            flattened_data=flattened_data,
+            cumulative_length=cumulative_length,
+            attrs=attrs,
+        )

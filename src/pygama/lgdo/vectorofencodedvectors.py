@@ -83,30 +83,21 @@ class VectorOfEncodedVectors(LGDO):
             return False
 
     def resize(self, new_size: int) -> None:
+        """Remove vectors at the end."""
         self.encoded_data.resize(new_size)
         self.decoded_size.resize(new_size)
 
-    def set_vector(self, i_vec: int, nda: np.ndarray, dec_size: int) -> None:
-        """Insert encoded vector `nda` and corresponding decoded size at
-        location `i_vec`.
+    def append(self, value: tuple[np.ndarray, int]) -> None:
+        self.encoded_data.append(value[0])
+        self.decoded_size.append(value[1])
 
-        See Also
-        --------
-        ~.vectorofvectors.VectorOfVectors
+    def replace(self, i: int, value: tuple[np.ndarray, int]) -> None:
+        self.encoded_data.replace(i, value[0])
+        self.decoded_size[i] = value[1]
 
-        Notes
-        -----
-        `self.decoded_size` is doubled in length until `dec_size` can be
-        appended to it.
-        """
-        self.encoded_data.set_vector(i_vec, nda)
-
-        while i_vec > len(self.decoded_size) - 1:
-            self.decoded_size.resize(2 * len(self.decoded_size))
-        self.decoded_size[i_vec] = dec_size
-
-    def __setitem__(self, i_vec: int, value: tuple[np.ndarray, int]) -> None:
-        return self.set_vector(i_vec, value[0], value[1])
+    def __setitem__(self, i: int, value: tuple[np.ndarray, int]) -> None:
+        self.encoded_data[i] = value[0]
+        self.decoded_size[i] = value[1]
 
     def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
         """Return vector at index `i`."""
