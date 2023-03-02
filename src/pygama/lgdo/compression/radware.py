@@ -139,7 +139,7 @@ def decode(
         siglen = _get_hton_u16(sig_in, 0)
         if not sig_out:
             # pre-allocate memory, use safe int32
-            sig_out = np.empty(siglen, dtype=int32)
+            sig_out = np.empty(siglen, dtype="int")
         elif len(sig_out) < siglen:
             sig_out.resize(siglen, refcheck=False)
 
@@ -154,7 +154,7 @@ def decode(
             # sig_out will be a VectorOfVectors for now because that's the most
             # general format
             sig_out = lgdo.VectorOfVectors(
-                cumulative_length=np.cumsum(sig_in.decoded_size), dtype=int32
+                cumulative_length=np.cumsum(sig_in.decoded_size), dtype="int"
             )
 
         elif not isinstance(

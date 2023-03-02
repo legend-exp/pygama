@@ -102,7 +102,7 @@ def test_wrapper(wftable):
     # check if encoding was lossless
     decomp_wf = decode(comp_wf, shift=shift)
     assert isinstance(decomp_wf, np.ndarray)
-    assert decomp_wf.dtype == np.int32
+    assert np.issubdtype(decomp_wf.dtype, np.integer)
 
     assert np.array_equal(decomp_wf, wf)
 
@@ -112,6 +112,15 @@ def test_must_shift_wf(wftable):
 
     # this wf should have samples that don't fit in the int16 range
     assert (wf > np.iinfo("int16").max).any()
+
+    shift = -32768
+    comp_wf = encode(wf, shift=shift)
+    decomp_wf = decode(comp_wf, shift=shift)
+    assert np.array_equal(decomp_wf, wf)
+
+
+def test_must_shift_uint32_presummed_wf(wftable):
+    wf = wftable.values.nda[0].astype("uint32")
 
     shift = -32768
     comp_wf = encode(wf, shift=shift)
@@ -133,7 +142,7 @@ def test_aoesa(wftable):
 
     dec_vov = decode(enc_vov, shift=shift)
     assert isinstance(dec_vov, VectorOfVectors)
-    assert dec_vov.dtype == np.int32
+    assert np.issubdtype(dec_vov.dtype, np.integer)
 
     for wf1, wf2 in zip(dec_vov, wftable.values):
         assert np.array_equal(wf1, wf2)
