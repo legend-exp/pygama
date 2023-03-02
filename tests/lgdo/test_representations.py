@@ -39,6 +39,17 @@ def test_representations():
             decoded_size=lgdo.Array(shape=5, fill_val=56),
             attrs={"codec": "radware-sigcompress", "codec_shift": 123},
         ),
+        "ArrayOfEncodedEqualSizedArrays": lgdo.ArrayOfEncodedEqualSizedArrays(
+            encoded_data=lgdo.VectorOfVectors(
+                flattened_data=lgdo.Array(
+                    np.random.randint(255, size=1000, dtype="ubyte")
+                ),
+                cumulative_length=lgdo.Array(np.array([5, 12, 34, 49, 150])),
+                attrs={"unit": "ns"},
+            ),
+            decoded_size=56,
+            attrs={"codec": "radware-sigcompress", "codec_shift": 123},
+        ),
         "Table": lgdo.Table(
             col_dict={
                 "first": lgdo.Array(np.random.rand(100), attrs={"unit": "ns"}),

@@ -19,11 +19,14 @@ functions. The basic data object classes are:
   Implemented as a pair of :class:`.Array`: :attr:`flattened_data` holding the
   raw data, and :attr:`cumulative_length` whose ith element is the sum of the
   lengths of the vectors with ``index <= i``
-* :class:`.VectorOfEncodedVectors`: a variable length array of variable length
-  *encoded* arrays. Implemented as a :class:`.VectorOfVectors`
-  :attr:`encoded_data` holding the encoded vectors and an :class:`.Array`
-  :attr:`decoded_size` specifying the size of each decoded vector. Mainly used
-  to represent a list of compressed waveforms.
+* :class:`.VectorOfEncodedVectors`: an array of variable length *encoded*
+  arrays. Implemented as a :class:`.VectorOfVectors` :attr:`encoded_data`
+  holding the encoded vectors and an :class:`.Array` :attr:`decoded_size`
+  specifying the size of each decoded vector. Mainly used to represent a list
+  of compressed waveforms.
+* :class:`.ArrayOfEncodedEqualSizedArrays`: an array of equal sized encoded
+  arrays. Similar to :class:`.VectorOfEncodedVectors` except for
+  :attr:`decoded_size`, which is now a scalar.
 * :class:`.Struct`: a dictionary containing LGDO objects. Derives from
   :class:`dict`
 * :class:`.Table`: a :class:`.Struct` whose elements ("columns") are all array
@@ -37,7 +40,7 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 
 from pygama.lgdo.array import Array
 from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.encoded import VectorOfEncodedVectors
+from pygama.lgdo.encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
 from pygama.lgdo.fixedsizearray import FixedSizeArray
 from pygama.lgdo.lgdo import LGDO
 from pygama.lgdo.lgdo_utils import copy
@@ -57,6 +60,7 @@ from pygama.lgdo.waveform_table import WaveformTable
 __all__ = [
     "Array",
     "ArrayOfEqualSizedArrays",
+    "ArrayOfEncodedEqualSizedArrays",
     "FixedSizeArray",
     "LGDO",
     "Scalar",

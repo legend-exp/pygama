@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from .array import Array
 from .lgdo import LGDO
@@ -92,7 +93,7 @@ class VectorOfEncodedVectors(LGDO):
         self.encoded_data.resize(new_size)
         self.decoded_size.resize(new_size)
 
-    def append(self, value: tuple[np.ndarray, int]) -> None:
+    def append(self, value: tuple[NDArray, int]) -> None:
         """Append a 1D encoded vector at the end.
 
         Parameters
@@ -107,7 +108,7 @@ class VectorOfEncodedVectors(LGDO):
         self.encoded_data.append(value[0])
         self.decoded_size.append(value[1])
 
-    def insert(self, i: int, value: tuple[np.ndarray, int]) -> None:
+    def insert(self, i: int, value: tuple[NDArray, int]) -> None:
         """Insert an encoded vector at index `i`.
 
         Parameters
@@ -124,7 +125,7 @@ class VectorOfEncodedVectors(LGDO):
         self.encoded_data.insert(value[0])
         self.decoded_size.insert(value[1])
 
-    def replace(self, i: int, value: tuple[np.ndarray, int]) -> None:
+    def replace(self, i: int, value: tuple[NDArray, int]) -> None:
         """Replace the encoded vector (and decoded size) at index `i` with a new one.
 
         Parameters
@@ -141,7 +142,7 @@ class VectorOfEncodedVectors(LGDO):
         self.encoded_data.replace(i, value[0])
         self.decoded_size[i] = value[1]
 
-    def __setitem__(self, i: int, value: tuple[np.ndarray, int]) -> None:
+    def __setitem__(self, i: int, value: tuple[NDArray, int]) -> None:
         """Set an encoded vector at index `i`.
 
         Parameters
@@ -154,7 +155,7 @@ class VectorOfEncodedVectors(LGDO):
         self.encoded_data[i] = value[0]
         self.decoded_size[i] = value[1]
 
-    def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
+    def __getitem__(self, i: int) -> tuple[NDArray, int]:
         """Return vector at index `i`.
 
         Returns
@@ -164,7 +165,7 @@ class VectorOfEncodedVectors(LGDO):
         """
         return (self.encoded_data[i], self.decoded_size[i])
 
-    def __iter__(self) -> Iterator[tuple[np.ndarray, int]]:
+    def __iter__(self) -> Iterator[tuple[NDArray, int]]:
         yield from zip(self.encoded_data, self.decoded_size)
 
     def __str__(self) -> str:
@@ -209,6 +210,169 @@ class VectorOfEncodedVectors(LGDO):
         )
         out = (
             "VectorOfEncodedVectors(encoded_data="
+            + repr(self.encoded_data)
+            + ", decoded_size="
+            + repr(self.decoded_size)
+            + ", attrs="
+            + repr(self.attrs)
+            + ")"
+        )
+        np.set_printoptions(**npopt)
+        return out
+
+
+class ArrayOfEncodedEqualSizedArrays(LGDO):
+    """An array of encoded arrays with equal decoded size.
+
+    Used to represent an encoded :class:`.ArrayOfEqualSizedArrays`. In addition to an
+    internal :class:`.VectorOfVectors` `self.encoded_data` storing the encoded
+    data, the size of the decoded arrays is stored in `self.encoded_size`.
+
+    See Also
+    --------
+    .ArrayOfEqualSizedArrays
+    """
+
+    def __init__(
+        self,
+        encoded_data: VectorOfVectors = None,
+        decoded_size: int = None,
+        attrs: dict[str, Any] = None,
+    ) -> None:
+        """
+        Parameters
+        ----------
+        encoded_data
+            the vector of vectors holding the encoded data.
+        decoded_size
+            the length of the decoded arrays.
+        attrs
+            A set of user attributes to be carried along with this LGDO. Should
+            include information about the codec used to encode the data.
+        """
+        if isinstance(encoded_data, VectorOfVectors):
+            self.encoded_data = encoded_data
+        else:
+            raise ValueError("encoded_data must be a valid VectorOfVectors")
+
+        if decoded_size is not None:
+            self.decoded_size = int(decoded_size)
+        else:
+            self.decoded_size = 0
+
+        super().__init__(attrs)
+
+    def datatype_name(self) -> str:
+        return "array"
+
+    def form_datatype(self) -> str:
+        et = get_element_type(self.encoded_data)
+        return "array_of_encoded_equalsized_arrays<1,1>{" + et + "}"
+
+    def __len__(self) -> int:
+        return len(self.encoded_data)
+
+    def __eq__(self, other: VectorOfEncodedVectors) -> bool:
+        if isinstance(other, VectorOfEncodedVectors):
+            return (
+                self.encoded_data == other.encoded_data
+                and self.decoded_size == other.decoded_size
+                and self.attrs == other.attrs
+            )
+
+        else:
+            return False
+
+    def resize(self, new_size: int) -> None:
+        """Resize array along the first axis.
+
+        See Also
+        --------
+        .VectorOfVectors.resize
+        """
+        self.encoded_data.resize(new_size)
+
+    def append(self, value: NDArray) -> None:
+        """Append a 1D encoded array at the end.
+
+        See Also
+        --------
+        .VectorOfVectors.append
+        """
+        self.encoded_data.append(value)
+
+    def insert(self, i: int, value: NDArray) -> None:
+        """Insert an encoded array at index `i`.
+
+        See Also
+        --------
+        .VectorOfVectors.insert
+        """
+        self.encoded_data.insert(value)
+
+    def replace(self, i: int, value: NDArray) -> None:
+        """Replace the encoded array at index `i` with a new one.
+
+        See Also
+        --------
+        .VectorOfVectors.replace
+        """
+        self.encoded_data.replace(i, value)
+
+    def __setitem__(self, i: int, value: NDArray) -> None:
+        """Set an encoded array at index `i`."""
+        self.encoded_data[i] = value[0]
+        if self.decoded_size != value[1]:
+            raise ValueError(
+                f"decoded_size mismatch: {self.decoded_size} != {value[1]}"
+            )
+
+    def __getitem__(self, i: int) -> NDArray:
+        """Return encoded array at index `i`."""
+        return self.encoded_data[i]
+
+    def __iter__(self) -> Iterator[NDArray]:
+        yield from self.encoded_data
+
+    def __str__(self) -> str:
+        string = ""
+        pos = 0
+        for vec in self:
+            if pos != 0:
+                string += " "
+
+            string += np.array2string(
+                vec,
+                prefix=" ",
+                formatter={
+                    "int": lambda x, vec=vec: f"0x{x:02x}"
+                    if vec.dtype == np.ubyte
+                    else str(x)
+                },
+            )
+
+            if pos < len(self.encoded_data.cumulative_length):
+                string += ",\n"
+
+            pos += 1
+
+        string = f"[{string}] decoded_size={self.decoded_size}"
+
+        attrs = self.getattrs()
+        if len(attrs) > 0:
+            string += f" with attrs={attrs}"
+
+        return string
+
+    def __repr__(self) -> str:
+        npopt = np.get_printoptions()
+        np.set_printoptions(
+            threshold=5,
+            edgeitems=2,
+            linewidth=100,
+        )
+        out = (
+            "ArrayOfEncodedEqualSizedArrays(encoded_data="
             + repr(self.encoded_data)
             + ", decoded_size="
             + repr(self.decoded_size)
