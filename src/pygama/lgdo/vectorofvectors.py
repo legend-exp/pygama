@@ -201,10 +201,6 @@ class VectorOfVectors(LGDO):
         dlen = new_size - old_s
         csum = vidx[-1] if len(self) > 0 else 0
 
-        # don't waste resources
-        if dlen == 0:
-            return
-
         # first resize the cumulative length
         self.cumulative_length.resize(new_size)
 
@@ -212,9 +208,10 @@ class VectorOfVectors(LGDO):
         # that
         if dlen > 0:
             self.cumulative_length[old_s:] = csum
-        else:
-            # if dlen > 0 this has no effect
-            self.flattened_data.resize(self.cumulative_length[-1])
+
+        # then resize the data array
+        # if dlen > 0 this has no effect
+        self.flattened_data.resize(self.cumulative_length[-1])
 
     def append(self, new: NDArray) -> None:
         """Append a 1D vector `new` at the end.

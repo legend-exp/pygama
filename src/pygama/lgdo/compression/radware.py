@@ -84,17 +84,28 @@ def encode(
     elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
         if not sig_out:
             # pre-allocate output structure
+            # use maximum length possible
+            if isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
+                max_out_len = 2 * sig_in.nda.shape[1]
+            else:
+                max_out_len = (
+                    2 * len(sig_in.flattened_data) / len(sig_in.cumulative_length)
+                )
             sig_out = lgdo.VectorOfEncodedVectors(
-                encoded_data=lgdo.VectorOfVectors(dtype=ubyte),
+                encoded_data=lgdo.VectorOfVectors(
+                    shape_guess=(len(sig_in), max_out_len), dtype=ubyte
+                ),
             )
         elif not isinstance(sig_out, lgdo.VectorOfEncodedVectors):
             raise ValueError("sig_out must be a VectorOfEncodedVectors")
 
+        # use unsafe set_vector to fill pre-allocated memory
         for i, wf in enumerate(sig_in):
-            if len(sig_out) <= i:
-                sig_out.append((encode(wf, shift=shift), len(wf)))
-            else:
-                sig_out.replace(i, (encode(wf, shift=shift), len(wf)))
+            sig_out.encoded_data._set_vector_unsafe(i, encode(wf, shift=shift))
+            sig_out.decoded_size[i] = len(wf)
+
+        # resize down flattened data array
+        sig_out.resize(len(sig_in))
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
