@@ -12,16 +12,16 @@ from .vectorofvectors import VectorOfVectors
 
 
 class VectorOfEncodedVectors(LGDO):
-    """A variable-length array of variable-length encoded arrays.
+    """An array of variable-length encoded arrays.
 
-    Mainly used to represent a vector of vector (lossless) encodings. In
-    addition to :class:`~.vectorofvectors.VectorOfVectors`, a 1D
-    :class:`~.array.Array` is stored in the ``encoded_size`` class attribute to
-    hold the original size of the encoded vectors.
+    Used to represent an encoded :class:`.VectorOfVectors`. In addition to an
+    internal :class:`.VectorOfVectors` `self.encoded_data` storing the encoded
+    data, a 1D :class:`.Array` in `self.encoded_size` holds the original sizes
+    of the encoded vectors.
 
     See Also
     --------
-    .vectorofvectors.VectorOfVectors
+    .VectorOfVectors
     """
 
     def __init__(
@@ -83,24 +83,85 @@ class VectorOfEncodedVectors(LGDO):
             return False
 
     def resize(self, new_size: int) -> None:
-        """Remove vectors at the end."""
+        """Resize vector along the first axis.
+
+        See Also
+        --------
+        .VectorOfVectors.resize
+        """
         self.encoded_data.resize(new_size)
         self.decoded_size.resize(new_size)
 
     def append(self, value: tuple[np.ndarray, int]) -> None:
+        """Append a 1D encoded vector at the end.
+
+        Parameters
+        ----------
+        value
+            a tuple holding the encoded array and its decoded size.
+
+        See Also
+        --------
+        .VectorOfVectors.append
+        """
         self.encoded_data.append(value[0])
         self.decoded_size.append(value[1])
 
+    def insert(self, i: int, value: tuple[np.ndarray, int]) -> None:
+        """Insert an encoded vector at index `i`.
+
+        Parameters
+        ----------
+        i
+            the new vector will be inserted before this index.
+        value
+            a tuple holding the encoded array and its decoded size.
+
+        See Also
+        --------
+        .VectorOfVectors.insert
+        """
+        self.encoded_data.insert(value[0])
+        self.decoded_size.insert(value[1])
+
     def replace(self, i: int, value: tuple[np.ndarray, int]) -> None:
+        """Replace the encoded vector (and decoded size) at index `i` with a new one.
+
+        Parameters
+        ----------
+        i
+            index of the vector to be replaced.
+        value
+            a tuple holding the encoded array and its decoded size.
+
+        See Also
+        --------
+        .VectorOfVectors.replace
+        """
         self.encoded_data.replace(i, value[0])
         self.decoded_size[i] = value[1]
 
     def __setitem__(self, i: int, value: tuple[np.ndarray, int]) -> None:
+        """Set an encoded vector at index `i`.
+
+        Parameters
+        ----------
+        i
+            the new vector will be set at this index.
+        value
+            a tuple holding the encoded array and its decoded size.
+        """
         self.encoded_data[i] = value[0]
         self.decoded_size[i] = value[1]
 
     def __getitem__(self, i: int) -> tuple[np.ndarray, int]:
-        """Return vector at index `i`."""
+        """Return vector at index `i`.
+
+        Returns
+        -------
+        (encoded_data, decoded_size)
+            the encoded array and its decoded length.
+        """
         return (self.encoded_data[i], self.decoded_size[i])
 
     def __iter__(self) -> Iterator[tuple[np.ndarray, int]]:

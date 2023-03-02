@@ -90,13 +90,15 @@ class Array(LGDO):
         return len(self.nda)
 
     def resize(self, new_size: int) -> None:
-        """Resize the array to `new_size`."""
         new_shape = (new_size,) + self.nda.shape[1:]
         return self.nda.resize(new_shape, refcheck=True)
 
     def append(self, value: np.ndarray) -> None:
         self.resize(len(self) + 1)
         self.nda[-1] = value
+
+    def insert(self, i: int, value: int | float) -> None:
+        self.nda = np.insert(self.nda, i, self.nda[i - 1])
 
     def __getitem__(self, key):
         return self.nda[key]
