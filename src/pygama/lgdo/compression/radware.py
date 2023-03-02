@@ -27,7 +27,9 @@ class RadwareSigcompress(WaveformCodec):
 
 def encode(
     sig_in: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays,
-    sig_out: NDArray[ubyte] | lgdo.VectorOfEncodedVectors = None,
+    sig_out: NDArray[ubyte]
+    | lgdo.VectorOfEncodedVectors
+    | lgdo.ArrayOfEncodedEqualSizedArrays = None,
     shift: int32 = 0,
 ) -> NDArray[ubyte] | lgdo.VectorOfEncodedVectors:
     """Compress digital signal(s) with `radware-sigcompress`.
@@ -81,16 +83,29 @@ def encode(
         if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
-    elif isinstance(sig_in, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)):
+    elif isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
         if not sig_out:
             # pre-allocate output structure
             # use maximum length possible
-            if isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
-                max_out_len = 2 * sig_in.nda.shape[1]
-            else:
-                max_out_len = (
-                    2 * len(sig_in.flattened_data) / len(sig_in.cumulative_length)
-                )
+            sig_out = lgdo.ArrayOfEncodedEqualSizedArrays(
+                encoded_data=lgdo.VectorOfVectors(
+                    shape_guess=(len(sig_in), 2 * sig_in.nda.shape[1]), dtype=ubyte
+                ),
+                decoded_size=sig_in.nda.shape[1],
+            )
+        elif not isinstance(sig_out, lgdo.ArrayOfEncodedEqualSizedArrays):
+            raise ValueError("sig_out must be an ArrayOfEncodedEqualSizedArrays")
+
+        # use unsafe set_vector to fill pre-allocated memory
+        for i, wf in enumerate(sig_in):
+            sig_out.encoded_data._set_vector_unsafe(i, encode(wf, shift=shift))
+
+        # resize down flattened data array
+        sig_out.resize(len(sig_in))
+
+    elif isinstance(sig_in, lgdo.VectorOfVectors):
+        if not sig_out:
+            max_out_len = 2 * len(sig_in.flattened_data) / len(sig_in.cumulative_length)
             sig_out = lgdo.VectorOfEncodedVectors(
                 encoded_data=lgdo.VectorOfVectors(
                     shape_guess=(len(sig_in), max_out_len), dtype=ubyte
@@ -104,17 +119,19 @@ def encode(
             sig_out.encoded_data._set_vector_unsafe(i, encode(wf, shift=shift))
             sig_out.decoded_size[i] = len(wf)
 
-        # resize down flattened data array
-        sig_out.resize(len(sig_in))
-
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
+
+        # resize down flattened data array
+        sig_out.resize(len(sig_in))
 
     return sig_out
 
 
 def decode(
-    sig_in: NDArray[ubyte] | lgdo.VectorOfEncodedVectors,
+    sig_in: NDArray[ubyte]
+    | lgdo.VectorOfEncodedVectors
+    | lgdo.ArrayOfEncodedEqualSizedArrays,
     sig_out: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays = None,
     shift: int32 = 0,
 ) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
@@ -159,21 +176,28 @@ def decode(
         if outlen < len(sig_out):
             sig_out.resize(outlen, refcheck=False)
 
+    elif isinstance(sig_in, lgdo.ArrayOfEncodedEqualSizedArrays):
+        if not sig_out:
+            # pre-allocate output structure
+            sig_out = lgdo.ArrayOfEqualSizedArrays(
+                shape=(len(sig_in), sig_in.decoded_size), dtype="int"
+            )
+
+        elif not isinstance(sig_out, lgdo.ArrayOfEqualSizedArrays):
+            raise ValueError("sig_out must be an ArrayOfEqualSizedArrays")
+
+        for i, wf in enumerate(sig_in):
+            sig_out[i] = decode(wf, shift=shift)
+
     elif isinstance(sig_in, lgdo.VectorOfEncodedVectors):
         if not sig_out:
             # pre-allocate output structure
-            # sig_out will be a VectorOfVectors for now because that's the most
-            # general format
             sig_out = lgdo.VectorOfVectors(
                 cumulative_length=np.cumsum(sig_in.decoded_size), dtype="int"
             )
 
-        elif not isinstance(
-            sig_out, (lgdo.VectorOfVectors, lgdo.ArrayOfEqualSizedArrays)
-        ):
-            raise ValueError(
-                "sig_out must be a ArrayOfEqualSizedArrays or VectorOfVectors"
-            )
+        elif not isinstance(sig_out, lgdo.VectorOfVectors):
+            raise ValueError("sig_out must be a VectorOfVectors")
 
         for i, wf in enumerate(sig_in):
             sig_out[i] = decode(wf[0], shift=shift)

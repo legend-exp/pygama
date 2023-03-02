@@ -2,7 +2,11 @@ from pathlib import Path
 
 import numpy as np
 
-from pygama.lgdo import LH5Store, VectorOfEncodedVectors, VectorOfVectors
+from pygama.lgdo import (
+    ArrayOfEncodedEqualSizedArrays,
+    ArrayOfEqualSizedArrays,
+    LH5Store,
+)
 from pygama.lgdo.compression.radware import (
     _get_hton_u16,
     _radware_sigcompress_decode,
@@ -132,16 +136,15 @@ def test_aoesa(wftable):
     shift = -32768
     enc_vov = encode(wftable.values, shift=shift)
 
-    assert isinstance(enc_vov, VectorOfEncodedVectors)
+    assert isinstance(enc_vov, ArrayOfEncodedEqualSizedArrays)
     assert enc_vov.encoded_data.dtype == np.ubyte
     assert len(wftable.values) == len(enc_vov)
     # test only first waveform
-    assert isinstance(enc_vov[0], tuple)
-    assert np.array_equal(enc_vov[0][0], encode(wftable.values[0], shift=shift))
-    assert enc_vov[0][1] == len(wftable.values[0])
+    assert np.array_equal(enc_vov[0], encode(wftable.values[0], shift=shift))
+    assert enc_vov.decoded_size == len(wftable.values[0])
 
     dec_vov = decode(enc_vov, shift=shift)
-    assert isinstance(dec_vov, VectorOfVectors)
+    assert isinstance(dec_vov, ArrayOfEqualSizedArrays)
     assert np.issubdtype(dec_vov.dtype, np.integer)
 
     for wf1, wf2 in zip(dec_vov, wftable.values):
