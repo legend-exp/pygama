@@ -176,7 +176,7 @@ def decode(
             )
 
         for i, wf in enumerate(sig_in):
-            sig_out.replace(i, decode(wf[0], shift=shift))
+            sig_out[i] = decode(wf[0], shift=shift)
 
     else:
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
