@@ -22,12 +22,12 @@ from . import compression as compress
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .compression import WaveformCodec
+from .encoded import VectorOfEncodedVectors
 from .fixedsizearray import FixedSizeArray
 from .lgdo_utils import expand_path, parse_datatype
 from .scalar import Scalar
 from .struct import Struct
 from .table import Table
-from .vectorofencodedvectors import VectorOfEncodedVectors
 from .vectorofvectors import VectorOfVectors
 from .waveform_table import WaveformTable
 
