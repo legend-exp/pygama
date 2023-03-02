@@ -226,7 +226,9 @@ class FCEventDecoder(DataDecoder):
                 ii
             ] = fcio.runtime  # the time since the beginning of the file in seconds
             tbl["numtraces"].nda[ii] = fcio.numtraces  # number of triggered adcs
-            tbl["tracelist"].set_vector(ii, fcio.tracelist)  # list of triggered adcs
+            tbl["tracelist"]._set_vector_unsafe(
+                ii, fcio.tracelist
+            )  # list of triggered adcs
             tbl["baseline"].nda[ii] = fcio.baseline[
                 iwf
             ]  # the fpga baseline values for each channel in LSB

@@ -199,7 +199,7 @@ class DataDecoder:
     def put_in_garbage(self, packet: int, packet_id: int, code: int) -> None:
         i_row = self.garbage_table.loc
         p8 = np.frombuffer(packet, dtype="uint8")
-        self.garbage_table["packets"].set_vector(i_row, p8)
+        self.garbage_table["packets"]._set_vector_unsafe(i_row, p8)
         self.garbage_table["packet_id"].nda[i_row] = packet_id
         self.garbage_table["garbage_codes"].nda[i_row] = code
         self.garbage_table.push_row()

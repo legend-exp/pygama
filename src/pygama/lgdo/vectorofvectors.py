@@ -11,6 +11,7 @@ from typing import Any
 
 import numba
 import numpy as np
+from numpy.typing import DTypeLike, NDArray
 
 import pygama.lgdo.lgdo_utils as utils
 from pygama.lgdo.array import Array
@@ -31,11 +32,11 @@ class VectorOfVectors(LGDO):
 
     def __init__(
         self,
-        listoflists: list = None,
-        flattened_data: Array = None,
-        cumulative_length: Array = None,
+        listoflists: list[list[int | float]] = None,
+        flattened_data: Array | NDArray = None,
+        cumulative_length: Array | NDArray = None,
         shape_guess: tuple[int, int] = None,
-        dtype: np.dtype = None,
+        dtype: DTypeLike = None,
         fill_val: int | float = None,
         attrs: dict[str, Any] = None,
     ) -> None:
@@ -164,8 +165,36 @@ class VectorOfVectors(LGDO):
         else:
             return self.flattened_data[self.cumulative_length[i - 1] : stop]
 
+    def __setitem__(self, i: int, new: NDArray) -> None:
+        self.__getitem__(i)[:] = new
+
     def resize(self, new_size: int) -> None:
-        """Resize vector along the first axis."""
+        """Resize vector along the first axis.
+
+        `self.flattened_data` is resized only if `new_size` is smaller than the
+        current vector length.
+
+        If `new_size` is larger than the current vector length,
+        `self.cumulative_length` is padded with its last element.  This
+        corresponds to appending empty vectors.
+
+        Examples
+        --------
+        >>> vov = VectorOfVectors([[1, 2, 3], [4, 5]])
+        >>> vov.resize(3)
+        >>> print(vov)
+        [[1 2 3],
+         [4 5],
+         [],
+        ]
+
+        >>> vov = VectorOfVectors([[1, 2], [3], [4, 5]])
+        >>> vov.resize(2)
+        >>> print(vov)
+        [[1 2],
+         [3],
+        ]
+        """
 
         vidx = self.cumulative_length
         old_s = len(self)
@@ -187,8 +216,19 @@ class VectorOfVectors(LGDO):
             # if dlen > 0 this has no effect
             self.flattened_data.resize(self.cumulative_length[-1])
 
-    def append(self, new) -> None:
-        """Append a vector at the end."""
+    def append(self, new: NDArray) -> None:
+        """Append a 1D vector `new` at the end.
+
+        Examples
+        --------
+        >>> vov = VectorOfVectors([[1, 2, 3], [4, 5]])
+        >>> vov.append([8, 9])
+        >>> print(vov)
+        [[1 2 3],
+         [4 5],
+         [8 9],
+        ]
+        """
         # first extend cumulative_length by +1
         self.cumulative_length.resize(len(self) + 1)
         # set it at the right value
@@ -199,11 +239,21 @@ class VectorOfVectors(LGDO):
         # finally set it
         self[-1] = new
 
-    def insert(self, i, new) -> int:
+    def insert(self, i: int, new: NDArray) -> None:
         """Insert a vector at index `i`.
 
-        ``self.flattened_data`` (and therefore ``self.cumulative_length``) is
+        `self.flattened_data` (and therefore `self.cumulative_length`) is
         resized in order to accommodate the new element.
+
+        Examples
+        --------
+        >>> vov = VectorOfVectors([[1, 2, 3], [4, 5]])
+        >>> vov.insert(1, [8, 9])
+        >>> print(vov)
+        [[1 2 3],
+         [8 9],
+         [4 5],
+        ]
 
         Warning
         -------
@@ -223,12 +273,21 @@ class VectorOfVectors(LGDO):
         )
         self.cumulative_length[i:] += len(new) - len(self[i])
 
-    def replace(self, i, new) -> None:
+    def replace(self, i: int, new: NDArray) -> None:
         """Replace the vector at index `i` with `new`.
 
-        ``self.flattened_data`` (and therefore ``self.cumulative_length``) is
+        `self.flattened_data` (and therefore `self.cumulative_length`) is
         resized, if the length of `new` is different from the vector currently
         at index `i`.
+
+        Examples
+        --------
+        >>> vov = VectorOfVectors([[1, 2, 3], [4, 5]])
+        >>> vov.replace(0, [8, 9])
+        >>> print(vov)
+        [[8 9],
+         [4 5],
+        ]
 
         Warning
         -------
@@ -265,33 +324,33 @@ class VectorOfVectors(LGDO):
 
         vidx[i:] += dlen
 
-    def __setitem__(self, i: int, new: np.ndarray) -> None:
-        self.__getitem__(i)[:] = new
+    def _set_vector_unsafe(self, i: int, vec: NDArray) -> None:
+        r"""Insert vector `vec` at position `i`.
 
-    def set_vector(self, i_vec: int, nda: np.ndarray) -> None:
-        """Insert vector `nda` at location `i_vec`.
+        Assumes that ``j = self.cumulative_length[i-1]`` is the index (in
+        `self.flattened_data`) of the end of the `(i-1)`\ th vector and copies
+        `vec` in ``self.flattened_data[j:len(vec)]``. Finally updates
+        ``self.cumulative_length[i]`` with the new flattened data array length.
 
-        Notes
-        -----
-        `flattened_data` is doubled in length until `nda` can be appended to
-        it.
+        Vectors stored after index `i` can be overridden, producing unintended
+        behavior. This method is typically used for fast sequential fill of a
+        pre-allocated vector of vectors.
+
+        Danger
+        ------
+        This method can lead to undefined behavior or vector invalidation if
+        used improperly. Use it only if you know what you are doing.
+
+        See Also
+        --------
+        append, replace, insert
         """
-        if i_vec < 0 or i_vec > len(self.cumulative_length.nda) - 1:
-            raise ValueError("bad i_vec", i_vec)
+        start = 0 if i == 0 else self.cumulative_length[i - 1]
+        end = start + len(vec)
+        self.flattened_data[start:end] = vec
+        self.cumulative_length[i] = end
 
-        if len(nda.shape) != 1:
-            raise ValueError("nda had bad shape", nda.shape)
-
-        start = 0 if i_vec == 0 else self.cumulative_length.nda[i_vec - 1]
-        end = start + len(nda)
-        while end >= len(self.flattened_data.nda):
-            self.flattened_data.nda.resize(
-                2 * len(self.flattened_data.nda), refcheck=True
-            )
-        self.flattened_data.nda[start:end] = nda
-        self.cumulative_length.nda[i_vec] = end
-
-    def __iter__(self) -> Iterator[np.ndarray]:
+    def __iter__(self) -> Iterator[NDArray]:
         for j, stop in enumerate(self.cumulative_length):
             if j == 0:
                 yield self.flattened_data[0:stop]
@@ -360,8 +419,8 @@ class VectorOfVectors(LGDO):
 
 
 def build_cl(
-    sorted_array_in: np.array, cumulative_length_out: np.ndarray = None
-) -> np.ndarray:
+    sorted_array_in: NDArray, cumulative_length_out: NDArray = None
+) -> NDArray:
     """Build a cumulative length array from an array of sorted data.
 
     Examples
@@ -406,9 +465,7 @@ def build_cl(
 
 
 @numba.njit
-def _nb_build_cl(
-    sorted_array_in: np.ndarray, cumulative_length_out: np.ndarray
-) -> np.ndarray:
+def _nb_build_cl(sorted_array_in: NDArray, cumulative_length_out: NDArray) -> NDArray:
     """numbified inner loop for build_cl"""
     ii = 0
     last_val = sorted_array_in[0]
@@ -424,9 +481,7 @@ def _nb_build_cl(
     return cumulative_length_out[:ii]
 
 
-def explode_cl(
-    cumulative_length: np.ndarray, array_out: np.ndarray = None
-) -> np.ndarray:
+def explode_cl(cumulative_length: NDArray, array_out: NDArray = None) -> NDArray:
     """Explode a `cumulative_length` array.
 
     Examples
@@ -463,7 +518,7 @@ def explode_cl(
 
 
 @numba.njit
-def _nb_explode_cl(cumulative_length: np.ndarray, array_out: np.ndarray) -> np.ndarray:
+def _nb_explode_cl(cumulative_length: NDArray, array_out: NDArray) -> NDArray:
     """numbified inner loop for explode_cl"""
     out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
     if len(array_out) != out_len:
@@ -478,8 +533,8 @@ def _nb_explode_cl(cumulative_length: np.ndarray, array_out: np.ndarray) -> np.n
 
 
 def explode(
-    cumulative_length: np.ndarray, array_in: np.ndarray, array_out: np.ndarray = None
-) -> np.ndarray:
+    cumulative_length: NDArray, array_in: NDArray, array_out: NDArray = None
+) -> NDArray:
     """Explode a data array using a `cumulative_length` array.
 
     This is identical to :func:`.explode_cl`, except `array_in` gets exploded
@@ -520,8 +575,8 @@ def explode(
 
 @numba.njit
 def nb_explode(
-    cumulative_length: np.ndarray, array_in: np.ndarray, array_out: np.ndarray
-) -> np.ndarray:
+    cumulative_length: NDArray, array_in: NDArray, array_out: NDArray
+) -> NDArray:
     """Numbified inner loop for :func:`.explode`."""
     out_len = cumulative_length[-1] if len(cumulative_length) > 0 else 0
     if len(cumulative_length) != len(array_in) or len(array_out) != out_len:
@@ -535,7 +590,7 @@ def nb_explode(
 
 
 def explode_arrays(
-    cumulative_length: Array, arrays: list[np.array], arrays_out: list[np.array] = None
+    cumulative_length: Array, arrays: list[NDArray], arrays_out: list[NDArray] = None
 ) -> list:
     """Explode a set of arrays using a `cumulative_length` array.
 
