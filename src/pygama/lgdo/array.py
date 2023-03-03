@@ -61,9 +61,6 @@ class Array(LGDO):
         attrs
             A set of user attributes to be carried along with this LGDO.
         """
-        if isinstance(nda, Array):
-            nda = nda.nda
-
         if nda is None:
             if fill_val is None:
                 nda = np.empty(shape, dtype=dtype)
@@ -71,6 +68,12 @@ class Array(LGDO):
                 nda = np.zeros(shape, dtype=dtype)
             else:
                 nda = np.full(shape, fill_val, dtype=dtype)
+
+        elif isinstance(nda, Array):
+            nda = nda.nda
+
+        elif not isinstance(nda, np.ndarray):
+            nda = np.array(nda)
 
         self.nda = nda
         self.dtype = self.nda.dtype
@@ -98,7 +101,7 @@ class Array(LGDO):
         self.nda[-1] = value
 
     def insert(self, i: int, value: int | float) -> None:
-        self.nda = np.insert(self.nda, i, self.nda[i - 1])
+        self.nda = np.insert(self.nda, i, value)
 
     def __getitem__(self, key):
         return self.nda[key]
