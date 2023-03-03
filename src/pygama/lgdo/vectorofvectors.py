@@ -262,12 +262,12 @@ class VectorOfVectors(LGDO):
             )
 
         self.flattened_data = Array(
-            np.insert(self.flattened_data, self.cumulative_length[i] - 1, new)
+            np.insert(self.flattened_data, self.cumulative_length[i - 1], new)
         )
         self.cumulative_length = Array(
             np.insert(self.cumulative_length, i, self.cumulative_length[i - 1])
         )
-        self.cumulative_length[i:] += len(new) - len(self[i])
+        self.cumulative_length[i:] += np.uint32(len(new))
 
     def replace(self, i: int, new: NDArray) -> None:
         """Replace the vector at index `i` with `new`.
