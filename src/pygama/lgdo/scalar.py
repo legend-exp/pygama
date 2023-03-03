@@ -42,6 +42,9 @@ class Scalar(LGDO):
     def form_datatype(self) -> str:
         return self.datatype_name()
 
+    def __len__(self) -> int:
+        return 1
+
     def __str__(self) -> str:
         attrs = self.getattrs()
         return f"{str(self.value)} with attrs={repr(attrs)}"
