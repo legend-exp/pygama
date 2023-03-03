@@ -141,7 +141,7 @@ def test_aoesa(wftable):
     assert len(wftable.values) == len(enc_vov)
     # test only first waveform
     assert np.array_equal(enc_vov[0], encode(wftable.values[0], shift=shift))
-    assert enc_vov.decoded_size == len(wftable.values[0])
+    assert enc_vov.decoded_size.value == len(wftable.values[0])
 
     dec_vov = decode(enc_vov, shift=shift)
     assert isinstance(dec_vov, ArrayOfEqualSizedArrays)

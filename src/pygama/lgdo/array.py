@@ -10,8 +10,8 @@ from typing import Any
 
 import numpy as np
 
-import pygama.lgdo.lgdo_utils as utils
-from pygama.lgdo.lgdo import LGDO
+from . import lgdo_utils as utils
+from .lgdo import LGDO
 
 log = logging.getLogger(__name__)
 

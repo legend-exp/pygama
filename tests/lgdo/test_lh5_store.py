@@ -303,7 +303,7 @@ def test_read_wftable_encoded(lh5_file):
         "/data/struct/wftable_enc", lh5_file, wfdecompress=False
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
-    assert isinstance(lh5_obj.values, lgdo.VectorOfEncodedVectors)
+    assert isinstance(lh5_obj.values, lgdo.ArrayOfEncodedEqualSizedArrays)
     assert n_rows == 3
     assert lh5_obj.values.attrs["codec"] == "radware_sigcompress"
     assert "codec_shift" in lh5_obj.values.attrs
@@ -312,7 +312,7 @@ def test_read_wftable_encoded(lh5_file):
         "/data/struct/wftable_enc", lh5_file, wfdecompress=True
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
-    assert isinstance(lh5_obj.values, lgdo.VectorOfVectors)
+    assert isinstance(lh5_obj.values, lgdo.ArrayOfEqualSizedArrays)
     assert n_rows == 3
 
     # FIXME: problem with VectorOfEncodedVectors buffer
@@ -460,7 +460,7 @@ def test_write_compressed_lgnd_waveform_table(enc_lgnd_file):
 def test_read_compressed_lgnd_waveform_table(lgnd_file, enc_lgnd_file):
     store = LH5Store()
     wft, _ = store.read_object("/geds/raw/waveform", enc_lgnd_file)
-    assert isinstance(wft.values, lgdo.VectorOfVectors)
+    assert isinstance(wft.values, lgdo.ArrayOfEqualSizedArrays)
 
 
 # First test that we can overwrite a table with the same name without deleting the original field

@@ -22,7 +22,7 @@ from . import compression as compress
 from .array import Array
 from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
 from .compression import WaveformCodec
-from .encoded import VectorOfEncodedVectors
+from .encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
 from .fixedsizearray import FixedSizeArray
 from .lgdo_utils import expand_path, parse_datatype
 from .scalar import Scalar
@@ -436,7 +436,10 @@ class LH5Store:
                     values = col_dict["values"]
                     # eventually decompress waveform values
                     if (
-                        isinstance(col_dict["values"], VectorOfEncodedVectors)
+                        isinstance(
+                            col_dict["values"],
+                            VectorOfEncodedVectors | ArrayOfEncodedEqualSizedArrays,
+                        )
                         and wfdecompress
                     ):
                         values = compress.decode_array(values)
@@ -464,49 +467,52 @@ class LH5Store:
                     )
                 return obj_buf, n_rows_read
 
-        # VectorOfEncodedVectors
-        # read out vector of vectors of different size
-        if elements.startswith("encoded_array"):
-            # TODO: do we want to decompress VectorOfEncodedVectors on the fly?
-            if obj_buf is not None and not isinstance(obj_buf, VectorOfEncodedVectors):
-                raise ValueError(
-                    f"obj_buf for '{name}' not a LGDO VectorOfEncodedVectors"
+        # ArrayOfEncodedEqualSizedArrays and VectorOfEncodedVectors
+        for (cond, lgdo) in [
+            (
+                datatype == "array_of_encoded_equalsized_arrays",
+                ArrayOfEncodedEqualSizedArrays,
+            ),
+            (elements.startswith("encoded_array"), VectorOfEncodedVectors),
+        ]:
+            if cond:
+                if obj_buf is not None and not isinstance(obj_buf, lgdo):
+                    raise ValueError(f"obj_buf for '{name}' not a LGDO {type(lgdo)}")
+
+                # read out encoded_data
+                encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
+                encoded_data, n_rows_read = self.read_object(
+                    f"{name}/encoded_data",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    obj_buf=encoded_data_buf,
+                    obj_buf_start=obj_buf_start,
                 )
 
-            # read out encoded_data
-            encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
-            encoded_data, n_rows_read = self.read_object(
-                f"{name}/encoded_data",
-                h5f,
-                start_row=start_row,
-                n_rows=n_rows,
-                idx=idx,
-                obj_buf=encoded_data_buf,
-                obj_buf_start=obj_buf_start,
-            )
+                # read out encoded_data
+                decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
+                decoded_size, n_rows_read = self.read_object(
+                    f"{name}/decoded_size",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    obj_buf=decoded_size_buf,
+                    obj_buf_start=obj_buf_start,
+                )
 
-            # read out encoded_data
-            decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
-            decoded_size, n_rows_read = self.read_object(
-                f"{name}/decoded_size",
-                h5f,
-                start_row=start_row,
-                n_rows=n_rows,
-                idx=idx,
-                obj_buf=decoded_size_buf,
-                obj_buf_start=obj_buf_start,
-            )
-
-            if obj_buf is not None:
-                return obj_buf, n_rows_read
-            return (
-                VectorOfEncodedVectors(
-                    encoded_data=encoded_data,
-                    decoded_size=decoded_size,
-                    attrs=h5f[name].attrs,
-                ),
-                n_rows_read,
-            )
+                if obj_buf is not None:
+                    return obj_buf, n_rows_read
+                return (
+                    lgdo(
+                        encoded_data=encoded_data,
+                        decoded_size=decoded_size,
+                        attrs=h5f[name].attrs,
+                    ),
+                    n_rows_read,
+                )
 
         # VectorOfVectors
         # read out vector of vectors of different size
@@ -858,6 +864,7 @@ class LH5Store:
                     isinstance(obj, WaveformTable)
                     and field == "values"
                     and not isinstance(obj.values, VectorOfEncodedVectors)
+                    and not isinstance(obj.values, ArrayOfEncodedEqualSizedArrays)
                     and wfcompressor is not None
                 ):
                     obj_fld = compress.encode_array(obj[field], codec=wfcompressor)
@@ -892,7 +899,7 @@ class LH5Store:
             return
 
         # vector of encoded vectors
-        elif isinstance(obj, VectorOfEncodedVectors):
+        elif isinstance(obj, VectorOfEncodedVectors | ArrayOfEncodedEqualSizedArrays):
             group = self.gimme_group(
                 name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
             )

@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo import LGDO
+from .lgdo import LGDO
 
 log = logging.getLogger(__name__)
 

@@ -13,11 +13,11 @@ import numpy as np
 import pandas as pd
 from pandas.io.formats import format as fmt
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.lgdo import LGDO
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .lgdo import LGDO
+from .struct import Struct
+from .vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 

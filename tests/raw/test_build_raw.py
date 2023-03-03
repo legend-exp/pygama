@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from pygama.lgdo import VectorOfEncodedVectors
+from pygama.lgdo import ArrayOfEncodedEqualSizedArrays
 from pygama.lgdo.compression import RadwareSigcompress
 from pygama.lgdo.lh5_store import LH5Store, ls
 from pygama.raw import build_raw
@@ -52,7 +52,7 @@ def test_build_raw_wfcompress(lgnd_test_data):
 
     store = LH5Store()
     wft, _ = store.read_object("FCEvent/waveform", out_file, wfdecompress=False)
-    assert isinstance(wft.values, VectorOfEncodedVectors)
+    assert isinstance(wft.values, ArrayOfEncodedEqualSizedArrays)
 
 
 def test_build_raw_fc_out_spec(lgnd_test_data):

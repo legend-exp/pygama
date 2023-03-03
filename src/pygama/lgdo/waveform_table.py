@@ -10,11 +10,11 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.encoded import VectorOfEncodedVectors
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
+from .table import Table
+from .vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 
@@ -132,7 +132,13 @@ class WaveformTable(Table):
             dt.attrs["units"] = f"{dt_units}"
 
         if not isinstance(
-            values, (ArrayOfEqualSizedArrays, VectorOfVectors, VectorOfEncodedVectors)
+            values,
+            (
+                ArrayOfEqualSizedArrays,
+                VectorOfVectors,
+                VectorOfEncodedVectors,
+                ArrayOfEncodedEqualSizedArrays,
+            ),
         ):
             if isinstance(values, np.ndarray):
                 try:

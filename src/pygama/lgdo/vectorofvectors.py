@@ -13,11 +13,10 @@ import numba
 import numpy as np
 from numpy.typing import DTypeLike, NDArray
 
-import pygama.lgdo.lgdo_utils as utils
-from pygama.lgdo.array import Array
-from pygama.lgdo.lgdo import LGDO
-
 from . import arrayofequalsizedarrays as aoesa
+from . import lgdo_utils as utils
+from .array import Array
+from .lgdo import LGDO
 
 log = logging.getLogger(__name__)
 

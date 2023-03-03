@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 from .array import Array
 from .lgdo import LGDO
 from .lgdo_utils import get_element_type
+from .scalar import Scalar
 from .vectorofvectors import VectorOfVectors
 
 
@@ -226,7 +227,8 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
 
     Used to represent an encoded :class:`.ArrayOfEqualSizedArrays`. In addition to an
     internal :class:`.VectorOfVectors` `self.encoded_data` storing the encoded
-    data, the size of the decoded arrays is stored in `self.encoded_size`.
+    data, the size of the decoded arrays is stored in a :class:`.Scalar`
+    `self.encoded_size`.
 
     See Also
     --------
@@ -236,7 +238,7 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
     def __init__(
         self,
         encoded_data: VectorOfVectors = None,
-        decoded_size: int = None,
+        decoded_size: Scalar | int = None,
         attrs: dict[str, Any] = None,
     ) -> None:
         """
@@ -255,8 +257,10 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
         else:
             raise ValueError("encoded_data must be a valid VectorOfVectors")
 
-        if decoded_size is not None:
-            self.decoded_size = int(decoded_size)
+        if isinstance(decoded_size, Scalar):
+            self.decoded_size = decoded_size
+        elif decoded_size is not None:
+            self.decoded_size = Scalar(int(decoded_size))
         else:
             self.decoded_size = 0
 
