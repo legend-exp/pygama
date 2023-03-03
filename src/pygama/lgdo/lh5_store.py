@@ -438,7 +438,7 @@ class LH5Store:
                     if (
                         isinstance(
                             col_dict["values"],
-                            VectorOfEncodedVectors | ArrayOfEncodedEqualSizedArrays,
+                            (VectorOfEncodedVectors, ArrayOfEncodedEqualSizedArrays),
                         )
                         and wfdecompress
                     ):
@@ -899,7 +899,7 @@ class LH5Store:
             return
 
         # vector of encoded vectors
-        elif isinstance(obj, VectorOfEncodedVectors | ArrayOfEncodedEqualSizedArrays):
+        elif isinstance(obj, (VectorOfEncodedVectors, ArrayOfEncodedEqualSizedArrays)):
             group = self.gimme_group(
                 name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
             )
