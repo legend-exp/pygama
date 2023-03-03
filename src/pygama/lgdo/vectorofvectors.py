@@ -318,7 +318,7 @@ class VectorOfVectors(LGDO):
                 np.insert(self.flattened_data, vidx[i], new[len(self[i]) :])
             )
 
-        vidx[i:] += dlen
+        vidx[i:] += np.uint32(dlen)
 
     def _set_vector_unsafe(self, i: int, vec: NDArray) -> None:
         r"""Insert vector `vec` at position `i`.

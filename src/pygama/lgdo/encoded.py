@@ -123,8 +123,8 @@ class VectorOfEncodedVectors(LGDO):
         --------
         .VectorOfVectors.insert
         """
-        self.encoded_data.insert(value[0])
-        self.decoded_size.insert(value[1])
+        self.encoded_data.insert(i, value[0])
+        self.decoded_size.insert(i, value[1])
 
     def replace(self, i: int, value: tuple[NDArray, int]) -> None:
         """Replace the encoded vector (and decoded size) at index `i` with a new one.
@@ -225,10 +225,10 @@ class VectorOfEncodedVectors(LGDO):
 class ArrayOfEncodedEqualSizedArrays(LGDO):
     """An array of encoded arrays with equal decoded size.
 
-    Used to represent an encoded :class:`.ArrayOfEqualSizedArrays`. In addition to an
-    internal :class:`.VectorOfVectors` `self.encoded_data` storing the encoded
-    data, the size of the decoded arrays is stored in a :class:`.Scalar`
-    `self.encoded_size`.
+    Used to represent an encoded :class:`.ArrayOfEqualSizedArrays`. In addition
+    to an internal :class:`.VectorOfVectors` `self.encoded_data` storing the
+    encoded data, the size of the decoded arrays is stored in a
+    :class:`.Scalar` `self.encoded_size`.
 
     See Also
     --------
@@ -262,7 +262,7 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
         elif decoded_size is not None:
             self.decoded_size = Scalar(int(decoded_size))
         else:
-            self.decoded_size = 0
+            self.decoded_size = Scalar(0)
 
         super().__init__(attrs)
 
@@ -312,7 +312,7 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
         --------
         .VectorOfVectors.insert
         """
-        self.encoded_data.insert(value)
+        self.encoded_data.insert(i, value)
 
     def replace(self, i: int, value: NDArray) -> None:
         """Replace the encoded array at index `i` with a new one.
@@ -325,11 +325,7 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
 
     def __setitem__(self, i: int, value: NDArray) -> None:
         """Set an encoded array at index `i`."""
-        self.encoded_data[i] = value[0]
-        if self.decoded_size != value[1]:
-            raise ValueError(
-                f"decoded_size mismatch: {self.decoded_size} != {value[1]}"
-            )
+        self.encoded_data[i] = value
 
     def __getitem__(self, i: int) -> NDArray:
         """Return encoded array at index `i`."""
