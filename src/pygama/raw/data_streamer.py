@@ -177,8 +177,7 @@ class DataStreamer(ABC):
 
     @abstractmethod
     def read_packet(self) -> bool:
-        """Reads a single packet's worth of data in to the
-        :class:`.RawBufferLibrary`.
+        """Reads a single packet's worth of data in to the :class:`.RawBufferLibrary`.
 
         Needs to be overloaded. Gets called by :meth:`.read_chunk` Needs to
         update :attr:`self.any_full` if any buffers would possibly over-fill on

@@ -18,78 +18,93 @@ log = logging.getLogger(__name__)
 
 
 def buffer_processor(rb: RawBuffer) -> Table:
-    r"""
-    Takes in a :class:`.RawBuffer`, performs any processes specified in the :class:`.RawBuffer`'s ``proc_spec``
-    attribute, and returns a :class:`pygama.lgdo.Table` with the processed buffer. This `tmp_table` shares columns with the :class:`.RawBuffer`'s lgdo,
-    so no data is copied. Currently implemented attributes:
+    r"""Process raw data buffers.
 
-    - "window" (list): [in_name, start_index, stop_index, out_name]
-      Windows objects with a name specified by the first argument passed in the ``proc_spec``, the window start and stop indices are the next two
-      arguments, and then updates the rb.lgdo with a name specified by the last argument. If the object is an :func:`pygama.lgdo.WaveformTable`, then
-      the ``t0`` attribute is updated accordingly. Although it is possible to use the DSP config to perform windowing, this hard-coded version
-      avoids a conversion to float32.
-    - "dsp_config" (dict): {dsp_config}
-      Performs DSP given by the "dsp_config" key in the ``proc_spec``. See :mod:`pygama.dsp.processing_chain.build_processing_chain` for more information on DSP config dictionaries.
-      All fields in the output of the DSP are written to the rb.lgdo
-    - "drop" (list): ["waveform", "packet_ids"]
-      Drops any requested fields from the rb.lgdo
-    - "dtype_conv" (dict): {"presummed_waveform/values": "uint32", "t_sat_lo": "uint16"}
-      Updates the data types of any field with its requested datatype in ``proc_spec``
+    Takes in a :class:`.RawBuffer`, performs any processes specified in the
+    :class:`.RawBuffer`'s ``proc_spec`` attribute, and returns a
+    :class:`.Table` with the processed buffer. This `tmp_table` shares columns
+    with the :class:`.RawBuffer`'s LGDO (`rb.lgdo`), so no data is copied.
+
+    Currently implemented attributes:
+
+    ``"window": [in_name, start_index, stop_index, out_name]`` `(list)`
+      Windows objects with a name specified by the first argument passed in the
+      ``proc_spec``, the window start and stop indices are the next two
+      arguments, and then updates the `rb.lgdo` with a name specified by the last
+      argument. If the object is an :func:`.WaveformTable`, then the
+      ``t0`` attribute is updated accordingly. Although it is possible to use
+      the DSP config to perform windowing, this hard-coded version avoids a
+      conversion to ``float32``.
+
+    ``"dsp_config": { dsp_config }`` `(dict)`
+      Performs DSP given by the ``dsp_config`` key in the ``proc_spec``. See
+      :mod:`.dsp.processing_chain.build_processing_chain` for more information
+      on DSP configuration dictionaries.  All fields in the output of the DSP
+      are written to the `rb.lgdo`.
+
+    ``"drop": ["waveform", "packet_ids"]`` `(list)`
+      Drops any requested fields from the `rb.lgdo`.
+
+    ``"dtype_conv": {"presummed_waveform/values": "uint32", "t_sat_lo": "uint16"}`` `(dict)`
+      Updates the data types of any field with its requested datatype in
+      ``proc_spec``.
 
     Parameters
     ----------
     rb
-        A :class:`.RawBuffer` to be processed, must contain a ``proc_spec`` attribute
+        A :class:`.RawBuffer` to be processed, must contain a `proc_spec` attribute.
 
     Notes
     -----
-    The original "waveforms" column in the table is not written to file if request! All updates are done on the
-    `tmp_table`, which shares the fields with `rb.lgdo` and are done in place. The `tmp_table` is necessary so that
-    the `rb.lgdo` keeps arrays needed by the table in the buffer.
-    An example ``proc_spec`` in an :mod:`pygama.raw.build_raw` ``out_spec`` is below
+    The original ``waveforms`` column in the table is not written to file if
+    request! All updates are done on the `tmp_table`, which shares the fields
+    with `rb.lgdo` and are done in place. The `tmp_table` is necessary so that
+    the `rb.lgdo` keeps arrays needed by the table in the buffer.  An example
+    ``proc_spec`` in an :mod:`.raw.build_raw` ``out_spec`` is below
 
     .. code-block:: json
 
         {
-           "FCEventDecoder" : {
-           "g{key:0>3d}" : {
-              "key_list" : [ [24,64] ],
+          "FCEventDecoder" : {
+            "g{key:0>3d}" : {
+              "key_list" : [[24,64]],
               "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds",
               "proc_spec": {
-                "window":
-                  ["waveform", 100, -100, "windowed_waveform"],
+                "window": ["waveform", 100, -100, "windowed_waveform"],
                 "dsp_config": {
-                  "outputs": [ "presummed_waveform", "t_sat_lo", "t_sat_hi" ],
-                    "processors": {
-                      "presummed_waveform": {
-                        "function": "presum",
-                        "module": "pygama.dsp.processors",
-                        "args": ["waveform", "presummed_waveform(shape=len(waveform)//16, period=waveform.period*16, offset=waveform.offset, 'f')"],
-                        "unit": "ADC"
-                        },
+                  "outputs": ["presummed_waveform", "t_sat_lo", "t_sat_hi"],
+                  "processors": {
+                    "presummed_waveform": {
+                      "function": "presum",
+                      "module": "pygama.dsp.processors",
+                      "args": [
+                        "waveform",
+                        "presummed_waveform(shape=len(waveform)//16, period=waveform.period*16, offset=waveform.offset, 'f')"
+                      ],
+                      "unit": "ADC"
+                    },
                     "t_sat_lo, t_sat_hi": {
-                        "function": "saturation",
-                        "module": "pygama.dsp.processors",
-                        "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
-                        "unit": "ADC"
-                        }
+                      "function": "saturation",
+                      "module": "pygama.dsp.processors",
+                      "args": ["waveform", 16, "t_sat_lo", "t_sat_hi"],
+                      "unit": "ADC"
                     }
+                  }
                 },
-                "drop":
-                    ["waveform", "packet_ids"],
+                "drop": ["waveform", "packet_ids"],
                 "dtype_conv": {
-                    "presummed_waveform/values": "uint32",
-                    "t_sat_lo": "uint16",
-                    "t_sat_hi": "uint16",
+                  "presummed_waveform/values": "uint32",
+                  "t_sat_lo": "uint16",
+                  "t_sat_hi": "uint16",
                 }
               }
-           },
-           "spms" : {
-             "key_list" : [ [6,23] ],
-             "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
-           }
+            },
+            "spms" : {
+              "key_list" : [ [6,23] ],
+              "out_stream" : "$DATADIR/{file_key}_spms.lh5:/spms"
+            }
+          }
         }
-
     """
     # Check that there is a valid object to process
     if isinstance(rb.lgdo, lgdo.Table) or isinstance(rb.lgdo, lgdo.Struct):
@@ -125,28 +140,31 @@ def buffer_processor(rb: RawBuffer) -> Table:
 
 
 def process_window(rb: RawBuffer, tmp_table: Table) -> None:
-    r"""
-    Windows arrays of equal sized arrays according to specifications
-    given in the rb.proc_spec "window" key.
+    r"""Window :class:`.ArrayOfEqualSizedArrays`.
 
-    First checks if the rb.lgdo is a table or not. If it's not a table,
-    then we only process it if its rb.out_name is the same as the window_in_name.
+    Windows arrays of equal sized arrays according to specifications given in
+    the `rb.proc_spec` ``window`` key.
 
-    If rb.lgdo is a table, special processing is done if the window_in_name field
-    is an lgdo.WaveformTable in order to update the t0s. Otherwise, windowing of the field
-    is performed without updating any of the other attributes.
+    First checks if the `rb.lgdo` is a :class:`.Table` or not. If it's not a
+    table, then we only process it if its `rb.out_name` is the same as the
+    window ``in_name``.
+
+    If `rb.lgdo` is a table, special processing is done if the window
+    ``in_name`` field is an :class:`.WaveformTable` in order to update the
+    ``t0``\ s.  Otherwise, windowing of the field is performed without updating
+    any of the other attributes.
 
     Parameters
     ----------
     rb
-        A :class:`.RawBuffer` to be processed
+        a :class:`.RawBuffer` to be processed.
     tmp_table
-        A :class:`pygama.lgdo.Table` that shares columns with the `rb.lgdo`
+        a :class:`.Table` that shares columns with the `rb.lgdo`.
 
     Notes
     -----
-    This windowing hard-coded; it is done without calling :mod:`pygama.dsp.build_dsp` to avoid
-    a conversion to float32.
+    This windowing hard-coded; it is done without calling :mod:`.dsp.build_dsp`
+    to avoid a conversion to ``float32``.
 
     """
     # Read the window parameters from the proc_spec
@@ -212,8 +230,8 @@ def process_window(rb: RawBuffer, tmp_table: Table) -> None:
 def window_array_of_arrays(
     array_of_arrays: ArrayOfEqualSizedArrays, window_start_idx: int, window_end_idx: int
 ) -> ArrayOfEqualSizedArrays:
-    r"""
-    Given an array of equal sized arrays, for each array it returns the view [window_start_idx:window_end_idx]
+    """Given an array of equal sized arrays, for each array it returns the view
+    ``[window_start_idx:window_end_idx]``.
     """
     if isinstance(array_of_arrays, lgdo.ArrayOfEqualSizedArrays):
         return array_of_arrays.nda[:, window_start_idx:window_end_idx]
@@ -224,8 +242,7 @@ def window_array_of_arrays(
 
 
 def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
-    """
-    In order for the processed data to work well with :mod:`pygama.dsp.build_dsp`, we need
+    """In order for the processed data to work well with :mod:`.dsp.build_dsp`, we need
     to keep ``t0`` in its original units.
 
     So we transform ``start_index`` to the units of ``t0`` and add it to every
@@ -241,20 +258,25 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
 
 
 def process_dsp(rb: RawBuffer, tmp_table: Table) -> None:
-    r"""
-    Run a provided DSP config from rb.proc_spec using build_processing_chain, and add specified outputs to the
-    rb.lgdo.
+    r"""Run a DSP processing chain.
+
+    Run a provided DSP config from `rb.proc_spec` using
+    :func:`.dsp.build_processing_chain`, and add specified outputs to the
+    `rb.lgdo`.
 
     Parameters
     ----------
     rb
-        A :class:`.RawBuffer` that contains a `proc_spec` and an `lgdo` attribute
+        a :class:`.RawBuffer` that contains a `proc_spec` and an `lgdo`
+        attribute.
     tmp_table
-        A :class:`pygama.lgdo.Table` that is temporarily created to be written to the raw file
+        a :class:`pygama.lgdo.Table` that is temporarily created to be written
+        to the raw file.
 
     Notes
     -----
-    rb.lgdo is assumed to be an lgdo.Table so that multiple DSP processor outputs can be written to it
+    `rb.lgdo` is assumed to be an :class`.Table` so that multiple DSP processor
+    outputs can be written to it.
     """
     # Load the dsp_dict
     dsp_dict = rb.proc_spec["dsp_config"]
@@ -281,13 +303,14 @@ def process_dsp(rb: RawBuffer, tmp_table: Table) -> None:
 
 
 def process_dtype_conv(rb: RawBuffer, tmp_table: Table) -> None:
-    """
-    Change the types of fields in an rb.lgdo according to the values specified in the ``proc_spec``'s ``dtype_conv`` list.
-    It operates in place on `tmp_table`.
+    """Change the types of fields in an `rb.lgdo` according to the values
+    specified in the ``proc_spec``'s ``dtype_conv`` list.  It operates in place
+    on `tmp_table`.
 
     Notes
     -----
-    This assumes that name provided points to an object in the rb.lgdo that has an `nda` attribute
+    This assumes that name provided points to an object in the `rb.lgdo` that has
+    an `nda` attribute.
     """
     type_list = rb.proc_spec["dtype_conv"]
     for return_name in type_list.keys():
@@ -312,6 +335,7 @@ def process_dtype_conv(rb: RawBuffer, tmp_table: Table) -> None:
 
 
 def process_drop(rb: RawBuffer, tmp_table: Table) -> None:
+    """Drops any requested fields from the `rb.lgdo`."""
     for drop_keys in rb.proc_spec["drop"]:
         try:
             tmp_table.remove_column(drop_keys, delete=False)
