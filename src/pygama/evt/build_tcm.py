@@ -7,7 +7,7 @@ import pygama.lgdo as lgdo
 
 
 def build_tcm(
-    input_tables: list[tuple[str, str]],
+    input_tables: list[tuple[str, str | list[str]]],
     coin_col: str,
     hash_func: str = r"\d+",
     coin_window: float = 0,
@@ -28,7 +28,8 @@ def build_tcm(
     input_tables
         each entry is ``(filename, table_name_pattern)``. All tables matching
         ``table_name_pattern`` in ``filename`` will be added to the list of
-        input tables.
+        input tables. ``table_name_pattern`` can be replaced with a list of
+        patterns to be searched for in the file
     coin_col
         the name of the column in each tables used to build coincidences. All
         tables must contain a column with this name.
@@ -59,23 +60,26 @@ def build_tcm(
     coin_data = []
     array_ids = []
     all_tables = []
-    for filename, pattern in input_tables:
-        tables = lgdo.ls(filename, lh5_group=pattern)
-        for table in tables:
-            all_tables.append(table)
-            array_id = len(array_ids)
-            if hash_func is not None:
-                if isinstance(hash_func, str):
-                    array_id = int(re.search(hash_func, table).group())
+    for filename, patterns in input_tables:
+        if isinstance(patterns, str):
+            patterns = [patterns]
+        for pattern in patterns:
+            tables = lgdo.ls(filename, lh5_group=pattern)
+            for table in tables:
+                all_tables.append(table)
+                array_id = len(array_ids)
+                if hash_func is not None:
+                    if isinstance(hash_func, str):
+                        array_id = int(re.search(hash_func, table).group())
+                    else:
+                        raise NotImplementedError(
+                            f"hash_func of type {type(hash_func).__name__}"
+                        )
                 else:
-                    raise NotImplementedError(
-                        f"hash_func of type {type(hash_func).__name__}"
-                    )
-            else:
-                array_id = len(all_tables) - 1
-            table = table + "/" + coin_col
-            coin_data.append(store.read_object(table, filename)[0].nda)
-            array_ids.append(array_id)
+                    array_id = len(all_tables) - 1
+                table = table + "/" + coin_col
+                coin_data.append(store.read_object(table, filename)[0].nda)
+                array_ids.append(array_id)
 
     tcm_cols = ptcm.generate_tcm_cols(
         coin_data, coin_window=coin_window, window_ref=window_ref, array_ids=array_ids
