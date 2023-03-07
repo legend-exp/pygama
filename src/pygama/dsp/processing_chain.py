@@ -1250,7 +1250,7 @@ class UnitConversionManager(ProcessorManager):
     def convert_int(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
         tmp = (buf_in + offset_in) * period_ratio - offset_out
         ret = round(tmp)
-        if np.abs(tmp-ret)<1.e-5:
+        if np.abs(tmp - ret) < 1.0e-5:
             return ret
         else:
             raise DSPFatal(f"Cannot convert to integer")
