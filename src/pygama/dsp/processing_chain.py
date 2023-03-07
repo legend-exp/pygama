@@ -1261,7 +1261,7 @@ class UnitConversionManager(ProcessorManager):
         # callable function used to process data
         if np.issubdtype(var.dtype, np.integer):
             self.processor = UnitConversionManager.convert_int
-        else
+        else:
             self.processor = UnitConversionManager.convert
         # list of parameters prior to converting to internal representation
         self.params = [var, unit]
