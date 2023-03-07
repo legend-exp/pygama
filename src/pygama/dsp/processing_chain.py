@@ -1245,12 +1245,24 @@ class UnitConversionManager(ProcessorManager):
     @vectorize(nopython=True, cache=True)
     def convert(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
         return (buf_in + offset_in) * period_ratio - offset_out
+    
+    @vectorize(nopython=True, cache=True)
+    def convert_int(buf_in, offset_in, offset_out, period_ratio):  # noqa: N805
+        tmp = (buf_in + offset_in) * period_ratio - offset_out
+        ret = round(tmp)
+        if np.abs(tmp-ret)<1.e-5:
+            return ret
+        else:
+            raise DSPFatal(f"Cannot convert to integer")
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
         # reference back to our processing chain
         self.proc_chain = var.proc_chain
         # callable function used to process data
-        self.processor = UnitConversionManager.convert
+        if np.issubdtype(var.dtype, np.integer):
+            self.processor = UnitConversionManager.convert_int
+        else
+            self.processor = UnitConversionManager.convert
         # list of parameters prior to converting to internal representation
         self.params = [var, unit]
         self.kw_params = {}
