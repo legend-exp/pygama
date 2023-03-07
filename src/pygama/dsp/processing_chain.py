@@ -1257,7 +1257,7 @@ class UnitConversionManager(ProcessorManager):
 
         from_buffer, from_grid = var._buffer[0]
         period_ratio = from_grid.get_period(unit.period)
-        self.out_buffer = np.zeros_like(from_buffer, dtype="float64")
+        self.out_buffer = np.zeros_like(from_buffer, dtype=var.dtype)
         self.args = [
             from_buffer,
             from_grid.get_offset(),
