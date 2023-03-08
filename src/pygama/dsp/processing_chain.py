@@ -1253,7 +1253,7 @@ class UnitConversionManager(ProcessorManager):
         if np.abs(tmp - ret) < 1.0e-5:
             return ret
         else:
-            raise DSPFatal(f"Cannot convert to integer")
+            raise DSPFatal("Cannot convert to integer")
 
     def __init__(self, var: ProcChainVar, unit: str | Unit) -> None:
         # reference back to our processing chain
