@@ -509,7 +509,11 @@ class DataLoader:
                 raise FileNotFoundError(f"Can't find TCM file for {tcm_level}")
 
             tcm_table_name = self.get_table_name(tcm_tier, tcm_tb)
-            tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
+            try:
+                tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
+            except KeyError:
+                log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
+                continue
             # Have to do some hacky stuff until I get a get_dataframe() method
             tcm_lgdo[self.tcms[tcm_level]["tcm_cols"]["child_idx"]] = Array(
                 nda=explode_cl(tcm_lgdo["cumulative_length"].nda)
@@ -562,12 +566,16 @@ class DataLoader:
                         if tier in col_tiers[file]["tables"].keys():
                             if tb in col_tiers[file]["tables"][tier]:
                                 table_name = self.get_table_name(tier, tb)
-                                tier_table, _ = sto.read_object(
-                                    table_name,
-                                    tier_path,
-                                    field_mask=cut_cols[level],
-                                    idx=idx_mask.tolist(),
-                                )
+                                try:
+                                    tier_table, _ = sto.read_object(
+                                        table_name,
+                                        tier_path,
+                                        field_mask=cut_cols[level],
+                                        idx=idx_mask.tolist(),
+                                    )
+                                except KeyError:
+                                    log.warning(f"Cannot find {table_name} in file {tier_path}")
+                                    continue
                                 if tb_table is None:
                                     tb_table = tier_table
                                 else:
@@ -736,7 +744,11 @@ class DataLoader:
                     )
                     # now read how many rows are there in the file
                     table_name = self.get_table_name(tier, tb)
-                    n_rows = sto.read_n_rows(table_name, tier_path)
+                    try:
+                        n_rows = sto.read_n_rows(table_name, tier_path)
+                    except KeyError:
+                        log.warning(f"Cannot find {table_name} in file {tier_path}")
+                        continue
                     tb_df = pd.DataFrame(
                         {
                             f"{low_level}_idx": np.arange(n_rows),
@@ -762,9 +774,13 @@ class DataLoader:
 
                             # load the data from the tier file, just the columns needed for the cut
                             table_name = self.get_table_name(tier, tb)
-                            tier_tb, _ = sto.read_object(
-                                table_name, tier_path, field_mask=cut_cols
-                            )
+                            try:
+                                tier_tb, _ = sto.read_object(
+                                    table_name, tier_path, field_mask=cut_cols
+                                )
+                            except KeyError:
+                                log.warning(f"Cannot find {table_name} in file {tier_path}")
+                                continue
                             # join eveything in one table
                             if tb_table is None:
                                 tb_table = tier_tb
