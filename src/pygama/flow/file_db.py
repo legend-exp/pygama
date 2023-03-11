@@ -114,7 +114,7 @@ class FileDB:
     --------
     >>> from pygama.flow import FileDB
     >>> db = FileDB("./filedb_config.json")
-    >>> db.get_tables_columns()  # read in also table columns names
+    >>> db.scan_tables_columns()  # read in also table columns names
     >>> print(db)
     << Columns >>
     [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['array_id', 'array_idx', 'cumulative_length']]
@@ -277,8 +277,8 @@ class FileDB:
         def check_status(row):
             status = 0
             for i, tier in enumerate(self.tiers):
-                path_name = (
-                    self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+                path_name = os.path.join(
+                    self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"]
                 )
                 if os.path.exists(path_name):
                     status |= 1 << len(self.tiers) - i - 1
@@ -296,7 +296,7 @@ class FileDB:
 
         def get_size(row, tier):
             size = 0
-            path_name = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+            path_name = os.path.join(self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"])
             if os.path.exists(path_name):
                 size = os.path.getsize(path_name)
             return size
@@ -340,7 +340,7 @@ class FileDB:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
         def update_tables_cols(row, tier: str) -> pd.Series:
-            fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+            fpath = os.path.join(self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"])
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
