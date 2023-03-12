@@ -466,6 +466,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         )
         self.decoded_values = {}  # dict[fcid]
         self.fcid = {}  # dict[crate][card]
+        self.board_id = {}  # dict[crate][card]
         self.n_adc = {}  # dict[fcid]
         self.key_list = {}  # dict[fcid]
         super().__init__(header=header, **kwargs)
@@ -502,6 +503,12 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 card = child["station"]
                 self.fcid[crate][card] = fcid
 
+                # load self.board_id
+                board_id = fc_card_info_dict[crate][card]["CardAddress"]
+                if crate not in self.board_id:
+                    self.board_id[crate] = {}
+                self.board_id[crate][card] = board_id
+
                 if crate not in fc_card_info_dict:
                     raise RuntimeError(f"no crate {crate} in fc_card_info_dict")
                 if card not in fc_card_info_dict[crate]:
@@ -512,7 +519,6 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                     if not fc_card_info_dict[crate][card]["Enabled"][fc_input]:
                         continue
                     self.n_adc[fcid] += 1
-                    board_id = fc_card_info_dict[crate][card]["CardAddress"]
                     key = get_key(fcid, board_id, fc_input)
                     if key in self.key_list[fcid]:
                         log.warning(f"key {key} already in key_list...")
@@ -532,7 +538,6 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             log.debug(f"fcid {fcid}: {self.n_adc[fcid]} adcs, wf_len = {wf_len}")
 
     def get_key_lists(self) -> list[list[int]]:
-        print('gkl', list(self.key_list.values()))
         return list(self.key_list.values())
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
@@ -568,6 +573,17 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         crate = (packet[2] & 0xF8000000) >> 27
         slot = (packet[2] & 0x07C00000) >> 22
         board_id = (packet[2] & 0x003FC000) >> 10
+        expected_board_id = self.board_id[crate][slot]
+        if board_id != expected_board_id:
+            if board_id == (expected_board_id << 4) & 0XFFF: # just an old ORCA shift
+                board_id = expected_board_id
+            else:
+                if not hasattr(self, 'warned_board_id'):
+                    self.warned_board_id = {}
+                if board_id not in self.warned_board_id:
+                    log.warning(f"decoded board_id {board_id} when {expected_board_id} was expected")
+                    self.warned_board_id[board_id] = True
+
         fc_input = (packet[2] & self.fc_input_mask) >> self.fc_input_shift
         channel = packet[2] & self.channel_mask
         fcid = self.fcid[crate][slot]
