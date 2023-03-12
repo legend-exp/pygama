@@ -228,6 +228,7 @@ def build_raw(
             progress_bar.update(streamer.n_bytes_read - n_bytes_last)
             n_bytes_last = streamer.n_bytes_read
         if len(chunk_list) == 0:
+            log.info(f"Reached EOF, exiting...")
             break
         n_read = 0
         for rb in chunk_list:
@@ -239,6 +240,7 @@ def build_raw(
             progress_bar.update(n_read)
         write_to_lh5_and_clear(chunk_list, lh5_store)
         if n_max <= 0:
+            log.info(f"Wrote {n_max} rows, exiting...")
             break
 
     streamer.close_stream()
