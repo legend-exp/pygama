@@ -936,7 +936,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
 
         # Check that the waveforms match
         # These are the channels that should be unprocessed
-        if group_name == "chan3" or group_name == "chan4":
+        if group_name == "chan28803" or group_name == "chan28804":
             raw_packet_waveform_values, _ = sto.read_object(
                 str(raw_group) + "/waveform/values", raw_file
             )
