@@ -758,7 +758,7 @@ def test_buffer_processor_multiple_keys(lgnd_test_data):
     out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
                 "proc_spec": {
@@ -800,7 +800,7 @@ def test_buffer_processor_multiple_keys(lgnd_test_data):
                 },
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
             },
@@ -810,12 +810,12 @@ def test_buffer_processor_multiple_keys(lgnd_test_data):
     copy_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
@@ -1106,7 +1106,7 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
     out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
                 "proc_spec": {
@@ -1148,7 +1148,7 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
                 },
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
             },
@@ -1158,12 +1158,12 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
     copy_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },

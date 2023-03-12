@@ -114,19 +114,20 @@ class OrcaEncoder:
         packets[1] += orca_header_length << 28
         packets[1] += fcio_header_length << 22
 
-        packet3 = 0x80000
+        packet3 = 0
         packet3 += tbl["channel"].nda[ii]
-        packet3 += tbl["ch_orca"].nda[ii] << 10
-        packet3 += tbl["crate"].nda[ii] << 22
-        packet3 += tbl["card"].nda[ii] << 27
+        packet3 += tbl["fc_input"].nda[ii] << 10
+        packet3 += (tbl["board_id"].nda[ii] << 4) & 0xFFF << 10
+        packet3 += tbl["slot"].nda[ii] << 22
+        packet3 += tbl["crate"].nda[ii] << 27
         packets.append(packet3)
 
         # time offsets
-        packets.append(tbl["to_mu_sec"].nda[ii])
-        packets.append(tbl["to_mu_usec"].nda[ii])
+        packets.append(tbl["mu_offset_sec"].nda[ii])
+        packets.append(tbl["mu_offset_usec"].nda[ii])
         packets.append(tbl["to_master_sec"].nda[ii])
-        packets.append(tbl["to_dt_mu_usec"].nda[ii])
-        packets.append(tbl["to_abs_mu_usec"].nda[ii])
+        packets.append(tbl["delta_mu_usec"].nda[ii])
+        packets.append(tbl["abs_delta_mu_usec"].nda[ii])
         packets.append(tbl["to_start_sec"].nda[ii])
         packets.append(tbl["to_start_usec"].nda[ii])
 

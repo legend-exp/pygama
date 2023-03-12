@@ -765,7 +765,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     proc_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
                 "proc_spec": {
@@ -806,7 +806,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
                 },
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
             },
@@ -816,12 +816,12 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     raw_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [28800, 28801],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [28803, 28804],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
