@@ -13,11 +13,10 @@ from pygama.raw.orca.orca_digitizers import (  # noqa: F401
     ORSIS3302DecoderForEnergy,
     ORSIS3316WaveformDecoder,
 )
-from pygama.raw.orca.orca_flashcam import (  # noqa: F401
-    ORFlashCamListenerConfigDecoder,
-    #ORFlashCamListenerStatusDecoder,
-    ORFlashCamWaveformDecoder,
+from pygama.raw.orca.orca_flashcam import (  # noqa: F401; ORFlashCamListenerStatusDecoder,
     ORFlashCamADCWaveformDecoder,
+    ORFlashCamListenerConfigDecoder,
+    ORFlashCamWaveformDecoder,
 )
 from pygama.raw.orca.orca_header_decoder import OrcaHeaderDecoder
 from pygama.raw.orca.orca_run_decoder import ORRunDecoderForRun  # noqa: F401

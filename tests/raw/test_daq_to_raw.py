@@ -82,14 +82,15 @@ class OrcaEncoder:
             if k == "gps":
                 break
 
-        bvi0 = 0 # start index of board vector-of-vector's
-        if ii > 0: bvi0 = tbl["ch_board_id"].cumulative_length.nda[ii-1]
+        bvi0 = 0  # start index of board vector-of-vector's
+        if ii > 0:
+            bvi0 = tbl["ch_board_id"].cumulative_length.nda[ii - 1]
         npacks = tbl["ch_board_id"].cumulative_length.nda[ii] - bvi0
 
         for jj in range(npacks):
-            board_id = tbl["ch_board_id"].flattened_data.nda[bvi0+jj] 
-            fc_input = tbl["ch_inputnum"].flattened_data.nda[bvi0+jj]
-            packets.append( (board_id << 16) + fc_input )
+            board_id = tbl["ch_board_id"].flattened_data.nda[bvi0 + jj]
+            fc_input = tbl["ch_inputnum"].flattened_data.nda[bvi0 + jj]
+            packets.append((board_id << 16) + fc_input)
 
         packets[0] += len(packets)
 

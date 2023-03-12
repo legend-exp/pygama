@@ -21,11 +21,13 @@ def get_key(fcid, board_id, fc_input: int) -> int:
 def get_fcid(key: int) -> int:
     return int(np.floor(key / 1000000)) + 1
 
+
 def get_board_id(key: int) -> int:
-    return int(np.floor(key/100)) & 0xfff
+    return int(np.floor(key / 100)) & 0xFFF
+
 
 def get_fc_input(key: int) -> int:
-    return int(key & 0xff)
+    return int(key & 0xFF)
 
 
 class ORFlashCamListenerConfigDecoder(OrcaDecoder):
@@ -53,23 +55,23 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
             "gps": {"dtype": "int32"},
             "ch_board_id": {
                 "dtype": "uint16",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": 2400, # max number of channels
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": 2400,  # max number of channels
             },
             "ch_inputnum": {
                 "dtype": "uint16",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": 2400, # max number of channels
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": 2400,  # max number of channels
             },
             "board_rev": {
                 "dtype": "uint8",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "board_uid": {
                 "dtype": "uint64",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
         }
         super().__init__(header=header, **kwargs)
@@ -97,49 +99,54 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         for i, k in enumerate(self.decoded_values):
             if i < 3:
                 continue
-            tbl[k].nda[ii] = int_packet[i-1]
+            tbl[k].nda[ii] = int_packet[i - 1]
             if k == "gps":
                 break
 
         # store gps in the header for building timestamps in the event decoder
-        if not hasattr(self.header, 'fc_gps'):
+        if not hasattr(self.header, "fc_gps"):
             self.header.fc_gps = {}
-        self.header.fc_gps[fcid] = tbl['gps'].nda[ii]
+        self.header.fc_gps[fcid] = tbl["gps"].nda[ii]
 
         # while decoding this list, store a map of (fcid,fc_channel) to FBI
         # (fcid - board address - input number) in the orca header for use in
         # the waveform packet decoders.
         n_adc = packet[3]
-        if not hasattr(self.header, 'fbi_map'):
+        if not hasattr(self.header, "fbi_map"):
             self.header.fbi_map = {}
         if fcid not in self.header.fbi_map:
             self.header.fbi_map[fcid] = np.empty(n_adc, dtype=np.uint32)
 
-        fd0 = 0 if ii == 0 else tbl["ch_board_id"].cumulative_length.nda[ii-1]
+        fd0 = 0 if ii == 0 else tbl["ch_board_id"].cumulative_length.nda[ii - 1]
         tbl["ch_board_id"].cumulative_length.nda[ii] = fd0 + n_adc
         tbl["ch_inputnum"].cumulative_length.nda[ii] = fd0 + n_adc
-        for i in range(n_adc): # i is FC channel
-            board_id = (packet[13+i] & 0xFFFF0000) >> 16
+        for i in range(n_adc):  # i is FC channel
+            board_id = (packet[13 + i] & 0xFFFF0000) >> 16
             tbl["ch_board_id"].flattened_data.nda[fd0 + i] = board_id
-            fc_input = packet[13+i] & 0x0000FFFF
+            fc_input = packet[13 + i] & 0x0000FFFF
             tbl["ch_inputnum"].flattened_data.nda[fd0 + i] = fc_input
             fbi = get_key(fcid, board_id, fc_input)
             self.header.fbi_map[fcid][i] = fbi
 
         if len(packet) > 13 + n_adc:
             n_boards = packet[11]
-            fd0 = 0 if ii == 0 else tbl["board_rev"].cumulative_length.nda[ii-1]
+            fd0 = 0 if ii == 0 else tbl["board_rev"].cumulative_length.nda[ii - 1]
             tbl["board_rev"].cumulative_length.nda[ii] = fd0 + n_boards
-            n_board_rev_words = int(np.ceil(n_boards/4))
+            n_board_rev_words = int(np.ceil(n_boards / 4))
             for i in range(n_board_rev_words):
                 for j in range(4):
-                    tbl["board_rev"].flattened_data.nda[fd0 + i*4 + j] = (packet[13+n_adc+i] >> 4*j) & 0xFF
+                    tbl["board_rev"].flattened_data.nda[fd0 + i * 4 + j] = (
+                        packet[13 + n_adc + i] >> 4 * j
+                    ) & 0xFF
 
             tbl["board_uid"].cumulative_length.nda[ii] = fd0 + n_boards
             for i in range(n_boards):
-                tbl["board_uid"].flattened_data.nda[fd0+i] = packet[13+n_adc + n_board_rev_words + 2*i] << 32
-                tbl["board_uid"].flattened_data.nda[fd0+i] |= packet[13+n_adc + n_board_rev_words + 2*i + 1]
-
+                tbl["board_uid"].flattened_data.nda[fd0 + i] = (
+                    packet[13 + n_adc + n_board_rev_words + 2 * i] << 32
+                )
+                tbl["board_uid"].flattened_data.nda[fd0 + i] |= packet[
+                    13 + n_adc + n_board_rev_words + 2 * i + 1
+                ]
 
         # check that the ADC decoder has the right number of samples
         objs = []
@@ -197,114 +204,114 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
             },
             "card_id": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_status": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_eventnumber": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_pps_count": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_clock_tick_count": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_max_clock_ticks": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_env_vals": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_cti_links": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_link_states": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_errors_tot": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_env_errors": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_cti_errors": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_n_link_errors": {
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
-            "card_n_other_errors": { #FIXME: should be v of v of array[5]
+            "card_n_other_errors": {  # FIXME: should be v of v of array[5]
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(5*2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(5 * 2400 / 6),  # max number of boards
             },
-            "card_temps": { #FIXME: should be v of v of array[5]
+            "card_temps": {  # FIXME: should be v of v of array[5]
                 "dtype": "int32",
                 "units": "mC",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(5*2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(5 * 2400 / 6),  # max number of boards
             },
-            "card_voltages": { #FIXME: should be v of v of array[6]
+            "card_voltages": {  # FIXME: should be v of v of array[6]
                 "dtype": "int32",
                 "units": "mV",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(6*2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(6 * 2400 / 6),  # max number of boards
             },
             "card_main_current": {
                 "dtype": "int32",
                 "units": "mA",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
             "card_humidity": {
                 "dtype": "int32",
                 "units": "o/oo",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2400 / 6),  # max number of boards
             },
-            "card_adc_temps": { #FIXME: should be v of v of array[2]
+            "card_adc_temps": {  # FIXME: should be v of v of array[2]
                 "dtype": "int32",
                 "units": "mC",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(2*2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(2 * 2400 / 6),  # max number of boards
             },
-            "card_cti_links": { #FIXME: should be v of v of v[n_cti_links]
+            "card_cti_links": {  # FIXME: should be v of v of v[n_cti_links]
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(4*2400/6), # max number of boards
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(4 * 2400 / 6),  # max number of boards
             },
-            "card_link_states": { #FIXME: should be v of v of v[n_link_states]
+            "card_link_states": {  # FIXME: should be v of v of v[n_link_states]
                 "dtype": "uint32",
-                "datatype": "array<1>{array<1>{real}}", # vector of vectors
-                "length_guess": int(256*2400/6), # 256*max number of boards
-            }
+                "datatype": "array<1>{array<1>{real}}",  # vector of vectors
+                "length_guess": int(256 * 2400 / 6),  # 256*max number of boards
+            },
         }
         super().__init__(header=header, **kwargs)
 
@@ -350,7 +357,7 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
         cd_size = int_packet[14]
         tbl["card_data_size"].nda[ii] = cd_size
 
-        fd0 = 0 if ii == 0 else tbl["card_id"].cumulative_length.nda[ii-1]
+        fd0 = 0 if ii == 0 else tbl["card_id"].cumulative_length.nda[ii - 1]
         tbl["card_id"].cumulative_length.nda[ii] = fd0 + n_cards
         tbl["card_status"].cumulative_length.nda[ii] = fd0 + n_cards
         tbl["card_eventnumber"].cumulative_length.nda[ii] = fd0 + n_cards
@@ -364,52 +371,81 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
         tbl["card_n_env_errors"].cumulative_length.nda[ii] = fd0 + n_cards
         tbl["card_n_cti_errors"].cumulative_length.nda[ii] = fd0 + n_cards
         tbl["card_n_link_errors"].cumulative_length.nda[ii] = fd0 + n_cards
-        tbl["card_n_other_errors"].cumulative_length.nda[ii] = (fd0 + n_cards)*5
-        tbl["card_temps"].cumulative_length.nda[ii] = (fd0 + n_cards)*5
-        tbl["card_voltages"].cumulative_length.nda[ii] = (fd0 + n_cards)*6
+        tbl["card_n_other_errors"].cumulative_length.nda[ii] = (fd0 + n_cards) * 5
+        tbl["card_temps"].cumulative_length.nda[ii] = (fd0 + n_cards) * 5
+        tbl["card_voltages"].cumulative_length.nda[ii] = (fd0 + n_cards) * 6
         tbl["card_main_current"].cumulative_length.nda[ii] = fd0 + n_cards
         tbl["card_humidity"].cumulative_length.nda[ii] = fd0 + n_cards
-        tbl["card_adc_temps"].cumulative_length.nda[ii] = (fd0 + n_cards)*2
+        tbl["card_adc_temps"].cumulative_length.nda[ii] = (fd0 + n_cards) * 2
         # FIXME: can't write multiple rows for some elements and not for others.
         # It breaks the table structure. Need to fix the FIXMEs above: make all
         # of these vector elements vectors of vectors of data. Can't just fix it
         # by implementing get_max_rows_in_packet()
         for i_card in range(n_cards):
-            i_cd = 15 + i_card*cd_size # start index of this card's data
+            i_cd = 15 + i_card * cd_size  # start index of this card's data
             tbl["card_id"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 0]
             tbl["card_status"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 1]
             tbl["card_eventnumber"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 2]
             tbl["card_pps_count"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 3]
-            tbl["card_clock_tick_count"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 4]
-            tbl["card_max_clock_ticks"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 5]
+            tbl["card_clock_tick_count"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 4
+            ]
+            tbl["card_max_clock_ticks"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 5
+            ]
             tbl["card_n_env_vals"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 6]
             tbl["card_n_cti_links"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 7]
             n_link_states = packet[i_cd + 7]
             tbl["card_n_link_states"].flattened_data.nda[fd0 + i_card] = n_link_states
             # packet[i_cd + 9] = empty / dummy
-            tbl["card_n_errors_tot"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 10]
-            tbl["card_n_env_errors"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 11]
-            tbl["card_n_cti_errors"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 12]
-            tbl["card_n_link_errors"].flattened_data.nda[fd0 + i_card] = packet[i_cd + 13]
+            tbl["card_n_errors_tot"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 10
+            ]
+            tbl["card_n_env_errors"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 11
+            ]
+            tbl["card_n_cti_errors"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 12
+            ]
+            tbl["card_n_link_errors"].flattened_data.nda[fd0 + i_card] = packet[
+                i_cd + 13
+            ]
             for j in range(5):
-                tbl["card_n_other_errors"].flattened_data.nda[(fd0 + i_card)*5+j] = packet[i_cd + 14 + j]
+                tbl["card_n_other_errors"].flattened_data.nda[
+                    (fd0 + i_card) * 5 + j
+                ] = packet[i_cd + 14 + j]
             for j in range(5):
-                tbl["card_temps"].flattened_data.nda[(fd0 + i_card)*5+j] = int_packet[i_cd + 19 + j]
+                tbl["card_temps"].flattened_data.nda[
+                    (fd0 + i_card) * 5 + j
+                ] = int_packet[i_cd + 19 + j]
             for j in range(6):
-                tbl["card_voltages"].flattened_data.nda[(fd0 + i_card)*6+j] = int_packet[i_cd + 24 + j]
-            tbl["card_main_current"].flattened_data.nda[fd0 + i_card] = int_packet[i_cd + 30]
-            tbl["card_humidity"].flattened_data.nda[fd0 + i_card] = int_packet[i_cd + 31]
+                tbl["card_voltages"].flattened_data.nda[
+                    (fd0 + i_card) * 6 + j
+                ] = int_packet[i_cd + 24 + j]
+            tbl["card_main_current"].flattened_data.nda[fd0 + i_card] = int_packet[
+                i_cd + 30
+            ]
+            tbl["card_humidity"].flattened_data.nda[fd0 + i_card] = int_packet[
+                i_cd + 31
+            ]
             for j in range(2):
-                tbl["card_adc_temps"].flattened_data.nda[(fd0 + i_card)*2+j] = int_packet[i_cd + 32 + j]
+                tbl["card_adc_temps"].flattened_data.nda[
+                    (fd0 + i_card) * 2 + j
+                ] = int_packet[i_cd + 32 + j]
             # packet[34] is empty / dummy
             for j in range(4):
-                tbl["card_cti_links"].flattened_data.nda[(fd0 + i_card)*4+j] = packet[i_cd + 35 + j]
+                tbl["card_cti_links"].flattened_data.nda[
+                    (fd0 + i_card) * 4 + j
+                ] = packet[i_cd + 35 + j]
             for j in range(256):
                 value = packet[i_cd + 39 + j] if j < n_link_states else 0
-                tbl["card_link_states"].flattened_data.nda[(fd0 + i_card)*256+j] = value
+                tbl["card_link_states"].flattened_data.nda[
+                    (fd0 + i_card) * 256 + j
+                ] = value
 
         rb.loc += 1
         return rb.is_full()
+
 
 class ORFlashCamWaveformDecoder(OrcaDecoder):
     """Decoder for FlashCam ADC data written by ORCA."""
@@ -495,7 +531,6 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             self.decoded_values[fcid]["waveform"]["wf_len"] = wf_len
             log.debug(f"fcid {fcid}: {self.n_adc[fcid]} adcs, wf_len = {wf_len}")
 
-
     def get_key_lists(self) -> list[list[int]]:
         print('gkl', list(self.key_list.values()))
         return list(self.key_list.values())
@@ -540,13 +575,16 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         # get the table for this fcid/board_id/fc_input
         key = get_key(fcid, board_id, fc_input)
         # check that the key matches the FC expectation
-        if hasattr(self.header, 'fbi_map') and key != self.header.fbi_map[fcid][channel]:
+        if (
+            hasattr(self.header, "fbi_map")
+            and key != self.header.fbi_map[fcid][channel]
+        ):
             # if it doesn't match, try to recover:
             # need to use orca key for looking up the buffer
             # but can correct what gets written to file using the fc_config data
             # this works as long as the the orca <-> fc board ID mapping is 1-to-1
             # So track the matches and emit warnings as they occur
-            if not hasattr(self, 'key_mismatches'):
+            if not hasattr(self, "key_mismatches"):
                 self.key_mismatches = {}
             if key not in self.key_mismatches:
                 self.key_mismatches[key] = []
@@ -642,7 +680,9 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
             else:
                 if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
-                    log.warning(f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}")
+                    log.warning(
+                        f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}"
+                    )
                 toff = np.float64(packet[offset + 2])
         tbl["timestamp"].nda[ii] = tstamp + toff
 
