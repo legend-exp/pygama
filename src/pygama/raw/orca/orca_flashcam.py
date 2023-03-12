@@ -40,6 +40,7 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         # different boards / channels on each FC system readout by ORCA
         self.decoded_values = {
             "packet_id": {"dtype": "uint32"},
+            "packet_len": {"dtype": "uint32"},
             "readout_id": {"dtype": "uint16"},
             "fcid": {"dtype": "uint16"},
             "telid": {"dtype": "int32"},
@@ -92,14 +93,15 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
         int_packet = packet.astype(np.int32)
 
         tbl["packet_id"].nda[ii] = packet_id
+        tbl["packet_len"].nda[ii] = len(packet)
         tbl["readout_id"].nda[ii] = (packet[1] & 0xFFFF0000) >> 16
         fcid = packet[1] & 0x0000FFFF
         tbl["fcid"].nda[ii] = fcid
 
         for i, k in enumerate(self.decoded_values):
-            if i < 3:
+            if i < 4:
                 continue
-            tbl[k].nda[ii] = int_packet[i - 1]
+            tbl[k].nda[ii] = int_packet[i - 2]
             if k == "gps":
                 break
 
