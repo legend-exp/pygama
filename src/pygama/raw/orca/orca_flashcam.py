@@ -575,13 +575,15 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         board_id = (packet[2] & 0x003FC000) >> 10
         expected_board_id = self.board_id[crate][slot]
         if board_id != expected_board_id:
-            if board_id == (expected_board_id << 4) & 0XFFF: # just an old ORCA shift
+            if board_id == (expected_board_id << 4) & 0xFFF:  # just an old ORCA shift
                 board_id = expected_board_id
             else:
-                if not hasattr(self, 'warned_board_id'):
+                if not hasattr(self, "warned_board_id"):
                     self.warned_board_id = {}
                 if board_id not in self.warned_board_id:
-                    log.warning(f"decoded board_id {board_id} when {expected_board_id} was expected")
+                    log.warning(
+                        f"decoded board_id {board_id} when {expected_board_id} was expected"
+                    )
                     self.warned_board_id[board_id] = True
 
         fc_input = (packet[2] & self.fc_input_mask) >> self.fc_input_shift
@@ -608,12 +610,14 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             if fc_fbi not in self.key_mismatches[key]:
                 log.warning(f"orca key {key} doesn't match FC key {fc_fbi}")
                 if len(self.key_mismatches[key]) == 1:
-                    log.error(f"orca key {key} corresponds to multiple FC keys! Channel data is mixed")
+                    log.error(
+                        f"orca key {key} corresponds to multiple FC keys! Channel data is mixed"
+                    )
                 self.key_mismatches[key].append(fc_fbi)
                 board_id = get_board_id(fc_fbi)
         if key not in evt_rbkd:
             if key not in self.skipped_channels:
-                log.debug(f'skipping key {key}')
+                log.debug(f"skipping key {key}")
                 self.skipped_channels[key] = 0
             self.skipped_channels[key] += 1
             return False
@@ -688,14 +692,18 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         tbl["runtime"].nda[ii] = tstamp
 
         # make a timestamp useful for sorting
-        if not hasattr(self.header, 'fc_gps'):
-            log.warning(f"didn't decode the FC config record -- timestamps may be miscalculated")
+        if not hasattr(self.header, "fc_gps"):
+            log.warning(
+                f"didn't decode the FC config record -- timestamps may be miscalculated"
+            )
             self.header.fc_gps = {}
         if fcid not in self.header.fc_gps:
             log.warning(f"didn't find fcid {fcid} in fc_gps, adding 0")
             self.header.fc_gps[fcid] = 0
         if self.header.fc_gps[fcid] == 0:
-            toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
+            toff = (
+                np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
+            )
         else:
             if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
                 log.warning(
