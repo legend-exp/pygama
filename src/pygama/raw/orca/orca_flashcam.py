@@ -497,6 +497,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
 
 
     def get_key_lists(self) -> list[list[int]]:
+        print('gkl', list(self.key_list.values()))
         return list(self.key_list.values())
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
@@ -551,11 +552,14 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
                 self.key_mismatches[key] = []
             fc_fbi = self.header.fbi_map[fcid][channel]
             if fc_fbi not in self.key_mismatches[key]:
-                log.warning(f"fcid {fcid} board_id {board_id} fc_input {fc_input}: orca key {key} doesn't match FC key {fc_fbi}")
+                log.warning(f"orca key {key} doesn't match FC key {fc_fbi}")
+                if len(self.key_mismatches[key]) == 1:
+                    log.error(f"orca key {key} corresponds to multiple FC keys! Channel data is mixed")
                 self.key_mismatches[key].append(fc_fbi)
                 board_id = get_board_id(fc_fbi)
         if key not in evt_rbkd:
             if key not in self.skipped_channels:
+                log.debug(f'skipping key {key}')
                 self.skipped_channels[key] = 0
             self.skipped_channels[key] += 1
             return False
@@ -630,12 +634,16 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         tbl["runtime"].nda[ii] = tstamp
 
         # make a timestamp useful for sorting
-        if self.header.fc_gps[fcid] == 0:
+        if not hasattr(self.header, 'fc_gps'):
+            log.warning(f"didn't decode the FC config record -- timestamps may be miscalculated")
             toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
         else:
-            if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
-                log.warning(f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}")
-            toff = np.float64(packet[offset + 2])
+            if self.header.fc_gps[fcid] == 0:
+                toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
+            else:
+                if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
+                    log.warning(f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}")
+                toff = np.float64(packet[offset + 2])
         tbl["timestamp"].nda[ii] = tstamp + toff
 
         # set the fpga baseline/energy and waveform
