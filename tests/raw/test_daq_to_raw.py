@@ -248,4 +248,5 @@ def test_daq_to_raw(lgnd_test_data):
         orig_orca_data = ff.read()
 
     # assert the byte strings are the same
+    assert len(rebuilt_orca_data) == len(orig_orca_data)
     assert rebuilt_orca_data == orig_orca_data
