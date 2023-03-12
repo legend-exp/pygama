@@ -66,11 +66,11 @@ fc_decoded_values = {
         "dtype": "int32",
     },
     # the offset in sec between the master and unix
-    "to_mu_sec": {
+    "mu_offset_sec": {
         "dtype": "int64",
     },
     # the offset in usec between master and unix
-    "to_mu_usec": {
+    "mu_offset_usec": {
         "dtype": "int32",
     },
     # the calculated sec which must be added to the master
@@ -78,11 +78,11 @@ fc_decoded_values = {
         "dtype": "int64",
     },
     # the delta time between master and unix in usec
-    "to_dt_mu_usec": {
+    "delta_mu_usec": {
         "dtype": "int32",
     },
     # the abs(time) between master and unix in usec
-    "to_abs_mu_usec": {
+    "abs_delta_mu_usec": {
         "dtype": "int32",
     },
     # startsec
@@ -236,11 +236,11 @@ class FCEventDecoder(DataDecoder):
             tbl["ts_pps"].nda[ii] = fcio.timestamp_pps
             tbl["ts_ticks"].nda[ii] = fcio.timestamp_ticks
             tbl["ts_maxticks"].nda[ii] = fcio.timestamp_maxticks
-            tbl["to_mu_sec"].nda[ii] = fcio.timeoffset_mu_sec
-            tbl["to_mu_usec"].nda[ii] = fcio.timeoffset_mu_usec
+            tbl["mu_offset_sec"].nda[ii] = fcio.timeoffset_mu_sec
+            tbl["mu_offset_usec"].nda[ii] = fcio.timeoffset_mu_usec
             tbl["to_master_sec"].nda[ii] = fcio.timeoffset_master_sec
-            tbl["to_dt_mu_usec"].nda[ii] = fcio.timeoffset_dt_mu_usec
-            tbl["to_abs_mu_usec"].nda[ii] = fcio.timeoffset_abs_mu_usec
+            tbl["delta_mu_usec"].nda[ii] = fcio.timeoffset_dt_mu_usec
+            tbl["abs_delta_mu_usec"].nda[ii] = fcio.timeoffset_abs_mu_usec
             tbl["to_start_sec"].nda[ii] = fcio.timeoffset_start_sec
             tbl["to_start_usec"].nda[ii] = fcio.timeoffset_start_usec
             tbl["dr_start_pps"].nda[ii] = fcio.deadregion_start_pps
