@@ -76,7 +76,7 @@ class OrcaEncoder:
         decoded_values = ORFlashCamListenerConfigDecoder().get_decoded_values()
 
         for i, k in enumerate(decoded_values):
-            if i < 2:
+            if i < 3:
                 continue
             packets.append(tbl[k].nda[ii])
             if k == "gps":
@@ -117,7 +117,7 @@ class OrcaEncoder:
         packet3 = 0
         packet3 += tbl["channel"].nda[ii]
         packet3 += tbl["fc_input"].nda[ii] << 10
-        packet3 += (tbl["board_id"].nda[ii] << 4) & 0xFFF << 10
+        packet3 += (tbl["board_id"].nda[ii] & 0xFF) << 14 # old bad board_id encoding
         packet3 += tbl["slot"].nda[ii] << 22
         packet3 += tbl["crate"].nda[ii] << 27
         packets.append(packet3)
