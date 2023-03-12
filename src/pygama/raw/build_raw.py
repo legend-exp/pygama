@@ -228,7 +228,7 @@ def build_raw(
             progress_bar.update(streamer.n_bytes_read - n_bytes_last)
             n_bytes_last = streamer.n_bytes_read
         if len(chunk_list) == 0:
-            log.info(f"Reached EOF, exiting...")
+            log.info("Reached EOF, exiting...")
             break
         n_read = 0
         for rb in chunk_list:

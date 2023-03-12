@@ -694,7 +694,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         # make a timestamp useful for sorting
         if not hasattr(self.header, "fc_gps"):
             log.warning(
-                f"didn't decode the FC config record -- timestamps may be miscalculated"
+                "didn't decode the FC config record -- timestamps may be miscalculated"
             )
             self.header.fc_gps = {}
         if fcid not in self.header.fc_gps:
