@@ -674,16 +674,18 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         # make a timestamp useful for sorting
         if not hasattr(self.header, 'fc_gps'):
             log.warning(f"didn't decode the FC config record -- timestamps may be miscalculated")
+            self.header.fc_gps = {}
+        if fcid not in self.header.fc_gps:
+            log.warning(f"didn't find fcid {fcid} in fc_gps, adding 0")
+            self.header.fc_gps[fcid] = 0
+        if self.header.fc_gps[fcid] == 0:
             toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
         else:
-            if self.header.fc_gps[fcid] == 0:
-                toff = np.float64(packet[offset + 0]) + np.float64(packet[offset + 1]) * 1e-6
-            else:
-                if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
-                    log.warning(
-                        f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}"
-                    )
-                toff = np.float64(packet[offset + 2])
+            if tbl["delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
+                log.warning(
+                    f"delta {tbl['delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}"
+                )
+            toff = np.float64(packet[offset + 2])
         tbl["timestamp"].nda[ii] = tstamp + toff
 
         # set the fpga baseline/energy and waveform
