@@ -566,6 +566,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
     ) -> bool:
         """Decode the ORCA FlashCam ADC packet."""
         evt_rbkd = rbl.get_keyed_dict()
+        int_packet = packet.astype(np.int32)
 
         # unpack lengths and ids from the header words
         orca_header_length = (packet[1] & 0xF0000000) >> 28
@@ -665,32 +666,33 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
 
         # set the time offsets
         offset = orca_header_length
-        tbl["mu_offset_sec"].nda[ii] = np.int32(packet[offset])
-        tbl["mu_offset_usec"].nda[ii] = np.int32(packet[offset + 1])
-        tbl["to_master_sec"].nda[ii] = np.int32(packet[offset + 2])
-        tbl["delta_mu_usec"].nda[ii] = np.int32(packet[offset + 3])
-        tbl["abs_delta_mu_usec"].nda[ii] = np.int32(packet[offset + 4])
-        tbl["to_start_sec"].nda[ii] = np.int32(packet[offset + 5])
-        tbl["to_start_usec"].nda[ii] = np.int32(packet[offset + 6])
+        tbl["mu_offset_sec"].nda[ii] = int_packet[offset]
+        tbl["mu_offset_usec"].nda[ii] = int_packet[offset + 1]
+        tbl["to_master_sec"].nda[ii] = int_packet[offset + 2]
+        tbl["delta_mu_usec"].nda[ii] = int_packet[offset + 3]
+        tbl["abs_delta_mu_usec"].nda[ii] = int_packet[offset + 4]
+        tbl["to_start_sec"].nda[ii] = int_packet[offset + 5]
+        tbl["to_start_usec"].nda[ii] = int_packet[offset + 6]
 
         # set the dead region values
         offset += 7
-        tbl["dr_start_pps"].nda[ii] = np.int32(packet[offset])
-        tbl["dr_start_ticks"].nda[ii] = np.int32(packet[offset + 1])
-        tbl["dr_stop_pps"].nda[ii] = np.int32(packet[offset + 2])
-        tbl["dr_stop_ticks"].nda[ii] = np.int32(packet[offset + 3])
-        tbl["dr_maxticks"].nda[ii] = np.int32(packet[offset + 4])
+        tbl["dr_start_pps"].nda[ii] = int_packet[offset]
+        tbl["dr_start_ticks"].nda[ii] = int_packet[offset + 1]
+        tbl["dr_stop_pps"].nda[ii] = int_packet[offset + 2]
+        tbl["dr_stop_ticks"].nda[ii] = int_packet[offset + 3]
+        tbl["dr_maxticks"].nda[ii] = int_packet[offset + 4]
+        tbl["deadtime"].nda[ii] = np.float64(int_packet[offset + 2] - int_packet[offset]) + np.float64(int_packet[offset+3] - int_packet[offset+1])/np.float64(int_packet[offset+4])
 
         # set the event number and clock counters
         offset += 5
-        tbl["eventnumber"].nda[ii] = np.int32(packet[offset])
-        tbl["ts_pps"].nda[ii] = np.int32(packet[offset + 1])
-        tbl["ts_ticks"].nda[ii] = np.int32(packet[offset + 2])
-        tbl["ts_maxticks"].nda[ii] = np.int32(packet[offset + 3])
+        tbl["eventnumber"].nda[ii] = int_packet[offset]
+        tbl["ts_pps"].nda[ii] = int_packet[offset + 1]
+        tbl["ts_ticks"].nda[ii] = int_packet[offset + 2]
+        tbl["ts_maxticks"].nda[ii] = int_packet[offset + 3]
 
         # set the runtime and timestamp
         tstamp = np.float64(packet[offset + 1])
-        tstamp += np.float64(packet[offset + 2]) / (np.int32(packet[offset + 3]) + 1)
+        tstamp += np.float64(packet[offset + 2]) / (int_packet[offset + 3] + 1)
         tbl["runtime"].nda[ii] = tstamp
 
         # make a timestamp useful for sorting

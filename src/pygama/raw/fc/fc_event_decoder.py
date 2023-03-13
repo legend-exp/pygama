@@ -67,7 +67,7 @@ fc_decoded_values = {
     },
     # the offset in sec between the master and unix
     "mu_offset_sec": {
-        "dtype": "int64",
+        "dtype": "int32",
     },
     # the offset in usec between master and unix
     "mu_offset_usec": {
@@ -75,7 +75,7 @@ fc_decoded_values = {
     },
     # the calculated sec which must be added to the master
     "to_master_sec": {
-        "dtype": "int64",
+        "dtype": "int32",
     },
     # the delta time between master and unix in usec
     "delta_mu_usec": {
@@ -87,7 +87,7 @@ fc_decoded_values = {
     },
     # startsec
     "to_start_sec": {
-        "dtype": "int64",
+        "dtype": "int32",
     },
     # startusec
     "to_start_usec": {
