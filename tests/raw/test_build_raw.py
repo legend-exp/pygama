@@ -111,7 +111,7 @@ def test_build_raw_orca_out_spec(lgnd_test_data):
     out_file = "/tmp/L200-comm-20220519-phy-geds.lh5"
     out_spec = {
         "ORFlashCamADCWaveformDecoder": {
-            "geds": {"key_list": [[28802, 28804]], "out_stream": out_file}
+            "geds": {"key_list": [[1028802, 1028804]], "out_stream": out_file}
         }
     }
 
