@@ -15,11 +15,11 @@ log = logging.getLogger(__name__)
 
 
 def get_key(fcid, board_id, fc_input: int) -> int:
-    return (fcid - 1) * 1000000 + board_id * 100 + fc_input
+    return fcid * 1000000 + board_id * 100 + fc_input
 
 
 def get_fcid(key: int) -> int:
-    return int(np.floor(key / 1000000)) + 1
+    return int(np.floor(key / 1000000))
 
 
 def get_board_id(key: int) -> int:
