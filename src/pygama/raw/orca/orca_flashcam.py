@@ -681,7 +681,11 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         tbl["dr_stop_pps"].nda[ii] = int_packet[offset + 2]
         tbl["dr_stop_ticks"].nda[ii] = int_packet[offset + 3]
         tbl["dr_maxticks"].nda[ii] = int_packet[offset + 4]
-        tbl["deadtime"].nda[ii] = np.float64(int_packet[offset + 2] - int_packet[offset]) + np.float64(int_packet[offset+3] - int_packet[offset+1])/np.float64(int_packet[offset+4])
+        tbl["deadtime"].nda[ii] = np.float64(
+            int_packet[offset + 2] - int_packet[offset]
+        ) + np.float64(int_packet[offset + 3] - int_packet[offset + 1]) / np.float64(
+            int_packet[offset + 4]
+        )
 
         # set the event number and clock counters
         offset += 5
