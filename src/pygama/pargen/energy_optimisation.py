@@ -359,8 +359,16 @@ def unbinned_energy_fit(
             & (~np.isnan(m.errors).any())
             & (~(np.array(m.errors[:-3]) == 0).all())
         )
-        if valid3 == False:
-            raise RuntimeError
+        if valid3 is False:
+            try:
+                m.minos()
+                valid3 = (
+                    m.valid
+                    & (~np.isnan(m.errors).any())
+                    & (~(np.array(m.errors[:-3]) == 0).all())
+                )
+            except: 
+                raise RuntimeError
 
         pars = np.array(m.values)[:-1]
         errs = np.array(m.errors)[:-1]
@@ -952,7 +960,7 @@ def event_selection(
         hist,
         bins,
         var,
-        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2614.553]),
+        np.array([583.191, 727.330, 860.564, 1620.5, 2103.53, 2614.553]),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
@@ -1076,10 +1084,8 @@ def interpolate_energy(peak_energies, points, err_points, energy):
     nan_mask = np.isnan(points) | (points < 0)
     if len(points[~nan_mask]) < 3:
         return np.nan, np.nan, np.nan
-    elif nan_mask[-1] == True or nan_mask[-2] == True:
-        return np.nan, np.nan, np.nan
     else:
-        param_guess = [0.2, 0.001, 0.000001]  #
+        param_guess = [2, 0.001, 0.000001]  #
         # param_bounds = (0, [10., 1. ])#
         try:
             fit_pars, fit_covs = curve_fit(
@@ -1103,8 +1109,8 @@ def interpolate_energy(peak_energies, points, err_points, energy):
         except:
             return np.nan, np.nan, np.nan
 
-        if nan_mask[-2] == True:
-            qbb_vals += qbb_err
+        if nan_mask[-1] == True or nan_mask[-2] == True:
+            qbb_err = np.nan
 
     return fit_qbb, qbb_err, fit_pars
 
@@ -1238,6 +1244,7 @@ def new_fom(data, kwarg_dict):
 
     return {
         "y_val": qbb,
+        "y_err": qbb_err,
         "qbb_fwhm": qbb,
         "qbb_fwhm_err": qbb_err,
         "alpha": alpha,
@@ -1402,9 +1409,10 @@ class BayesianOptimizer:
 
     def update(self, results):
         y_val = results["y_val"]
+        y_err = results["y_err"]
         self._extend_prior_with_posterior_data(self.current_x, np.array([y_val]))
 
-        if np.isnan(y_val):
+        if np.isnan(y_val) | np.isnan(y_err):
             pass
         else:
             if y_val < self.y_min:
@@ -1450,13 +1458,15 @@ class BayesianOptimizer:
         elif len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
+            ys_err = np.zeros_like(points)
             for i, point in enumerate(points):
-                ys[i] = self.gauss_pr.predict(
-                    np.array([point]).reshape(1, -1), return_std=False
+                ys[i],ys_err[i] = self.gauss_pr.predict(
+                    np.array([point]).reshape(1, -1), return_std=True
                 )
             fig = plt.figure()
-            plt.plot(points, ys)
+
             plt.scatter(np.array(self.x_init), np.array(self.y_init))
+            plt.fill_between(points, ys-ys_err,ys+ys_err, alpha = 0.1)
             if init_samples is not None:
                 init_ys = np.array(
                     [
