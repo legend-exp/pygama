@@ -3,8 +3,8 @@ Base classes for streaming data.
 """
 from __future__ import annotations
 
-import logging
 import fnmatch
+import logging
 from abc import ABC, abstractmethod
 
 from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
@@ -129,7 +129,11 @@ class DataStreamer(ABC):
 
             # set up wildcard key buffers
             for rb in rb_lib[dec_name]:
-                if len(rb.key_list) == 1 and isinstance(rb.key_list[0],str) and "*" in rb.key_list[0]:
+                if (
+                    len(rb.key_list) == 1
+                    and isinstance(rb.key_list[0], str)
+                    and "*" in rb.key_list[0]
+                ):
                     matched_key_lists = []
                     for key_list in decoder.get_key_lists():
                         # special case: decoders without keys
