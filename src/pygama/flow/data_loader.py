@@ -984,7 +984,10 @@ class DataLoader:
                 else:
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
-                        col_dict[col] = ArrayOfEqualSizedArrays(nda=nda, attrs=attr_dict[col], dims=(1,1))
+                        dt = attr_dict[col]['datatype']
+                        dims = dt[dt.index('<')+1 : dt.index('>')]
+                        dims = [int(e) for e in dims.split(',')]
+                        col_dict[col] = ArrayOfEqualSizedArrays(dims=dims, nda=nda, attrs=attr_dict[col])
                     else:
                         col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
                 attr_dict.pop(col)
