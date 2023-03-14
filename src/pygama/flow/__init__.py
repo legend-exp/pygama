@@ -1,9 +1,8 @@
 """
-Subpackage description
+High-level data flow handling routines.
 """
 
 from .data_loader import DataLoader
-from .datagroup import DataGroup
 from .file_db import FileDB
 
-__all__ = ["DataGroup", "DataLoader", "FileDB"]
+__all__ = ["DataLoader", "FileDB"]
