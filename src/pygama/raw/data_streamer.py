@@ -128,7 +128,6 @@ class DataStreamer(ABC):
             dec_names.append(dec_name)
 
             # set up wildcard key buffers
-            rbs_to_add = []
             for rb in rb_lib[dec_name]:
                 if len(rb.key_list) == 1 and isinstance(rb.key_list[0],str) and "*" in rb.key_list[0]:
                     matched_key_lists = []
