@@ -391,7 +391,11 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
 
         # Expand list_names if name contains a key-based formatter
         if "{key" in name:
-            if len(info["key_list"]) == 1 and isinstance(info["key_list"][0], str) and "*" in info["key_list"][0]:
+            if (
+                len(info["key_list"]) == 1
+                and isinstance(info["key_list"][0], str)
+                and "*" in info["key_list"][0]
+            ):
                 continue  # will be handled later, once the key_list is known
             for key in info["key_list"]:
                 expanded_name = name.format(key=key)
@@ -401,7 +405,9 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
 
     # now re-iterate and expand out_paths
     for name, info in json_dict.items():
-        if len(info["key_list"]) == 1 and not (isinstance(info["key_list"][0], str) and "*" in info["key_list"][0]):
+        if len(info["key_list"]) == 1 and not (
+            isinstance(info["key_list"][0], str) and "*" in info["key_list"][0]
+        ):
             kw_dict["key"] = info["key_list"][0]
         if "out_stream" in info:
             if name != "*" and "{name" in info["out_stream"]:
