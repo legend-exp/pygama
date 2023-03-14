@@ -4,6 +4,7 @@ Base classes for streaming data.
 from __future__ import annotations
 
 import logging
+import fnmatch
 from abc import ABC, abstractmethod
 
 from .raw_buffer import RawBuffer, RawBufferLibrary, RawBufferList
@@ -127,14 +128,29 @@ class DataStreamer(ABC):
             dec_names.append(dec_name)
 
             # set up wildcard key buffers
+            rbs_to_add = []
             for rb in rb_lib[dec_name]:
-                if len(rb.key_list) == 1 and rb.key_list[0] == "*":
-                    key_lists = decoder.get_key_lists()
-                    if len(key_lists) != 1:
+                if len(rb.key_list) == 1 and isinstance(rb.key_list[0],str) and "*" in rb.key_list[0]:
+                    matched_key_lists = []
+                    for key_list in decoder.get_key_lists():
+                        # special case: decoders without keys
+                        if rb.key_list[0] == "*" and key_list == [None]:
+                            matched_key_lists.append(key_list)
+                            continue
+                        key_type = type(key_list[0])
+                        for ik in range(len(key_list)):
+                            key_list[ik] = str(key_list[ik])
+                        matched_keys = fnmatch.filter(key_list, rb.key_list[0])
+                        if len(matched_keys) > 1:
+                            for ik in range(len(matched_keys)):
+                                matched_keys[ik] = key_type(key_list[ik])
+                            matched_key_lists.append(matched_keys)
+                    if len(matched_key_lists) == 0:
                         log.warning(
-                            f"{dec_name} has {len(key_lists)} lists of keys, need a rb for each. Only the first will be decoded."
+                            f"no matched keys for key_list {rb.key_list[0]} in {dec_name}.{rb.out_name}"
                         )
-                    rb.key_list = key_lists[0]
+                        continue
+                    rb.key_list = sum(matched_key_lists, [])
             keyed_name_rbs = []
             ii = 0
             while ii < len(rb_lib[dec_name]):

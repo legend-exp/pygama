@@ -12,9 +12,9 @@ output stream it is associated with (if any), etc. Each
 :class:`.RawBuffer` of a particular format.
 
 :class:`.RawBufferList`: a collection of :class:`RawBuffer` with LGDO's that
-all have the same structure (same type, same fields, etc). A
-:class:`~.raw.data_decoder.DataDecoder` will write its output to a
-:class:`.RawBufferList`.
+all have the same structure (same type, same fields, etc., but the fields can
+have different shape). A :class:`~.raw.data_decoder.DataDecoder` will write its
+output to a :class:`.RawBufferList`.
 
 :class:`.RawBufferLibrary`: a dictionary of :class:`RawBufferList`\ s, e.g. one
 for each :class:`~.raw.data_decoder.DataDecoder`. Keyed by the decoder name.
