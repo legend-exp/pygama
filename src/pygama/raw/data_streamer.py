@@ -160,7 +160,18 @@ class DataStreamer(ABC):
                     ii += 1
             for rb in keyed_name_rbs:
                 for key in rb.key_list:
-                    expanded_name = rb.out_name.format(key=key)
+                    # keys can be strs or ints; try as-is, but can get a
+                    # ValueError e.g. when using a wildcard with int keys. In
+                    # that case, switch to the other type and try again
+                    try:
+                        expanded_name = rb.out_name.format(key=key)
+                    except ValueError:
+                        if isinstance(key, str):
+                            key = int(key)
+                        else:
+                            key = str(key)
+                        expanded_name = rb.out_name.format(key=key)
+
                     new_rb = RawBuffer(
                         key_list=[key],
                         out_stream=rb.out_stream,
