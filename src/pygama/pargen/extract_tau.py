@@ -47,9 +47,9 @@ def load_data(
                 df.daqenergy.values > entry[0] - entry[1]
             )
             if final_mask is None:
-                final_mask = e_cut 
+                final_mask = e_cut
             else:
-                final_mask = final_mask | e_cut 
+                final_mask = final_mask | e_cut
         ids = ~(final_mask)
         log.debug(f"pulser found: {pulser_props}")
     else:
@@ -122,7 +122,7 @@ def get_decay_constant(
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
-        bins = np.linspace(-0.01,0,100000)  # change if needed
+        bins = np.linspace(-0.01, 0, 100000)  # change if needed
         counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
         plot_max = np.argmax(counts)
         in_min = plot_max - 20
@@ -140,7 +140,7 @@ def get_decay_constant(
             bins=200,
             histtype="step",
         )
-        axins.axvline(high_bin,color="red")
+        axins.axvline(high_bin, color="red")
         axins.set_xlim(bins[in_min], bins[in_max])
         labels = ax.get_xticklabels()
         ax.set_xticklabels(labels=labels, rotation=45)

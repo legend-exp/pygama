@@ -10,9 +10,9 @@ import math
 import os
 import pathlib
 from datetime import datetime
-from scipy.stats import binned_statistic
 
 import matplotlib as mpl
+from scipy.stats import binned_statistic
 
 mpl.use("agg")
 import matplotlib.pyplot as plt
@@ -41,14 +41,15 @@ def fwhm_slope(x: np.array, m0: float, m1: float, m2: float = None) -> np.array:
     else:
         return np.sqrt(m0 + m1 * x + m2 * x**2)
 
+
 def load_data(
     files: list[str],
     lh5_path: str,
     energy_params: list[str],
     hit_dict: dict = {},
-    cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"]
+    cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"],
 ) -> pd.DataFrame:
-    
+
     df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
     pulser_props = cts.find_pulser_properties(df, energy="trapTmax")
     if len(pulser_props) > 0:
@@ -58,9 +59,9 @@ def load_data(
                 df.trapTmax.values > entry[0] - entry[1]
             )
             if final_mask is None:
-                final_mask = e_cut 
+                final_mask = e_cut
             else:
-                final_mask = final_mask | e_cut 
+                final_mask = final_mask | e_cut
         ids = ~(final_mask)
         log.debug(f"pulser found: {pulser_props}")
 
@@ -70,23 +71,23 @@ def load_data(
 
     sto = lh5.LH5Store()
     table = sto.read_object(lh5_path, files)[0]
-    
+
     if len(hit_dict.keys()) == 0:
         out_df = df.copy()
         for param in energy_params:
             try:
                 out_df[param] = table[param].nda
-                
+
             except RuntimeError:
-                param = param.split("_")[0] 
+                param = param.split("_")[0]
                 out_df[param] = table[param].nda
-                
+
     else:
-        
+
         out_df = table.eval(hit_dict).get_dataframe()
         out_df = pd.concat([df, out_df], axis=1)
         out_df["is_not_pulser"] = ids
-        
+
         cut_parameters = cts.get_keys(table, cut_parameters)
 
         for param in energy_params:
@@ -99,24 +100,31 @@ def load_data(
     log.debug("Data Loaded")
     return out_df
 
-def apply_cuts(data:pd.DataFrame, hit_dict, cut_parameters=None, final_cut_field: str = "is_valid_cal"):
+
+def apply_cuts(
+    data: pd.DataFrame,
+    hit_dict,
+    cut_parameters=None,
+    final_cut_field: str = "is_valid_cal",
+):
     if cut_parameters is not None:
         cut_dict = cts.generate_cuts(data.query("is_not_pulser"), cut_parameters)
         hit_dict.update(
             cts.cut_dict_to_hit_dict(cut_dict, final_cut_field=final_cut_field)
         )
         mask = cts.get_cut_indexes(data, cut_dict)
-        
-        data["is_valid_cal"]= mask
-        
+
+        data["is_valid_cal"] = mask
+
     else:
-        data["is_valid_cal"]= np.ones(len(data), dtype=bool)
-    data["is_usable"] = data["is_valid_cal"]&data["is_not_pulser"]
-    
+        data["is_valid_cal"] = np.ones(len(data), dtype=bool)
+    data["is_usable"] = data["is_valid_cal"] & data["is_not_pulser"]
+
     events_pqc = len(data.query("is_usable"))
     log.debug(f"{events_pqc} events valid for calibration")
-    
+
     return data, hit_dict
+
 
 def gen_pars_dict(pars, deg, energy_param):
     if deg == 1:
@@ -139,9 +147,11 @@ def gen_pars_dict(pars, deg, energy_param):
         log.warning(f"hit_dict not implemented for deg = {deg}")
 
     return out_dict
-class calibrate_parameter():
+
+
+class calibrate_parameter:
     glines = [
-        #238.632,
+        # 238.632,
         583.191,
         727.330,
         860.564,
@@ -151,7 +161,7 @@ class calibrate_parameter():
         2614.50,
     ]  # gamma lines used for calibration
     range_keV = [
-        #(8, 8),
+        # (8, 8),
         (20, 20),
         (30, 30),
         (30, 30),
@@ -161,7 +171,7 @@ class calibrate_parameter():
         (60, 60),
     ]  # side bands width
     funcs = [
-        #pgf.extended_gauss_step_pdf,
+        # pgf.extended_gauss_step_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
@@ -171,7 +181,7 @@ class calibrate_parameter():
         pgf.extended_radford_pdf,
     ]
     gof_funcs = [
-        #pgf.gauss_step_pdf,
+        # pgf.gauss_step_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
@@ -180,30 +190,32 @@ class calibrate_parameter():
         pgf.radford_pdf,
         pgf.radford_pdf,
     ]
-    
-    def __init__(self, 
-                 data,
-                 energy_param,
-                plot_options:dict =None,
-                guess_keV: float | None = None,
-                threshold: int = 0,
-                p_val: float = 0,
-                n_events: int = 15000,
-                deg: int = 1,):
-        
-        self.data=data
-        self.energy_param=energy_param
+
+    def __init__(
+        self,
+        data,
+        energy_param,
+        plot_options: dict = None,
+        guess_keV: float | None = None,
+        threshold: int = 0,
+        p_val: float = 0,
+        n_events: int = 15000,
+        deg: int = 1,
+    ):
+
+        self.data = data
+        self.energy_param = energy_param
         self.guess_keV = guess_keV
-        self.threshold=threshold
-        self.p_val=p_val
-        self.n_events=n_events
-        self.deg=deg
+        self.threshold = threshold
+        self.p_val = p_val
+        self.n_events = n_events
+        self.deg = deg
         self.plot_options = plot_options
-        
-        self.output_dict={}
-        self.hit_dict={}
-        self.plot_dict={}
-        
+
+        self.output_dict = {}
+        self.hit_dict = {}
+        self.plot_dict = {}
+
     def fit_energy_res(self):
         fitted_peaks = self.results["fitted_keV"]
         fwhms = self.results["pk_fwhms"][:, 0]
@@ -263,17 +275,20 @@ class calibrate_parameter():
             log.info(f"FWHM curve fit: {self.fit_pars}")
             log.info(f"FWHM fit values:")
             for peak in fwhm_peaks:
-                log.info(f"Predicted FWHM of {peak} keV peak is: {fwhm_slope(peak, *self.fit_pars):.2f} keV")
-            log.info(f"FWHM energy resolution at Qbb: {self.fit_qbb:1.2f} +- {self.qbb_err:1.2f} keV")
+                log.info(
+                    f"Predicted FWHM of {peak} keV peak is: {fwhm_slope(peak, *self.fit_pars):.2f} keV"
+                )
+            log.info(
+                f"FWHM energy resolution at Qbb: {self.fit_qbb:1.2f} +- {self.qbb_err:1.2f} keV"
+            )
         except RuntimeError:
             log.error(f"FWHM fit failed for {energy_param}")
-            self.fit_pars = np.array([np.nan,np.nan])
-            self.fit_covs = np.array([[ np.nan, np.nan],
-                                [np.nan,  np.nan]])
+            self.fit_pars = np.array([np.nan, np.nan])
+            self.fit_covs = np.array([[np.nan, np.nan], [np.nan, np.nan]])
             self.fit_qbb = np.nan
-            self.qbb_err=np.nan
+            self.qbb_err = np.nan
             log.error("FWHM fit failed to converge")
-            
+
     def gen_pars_dict(self):
         if self.deg == 1:
             out_dict = {
@@ -295,17 +310,20 @@ class calibrate_parameter():
             log.warning(f"hit_dict not implemented for deg = {self.deg}")
 
         return out_dict
-    
+
     def calibrate_parameter(self):
         kev_ranges = self.range_keV.copy()
         if self.guess_keV is None:
             self.guess_keV = 2620 / np.nanpercentile(
-                self.data.query(f"is_usable & {self.energy_param}>{self.threshold}")[self.energy_param], 99
+                self.data.query(f"is_usable & {self.energy_param}>{self.threshold}")[
+                    self.energy_param
+                ],
+                99,
             )
 
         log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
         log.debug(f"Guess is {self.guess_keV:.3f}")
-        
+
         try:
             self.pars, self.cov, self.results = cal.hpge_E_calibration(
                 self.data.query("is_usable")[self.energy_param],
@@ -335,7 +353,11 @@ class calibrate_parameter():
                 kev_ranges[i] = (kev_ranges[i][0] - 5, kev_ranges[i][1] - 5)
         for i, peak in enumerate(fitted_peaks):
             try:
-                if self.results["pk_fwhms"][:, 1][i] / self.results["pk_fwhms"][:, 0][i] > 0.05:
+                if (
+                    self.results["pk_fwhms"][:, 1][i]
+                    / self.results["pk_fwhms"][:, 0][i]
+                    > 0.05
+                ):
                     index = np.where(self.glines == peak)[0][0]
                     kev_ranges[i] = (kev_ranges[index][0] - 5, kev_ranges[index][1] - 5)
             except:
@@ -358,7 +380,9 @@ class calibrate_parameter():
         except:
             self.pars = None
         if self.pars is None:
-            log.error(f"Calibration failed for {self.energy_param}, trying with 0 p_val")
+            log.error(
+                f"Calibration failed for {self.energy_param}, trying with 0 p_val"
+            )
             try:
                 self.pars, self.cov, self.results = cal.hpge_E_calibration(
                     self.data.query("is_usable")[self.energy_param],
@@ -377,7 +401,9 @@ class calibrate_parameter():
                     raise ValueError
 
                 self.fit_energy_res()
-                self.data[f"{self.energy_param}_cal"] = pgf.poly(self.data[self.energy_param], self.pars)
+                self.data[f"{self.energy_param}_cal"] = pgf.poly(
+                    self.data[self.energy_param], self.pars
+                )
                 self.hit_dict[f"{self.energy_param}_cal"] = self.gen_pars_dict()
                 self.output_dict[f"{self.energy_param}_cal"] = {
                     "Qbb_fwhm": np.nan,
@@ -388,13 +414,31 @@ class calibrate_parameter():
                     "fitted_peaks": np.nan,
                     "fwhms": np.nan,
                     "peak_fit_pars": np.nan,
-                    "total_fep":len(self.data.query(f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624")),
-                    "total_dep":len(self.data.query(f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597")),
-                    "pass_fep":len(self.data.query(f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624&is_usable")),
-                    "pass_dep":len(self.data.query(f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597&is_usable"))
+                    "total_fep": len(
+                        self.data.query(
+                            f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624"
+                        )
+                    ),
+                    "total_dep": len(
+                        self.data.query(
+                            f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597"
+                        )
+                    ),
+                    "pass_fep": len(
+                        self.data.query(
+                            f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624&is_usable"
+                        )
+                    ),
+                    "pass_dep": len(
+                        self.data.query(
+                            f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597&is_usable"
+                        )
+                    ),
                 }
             except:
-                log.error(f"Calibration failed completely for {self.energy_param} even with 0 p_val")
+                log.error(
+                    f"Calibration failed completely for {self.energy_param} even with 0 p_val"
+                )
                 self.pars = np.full(self.deg + 1, np.nan)
 
                 self.hit_dict[f"{self.energy_param}_cal"] = self.gen_pars_dict()
@@ -408,23 +452,27 @@ class calibrate_parameter():
                     "fitted_peaks": np.nan,
                     "fwhms": np.nan,
                     "peak_fit_pars": np.nan,
-                    "total_fep":np.nan,
-                    "total_dep":np.nan,
-                    "pass_fep":np.nan,
-                    "pass_dep":np.nan
+                    "total_fep": np.nan,
+                    "total_dep": np.nan,
+                    "pass_fep": np.nan,
+                    "pass_dep": np.nan,
                 }
 
         else:
             log.debug("done")
             log.info(f"Calibration pars are {self.pars}")
 
-            self.data[f"{self.energy_param}_cal"] = pgf.poly(self.data[self.energy_param], self.pars)
+            self.data[f"{self.energy_param}_cal"] = pgf.poly(
+                self.data[self.energy_param], self.pars
+            )
 
-            pk_rs_dict = {peak: self.results["pk_pars"][i].tolist() for i, peak in enumerate(self.results["fitted_keV"])}
+            pk_rs_dict = {
+                peak: self.results["pk_pars"][i].tolist()
+                for i, peak in enumerate(self.results["fitted_keV"])
+            }
 
             self.fit_energy_res()
             self.hit_dict[f"{self.energy_param}_cal"] = self.gen_pars_dict()
-
 
             if self.results["fitted_keV"][-1] == 2614.50:
                 fep_fwhm = round(self.results["pk_fwhms"][-1, 0], 2)
@@ -442,22 +490,37 @@ class calibrate_parameter():
                 "fitted_peaks": self.results["fitted_keV"].tolist(),
                 "fwhms": self.results["pk_fwhms"].tolist(),
                 "peak_fit_pars": pk_rs_dict,
-                "total_fep":len(self.data.query(f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624")),
-                "total_dep":len(self.data.query(f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597")),
-                "pass_fep":len(self.data.query(f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624&is_usable")),
-                "pass_dep":len(self.data.query(f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597&is_usable"))
+                "total_fep": len(
+                    self.data.query(
+                        f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624"
+                    )
+                ),
+                "total_dep": len(
+                    self.data.query(
+                        f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597"
+                    )
+                ),
+                "pass_fep": len(
+                    self.data.query(
+                        f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624&is_usable"
+                    )
+                ),
+                "pass_dep": len(
+                    self.data.query(
+                        f"{self.energy_param}_cal>1587&{self.energy_param}_cal<1597&is_usable"
+                    )
+                ),
             }
         log.info(
             f"Results {self.energy_param}: {json.dumps(self.output_dict[f'{self.energy_param}_cal'], indent=2)}"
         )
-    
+
     def fill_plot_dict(self):
         for key, item in self.plot_options.items():
             if item["options"] is not None:
-                self.plot_dict[key]=item["function"](self, **item["options"])
+                self.plot_dict[key] = item["function"](self, **item["options"])
             else:
-                self.plot_dict[key]=item["function"](self)
-
+                self.plot_dict[key] = item["function"](self)
 
 
 def get_peak_labels(
@@ -490,39 +553,40 @@ def get_peak_label(peak: float) -> str:
     elif peak == 2614.5:
         return "Tl FEP"
 
-def plot_fits(ecal_class, figsize = [12,8], fontsize=12, ncols=3, n_rows=3):
+
+def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    
+
     fitted_peaks = ecal_class.results["fitted_keV"]
     pk_pars = ecal_class.results["pk_pars"]
     pk_ranges = ecal_class.results["pk_ranges"]
     p_vals = ecal_class.results["pk_pvals"]
-        
+
     fitted_gof_funcs = []
     for i, peak in enumerate(ecal_class.glines):
         if peak in fitted_peaks:
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
-    
+
     mus = [
         pgf.get_mu_func(func_i, pars_i)
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
     fwhms = ecal_class.results["pk_fwhms"][:, 0]
     dfwhms = ecal_class.results["pk_fwhms"][:, 1]
-    
-
 
     fig = plt.figure()
     range_adu = 5 / ecal_class.pars[0]  # 10keV window around peak in adu
     for i, peak in enumerate(mus):
-        #plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
+        # plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
         plt.subplot(n_rows, ncols, i + 1)
         binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
         bin_cs = (binning[1:] + binning[:-1]) / 2
-        energies = ecal_class.data.query(f"{ecal_class.energy_param}>{pk_ranges[i][0]}&{ecal_class.energy_param}<{pk_ranges[i][1]}&is_usable")[ecal_class.energy_param]
-        energies=energies.iloc[:ecal_class.n_events]
-        
+        energies = ecal_class.data.query(
+            f"{ecal_class.energy_param}>{pk_ranges[i][0]}&{ecal_class.energy_param}<{pk_ranges[i][1]}&is_usable"
+        )[ecal_class.energy_param]
+        energies = energies.iloc[: ecal_class.n_events]
+
         counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
         fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(bs)
         plt.plot(bin_cs, fit_vals)
@@ -570,23 +634,28 @@ def plot_fits(ecal_class, figsize = [12,8], fontsize=12, ncols=3, n_rows=3):
     plt.close()
     return fig
 
-def plot_2614_timemap(ecal_class, figsize = [12,8], fontsize=12, erange=[2580,2630], dx=1, time_dx=180):
+
+def plot_2614_timemap(
+    ecal_class, figsize=[12, 8], fontsize=12, erange=[2580, 2630], dx=1, time_dx=180
+):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    
-    selection = ecal_class.data.query(f"{ecal_class.energy_param}_cal>2560&{ecal_class.energy_param}_cal<2660&is_usable")
-    
+
+    selection = ecal_class.data.query(
+        f"{ecal_class.energy_param}_cal>2560&{ecal_class.energy_param}_cal<2660&is_usable"
+    )
+
     time_bins = np.arange(
         (np.amin(ecal_class.data["timestamp"]) // time_dx) * time_dx,
         ((np.amax(ecal_class.data["timestamp"]) // time_dx) + 2) * time_dx,
         time_dx,
     )
-    
+
     fig = plt.figure()
     plt.hist2d(
         selection["timestamp"],
         selection[f"{ecal_class.energy_param}_cal"],
-        bins=[time_bins, np.arange(erange[0], erange[1]+dx, dx)],
+        bins=[time_bins, np.arange(erange[0], erange[1] + dx, dx)],
         norm=LogNorm(),
     )
 
@@ -604,24 +673,30 @@ def plot_2614_timemap(ecal_class, figsize = [12,8], fontsize=12, erange=[2580,26
     plt.close()
     return fig
 
-def plot_pulser_timemap(ecal_class, figsize = [12, 8], fontsize = 12 , dx=0.2, time_dx=180, n_spread=3):
+
+def plot_pulser_timemap(
+    ecal_class, figsize=[12, 8], fontsize=12, dx=0.2, time_dx=180, n_spread=3
+):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    
+
     time_bins = np.arange(
         (np.amin(ecal_class.data["timestamp"]) // time_dx) * time_dx,
         ((np.amax(ecal_class.data["timestamp"]) // time_dx) + 2) * time_dx,
         time_dx,
     )
-    
+
     selection = ecal_class.data.query(f"~is_not_pulser")
-    mean = np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"],50)
-    spread = mean-np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"],10)
+    mean = np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"], 50)
+    spread = mean - np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"], 10)
     fig = plt.figure()
     plt.hist2d(
         selection["timestamp"],
         selection[f"{ecal_class.energy_param}_cal"],
-        bins=[time_bins, np.arange(mean-n_spread*spread, mean+n_spread*spread+dx, dx)],
+        bins=[
+            time_bins,
+            np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
+        ],
         norm=LogNorm(),
     )
 
@@ -630,7 +705,7 @@ def plot_pulser_timemap(ecal_class, figsize = [12, 8], fontsize = 12 , dx=0.2, t
         f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
     )
     plt.ylabel("Energy(keV)")
-    plt.ylim([mean-n_spread*spread, mean+n_spread*spread])
+    plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
 
     plt.xticks(
         ticks,
@@ -640,14 +715,13 @@ def plot_pulser_timemap(ecal_class, figsize = [12, 8], fontsize = 12 , dx=0.2, t
     return fig
 
 
-def bin_pulser_stability(ecal_class, 
-                   time_slice= 180):
-    
+def bin_pulser_stability(ecal_class, time_slice=180):
+
     selection = ecal_class.data.query(f"~is_not_pulser")
-    
+
     utime_array = ecal_class.data["timestamp"]
     select_energies = selection[f"{ecal_class.energy_param}_cal"].to_numpy()
-    
+
     time_bins = np.arange(
         (np.amin(utime_array) // time_slice) * time_slice,
         ((np.amax(utime_array) // time_slice) + 2) * time_slice,
@@ -656,24 +730,28 @@ def bin_pulser_stability(ecal_class,
     # bin time values
     times_average = (time_bins[:-1] + time_bins[1:]) / 2
 
-    nanmedian = lambda x : np.nanpercentile(x,50) if len(x)>=10 else np.nan
-    error = lambda x : np.nanvar(x)/np.sqrt(len(x)) if len(x)>=10 else np.nan
+    nanmedian = lambda x: np.nanpercentile(x, 50) if len(x) >= 10 else np.nan
+    error = lambda x: np.nanvar(x) / np.sqrt(len(x)) if len(x) >= 10 else np.nan
 
-    par_average,_,_ = binned_statistic(selection["timestamp"], select_energies, statistic=nanmedian,
-                                        bins=time_bins)
-    par_error,_,_ = binned_statistic(selection["timestamp"], select_energies, statistic=error,
-                                        bins=time_bins)
-        
-    return {"time": times_average, "energy":par_average, "spread": par_error}
+    par_average, _, _ = binned_statistic(
+        selection["timestamp"], select_energies, statistic=nanmedian, bins=time_bins
+    )
+    par_error, _, _ = binned_statistic(
+        selection["timestamp"], select_energies, statistic=error, bins=time_bins
+    )
 
-def bin_stability(ecal_class, 
-                   time_slice= 180, energy_range = [2585, 2660]):
-    
-    selection = ecal_class.data.query(f"{ecal_class.energy_param}_cal>{energy_range[0]}&{ecal_class.energy_param}_cal<{energy_range[1]}&is_usable")
-    
+    return {"time": times_average, "energy": par_average, "spread": par_error}
+
+
+def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
+
+    selection = ecal_class.data.query(
+        f"{ecal_class.energy_param}_cal>{energy_range[0]}&{ecal_class.energy_param}_cal<{energy_range[1]}&is_usable"
+    )
+
     utime_array = ecal_class.data["timestamp"]
     select_energies = selection[f"{ecal_class.energy_param}_cal"].to_numpy()
-    
+
     time_bins = np.arange(
         (np.amin(utime_array) // time_slice) * time_slice,
         ((np.amax(utime_array) // time_slice) + 2) * time_slice,
@@ -682,32 +760,33 @@ def bin_stability(ecal_class,
     # bin time values
     times_average = (time_bins[:-1] + time_bins[1:]) / 2
 
-    nanmedian = lambda x : np.nanpercentile(x,50) if len(x)>=10 else np.nan
-    error = lambda x : np.nanvar(x)/np.sqrt(len(x)) if len(x)>=10 else np.nan
+    nanmedian = lambda x: np.nanpercentile(x, 50) if len(x) >= 10 else np.nan
+    error = lambda x: np.nanvar(x) / np.sqrt(len(x)) if len(x) >= 10 else np.nan
 
-    par_average,_,_ = binned_statistic(selection["timestamp"], select_energies, statistic=nanmedian,
-                                        bins=time_bins)
-    par_error,_,_ = binned_statistic(selection["timestamp"], select_energies, statistic=error,
-                                        bins=time_bins)
-        
-    return {"time": times_average, "energy":par_average, "spread": par_error}
+    par_average, _, _ = binned_statistic(
+        selection["timestamp"], select_energies, statistic=nanmedian, bins=time_bins
+    )
+    par_error, _, _ = binned_statistic(
+        selection["timestamp"], select_energies, statistic=error, bins=time_bins
+    )
 
-def plot_cal_fit(ecal_class, figsize = [12,8], fontsize=12,
-                 erange=[200,2700]):
-    
-    
+    return {"time": times_average, "energy": par_average, "spread": par_error}
+
+
+def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
+
     pk_pars = ecal_class.results["pk_pars"]
     fitted_peaks = ecal_class.results["fitted_keV"]
-        
+
     fitted_gof_funcs = []
     for i, peak in enumerate(ecal_class.glines):
         if peak in fitted_peaks:
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
-            
+
     mus = [
-            pgf.get_mu_func(func_i, pars_i)
-            for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
-        ]
+        pgf.get_mu_func(func_i, pars_i)
+        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
+    ]
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
@@ -717,7 +796,6 @@ def plot_cal_fit(ecal_class, figsize = [12,8], fontsize=12,
     )
 
     cal_bins = np.arange(0, np.nanmax(mus) * 1.1, 10)
-
 
     ax1.scatter(fitted_peaks, mus, marker="x", c="b")
 
@@ -739,12 +817,12 @@ def plot_cal_fit(ecal_class, figsize = [12,8], fontsize=12,
     plt.close()
     return fig
 
-def plot_eres_fit(ecal_class, figsize = [12,8], fontsize=12,
-                 erange=[200,2700]):
+
+def plot_eres_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    
+
     fwhms = ecal_class.results["pk_fwhms"][:, 0]
     dfwhms = ecal_class.results["pk_fwhms"][:, 1]
     fitted_peaks = ecal_class.results["fitted_keV"]
@@ -770,13 +848,11 @@ def plot_eres_fit(ecal_class, figsize = [12,8], fontsize=12,
             fwhm_peaks = np.append(fwhm_peaks, peak)
     fit_fwhms = np.delete(fwhms, [indexes])
     fit_dfwhms = np.delete(dfwhms, [indexes])
-    
+
     fig, (ax1, ax2) = plt.subplots(
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
-    ax1.errorbar(
-        fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", lw=0, c="b"
-    )
+    ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", lw=0, c="b")
 
     fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
 
@@ -803,9 +879,9 @@ def plot_eres_fit(ecal_class, figsize = [12,8], fontsize=12,
     ax1.legend(loc="upper left", frameon=False)
     if np.isnan(ecal_class.fit_pars).all():
         [
-                0.9 * np.nanmin(fit_fwhms),
-                1.1 * np.nanmax(fit_fwhms),
-            ]
+            0.9 * np.nanmin(fit_fwhms),
+            1.1 * np.nanmax(fit_fwhms),
+        ]
     else:
         ax1.set_ylim(
             [
@@ -830,29 +906,41 @@ def plot_eres_fit(ecal_class, figsize = [12,8], fontsize=12,
     plt.close()
     return fig
 
-def bin_spectrum(ecal_class, 
-                  erange=[0,3000],dx=2):
-    bins = np.arange(erange[0], erange[1]+dx, dx)
-    return {"bins": pgh.get_bin_centers(bins), "counts": np.histogram(ecal_class.data.query("is_usable")[f"{ecal_class.energy_param}_cal"], bins)[0],
-           "cut_counts": np.histogram(ecal_class.data.query("~is_valid_cal&is_not_pulser")[f"{ecal_class.energy_param}_cal"], bins)[0],
-           "pulser_counts": np.histogram(ecal_class.data.query("~is_not_pulser")[f"{ecal_class.energy_param}_cal"], bins)[0]}
 
-def bin_survival_fraction(ecal_class,
-                           erange=[0,3000],dx=6):
+def bin_spectrum(ecal_class, erange=[0, 3000], dx=2):
+    bins = np.arange(erange[0], erange[1] + dx, dx)
+    return {
+        "bins": pgh.get_bin_centers(bins),
+        "counts": np.histogram(
+            ecal_class.data.query("is_usable")[f"{ecal_class.energy_param}_cal"], bins
+        )[0],
+        "cut_counts": np.histogram(
+            ecal_class.data.query("~is_valid_cal&is_not_pulser")[
+                f"{ecal_class.energy_param}_cal"
+            ],
+            bins,
+        )[0],
+        "pulser_counts": np.histogram(
+            ecal_class.data.query("~is_not_pulser")[f"{ecal_class.energy_param}_cal"],
+            bins,
+        )[0],
+    }
+
+
+def bin_survival_fraction(ecal_class, erange=[0, 3000], dx=6):
     counts_pass, bins_pass, _ = pgh.get_hist(
-            ecal_class.data.query("is_usable")[f"{ecal_class.energy_param}_cal"], 
-            bins=np.arange(erange[0], erange[1]+dx,dx)
-        )
+        ecal_class.data.query("is_usable")[f"{ecal_class.energy_param}_cal"],
+        bins=np.arange(erange[0], erange[1] + dx, dx),
+    )
     counts_fail, bins_fail, _ = pgh.get_hist(
-            ecal_class.data.query("~is_valid_cal&is_not_pulser")[f"{ecal_class.energy_param}_cal"], 
-            bins=np.arange(erange[0], erange[1]+dx,dx)
-        )
-    sf = (
-            100
-            * (counts_pass + 10 ** (-6))
-            / (counts_pass + counts_fail + 10 ** (-6))
-        )
+        ecal_class.data.query("~is_valid_cal&is_not_pulser")[
+            f"{ecal_class.energy_param}_cal"
+        ],
+        bins=np.arange(erange[0], erange[1] + dx, dx),
+    )
+    sf = 100 * (counts_pass + 10 ** (-6)) / (counts_pass + counts_fail + 10 ** (-6))
     return {"bins": pgh.get_bin_centers(bins_pass), "sf": sf}
+
 
 def energy_cal_th(
     files: list[str],
@@ -860,7 +948,7 @@ def energy_cal_th(
     hit_dict: dict = {},
     cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
     lh5_path: str = "dsp",
-    plot_options:dict=None,
+    plot_options: dict = None,
     guess_keV: float | None = None,
     threshold: int = 0,
     p_val: float = 0,
@@ -868,7 +956,7 @@ def energy_cal_th(
     final_cut_field: str = "is_valid_cal",
     deg: int = 1,
 ) -> tuple(dict, dict):
-    
+
     data = load_data(
         files,
         lh5_path,
@@ -878,25 +966,19 @@ def energy_cal_th(
     )
 
     data, hit_dict = apply_cuts(data, hit_dict, cut_parameters, final_cut_field)
-    
+
     output_dict = {}
-    plot_dict={}
+    plot_dict = {}
     for energy_param in energy_params:
-        ecal = calibrate_parameter(data,
-                energy_param,
-                plot_options,
-                guess_keV,
-                threshold,
-                p_val,
-                n_events,
-                deg)
+        ecal = calibrate_parameter(
+            data, energy_param, plot_options, guess_keV, threshold, p_val, n_events, deg
+        )
         ecal.calibrate_parameter()
         output_dict.update(ecal.output_dict)
         hit_dict.update(ecal.hit_dict)
         if ~np.isnan(ecal.pars).all():
             ecal.fill_plot_dict()
-        plot_dict[energy_param]= ecal.plot_dict
-        
-    
+        plot_dict[energy_param] = ecal.plot_dict
+
     log.info(f"Finished all calibrations")
     return hit_dict, output_dict, plot_dict

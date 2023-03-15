@@ -367,7 +367,7 @@ def unbinned_energy_fit(
                     & (~np.isnan(m.errors).any())
                     & (~(np.array(m.errors[:-3]) == 0).all())
                 )
-            except: 
+            except:
                 raise RuntimeError
 
         pars = np.array(m.values)[:-1]
@@ -938,9 +938,9 @@ def event_selection(
                 df.daqenergy.values > entry[0] - entry[1]
             )
             if final_mask is None:
-                final_mask = e_cut 
+                final_mask = e_cut
             else:
-                final_mask = final_mask | e_cut 
+                final_mask = final_mask | e_cut
         ids = final_mask
         log.debug(f"pulser found: {pulser_props}")
     else:
@@ -1059,9 +1059,9 @@ def event_selection(
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
-        if len(peak_ids[final_mask]) < 0.5*n_events:
+        if len(peak_ids[final_mask]) < 0.5 * n_events:
             log.warning("Less than half number of specified events found")
-        elif len(peak_ids[final_mask]) < 0.1*n_events:
+        elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
 
     sort_index = np.argsort(np.concatenate(final_events))
@@ -1111,7 +1111,7 @@ def interpolate_energy(peak_energies, points, err_points, energy):
 
         if nan_mask[-1] == True or nan_mask[-2] == True:
             qbb_err = np.nan
-        if qbb_err/fit_qbb > 0.1:
+        if qbb_err / fit_qbb > 0.1:
             qbb_err = np.nan
 
     return fit_qbb, qbb_err, fit_pars
@@ -1374,7 +1374,7 @@ class BayesianOptimizer:
 
         return x_optimal, min_ei
 
-    def _extend_prior_with_posterior_data(self, x, y,yerr):
+    def _extend_prior_with_posterior_data(self, x, y, yerr):
         self.x_init = np.append(self.x_init, np.array([x]), axis=0)
         self.y_init = np.append(self.y_init, np.array(y), axis=0)
         self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
@@ -1414,7 +1414,9 @@ class BayesianOptimizer:
     def update(self, results):
         y_val = results["y_val"]
         y_err = results["y_err"]
-        self._extend_prior_with_posterior_data(self.current_x, np.array([y_val]), np.array([y_err]))
+        self._extend_prior_with_posterior_data(
+            self.current_x, np.array([y_val]), np.array([y_err])
+        )
 
         if np.isnan(y_val) | np.isnan(y_err):
             pass
@@ -1465,15 +1467,19 @@ class BayesianOptimizer:
             ys = np.zeros_like(points)
             ys_err = np.zeros_like(points)
             for i, point in enumerate(points):
-                ys[i],ys_err[i] = self.gauss_pr.predict(
+                ys[i], ys_err[i] = self.gauss_pr.predict(
                     np.array([point]).reshape(1, -1), return_std=True
                 )
             fig = plt.figure()
 
             plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
-            plt.scatter(np.array(self.x_init)[fail_idxs], np.array(self.y_init)[fail_idxs], 
-                        color="green", label="Failed samples")
-            plt.fill_between(points, ys-ys_err,ys+ys_err, alpha = 0.1)
+            plt.scatter(
+                np.array(self.x_init)[fail_idxs],
+                np.array(self.y_init)[fail_idxs],
+                color="green",
+                label="Failed samples",
+            )
+            plt.fill_between(points, ys - ys_err, ys + ys_err, alpha=0.1)
             if init_samples is not None:
                 init_ys = np.array(
                     [
@@ -1484,14 +1490,10 @@ class BayesianOptimizer:
                 plt.scatter(
                     np.array(init_samples)[:, 0],
                     np.array(self.y_init)[init_ys],
-                    color="red", label="Init Samples"
+                    color="red",
+                    label="Init Samples",
                 )
-            plt.scatter(
-                self.optimal_x[0],
-                self.y_min,
-                color="orange",
-                label="Optimal"
-            )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
 
             plt.xlabel(
                 f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
@@ -1583,14 +1585,10 @@ class BayesianOptimizer:
                 plt.scatter(
                     np.array(init_samples)[:, 0],
                     np.array(self.y_init)[init_ys],
-                    color="red", label="Init Samples"
+                    color="red",
+                    label="Init Samples",
                 )
-            plt.scatter(
-                self.optimal_x[0],
-                self.y_min,
-                color="orange",
-                 label="Optimal"
-            )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
 
             plt.xlabel(
                 f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"

@@ -1235,7 +1235,7 @@ def cal_aoe(
         aoe_tmp = aoe[(energy > 1000) & (energy < 1300) & (aoe > 0)]  # [:20000]
         bulk_pars, bulk_errs = unbinned_aoe_fit(aoe_tmp, display=0)
     except:
-        bulk_pars = np.full(8,np.nan)
+        bulk_pars = np.full(8, np.nan)
         log.error("1000-1300 keV mean determination failed")
 
     try:
@@ -1251,36 +1251,38 @@ def cal_aoe(
         sigma_pars = np.full(2, np.nan)
 
     try:
-        cut = get_aoe_cut_fit(energy, classifier, 1592, (40, 20), 0.9, eres_pars, display=0)
+        cut = get_aoe_cut_fit(
+            energy, classifier, 1592, (40, 20), 0.9, eres_pars, display=0
+        )
     except:
         log.error("A/E cut determination failed")
         cut = np.nan
-        
+
     cal_dict.update(
-            {
-                "AoE_Corrected": {
-                    "expression": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)",
-                    "parameters": {"a": mu_pars[0], "b": mu_pars[1]},
+        {
+            "AoE_Corrected": {
+                "expression": f"(((A_max/{energy_param})/(a*{cal_energy_param} +b))-1)",
+                "parameters": {"a": mu_pars[0], "b": mu_pars[1]},
+            },
+            "AoE_Classifier": {
+                "expression": f"AoE_Corrected/(sqrt(c+(d/{cal_energy_param})**2)/(a*{cal_energy_param} +b))",
+                "parameters": {
+                    "a": mu_pars[0],
+                    "b": mu_pars[1],
+                    "c": sigma_pars[0],
+                    "d": sigma_pars[1],
                 },
-                "AoE_Classifier": {
-                    "expression": f"AoE_Corrected/(sqrt(c+(d/{cal_energy_param})**2)/(a*{cal_energy_param} +b))",
-                    "parameters": {
-                        "a": mu_pars[0],
-                        "b": mu_pars[1],
-                        "c": sigma_pars[0],
-                        "d": sigma_pars[1],
-                    },
-                },
-                "AoE_Low_Cut": {
-                    "expression": "AoE_Classifier>a",
-                    "parameters": {"a": cut},
-                },
-                "AoE_Double_Sided_Cut": {
-                    "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
-                    "parameters": {"a": cut, "b": aoe_high_cut},
-                }
-            }
-        )
+            },
+            "AoE_Low_Cut": {
+                "expression": "AoE_Classifier>a",
+                "parameters": {"a": cut},
+            },
+            "AoE_Double_Sided_Cut": {
+                "expression": "(b>AoE_Classifier)&(AoE_Classifier>a)",
+                "parameters": {"a": cut, "b": aoe_high_cut},
+            },
+        }
+    )
 
     try:
         log.info("  Compute low side survival fractions: ")
