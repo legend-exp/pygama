@@ -167,7 +167,7 @@ class LH5Store:
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         obj_buf: LGDO = None,
         obj_buf_start: int = 0,
-        wfdecompress: bool = True,
+        decompress: bool = True,
     ) -> tuple[LGDO, int]:
         """Read LH5 object data from a file.
 
@@ -213,7 +213,7 @@ class LH5Store:
         obj_buf_start
             Start location in ``obj_buf`` for read. For concatenating data to
             array-like objects.
-        wfdecompress
+        decompress
             Decompress data encoded with pygama's compression routines right
             after reading. The option has no effect on data encoded with HDF5
             built-in filters, which is always decompressed upstream by HDF5.
@@ -228,9 +228,6 @@ class LH5Store:
             ``table.loc``.
         """
         # Handle list-of-files recursively
-        # FIXME: wfdecompression breaks reading from multiple files, as the
-        # buffer type changes (VectorOfEncodedVectors -> VectorOfVectors) after
-        # reading the first file
         if not isinstance(lh5_file, (str, h5py._hl.files.File)):
             lh5_file = list(lh5_file)
             n_rows_read = 0
@@ -262,6 +259,7 @@ class LH5Store:
                     field_mask=field_mask,
                     obj_buf=obj_buf,
                     obj_buf_start=obj_buf_start,
+                    decompress=decompress,
                 )
                 n_rows_read += n_rows_read_i
                 if n_rows_read >= n_rows or obj_buf is None:
@@ -276,7 +274,7 @@ class LH5Store:
             raise KeyError(f"'{name}' not in {h5f.filename}")
 
         log.debug(
-            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress wfs = {wfdecompress}, "
+            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress wfs = {decompress}, "
             + (f" with field mask {field_mask}" if field_mask else "")
         )
 
@@ -346,7 +344,12 @@ class LH5Store:
                 # table... Maybe should emit a warning? Or allow them to be
                 # dicts keyed by field name?
                 obj_dict[field], _ = self.read_object(
-                    name + "/" + field, h5f, start_row=start_row, n_rows=n_rows, idx=idx
+                    name + "/" + field,
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    decompress=decompress,
                 )
             # modify datatype in attrs if a field_mask was used
             attrs = dict(h5f[name].attrs)
@@ -394,6 +397,7 @@ class LH5Store:
                     idx=idx,
                     obj_buf=fld_buf,
                     obj_buf_start=obj_buf_start,
+                    decompress=decompress,
                 )
                 if obj_buf is not None and obj_buf_start + n_rows_read > len(obj_buf):
                     obj_buf.resize(obj_buf_start + n_rows_read)
@@ -432,23 +436,12 @@ class LH5Store:
                     and "dt" in col_dict
                     and "values" in col_dict
                 ):
-
-                    values = col_dict["values"]
-                    # eventually decompress waveform values
-                    if (
-                        isinstance(
-                            col_dict["values"],
-                            (VectorOfEncodedVectors, ArrayOfEncodedEqualSizedArrays),
-                        )
-                        and wfdecompress
-                    ):
-                        values = compress.decode_array(values)
-
                     table = WaveformTable(
-                        t0=col_dict["t0"], dt=col_dict["dt"], values=values
+                        t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"]
                     )
                 else:
                     table = Table(col_dict=col_dict, attrs=attrs)
+
                 # set (write) loc to end of tree
                 table.loc = n_rows_read
                 return table, n_rows_read
@@ -468,7 +461,8 @@ class LH5Store:
                 return obj_buf, n_rows_read
 
         # ArrayOfEncodedEqualSizedArrays and VectorOfEncodedVectors
-        for (cond, lgdo) in [
+        # FIXME: buffered reading when decompress=True
+        for (cond, enc_lgdo) in [
             (
                 datatype == "array_of_encoded_equalsized_arrays",
                 ArrayOfEncodedEqualSizedArrays,
@@ -476,8 +470,8 @@ class LH5Store:
             (elements.startswith("encoded_array"), VectorOfEncodedVectors),
         ]:
             if cond:
-                if obj_buf is not None and not isinstance(obj_buf, lgdo):
-                    raise ValueError(f"obj_buf for '{name}' not a LGDO {type(lgdo)}")
+                if obj_buf is not None and not isinstance(obj_buf, enc_lgdo):
+                    raise ValueError(f"obj_buf for '{name}' not a {enc_lgdo}")
 
                 # read out encoded_data
                 encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
@@ -505,12 +499,16 @@ class LH5Store:
 
                 if obj_buf is not None:
                     return obj_buf, n_rows_read
+
+                rawdata = enc_lgdo(
+                    encoded_data=encoded_data,
+                    decoded_size=decoded_size,
+                    attrs=h5f[name].attrs,
+                )
+
+                # eventually decompress encoded arrays
                 return (
-                    lgdo(
-                        encoded_data=encoded_data,
-                        decoded_size=decoded_size,
-                        attrs=h5f[name].attrs,
-                    ),
+                    compress.decode_array(rawdata) if decompress else rawdata,
                     n_rows_read,
                 )
 

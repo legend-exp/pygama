@@ -239,7 +239,7 @@ def test_read_vov_fancy_idx(lh5_file):
 
 def test_read_voev(lh5_file):
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/data/struct/voev", lh5_file)
+    lh5_obj, n_rows = store.read_object("/data/struct/voev", lh5_file, decompress=False)
     assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
 
     desired = [np.array([3, 4, 5]), np.array([2]), np.array([4, 8, 9, 7])]
@@ -249,14 +249,18 @@ def test_read_voev(lh5_file):
 
     assert n_rows == 3
 
-    lh5_obj, n_rows = store.read_object("/data/struct/voev", [lh5_file, lh5_file])
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/voev", [lh5_file, lh5_file], decompress=False
+    )
     assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
     assert n_rows == 6
 
 
 def test_read_voev_fancy_idx(lh5_file):
     store = LH5Store()
-    lh5_obj, n_rows = store.read_object("/data/struct_full/voev", lh5_file, idx=[0, 2])
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct_full/voev", lh5_file, idx=[0, 2], decompress=False
+    )
     assert isinstance(lh5_obj, lgdo.VectorOfEncodedVectors)
 
     desired = [np.array([1, 2]), np.array([2])]
@@ -300,7 +304,7 @@ def test_read_wftable(lh5_file):
 def test_read_wftable_encoded(lh5_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object(
-        "/data/struct/wftable_enc", lh5_file, wfdecompress=False
+        "/data/struct/wftable_enc", lh5_file, decompress=False
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert isinstance(lh5_obj.values, lgdo.ArrayOfEncodedEqualSizedArrays)
@@ -309,18 +313,21 @@ def test_read_wftable_encoded(lh5_file):
     assert "codec_shift" in lh5_obj.values.attrs
 
     lh5_obj, n_rows = store.read_object(
-        "/data/struct/wftable_enc", lh5_file, wfdecompress=True
+        "/data/struct/wftable_enc", lh5_file, decompress=True
     )
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert isinstance(lh5_obj.values, lgdo.ArrayOfEqualSizedArrays)
     assert n_rows == 3
 
-    # FIXME: problem with VectorOfEncodedVectors buffer
-    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], wfdecompress=False)
-    # assert n_rows == 6
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=False
+    )
+    assert n_rows == 6
 
-    # lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", [lh5_file, lh5_file], wfdecompress=True)
-    # assert n_rows == 6
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=True
+    )
+    assert n_rows == 6
 
 
 def test_read_with_field_mask(lh5_file):
