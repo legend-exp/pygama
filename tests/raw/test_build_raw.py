@@ -3,8 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from pygama.lgdo import ArrayOfEncodedEqualSizedArrays
-from pygama.lgdo.compression import RadwareSigcompress
 from pygama.lgdo.lh5_store import LH5Store, ls
 from pygama.raw import build_raw
 
@@ -39,20 +37,6 @@ def test_build_raw_fc(lgnd_test_data):
     )
 
     assert os.path.exists("/tmp/L200-comm-20211130-phy-spms.lh5")
-
-
-def test_build_raw_wfcompress(lgnd_test_data):
-    out_file = "/tmp/L200-comm-20211130-phy-spms.lh5"
-    build_raw(
-        in_stream=lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio"),
-        out_spec=out_file,
-        wfcompressor=RadwareSigcompress(codec_shift=-32768),
-        overwrite=True,
-    )
-
-    store = LH5Store()
-    wft, _ = store.read_object("FCEvent/waveform", out_file, wfdecompress=False)
-    assert isinstance(wft.values, ArrayOfEncodedEqualSizedArrays)
 
 
 def test_build_raw_fc_out_spec(lgnd_test_data):

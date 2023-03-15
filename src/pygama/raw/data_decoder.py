@@ -110,7 +110,8 @@ class DataDecoder:
 
         if not hasattr(self, "decoded_values"):
             raise AttributeError(
-                type(self).__name__, ":no decoded_values available for setting up table"
+                type(self).__name__
+                + ": no decoded_values available for setting up table"
             )
 
         data_obj = lgdo.Table(size=size)
@@ -123,7 +124,7 @@ class DataDecoder:
             # get the dtype
             if "dtype" not in attrs:
                 raise AttributeError(
-                    type(self).__name__, ": must specify dtype for", field
+                    type(self).__name__ + ": must specify dtype for", field
                 )
 
             dtype = attrs.pop("dtype")

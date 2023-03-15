@@ -737,7 +737,6 @@ class LH5Store:
         n_rows: int = None,
         wo_mode: str = "append",
         write_start: int = 0,
-        wfcompressor: WaveformCodec = None,
     ) -> None:
         """Write an LGDO into an LH5 file.
 
@@ -775,14 +774,11 @@ class LH5Store:
         write_start
             row in the output file (if already existing) to start overwriting
             from.
-        wfcompressor
-            compression algorithm to be used to compress waveforms before
-            writing to disk, see :mod:`.lgdo.compression`.
         """
         log.debug(
             f"writing {repr(obj)}[{start_row}:{n_rows}] as "
             f"{lh5_file}:{group}/{name}[{write_start}:], "
-            f"mode = {wo_mode}, waveform compressor = {wfcompressor}"
+            f"mode = {wo_mode}"
         )
 
         if wo_mode == "write_safe":
@@ -798,9 +794,6 @@ class LH5Store:
             wo_mode = "ac"
         if wo_mode not in ["w", "a", "o", "of", "ac"]:
             raise ValueError(f"unknown wo_mode '{wo_mode}'")
-
-        if wfcompressor is not None and not isinstance(wfcompressor, WaveformCodec):
-            raise ValueError("compression: WaveformCodec object expected")
 
         # "mode" is for the h5df.File and wo_mode is for this function
         # In hdf5, 'a' is really "modify" -- in addition to appending, you can
@@ -863,9 +856,15 @@ class LH5Store:
                     and field == "values"
                     and not isinstance(obj.values, VectorOfEncodedVectors)
                     and not isinstance(obj.values, ArrayOfEncodedEqualSizedArrays)
-                    and wfcompressor is not None
+                    and "compression" in obj.values.attrs
                 ):
-                    obj_fld = compress.encode_array(obj[field], codec=wfcompressor)
+                    if not isinstance(obj.values.attrs["compression"], WaveformCodec):
+                        raise ValueError()
+
+                    obj_fld = compress.encode_array(
+                        obj.values, codec=obj.values.attrs["compression"]
+                    )
+                    obj.values.attrs.pop("compression")
                 else:
                     obj_fld = obj[field]
 
@@ -878,7 +877,6 @@ class LH5Store:
                     n_rows=n_rows,
                     wo_mode=wo_mode,
                     write_start=write_start,
-                    wfcompressor=wfcompressor,
                 )
             return
 
@@ -991,8 +989,19 @@ class LH5Store:
                 if wo_mode == "o" and name in group:
                     log.debug(f"overwriting {name} in {group}")
                     del group[name]
-                ds = group.create_dataset(name, data=nda, maxshape=maxshape)
-                ds.attrs.update(obj.attrs)
+
+                # create HDF5 dataset, compress using the 'compression' LGDO
+                # attribute, if available
+                ds = group.create_dataset(
+                    name,
+                    data=nda,
+                    maxshape=maxshape,
+                    compression=obj.attrs.get("compression", None),
+                )
+                # write HDF5 attributes, but not "compression"!
+                tmpattrs = obj.getattrs(datatype=True)
+                tmpattrs.pop("compression", None)
+                ds.attrs.update(tmpattrs)
                 return
 
             # Now append or overwrite

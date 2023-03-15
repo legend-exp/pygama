@@ -132,7 +132,8 @@ class DataStreamer(ABC):
                     key_lists = decoder.get_key_lists()
                     if len(key_lists) != 1:
                         log.warning(
-                            f"{dec_name} has {len(key_lists)} lists of keys, need a rb for each. Only the first will be decoded."
+                            f"{dec_name} has {len(key_lists)} lists of keys, "
+                            "need a rb for each. Only the first will be decoded."
                         )
                     rb.key_list = key_lists[0]
             keyed_name_rbs = []

@@ -10,7 +10,6 @@ import numpy as np
 from tqdm import tqdm
 
 from pygama import lgdo
-from pygama.lgdo.compression import WaveformCodec
 from pygama.math.utils import sizeof_fmt
 
 from .compass.compass_streamer import CompassStreamer
@@ -29,7 +28,6 @@ def build_raw(
     n_max: int = np.inf,
     overwrite: bool = False,
     compass_config_file: str = None,
-    wfcompressor: WaveformCodec = None,
     **kwargs,
 ) -> None:
     """Convert data into LEGEND HDF5 raw-tier format.
@@ -75,10 +73,6 @@ def build_raw(
         - if None, CompassDecoder will sacrifice the first packet to determine waveform length
         - if a str ending in ``.json``, interpreted as a filename containing
           json-shorthand for the output specification (see :mod:`.compass.compass_event_decoder`).
-
-    wfcompressor
-        compression algorithm to be used to compress waveforms before
-        writing to disk, see :meth:`.lgdo.lh5_store.LH5Store.write_object`.
 
     **kwargs
         sent to :class:`.RawBufferLibrary` generation as `kw_dict` argument.
@@ -223,7 +217,7 @@ def build_raw(
 
     # Write header data
     lh5_store = lgdo.LH5Store(keep_open=True)
-    write_to_lh5_and_clear(header_data, lh5_store, wfcompressor=wfcompressor)
+    write_to_lh5_and_clear(header_data, lh5_store)
 
     # Now loop through the data
     n_bytes_last = streamer.n_bytes_read
@@ -248,7 +242,7 @@ def build_raw(
         if log.getEffectiveLevel() <= logging.INFO and n_max < np.inf:
             progress_bar.update(n_read)
 
-        write_to_lh5_and_clear(chunk_list, lh5_store, wfcompressor=wfcompressor)
+        write_to_lh5_and_clear(chunk_list, lh5_store)
 
         if n_max <= 0:
             log.info(f"Wrote {n_max} rows, exiting...")
