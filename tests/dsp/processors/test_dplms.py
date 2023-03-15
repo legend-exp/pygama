@@ -19,25 +19,25 @@ def test_dplms(compare_numba_vs_python):
 
     # ensure the DSPFatal is raised for a negative length
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, -1, 1, 1, 1, 1)
+        dplms(-1, nmat, ref, 1, 1, 1, 1, [])
 
     # ensure the DSPFatal is raised for length not equal to noise matrix shape
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, 10, 1, 1, 1, 1)
+        dplms(10, nmat, ref, 1, 1, 1, 1, [])
 
     # ensure the DSPFatal is raised for negative coefficients
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, length, -1, 1, 1, 1)
+        dplms(length, nmat, ref, -1, 1, 1, 1, [])
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, length, 1, -1, 1, 1)
+        dplms(length, nmat, ref, 1, -1, 1, 1, [])
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, length, 1, 1, -1, 1)
+        dplms(length, nmat, ref, 1, 1, -1, 1, [])
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, length, 1, 1, 1, -1)
+        dplms(length, nmat, ref, 1, 1, 1, -1, [])
     with pytest.raises(DSPFatal):
-        dplms(nmat, ref, length, 1, 1, 1, 2)
+        dplms(length, nmat, ref, 1, 1, 1, 2, [])
 
-    dplms_func = dplms(nmat, ref, length, 1, 1, 1, 1)
+    dplms_func = dplms(length, nmat, ref, 1, 1, 1, 1, [])
 
     # ensure to have a valid output
     w_in = np.ones(len_wf)
