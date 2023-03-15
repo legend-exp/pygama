@@ -17,7 +17,7 @@ def dplms(
     a2: float = 1.0,
     a3: float = 1.0,
     ff: int = 1,
-    coefficients: list = []
+    coefficients: list = [],
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
 
@@ -74,12 +74,12 @@ def dplms(
 
     if length <= 0:
         raise DSPFatal("The length of the filter must be positive")
-    
+
     if len(coefficients) > 0:
-        
+
         if length != len(coefficients):
             raise DSPFatal("The length and the provided filter are not matching")
-            
+
         x = np.array(coefficients)
     else:
         noise_mat = np.array(noise_mat)
@@ -97,13 +97,19 @@ def dplms(
             raise DSPFatal("The penalized coefficient for the noise must be positive")
 
         if a2 <= 0:
-            raise DSPFatal("The penalized coefficient for the reference must be positive")
+            raise DSPFatal(
+                "The penalized coefficient for the reference must be positive"
+            )
 
         if a3 <= 0:
-            raise DSPFatal("The penalized coefficient for the zero area must be positive")
+            raise DSPFatal(
+                "The penalized coefficient for the zero area must be positive"
+            )
 
         if ff <= 0:
-            raise DSPFatal("The penalized coefficient for the ref matrix must be positive")
+            raise DSPFatal(
+                "The penalized coefficient for the ref matrix must be positive"
+            )
 
         # reference matrix
         ssize = len(reference)
@@ -116,9 +122,13 @@ def dplms(
         elif ff == 1:
             ff = [-1, 0, 1]
         else:
-            raise DSPFatal("The penalized coefficient for the ref matrix must be 0 or 1")
+            raise DSPFatal(
+                "The penalized coefficient for the ref matrix must be 0 or 1"
+            )
         for i in ff:
-            ref_mat += np.outer(reference[flo + i : fhi + i], reference[flo + i : fhi + i])
+            ref_mat += np.outer(
+                reference[flo + i : fhi + i], reference[flo + i : fhi + i]
+            )
             ref_sig += reference[flo + i : fhi + i]
         ref_mat /= len(ff)
 
