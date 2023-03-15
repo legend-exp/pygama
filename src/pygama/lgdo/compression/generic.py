@@ -5,7 +5,7 @@ from . import radware, varlen
 from .base import WaveformCodec
 
 
-def encode_array(obj: LGDO, codec: WaveformCodec) -> LGDO:
+def encode_array(obj: LGDO, codec: WaveformCodec | str = None) -> LGDO:
     """Encode arrays with `codec`.
 
     Defines behaviors for each implemented waveform encoding algorithm.
@@ -17,14 +17,18 @@ def encode_array(obj: LGDO, codec: WaveformCodec) -> LGDO:
     codec
         algorithm to be used for encoding.
     """
-    if isinstance(codec, radware.RadwareSigcompress):
-        enc_obj = radware.encode(obj, shift=codec.codec_shift)
-    elif isinstance(codec, varlen.ULEB128ZigZagDiff):
-        enc_obj = varlen.encode(obj)
+    if codec is None:
+        pass
     else:
-        raise ValueError(f"'{codec}' not supported")
+        if _is_codec(codec, radware.RadwareSigcompress):
+            enc_obj = radware.encode(obj, shift=codec.codec_shift)
+        elif _is_codec(codec, varlen.ULEB128ZigZagDiff):
+            enc_obj = varlen.encode(obj)
+        else:
+            raise ValueError(f"'{codec}' not supported")
 
-    enc_obj.attrs |= codec.asdict()
+        enc_obj.attrs |= codec.asdict()
+
     return enc_obj
 
 
@@ -47,9 +51,18 @@ def decode_array(obj: LGDO) -> LGDO:
 
     codec = obj.attrs["codec"]
 
-    if codec == "radware_sigcompress":
+    if _is_codec(codec, radware.RadwareSigcompress):
         return radware.decode(obj, shift=int(obj.attrs.get("codec_shift", 0)))
-    elif codec == "uleb128_zigzag_diff":
+    elif _is_codec(codec, varlen.ULEB128ZigZagDiff):
         return varlen.decode(obj)
     else:
         raise ValueError(f"'{codec}' not supported")
+
+
+def _is_codec(ident: WaveformCodec | str, codec) -> bool:
+    if isinstance(ident, WaveformCodec):
+        return isinstance(ident, codec)
+    elif isinstance(ident, str):
+        return ident == codec().codec
+    else:
+        raise ValueError("input must be WaveformCodec object or string identifier")
