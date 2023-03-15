@@ -11,13 +11,13 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
 def dplms(
     length: int,
-    noise_mat: list = [],
-    reference: list = [],
-    a1: float = 1.0,
-    a2: float = 1.0,
-    a3: float = 1.0,
-    ff: int = 1,
-    coefficients: list = [],
+    noise_mat: list,
+    reference: list,
+    a1: float,
+    a2: float,
+    a3: float,
+    ff: int,
+    coefficients: list,
 ) -> Callable:
     """Calculate and apply an optimum DPLMS filter to the waveform.
 
