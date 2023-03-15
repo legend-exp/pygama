@@ -131,7 +131,7 @@ def lh5_file():
 
     col_dict = {
         "a": lgdo.Array(nda=np.array([1, 2, 3, 4]), attrs={"attr": 9}),
-        "b": lgdo.Array(nda=np.array([5, 6, 7, 8])),
+        "b": lgdo.Array(nda=np.array([5, 6, 7, 8]), attrs={"compression": "gzip"}),
     }
 
     struct.add_field("table", lgdo.Table(col_dict=col_dict, attrs={"stuff": 5}))
@@ -288,6 +288,16 @@ def test_read_table(lh5_file):
     assert n_rows == 6
     assert lh5_obj.attrs["stuff"] == 5
     assert lh5_obj["a"].attrs["attr"] == 9
+
+
+def test_read_hdf5_compressed_data(lh5_file):
+    store = LH5Store()
+    lh5_obj, n_rows = store.read_object("/data/struct/table", lh5_file)
+
+    assert "compression" not in lh5_obj["b"].attrs
+    with h5py.File(lh5_file) as h5f:
+        assert h5f["/data/struct/table/b"].compression == "gzip"
+        assert h5f["/data/struct/table/a"].compression is None
 
 
 def test_read_wftable(lh5_file):
@@ -469,6 +479,7 @@ def test_read_compressed_lgnd_waveform_table(lgnd_file, enc_lgnd_file):
     store = LH5Store()
     wft, _ = store.read_object("/geds/raw/waveform", enc_lgnd_file)
     assert isinstance(wft.values, lgdo.ArrayOfEqualSizedArrays)
+    assert "compression" not in wft.values.attrs
 
 
 # First test that we can overwrite a table with the same name without deleting the original field
