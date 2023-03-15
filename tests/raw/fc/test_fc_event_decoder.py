@@ -65,6 +65,11 @@ def test_data_types(event_rbkd):
         assert isinstance(tbl["waveform"]["values"], lgdo.ArrayOfEqualSizedArrays)
 
 
+def test_compression_attributes(event_rbkd):
+    assert "compression" in event_rbkd[0].lgdo["packet_id"].attrs
+    assert "compression" in event_rbkd[0].lgdo["waveform"].values.attrs
+
+
 def test_values(event_rbkd, fcio_obj):
 
     fc = fcio_obj

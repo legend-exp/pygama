@@ -148,6 +148,7 @@ class DataDecoder:
                 dt = attrs.pop("dt")
                 dt_units = attrs.pop("dt_units")
                 wf_len = attrs.pop("wf_len")
+                compression = attrs.pop("compression", None)
                 wf_table = lgdo.WaveformTable(
                     size=size,
                     t0=0,
@@ -158,6 +159,19 @@ class DataDecoder:
                     dtype=dtype,
                     attrs=attrs,
                 )
+                if compression is not None:
+                    if not isinstance(compression, dict):
+                        raise RuntimeError(
+                            "waveform/compression attribute must be a dictionary"
+                        )
+
+                    if "values" in compression:
+                        wf_table.values.attrs["compression"] = compression["values"]
+                    if "t0" in compression:
+                        wf_table.t0.attrs["compression"] = compression["t0"]
+                    if "dt" in compression:
+                        wf_table.dt.attrs["compression"] = compression["dt"]
+
                 data_obj.add_field(field, wf_table)
                 continue
 

@@ -229,7 +229,7 @@ def build_raw(
             n_bytes_last = streamer.n_bytes_read
 
         if len(chunk_list) == 0:
-            log.info("Reached EOF, exiting...")
+            log.debug("Reached EOF, exiting...")
             break
 
         n_read = 0

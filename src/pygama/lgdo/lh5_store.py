@@ -849,7 +849,10 @@ class LH5Store:
                     del group[key]
 
             for field in obj.keys():
-                # eventually compress waveform table values before writing
+                # eventually compress waveform table values with pygama's
+                # custom codecs before writing
+                # if waveformtable.values.attrs["compression"] is a string,
+                # interpret it as an HDF5 built-in filter
                 obj_fld = None
                 if (
                     isinstance(obj, WaveformTable)
@@ -857,10 +860,8 @@ class LH5Store:
                     and not isinstance(obj.values, VectorOfEncodedVectors)
                     and not isinstance(obj.values, ArrayOfEncodedEqualSizedArrays)
                     and "compression" in obj.values.attrs
+                    and isinstance(obj.values.attrs["compression"], WaveformCodec)
                 ):
-                    if not isinstance(obj.values.attrs["compression"], WaveformCodec):
-                        raise ValueError()
-
                     obj_fld = compress.encode_array(
                         obj.values, codec=obj.values.attrs["compression"]
                     )
