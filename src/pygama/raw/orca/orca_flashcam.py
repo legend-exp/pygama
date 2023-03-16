@@ -681,9 +681,11 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
         tbl["dr_stop_pps"].nda[ii] = int_packet[offset + 2]
         tbl["dr_stop_ticks"].nda[ii] = int_packet[offset + 3]
         tbl["dr_maxticks"].nda[ii] = int_packet[offset + 4]
-        dr_dpps = np.float64(int_packet[offset + 2] - int_packet[offset]) 
+        dr_dpps = np.float64(int_packet[offset + 2] - int_packet[offset])
         dr_dticks = np.float64(int_packet[offset + 3] - int_packet[offset + 1])
-        tbl["deadtime"].nda[ii] = dr_dpps + dr_dticks / np.float64(int_packet[offset + 4])
+        tbl["deadtime"].nda[ii] = dr_dpps + dr_dticks / np.float64(
+            int_packet[offset + 4]
+        )
 
         # set the event number and clock counters
         offset += 5
@@ -708,7 +710,8 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             self.header.fc_gps[fcid] = 0
         if self.header.fc_gps[fcid] == 0:
             toff = (
-                np.float64(tbl["mu_offset_sec"].nda[ii]) + np.float64(tbl["mu_offset_usec"].nda[ii]) * 1e-6
+                np.float64(tbl["mu_offset_sec"].nda[ii])
+                + np.float64(tbl["mu_offset_usec"].nda[ii]) * 1e-6
             )
         else:
             if tbl["abs_delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
