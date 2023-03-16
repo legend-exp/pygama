@@ -708,14 +708,14 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
             self.header.fc_gps[fcid] = 0
         if self.header.fc_gps[fcid] == 0:
             toff = (
-                np.float64(tbl["mu_offset_sec"].nda[ii] + np.float64(tbl["mu_offset_usec"].nad[ii]) * 1e-6
+                np.float64(tbl["mu_offset_sec"].nda[ii]) + np.float64(tbl["mu_offset_usec"].nda[ii]) * 1e-6
             )
         else:
             if tbl["abs_delta_mu_usec"].nda[ii] >= self.header.fc_gps[fcid]:
                 log.warning(
                     f"delta {tbl['abs_delta_mu_usec'].nda[ii]} > gps drift allowance {self.header.fc_gps[fcid]}"
                 )
-            toff = np.float64(tbl["to_master_sec"].nad[ii])
+            toff = np.float64(tbl["to_master_sec"].nda[ii])
         tbl["timestamp"].nda[ii] = tstamp + toff
 
         # set the fpga baseline/energy and waveform
