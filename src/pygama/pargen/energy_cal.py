@@ -839,7 +839,7 @@ def hpge_E_calibration(
     )
     Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
     Euc_max = Euc_max[
-        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal)* 1.1)
+        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal) * 1.1)
     ][0]
     dEuc = 0.2 / roughpars[-2]
 
