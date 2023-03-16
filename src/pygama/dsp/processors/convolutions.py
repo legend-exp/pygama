@@ -4,7 +4,6 @@ from typing import Callable
 
 import numpy as np
 from numba import guvectorize
-from scipy.signal import fftconvolve
 
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
@@ -72,7 +71,7 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
         cusp[ind] = float(np.sinh((length - ind) / sigma) / np.sinh(lt / sigma))
 
     den = [1, -np.exp(-1 / decay)]
-    cuspd = fftconvolve(cusp, den, "same")
+    cuspd = np.convolve(cusp, den, "same")
 
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
@@ -99,7 +98,7 @@ def cusp_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
         if len(cuspd) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = fftconvolve(w_in, cuspd, "valid")
+        w_out[:] = np.convolve(w_in, cuspd, "valid")
 
     return cusp_out
 
@@ -184,7 +183,7 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
 
     # deconvolve zac filter
     den = [1, -np.exp(-1 / decay)]
-    zacd = fftconvolve(zac, den, "same")
+    zacd = np.convolve(zac, den, "same")
 
     @guvectorize(
         ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
@@ -211,7 +210,7 @@ def zac_filter(length: int, sigma: float, flat: int, decay: int) -> Callable:
         if len(zacd) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = fftconvolve(w_in, zacd, "valid")
+        w_out[:] = np.convolve(w_in, zacd, "valid")
 
     return zac_out
 
@@ -284,6 +283,6 @@ def t0_filter(rise: int, fall: int) -> Callable:
         if len(t0_kern) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] = fftconvolve(w_in, t0_kern)[: len(w_in)]
+        w_out[:] = np.convolve(w_in, t0_kern)[: len(w_in)]
 
     return t0_filter_out
