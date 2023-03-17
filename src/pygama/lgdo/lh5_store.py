@@ -473,6 +473,18 @@ class LH5Store:
                 if obj_buf is not None and not isinstance(obj_buf, enc_lgdo):
                     raise ValueError(f"obj_buf for '{name}' not a {enc_lgdo}")
 
+                # read out decoded_size
+                decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
+                decoded_size, _ = self.read_object(
+                    f"{name}/decoded_size",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    obj_buf=decoded_size_buf,
+                    obj_buf_start=obj_buf_start,
+                )
+
                 # read out encoded_data
                 encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
                 encoded_data, n_rows_read = self.read_object(
@@ -482,18 +494,6 @@ class LH5Store:
                     n_rows=n_rows,
                     idx=idx,
                     obj_buf=encoded_data_buf,
-                    obj_buf_start=obj_buf_start,
-                )
-
-                # read out encoded_data
-                decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
-                decoded_size, n_rows_read = self.read_object(
-                    f"{name}/decoded_size",
-                    h5f,
-                    start_row=start_row,
-                    n_rows=n_rows,
-                    idx=idx,
-                    obj_buf=decoded_size_buf,
                     obj_buf_start=obj_buf_start,
                 )
 
