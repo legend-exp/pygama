@@ -645,7 +645,7 @@ def plot_2614_timemap(
         f"{ecal_class.energy_param}_cal>2560&{ecal_class.energy_param}_cal<2660&is_usable"
     )
 
-    if len(selection)==0:
+    if len(selection) == 0:
         pass
     else:
 
@@ -783,10 +783,12 @@ def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
     # bin time values
     times_average = (time_bins[:-1] + time_bins[1:]) / 2
 
-    if len(selection)==0:
-        return {"time": times_average, 
-                "energy": np.full_like(times_average,np.nan), 
-                "spread": np.full_like(times_average,np.nan)}
+    if len(selection) == 0:
+        return {
+            "time": times_average,
+            "energy": np.full_like(times_average, np.nan),
+            "spread": np.full_like(times_average, np.nan),
+        }
 
     nanmedian = (
         lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
