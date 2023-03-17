@@ -183,6 +183,18 @@ def test_write_objects(lh5_file):
     pass
 
 
+def test_read_n_rows(lh5_file):
+    store = LH5Store()
+    assert store.read_n_rows("/data/struct_full/aoesa", lh5_file) == 5
+    assert store.read_n_rows("/data/struct_full/array", lh5_file) == 5
+    assert store.read_n_rows("/data/struct_full/scalar", lh5_file) is None
+    assert store.read_n_rows("/data/struct_full/table", lh5_file) == 4
+    assert store.read_n_rows("/data/struct_full/voev", lh5_file) == 5
+    assert store.read_n_rows("/data/struct_full/vov", lh5_file) == 5
+    assert store.read_n_rows("/data/struct_full/wftable", lh5_file) == 10
+    assert store.read_n_rows("/data/struct_full/wftable_enc/values", lh5_file) == 10
+
+
 def test_read_scalar(lh5_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object("/data/struct/scalar", lh5_file)
@@ -322,11 +334,13 @@ def test_read_wftable_encoded(lh5_file):
     assert lh5_obj.values.attrs["codec"] == "radware_sigcompress"
     assert "codec_shift" in lh5_obj.values.attrs
 
-    lh5_obj, n_rows = store.read_object(
-        "/data/struct/wftable_enc", lh5_file, decompress=True
-    )
+    lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc", lh5_file)
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert isinstance(lh5_obj.values, lgdo.ArrayOfEqualSizedArrays)
+    assert n_rows == 3
+
+    lh5_obj, n_rows = store.read_object("/data/struct/wftable_enc/values", lh5_file)
+    assert isinstance(lh5_obj, lgdo.ArrayOfEqualSizedArrays)
     assert n_rows == 3
 
     lh5_obj, n_rows = store.read_object(
