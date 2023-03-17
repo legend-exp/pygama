@@ -692,13 +692,15 @@ def plot_pulser_timemap(
 
     selection = ecal_class.data.query(f"~is_not_pulser")
     fig = plt.figure()
-    if len(selection)==0:
+    if len(selection) == 0:
         pass
 
     else:
         mean = np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"], 50)
-        spread = mean - np.nanpercentile(selection[f"{ecal_class.energy_param}_cal"], 10)
-        
+        spread = mean - np.nanpercentile(
+            selection[f"{ecal_class.energy_param}_cal"], 10
+        )
+
         plt.hist2d(
             selection["timestamp"],
             selection[f"{ecal_class.energy_param}_cal"],
@@ -714,7 +716,6 @@ def plot_pulser_timemap(
         f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
     )
     plt.ylabel("Energy(keV)")
-    
 
     plt.xticks(
         ticks,
@@ -739,10 +740,12 @@ def bin_pulser_stability(ecal_class, time_slice=180):
     # bin time values
     times_average = (time_bins[:-1] + time_bins[1:]) / 2
 
-    if len(selection)==0:
-        return {"time": times_average, 
-                "energy": np.full_like(times_average,np.nan), 
-                "spread": np.full_like(times_average,np.nan)}
+    if len(selection) == 0:
+        return {
+            "time": times_average,
+            "energy": np.full_like(times_average, np.nan),
+            "spread": np.full_like(times_average, np.nan),
+        }
 
     nanmedian = (
         lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
