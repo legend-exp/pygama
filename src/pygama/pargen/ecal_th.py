@@ -645,19 +645,23 @@ def plot_2614_timemap(
         f"{ecal_class.energy_param}_cal>2560&{ecal_class.energy_param}_cal<2660&is_usable"
     )
 
-    time_bins = np.arange(
-        (np.amin(ecal_class.data["timestamp"]) // time_dx) * time_dx,
-        ((np.amax(ecal_class.data["timestamp"]) // time_dx) + 2) * time_dx,
-        time_dx,
-    )
+    if len(selection)==0:
+        pass
+    else:
 
-    fig = plt.figure()
-    plt.hist2d(
-        selection["timestamp"],
-        selection[f"{ecal_class.energy_param}_cal"],
-        bins=[time_bins, np.arange(erange[0], erange[1] + dx, dx)],
-        norm=LogNorm(),
-    )
+        time_bins = np.arange(
+            (np.amin(ecal_class.data["timestamp"]) // time_dx) * time_dx,
+            ((np.amax(ecal_class.data["timestamp"]) // time_dx) + 2) * time_dx,
+            time_dx,
+        )
+
+        fig = plt.figure()
+        plt.hist2d(
+            selection["timestamp"],
+            selection[f"{ecal_class.energy_param}_cal"],
+            bins=[time_bins, np.arange(erange[0], erange[1] + dx, dx)],
+            norm=LogNorm(),
+        )
 
     ticks, labels = plt.xticks()
     plt.xlabel(
@@ -775,6 +779,11 @@ def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
     )
     # bin time values
     times_average = (time_bins[:-1] + time_bins[1:]) / 2
+
+    if len(selection)==0:
+        return {"time": times_average, 
+                "energy": np.full_like(times_average,np.nan), 
+                "spread": np.full_like(times_average,np.nan)}
 
     nanmedian = (
         lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
