@@ -979,10 +979,13 @@ class LH5Store:
         elif isinstance(obj, Array):
             if n_rows is None or n_rows > obj.nda.shape[0] - start_row:
                 n_rows = obj.nda.shape[0] - start_row
+
             nda = obj.nda[start_row : start_row + n_rows]
+
             # hack to store bools as uint8 for c / Julia compliance
             if nda.dtype.name == "bool":
                 nda = nda.astype(np.uint8)
+
             # need to create dataset from ndarray the first time for speed
             # creating an empty dataset and appending to that is super slow!
             if (wo_mode != "a" and write_start == 0) or name not in group:
@@ -999,6 +1002,7 @@ class LH5Store:
                     maxshape=maxshape,
                     compression=obj.attrs.get("compression", None),
                 )
+
                 # write HDF5 attributes, but not "compression"!
                 tmpattrs = obj.getattrs(datatype=True)
                 tmpattrs.pop("compression", None)
@@ -1067,8 +1071,11 @@ class LH5Store:
             return self.read_n_rows(f"{name}/cumulative_length", h5f)
 
         # length of vector of encoded vectors is the length of its decoded_size
-        if elements.startswith("encoded_array"):
-            return self.read_n_rows(f"{name}/decoded_size", h5f)
+        if (
+            elements.startswith("encoded_array")
+            or datatype == "array_of_encoded_equalsized_arrays"
+        ):
+            return self.read_n_rows(f"{name}/encoded_data", h5f)
 
         # return array length (without reading the array!)
         if "array" in datatype:
