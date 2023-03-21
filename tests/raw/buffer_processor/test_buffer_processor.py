@@ -8,6 +8,9 @@ import numpy as np
 import pygama.lgdo as lgdo
 from pygama.dsp import build_processing_chain as bpc
 from pygama.raw.build_raw import build_raw
+from pygama.raw.fc.fc_event_decoder import fc_decoded_values
+
+fc_decoded_values["waveform"].pop("compression", None)
 
 config_dir = Path(__file__).parent / "test_buffer_processor_configs"
 
@@ -148,11 +151,14 @@ def test_buffer_processor_waveform_lengths(lgnd_test_data):
         assert len(raw_packet_waveform_values[0].nda[0]) == presum_rate * len(
             presummed_packet_waveform_values[0].nda[0]
         )
-        assert isinstance(presummed_packet_waveform_values[0].nda[0][0], np.uint32)
+        assert presummed_packet_waveform_values[0].nda.dtype == np.uint32
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
-        assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
+        assert (
+            windowed_packet_waveform_values[0].dtype
+            == raw_packet_waveform_values[0].dtype
+        )
 
         raw_packet_waveform_t0s, _ = sto.read_object(
             str(raw_group) + "/waveform/t0", raw_file
@@ -431,11 +437,14 @@ def test_buffer_processor_separate_name_tables(lgnd_test_data):
         assert len(raw_packet_waveform_values[0].nda[0]) == presum_rate * len(
             presummed_packet_waveform_values[0].nda[0]
         )
-        assert isinstance(presummed_packet_waveform_values[0].nda[0][0], np.uint32)
+        assert presummed_packet_waveform_values[0].dtype == np.uint32
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
-        assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
+        assert (
+            windowed_packet_waveform_values[0].dtype
+            == raw_packet_waveform_values[0].dtype
+        )
 
         raw_packet_waveform_t0s, _ = sto.read_object(
             str(raw_group) + "/waveform/t0", raw_file
@@ -659,7 +668,10 @@ def test_proc_geds_no_proc_spms(lgnd_test_data):
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
-        assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
+        assert (
+            windowed_packet_waveform_values[0].dtype
+            == raw_packet_waveform_values[0].dtype
+        )
 
         raw_packet_waveform_t0s, _ = sto.read_object(
             str(raw_group) + "/waveform/t0", raw_file
@@ -739,7 +751,7 @@ def test_proc_geds_no_proc_spms(lgnd_test_data):
 
             assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
             assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
-            assert type(proc_sat_lo.nda[0]) == np.uint16
+            assert proc_sat_lo.dtype == np.uint16
 
 
 # check that packet indexes match in verification test
@@ -924,7 +936,10 @@ def test_buffer_processor_multiple_keys(lgnd_test_data):
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
-        assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
+        assert (
+            windowed_packet_waveform_values[0].dtype
+            == raw_packet_waveform_values[0].dtype
+        )
 
         # Check that the waveforms match
         # These are the channels that should be unprocessed
@@ -1029,7 +1044,7 @@ def test_buffer_processor_multiple_keys(lgnd_test_data):
 
             assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
             assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
-            assert type(proc_sat_lo.nda[0]) == np.uint16
+            assert proc_sat_lo.dtype == np.uint16
 
 
 def test_buffer_processor_all_pass(lgnd_test_data):
@@ -1272,7 +1287,10 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
         assert len(raw_packet_waveform_values[0].nda[0]) == len(
             windowed_packet_waveform_values[0].nda[0]
         ) + np.abs(window_start_index) + np.abs(window_end_index)
-        assert isinstance(windowed_packet_waveform_values[0].nda[0][0], np.uint16)
+        assert (
+            windowed_packet_waveform_values[0].dtype
+            == raw_packet_waveform_values[0].dtype
+        )
 
         # Check that the waveforms match
         # These are the channels that should be unprocessed
@@ -1377,4 +1395,4 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
 
             assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
             assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
-            assert type(proc_sat_lo.nda[0]) == np.uint16
+            assert proc_sat_lo.dtype == np.uint16
