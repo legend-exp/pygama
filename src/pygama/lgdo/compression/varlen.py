@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numba
 import numpy as np
-from numpy import ubyte, uint32
+from numpy import int32, ubyte, uint32
 from numpy.typing import NDArray
 
 from pygama import lgdo
@@ -158,7 +158,7 @@ def decode(
     if isinstance(sig_in, tuple):
         if sig_out is None:
             # allocate output array of the same shape (generous)
-            sig_out = np.empty_like(sig_in[0], dtype=uint32)
+            sig_out = np.empty_like(sig_in[0], dtype=int32)
 
         # siglen has one dimension less (the last)
         s = sig_in[0].shape
@@ -192,7 +192,7 @@ def decode(
 
         return lgdo.ArrayOfEqualSizedArrays(
             nda=sig_out, attrs=sig_in.getattrs()
-        ).to_vov(np.cumsum(siglen, dtype=uint32))
+        ).to_vov(np.cumsum(siglen, dtype=int32))
 
     else:
         raise ValueError("unsupported input signal type")
@@ -283,13 +283,16 @@ def uleb128_decode(encx: NDArray[ubyte]) -> (int, int):
         "void(uint16[:], byte[:], uint32[:])",
         "void(uint32[:], byte[:], uint32[:])",
         "void(uint64[:], byte[:], uint32[:])",
+        "void(int16[:], byte[:], uint32[:])",
+        "void(int32[:], byte[:], uint32[:])",
+        "void(int64[:], byte[:], uint32[:])",
     ],
     "(n),(m),()",
 )
 def uleb128_zigzag_diff_array_encode(
     sig_in: NDArray[int], sig_out: NDArray[ubyte], nbytes: int
 ) -> None:
-    """Encode an array of unsigned integer numbers.
+    """Encode an array of integer numbers.
 
     The algorithm computes the derivative (prepending 0 first) of `sig_in`,
     maps it to positive numbers by applying :func:`zigzag_encode` and finally
@@ -303,7 +306,7 @@ def uleb128_zigzag_diff_array_encode(
     Parameters
     ----------
     sig_in
-        the input array of unsigned integers.
+        the input array of integers.
     sig_out
         pre-allocated bytes array for the output encoded data.
     nbytes
@@ -315,9 +318,9 @@ def uleb128_zigzag_diff_array_encode(
     .uleb128_zigzag_diff_array_decode
     """
     pos = uint32(0)
-    last = int(0)
+    last = int32(0)
     for s in sig_in:
-        zzdiff = zigzag_encode(int(s - last))
+        zzdiff = zigzag_encode(int32(s - last))
         pos += uleb128_encode(zzdiff, sig_out[pos:])
         last = s
 
@@ -329,6 +332,9 @@ def uleb128_zigzag_diff_array_encode(
         "void(byte[:], uint32[:], uint16[:], uint32[:])",
         "void(byte[:], uint32[:], uint32[:], uint32[:])",
         "void(byte[:], uint32[:], uint64[:], uint32[:])",
+        "void(byte[:], uint32[:], int16[:], uint32[:])",
+        "void(byte[:], uint32[:], int32[:], uint32[:])",
+        "void(byte[:], uint32[:], int64[:], uint32[:])",
     ],
     "(n),(),(m),()",
 )
@@ -367,7 +373,8 @@ def uleb128_zigzag_diff_array_decode(
         raise ValueError("input bytes array is empty")
 
     _nbytes = min(nbytes[0], len(sig_in))
-    pos = i = last = uint32(0)
+    pos = i = uint32(0)
+    last = int32(0)
     while pos < _nbytes:
         x, nread = uleb128_decode(sig_in[pos:])
         sig_out[i] = last = zigzag_decode(x) + last

@@ -171,7 +171,7 @@ def decode(
         siglen = _get_hton_u16(sig_in, 0)
         if not sig_out:
             # pre-allocate memory, use safe int32
-            sig_out = np.empty(siglen, dtype="int")
+            sig_out = np.empty(siglen, dtype="int32")
         elif len(sig_out) < siglen:
             # TODO: really even if user supplied? Maybe not
             sig_out.resize(siglen, refcheck=False)
@@ -182,7 +182,7 @@ def decode(
         if not sig_out:
             # pre-allocate output structure
             sig_out = lgdo.ArrayOfEqualSizedArrays(
-                shape=(len(sig_in), sig_in.decoded_size.value), dtype="int"
+                shape=(len(sig_in), sig_in.decoded_size.value), dtype="int32"
             )
 
         elif not isinstance(sig_out, lgdo.ArrayOfEqualSizedArrays):
@@ -195,7 +195,7 @@ def decode(
         if not sig_out:
             # pre-allocate output structure
             sig_out = lgdo.VectorOfVectors(
-                cumulative_length=np.cumsum(sig_in.decoded_size), dtype="int"
+                cumulative_length=np.cumsum(sig_in.decoded_size), dtype="int32"
             )
 
         elif not isinstance(sig_out, lgdo.VectorOfVectors):
