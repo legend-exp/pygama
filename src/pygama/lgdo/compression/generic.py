@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-from ..lgdo import LGDO
+import logging
+
+from .. import lgdo
 from . import radware, varlen
 from .base import WaveformCodec
 
+log = logging.getLogger(__name__)
 
-def encode_array(obj: LGDO, codec: WaveformCodec | str = None) -> LGDO:
+# TODO: this should maybe renamed to encode_lgdo or so
+
+
+def encode_array(
+    obj: lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays,
+    codec: WaveformCodec | str = None,
+) -> lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays:
     """Encode arrays with `codec`.
 
     Defines behaviors for each implemented waveform encoding algorithm.
@@ -17,22 +26,23 @@ def encode_array(obj: LGDO, codec: WaveformCodec | str = None) -> LGDO:
     codec
         algorithm to be used for encoding.
     """
-    if codec is None:
-        pass
-    else:
-        if _is_codec(codec, radware.RadwareSigcompress):
-            enc_obj = radware.encode(obj, shift=codec.codec_shift)
-        elif _is_codec(codec, varlen.ULEB128ZigZagDiff):
-            enc_obj = varlen.encode(obj)
-        else:
-            raise ValueError(f"'{codec}' not supported")
+    log.debug(f"encoding {obj} with {codec}")
 
-        enc_obj.attrs |= codec.asdict()
+    if _is_codec(codec, radware.RadwareSigcompress):
+        enc_obj = radware.encode(obj, shift=codec.codec_shift)
+    elif _is_codec(codec, varlen.ULEB128ZigZagDiff):
+        enc_obj = varlen.encode(obj)
+    else:
+        raise ValueError(f"'{codec}' not supported")
+
+    enc_obj.attrs |= codec.asdict()
 
     return enc_obj
 
 
-def decode_array(obj: LGDO) -> LGDO:
+def decode_array(
+    obj: lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays,
+) -> lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays:
     """Decode encoded arrays.
 
     Defines decoding behaviors for each implemented waveform encoding
@@ -50,6 +60,7 @@ def decode_array(obj: LGDO) -> LGDO:
         )
 
     codec = obj.attrs["codec"]
+    log.debug(f"decoding {obj} with {codec}")
 
     if _is_codec(codec, radware.RadwareSigcompress):
         return radware.decode(obj, shift=int(obj.attrs.get("codec_shift", 0)))

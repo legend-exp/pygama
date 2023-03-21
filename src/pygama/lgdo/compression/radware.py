@@ -63,13 +63,13 @@ def encode(
     --------
     ._radware_sigcompress_encode
     """
-    if len(sig_in) == 0:
-        return sig_in
-
     # the encoded signal is an array of bytes -> twice as long as a uint16
     # array
     max_out_len = 2 * len(sig_in)
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1:
+        if len(sig_in) == 0:
+            return sig_in
+
         if not sig_out:
             # pre-allocate ubyte (uint8) array
             sig_out = np.empty(max_out_len, dtype=ubyte)
@@ -80,6 +80,7 @@ def encode(
         outlen = _radware_sigcompress_encode(sig_in, sig_out, shift=shift)
 
         # resize (down) the encoded signal to its actual length
+        # TODO: really even if user supplied? Maybe not
         if outlen < max_out_len:
             sig_out.resize(outlen, refcheck=True)
 
@@ -101,6 +102,7 @@ def encode(
             sig_out.encoded_data._set_vector_unsafe(i, encode(wf, shift=shift))
 
         # resize down flattened data array
+        # TODO: really even if user supplied? Maybe not
         sig_out.resize(len(sig_in))
 
     elif isinstance(sig_in, lgdo.VectorOfVectors):
@@ -115,6 +117,7 @@ def encode(
             raise ValueError("sig_out must be a VectorOfEncodedVectors")
 
         # use unsafe set_vector to fill pre-allocated memory
+        # should be fast enough
         for i, wf in enumerate(sig_in):
             sig_out.encoded_data._set_vector_unsafe(i, encode(wf, shift=shift))
             sig_out.decoded_size[i] = len(wf)
@@ -123,6 +126,7 @@ def encode(
         raise ValueError(f"unsupported input signal type ({type(sig_in)})")
 
         # resize down flattened data array
+        # TODO: really even if user supplied? Maybe not
         sig_out.resize(len(sig_in))
 
     return sig_out
@@ -160,21 +164,19 @@ def decode(
     --------
     ._radware_sigcompress_decode
     """
-    if len(sig_in) == 0:
-        return sig_in
-
     if isinstance(sig_in, np.ndarray) and sig_in.ndim == 1 and sig_in.dtype == ubyte:
+        if len(sig_in) == 0:
+            return sig_in
+
         siglen = _get_hton_u16(sig_in, 0)
         if not sig_out:
             # pre-allocate memory, use safe int32
             sig_out = np.empty(siglen, dtype="int")
         elif len(sig_out) < siglen:
+            # TODO: really even if user supplied? Maybe not
             sig_out.resize(siglen, refcheck=False)
 
-        outlen = _radware_sigcompress_decode(sig_in, sig_out, shift=shift)
-
-        if outlen < len(sig_out):
-            sig_out.resize(outlen, refcheck=False)
+        _radware_sigcompress_decode(sig_in, sig_out, shift=shift)
 
     elif isinstance(sig_in, lgdo.ArrayOfEncodedEqualSizedArrays):
         if not sig_out:
