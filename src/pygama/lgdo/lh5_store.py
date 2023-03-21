@@ -274,7 +274,7 @@ class LH5Store:
             raise KeyError(f"'{name}' not in {h5f.filename}")
 
         log.debug(
-            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress wfs = {decompress}, "
+            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress = {decompress}, "
             + (f" with field mask {field_mask}" if field_mask else "")
         )
 
@@ -470,47 +470,82 @@ class LH5Store:
             (elements.startswith("encoded_array"), VectorOfEncodedVectors),
         ]:
             if cond:
-                if obj_buf is not None and not isinstance(obj_buf, enc_lgdo):
+                if (
+                    not decompress
+                    and obj_buf is not None
+                    and not isinstance(obj_buf, enc_lgdo)
+                ):
                     raise ValueError(f"obj_buf for '{name}' not a {enc_lgdo}")
 
-                # read out decoded_size
-                decoded_size_buf = None if obj_buf is None else obj_buf.decoded_size
+                # read out decoded_size, either a Scalar or an Array
+                decoded_size_buf = encoded_data_buf = None
+                if obj_buf is not None and not decompress:
+                    decoded_size_buf = obj_buf.decoded_size
+                    encoded_data_buf = obj_buf.encoded_data
+
                 decoded_size, _ = self.read_object(
                     f"{name}/decoded_size",
                     h5f,
                     start_row=start_row,
                     n_rows=n_rows,
                     idx=idx,
-                    obj_buf=decoded_size_buf,
-                    obj_buf_start=obj_buf_start,
+                    obj_buf=None if decompress else decoded_size_buf,
+                    obj_buf_start=0 if decompress else obj_buf_start,
                 )
 
-                # read out encoded_data
-                encoded_data_buf = None if obj_buf is None else obj_buf.encoded_data
+                # read out encoded_data, a VectorOfVectors
                 encoded_data, n_rows_read = self.read_object(
                     f"{name}/encoded_data",
                     h5f,
                     start_row=start_row,
                     n_rows=n_rows,
                     idx=idx,
-                    obj_buf=encoded_data_buf,
-                    obj_buf_start=obj_buf_start,
+                    obj_buf=None if decompress else encoded_data_buf,
+                    obj_buf_start=0 if decompress else obj_buf_start,
                 )
 
-                if obj_buf is not None:
+                # return the still encoded data in the buffer object, if there
+                if obj_buf is not None and not decompress:
                     return obj_buf, n_rows_read
+                else:
+                    # otherwise re-create the encoded LGDO
+                    rawdata = enc_lgdo(
+                        encoded_data=encoded_data,
+                        decoded_size=decoded_size,
+                        attrs=h5f[name].attrs,
+                    )
 
-                rawdata = enc_lgdo(
-                    encoded_data=encoded_data,
-                    decoded_size=decoded_size,
-                    attrs=h5f[name].attrs,
-                )
+                    # already return if no decompression is requested
+                    if not decompress:
+                        return rawdata, n_rows_read
 
-                # eventually decompress encoded arrays
-                return (
-                    compress.decode_array(rawdata) if decompress else rawdata,
-                    n_rows_read,
-                )
+                    # if no buffer, decode and return
+                    elif obj_buf is None and decompress:
+                        return compress.decode_array(rawdata), n_rows_read
+
+                    # use the (decoded object type) buffer otherwise
+                    else:
+                        if enc_lgdo == VectorOfEncodedVectors and not isinstance(
+                            obj_buf, VectorOfVectors
+                        ):
+                            raise ValueError(
+                                f"obj_buf for decoded '{name}' not a VectorOfVectors"
+                            )
+                        elif (
+                            enc_lgdo == ArrayOfEncodedEqualSizedArrays
+                            and not isinstance(obj_buf, ArrayOfEqualSizedArrays)
+                        ):
+                            raise ValueError(
+                                f"obj_buf for decoded '{name}' not an ArrayOfEqualSizedArrays"
+                            )
+
+                        # FIXME: not a good idea. an in place decoding version
+                        # of decode_array would be needed to avoid extra memory
+                        # allocations
+                        for i, wf in enumerate(compress.decode_array(rawdata)):
+                            obj_buf[i] = wf
+
+                        return obj_buf, n_rows_read
 
         # VectorOfVectors
         # read out vector of vectors of different size
@@ -687,9 +722,6 @@ class LH5Store:
                 if len(obj_buf) < buf_size:
                     obj_buf.resize(buf_size)
                 dest_sel = np.s_[obj_buf_start:buf_size]
-                # NOTE: if your script fails on this line, it may be because you
-                # have to apply this patch to h5py (or update h5py, if it's
-                # fixed): https://github.com/h5py/h5py/issues/1792
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
                 nda = obj_buf.nda
             else:
@@ -862,10 +894,10 @@ class LH5Store:
                     and "compression" in obj.values.attrs
                     and isinstance(obj.values.attrs["compression"], WaveformCodec)
                 ):
-                    obj_fld = compress.encode_array(
-                        obj.values, codec=obj.values.attrs["compression"]
-                    )
-                    obj.values.attrs.pop("compression")
+                    # FIXME
+                    # codec = obj.values.attrs.pop("compression")
+                    codec = obj.values.attrs["compression"]
+                    obj_fld = compress.encode_array(obj.values, codec=codec)
                 else:
                     obj_fld = obj[field]
 

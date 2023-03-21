@@ -195,6 +195,12 @@ def test_read_n_rows(lh5_file):
     assert store.read_n_rows("/data/struct_full/wftable_enc/values", lh5_file) == 10
 
 
+def test_get_buffer(lh5_file):
+    store = LH5Store()
+    buf = store.get_buffer("/data/struct_full/wftable_enc", lh5_file)
+    assert isinstance(buf.values, lgdo.ArrayOfEqualSizedArrays)
+
+
 def test_read_scalar(lh5_file):
     store = LH5Store()
     lh5_obj, n_rows = store.read_object("/data/struct/scalar", lh5_file)
@@ -348,11 +354,10 @@ def test_read_wftable_encoded(lh5_file):
     )
     assert n_rows == 6
 
-    # FIXME: buffered read bug
-    # lh5_obj, n_rows = store.read_object(
-    #     "/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=True
-    # )
-    # assert n_rows == 6
+    lh5_obj, n_rows = store.read_object(
+        "/data/struct/wftable_enc", [lh5_file, lh5_file], decompress=True
+    )
+    assert n_rows == 6
 
 
 def test_read_with_field_mask(lh5_file):

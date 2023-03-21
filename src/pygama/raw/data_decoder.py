@@ -149,6 +149,7 @@ class DataDecoder:
                 dt_units = attrs.pop("dt_units")
                 wf_len = attrs.pop("wf_len")
                 compression = attrs.pop("compression", None)
+
                 wf_table = lgdo.WaveformTable(
                     size=size,
                     t0=0,
