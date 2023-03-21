@@ -9,6 +9,9 @@ import pygama.lgdo as lgdo
 from pygama.dsp import build_processing_chain as bpc
 from pygama.raw.buffer_processor.lh5_buffer_processor import lh5_buffer_processor
 from pygama.raw.build_raw import build_raw
+from pygama.raw.fc.fc_event_decoder import fc_decoded_values
+
+fc_decoded_values["waveform"].pop("compression", None)
 
 config_dir = Path(__file__).parent / "test_buffer_processor_configs"
 
