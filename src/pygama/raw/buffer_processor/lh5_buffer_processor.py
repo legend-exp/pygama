@@ -17,33 +17,40 @@ log = logging.getLogger(__name__)
 def lh5_buffer_processor(
     lh5_raw_file_in: str,
     overwrite: bool = False,
-    out_spec: list[str | dict] = None,
+    out_spec: dict = None,
     proc_file_name: str = None,
 ) -> None:
-    """
-    This function performs data processing on an existing raw-level :func:`lh5` file according to the :func:`out_spec` passed in the arguments.
-    It iterates through any valid table in an :func:`lh5` file and checks that either the :func:`group_name` or the :func:`out_name` of this table
-    are found in the :func:`out_spec`. If there is a valid :func:`proc_spec` entry in the :func:`out_spec`, then the table is stored in a :func:`RawBuffer`
-    and the :func:`RawBuffer` is passed to the buffer processor. If no :func:`proc_spec` is found, the table is written to the file without any modifications.
+    r"""Process raw buffers from an LH5 file.
+
+    This function performs data processing on an existing raw-level LH5 file
+    according to `out_spec`.  It iterates through any valid table in the
+    `lh5_raw_file_in` file and checks that either the `group_name` or the
+    `out_name` of this table are found in the `out_spec`. If there is a valid
+    `proc_spec` entry in the `out_spec`, then the table is stored in a
+    :class:`RawBuffer` and the :func:`RawBuffer` is passed to the buffer
+    processor. If no `proc_spec` is found, the table is written to the file
+    without any modifications.
 
 
     Parameters
     ----------
     lh5_raw_file_in
-        The path of a file created from :meth:`pygama.raw.build_raw`
+        the path of a file created by :func:`~.raw.build_raw.build_raw`.
     overwrite
-        sets whether to overwrite the output file(s) if it (they) already exist.
+        sets whether to overwrite the output file(s) if it (they) already
+        exist.
     out_spec
-        An out_spec for :mod:`pygama.raw.build_raw` containing a `proc_spec` dict used for data processing.
-        See :mod:`pygama.raw.buffer_processor.buffer_processor` for an example of such an out_spec.
+        an `out_spec` for :func:`~.raw.build_raw.build_raw` also containing a
+        dictionary named `proc_spec` used for data processing.  See
+        :func:`.buffer_processor` for an example of such an `out_spec`.
     proc_file_name
-        The path to the processed output file created
-            - if None, uses ``{lh5_raw_file_in}_proc.lh5`` as the output filename.
+        The path to the processed output file created. If ``None``, uses
+        ``{lh5_raw_file_in}_proc.lh5`` as the output filename.
 
     Notes
     -----
-    This function assumes that all raw file data are stored in at most two :meth:`h5py.Group`s, as in the following
-    :func:`ch000/raw` or :func:`raw/geds`
+    This function assumes that all raw file data are stored in at most two
+    :class:`h5py.Group`\ s, as in e.g. ``ch000/raw`` or ``raw/geds``
     """
 
     # Initialize the input raw file
