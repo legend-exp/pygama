@@ -39,6 +39,9 @@ def test_init(lgdo_vov):
     assert len(vov.flattened_data) == 15
     assert len(vov[-1]) == 5
 
+    vov = VectorOfVectors(shape_guess=(5, 0), dtype="int32")
+    assert vov.cumulative_length == lgdo.Array([0, 0, 0, 0, 0])
+
 
 def test_datatype_name(lgdo_vov):
     assert lgdo_vov.datatype_name() == "array"

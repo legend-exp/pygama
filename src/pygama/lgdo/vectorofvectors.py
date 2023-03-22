@@ -94,15 +94,20 @@ class VectorOfVectors(LGDO):
                     # just make an empty vector
                     self.cumulative_length = Array(np.empty((0,), dtype="uint32"))
                 else:
-                    # initialiye based on shape_guess
-                    self.cumulative_length = Array(
-                        np.arange(
-                            shape_guess[1],
-                            np.prod(shape_guess) + 1,
-                            shape_guess[1],
-                            dtype="uint32",
+                    # initialize based on shape_guess
+                    if shape_guess[1] <= 0:
+                        self.cumulative_length = Array(
+                            shape=(shape_guess[0],), dtype="uint32", fill_val=0
                         )
-                    )
+                    else:
+                        self.cumulative_length = Array(
+                            np.arange(
+                                shape_guess[1],
+                                np.prod(shape_guess) + 1,
+                                shape_guess[1],
+                                dtype="uint32",
+                            )
+                        )
             else:
                 self.cumulative_length = Array(cumulative_length)
 
