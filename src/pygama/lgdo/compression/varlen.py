@@ -35,7 +35,14 @@ def encode(
     """Compress digital signal(s) with a variable-length encoding of its derivative.
 
     Wraps :func:`uleb128_zigzag_diff_array_encode` and adds support for encoding
-    LGDOs. Because of the current implementation, providing a pre-allocated
+    LGDOs.
+
+    Note
+    ----
+    If `sig_in` is a NumPy array, no resizing of `sig_out` is performed. Not
+    even of the internally allocated one.
+
+    Because of the current implementation, providing a pre-allocated
     :class:`.VectorOfEncodedVectors` as `sig_out` is not possible.
 
     Parameters
@@ -65,10 +72,8 @@ def encode(
         s = sig_in.shape
         if sig_out is None:
             # the encoded signal is an array of bytes
-            # at maximum all bytes are used from the input type
-            # FIXME: not true if encoding differences
-            max_b = int(np.iinfo(sig_in.dtype).bits / 8) + 1
-            # pre-allocate ubyte (uint8) array
+            # pre-allocate ubyte (uint8) array with a generous (but safe) size
+            max_b = int(np.ceil(np.iinfo(sig_in.dtype).bits / 16) * 5)
             # expand last dimension
             sig_out = np.empty(s[:-1] + (s[-1] * max_b,), dtype=ubyte)
 
@@ -80,6 +85,7 @@ def encode(
 
         uleb128_zigzag_diff_array_encode(sig_in, sig_out, nbytes)
 
+        # return without resizing
         return sig_out, nbytes
 
     elif isinstance(sig_in, lgdo.VectorOfVectors):
@@ -143,8 +149,19 @@ def decode(
     """Deompress digital signal(s) with a variable-length encoding of its derivative.
 
     Wraps :func:`uleb128_zigzag_diff_array_decode` and adds support for decoding
-    LGDOs. Because of the current implementation, providing a pre-allocated
-    :class:`.LGDO` as `sig_out` is not possible.
+    LGDOs.
+
+    Note
+    ----
+    If `sig_in` is a NumPy array, no resizing (along the last dimension) of
+    `sig_out` to its actual length is performed. Not even of the internally
+    allocated one. If a pre-allocated :class:`.ArrayOfEqualSizedArrays` is
+    provided, it won't be resized too. The internally allocated
+    :class:`.ArrayOfEqualSizedArrays` `sig_out` has instead always the correct
+    size.
+
+    Because of the current implementation, providing a pre-allocated
+    :class:`.VectorOfVectors` as `sig_out` is not possible.
 
     Parameters
     ----------
@@ -191,11 +208,11 @@ def decode(
                 attrs=sig_in.getattrs(),
             )
 
-        # convert vector of vectors to array of equal sized arrays
         siglen = np.empty(len(sig_in), dtype=uint32)
         # save original encoded vector lengths
         nbytes = np.diff(sig_in.encoded_data.cumulative_length.nda, prepend=uint32(0))
 
+        # convert vector of vectors to array of equal sized arrays
         # can now decode on the 2D matrix together with number of bytes to read per row
         _, siglen = decode(
             (sig_in.encoded_data.to_aoesa(preserve_dtype=True).nda, nbytes), sig_out.nda
@@ -205,6 +222,31 @@ def decode(
         assert np.all(sig_in.decoded_size.value == siglen)
 
         return sig_out
+
+    elif isinstance(sig_in, lgdo.VectorOfEncodedVectors):
+        if sig_out:
+            log.warning(
+                "a pre-allocated VectorOfVectors was given "
+                "to hold an encoded VectorOfVectors. "
+                "This is not supported at the moment, so a new one "
+                "will be allocated to replace it"
+            )
+
+        siglen = np.empty(len(sig_in), dtype=uint32)
+        # save original encoded vector lengths
+        nbytes = np.diff(sig_in.encoded_data.cumulative_length.nda, prepend=uint32(0))
+
+        # convert vector of vectors to array of equal sized arrays
+        # can now decode on the 2D matrix together with number of bytes to read per row
+        sig_out, siglen = decode(
+            (sig_in.encoded_data.to_aoesa(preserve_dtype=True).nda, nbytes)
+        )
+
+        # sanity check
+        assert np.array_equal(sig_in.decoded_size, siglen)
+
+        # converto to VOV before returning
+        return sig_out.to_vov(np.cumsum(siglen, dtype=uint32))
 
     else:
         raise ValueError("unsupported input signal type")
