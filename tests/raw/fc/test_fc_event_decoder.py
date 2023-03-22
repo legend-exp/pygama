@@ -21,20 +21,25 @@ def event_rbkd(fcio_obj, fcio_config):
 
     # decode packet into the lgdo's and check if the buffer is full
     assert decoder.decode_packet(fcio=fcio_obj, evt_rbkd=rbkd, packet_id=69) is True
+
+    # # check compression settings (here before any LH5Store.write_object() call
+    # assert "compression" in rbkd[0].lgdo["packet_id"].attrs
+    # assert "compression" in rbkd[0].lgdo["waveform"].values.attrs
+
     return rbkd
 
 
-def test_decoding(event_rbkd):
+def test_decoding_and_compression_attrs(event_rbkd):
     assert event_rbkd != {}
 
 
 def test_data_types(event_rbkd):
 
     for _, v in event_rbkd.items():
-        # assert v.out_name == 'FCEvent' FIXME: is this a bug?
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
         assert isinstance(tbl["packet_id"], lgdo.Array)
+        assert "compression" in tbl["packet_id"].attrs
         assert isinstance(tbl["eventnumber"], lgdo.Array)
         assert isinstance(tbl["timestamp"], lgdo.Array)
         assert isinstance(tbl["runtime"], lgdo.Array)
@@ -63,12 +68,7 @@ def test_data_types(event_rbkd):
         assert isinstance(tbl["waveform"]["t0"], lgdo.Array)
         assert isinstance(tbl["waveform"]["dt"], lgdo.Array)
         assert isinstance(tbl["waveform"]["values"], lgdo.ArrayOfEqualSizedArrays)
-
-
-def test_compression_attributes(event_rbkd):
-    pass
-    # assert "compression" in event_rbkd[0].lgdo["packet_id"].attrs
-    # assert "compression" in event_rbkd[0].lgdo["waveform"].values.attrs
+        assert "compression" in tbl["waveform"]["values"].attrs
 
 
 def test_values(event_rbkd, fcio_obj):

@@ -506,45 +506,44 @@ class LH5Store:
                 # return the still encoded data in the buffer object, if there
                 if obj_buf is not None and not decompress:
                     return obj_buf, n_rows_read
-                else:
-                    # otherwise re-create the encoded LGDO
-                    rawdata = enc_lgdo(
-                        encoded_data=encoded_data,
-                        decoded_size=decoded_size,
-                        attrs=h5f[name].attrs,
+
+                # otherwise re-create the encoded LGDO
+                rawdata = enc_lgdo(
+                    encoded_data=encoded_data,
+                    decoded_size=decoded_size,
+                    attrs=h5f[name].attrs,
+                )
+
+                # already return if no decompression is requested
+                if not decompress:
+                    return rawdata, n_rows_read
+
+                # if no buffer, decode and return
+                elif obj_buf is None and decompress:
+                    return compress.decode(rawdata), n_rows_read
+
+                # use the (decoded object type) buffer otherwise
+                if enc_lgdo == VectorOfEncodedVectors and not isinstance(
+                    obj_buf, VectorOfVectors
+                ):
+                    raise ValueError(
+                        f"obj_buf for decoded '{name}' not a VectorOfVectors"
+                    )
+                elif enc_lgdo == ArrayOfEncodedEqualSizedArrays and not isinstance(
+                    obj_buf, ArrayOfEqualSizedArrays
+                ):
+                    raise ValueError(
+                        f"obj_buf for decoded '{name}' not an ArrayOfEqualSizedArrays"
                     )
 
-                    # already return if no decompression is requested
-                    if not decompress:
-                        return rawdata, n_rows_read
+                # FIXME: not a good idea. an in place decoding version
+                # of decode would be needed to avoid extra memory
+                # allocations
+                # FIXME: obj_buf_start??? Write a unit test
+                for i, wf in enumerate(compress.decode(rawdata)):
+                    obj_buf[i] = wf
 
-                    # if no buffer, decode and return
-                    elif obj_buf is None and decompress:
-                        return compress.decode(rawdata), n_rows_read
-
-                    # use the (decoded object type) buffer otherwise
-                    else:
-                        if enc_lgdo == VectorOfEncodedVectors and not isinstance(
-                            obj_buf, VectorOfVectors
-                        ):
-                            raise ValueError(
-                                f"obj_buf for decoded '{name}' not a VectorOfVectors"
-                            )
-                        elif (
-                            enc_lgdo == ArrayOfEncodedEqualSizedArrays
-                            and not isinstance(obj_buf, ArrayOfEqualSizedArrays)
-                        ):
-                            raise ValueError(
-                                f"obj_buf for decoded '{name}' not an ArrayOfEqualSizedArrays"
-                            )
-
-                        # FIXME: not a good idea. an in place decoding version
-                        # of decode would be needed to avoid extra memory
-                        # allocations
-                        for i, wf in enumerate(compress.decode(rawdata)):
-                            obj_buf[i] = wf
-
-                        return obj_buf, n_rows_read
+                return obj_buf, n_rows_read
 
         # VectorOfVectors
         # read out vector of vectors of different size
@@ -786,6 +785,10 @@ class LH5Store:
           this algorithm. More documentation about the supported waveform
           compression algorithms at :mod:`.lgdo.compression`.
 
+        Note
+        ----
+        The `compression` attribute is not written to disk.
+
         Parameters
         ----------
         obj
@@ -908,9 +911,9 @@ class LH5Store:
                     and "compression" in obj.values.attrs
                     and isinstance(obj.values.attrs["compression"], WaveformCodec)
                 ):
-                    # FIXME
-                    # codec = obj.values.attrs.pop("compression")
-                    codec = obj.values.attrs["compression"]
+                    # remove the attribute, it's not needed anymore and we
+                    # don't want to write it to disk
+                    codec = obj.values.attrs.pop("compression")
                     obj_fld = compress.encode(obj.values, codec=codec)
                 else:
                     obj_fld = obj[field]
