@@ -144,7 +144,7 @@ def encode(
 
 def decode(
     sig_in: (NDArray[ubyte], NDArray[uint32]) | lgdo.VectorOfEncodedVectors,
-    sig_out: NDArray = None,
+    sig_out: NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays = None,
 ) -> NDArray | lgdo.VectorOfVectors | lgdo.ArrayOfEqualSizedArrays:
     """Deompress digital signal(s) with a variable-length encoding of its derivative.
 
