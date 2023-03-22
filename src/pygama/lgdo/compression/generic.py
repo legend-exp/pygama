@@ -13,7 +13,7 @@ def encode(
     obj: lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays,
     codec: WaveformCodec | str = None,
 ) -> lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays:
-    """Encode arrays with `codec`.
+    """Encode LGDOs with `codec`.
 
     Defines behaviors for each implemented waveform encoding algorithm.
 
@@ -41,7 +41,7 @@ def encode(
 def decode(
     obj: lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays,
 ) -> lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays:
-    """Decode encoded arrays.
+    """Decode encoded LGDOs.
 
     Defines decoding behaviors for each implemented waveform encoding
     algorithm. Expects to find the codec (and its parameters) the arrays where

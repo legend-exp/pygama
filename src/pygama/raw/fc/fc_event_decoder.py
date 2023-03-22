@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 # put decoded values here where they can be used also by the orca decoder
 fc_decoded_values = {
     # packet index in file
-    "packet_id": {"dtype": "uint32"},
+    "packet_id": {"dtype": "uint32", "compression": "gzip"},
     # index of event
     "eventnumber": {"dtype": "int32"},
     # time since epoch
@@ -80,6 +80,14 @@ fc_decoded_values = {
         "compression": {"values": RadwareSigcompress(codec_shift=-32768)},
     },
 }
+"""Default FlashCam Event decoded values.
+
+Re-used by :class:`~.raw.orca.orca_flashcam.ORFlashCamWaveformDecoder`.
+
+Warning
+-------
+This configuration can be dynamically modified by the decoder at runtime.
+"""
 
 
 class FCEventDecoder(DataDecoder):

@@ -461,7 +461,6 @@ class LH5Store:
                 return obj_buf, n_rows_read
 
         # ArrayOfEncodedEqualSizedArrays and VectorOfEncodedVectors
-        # FIXME: buffered reading when decompress=True
         for (cond, enc_lgdo) in [
             (
                 datatype == "array_of_encoded_equalsized_arrays",
@@ -771,6 +770,21 @@ class LH5Store:
         write_start: int = 0,
     ) -> None:
         """Write an LGDO into an LH5 file.
+
+        If the `obj` :class:`.LGDO` has a `compression` attribute, its value is
+        interpreted as the algorithm to be used to compress `obj` before
+        writing to disk. The type of `compression` can be:
+
+        a string
+          interpreted as the name of an `HDF5 built-in compression
+          filter <https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline>`_
+          (``"gzip"``, ``"lzf"``, ``"szip"``, etc.) and passed directly to
+          :meth:`h5py.Group.create_dataset`.
+
+        a :class:`.WaveformCodec` object
+          If `obj` is a :class:`.WaveformTable`, compress its `values` using
+          this algorithm. More documentation about the supported waveform
+          compression algorithms at :mod:`.lgdo.compression`.
 
         Parameters
         ----------

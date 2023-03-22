@@ -7,10 +7,15 @@ files, and in which HDF5 groups inside of each file, is controlled via
 all decoded data should be written to a single output file, with all fields
 from each hardware decoder in their own output table.
 
-Currently we support the following hardware:
+Currently we support the following DAQ data formats:
 
-* FlashCam ADC (requires `fcutils <https://github.com/legend-exp/pyfcutils>`_)
-* FlashCam ADC read out with `ORCA <https://github.com/unc-enap/Orca>`_
+* `FlashCam <https://www.mizzi-computer.de/home>`_
+* `CoMPASS <https://www.caen.it/products/compass>`_
+* `ORCA <https://github.com/unc-enap/Orca>`_, reading out:
+
+  - FlashCam
+  - `Struck SIS3302 <https://www.struck.de/sis3302.htm>`_
+  - `Struck SIS3316 <https://www.struck.de/sis3316.html>`_
 """
 
 from pygama.raw.build_raw import build_raw
