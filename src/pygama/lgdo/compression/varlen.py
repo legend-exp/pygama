@@ -66,6 +66,7 @@ def encode(
         if sig_out is None:
             # the encoded signal is an array of bytes
             # at maximum all bytes are used from the input type
+            # FIXME: not true if encoding differences
             max_b = int(np.iinfo(sig_in.dtype).bits / 8) + 1
             # pre-allocate ubyte (uint8) array
             # expand last dimension
@@ -82,9 +83,27 @@ def encode(
         return sig_out, nbytes
 
     elif isinstance(sig_in, lgdo.VectorOfVectors):
+        if sig_out:
+            log.warning(
+                "a pre-allocated VectorOfEncodedVectors was given "
+                "to hold an encoded ArrayOfEqualSizedArrays. "
+                "This is not supported at the moment, so a new one "
+                "will be allocated to replace it"
+            )
         # convert VectorOfVectors to ArrayOfEqualSizedArrays so it can be
         # directly passed to the low-level encoding routine
-        return encode(sig_in.to_aoesa(), sig_out)
+        sig_out_nda, nbytes = encode(sig_in.to_aoesa())
+
+        # build the encoded LGDO
+        encoded_data = lgdo.ArrayOfEqualSizedArrays(nda=sig_out_nda).to_vov(
+            cumulative_length=np.cumsum(nbytes, dtype=uint32)
+        )
+        # decoded_size is an array, compute it by diff'ing the original VOV
+        decoded_size = np.diff(sig_in.cumulative_length, prepend=uint32(0))
+
+        sig_out = lgdo.VectorOfEncodedVectors(encoded_data, decoded_size)
+
+        return sig_out
 
     elif isinstance(sig_in, lgdo.ArrayOfEqualSizedArrays):
         if sig_out:
@@ -102,15 +121,9 @@ def encode(
         encoded_data = lgdo.ArrayOfEqualSizedArrays(nda=sig_out_nda).to_vov(
             cumulative_length=np.cumsum(nbytes, dtype=uint32)
         )
-        decoded_size = lgdo.Array(
-            np.full(
-                shape=(sig_in.nda.shape[0],),
-                fill_value=sig_in.nda.shape[1],
-                dtype=uint32,
-            )
+        sig_out = lgdo.ArrayOfEncodedEqualSizedArrays(
+            encoded_data, decoded_size=sig_in.nda.shape[1]
         )
-
-        sig_out = lgdo.VectorOfEncodedVectors(encoded_data, decoded_size)
 
         return sig_out
 
@@ -168,13 +181,14 @@ def decode(
 
         return sig_out, siglen
 
-    elif isinstance(sig_in, lgdo.VectorOfEncodedVectors):
-        if sig_out:
-            log.warning(
-                "a pre-allocated LGDO was given "
-                "to hold a decoded VectorOfEncodedVectors. "
-                "This is not supported at the moment, so a new one "
-                "will be allocated to replace it"
+    elif isinstance(sig_in, lgdo.ArrayOfEncodedEqualSizedArrays):
+        if not sig_out:
+            # initialize output structure with decoded_size
+            sig_out = lgdo.ArrayOfEqualSizedArrays(
+                dims=(1, 1),
+                shape=(len(sig_in), sig_in.decoded_size.value),
+                dtype=int32,
+                attrs=sig_in.getattrs(),
             )
 
         # convert vector of vectors to array of equal sized arrays
@@ -183,16 +197,14 @@ def decode(
         nbytes = np.diff(sig_in.encoded_data.cumulative_length.nda, prepend=uint32(0))
 
         # can now decode on the 2D matrix together with number of bytes to read per row
-        sig_out, siglen = decode(
-            (sig_in.encoded_data.to_aoesa(preserve_dtype=True).nda, nbytes),
+        _, siglen = decode(
+            (sig_in.encoded_data.to_aoesa(preserve_dtype=True).nda, nbytes), sig_out.nda
         )
 
         # sanity check
-        assert np.array_equal(sig_in.decoded_size, siglen)
+        assert np.all(sig_in.decoded_size.value == siglen)
 
-        return lgdo.ArrayOfEqualSizedArrays(
-            nda=sig_out, attrs=sig_in.getattrs()
-        ).to_vov(np.cumsum(siglen, dtype=int32))
+        return sig_out
 
     else:
         raise ValueError("unsupported input signal type")

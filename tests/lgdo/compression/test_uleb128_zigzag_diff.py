@@ -1,6 +1,6 @@
 import numpy as np
 
-from pygama.lgdo import VectorOfEncodedVectors
+from pygama.lgdo import ArrayOfEncodedEqualSizedArrays, ArrayOfEqualSizedArrays
 from pygama.lgdo.compression import varlen
 
 
@@ -101,15 +101,25 @@ def test_uleb128zzdiff_encode_decode_wrapper_2dmatrix_equality():
 
 def test_uleb128zzdiff_encode_decode_lgdo_aoesa(wftable):
     voev = varlen.encode(wftable.values)
-    assert isinstance(voev, VectorOfEncodedVectors)
-    assert np.array_equal(voev.decoded_size, np.full(len(wftable), wftable.wf_len))
+    assert isinstance(voev, ArrayOfEncodedEqualSizedArrays)
+    assert voev.decoded_size.value == wftable.wf_len
 
     for i in range(len(voev)):
         wf_enc, nbytes = varlen.encode(wftable.values[i])
-        assert len(voev[i][0]) == nbytes
-        assert np.array_equal(voev[i][0], wf_enc[:nbytes])
+        assert len(voev[i]) == nbytes
+        assert np.array_equal(voev[i], wf_enc[:nbytes])
+        wf_dec, siglen = varlen.decode((wf_enc, nbytes))
+        assert np.array_equal(wf_dec[:siglen], wftable.values[i])
 
     assert voev.encoded_data.to_aoesa(preserve_dtype=True).nda.dtype == np.ubyte
 
     sig_in_dec = varlen.decode(voev)
-    np.array_equal(sig_in_dec, wftable.values)
+    assert isinstance(sig_in_dec, ArrayOfEqualSizedArrays)
+    assert sig_in_dec == wftable.values
+
+    # decode with pre-allocated LGDO
+    sig_in_dec = ArrayOfEqualSizedArrays(
+        dims=(1, 1), shape=(len(wftable), wftable.wf_len), dtype="uint16"
+    )
+    varlen.decode(voev, sig_in_dec)
+    assert sig_in_dec == wftable.values
