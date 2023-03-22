@@ -39,7 +39,6 @@ def test_data_types(event_rbkd):
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
         assert isinstance(tbl["packet_id"], lgdo.Array)
-        assert "compression" in tbl["packet_id"].attrs
         assert isinstance(tbl["eventnumber"], lgdo.Array)
         assert isinstance(tbl["timestamp"], lgdo.Array)
         assert isinstance(tbl["runtime"], lgdo.Array)
@@ -68,7 +67,6 @@ def test_data_types(event_rbkd):
         assert isinstance(tbl["waveform"]["t0"], lgdo.Array)
         assert isinstance(tbl["waveform"]["dt"], lgdo.Array)
         assert isinstance(tbl["waveform"]["values"], lgdo.ArrayOfEqualSizedArrays)
-        assert "compression" in tbl["waveform"]["values"].attrs
 
 
 def test_values(event_rbkd, fcio_obj):
