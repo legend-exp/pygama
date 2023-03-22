@@ -5,10 +5,10 @@ decompression (decoding) algorithms.
 
 Available lossless waveform compression algorithms:
 
-  * :class:`.RadwareSigcompress`, a Python port of the C algorithm
-    `radware-sigcompress` by D. Radford.
-  * :class:`.ULEB128ZigZagDiff` variable-length base-128 encoding of waveform
-    differences.
+* :class:`.RadwareSigcompress`, a Python port of the C algorithm
+  `radware-sigcompress` by D. Radford.
+* :class:`.ULEB128ZigZagDiff` variable-length base-128 encoding of waveform
+  differences.
 
 All waveform compression algorithms inherit from the :class:`.WaveformCodec`
 abstract class.
