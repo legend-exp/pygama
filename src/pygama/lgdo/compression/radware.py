@@ -19,10 +19,22 @@ _radware_sigcompress_mask = uint16([0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023,
 
 @dataclass(frozen=True)
 class RadwareSigcompress(WaveformCodec):
-    """`radware-sigcompress` array codec."""
+    """`radware-sigcompress` array codec.
+
+    Examples
+    --------
+    >>> from pygama.lgdo.compression import RadwareSigcompress
+    >>> codec = RadwareSigcompress(codec_shift=-32768)
+    """
 
     codec_shift: int = 0
-    """Offset added to the input waveform before encoding."""
+    """Offset added to the input waveform before encoding.
+
+    The `radware-sigcompress` algorithm is limited to encoding of 16-bit
+    integer values. In certain cases (notably, with *unsigned* 19-bit integer
+    values), shifting incompatible data by a fixed amount circumvents the
+    issue.
+    """
 
 
 def encode(

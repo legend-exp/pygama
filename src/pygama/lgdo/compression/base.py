@@ -8,6 +8,9 @@ from dataclasses import asdict, dataclass
 class WaveformCodec:
     """Base class identifying a waveform compression algorithm.
 
+    The `self.codec` property returns a string identifier suitable for labeling
+    encoded data on disk. This identifier is constant for all class instances.
+
     Note
     ----
     This is an abstract type. The user must provided a concrete subclass.
