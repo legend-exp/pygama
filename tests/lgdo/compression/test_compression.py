@@ -4,7 +4,7 @@ from pygama.lgdo.compression.generic import _is_codec
 
 
 def test_encode_decode_array(wftable):
-    result = compression.encode_array(
+    result = compression.encode(
         wftable.values, codec=RadwareSigcompress(codec_shift=-32768)
     )
     assert isinstance(result, ArrayOfEncodedEqualSizedArrays)
@@ -12,7 +12,7 @@ def test_encode_decode_array(wftable):
     assert result.attrs["codec"] == "radware_sigcompress"
     assert result.attrs["codec_shift"] == -32768
 
-    compression.decode_array(result)
+    compression.decode(result)
 
 
 def test_is_codec():

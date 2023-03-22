@@ -521,7 +521,7 @@ class LH5Store:
 
                     # if no buffer, decode and return
                     elif obj_buf is None and decompress:
-                        return compress.decode_array(rawdata), n_rows_read
+                        return compress.decode(rawdata), n_rows_read
 
                     # use the (decoded object type) buffer otherwise
                     else:
@@ -540,9 +540,9 @@ class LH5Store:
                             )
 
                         # FIXME: not a good idea. an in place decoding version
-                        # of decode_array would be needed to avoid extra memory
+                        # of decode would be needed to avoid extra memory
                         # allocations
-                        for i, wf in enumerate(compress.decode_array(rawdata)):
+                        for i, wf in enumerate(compress.decode(rawdata)):
                             obj_buf[i] = wf
 
                         return obj_buf, n_rows_read
@@ -897,7 +897,7 @@ class LH5Store:
                     # FIXME
                     # codec = obj.values.attrs.pop("compression")
                     codec = obj.values.attrs["compression"]
-                    obj_fld = compress.encode_array(obj.values, codec=codec)
+                    obj_fld = compress.encode(obj.values, codec=codec)
                 else:
                     obj_fld = obj[field]
 

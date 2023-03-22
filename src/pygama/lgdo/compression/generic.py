@@ -8,10 +8,8 @@ from .base import WaveformCodec
 
 log = logging.getLogger(__name__)
 
-# TODO: this should maybe renamed to encode_lgdo or so
 
-
-def encode_array(
+def encode(
     obj: lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays,
     codec: WaveformCodec | str = None,
 ) -> lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays:
@@ -40,7 +38,7 @@ def encode_array(
     return enc_obj
 
 
-def decode_array(
+def decode(
     obj: lgdo.VectorOfEncodedVectors | lgdo.ArrayOfEncodedEqualSizedArrays,
 ) -> lgdo.VectorOfVectors | lgdo.ArrayOfEqualsizedArrays:
     """Decode encoded arrays.

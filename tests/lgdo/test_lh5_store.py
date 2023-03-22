@@ -152,7 +152,7 @@ def lh5_file():
         lgdo.WaveformTable(
             t0=lgdo.Array(np.zeros(10)),
             dt=lgdo.Array(np.full(10, fill_value=1)),
-            values=compression.encode_array(
+            values=compression.encode(
                 struct["wftable"].values, codec=RadwareSigcompress(codec_shift=-32768)
             ),
         ),
