@@ -10,6 +10,8 @@ import pygama.lgdo as lgdo
 from pygama.dsp.errors import ProcessingChainError
 from pygama.dsp.processing_chain import build_processing_chain as bpc
 from pygama.lgdo import Array, ArrayOfEqualSizedArrays, Table
+from pygama.lgdo.compression import WaveformCodec
+from pygama.lgdo.compression.utils import str2wfcodec
 
 if TYPE_CHECKING:
     from pygama.raw.raw_buffer import RawBuffer
@@ -149,7 +151,9 @@ def buffer_processor(rb: RawBuffer) -> Table:
             for word in name.split("/"):
                 ptr = ptr[word]
 
-            ptr.attrs["compression"] = codec
+            ptr.attrs["compression"] = (
+                codec if isinstance(codec, WaveformCodec) else str2wfcodec(codec)
+            )
 
     return tmp_table
 
