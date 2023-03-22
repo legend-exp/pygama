@@ -7,6 +7,7 @@ import numpy as np
 
 import pygama.lgdo as lgdo
 from pygama.dsp import build_processing_chain as bpc
+from pygama.lgdo.compression import RadwareSigcompress, ULEB128ZigZagDiff
 from pygama.raw.build_raw import build_raw
 from pygama.raw.fc.fc_event_decoder import fc_decoded_values
 
@@ -1397,3 +1398,67 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
             assert np.array_equal(raw_sat_lo.nda, proc_sat_lo.nda)
             assert np.array_equal(raw_sat_hi.nda, proc_sat_hi.nda)
             assert proc_sat_lo.dtype == np.uint16
+
+
+# check that packet indexes match in verification test
+def test_buffer_processor_compression_settings(lgnd_test_data):
+
+    # Set up I/O files, including config
+    daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
+    processed_file = "/tmp/L200-comm-20220519-phy-geds_proc_comp.lh5"
+
+    out_spec = {
+        "FCEventDecoder": {
+            "ch{key}": {
+                "key_list": [[0, 6]],
+                "out_stream": processed_file + ":{name}",
+                "out_name": "raw",
+                "proc_spec": {
+                    "window": ["waveform", 1000, -1000, "windowed_waveform"],
+                    "dsp_config": {
+                        "outputs": ["presum_rate", "presummed_waveform"],
+                        "processors": {
+                            "presum_rate, presummed_waveform": {
+                                "function": "presum",
+                                "module": "pygama.dsp.processors",
+                                "args": [
+                                    "waveform",
+                                    0,
+                                    "presum_rate",
+                                    "presummed_waveform(shape=len(waveform)/16, period=waveform.period*16, offset=waveform.offset)",
+                                ],
+                                "unit": "ADC",
+                            }
+                        },
+                    },
+                    "drop": ["waveform"],
+                    "dtype_conv": {
+                        "presummed_waveform/values": "uint32",
+                        "presum_rate": "uint16",
+                    },
+                    "compression": {
+                        "windowed_waveform/values": RadwareSigcompress(
+                            codec_shift=-32768
+                        ),
+                        "presummed_waveform/values": ULEB128ZigZagDiff(),
+                    },
+                },
+            }
+        }
+    }
+
+    build_raw(in_stream=daq_file, out_spec=out_spec, overwrite=True)
+
+    sto = lgdo.LH5Store()
+    presum_wf, _ = sto.read_object(
+        "/ch0/raw/presummed_waveform/values", processed_file, decompress=False
+    )
+    window_wf, _ = sto.read_object(
+        "/ch0/raw/windowed_waveform/values", processed_file, decompress=False
+    )
+
+    assert isinstance(presum_wf, lgdo.ArrayOfEncodedEqualSizedArrays)
+    assert isinstance(window_wf, lgdo.ArrayOfEncodedEqualSizedArrays)
+
+    assert presum_wf.attrs["codec"] == "uleb128_zigzag_diff"
+    assert window_wf.attrs["codec"] == "radware_sigcompress"
