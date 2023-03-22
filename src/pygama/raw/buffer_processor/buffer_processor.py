@@ -21,33 +21,37 @@ def buffer_processor(rb: RawBuffer) -> Table:
     r"""Process raw data buffers.
 
     Takes in a :class:`.RawBuffer`, performs any processes specified in the
-    :class:`.RawBuffer`'s ``proc_spec`` attribute, and returns a
+    :class:`.RawBuffer`'s ``proc_spec`` attribute (a dictionary), and returns a
     :class:`.Table` with the processed buffer. This `tmp_table` shares columns
     with the :class:`.RawBuffer`'s LGDO (`rb.lgdo`), so no data is copied.
 
-    Currently implemented attributes:
+    Currently implemented ``proc_spec`` processors:
 
-    ``"window": [in_name, start_index, stop_index, out_name]`` `(list)`
-      Windows objects with a name specified by the first argument passed in the
-      ``proc_spec``, the window start and stop indices are the next two
-      arguments, and then updates the `rb.lgdo` with a name specified by the last
-      argument. If the object is an :func:`.WaveformTable`, then the
-      ``t0`` attribute is updated accordingly. Although it is possible to use
-      the DSP config to perform windowing, this hard-coded version avoids a
-      conversion to ``float32``.
+    ``"window": ["waveform", start_index, stop_index, "out_name"]`` `(list)`
+      Windows objects with a name specified by the first argument, the window
+      start and stop indices are the next two arguments, and then updates the
+      `rb.lgdo` with a name specified by the last argument. If the object is an
+      :class:`.WaveformTable`, then the ``t0`` attribute is updated
+      accordingly.  Although it is possible to use the DSP config to perform
+      windowing, this hard-coded version avoids a conversion to ``float32``.
 
-    ``"dsp_config": { dsp_config }`` `(dict)`
-      Performs DSP given by the ``dsp_config`` key in the ``proc_spec``. See
-      :mod:`.dsp.processing_chain.build_processing_chain` for more information
+    ``"dsp_config": { <dsp_config> }`` `(dict)`
+      Performs DSP given by the ``<dsp_config>`` specification. See
+      :func:`~.dsp.processing_chain.build_processing_chain` for more information
       on DSP configuration dictionaries.  All fields in the output of the DSP
       are written to the `rb.lgdo`.
 
-    ``"drop": ["waveform", "packet_ids"]`` `(list)`
+    ``"drop": ["waveform" [, ...]]`` `(list)`
       Drops any requested fields from the `rb.lgdo`.
 
-    ``"dtype_conv": {"presummed_waveform/values": "uint32", "t_sat_lo": "uint16"}`` `(dict)`
-      Updates the data types of any field with its requested datatype in
-      ``proc_spec``.
+    ``"dtype_conv": {"lgdo": "dtype" [, ...]}`` `(dict)`
+      Casts `lgdo` to the requested data type.
+
+    ``"compression": { "lgdo": "codec_name" [, ...]}`` `(dict)`
+      Updates the `compression` attribute of `lgdo` to `codec_name`. The
+      attribute sets the compression algorithm applied by
+      :func:`~.lgdo.lh5_store.LH5Store.read_object` before writing `lgdo` to
+      disk.
 
     Parameters
     ----------
@@ -60,14 +64,12 @@ def buffer_processor(rb: RawBuffer) -> Table:
     request! All updates are done on the `tmp_table`, which shares the fields
     with `rb.lgdo` and are done in place. The `tmp_table` is necessary so that
     the `rb.lgdo` keeps arrays needed by the table in the buffer.  An example
-    ``proc_spec`` in an :mod:`.raw.build_raw` ``out_spec`` is below
-
-    .. code-block:: json
+    `proc_spec` in an :func:`~.raw.build_raw.build_raw` `out_spec` is below. ::
 
         {
           "FCEventDecoder" : {
             "g{key:0>3d}" : {
-              "key_list" : [[24,64]],
+              "key_list" : [[24, 64]],
               "out_stream" : "$DATADIR/{file_key}_geds.lh5:/geds",
               "proc_spec": {
                 "window": ["waveform", 100, -100, "windowed_waveform"],
@@ -96,6 +98,10 @@ def buffer_processor(rb: RawBuffer) -> Table:
                   "presummed_waveform/values": "uint32",
                   "t_sat_lo": "uint16",
                   "t_sat_hi": "uint16",
+                ,}
+                "compression": {
+                  "windowed_waveform/values": RadwareSigcompress(codec_shift=-32768),
+                  "presummed_waveform/values": ULEB128ZigZagDiff(),
                 }
               }
             },
@@ -135,6 +141,15 @@ def buffer_processor(rb: RawBuffer) -> Table:
     # Drop any requested columns from the table
     if "drop" in rb.proc_spec.keys():
         process_drop(rb, tmp_table)
+
+    # at last, assign compression attributes
+    if "compression" in rb.proc_spec.keys():
+        for name, codec in rb.proc_spec["compression"].items():
+            ptr = tmp_table
+            for word in name.split("/"):
+                ptr = ptr[word]
+
+            ptr.attrs["compression"] = codec
 
     return tmp_table
 
@@ -249,6 +264,7 @@ def process_windowed_t0(t0s: Array, dts: Array, start_index: int) -> Array:
     ``t0`` value.
     """
     # don't want to modify the original lgdo_table t0s
+    # deepcopy also preserves attributes
     copy_t0s = copy.deepcopy(t0s)
 
     # perform t0+start_index*dt to rewrite the new t0 in terms of sample
@@ -293,8 +309,10 @@ def process_dsp(rb: RawBuffer, tmp_table: Table) -> None:
 
     proc_chain.execute()
 
-    # For every processor in dsp_dict for this group, create a new entry in the lgdo table with that processor's name
-    # If the processor returns a waveform, create a new waveform table and add it to the original lgdo table
+    # For every processor in dsp_dict for this group, create a new entry in the
+    # lgdo table with that processor's name.  If the processor returns a
+    # waveform, create a new waveform table and add it to the original lgdo
+    # table
     for proc in dsp_out.keys():
         # # Check what DSP routine the processors output is from, and manipulate accordingly
         tmp_table.add_field(proc, dsp_out[proc], use_obj_size=True)
