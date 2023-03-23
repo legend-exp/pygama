@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 # put decoded values here where they can be used also by the orca decoder
 fc_decoded_values = {
     # packet index in file
-    "packet_id": {"dtype": "uint32", "compression": "gzip"},
+    "packet_id": {"dtype": "uint32"},
     # index of event
     "eventnumber": {"dtype": "int32"},
     # time since epoch

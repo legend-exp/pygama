@@ -14,6 +14,7 @@ from collections import defaultdict
 from typing import Any, Union
 
 import h5py
+import hdf5plugin
 import numba as nb
 import numpy as np
 import pandas as pd
@@ -34,6 +35,8 @@ from .waveform_table import WaveformTable
 LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
 log = logging.getLogger(__name__)
+
+DEFAULT_HDF5_COMPRESSION = hdf5plugin.Blosc(cname="zlib")
 
 
 class LH5Store:
@@ -228,7 +231,7 @@ class LH5Store:
             ``table.loc``.
         """
         # Handle list-of-files recursively
-        if not isinstance(lh5_file, (str, h5py._hl.files.File)):
+        if not isinstance(lh5_file, (str, h5py.File)):
             lh5_file = list(lh5_file)
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
@@ -767,6 +770,7 @@ class LH5Store:
         n_rows: int = None,
         wo_mode: str = "append",
         write_start: int = 0,
+        hdf5_compression: str | h5py.filters.FilterRefBase = DEFAULT_HDF5_COMPRESSION,
     ) -> None:
         """Write an LGDO into an LH5 file.
 
@@ -774,20 +778,27 @@ class LH5Store:
         interpreted as the algorithm to be used to compress `obj` before
         writing to disk. The type of `compression` can be:
 
-        a string
-          interpreted as the name of an `HDF5 built-in compression
+        string, kwargs dictionary, hdf5plugin filter
+          interpreted as the name of a built-in or custom `HDF5 compression
           filter <https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline>`_
-          (``"gzip"``, ``"lzf"``, ``"szip"``, etc.) and passed directly to
-          :meth:`h5py.Group.create_dataset`.
+          (``"gzip"``, ``"lzf"``, :mod:`hdf5plugin` filter object etc.) and
+          passed directly to :meth:`h5py.Group.create_dataset`.
 
-        a :class:`.WaveformCodec` object
+        :class:`.WaveformCodec` object
           If `obj` is a :class:`.WaveformTable`, compress its `values` using
           this algorithm. More documentation about the supported waveform
           compression algorithms at :mod:`.lgdo.compression`.
 
         Note
         ----
-        The `compression` attribute is not written to disk.
+        The `compression` attribute takes precedence over the
+        `hdf5_compression` argument and is not written to disk.
+
+        Note
+        ----
+        HDF5 compression is skipped for the `encoded_data` dataset of
+        :class:`.VectorOfEncodedVectors` and
+        :class`.ArrayOfEncodedEqualSizedArrays`.
 
         Parameters
         ----------
@@ -823,11 +834,15 @@ class LH5Store:
         write_start
             row in the output file (if already existing) to start overwriting
             from.
+        hdf5_compression
+            HDF5 compression filter to be applied before writing non-scalar
+            datasets. **Ignored if compression is specified as an `obj`
+            attribute.**
         """
         log.debug(
             f"writing {repr(obj)}[{start_row}:{n_rows}] as "
             f"{lh5_file}:{group}/{name}[{write_start}:], "
-            f"mode = {wo_mode}"
+            f"mode = {wo_mode}, hdf5_compression = {hdf5_compression}"
         )
 
         if wo_mode == "write_safe":
@@ -927,6 +942,7 @@ class LH5Store:
                     n_rows=n_rows,
                     wo_mode=wo_mode,
                     write_start=write_start,
+                    hdf5_compression=hdf5_compression,
                 )
             return
 
@@ -949,20 +965,30 @@ class LH5Store:
             group = self.gimme_group(
                 name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
             )
-            for o, field in [
-                (obj.encoded_data, "encoded_data"),
-                (obj.decoded_size, "decoded_size"),
-            ]:
-                self.write_object(
-                    o,
-                    field,
-                    lh5_file,
-                    group=group,
-                    start_row=start_row,
-                    n_rows=n_rows,
-                    wo_mode=wo_mode,
-                    write_start=write_start,
-                )
+
+            self.write_object(
+                obj.encoded_data,
+                "encoded_data",
+                lh5_file,
+                group=group,
+                start_row=start_row,
+                n_rows=n_rows,
+                wo_mode=wo_mode,
+                write_start=write_start,
+                hdf5_compression=None,  # data is already compressed!
+            )
+
+            self.write_object(
+                obj.decoded_size,
+                "decoded_size",
+                lh5_file,
+                group=group,
+                start_row=start_row,
+                n_rows=n_rows,
+                wo_mode=wo_mode,
+                write_start=write_start,
+                hdf5_compression=hdf5_compression,
+            )
 
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):
@@ -997,6 +1023,7 @@ class LH5Store:
                 n_rows=fd_n_rows,
                 wo_mode=wo_mode,
                 write_start=offset,
+                hdf5_compression=hdf5_compression,
             )
 
             # now offset is used to give appropriate in-file values for
@@ -1019,6 +1046,7 @@ class LH5Store:
                 n_rows=n_rows,
                 wo_mode=wo_mode,
                 write_start=write_start,
+                hdf5_compression=hdf5_compression,
             )
             obj.cumulative_length.nda -= cl_dtype(offset)
 
@@ -1043,19 +1071,23 @@ class LH5Store:
                     log.debug(f"overwriting {name} in {group}")
                     del group[name]
 
-                # create HDF5 dataset, compress using the 'compression' LGDO
-                # attribute, if available
+                # create HDF5 dataset
+                # - compress using the 'compression' LGDO attribute, if
+                #   available
+                # - otherwise use "hdf5_compression"
+                # - attach HDF5 dataset attributes, but not "compression"!
+                comp_algo = obj.attrs.pop("compression", hdf5_compression)
+                comp_kwargs = {}
+                if isinstance(comp_algo, str):
+                    comp_kwargs = {"compression": comp_algo}
+                elif comp_algo is not None:
+                    comp_kwargs = comp_algo
+
                 ds = group.create_dataset(
-                    name,
-                    data=nda,
-                    maxshape=maxshape,
-                    compression=obj.attrs.get("compression", None),
+                    name, data=nda, maxshape=maxshape, **comp_kwargs
                 )
 
-                # write HDF5 attributes, but not "compression"!
-                tmpattrs = obj.getattrs(datatype=True)
-                tmpattrs.pop("compression", None)
-                ds.attrs.update(tmpattrs)
+                ds.attrs.update(obj.attrs)
                 return
 
             # Now append or overwrite
