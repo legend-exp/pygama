@@ -36,7 +36,7 @@ LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HDF5_COMPRESSION = hdf5plugin.Blosc(cname="zlib")
+DEFAULT_HDF5_COMPRESSION = hdf5plugin.Blosc()
 
 
 class LH5Store:
