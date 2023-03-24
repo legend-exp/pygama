@@ -215,7 +215,8 @@ class VectorOfVectors(LGDO):
 
         # then resize the data array
         # if dlen > 0 this has no effect
-        self.flattened_data.resize(self.cumulative_length[-1])
+        if len(self.cumulative_length) > 0:
+            self.flattened_data.resize(self.cumulative_length[-1])
 
     def append(self, new: NDArray) -> None:
         """Append a 1D vector `new` at the end.
