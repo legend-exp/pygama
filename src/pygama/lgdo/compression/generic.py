@@ -24,7 +24,7 @@ def encode(
     codec
         algorithm to be used for encoding.
     """
-    log.debug(f"encoding {obj} with {codec}")
+    log.debug(f"encoding {repr(obj)} with {codec}")
 
     if _is_codec(codec, radware.RadwareSigcompress):
         enc_obj = radware.encode(obj, shift=codec.codec_shift)
@@ -58,7 +58,7 @@ def decode(
         )
 
     codec = obj.attrs["codec"]
-    log.debug(f"decoding {obj} with {codec}")
+    log.debug(f"decoding {repr(obj)} with {codec}")
 
     if _is_codec(codec, radware.RadwareSigcompress):
         return radware.decode(obj, shift=int(obj.attrs.get("codec_shift", 0)))

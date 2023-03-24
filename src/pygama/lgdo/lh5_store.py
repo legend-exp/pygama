@@ -926,9 +926,7 @@ class LH5Store:
                     and "compression" in obj.values.attrs
                     and isinstance(obj.values.attrs["compression"], WaveformCodec)
                 ):
-                    # remove the attribute, it's not needed anymore and we
-                    # don't want to write it to disk
-                    codec = obj.values.attrs.pop("compression")
+                    codec = obj.values.attrs["compression"]
                     obj_fld = compress.encode(obj.values, codec=codec)
                 else:
                     obj_fld = obj[field]
@@ -1076,7 +1074,7 @@ class LH5Store:
                 #   available
                 # - otherwise use "hdf5_compression"
                 # - attach HDF5 dataset attributes, but not "compression"!
-                comp_algo = obj.attrs.pop("compression", hdf5_compression)
+                comp_algo = obj.attrs.get("compression", hdf5_compression)
                 comp_kwargs = {}
                 if isinstance(comp_algo, str):
                     comp_kwargs = {"compression": comp_algo}
@@ -1087,11 +1085,19 @@ class LH5Store:
                     name, data=nda, maxshape=maxshape, **comp_kwargs
                 )
 
-                ds.attrs.update(obj.attrs)
+                _attrs = obj.getattrs(datatype=True)
+                _attrs.pop("compression", None)
+                ds.attrs.update(_attrs)
                 return
 
             # Now append or overwrite
             ds = group[name]
+            if not isinstance(ds, h5py.Dataset):
+                raise RuntimeError(
+                    f"existing HDF5 object '{name}' in group '{group}'"
+                    " is not a dataset! Cannot overwrite or append"
+                )
+
             old_len = ds.shape[0]
             if wo_mode == "a":
                 write_start = old_len
