@@ -46,6 +46,8 @@ class VectorOfEncodedVectors(LGDO):
         """
         if isinstance(encoded_data, VectorOfVectors):
             self.encoded_data = encoded_data
+        elif encoded_data is None:
+            self.encoded_data = VectorOfVectors(dtype="ubyte")
         else:
             raise ValueError("encoded_data must be a valid VectorOfVectors")
 
@@ -254,6 +256,8 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
         """
         if isinstance(encoded_data, VectorOfVectors):
             self.encoded_data = encoded_data
+        elif encoded_data is None:
+            self.encoded_data = VectorOfVectors(dtype="ubyte")
         else:
             raise ValueError("encoded_data must be a valid VectorOfVectors")
 
@@ -276,8 +280,8 @@ class ArrayOfEncodedEqualSizedArrays(LGDO):
     def __len__(self) -> int:
         return len(self.encoded_data)
 
-    def __eq__(self, other: VectorOfEncodedVectors) -> bool:
-        if isinstance(other, VectorOfEncodedVectors):
+    def __eq__(self, other: ArrayOfEncodedEqualSizedArrays) -> bool:
+        if isinstance(other, ArrayOfEncodedEqualSizedArrays):
             return (
                 self.encoded_data == other.encoded_data
                 and self.decoded_size == other.decoded_size
