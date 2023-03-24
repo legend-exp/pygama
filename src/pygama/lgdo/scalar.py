@@ -45,6 +45,12 @@ class Scalar(LGDO):
     def __len__(self) -> int:
         return 1
 
+    def __eq__(self, other: Scalar) -> bool:
+        if isinstance(other, Scalar):
+            return self.value == other.value and self.attrs == self.attrs
+        else:
+            return False
+
     def __str__(self) -> str:
         attrs = self.getattrs()
         return f"{str(self.value)} with attrs={repr(attrs)}"
