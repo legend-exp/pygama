@@ -123,3 +123,10 @@ def test_uleb128zzdiff_encode_decode_lgdo_aoesa(wftable):
     )
     varlen.decode(voev, sig_in_dec)
     assert sig_in_dec == wftable.values
+
+
+def test_encoding_decoding_empty():
+    aoesa = ArrayOfEqualSizedArrays(dims=(1, 1), nda=np.empty((0, 0)))
+    enc_aoesa = varlen.encode(aoesa)
+    assert enc_aoesa == ArrayOfEncodedEqualSizedArrays()
+    assert varlen.decode(enc_aoesa) == aoesa

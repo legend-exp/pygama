@@ -65,11 +65,11 @@ def encode(
     --------
     uleb128_zigzag_diff_array_encode
     """
-    if len(sig_in) == 0:
-        return sig_in
-
     if isinstance(sig_in, np.ndarray):
         s = sig_in.shape
+        if len(sig_in) == 0:
+            return np.empty(s[:-1] + (0,), dtype=ubyte), np.empty(0, dtype=uint32)
+
         if sig_out is None:
             # the encoded signal is an array of bytes
             # pre-allocate ubyte (uint8) array with a generous (but safe) size
@@ -181,9 +181,6 @@ def decode(
     --------
     uleb128_zigzag_diff_array_decode
     """
-    if len(sig_in) == 0:
-        return sig_in
-
     # expect the output of encode()
     if isinstance(sig_in, tuple):
         if sig_out is None:
@@ -193,6 +190,10 @@ def decode(
         # siglen has one dimension less (the last)
         s = sig_in[0].shape
         siglen = np.empty(s[:-1], dtype=uint32)
+
+        if len(sig_in[0]) == 0:
+            return sig_out, siglen
+
         # call low-level routine
         uleb128_zigzag_diff_array_decode(sig_in[0], sig_in[1], sig_out, siglen)
 
@@ -211,6 +212,9 @@ def decode(
         siglen = np.empty(len(sig_in), dtype=uint32)
         # save original encoded vector lengths
         nbytes = np.diff(sig_in.encoded_data.cumulative_length.nda, prepend=uint32(0))
+
+        if len(sig_in) == 0:
+            return sig_out
 
         # convert vector of vectors to array of equal sized arrays
         # can now decode on the 2D matrix together with number of bytes to read per row
