@@ -59,6 +59,8 @@ class VectorOfEncodedVectors(LGDO):
             self.decoded_size = Array(
                 shape=len(encoded_data), dtype="uint32", fill_val=0
             )
+        elif decoded_size is None:
+            self.decoded_size = Array()
 
         if len(self.encoded_data) != len(self.decoded_size):
             raise RuntimeError("encoded_data vs. decoded_size shape mismatch")

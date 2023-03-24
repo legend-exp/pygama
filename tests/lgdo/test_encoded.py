@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from pygama.lgdo import (
     Array,
@@ -11,9 +10,6 @@ from pygama.lgdo import (
 
 
 def test_voev_init():
-    with pytest.raises(ValueError):
-        VectorOfEncodedVectors()
-
     voev = VectorOfEncodedVectors(
         VectorOfVectors(shape_guess=(100, 1000), dtype="uint16")
     )
@@ -30,9 +26,6 @@ def test_voev_init():
 
 
 def test_aoeesa_init():
-    with pytest.raises(ValueError):
-        ArrayOfEncodedEqualSizedArrays()
-
     voev = ArrayOfEncodedEqualSizedArrays(
         VectorOfVectors(shape_guess=(100, 1000), dtype="uint16")
     )
