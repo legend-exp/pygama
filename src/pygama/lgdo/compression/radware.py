@@ -194,7 +194,9 @@ def decode(
         if not sig_out:
             # pre-allocate output structure
             sig_out = lgdo.ArrayOfEqualSizedArrays(
-                shape=(len(sig_in), sig_in.decoded_size.value), dtype="int32"
+                dims=(1, 1),
+                shape=(len(sig_in), sig_in.decoded_size.value),
+                dtype="int32",
             )
 
         elif not isinstance(sig_out, lgdo.ArrayOfEqualSizedArrays):

@@ -181,6 +181,13 @@ def test_hton_u16():
         assert a[i] == _get_hton_u16(b, i)
 
 
+def test_encoding_decoding_empty():
+    aoesa = ArrayOfEqualSizedArrays(dims=(1, 1), nda=np.empty((0, 0)))
+    enc_aoesa = encode(aoesa)
+    assert enc_aoesa == ArrayOfEncodedEqualSizedArrays()
+    assert decode(enc_aoesa) == aoesa
+
+
 def test_special_wfs():
     # fmt: off
     wf = np.array([5, -7, -14, 17, -21, 0, -10, -2, -17, -14, 22, -5, -7, 7,
