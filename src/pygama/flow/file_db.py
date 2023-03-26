@@ -305,7 +305,8 @@ class FileDB:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
     def scan_tables_columns(
-        self, to_file: str = None, override: bool = False
+        self, to_file: str = None, override: bool = False,
+        dir_files_conform: bool = False
     ) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
@@ -339,8 +340,17 @@ class FileDB:
             else:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
-        def update_tables_cols(row, tier: str) -> pd.Series:
+        # set up a cache to provide a fast option if all files in each directory
+        # are expected to all have the same cols
+        utc_cache = {}
+
+        def update_tables_cols(row, tier: str, dir_files_conform: bool = False) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+            this_dir = fpath[:fpath.rfind('/')]
+            if this_dir in utc_cache and dir_files_conform:
+                return utc_cache[this_dir]
+            print(fpath)
+
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
@@ -398,14 +408,16 @@ class FileDB:
                 else:
                     col_idx.append(columns.index(col))
 
-            return pd.Series(
+            series = pd.Series(
                 {f"{tier}_tables": tier_tables, f"{tier}_col_idx": col_idx}
             )
+            if dir_files_conform: utc_cache[this_dir] = series
+            return series
 
         columns = []
         for tier in self.tiers:
             self.df[[f"{tier}_tables", f"{tier}_col_idx"]] = self.df.apply(
-                update_tables_cols, axis=1, tier=tier
+                update_tables_cols, axis=1, tier=tier, dir_files_conform=dir_files_conform
             )
 
         self.columns = columns
