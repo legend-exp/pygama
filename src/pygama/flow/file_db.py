@@ -21,7 +21,6 @@ from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
 
-
 def to_datetime(key: str) -> datetime:
     """Convert LEGEND cycle key to :class:`~datetime.datetime`.
 
@@ -340,23 +339,18 @@ class FileDB:
             else:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
-        # set up a cache to provide a fast option if all files in each directory
-        # are expected to all have the same cols
-        utc_cache = {}
-
-        def update_tables_cols(row, tier: str, dir_files_conform: bool = False) -> pd.Series:
+        def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
             this_dir = fpath[:fpath.rfind('/')]
-            if this_dir in utc_cache and dir_files_conform:
+            if utc_cache is not None and this_dir in utc_cache:
                 return utc_cache[this_dir]
-            print(fpath)
-
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
             if os.path.exists(fpath):
                 f = h5py.File(fpath)
             else:
+                log.debug(f"{fpath} doesn't exist")
                 return pd.Series({f"{tier}_tables": None, f"{tier}_col_idx": None})
 
             # Get tables in each tier
@@ -382,9 +376,12 @@ class FileDB:
 
                 # TODO this call here is really expensive!
                 groups = ls(f, wildcard)
-                tier_tables = [
-                    list(parse(template, g).named.values())[0] for g in groups
-                ]
+                if len(groups) > 0 and parse(template, groups[0]) is None:
+                    log.warning(f"groups in {fpath} don't match template")
+                else:
+                    tier_tables = [
+                        list(parse(template, g).named.values())[0] for g in groups
+                    ]
 
             # Get columns
             col_idx = []
@@ -411,13 +408,20 @@ class FileDB:
             series = pd.Series(
                 {f"{tier}_tables": tier_tables, f"{tier}_col_idx": col_idx}
             )
-            if dir_files_conform: utc_cache[this_dir] = series
+            if utc_cache is not None: 
+                utc_cache[this_dir] = series
             return series
 
         columns = []
+
+        # set up a cache to provide a fast option if all files in each directory
+        # are expected to all have the same cols
+        utc_cache = None
+        if dir_files_conform: utc_cache = {}
+
         for tier in self.tiers:
             self.df[[f"{tier}_tables", f"{tier}_col_idx"]] = self.df.apply(
-                update_tables_cols, axis=1, tier=tier, dir_files_conform=dir_files_conform
+                update_tables_cols, axis=1, tier=tier, utc_cache=utc_cache
             )
 
         self.columns = columns
