@@ -21,6 +21,7 @@ from pygama.lgdo.lh5_store import ls
 
 log = logging.getLogger(__name__)
 
+
 def to_datetime(key: str) -> datetime:
     """Convert LEGEND cycle key to :class:`~datetime.datetime`.
 
@@ -304,8 +305,10 @@ class FileDB:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
     def scan_tables_columns(
-        self, to_file: str = None, override: bool = False,
-        dir_files_conform: bool = False
+        self,
+        to_file: str = None,
+        override: bool = False,
+        dir_files_conform: bool = False,
     ) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
@@ -341,7 +344,7 @@ class FileDB:
 
         def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
             fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
-            this_dir = fpath[:fpath.rfind('/')]
+            this_dir = fpath[: fpath.rfind("/")]
             if utc_cache is not None and this_dir in utc_cache:
                 return utc_cache[this_dir]
 
@@ -408,7 +411,7 @@ class FileDB:
             series = pd.Series(
                 {f"{tier}_tables": tier_tables, f"{tier}_col_idx": col_idx}
             )
-            if utc_cache is not None: 
+            if utc_cache is not None:
                 utc_cache[this_dir] = series
             return series
 
@@ -417,7 +420,8 @@ class FileDB:
         # set up a cache to provide a fast option if all files in each directory
         # are expected to all have the same cols
         utc_cache = None
-        if dir_files_conform: utc_cache = {}
+        if dir_files_conform:
+            utc_cache = {}
 
         for tier in self.tiers:
             self.df[[f"{tier}_tables", f"{tier}_col_idx"]] = self.df.apply(
