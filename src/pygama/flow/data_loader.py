@@ -1008,11 +1008,13 @@ class DataLoader:
                         col_dict=col_dict[col], attr_dict=attr_dict[col]
                     )
                 else:
-                    #ndas are Arrays or AOESA
+                    # ndas are Arrays or AOESA
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
                         dt = attr_dict[col]["datatype"]
-                        dims = re.search("<(\d+),(\d+)>", dt)[0][1:-1] # end up with 'n,m' 
+                        dims = re.search(r"<(\d+),(\d+)>", dt)[0][
+                            1:-1
+                        ]  # end up with 'n,m'
                         dims = [int(e) for e in dims.split(",")]
                         col_dict[col] = ArrayOfEqualSizedArrays(
                             dims=dims, nda=nda, attrs=attr_dict[col]
