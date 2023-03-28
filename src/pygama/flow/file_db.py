@@ -278,7 +278,9 @@ class FileDB:
             status = 0
             for i, tier in enumerate(self.tiers):
                 path_name = os.path.join(
-                    self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/")
+                    self.data_dir,
+                    self.tier_dirs[tier].lstrip("/"),
+                    row[f"{tier}_file"].lstrip("/"),
                 )
                 if os.path.exists(path_name):
                     status |= 1 << len(self.tiers) - i - 1
@@ -296,7 +298,11 @@ class FileDB:
 
         def get_size(row, tier):
             size = 0
-            path_name = os.path.join(self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/"))
+            path_name = os.path.join(
+                self.data_dir,
+                self.tier_dirs[tier].lstrip("/"),
+                row[f"{tier}_file"].lstrip("/"),
+            )
             if os.path.exists(path_name):
                 size = os.path.getsize(path_name)
             return size
@@ -343,7 +349,11 @@ class FileDB:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
         def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
-            fpath = os.path.join(self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/"))
+            fpath = os.path.join(
+                self.data_dir,
+                self.tier_dirs[tier].lstrip("/"),
+                row[f"{tier}_file"].lstrip("/"),
+            )
             this_dir = fpath[: fpath.rfind("/")]
             if utc_cache is not None and this_dir in utc_cache:
                 return utc_cache[this_dir]
