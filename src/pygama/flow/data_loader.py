@@ -994,21 +994,25 @@ class DataLoader:
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
+                        # Convert to VectorOfVectors if there is array-like in a list
                         col_dict[col] = VectorOfVectors(
                             listoflists=col_dict[col], attrs=attr_dict[col]
                         )
                     else:
+                        # Elements are scalars, convert to Array
                         nda = np.array(col_dict[col])
                         col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
                 elif isinstance(col_dict[col], dict):
+                    # Dicts are Tables
                     col_dict[col] = dict_to_table(
                         col_dict=col_dict[col], attr_dict=attr_dict[col]
                     )
                 else:
+                    #ndas are Arrays or AOESA
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
                         dt = attr_dict[col]["datatype"]
-                        dims = dt[dt.index("<") + 1 : dt.index(">")]
+                        dims = re.search("<(\d+),(\d+)>", dt)[0][1:-1] # end up with 'n,m' 
                         dims = [int(e) for e in dims.split(",")]
                         col_dict[col] = ArrayOfEqualSizedArrays(
                             dims=dims, nda=nda, attrs=attr_dict[col]
