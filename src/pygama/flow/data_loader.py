@@ -746,8 +746,6 @@ class DataLoader:
                     table_name = self.get_table_name(tier, tb)
                     try:
                         n_rows = sto.read_n_rows(table_name, tier_path)
-                        if file == 2862:
-                            print(tier, n_rows)
                     except KeyError:
                         log.warning(f"Cannot find {table_name} in file {tier_path}")
                         continue
@@ -1147,8 +1145,6 @@ class DataLoader:
                             field_mask=field_mask,
                         )
 
-                        if len(tier_table[list(tier_table.keys())[0]].nda) != len(tcm_idx):
-                            print(tier_path)
                         if level == child:
                             explode_evt_cols(f_entries, tier_table)
 
