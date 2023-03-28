@@ -46,11 +46,11 @@ def test_data_types(event_rbkd):
         assert isinstance(tbl["ts_pps"], lgdo.Array)
         assert isinstance(tbl["ts_ticks"], lgdo.Array)
         assert isinstance(tbl["ts_maxticks"], lgdo.Array)
-        assert isinstance(tbl["to_mu_sec"], lgdo.Array)
-        assert isinstance(tbl["to_mu_usec"], lgdo.Array)
+        assert isinstance(tbl["mu_offset_sec"], lgdo.Array)
+        assert isinstance(tbl["mu_offset_usec"], lgdo.Array)
         assert isinstance(tbl["to_master_sec"], lgdo.Array)
-        assert isinstance(tbl["to_dt_mu_usec"], lgdo.Array)
-        assert isinstance(tbl["to_abs_mu_usec"], lgdo.Array)
+        assert isinstance(tbl["delta_mu_usec"], lgdo.Array)
+        assert isinstance(tbl["abs_delta_mu_usec"], lgdo.Array)
         assert isinstance(tbl["to_start_sec"], lgdo.Array)
         assert isinstance(tbl["to_start_usec"], lgdo.Array)
         assert isinstance(tbl["dr_start_pps"], lgdo.Array)
@@ -93,11 +93,11 @@ def test_values(event_rbkd, fcio_obj):
         assert tbl["ts_pps"].nda[loc] == fc.timestamp_pps
         assert tbl["ts_ticks"].nda[loc] == fc.timestamp_ticks
         assert tbl["ts_maxticks"].nda[loc] == fc.timestamp_maxticks
-        assert tbl["to_mu_sec"].nda[loc] == fc.timeoffset_mu_sec
-        assert tbl["to_mu_usec"].nda[loc] == fc.timeoffset_mu_usec
+        assert tbl["mu_offset_sec"].nda[loc] == fc.timeoffset_mu_sec
+        assert tbl["mu_offset_usec"].nda[loc] == fc.timeoffset_mu_usec
         assert tbl["to_master_sec"].nda[loc] == fc.timeoffset_master_sec
-        assert tbl["to_dt_mu_usec"].nda[loc] == fc.timeoffset_dt_mu_usec
-        assert tbl["to_abs_mu_usec"].nda[loc] == fc.timeoffset_abs_mu_usec
+        assert tbl["delta_mu_usec"].nda[loc] == fc.timeoffset_dt_mu_usec
+        assert tbl["abs_delta_mu_usec"].nda[loc] == fc.timeoffset_abs_mu_usec
         assert tbl["to_start_sec"].nda[loc] == fc.timeoffset_start_sec
         assert tbl["to_start_usec"].nda[loc] == fc.timeoffset_start_usec
         assert tbl["dr_start_pps"].nda[loc] == fc.deadregion_start_pps

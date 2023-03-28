@@ -76,18 +76,24 @@ class OrcaEncoder:
         decoded_values = ORFlashCamListenerConfigDecoder().get_decoded_values()
 
         for i, k in enumerate(decoded_values):
-            if i < 2:
+            if i < 4:
                 continue
             packets.append(tbl[k].nda[ii])
             if k == "gps":
                 break
 
-        npacks = tbl["ch_boardid"].nda.shape[-1]
+        bvi0 = 0  # start index of board vector-of-vector's
+        if ii > 0:
+            bvi0 = tbl["ch_board_id"].cumulative_length.nda[ii - 1]
+        npacks = tbl["ch_board_id"].cumulative_length.nda[ii] - bvi0
 
         for jj in range(npacks):
-            packets.append(
-                (tbl["ch_boardid"].nda[ii, jj] << 16) + tbl["ch_inputnum"].nda[ii, jj]
-            )
+            board_id = tbl["ch_board_id"].flattened_data.nda[bvi0 + jj]
+            fc_input = tbl["ch_inputnum"].flattened_data.nda[bvi0 + jj]
+            packets.append((board_id << 16) + fc_input)
+
+        while len(packets) < tbl["packet_len"].nda[ii]:
+            packets.append(0)
 
         packets[0] += len(packets)
 
@@ -111,19 +117,20 @@ class OrcaEncoder:
         packets[1] += orca_header_length << 28
         packets[1] += fcio_header_length << 22
 
-        packet3 = 0x80000
+        packet3 = 0
         packet3 += tbl["channel"].nda[ii]
-        packet3 += tbl["ch_orca"].nda[ii] << 10
-        packet3 += tbl["crate"].nda[ii] << 22
-        packet3 += tbl["card"].nda[ii] << 27
+        packet3 += tbl["fc_input"].nda[ii] << 10
+        packet3 += (tbl["board_id"].nda[ii] & 0xFF) << 14  # old bad board_id encoding
+        packet3 += tbl["slot"].nda[ii] << 22
+        packet3 += tbl["crate"].nda[ii] << 27
         packets.append(packet3)
 
         # time offsets
-        packets.append(tbl["to_mu_sec"].nda[ii])
-        packets.append(tbl["to_mu_usec"].nda[ii])
+        packets.append(tbl["mu_offset_sec"].nda[ii])
+        packets.append(tbl["mu_offset_usec"].nda[ii])
         packets.append(tbl["to_master_sec"].nda[ii])
-        packets.append(tbl["to_dt_mu_usec"].nda[ii])
-        packets.append(tbl["to_abs_mu_usec"].nda[ii])
+        packets.append(tbl["delta_mu_usec"].nda[ii])
+        packets.append(tbl["abs_delta_mu_usec"].nda[ii])
         packets.append(tbl["to_start_sec"].nda[ii])
         packets.append(tbl["to_start_usec"].nda[ii])
 
@@ -244,4 +251,5 @@ def test_daq_to_raw(lgnd_test_data):
         orig_orca_data = ff.read()
 
     # assert the byte strings are the same
+    assert len(rebuilt_orca_data) == len(orig_orca_data)
     assert rebuilt_orca_data == orig_orca_data
