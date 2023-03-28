@@ -35,7 +35,7 @@ def get_keys(in_data, parameters):
 
 
 def generate_cuts(
-    data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 2
+    data: dict[str, np.ndarray], parameters: dict[str, int], rounding: int = 4
 ) -> dict:
     """
     Finds double sided cut boundaries for a file for the parameters specified
@@ -76,42 +76,22 @@ def generate_cuts(
             all_par_array < np.nanpercentile(all_par_array, 99)
         )
         par_array = all_par_array[idxs]
-        counts, start_bins, var = pgh.get_hist(par_array, 100)
+        bin_width = (
+            np.nanpercentile(par_array, 70) - np.nanpercentile(par_array, 50)
+        ) / 5
+
+        counts, start_bins, var = pgh.get_hist(
+            par_array, range=(np.nanmin(par_array), np.nanmax(par_array)), dx=bin_width
+        )
         max_idx = np.argmax(counts)
         mu = start_bins[max_idx]
         try:
-            pars, cov = pgf.gauss_mode_width_max(
-                counts,
-                start_bins,
-                mode_guess=mu,
-                n_bins=10,
-                cost_func="Least Squares",
-                inflate_errors=False,
-                gof_method="var",
-            )
+            fwhm = pgh.get_fwhm(counts, start_bins)[0]
+            guess_sig = fwhm / 2.355
 
-            guess_mu, guess_sig, guess_amp = pars
+            lower_bound = mu - 10 * guess_sig
 
-            lower_bound = guess_mu - 10 * guess_sig
-
-            upper_bound = guess_mu + 10 * guess_sig
-
-            if lower_bound < np.nanmin(par_array) or upper_bound > np.nanmax(par_array):
-                pars, cov = pgf.gauss_mode_width_max(
-                    counts,
-                    start_bins,
-                    mode_guess=mu,
-                    n_bins=5,
-                    cost_func="Least Squares",
-                    inflate_errors=False,
-                    gof_method="var",
-                )
-
-            guess_mu, guess_sig, guess_amp = pars
-
-            lower_bound = guess_mu - 10 * guess_sig
-
-            upper_bound = guess_mu + 10 * guess_sig
+            upper_bound = mu + 10 * guess_sig
 
         except:
             bin_range = 1000
@@ -282,60 +262,102 @@ def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
 
 def find_pulser_properties(df, energy="daqenergy"):
 
-    hist, bins, var = pgh.get_hist(df[energy], dx=1, range=(100, np.nanmax(df[energy])))
+    if np.nanmax(df[energy]) > 8000:
+        hist, bins, var = pgh.get_hist(
+            df[energy], dx=1, range=(1000, np.nanmax(df[energy]))
+        )
+        allowed_err = 200
+    else:
+        hist, bins, var = pgh.get_hist(
+            df[energy], dx=0.2, range=(500, np.nanmax(df[energy]))
+        )
+        allowed_err = 50
     if np.any(var == 0):
         var[np.where(var == 0)] = 1
-    imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 5)
+    imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 3)
     peak_energies = pgh.get_bin_centers(bins)[imaxes]
     pt_pars, pt_covs = pgc.hpge_fit_E_peak_tops(
-        hist, bins, var, peak_energies, n_to_fit=15
+        hist, bins, var, peak_energies, n_to_fit=10
     )
     peak_e_err = pt_pars[:, 1] * 4
 
-    out_pulsers = []
-    for i, e in enumerate(peak_energies):
-        if peak_e_err[i] > 200:
+    allowed_mask = np.ones(len(peak_energies), dtype=bool)
+    for i, e in enumerate(peak_energies[1:-1]):
+        i += 1
+        if peak_e_err[i] > allowed_err:
             continue
-        else:
-            try:
-                e_cut = (df[energy] > e - peak_e_err[i]) & (
-                    df[energy] < e + peak_e_err[i]
+        if i == 1:
+            if (
+                e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
+                and peak_e_err[i - 1] < allowed_err
+            ):
+                overlap = (
+                    peak_energies[i - 1]
+                    + peak_e_err[i - 1]
+                    - (peak_energies[i] - peak_e_err[i])
                 )
-                df_peak = df[e_cut]
-
-                time_since_last = (
-                    df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
+                peak_e_err[i] -= overlap * (
+                    peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
+                )
+                peak_e_err[i - 1] -= overlap * (
+                    peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
                 )
 
-                tsl = time_since_last[
-                    (time_since_last >= 0)
-                    & (time_since_last < np.percentile(time_since_last, 99.9))
-                ]
+        if (
+            e + peak_e_err[i] > peak_energies[i + 1] - peak_e_err[i + 1]
+            and peak_e_err[i + 1] < allowed_err
+        ):
+            overlap = (e + peak_e_err[i]) - (peak_energies[i + 1] - peak_e_err[i + 1])
+            total = peak_e_err[i] + peak_e_err[i + 1]
+            peak_e_err[i] -= (overlap) * (peak_e_err[i] / total)
+            peak_e_err[i + 1] -= (overlap) * (peak_e_err[i + 1] / total)
 
-                bins = np.arange(0.1, 5, 0.0001)
-                bcs = pgh.get_bin_centers(bins)
-                hist, bins, var = pgh.get_hist(tsl, bins=bins)
+    out_pulsers = []
+    for i, e in enumerate(peak_energies[allowed_mask]):
+        if peak_e_err[i] > allowed_err:
+            continue
 
-                maxs = pgc.get_i_local_maxima(hist, 40)
-                if len(maxs) < 2:
-                    continue
-                else:
+        try:
+            e_cut = (df[energy] > e - peak_e_err[i]) & (df[energy] < e + peak_e_err[i])
+            df_peak = df[e_cut]
 
-                    max_locs = np.array([0.0])
-                    max_locs = np.append(max_locs, bcs[np.array(maxs)])
-                    if (
-                        len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0])
-                        > 1
-                        or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
-                    ):
-                        pulser_e = e
-                        period = stats.mode(tsl).mode[0]
-                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+            time_since_last = (
+                df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
+            )
 
-                    else:
-                        continue
-            except:
+            tsl = time_since_last[
+                (time_since_last >= 0)
+                & (time_since_last < np.percentile(time_since_last, 99.9))
+            ]
+
+            bins = np.arange(0.1, 5, 0.001)
+            bcs = pgh.get_bin_centers(bins)
+            hist, bins, var = pgh.get_hist(tsl, bins=bins)
+
+            maxs = pgc.get_i_local_maxima(hist, 45)
+            maxs = maxs[maxs > 20]
+
+            super_max = pgc.get_i_local_maxima(hist, 500)
+            super_max = super_max[super_max > 20]
+            if len(maxs) < 2:
                 continue
+            else:
+
+                max_locs = np.array([0.0])
+                max_locs = np.append(max_locs, bcs[np.array(maxs)])
+                if (
+                    len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0]) > 1
+                    or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
+                    or len(super_max) > 0
+                ):
+                    pulser_e = e
+                    period = stats.mode(tsl).mode[0]
+                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+
+                else:
+                    continue
+        except:
+            continue
     return out_pulsers
 
 

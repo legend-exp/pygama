@@ -765,7 +765,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     proc_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [1028800, 1028801],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
                 "proc_spec": {
@@ -806,7 +806,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
                 },
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [1028803, 1028804],
                 "out_stream": processed_file + ":{name}",
                 "out_name": "raw",
             },
@@ -816,12 +816,12 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     raw_out_spec = {
         "ORFlashCamADCWaveformDecoder": {
             "ch{key}": {
-                "key_list": [0, 1],
+                "key_list": [1028800, 1028801],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
             "chan{key}": {
-                "key_list": [3, 4],
+                "key_list": [1028803, 1028804],
                 "out_stream": raw_file + ":{name}",
                 "out_name": "raw",
             },
@@ -936,7 +936,7 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
 
         # Check that the waveforms match
         # These are the channels that should be unprocessed
-        if group_name == "chan3" or group_name == "chan4":
+        if group_name == "chan1028803" or group_name == "chan1028804":
             raw_packet_waveform_values, _ = sto.read_object(
                 str(raw_group) + "/waveform/values", raw_file
             )
