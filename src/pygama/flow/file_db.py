@@ -200,7 +200,7 @@ class FileDB:
         # Relative paths are interpreted relative to the configuration file
         if not data_dir.startswith("/"):
             config_dir = os.path.dirname(config_path)
-            data_dir = os.path.join(config_dir, data_dir)
+            data_dir = os.path.join(config_dir, data_dir.lstrip("/"))
             data_dir = os.path.abspath(data_dir)
         self.data_dir = data_dir
 
@@ -278,7 +278,7 @@ class FileDB:
             status = 0
             for i, tier in enumerate(self.tiers):
                 path_name = os.path.join(
-                    self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"]
+                    self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/")
                 )
                 if os.path.exists(path_name):
                     status |= 1 << len(self.tiers) - i - 1
@@ -296,7 +296,7 @@ class FileDB:
 
         def get_size(row, tier):
             size = 0
-            path_name = os.path.join(self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"])
+            path_name = os.path.join(self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/"))
             if os.path.exists(path_name):
                 size = os.path.getsize(path_name)
             return size
@@ -340,7 +340,7 @@ class FileDB:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
         def update_tables_cols(row, tier: str) -> pd.Series:
-            fpath = os.path.join(self.data_dir, self.tier_dirs[tier], row[f"{tier}_file"])
+            fpath = os.path.join(self.data_dir, self.tier_dirs[tier].lstrip("/"), row[f"{tier}_file"].lstrip("/"))
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
