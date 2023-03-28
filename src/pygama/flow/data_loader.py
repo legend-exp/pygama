@@ -574,7 +574,9 @@ class DataLoader:
                                         idx=idx_mask.tolist(),
                                     )
                                 except KeyError:
-                                    log.warning(f"Cannot find {table_name} in file {tier_path}")
+                                    log.warning(
+                                        f"Cannot find {table_name} in file {tier_path}"
+                                    )
                                     continue
                                 if tb_table is None:
                                     tb_table = tier_table
@@ -779,7 +781,9 @@ class DataLoader:
                                     table_name, tier_path, field_mask=cut_cols
                                 )
                             except KeyError:
-                                log.warning(f"Cannot find {table_name} in file {tier_path}")
+                                log.warning(
+                                    f"Cannot find {table_name} in file {tier_path}"
+                                )
                                 continue
                             # join eveything in one table
                             if tb_table is None:
@@ -915,7 +919,10 @@ class DataLoader:
             return tier_table
 
         def fill_col_dict(
-            tier_table: Table, col_dict: dict, attr_dict: dict, tcm_idx: list | pd.RangeIndex
+            tier_table: Table,
+            col_dict: dict,
+            attr_dict: dict,
+            tcm_idx: list | pd.RangeIndex,
         ):
             # Put the information from the tier_table (after the columns have been exploded)
             # into col_dict, which will be turned into the final Table
@@ -925,11 +932,18 @@ class DataLoader:
                 else:
                     if attr_dict[col] != tier_table[col].attrs:
                         if isinstance(tier_table[col], Table):
-                            temp_attr = {k: attr_dict[col][k] for k in attr_dict[col].keys() - tier_table[col].keys()}
+                            temp_attr = {
+                                k: attr_dict[col][k]
+                                for k in attr_dict[col].keys() - tier_table[col].keys()
+                            }
                             if temp_attr != tier_table[col].attrs:
-                                raise ValueError(f"{col} attributes are inconsistent across data")
+                                raise ValueError(
+                                    f"{col} attributes are inconsistent across data"
+                                )
                         else:
-                            raise ValueError(f"{col} attributes are inconsistent across data")
+                            raise ValueError(
+                                f"{col} attributes are inconsistent across data"
+                            )
                 if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
                     # Allocate memory for column for all channels
                     if self.aoesa_to_vov:  # convert to VectorOfVectors
@@ -980,25 +994,34 @@ class DataLoader:
             for col in col_dict.keys():
                 if isinstance(col_dict[col], list):
                     if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
-                        col_dict[col] = VectorOfVectors(listoflists=col_dict[col], attrs=attr_dict[col])
+                        col_dict[col] = VectorOfVectors(
+                            listoflists=col_dict[col], attrs=attr_dict[col]
+                        )
                     else:
                         nda = np.array(col_dict[col])
                         col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
                 elif isinstance(col_dict[col], dict):
-                    col_dict[col] = dict_to_table(col_dict=col_dict[col], attr_dict=attr_dict[col])
+                    col_dict[col] = dict_to_table(
+                        col_dict=col_dict[col], attr_dict=attr_dict[col]
+                    )
                 else:
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
-                        dt = attr_dict[col]['datatype']
-                        dims = dt[dt.index('<')+1 : dt.index('>')]
-                        dims = [int(e) for e in dims.split(',')]
-                        col_dict[col] = ArrayOfEqualSizedArrays(dims=dims, nda=nda, attrs=attr_dict[col])
+                        dt = attr_dict[col]["datatype"]
+                        dims = dt[dt.index("<") + 1 : dt.index(">")]
+                        dims = [int(e) for e in dims.split(",")]
+                        col_dict[col] = ArrayOfEqualSizedArrays(
+                            dims=dims, nda=nda, attrs=attr_dict[col]
+                        )
                     else:
                         col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
                 attr_dict.pop(col)
             if set(col_dict.keys()) == {"t0", "dt", "values"}:
                 return WaveformTable(
-                    t0=col_dict["t0"], dt=col_dict["dt"], values=col_dict["values"], attrs=attr_dict
+                    t0=col_dict["t0"],
+                    dt=col_dict["dt"],
+                    values=col_dict["values"],
+                    attrs=attr_dict,
                 )
             else:
                 return Table(col_dict=col_dict)
@@ -1052,7 +1075,7 @@ class DataLoader:
                         tier_table,
                         col_dict,
                         attr_dict,
-                        [idx for idx_list in el_idx for idx in idx_list]
+                        [idx for idx_list in el_idx for idx in idx_list],
                     )
             # Convert col_dict to lgdo.Table
 
@@ -1148,7 +1171,9 @@ class DataLoader:
                         if level == child:
                             explode_evt_cols(f_entries, tier_table)
 
-                        col_dict, attr_dict = fill_col_dict(tier_table, col_dict, attr_dict, tcm_idx)
+                        col_dict, attr_dict = fill_col_dict(
+                            tier_table, col_dict, attr_dict, tcm_idx
+                        )
                         # end tb loop
 
                 # Convert col_dict to lgdo.Table

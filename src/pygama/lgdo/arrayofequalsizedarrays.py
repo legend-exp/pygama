@@ -62,12 +62,12 @@ class ArrayOfEqualSizedArrays(Array):
         :class:`.Array`
         """
         if dims is None:
-            # If no dims are provided, assume that it's a 1D Array of (N-1)-D Arrays 
+            # If no dims are provided, assume that it's a 1D Array of (N-1)-D Arrays
             if nda is None:
-                s = shape 
+                s = shape
             else:
                 s = nda.shape
-            self.dims = (1, len(s)-1)
+            self.dims = (1, len(s) - 1)
         else:
             self.dims = dims
         super().__init__(
