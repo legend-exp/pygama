@@ -167,7 +167,6 @@ def lh5_buffer_processor(
                     ]
                 )
             ):
-
                 # if out_name is a key, check that the out_name matches and use that
                 if (
                     "proc_spec"

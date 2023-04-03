@@ -83,7 +83,6 @@ class CompassEventDecoder(DataDecoder):
         # Loop over crates, cards, build decoded values for enabled channels
         for board in self.header["boards"].keys():
             for channel in self.header["boards"][board]["channels"].keys():
-
                 bc = get_bc(int(board), int(channel))
 
                 self.decoded_values[bc] = copy.deepcopy(compass_decoded_values)

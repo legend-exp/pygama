@@ -48,7 +48,6 @@ def hex_dump(
     id_dict: dict = None,
     use_logging: bool = True,
 ) -> None:
-
     dump_cmd = print  # noqa: T202
     if use_logging:
         dump_cmd = log.debug

@@ -77,7 +77,6 @@ def dplms(
         raise DSPFatal("The length of the filter must be positive")
 
     if len(coefficients) > 0:
-
         if length != len(coefficients):
             raise DSPFatal("The length and the provided filter are not matching")
 

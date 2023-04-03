@@ -71,7 +71,6 @@ def load_data(
 def get_decay_constant(
     slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
 ) -> dict:
-
     """
     Finds the decay constant from the modal value of the tail slope after cuts
     and saves it to the specified json.
@@ -155,7 +154,6 @@ def get_decay_constant(
 
 
 def fom_dpz(tb_data, verbosity=0, rand_arg=None):
-
     std = tb_data["pz_std"].nda
     counts, start_bins, var = pgh.get_hist(std, dx=0.1, range=(0, 400))
     max_idx = np.argmax(counts)

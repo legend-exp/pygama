@@ -7,7 +7,6 @@ from pygama.raw.raw_buffer import RawBuffer
 
 @pytest.fixture(scope="module")
 def run_rbkd(orca_stream):
-
     decoder = ORRunDecoderForRun(header=orca_stream.header)
 
     rbkd = {}
@@ -32,7 +31,6 @@ def test_decoding(run_rbkd):
 
 
 def test_data_types(run_rbkd):
-
     for _, v in run_rbkd[0].items():
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
@@ -48,7 +46,6 @@ def test_data_types(run_rbkd):
 
 
 def test_values(run_rbkd):
-
     this_packet = run_rbkd[1]
 
     decoded_values = ORRunDecoderForRun().decoded_values
