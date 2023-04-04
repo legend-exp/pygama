@@ -189,7 +189,6 @@ def generate_cuts(
 def get_cut_indexes(
     all_data: dict[str, np.ndarray], cut_dict: dict, energy_param: str = "trapTmax"
 ) -> list[int]:
-
     """
     Returns a mask of the data, for a single file, that passes cuts based on dictionary of cuts
     in form of cut boundaries above
@@ -242,7 +241,6 @@ def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
     symbols = "/-+*"
     replacewith = "_"
     for i, param in enumerate(cut_dict):
-
         out_dict[
             f"{''.join(replacewith  if c in symbols else c for c in param).replace('(','').replace(')','')}_cut"
         ] = {
@@ -261,7 +259,6 @@ def cut_dict_to_hit_dict(cut_dict, final_cut_field="is_valid_cal"):
 
 
 def find_pulser_properties(df, energy="daqenergy"):
-
     if np.nanmax(df[energy]) > 8000:
         hist, bins, var = pgh.get_hist(
             df[energy], dx=1, range=(1000, np.nanmax(df[energy]))
@@ -342,7 +339,6 @@ def find_pulser_properties(df, energy="daqenergy"):
             if len(maxs) < 2:
                 continue
             else:
-
                 max_locs = np.array([0.0])
                 max_locs = np.append(max_locs, bcs[np.array(maxs)])
                 if (

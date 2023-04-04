@@ -698,7 +698,6 @@ class DataLoader:
 
         # now we loop over the files in our list
         for file in self.file_list:
-
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.update()
                 progress_bar.set_postfix(
@@ -1049,7 +1048,6 @@ class DataLoader:
 
             # now loop over the output of build_entry_list()
             for file, f_entries in entry_list.items():
-
                 if log.getEffectiveLevel() >= logging.INFO:
                     progress_bar.update()
                     progress_bar.set_postfix(
@@ -1082,7 +1080,6 @@ class DataLoader:
 
                     # loop over tiers in the level
                     for tier in self.tiers[level]:
-
                         if tb not in col_tiers[file]["tables"][tier]:
                             continue
 

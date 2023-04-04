@@ -7,7 +7,6 @@ import pygama.lgdo.lgdo_utils as lgdo_utils
 
 
 def test_get_element_type():
-
     objs = [
         ("hi", "string"),
         (True, "bool"),
@@ -26,7 +25,6 @@ def test_get_element_type():
 
 
 def test_parse_datatype():
-
     datatypes = [
         ("real", ("scalar", None, "real")),
         ("array<1>{bool}", ("array", (1,), "bool")),

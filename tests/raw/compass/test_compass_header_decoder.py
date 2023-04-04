@@ -58,7 +58,6 @@ def test_values(compass_config):
                 if type(compass_config[key][key_2]) == Scalar:
                     assert compass_config[key][key_2].value == expected_dict[key][key_2]
                 else:
-
                     for key_3 in compass_config[key][key_2]:
                         if type(compass_config[key][key_2][key_3]) == Scalar:
                             assert (

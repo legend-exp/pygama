@@ -15,7 +15,6 @@ config_dir = Path(__file__).parent / "test_buffer_processor_configs"
 
 # check that packet indexes match in verification test
 def test_lh5_buffer_processor_packet_ids(lgnd_test_data):
-
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
     raw_file = "/tmp/L200-comm-20220519-phy-geds.lh5"
@@ -50,7 +49,6 @@ def test_lh5_buffer_processor_packet_ids(lgnd_test_data):
 
 # check that packet indexes match in verification test
 def test_lh5_buffer_processor_waveform_lengths(lgnd_test_data):
-
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
     raw_file = daq_file.replace(
@@ -142,7 +140,6 @@ def test_lh5_buffer_processor_waveform_lengths(lgnd_test_data):
     sto = lgdo.LH5Store()
 
     for raw_group in lh5_tables:
-
         raw_packet_waveform_values = sto.read_object(
             str(raw_group) + "/waveform/values", raw_file
         )
@@ -304,7 +301,6 @@ def test_lh5_buffer_processor_file_size_decrease(lgnd_test_data):
 
 # check that packet indexes match in verification test on file that has both spms and geds
 def test_lh5_buffer_processor_separate_name_tables(lgnd_test_data):
-
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
     raw_file = daq_file.replace(
@@ -417,7 +413,6 @@ def test_lh5_buffer_processor_separate_name_tables(lgnd_test_data):
     sto = lgdo.LH5Store()
 
     for raw_group in lh5_tables:
-
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
         processed_packet_ids, _ = sto.read_object(
@@ -613,7 +608,6 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
     sto = lgdo.LH5Store()
 
     for raw_group in lh5_tables:
-
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
         processed_packet_ids, _ = sto.read_object(
@@ -713,12 +707,10 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
         )
 
         if pass_flag:
-
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/waveform/dt", processed_file
             )
         else:
-
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/presummed_waveform/dt", processed_file
             )
@@ -751,7 +743,6 @@ def test_raw_geds_no_proc_spms(lgnd_test_data):
 
 # check that packet indexes match in verification test
 def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
-
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("orca/fc/L200-comm-20220519-phy-geds.orca")
     processed_file = daq_file.replace(
@@ -870,7 +861,6 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
     sto = lgdo.LH5Store()
 
     for raw_group in lh5_tables:
-
         # First, check the packet ids
         raw_packet_ids, _ = sto.read_object(str(raw_group) + "/packet_id", raw_file)
         processed_packet_ids, _ = sto.read_object(
@@ -998,12 +988,10 @@ def test_lh5_buffer_processor_multiple_keys(lgnd_test_data):
         )
 
         if pass_flag:
-
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/waveform/dt", processed_file
             )
         else:
-
             presummed_packet_waveform_dts, _ = sto.read_object(
                 str(raw_group) + "/presummed_waveform/dt", processed_file
             )

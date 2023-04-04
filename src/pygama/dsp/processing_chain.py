@@ -968,7 +968,6 @@ class ProcessorManager:
         signature: str = None,
         types: list[str] = None,
     ) -> None:
-
         assert (
             isinstance(proc_chain, ProcessingChain)
             and callable(func)
@@ -1192,7 +1191,7 @@ class ProcessorManager:
                         param = np.frombuffer(param.encode("ascii"), dtype).reshape(
                             shape
                         )
-                    except (ValueError):
+                    except ValueError:
                         raise ProcessingChainError(
                             f"could not convert string '{param}' into"
                             f"byte-array of type {dtype} and shape {shape}"

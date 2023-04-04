@@ -49,7 +49,6 @@ def load_data(
     hit_dict: dict = {},
     cut_parameters: list[str] = ["bl_mean", "bl_std", "pz_std"],
 ) -> pd.DataFrame:
-
     df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
     pulser_props = cts.find_pulser_properties(df, energy="trapTmax")
     if len(pulser_props) > 0:
@@ -83,7 +82,6 @@ def load_data(
                 out_df[param] = table[param].nda
 
     else:
-
         out_df = table.eval(hit_dict).get_dataframe()
         out_df = pd.concat([df, out_df], axis=1)
         out_df["is_not_pulser"] = ids
@@ -202,7 +200,6 @@ class calibrate_parameter:
         n_events: int = 15000,
         deg: int = 1,
     ):
-
         self.data = data
         self.energy_param = energy_param
         self.guess_keV = guess_keV
@@ -648,7 +645,6 @@ def plot_2614_timemap(
     if len(selection) == 0:
         pass
     else:
-
         time_bins = np.arange(
             (np.amin(ecal_class.data["timestamp"]) // time_dx) * time_dx,
             ((np.amax(ecal_class.data["timestamp"]) // time_dx) + 2) * time_dx,
@@ -726,7 +722,6 @@ def plot_pulser_timemap(
 
 
 def bin_pulser_stability(ecal_class, time_slice=180):
-
     selection = ecal_class.data.query(f"~is_not_pulser")
 
     utime_array = ecal_class.data["timestamp"]
@@ -767,7 +762,6 @@ def bin_pulser_stability(ecal_class, time_slice=180):
 
 
 def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
-
     selection = ecal_class.data.query(
         f"{ecal_class.energy_param}_cal>{energy_range[0]}&{ecal_class.energy_param}_cal<{energy_range[1]}&is_usable"
     )
@@ -810,7 +804,6 @@ def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
 
 
 def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
-
     pk_pars = ecal_class.results["pk_pars"]
     fitted_peaks = ecal_class.results["fitted_keV"]
 
@@ -855,7 +848,6 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
 
 
 def plot_eres_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
-
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -992,7 +984,6 @@ def energy_cal_th(
     final_cut_field: str = "is_valid_cal",
     deg: int = 1,
 ) -> tuple(dict, dict):
-
     data = load_data(
         files,
         lh5_path,

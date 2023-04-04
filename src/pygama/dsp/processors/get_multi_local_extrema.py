@@ -130,7 +130,6 @@ def get_multi_local_extrema(
         find_max = True
         imax, imin = 0, 0
         for i in range(len(w_in)):
-
             if w_in[i] > w_in[imax]:
                 imax = i
             if w_in[i] < w_in[imin]:
@@ -165,7 +164,6 @@ def get_multi_local_extrema(
         find_max = True
         imax, imin = len(w_in) - 1, len(w_in) - 1
         for i in range(len(w_in) - 1, -1, -1):
-
             if w_in[i] > w_in[imax]:
                 imax = i
             if w_in[i] < w_in[imin]:
@@ -212,7 +210,6 @@ def get_multi_local_extrema(
 
     # conservative search (only extrema found in both directions)
     elif search_direction == 2:
-
         # sort the right search result. Left search should be already sorted
         right_vt_max = np.sort(right_vt_max)
         right_vt_min = np.sort(right_vt_min)

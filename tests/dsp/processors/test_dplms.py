@@ -8,7 +8,6 @@ from pygama.dsp.processors import dplms
 
 
 def test_dplms(compare_numba_vs_python):
-
     with open(Path(__file__).parent / "dplms_noise_mat.dat") as f:
         nmat = [[float(num) for num in line.split(" ")] for line in f]
 

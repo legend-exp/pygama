@@ -27,7 +27,6 @@ def test_decoding(event_rbkd):
 
 
 def test_data_types(event_rbkd):
-
     for _, v in event_rbkd.items():
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
@@ -46,7 +45,6 @@ def test_data_types(event_rbkd):
 
 
 def test_values(event_rbkd):
-
     for _, v in event_rbkd.items():
         tbl = v.lgdo
         assert tbl["packet_id"].nda == [1]
