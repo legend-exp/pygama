@@ -288,7 +288,6 @@ def run_grid_multiprocess_parallel(
     processes=5,
     fom_kwargs=None,
 ):
-
     """
     run one iteration of DSP on tb_data with multiprocessing, can handle
     multiple grids if they are the same dimensions

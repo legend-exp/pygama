@@ -25,6 +25,7 @@ wf = np.array([0, 0, 1, 2, 3, 4, 5, 4, 3, 4, 5, 6, 7, 8, 9, 10,
 
 # delta_min=delta_max tests (all searches should behave identical)
 
+
 # L->R
 def test_get_multi_local_extrema_ltor(compare_numba_vs_python):
     max_out = np.zeros(3)
@@ -140,6 +141,7 @@ def test_get_multi_local_extrema_both_agro(compare_numba_vs_python):
 
 
 # delta_min != delta_max (result should be search direction dependent)
+
 
 # L->R
 def test_get_multi_local_extrema_ltor_asym(compare_numba_vs_python):
@@ -287,6 +289,7 @@ def test_get_multi_local_extrema_both_agro_asym_abs(compare_numba_vs_python):
 
 
 # And now test if everything works well when vectorized
+
 
 # return nan tests
 def test_get_multi_local_extrema_return_on_nan(compare_numba_vs_python):

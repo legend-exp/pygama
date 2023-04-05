@@ -62,7 +62,6 @@ def compass_config_to_struct(
     """
     # If the config file is not none, read in the xml and convert it to dict
     if compass_config_file is not None:
-
         with open(compass_config_file) as xml_file:
             data_dict = xmltodict.parse(xml_file.read())
 
@@ -123,7 +122,6 @@ def compass_config_to_struct(
             config_struct["boards"]["0"].add_field("channels", lgdo.Struct())
 
             for channel_dictionary in data_dict["configuration"]["board"]["channel"]:
-
                 channel_number = channel_dictionary["index"]
                 # first check to make sure that the channel wasn't disabled from the compass interface,
                 # the xml file would then have <index>channel_no</index></values>
@@ -139,7 +137,6 @@ def compass_config_to_struct(
                     )
 
                 for x in channel_dictionary["values"]["entry"]:
-
                     # if a value isn't present, then the key is just set to the default in the param_dict
                     if (x["key"] in param_dict.keys()) and ("value" not in x.keys()):
                         config_struct["boards"]["0"]["channels"][
@@ -216,7 +213,6 @@ def compass_config_to_struct(
                 for channel_dictionary in data_dict["configuration"]["board"][i][
                     "channel"
                 ]:
-
                     channel_number = channel_dictionary["index"]
                     # if channel_dictionary["values"]["entry"] is a dictionary, then that channel is not enabled
                     if isinstance(channel_dictionary["values"]["entry"], dict):
@@ -228,7 +224,6 @@ def compass_config_to_struct(
                         )
 
                     for x in channel_dictionary["values"]["entry"]:
-
                         # if a value isn't present, then the key is just set to the default in the param_dict
                         if (x["key"] in param_dict.keys()) and (
                             "value" not in x.keys()
@@ -251,7 +246,6 @@ def compass_config_to_struct(
         config_struct = lgdo.Struct()
         config_struct.add_field("boards", lgdo.Struct())
         for i in range(max_number_of_boards):
-
             config_struct["boards"].add_field(str(i), lgdo.Struct())
 
             # Set board and adc to none

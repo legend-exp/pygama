@@ -1,9 +1,0 @@
-{
-  "pz2": { "tau1": "52.00*us", "tau2": "6.40*us", "frac": "0.043" },
-  "etrap": { "rise": "11.00*us", "flat": "3.00*us" },
-  "atrap": { "rise": "20*ns", "flat": "1*us", "fall": "4*us" },
-  "tp_ftp": { "ftp": "tp_0 + 12.5*us" },
-  "dcr_pz": { "tau1": "52.00*us", "tau2": "6.40*us", "frac": "0.043" },
-  "dcr_trap": { "flat": "20.33*us", "rise": "7.00*us" },
-  "dcr": { "ftp": "80*us" }
-}

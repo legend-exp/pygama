@@ -72,7 +72,6 @@ class NumbaFunctionDocumenter(FunctionDocumenter):
                 extra_lines.insert(0, "- *Precompiled signatures:* " + line)
 
             if hasattr(self.jitobj, "gufunc_builder"):
-
                 if hasattr(self.jitobj.gufunc_builder, "targetoptions"):
                     opts = copy(self.jitobj.gufunc_builder.targetoptions)
                 else:

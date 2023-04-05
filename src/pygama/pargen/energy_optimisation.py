@@ -241,7 +241,6 @@ def unbinned_energy_fit(
     verbose=False,
     display=0,
 ):
-
     """
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
@@ -417,7 +416,6 @@ def get_peak_fwhm_with_dt_corr(
     kev=False,
     display=0,
 ):
-
     """
     Applies the drift time correction and fits the peak returns the fwhm, fwhm/max and associated errors,
     along with the number of signal events and the reduced chi square of the fit. Can return result in ADC or keV.
@@ -1080,7 +1078,6 @@ def fwhm_slope(x, m0, m1, m2):
 
 
 def interpolate_energy(peak_energies, points, err_points, energy):
-
     nan_mask = np.isnan(points) | (points < 0)
     if len(points[~nan_mask]) < 3:
         return np.nan, np.nan, np.nan
@@ -1206,7 +1203,6 @@ def single_peak_fom(data, kwarg_dict):
 
 
 def new_fom(data, kwarg_dict):
-
     peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
@@ -1272,7 +1268,6 @@ class BayesianOptimizer:
     # kernel=ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1, length_scale_bounds="fixed") #+ WhiteKernel(noise_level=0.0111)
 
     def __init__(self, acq_func, batch_size, kernel=None):
-
         self.dims = []
         self.current_iter = 0
 
@@ -1304,7 +1299,6 @@ class BayesianOptimizer:
         self.yerr_init = yerr_init
 
     def _get_expected_improvement(self, x_new):
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
@@ -1318,14 +1312,12 @@ class BayesianOptimizer:
         return exp_imp
 
     def _get_ucb(self, x_new):
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
         return mean_y_new[0] + self.lambda_param * sigma_y_new[0]
 
     def _get_lcb(self, x_new):
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
@@ -1916,7 +1908,6 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
         pathlib.Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
 
         with PdfPages(save_path) as pdf:
-
             keys = list(opt_dict.keys())
             print(keys)
             x_dict = opt_dict[keys[1]]

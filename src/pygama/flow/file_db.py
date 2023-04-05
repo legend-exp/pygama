@@ -534,7 +534,6 @@ class FileDB:
             n_files += len(files)
 
             for f in files:
-
                 # in some cases, we need information from the path name
                 if "/" in daq_template:
                     f_tmp = path.replace(daq_dir, "") + "/" + f
