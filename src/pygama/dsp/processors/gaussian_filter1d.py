@@ -97,7 +97,6 @@ def gaussian_filter1d(sigma: int, truncate: float = 4.0) -> numpy.ndarray:
         ),
     )
     def gaussian_filter1d_out(wf_in, wf_out):
-
         # Have to create an array to enable the reflect mode
         # Extend the signal on the left and right by at least half of the length of the kernel
 

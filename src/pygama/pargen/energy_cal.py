@@ -322,7 +322,6 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         or func == pgf.radford_pdf
         or func == pgf.extended_radford_pdf
     ):
-
         # guess mu, height
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
@@ -958,7 +957,7 @@ def hpge_E_calibration(
         # parsigsi = np.sqrt(covsi.diagonal())
         log.info(f"\tEnergy: {str(Ei)}")
         log.info(f"\t\tParameter  |    Value +/- Sigma  ")
-        for (vari, pari, errorsi) in zip(varnames, parsi, errorsi):
+        for vari, pari, errorsi in zip(varnames, parsi, errorsi):
             log.info(
                 f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
             )
@@ -1124,7 +1123,6 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 
         # quit if ii is the last index of ixtup and it's already maxed out
         if not (ii == len(ixtup) - 1 and ixtup[ii] == len(xx) - 1):
-
             # otherwise increment ii and reset indices < ii
             ixtup[ii] += 1
             ixtup[0:ii] = list(range(ii))
@@ -1140,7 +1138,6 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 
         # quit if ii is the last index of iytup and it's already maxed out
         if not (ii == len(iytup) - 1 and iytup[ii] == len(yy) - 1):
-
             # otherwise increment ii and reset indices < ii
             iytup[ii] += 1
             iytup[0:ii] = list(range(ii))
@@ -1204,7 +1201,6 @@ def get_i_local_extrema(data, delta):
     imax, imin = 0, 0
     find_max = True
     for i in range(len(data)):
-
         if data[i] > data[imax]:
             imax = i
         if data[i] < data[imin]:
@@ -1292,11 +1288,9 @@ def match_peaks(data_pks, cal_pks):
 
     best_err, best_m, best_b = np.inf, None, None
     for i, cal_set in enumerate(cal_sets):
-
         cal = cal_pks[list(cal_set)]  # lit energies for this set
 
         for data_set in data_sets:
-
             data = data_pks[list(data_set)]  # uncal energies for this set
 
             m, b, _, _, _ = linregress(data, y=cal)
@@ -1465,7 +1459,6 @@ def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
     linear_cal = np.polyfit(centers, cal_peaks, deg=1)
 
     if plotFigure is not None:
-
         plt.figure(plotFigure.number)
         plt.clf()
 

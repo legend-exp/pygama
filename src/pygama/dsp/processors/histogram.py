@@ -18,7 +18,6 @@ from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 def histogram(
     w_in: np.ndarray, weights_out: np.ndarray, borders_out: np.ndarray
 ) -> None:
-
     """Produces and returns an histogram of the waveform.
 
     Parameters
@@ -97,7 +96,6 @@ def histogram_stats(
     fwhm_out: float,
     max_in: float,
 ) -> None:
-
     """Compute useful histogram-related quantities.
 
     Parameters

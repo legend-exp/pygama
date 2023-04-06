@@ -318,7 +318,6 @@ class LH5Store:
         # Struct
         # recursively build a struct, return as a dictionary
         if datatype == "struct":
-
             # ignore obj_buf.
             # TODO: could append new fields or overwrite/concat to existing
             # fields. If implemented, get_buffer() above should probably also

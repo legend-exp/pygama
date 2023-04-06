@@ -29,7 +29,6 @@ def test_decoding(event_rbkd):
 
 
 def test_data_types(event_rbkd):
-
     for _, v in event_rbkd.items():
         # assert v.out_name == 'FCEvent' FIXME: is this a bug?
         tbl = v.lgdo
@@ -66,7 +65,6 @@ def test_data_types(event_rbkd):
 
 
 def test_values(event_rbkd, fcio_obj):
-
     fc = fcio_obj
     for ch in fc.tracelist:
         loc = event_rbkd[ch].loc - 1

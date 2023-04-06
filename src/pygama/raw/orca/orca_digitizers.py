@@ -19,7 +19,6 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
     """
 
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
-
         self.decoded_values_template = {
             "packet_id": {
                 "dtype": "uint32",
@@ -211,7 +210,6 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
     digitizer data written by ORCA."""
 
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
-
         # store an entry for every event
         self.decoded_values_template = {
             "packet_id": {
