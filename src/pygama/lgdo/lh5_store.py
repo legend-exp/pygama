@@ -463,7 +463,7 @@ class LH5Store:
                 return obj_buf, n_rows_read
 
         # ArrayOfEncodedEqualSizedArrays and VectorOfEncodedVectors
-        for (cond, enc_lgdo) in [
+        for cond, enc_lgdo in [
             (
                 datatype == "array_of_encoded_equalsized_arrays",
                 ArrayOfEncodedEqualSizedArrays,

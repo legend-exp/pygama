@@ -1386,7 +1386,6 @@ def test_buffer_processor_drop_waveform_small_buffer(lgnd_test_data):
 
 # check that packet indexes match in verification test
 def test_buffer_processor_compression_settings(lgnd_test_data):
-
     # Set up I/O files, including config
     daq_file = lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio")
     processed_file = "/tmp/L200-comm-20220519-phy-geds_proc_comp.lh5"
