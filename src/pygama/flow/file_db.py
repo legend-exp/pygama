@@ -114,7 +114,7 @@ class FileDB:
     --------
     >>> from pygama.flow import FileDB
     >>> db = FileDB("./filedb_config.json")
-    >>> db.get_tables_columns()  # read in also table columns names
+    >>> db.scan_tables_columns()  # read in also table columns names
     >>> print(db)
     << Columns >>
     [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['array_id', 'array_idx', 'cumulative_length']]
@@ -200,7 +200,7 @@ class FileDB:
         # Relative paths are interpreted relative to the configuration file
         if not data_dir.startswith("/"):
             config_dir = os.path.dirname(config_path)
-            data_dir = os.path.join(config_dir, data_dir)
+            data_dir = os.path.join(config_dir, data_dir.lstrip("/"))
             data_dir = os.path.abspath(data_dir)
         self.data_dir = data_dir
 
@@ -277,8 +277,10 @@ class FileDB:
         def check_status(row):
             status = 0
             for i, tier in enumerate(self.tiers):
-                path_name = (
-                    self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+                path_name = os.path.join(
+                    self.data_dir,
+                    self.tier_dirs[tier].lstrip("/"),
+                    row[f"{tier}_file"].lstrip("/"),
                 )
                 if os.path.exists(path_name):
                     status |= 1 << len(self.tiers) - i - 1
@@ -296,7 +298,11 @@ class FileDB:
 
         def get_size(row, tier):
             size = 0
-            path_name = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+            path_name = os.path.join(
+                self.data_dir,
+                self.tier_dirs[tier].lstrip("/"),
+                row[f"{tier}_file"].lstrip("/"),
+            )
             if os.path.exists(path_name):
                 size = os.path.getsize(path_name)
             return size
@@ -305,7 +311,10 @@ class FileDB:
             self.df[f"{tier}_size"] = self.df.apply(get_size, axis=1, tier=tier)
 
     def scan_tables_columns(
-        self, to_file: str = None, override: bool = False
+        self,
+        to_file: str = None,
+        override: bool = False,
+        dir_files_conform: bool = False,
     ) -> list[str]:
         """Open files in the database to read (and store) available tables (and
         columns therein) names.
@@ -339,14 +348,22 @@ class FileDB:
             else:
                 log.warning("Overwriting existing LH5 tables/columns names")
 
-        def update_tables_cols(row, tier: str) -> pd.Series:
-            fpath = self.data_dir + self.tier_dirs[tier] + "/" + row[f"{tier}_file"]
+        def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
+            fpath = os.path.join(
+                self.data_dir,
+                self.tier_dirs[tier].lstrip("/"),
+                row[f"{tier}_file"].lstrip("/"),
+            )
+            this_dir = fpath[: fpath.rfind("/")]
+            if utc_cache is not None and this_dir in utc_cache:
+                return utc_cache[this_dir]
 
             log.debug(f"Reading column names for tier '{tier}' from {fpath}")
 
             if os.path.exists(fpath):
                 f = h5py.File(fpath)
             else:
+                log.debug(f"{fpath} doesn't exist")
                 return pd.Series({f"{tier}_tables": None, f"{tier}_col_idx": None})
 
             # Get tables in each tier
@@ -362,7 +379,7 @@ class FileDB:
             if len(braces) % 2 != 0:
                 raise ValueError("Braces mismatch in table format")
             if len(braces) == 0:
-                tier_tables.append("")
+                tier_tables.append(0)
             else:
                 wildcard = (
                     template[: braces[0].span()[0]]
@@ -372,9 +389,12 @@ class FileDB:
 
                 # TODO this call here is really expensive!
                 groups = ls(f, wildcard)
-                tier_tables = [
-                    list(parse(template, g).named.values())[0] for g in groups
-                ]
+                if len(groups) > 0 and parse(template, groups[0]) is None:
+                    log.warning(f"groups in {fpath} don't match template")
+                else:
+                    tier_tables = [
+                        list(parse(template, g).named.values())[0] for g in groups
+                    ]
 
             # Get columns
             col_idx = []
@@ -391,21 +411,35 @@ class FileDB:
                 else:
                     table_name = template
 
-                col = ls(f[table_name])
+                try:
+                    col = ls(f[table_name])
+                except KeyError:
+                    log.warning(f"Cannot find '{table_name}' in {fpath}")
+                    continue
                 if col not in columns:
                     columns.append(col)
                     col_idx.append(len(columns) - 1)
                 else:
                     col_idx.append(columns.index(col))
 
-            return pd.Series(
+            series = pd.Series(
                 {f"{tier}_tables": tier_tables, f"{tier}_col_idx": col_idx}
             )
+            if utc_cache is not None:
+                utc_cache[this_dir] = series
+            return series
 
         columns = []
+
+        # set up a cache to provide a fast option if all files in each directory
+        # are expected to all have the same cols
+        utc_cache = None
+        if dir_files_conform:
+            utc_cache = {}
+
         for tier in self.tiers:
             self.df[[f"{tier}_tables", f"{tier}_col_idx"]] = self.df.apply(
-                update_tables_cols, axis=1, tier=tier
+                update_tables_cols, axis=1, tier=tier, utc_cache=utc_cache
             )
 
         self.columns = columns
@@ -504,7 +538,6 @@ class FileDB:
             n_files += len(files)
 
             for f in files:
-
                 # in some cases, we need information from the path name
                 if "/" in daq_template:
                     f_tmp = path.replace(daq_dir, "") + "/" + f

@@ -35,7 +35,6 @@ def test_raw_buffer_list():
 
 
 def test_raw_buffer_lib_json_load():
-
     rb_json = """
     {
       "FCEventDecoder" : {

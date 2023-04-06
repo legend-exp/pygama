@@ -18,7 +18,6 @@ def geds_raw_tbl(lgnd_test_data):
 
 @pytest.fixture(scope="session")
 def spms_raw_tbl(lgnd_test_data):
-
     out_file = "/tmp/L200-comm-20211130-phy-spms.lh5"
     out_spec = {
         "FCEventDecoder": {

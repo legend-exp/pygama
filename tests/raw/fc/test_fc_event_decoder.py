@@ -34,7 +34,6 @@ def test_decoding_and_compression_attrs(event_rbkd):
 
 
 def test_data_types(event_rbkd):
-
     for _, v in event_rbkd.items():
         tbl = v.lgdo
         assert isinstance(tbl, lgdo.Struct)
@@ -70,7 +69,6 @@ def test_data_types(event_rbkd):
 
 
 def test_values(event_rbkd, fcio_obj):
-
     fc = fcio_obj
     for ch in fc.tracelist:
         loc = event_rbkd[ch].loc - 1
