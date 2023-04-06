@@ -379,7 +379,7 @@ class FileDB:
             if len(braces) % 2 != 0:
                 raise ValueError("Braces mismatch in table format")
             if len(braces) == 0:
-                tier_tables.append("")
+                tier_tables.append(0)
             else:
                 wildcard = (
                     template[: braces[0].span()[0]]
@@ -410,8 +410,12 @@ class FileDB:
                     table_name = template.format(**args)
                 else:
                     table_name = template
-
-                col = ls(f[table_name])
+                    
+                try:
+                    col = ls(f[table_name])
+                except KeyError:
+                    log.warning(f"Cannot find '{table_name}' in {fpath}")
+                    continue
                 if col not in columns:
                     columns.append(col)
                     col_idx.append(len(columns) - 1)

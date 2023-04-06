@@ -596,7 +596,7 @@ class DataLoader:
                         )
                         f_entries.drop(drop_idx, inplace=True)
                     elif mode == "any":
-                        evts = idx_match[f"{child}_idx"].unique()
+                        evts = list(idx_match[f"{child}_idx"].unique())
                         keep_idx = f_entries.query(f"{child}_idx in {evts}").index
                         drop = set.symmetric_difference(
                             set(f_entries.index), list(keep_idx)
@@ -615,7 +615,8 @@ class DataLoader:
                     # end for each table loop
                 # end for each level loop
             if mode == "any":
-                f_entries.drop(drop_idx, inplace=True)
+                if drop_idx is not None:
+                    f_entries.drop(index=drop_idx, inplace=True)
             f_entries.reset_index(inplace=True, drop=True)
             if in_memory:
                 entries[file] = f_entries
