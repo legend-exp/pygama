@@ -1012,7 +1012,7 @@ class DataLoader:
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
                         dt = attr_dict[col]["datatype"]
-                        g = re.match("\w+<(\d+),(\d+)>{\w+}", dt).groups()
+                        g = re.match(r"\w+<(\d+),(\d+)>{\w+}", dt).groups()
                         dims = [int(e) for e in g]
                         col_dict[col] = ArrayOfEqualSizedArrays(
                             dims=dims, nda=nda, attrs=attr_dict[col]
