@@ -334,7 +334,19 @@ class LH5Store:
                 # fields. If they all had shared indexing, they should be in a
                 # table... Maybe should emit a warning? Or allow them to be
                 # dicts keyed by field name?
-                obj_dict[field], _ = self.read_object(
+                if 'keys_dtype' in h5f[name].attrs:
+                    keys_dtype = dict(h5f[name].attrs)['keys_dtype']
+                    if keys_dtype == 'str':
+                        f = str(field)
+                    elif keys_dtype == 'int':
+                        f = int(field)
+                    elif keys_dtype == 'float':
+                        f = float(field)
+                    elif keys_dtype == 'bool':
+                        f = bool(field)
+                else:
+                    f = str(field)
+                obj_dict[f], _ = self.read_object(
                     name + "/" + field, h5f, start_row=start_row, n_rows=n_rows, idx=idx
                 )
             # modify datatype in attrs if a field_mask was used
@@ -771,9 +783,11 @@ class LH5Store:
                     del group[key]
 
             for field in obj.keys():
+                # Convert keys to string for dataset names
+                f = str(field)
                 self.write_object(
                     obj[field],
-                    field,
+                    f,
                     lh5_file,
                     group=group,
                     start_row=start_row,
