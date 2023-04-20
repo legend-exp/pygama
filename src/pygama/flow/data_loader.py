@@ -10,6 +10,7 @@ import re
 import string
 from itertools import product
 from keyword import iskeyword
+from typing import Iterator
 
 import numpy as np
 import pandas as pd
@@ -826,7 +827,59 @@ class DataLoader:
                 entries = pd.concat(entries.values(), ignore_index=True)
             return entries
 
-    # TODO : support chunked reading of entry_list from disk
+    def next(
+        self, entry_list: pd.DataFrame = None, chunk_size: int = 10000, **kwargs
+    ) -> Iterator[Table | Struct | pd.DataFrame]:
+        """Loads the requested data from disk in chunks.
+
+        This method should be used instead of :meth:`.load` to handle large
+        data sets.
+
+        Note
+        ----
+        It is a user responsibility to optimize the chunk size in order to
+        achieve best performance.
+
+        Parameters
+        ----------
+        chunk_size
+            number of entries to load at each iteration. Adapt based on the
+            size of each entry and the amount of memory available on the
+            system.
+        entry_list, **kwargs
+            keyword arguments forwarded to :meth:`.load`.
+
+        Returns
+        -------
+        data
+            see :meth:`.load`.
+
+        Examples
+        --------
+        >>> for chunk in dl.next():
+        >>>    # 'chunk' has the same type of the output of dl.load()
+
+        See Also
+        --------
+        .load
+        """
+        if entry_list is None:
+            entry_list = self.build_entry_list(
+                tcm_level=kwargs.get("tcm_level", None), save_output_columns=True
+            )
+
+        start = stop = 0
+        etot = len(entry_list)
+        while stop < etot:
+            start = stop
+
+            if stop + chunk_size > etot:
+                stop = etot
+            else:
+                stop += chunk_size
+
+            yield self.load(entry_list=entry_list[start:stop].reset_index(drop=True), **kwargs)
+
     def load(
         self,
         entry_list: pd.DataFrame = None,
@@ -835,13 +888,16 @@ class DataLoader:
         orientation: str = "hit",
         tcm_level: str = None,
     ) -> None | Table | Struct | pd.DataFrame:
-        """Loads the requested columns in `self.output_columns` for the entries
-        in the given `entry_list`.
+        """Loads the requested data from disk.
+
+        Loads the requested columns in `self.output_columns` for the entries in
+        the given `entry_list`.
 
         Parameters
         ----------
         entry_list
-            the output of :meth:`.build_entry_list`.
+            the output of :meth:`.build_entry_list`. If ``None``, builds it
+            according to the current configuration.
         in_memory
             if ``True``, returns the loaded data in memory and stores in
             `self.data`.
@@ -1184,7 +1240,7 @@ class DataLoader:
                 if in_memory:
                     load_out[file] = f_table
                 if output_file:
-                    sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
+                    sto.write_object(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
