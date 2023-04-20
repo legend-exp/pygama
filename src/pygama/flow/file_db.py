@@ -410,7 +410,7 @@ class FileDB:
                     table_name = template.format(**args)
                 else:
                     table_name = template
-                    
+
                 try:
                     col = ls(f[table_name])
                 except KeyError:

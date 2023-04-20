@@ -1012,10 +1012,8 @@ class DataLoader:
                     nda = np.array(col_dict[col])
                     if len(nda.shape) == 2:
                         dt = attr_dict[col]["datatype"]
-                        dims = re.search(r"<(\d+),(\d+)>", dt)[0][
-                            1:-1
-                        ]  # end up with 'n,m'
-                        dims = [int(e) for e in dims.split(",")]
+                        g = re.match(r"\w+<(\d+),(\d+)>{\w+}", dt).groups()
+                        dims = [int(e) for e in g]
                         col_dict[col] = ArrayOfEqualSizedArrays(
                             dims=dims, nda=nda, attrs=attr_dict[col]
                         )
