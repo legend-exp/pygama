@@ -1098,7 +1098,7 @@ class DataLoader:
                     )
         else:  # not merge_files
             if in_memory:
-                load_out = {}
+                load_out = Struct(attrs={'keys_dtype':'int'})
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
@@ -1182,7 +1182,7 @@ class DataLoader:
                 f_table = dict_to_table(col_dict, attr_dict)
 
                 if in_memory:
-                    load_out[file] = f_table
+                    load_out.add_field(name=file, obj=f_table)
                 if output_file:
                     sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
