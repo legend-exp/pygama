@@ -333,15 +333,20 @@ class DataLoader:
         fmt
             ``lgdo.Table`` or ``pd.DataFrame``.
         merge_files
-            If ``True``, information from multiple files will be merged into
+            if ``True``, information from multiple files will be merged into
             one table.
         columns
-            The columns that should be copied into the output.
+            the columns that should be copied into the output.
         aoesa_to_vov
+            output :class:`.ArrayOfEqualSizedArrays` as :class:`.VectorOfVectors`.
 
         Example
         -------
-        >>> dl.set_output(fmt="pd.DataFrame", merge_files=False, columns=["daqenergy", "trapEmax", "channel"])
+        >>> dl.set_output(
+        ...   fmt="pd.DataFrame",
+        ...   merge_files=False,
+        ...   columns=["daqenergy", "trapEmax", "channel"]
+        ... )
         """
         if fmt not in ["lgdo.Table", "pd.DataFrame", None]:
             raise ValueError(f"'{fmt}' output format not supported")
@@ -356,8 +361,9 @@ class DataLoader:
             self.aoesa_to_vov = aoesa_to_vov
 
     def reset(self):
-        """Resets all fields to their default values, as if this is a newly
-        created data loader.
+        """Resets all fields to their default values.
+
+        As if this is a newly created data loader.
         """
         self.file_list = None
         self.table_list = None
