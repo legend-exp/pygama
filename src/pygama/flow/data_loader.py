@@ -1,6 +1,5 @@
-"""
-Routines for high-level data loading and skimming.
-"""
+"""Routines for high-level data loading and skimming."""
+
 from __future__ import annotations
 
 import json
@@ -16,7 +15,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pygama.flow.file_db import FileDB
 from pygama.lgdo import (
     Array,
     ArrayOfEqualSizedArrays,
@@ -24,9 +22,11 @@ from pygama.lgdo import (
     Struct,
     Table,
     VectorOfVectors,
-    WaveformTable,
 )
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
+
+from . import utils
+from .file_db import FileDB
 
 log = logging.getLogger(__name__)
 
@@ -878,7 +878,9 @@ class DataLoader:
             else:
                 stop += chunk_size
 
-            yield self.load(entry_list=entry_list[start:stop].reset_index(drop=True), **kwargs)
+            yield self.load(
+                entry_list=entry_list[start:stop].reset_index(drop=True), **kwargs
+            )
 
     def load(
         self,
@@ -1046,46 +1048,6 @@ class DataLoader:
                     )
             return col_dict, attr_dict
 
-        def dict_to_table(col_dict: dict, attr_dict: dict):
-            for col in col_dict.keys():
-                if isinstance(col_dict[col], list):
-                    if isinstance(col_dict[col][0], (list, np.ndarray, Array)):
-                        # Convert to VectorOfVectors if there is array-like in a list
-                        col_dict[col] = VectorOfVectors(
-                            listoflists=col_dict[col], attrs=attr_dict[col]
-                        )
-                    else:
-                        # Elements are scalars, convert to Array
-                        nda = np.array(col_dict[col])
-                        col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
-                elif isinstance(col_dict[col], dict):
-                    # Dicts are Tables
-                    col_dict[col] = dict_to_table(
-                        col_dict=col_dict[col], attr_dict=attr_dict[col]
-                    )
-                else:
-                    # ndas are Arrays or AOESA
-                    nda = np.array(col_dict[col])
-                    if len(nda.shape) == 2:
-                        dt = attr_dict[col]["datatype"]
-                        g = re.match(r"\w+<(\d+),(\d+)>{\w+}", dt).groups()
-                        dims = [int(e) for e in g]
-                        col_dict[col] = ArrayOfEqualSizedArrays(
-                            dims=dims, nda=nda, attrs=attr_dict[col]
-                        )
-                    else:
-                        col_dict[col] = Array(nda=nda, attrs=attr_dict[col])
-                attr_dict.pop(col)
-            if set(col_dict.keys()) == {"t0", "dt", "values"}:
-                return WaveformTable(
-                    t0=col_dict["t0"],
-                    dt=col_dict["dt"],
-                    values=col_dict["values"],
-                    attrs=attr_dict,
-                )
-            else:
-                return Table(col_dict=col_dict)
-
         sto = LH5Store()
 
         if self.merge_files:
@@ -1139,7 +1101,7 @@ class DataLoader:
                     )
             # Convert col_dict to lgdo.Table
 
-            f_table = dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
+            f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
                 sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
@@ -1235,7 +1197,7 @@ class DataLoader:
                         # end tb loop
 
                 # Convert col_dict to lgdo.Table
-                f_table = dict_to_table(col_dict, attr_dict)
+                f_table = utils.dict_to_table(col_dict, attr_dict)
 
                 if in_memory:
                     load_out[file] = f_table

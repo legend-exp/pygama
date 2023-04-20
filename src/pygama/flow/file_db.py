@@ -482,6 +482,7 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
+    # TODO: rename to write() or dump() and make it accept an i/o stream
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
         """Serializes database to disk.
 
