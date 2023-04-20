@@ -15,14 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pygama.lgdo import (
-    Array,
-    ArrayOfEqualSizedArrays,
-    LH5Store,
-    Struct,
-    Table,
-    VectorOfVectors,
-)
+from pygama.lgdo import Array, LH5Store, Struct, Table
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
 from . import utils
@@ -976,78 +969,6 @@ class DataLoader:
             tier_table.update(zip(tier_table.keys(), exp_cols))
             return tier_table
 
-        def fill_col_dict(
-            tier_table: Table,
-            col_dict: dict,
-            attr_dict: dict,
-            tcm_idx: list | pd.RangeIndex,
-        ):
-            # Put the information from the tier_table (after the columns have been exploded)
-            # into col_dict, which will be turned into the final Table
-            for col in tier_table.keys():
-                if col not in attr_dict.keys():
-                    attr_dict[col] = tier_table[col].attrs
-                else:
-                    if attr_dict[col] != tier_table[col].attrs:
-                        if isinstance(tier_table[col], Table):
-                            temp_attr = {
-                                k: attr_dict[col][k]
-                                for k in attr_dict[col].keys() - tier_table[col].keys()
-                            }
-                            if temp_attr != tier_table[col].attrs:
-                                raise ValueError(
-                                    f"{col} attributes are inconsistent across data"
-                                )
-                        else:
-                            raise ValueError(
-                                f"{col} attributes are inconsistent across data"
-                            )
-                if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
-                    # Allocate memory for column for all channels
-                    if self.aoesa_to_vov:  # convert to VectorOfVectors
-                        if col not in col_dict.keys():
-                            col_dict[col] = [[]] * table_length
-                        for i, idx in enumerate(tcm_idx):
-                            col_dict[col][idx] = tier_table[col].nda[i]
-                    else:  # Try to make AoESA, raise error otherwise
-                        if col not in col_dict.keys():
-                            col_dict[col] = np.empty(
-                                (table_length, len(tier_table[col].nda[0])),
-                                dtype=tier_table[col].dtype,
-                            )
-                        try:
-                            col_dict[col][tcm_idx] = tier_table[col].nda
-                        except BaseException:
-                            raise ValueError(
-                                f"self.aoesa_to_vov is False but {col} is a jagged array"
-                            )
-                elif isinstance(tier_table[col], VectorOfVectors):
-                    # Allocate memory for column for all channels
-                    if col not in col_dict.keys():
-                        col_dict[col] = [[]] * table_length
-                    for i, idx in enumerate(tcm_idx):
-                        col_dict[col][idx] = tier_table[col][i]
-                elif isinstance(tier_table[col], Array):
-                    # Allocate memory for column for all channels
-                    if col not in col_dict.keys():
-                        col_dict[col] = np.empty(
-                            table_length,
-                            dtype=tier_table[col].dtype,
-                        )
-                    col_dict[col][tcm_idx] = tier_table[col].nda
-                elif isinstance(tier_table[col], Table):
-                    if col not in col_dict.keys():
-                        col_dict[col] = {}
-                    col_dict[col], attr_dict[col] = fill_col_dict(
-                        tier_table[col], col_dict[col], attr_dict[col], tcm_idx
-                    )
-                else:
-                    log.warning(
-                        f"not sure how to handle column {col} "
-                        f"of type {type(tier_table[col])} yet"
-                    )
-            return col_dict, attr_dict
-
         sto = LH5Store()
 
         if self.merge_files:
@@ -1093,14 +1014,16 @@ class DataLoader:
                     if level == child:
                         explode_evt_cols(entry_list, tier_table)
 
-                    col_dict, attr_dict = fill_col_dict(
+                    col_dict, attr_dict = utils.fill_col_dict(
                         tier_table,
                         col_dict,
                         attr_dict,
                         [idx for idx_list in el_idx for idx in idx_list],
+                        table_length,
+                        self.aoesa_to_vov,
                     )
-            # Convert col_dict to lgdo.Table
 
+            # Convert col_dict to lgdo.Table
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
@@ -1191,8 +1114,13 @@ class DataLoader:
                         if level == child:
                             explode_evt_cols(f_entries, tier_table)
 
-                        col_dict, attr_dict = fill_col_dict(
-                            tier_table, col_dict, attr_dict, tcm_idx
+                        col_dict, attr_dict = utils.fill_col_dict(
+                            tier_table,
+                            col_dict,
+                            attr_dict,
+                            tcm_idx,
+                            table_length,
+                            self.aoesa_to_vov,
                         )
                         # end tb loop
 

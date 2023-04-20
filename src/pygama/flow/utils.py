@@ -1,6 +1,8 @@
+import logging
 import re
 
 import numpy as np
+import pandas as pd
 
 from pygama.lgdo import (
     Array,
@@ -9,6 +11,8 @@ from pygama.lgdo import (
     VectorOfVectors,
     WaveformTable,
 )
+
+log = logging.getLogger(__name__)
 
 
 def dict_to_table(col_dict: dict, attr_dict: dict):
@@ -50,3 +54,81 @@ def dict_to_table(col_dict: dict, attr_dict: dict):
         )
     else:
         return Table(col_dict=col_dict)
+
+
+def fill_col_dict(
+    tier_table: Table,
+    col_dict: dict,
+    attr_dict: dict,
+    tcm_idx: list | pd.RangeIndex,
+    table_length: int,
+    aoesa_to_vov: bool,
+):
+    # Put the information from the tier_table (after the columns have been exploded)
+    # into col_dict, which will be turned into the final Table
+    for col in tier_table.keys():
+        if col not in attr_dict.keys():
+            attr_dict[col] = tier_table[col].attrs
+        else:
+            if attr_dict[col] != tier_table[col].attrs:
+                if isinstance(tier_table[col], Table):
+                    temp_attr = {
+                        k: attr_dict[col][k]
+                        for k in attr_dict[col].keys() - tier_table[col].keys()
+                    }
+                    if temp_attr != tier_table[col].attrs:
+                        raise ValueError(
+                            f"{col} attributes are inconsistent across data"
+                        )
+                else:
+                    raise ValueError(f"{col} attributes are inconsistent across data")
+        if isinstance(tier_table[col], ArrayOfEqualSizedArrays):
+            # Allocate memory for column for all channels
+            if aoesa_to_vov:  # convert to VectorOfVectors
+                if col not in col_dict.keys():
+                    col_dict[col] = [[]] * table_length
+                for i, idx in enumerate(tcm_idx):
+                    col_dict[col][idx] = tier_table[col].nda[i]
+            else:  # Try to make AoESA, raise error otherwise
+                if col not in col_dict.keys():
+                    col_dict[col] = np.empty(
+                        (table_length, len(tier_table[col].nda[0])),
+                        dtype=tier_table[col].dtype,
+                    )
+                try:
+                    col_dict[col][tcm_idx] = tier_table[col].nda
+                except BaseException:
+                    raise ValueError(
+                        f"self.aoesa_to_vov is False but {col} is a jagged array"
+                    )
+        elif isinstance(tier_table[col], VectorOfVectors):
+            # Allocate memory for column for all channels
+            if col not in col_dict.keys():
+                col_dict[col] = [[]] * table_length
+            for i, idx in enumerate(tcm_idx):
+                col_dict[col][idx] = tier_table[col][i]
+        elif isinstance(tier_table[col], Array):
+            # Allocate memory for column for all channels
+            if col not in col_dict.keys():
+                col_dict[col] = np.empty(
+                    table_length,
+                    dtype=tier_table[col].dtype,
+                )
+            col_dict[col][tcm_idx] = tier_table[col].nda
+        elif isinstance(tier_table[col], Table):
+            if col not in col_dict.keys():
+                col_dict[col] = {}
+            col_dict[col], attr_dict[col] = fill_col_dict(
+                tier_table[col],
+                col_dict[col],
+                attr_dict[col],
+                tcm_idx,
+                table_length,
+                aoesa_to_vov,
+            )
+        else:
+            log.warning(
+                f"not sure how to handle column {col} "
+                f"of type {type(tier_table[col])} yet"
+            )
+    return col_dict, attr_dict
