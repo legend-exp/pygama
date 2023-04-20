@@ -502,7 +502,7 @@ class DataLoader:
             if not os.path.exists(tcm_path):
                 raise FileNotFoundError(f"Can't find TCM file for {tcm_level}")
 
-            tcm_table_name = self.get_table_name(tcm_tier, tcm_tb)
+            tcm_table_name = self.filedb.get_table_name(tcm_tier, tcm_tb)
             try:
                 tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
             except KeyError:
@@ -559,7 +559,7 @@ class DataLoader:
                         )
                         if tier in col_tiers[file]["tables"].keys():
                             if tb in col_tiers[file]["tables"][tier]:
-                                table_name = self.get_table_name(tier, tb)
+                                table_name = self.filedb.get_table_name(tier, tb)
                                 try:
                                     tier_table, _ = sto.read_object(
                                         table_name,
@@ -739,7 +739,7 @@ class DataLoader:
                         self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
                     )
                     # now read how many rows are there in the file
-                    table_name = self.get_table_name(tier, tb)
+                    table_name = self.filedb.get_table_name(tier, tb)
                     try:
                         n_rows = sto.read_n_rows(table_name, tier_path)
                     except KeyError:
@@ -769,7 +769,7 @@ class DataLoader:
                             )
 
                             # load the data from the tier file, just the columns needed for the cut
-                            table_name = self.get_table_name(tier, tb)
+                            table_name = self.filedb.get_table_name(tier, tb)
                             try:
                                 tier_tb, _ = sto.read_object(
                                     table_name, tier_path, field_mask=cut_cols
@@ -994,7 +994,7 @@ class DataLoader:
                 for tier in self.tiers[level]:
                     if tb not in col_tiers[tier]:
                         continue
-                    tb_name = self.get_table_name(tier, tb)
+                    tb_name = self.filedb.get_table_name(tier, tb)
                     tier_paths = [
                         os.path.join(
                             self.data_dir,
@@ -1090,7 +1090,7 @@ class DataLoader:
                             continue
 
                         log.debug(
-                            f"...for stream '{self.get_table_name(tier, tb)}' (at {level} level)"
+                            f"...for stream '{self.filedb.get_table_name(tier, tb)}' (at {level} level)"
                         )
 
                         # path to tier file
@@ -1103,7 +1103,7 @@ class DataLoader:
                         if not os.path.exists(tier_path):
                             raise FileNotFoundError(tier_path)
 
-                        table_name = self.get_table_name(tier, tb)
+                        table_name = self.filedb.get_table_name(tier, tb)
                         tier_table, _ = sto.read_object(
                             table_name,
                             tier_path,
@@ -1199,7 +1199,7 @@ class DataLoader:
                                     ),
                                 )
                                 if os.path.exists(tier_path):
-                                    table_name = self.get_table_name(tier, tb)
+                                    table_name = self.filedb.get_table_name(tier, tb)
                                     tier_table, _ = sto.read_object(
                                         table_name,
                                         tier_path,
@@ -1353,30 +1353,3 @@ class DataLoader:
                                         col_tiers[file]["columns"][c] = tier
 
         return col_tiers
-
-    def get_table_name(self, tier: str, tb: str) -> str:
-        """Get the table name for a tier given its table identifier.
-
-        Parameters
-        ----------
-        tier
-            specify the tier whose table format will be used.
-        tb
-            the table identifier that will be passed to the table format.
-
-        Returns
-        -------
-        table_name
-            the name of the table in `tier` with table identifier `tb`
-        """
-        template = self.filedb.table_format[tier]
-        fm = string.Formatter()
-        parse_arr = np.array(list(fm.parse(template)))
-        names = list(parse_arr[:, 1])
-        if len(names) > 0:
-            keyword = names[0]
-            args = {keyword: tb}
-            table_name = template.format(**args)
-        else:
-            table_name = template
-        return table_name
