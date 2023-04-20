@@ -1359,3 +1359,14 @@ class DataLoader:
                                         col_tiers[file]["columns"][c] = tier
 
         return col_tiers
+
+    def __repr__(self) -> str:
+        return (
+            "DataLoader("
+            f"cuts={self.cuts}, "
+            f"merge_files={self.merge_files}, "
+            f'output_format="{self.output_format}", '
+            f"output_columns={self.output_columns}, "
+            f"aoesa_to_vov={self.aoesa_to_vov}"
+            ")"
+        )

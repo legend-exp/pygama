@@ -20,7 +20,7 @@ def test_dl(lgnd_test_data):
     return DataLoader(f"{config_dir}/data-loader-config.json", db_config)
 
 
-def test_init(test_filedb):
+def test_init(test_dl):
     pass
 
 
