@@ -204,47 +204,71 @@ class FileDB:
             data_dir = os.path.abspath(data_dir)
         self.data_dir = data_dir
 
-    def scan_files(self) -> None:
-        """Scan the directory containing files from the lower tier and fill the
-        dataframe.
+    def scan_files(self, dirs: list[str] = None) -> None:
+        """Scan the directory containing files from the lowest tier and fill the dataframe.
 
-        The lower tier is defined as the first element of the `tiers` array.
-        Only fills columns that can be populated with just the `raw` files.
+        The lowest tier is defined as the first element of the `tiers` array.
+        Only fills columns that can be populated with just these files.
+
+        Parameters
+        ----------
+        dirs
+            restrict search to this list of directories. Specified paths can be
+            absolute, relative to `self.data_dir` or relative to the root
+            directory of the lowest-tier files. If ``None``, the whole root
+            lowest-tier directory is scanned. Useful to build a partial
+            database.
         """
         file_keys = []
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        scan_dir = os.path.join(
-            self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/")
+        root_scan_dir = os.path.join(
+            self.data_dir, self.tier_dirs[low_tier].lstrip("/")
         )
 
-        log.info(f"Scanning {scan_dir} with template {template}")
+        scan_dirs = None
+        if dirs is None:
+            scan_dirs = [root_scan_dir]
+        else:
+            scan_dirs = dirs
 
-        for path, _folders, files in os.walk(scan_dir):
-            log.debug(f"Scanning {path}")
-            n_files += len(files)
+        log.info(f"Scanning {scan_dirs} with template {template}")
 
-            for f in files:
-                # in some cases, we need information from the path name
-                if "/" in template:
-                    f_tmp = path.replace(scan_dir, "") + "/" + f
-                else:
-                    f_tmp = f
+        for scan_dir in scan_dirs:
+            # some logic to guess where the scan directory is
+            if not os.path.isabs(scan_dir):
+                if os.path.isdir(os.path.join(root_scan_dir, scan_dir)):
+                    scan_dir = os.path.join(root_scan_dir, scan_dir)
+                elif os.path.isdir(os.path.join(self.data_dir, scan_dir)):
+                    scan_dir = os.path.join(self.data_dir, scan_dir)
 
-                finfo = parse(template, f_tmp)
-                if finfo is not None:
-                    finfo = finfo.named
-                    for tier in self.tiers:
-                        finfo[f"{tier}_file"] = self.file_format[tier].format(**finfo)
+            for path, _, files in os.walk(scan_dir):
+                log.debug(f"Scanning {path}")
+                n_files += len(files)
 
-                    file_keys.append(finfo)
+                for f in files:
+                    # in some cases, we need information from the path name
+                    if "/" in template:
+                        f_tmp = path.replace(root_scan_dir, "") + "/" + f
+                    else:
+                        f_tmp = f
+
+                    finfo = parse(template, f_tmp)
+                    if finfo is not None:
+                        finfo = finfo.named
+                        for tier in self.tiers:
+                            finfo[f"{tier}_file"] = self.file_format[tier].format(
+                                **finfo
+                            )
+
+                        file_keys.append(finfo)
 
         if n_files == 0:
             raise FileNotFoundError(f"No {low_tier} files found")
 
         if len(file_keys) == 0:
-            raise FileNotFoundError(f"No {low_tier} files matched pattern ", template)
+            raise FileNotFoundError(f"No {low_tier} files matched pattern " + template)
 
         temp_df = pd.DataFrame(file_keys)
 
