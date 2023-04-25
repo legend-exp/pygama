@@ -90,7 +90,7 @@ def linear_slope_diff(
 ) -> None:
     """
     Calculate the mean, standard deviation, slope and y-intercept of waveform.
-    
+
     Uses Welford's method and linear regression.
 
     Parameters
