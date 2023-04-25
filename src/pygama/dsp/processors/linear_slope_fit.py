@@ -89,9 +89,10 @@ def linear_slope_diff(
     w_in: np.ndarray, slope: float, intercept: float, mean: float, rms: float
 ) -> None:
     """
-    Calculate the mean and standard deviation of the waveform using
-    Welford's method as well as the slope an intercept of the waveform
-    using linear regression.
+    Calculate the mean, standard deviation, slope and y-intercept of waveform.
+    
+    Uses Welford's method and linear regression.
+
     Parameters
     ----------
     w_in
@@ -104,8 +105,10 @@ def linear_slope_diff(
         the slope of the linear fit.
     intercept
         the intercept of the linear fit.
+
     JSON Configuration Example
     --------------------------
+
     .. code-block :: json
         "bl_mean, bl_std, bl_slope, bl_intercept": {
             "function": "linear_slope_fit",
