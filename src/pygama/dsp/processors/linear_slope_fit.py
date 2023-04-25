@@ -110,6 +110,7 @@ def linear_slope_diff(
     --------------------------
 
     .. code-block :: json
+
         "bl_mean, bl_std, bl_slope, bl_intercept": {
             "function": "linear_slope_fit",
             "module": "pygama.dsp.processors",
