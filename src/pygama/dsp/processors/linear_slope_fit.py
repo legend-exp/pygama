@@ -76,6 +76,7 @@ def linear_slope_fit(
     slope[0] = (isum * sum_xy - sum_x * sum_y) / (isum * sum_x2 - sum_x * sum_x)
     intercept[0] = (sum_y - sum_x * slope[0]) / isum
 
+
 @guvectorize(
     [
         "void(float32[:], float32[:], float32[:], float32[:], float32[:])",
@@ -124,7 +125,7 @@ def linear_slope_diff(
 
     for i in range(0, len(w_in), 1):
         # the mean and standard deviation
-        temp = w_in[i] - (slope*i + intercept)
+        temp = w_in[i] - (slope * i + intercept)
         mean += temp / (i + 1)
         rms += temp * temp
 

@@ -68,7 +68,7 @@ from .fixed_time_pickoff import fixed_time_pickoff
 from .gaussian_filter1d import gaussian_filter1d
 from .get_multi_local_extrema import get_multi_local_extrema
 from .histogram import histogram, histogram_stats
-from .linear_slope_fit import linear_slope_fit, linear_slope_diff
+from .linear_slope_fit import linear_slope_diff, linear_slope_fit
 from .log_check import log_check
 from .min_max import min_max
 from .moving_windows import (
