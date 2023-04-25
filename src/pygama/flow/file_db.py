@@ -329,13 +329,17 @@ class FileDB:
 
         Parameters
         ----------
-        to_file:
+        to_file
             Optionally write the column table to an LH5 file (as a
-            :class:`~.lgdo.vectorofvectors.VectorOfVectors`)
-
-        override:
-            If the FileDB already has a `columns` field, the scan will not run unless
-            this parameter is set to True
+            :class:`~.lgdo.vectorofvectors.VectorOfVectors`).
+        override
+            If the :class:`FileDB` already has a `columns` field, the scan will
+            not run unless this parameter is set to ``True``.
+        dir_files_conform
+            if ``True``, assume that all files in a directory contain tables
+            with the same columns (i.e. all file contents conform to the same
+            format) and scan only the first file. Significantly reduces
+            processing time.
         """
         log.info("Getting table column names")
 
