@@ -680,7 +680,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
 
     # Make sure fit isn't based on only a few points
     if len(fwhms) < 10:
-        log.warning("less than 10 fits successful")
+        log.debug("less than 10 fits successful")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -729,7 +729,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             plt.show()
 
     except:
-        log.warning("alpha fit failed")
+        log.debug("alpha fit failed")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -741,7 +741,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
         }
 
     if np.isnan(fit_vals).all():
-        log.warning("alpha fit all nan")
+        log.debug("alpha fit all nan")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -797,7 +797,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
                 display=display,
             )
         if np.isnan(final_fwhm) or np.isnan(final_err):
-            log.warning(f"final fit failed, alpha was {alpha}")
+            log.debug(f"final fit failed, alpha was {alpha}")
         return {
             "fwhm": final_fwhm,
             "fwhm_err": final_err,
@@ -1134,9 +1134,9 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
     if np.isnan(Energies).any() or np.isnan(dt).any():
         if np.isnan(Energies).any():
-            log.warning(f"nan energy values for peak {peak}")
+            log.debug(f"nan energy values for peak {peak}")
         else:
-            log.warning(f"nan dt values for peak {peak}")
+            log.debug(f"nan dt values for peak {peak}")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
