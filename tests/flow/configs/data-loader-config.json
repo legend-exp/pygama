@@ -1,4 +1,5 @@
 {
+  "filedb": "$_/filedb-config.json",
   "levels": {
     "hit": {
       "tiers": ["raw", "dsp", "hit"]

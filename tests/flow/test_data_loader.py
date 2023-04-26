@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 import pandas as pd
@@ -11,13 +10,8 @@ config_dir = Path(__file__).parent / "configs"
 
 
 @pytest.fixture(scope="function")
-def test_dl(lgnd_test_data):
-    with open(config_dir / "filedb-config.json") as f:
-        db_config = json.load(f)
-
-    db_config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
-
-    return DataLoader(f"{config_dir}/data-loader-config.json", db_config)
+def test_dl(test_filedb):
+    return DataLoader(f"{config_dir}/data-loader-config.json", test_filedb)
 
 
 def test_init(test_dl):
