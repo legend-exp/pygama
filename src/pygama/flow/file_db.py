@@ -16,8 +16,9 @@ import numpy as np
 import pandas as pd
 from parse import parse
 
-from pygama.lgdo import Array, LH5Store, Scalar, VectorOfVectors
-from pygama.lgdo.lh5_store import ls
+from pygama import lgdo
+from pygama.lgdo import Array, Scalar, VectorOfVectors
+from pygama.lgdo import lh5_store as lh5
 
 log = logging.getLogger(__name__)
 
@@ -125,7 +126,7 @@ class FileDB:
     >>> db.to_disk("file_db.lh5")
     """
 
-    def __init__(self, config: str | dict, scan: bool = True) -> None:
+    def __init__(self, config: str | dict | list[str], scan: bool = True) -> None:
         """
         Parameters
         ----------
@@ -137,15 +138,23 @@ class FileDB:
             whether the file database should scan the directory containing
             `raw` files to fill its rows with file keys.
         """
+        self.df = None
+
+        # TODO: better error message
         config_path = None
         if isinstance(config, str):
-            if h5py.is_hdf5(config):
-                self.from_disk(config)
-                return
-            else:
-                config_path = config
+            config_path = config
+            try:
                 with open(config) as f:
                     config = json.load(f)
+            # can otherwise be (wildcard of) HDF5 file(s)
+            except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+                self.from_disk(config)
+                return
+
+        elif isinstance(config, list):
+            self.from_disk(config)
+            return
 
         if not isinstance(config, dict):
             raise ValueError("Bad FileDB configuration value")
@@ -173,7 +182,7 @@ class FileDB:
 
             # Use config columns and tables if provided
             if "columns" in self.config.keys() and "tables" in self.config.keys():
-                log.info("Setting columns/tables from config")
+                log.debug("setting columns/tables from config")
                 self.columns = list(self.config["columns"].values())
                 for tier in self.tiers:
                     self.df[f"{tier}_tables"] = [self.config["tables"][tier]] * len(
@@ -219,10 +228,10 @@ class FileDB:
             self.data_dir.rstrip("/"), self.tier_dirs[low_tier].lstrip("/")
         )
 
-        log.info(f"Scanning {scan_dir} with template {template}")
+        log.info(f"scanning {scan_dir} with template {template}")
 
         for path, _folders, files in os.walk(scan_dir):
-            log.debug(f"Scanning {path}")
+            log.debug(f"scanning {path}")
             n_files += len(files)
 
             for f in files:
@@ -256,13 +265,7 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
         # sort rows according to timestamps
-        log.debug(f"Sorting database entries according to {self.sortby}")
-        if self.sortby == "timestamp":
-            self.df["_datetime"] = self.df["timestamp"].apply(to_datetime)
-            self.df.sort_values("_datetime", ignore_index=True, inplace=True)
-            self.df.drop("_datetime", axis=1, inplace=True)
-        else:
-            self.df.sort_values(self.sortby, ignore_index=True, inplace=True)
+        inplace_sort(self.df, self.sortby)
 
     def set_file_status(self) -> None:
         """
@@ -337,7 +340,7 @@ class FileDB:
             If the FileDB already has a `columns` field, the scan will not run unless
             this parameter is set to True
         """
-        log.info("Getting table column names")
+        log.info("getting table column names")
 
         if self.columns is not None:
             if not override:
@@ -346,7 +349,7 @@ class FileDB:
                 )
                 return
             else:
-                log.warning("Overwriting existing LH5 tables/columns names")
+                log.warning("overwriting existing LH5 tables/columns names")
 
         def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
             fpath = os.path.join(
@@ -358,7 +361,7 @@ class FileDB:
             if utc_cache is not None and this_dir in utc_cache:
                 return utc_cache[this_dir]
 
-            log.debug(f"Reading column names for tier '{tier}' from {fpath}")
+            log.debug(f"reading column names for tier '{tier}' from {fpath}")
 
             if os.path.exists(fpath):
                 f = h5py.File(fpath)
@@ -375,9 +378,9 @@ class FileDB:
             braces = list(re.finditer("{|}", template))
 
             if len(braces) > 2:
-                raise ValueError("Tables can only have one identifier")
+                raise ValueError("tables can only have one identifier")
             if len(braces) % 2 != 0:
-                raise ValueError("Braces mismatch in table format")
+                raise ValueError("braces mismatch in table format")
             if len(braces) == 0:
                 tier_tables.append(0)
             else:
@@ -388,7 +391,7 @@ class FileDB:
                 )
 
                 # TODO this call here is really expensive!
-                groups = ls(f, wildcard)
+                groups = lh5.ls(f, wildcard)
                 if len(groups) > 0 and parse(template, groups[0]) is None:
                     log.warning(f"groups in {fpath} don't match template")
                 else:
@@ -412,9 +415,9 @@ class FileDB:
                     table_name = template
 
                 try:
-                    col = ls(f[table_name])
+                    col = lh5.ls(f[table_name])
                 except KeyError:
-                    log.warning(f"Cannot find '{table_name}' in {fpath}")
+                    log.warning(f"cannot find '{table_name}' in {fpath}")
                     continue
                 if col not in columns:
                     columns.append(col)
@@ -445,7 +448,7 @@ class FileDB:
         self.columns = columns
 
         if to_file is not None:
-            log.debug(f"Writing column names to '{to_file}'")
+            log.debug(f"writing column names to '{to_file}'")
             flattened = []
             length = []
             for i, col in enumerate(columns):
@@ -458,29 +461,88 @@ class FileDB:
             columns_vov = VectorOfVectors(
                 flattened_data=flattened, cumulative_length=length
             )
-            sto = LH5Store()
+            sto = lh5.LH5Store()
             sto.write_object(columns_vov, "unique_columns", to_file)
 
-        return columns
+        return self.columns
 
-    def from_disk(self, filename: str) -> None:
+    def from_disk(self, path: str | list[str]) -> None:
+        """Read FileDBs from disk.
+
+        Overrides the dataframe, configuration dictionary and columns with the
+        information from a file created by :meth:`to_disk`.
         """
-        Fills the dataframe (and configuration dictionary) with the information
-        from a file created by :meth:`to_disk`.
-        """
-        sto = LH5Store()
-        cfg, _ = sto.read_object("config", filename)
-        self.set_config(json.loads(cfg.value.decode()))
+        log.debug(f"reading FileDB from disk at {path}")
 
-        self.df = pd.read_hdf(filename, key="dataframe")
+        if not isinstance(path, list):
+            path = [path]
 
-        vov, _ = sto.read_object("columns", filename)
-        # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
-        vov = list(vov)
-        columns = []
-        for ov in vov:
-            columns.append([v.decode("utf-8") for v in ov])
-        self.columns = columns
+        # expand wildcards
+        paths = []
+        for p in path:
+            paths += lgdo.lgdo_utils.expand_path(p, list=True)
+
+        sto = lh5.LH5Store()
+        # objects that will be used to configure the FileDB at the end
+        _cfg = None
+        _df = None
+        _columns = None
+
+        for p in paths:
+            cfg, _ = sto.read_object("config", p)
+            cfg = json.loads(cfg.value.decode())
+
+            # make sure configurations are all the same
+            if _cfg is None:
+                _cfg = cfg
+            elif cfg != _cfg:
+                raise RuntimeError(
+                    "cannot merge FileDBs created with different configuration files"
+                )
+
+            # read in unique columns
+            vov, _ = sto.read_object("columns", p)
+            # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
+            columns = [[v.decode("utf-8") for v in ov] for ov in list(vov)]
+
+            # read in dataframe
+            df = pd.read_hdf(p, key="dataframe")
+
+            if _columns is None:
+                _columns = columns
+                _df = df
+            elif _columns != columns:
+                log.debug("found inconsistent FileDB, trying to merge")
+                # if columns are not the same, need to merge the two dataframes
+                # in the right way
+                for idx, cols in enumerate(columns):
+                    if cols not in _columns:
+                        # add the new column at the end and save its index
+                        _columns += [cols]
+                        new_idx = len(_columns) - 1
+
+                        # now go through the new dataframe and update the old index
+                        # everywhere in the {tier}_col_idx columns
+                        def search_and_replace(row, label, old, new):
+                            arr = np.array(row[label])
+                            arr[arr == old] = new
+                            return arr
+
+                        for tier in list(_cfg["tier_dirs"].keys()):
+                            df[f"{tier}_col_idx"] = df.apply(
+                                search_and_replace,
+                                args=(f"{tier}_col_idx", idx, new_idx),
+                                axis=1,
+                            )
+            else:
+                # if columns are the same, assume we can safely concat the dataframes
+                _df = pd.concat([_df, df], ignore_index=True, copy=False)
+
+        self.set_config(_cfg)
+        self.df = _df
+        self.columns = _columns
+
+        inplace_sort(self.df, self.sortby)
 
     # TODO: rename to write() or dump() and make it accept an i/o stream
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
@@ -493,9 +555,9 @@ class FileDB:
         wo_mode
             passed to :meth:`~.lgdo.lh5_store.write_object`.
         """
-        log.debug(f"Writing database to {filename}")
+        log.debug(f"writing database to {filename}")
 
-        sto = LH5Store()
+        sto = lh5.LH5Store()
         sto.write_object(
             Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
         )
@@ -601,3 +663,14 @@ class FileDB:
         else:
             table_name = template
         return table_name
+
+
+def inplace_sort(df: pd.DataFrame, by: str) -> None:
+    # sort rows according to timestamps
+    log.debug(f"sorting database entries according to {by}")
+    if by == "timestamp":
+        df["_datetime"] = df["timestamp"].apply(to_datetime)
+        df.sort_values("_datetime", ignore_index=True, inplace=True)
+        df.drop("_datetime", axis=1, inplace=True)
+    else:
+        df.sort_values(by, ignore_index=True, inplace=True)
