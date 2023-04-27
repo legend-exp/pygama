@@ -1,10 +1,26 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from pandas.testing import assert_frame_equal
 
 from pygama.flow import FileDB
 from pygama.flow.file_db import to_datetime, to_unixtime
+
+config_dir = Path(__file__).parent / "configs"
+
+
+def test_init_partial(lgnd_test_data, test_filedb_full):
+    with open(config_dir / "filedb-config.json") as f:
+        config = json.load(f)
+
+    config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
+    fdb = FileDB(config, scan=False)
+    fdb.scan_files("cal/p01/r014")
+    fdb.scan_tables_columns()
+
+    assert fdb.df.equals(test_filedb_full.df)
 
 
 def test_filedb_basics(test_filedb):
@@ -69,9 +85,8 @@ def test_filedb_basics(test_filedb):
     ]
 
 
-def test_scan_tables_columns(test_filedb):
-    db = test_filedb
-    db.scan_tables_columns()
+def test_scan_tables_columns(test_filedb_full):
+    db = test_filedb_full
 
     assert list(db.df.keys()) == [
         "exp",
@@ -144,8 +159,8 @@ def test_scan_tables_columns(test_filedb):
     ]
 
 
-def test_serialization(test_filedb):
-    db = test_filedb
+def test_serialization(test_filedb_full):
+    db = test_filedb_full
     db.to_disk("/tmp/filedb.lh5", wo_mode="of")
 
     with pytest.raises(RuntimeError):

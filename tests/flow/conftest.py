@@ -15,3 +15,14 @@ def test_filedb(lgnd_test_data):
 
     config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
     return FileDB(config)
+
+
+@pytest.fixture(scope="module")
+def test_filedb_full(lgnd_test_data):
+    with open(config_dir / "filedb-config.json") as f:
+        config = json.load(f)
+
+    config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
+    db = FileDB(config)
+    db.scan_tables_columns()
+    return db

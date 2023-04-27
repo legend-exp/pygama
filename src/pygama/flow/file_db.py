@@ -234,11 +234,11 @@ class FileDB:
             self.data_dir, self.tier_dirs[low_tier].lstrip("/")
         )
 
-        scan_dirs = None
+        scan_dirs = dirs
         if dirs is None:
             scan_dirs = [root_scan_dir]
-        else:
-            scan_dirs = dirs
+        elif not isinstance(dirs, list):
+            scan_dirs = [dirs]
 
         log.info(f"scanning {scan_dirs} with template {template}")
 
