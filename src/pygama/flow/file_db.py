@@ -559,15 +559,12 @@ class FileDB:
 
                         # now go through the new dataframe and update the old index
                         # everywhere in the {tier}_col_idx columns
-                        def search_and_replace(row, label, old, new):
-                            arr = np.array(row[label])
-                            arr[arr == old] = new
-                            return arr
-
                         for tier in list(_cfg["tier_dirs"].keys()):
                             df[f"{tier}_col_idx"] = df.apply(
-                                search_and_replace,
-                                args=(f"{tier}_col_idx", idx, new_idx),
+                                lambda row, idx=idx, new_idx=new_idx, tier=tier: [
+                                    new_idx if x == idx else x
+                                    for x in row[f"{tier}_col_idx"]
+                                ],
                                 axis=1,
                             )
             else:
