@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,35 @@ from pygama.lgdo import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def to_datetime(key: str) -> datetime:
+    """Convert LEGEND cycle key to :class:`~datetime.datetime`.
+
+    Assumes `key` is formatted as ``YYYYMMDDTHHMMSSZ`` (UTC).
+    """
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$", key)
+    if m is None:
+        raise ValueError(f"Could not parse '{key}' as a datetime object")
+    else:
+        g = [int(el) for el in m.groups()]
+        return datetime(*g, tzinfo=timezone.utc)
+
+
+def to_unixtime(key: str) -> int:
+    """Convert LEGEND cycle key to `POSIX timestamp <https://en.wikipedia.org/wiki/Unix_time>`_."""
+    return int(to_datetime(key).timestamp())
+
+
+def inplace_sort(df: pd.DataFrame, by: str) -> None:
+    # sort rows according to timestamps
+    log.debug(f"sorting database entries according to {by}")
+    if by == "timestamp":
+        df["_datetime"] = df["timestamp"].apply(to_datetime)
+        df.sort_values("_datetime", ignore_index=True, inplace=True)
+        df.drop("_datetime", axis=1, inplace=True)
+    else:
+        df.sort_values(by, ignore_index=True, inplace=True)
 
 
 def dict_to_table(col_dict: dict, attr_dict: dict):

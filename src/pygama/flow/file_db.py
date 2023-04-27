@@ -1,6 +1,4 @@
-"""
-Utilities for LH5 file inventory.
-"""
+"""Utilities for LH5 file inventory."""
 from __future__ import annotations
 
 import json
@@ -9,7 +7,6 @@ import os
 import re
 import string
 import warnings
-from datetime import datetime, timezone
 
 import h5py
 import numpy as np
@@ -20,25 +17,9 @@ from pygama import lgdo
 from pygama.lgdo import Array, Scalar, VectorOfVectors
 from pygama.lgdo import lh5_store as lh5
 
+from . import utils
+
 log = logging.getLogger(__name__)
-
-
-def to_datetime(key: str) -> datetime:
-    """Convert LEGEND cycle key to :class:`~datetime.datetime`.
-
-    Assumes `key` is formatted as ``YYYYMMDDTHHMMSSZ`` (UTC).
-    """
-    m = re.match(r"^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$", key)
-    if m is None:
-        raise ValueError(f"Could not parse '{key}' as a datetime object")
-    else:
-        g = [int(el) for el in m.groups()]
-        return datetime(*g, tzinfo=timezone.utc)
-
-
-def to_unixtime(key: str) -> int:
-    """Convert LEGEND cycle key to `POSIX timestamp <https://en.wikipedia.org/wiki/Unix_time>`_."""
-    return int(to_datetime(key).timestamp())
 
 
 class FileDB:
@@ -293,7 +274,7 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
         # sort rows according to timestamps
-        inplace_sort(self.df, self.sortby)
+        utils.inplace_sort(self.df, self.sortby)
 
         # set file status and sizes
         self.set_file_status()
@@ -575,10 +556,10 @@ class FileDB:
         self.df = _df
         self.columns = _columns
 
-        inplace_sort(self.df, self.sortby)
+        utils.inplace_sort(self.df, self.sortby)
 
-    # TODO: rename to write() or dump() and make it accept an i/o stream
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
+        pass
         """Serializes database to disk.
 
         Parameters
@@ -696,14 +677,3 @@ class FileDB:
         else:
             table_name = template
         return table_name
-
-
-def inplace_sort(df: pd.DataFrame, by: str) -> None:
-    # sort rows according to timestamps
-    log.debug(f"sorting database entries according to {by}")
-    if by == "timestamp":
-        df["_datetime"] = df["timestamp"].apply(to_datetime)
-        df.sort_values("_datetime", ignore_index=True, inplace=True)
-        df.drop("_datetime", axis=1, inplace=True)
-    else:
-        df.sort_values(by, ignore_index=True, inplace=True)

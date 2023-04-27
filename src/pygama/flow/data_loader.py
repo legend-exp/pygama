@@ -69,6 +69,12 @@ class DataLoader:
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load()
 
+    Be careful, :meth:`.load()` loads data in memory regardless of its size. If
+    loading a lot of data (e.g. waveforms), you might want to do it in chunks.
+    :class:`.next()` does exactly this:
+
+    >>> for chunk in dl.load():
+    ...   run_my_processing(chunk)
 
     Advanced Usage:
 
@@ -248,7 +254,6 @@ class DataLoader:
         """
         return self.filedb.df.iloc[self.file_list]
 
-    # TODO Make this able to handle more complicated requests
     def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
         """Apply selection on data streams (or channels).
 
@@ -384,8 +389,6 @@ class DataLoader:
         self.output_columns = None
         self.aoesa_to_vov = False
         self.data = None
-
-    # ------------- Applying Cuts/Loading Data --------------#
 
     # TODO: mode
     def build_entry_list(
@@ -623,12 +626,13 @@ class DataLoader:
                         for col in tb_df.columns:
                             if col in for_output:
                                 f_entries.loc[keep_idx, col] = tb_df[col].tolist()
-                    # end for each table loop
-                # end for each level loop
+
             if mode == "any":
                 if drop_idx is not None:
                     f_entries.drop(index=drop_idx, inplace=True)
+
             f_entries.reset_index(inplace=True, drop=True)
+
             if in_memory:
                 entries[file] = f_entries
             if output_file:
@@ -641,7 +645,6 @@ class DataLoader:
                     sto.write_object(
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
-            # end for each file loop
 
         if in_memory:
             if self.merge_files:
@@ -857,7 +860,7 @@ class DataLoader:
             size of each entry and the amount of memory available on the
             system.
         entry_list, **kwargs
-            keyword arguments forwarded to :meth:`.load`.
+            keyword argument forwarded to :meth:`.load`.
 
         Returns
         -------
@@ -1286,7 +1289,6 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    # -------------- Helper Functions ----------------#
     def get_tiers_for_col(
         self, columns: list | np.ndarray, merge_files: bool = None
     ) -> dict:
