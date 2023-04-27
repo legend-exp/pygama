@@ -6,7 +6,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from pygama.flow import FileDB
-from pygama.flow.file_db import to_datetime, to_unixtime
+from pygama.flow.utils import to_datetime, to_unixtime
 
 config_dir = Path(__file__).parent / "configs"
 
