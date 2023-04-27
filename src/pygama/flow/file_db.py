@@ -177,8 +177,6 @@ class FileDB:
 
         if scan:
             self.scan_files()
-            self.set_file_status()
-            self.set_file_sizes()
 
             # Use config columns and tables if provided
             if "columns" in self.config.keys() and "tables" in self.config.keys():
@@ -247,13 +245,19 @@ class FileDB:
         for scan_dir in scan_dirs:
             # some logic to guess where the scan directory is
             if not os.path.isabs(scan_dir):
+                # first check if it's relative to lowest tier directory
                 if os.path.isdir(os.path.join(root_scan_dir, scan_dir)):
                     scan_dir = os.path.join(root_scan_dir, scan_dir)
+                # or maybe relative to the data dir?
                 elif os.path.isdir(os.path.join(self.data_dir, scan_dir)):
                     scan_dir = os.path.join(self.data_dir, scan_dir)
+                else:
+                    scan_dir = os.path.join(os.getcwd(), scan_dir)
+
+            log.debug(f"scanning {scan_dir}")
 
             for path, _, files in os.walk(scan_dir):
-                log.debug(f"Scanning {path}")
+                log.debug(f"scanning {path}")
                 n_files += len(files)
 
                 for f in files:
@@ -274,10 +278,10 @@ class FileDB:
                         file_keys.append(finfo)
 
         if n_files == 0:
-            raise FileNotFoundError(f"No {low_tier} files found")
+            raise FileNotFoundError(f"no {low_tier} files found")
 
         if len(file_keys) == 0:
-            raise FileNotFoundError(f"No {low_tier} files matched pattern " + template)
+            raise FileNotFoundError(f"no {low_tier} files matched pattern " + template)
 
         temp_df = pd.DataFrame(file_keys)
 
@@ -290,6 +294,10 @@ class FileDB:
 
         # sort rows according to timestamps
         inplace_sort(self.df, self.sortby)
+
+        # set file status and sizes
+        self.set_file_status()
+        self.set_file_sizes()
 
     def set_file_status(self) -> None:
         """
