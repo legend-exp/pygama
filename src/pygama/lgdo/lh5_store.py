@@ -1189,12 +1189,12 @@ class LH5Iterator:
     def __init__(
         self,
         lh5_files: str | list[str],
-        group: str,
-        base_path: str = "",
+        groups: str | list[str],
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[bool] | list[list[bool]] = None,
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         buffer_len: int = 3200,
+        friend: LH5Iterator = None,
     ) -> None:
         """
         Parameters
@@ -1202,10 +1202,10 @@ class LH5Iterator:
         lh5_files
             file or files to read from. May include wildcards and environment
             variables.
-        group
-            HDF5 group to read.
-        base_path
-            HDF5 path to prepend.
+        groups
+            HDF5 group(s) to read. If a list is provided for both lh5_files
+            and group, they must be the same size. If a file is wild-carded,
+            the same group will be assigned to each file found
         entry_list
             list of entry numbers to read. If a nested list is provided,
             expect one top-level list for each file, containing a list of
@@ -1218,32 +1218,50 @@ class LH5Iterator:
             more details.
         buffer_len
             number of entries to read at a time while iterating through files.
+        friend
+            a ''friend'' LH5Iterator that will be read in parallel with this.
+            The friend should have the same length and entry list. A single
+            LH5 table containing columns from both iterators will be returned.
         """
-        self.lh5_st = LH5Store(base_path=base_path, keep_open=True)
+        self.lh5_st = LH5Store(base_path="", keep_open=True)
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
-            lh5_files = expand_path(lh5_files, True)
+            lh5_files = [lh5_files]
+            if isinstance(groups, list):
+                lh5_files *= len(groups)
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
+
+        if isinstance(groups, str):
+            groups = [groups] * len(lh5_files)
+        elif not isinstance(groups, list):
+            raise ValueError("group must be a string or list of strings")
+
+        if not len(groups) == len(lh5_files):
+            raise ValueError("lh5_files and groups must have same length")
+
+        self.lh5_files = []
+        self.groups = []
+        for f, g in zip(lh5_files, groups):
+            f_exp = expand_path(f, True)
+            self.lh5_files += f_exp
+            self.groups += [g] * len(f_exp)
 
         if entry_list is not None and entry_mask is not None:
             raise ValueError(
                 "entry_list and entry_mask arguments are mutually exclusive"
             )
 
-        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
-
         # Map to last row in each file
         self.file_map = np.array(
-            [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
+            [self.lh5_st.read_n_rows(g, f) for f, g in zip(self.lh5_files, self.groups)], "int64"
         ).cumsum()
-        self.group = group
         self.buffer_len = buffer_len
 
         if len(self.lh5_files) > 0:
             self.lh5_buffer = self.lh5_st.get_buffer(
-                self.group,
+                self.groups[0],
                 self.lh5_files[0],
                 size=self.buffer_len,
                 field_mask=field_mask,
@@ -1298,6 +1316,16 @@ class LH5Iterator:
             else np.array([len(elist) for elist in self.entry_list]).cumsum()
         )
 
+        if friend is not None:
+            if not isinstance(friend, LH5Iterator):
+                raise ValueError("Friend must be an LH5Iterator")
+            if not ((self.file_map==friend.file_map).all()
+                    and self.entry_list==friend.entry_list):
+                raise RuntimeError("Friend files and entries must map one-to-one with friend")
+
+            self.lh5_buffer.join(friend.lh5_buffer)
+        self.friend = friend
+    
     def read(self, entry: int) -> tuple[LGDO, int]:
         """Read the next chunk of events, starting at entry. Return the
         LH5 buffer and number of rows read."""
@@ -1312,7 +1340,7 @@ class LH5Iterator:
             local_idx = self.entry_list[i_file] if self.entry_list is not None else None
             i_local = local_idx[local_entry] if local_idx is not None else local_entry
             self.lh5_buffer, n_rows = self.lh5_st.read_object(
-                self.group,
+                self.groups[i_file],
                 self.lh5_files[i_file],
                 start_row=i_local,
                 n_rows=self.buffer_len - self.n_rows,
@@ -1327,6 +1355,10 @@ class LH5Iterator:
             local_entry = 0
 
         self.current_entry = entry
+        
+        if self.friend is not None:
+            self.friend.read(entry)
+        
         return (self.lh5_buffer, self.n_rows)
 
     def __len__(self) -> int:
