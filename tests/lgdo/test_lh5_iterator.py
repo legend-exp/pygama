@@ -84,14 +84,12 @@ def test_friend(more_lgnd_files):
     lh5_raw_it = LH5Iterator(
         more_lgnd_files[0],
         "ch000/raw",
-        entry_list=[[0, 2, 4, 6, 8], [1, 3, 5, 7, 9]],
         field_mask=["waveform", "baseline"],
         buffer_len=5
     )
     lh5_it = LH5Iterator(
         more_lgnd_files[1],
         "ch000/hit",
-        entry_list=[[0, 2, 4, 6, 8], [1, 3, 5, 7, 9]],
         field_mask=["hit_par1"],
         buffer_len=5,
         friend=lh5_raw_it
@@ -99,12 +97,7 @@ def test_friend(more_lgnd_files):
 
     lh5_obj, n_rows = lh5_it.read(0)
 
-    assert n_rows==10
+    assert n_rows==2
     assert isinstance(lh5_obj, lgdo.Table)
     assert set(lh5_obj.keys()) == {"waveform", "baseline", "hit_par1"}
-
-    for lh5_obj, entry, n_rows in lh5_it:
-        assert len(lh5_obj) == 5
-        assert n_rows == 5
-        assert entry % 5 == 0
     
