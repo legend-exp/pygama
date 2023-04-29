@@ -90,7 +90,7 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         return datatype, None, element_description.split(",")
 
 
-def expand_path(path: str, list: bool = False) -> str | list:
+def expand_path(path: str, list: bool = False, base_path: str = None) -> str | list:
     """Expand environment variables and wildcards to return absolute path
 
     Parameters
@@ -100,6 +100,8 @@ def expand_path(path: str, list: bool = False) -> str | list:
     list
         if True, return a list. If False, return a string; if False and a
         unique file is not found, raise an Exception
+    base_path
+        name of base path. Returned paths will be relative to base
 
     Returns
     -------
@@ -107,7 +109,13 @@ def expand_path(path: str, list: bool = False) -> str | list:
         Unique absolute path, or list of all absolute paths
     """
 
+    if base_path is not None:
+        base_path = os.path.expanduser(os.path.expandvars(base_path))
+        path = os.path.join(base_path, path)
     paths = glob.glob(os.path.expanduser(os.path.expandvars(path)))
+    if base_path is not None:
+        paths = [os.path.relpath(p, base_path) for p in paths]
+
     if not list:
         if len(paths) == 0:
             raise FileNotFoundError(f"could not find path matching {path}")

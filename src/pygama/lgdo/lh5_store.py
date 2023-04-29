@@ -74,7 +74,7 @@ class LH5Store:
         if isinstance(lh5_file, h5py.File):
             return lh5_file
         if mode == "r":
-            lh5_file = expand_path(lh5_file)
+            lh5_file = expand_path(lh5_file, base_path=self.base_path)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
@@ -1190,6 +1190,7 @@ class LH5Iterator:
         self,
         lh5_files: str | list[str],
         groups: str | list[str],
+        base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[bool] | list[list[bool]] = None,
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
@@ -1223,7 +1224,7 @@ class LH5Iterator:
             The friend should have the same length and entry list. A single
             LH5 table containing columns from both iterators will be returned.
         """
-        self.lh5_st = LH5Store(base_path="", keep_open=True)
+        self.lh5_st = LH5Store(base_path=base_path, keep_open=True)
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
@@ -1244,7 +1245,7 @@ class LH5Iterator:
         self.lh5_files = []
         self.groups = []
         for f, g in zip(lh5_files, groups):
-            f_exp = expand_path(f, True)
+            f_exp = expand_path(f, True, base_path)
             self.lh5_files += f_exp
             self.groups += [g] * len(f_exp)
 
