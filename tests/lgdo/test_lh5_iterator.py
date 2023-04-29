@@ -75,8 +75,10 @@ def test_lgnd_waveform_table_fancy_idx(lgnd_file):
 
 @pytest.fixture(scope="module")
 def more_lgnd_files(lgnd_test_data):
-    return [lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/*.lh5"),
-            lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/*.lh5")]
+    return [ [lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_dsp.lh5"),
+              lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_dsp.lh5")],
+             [lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_hit.lh5"),
+              lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_hit.lh5")] ]
 
 def test_friend(more_lgnd_files):
     lh5_raw_it = LH5Iterator(
