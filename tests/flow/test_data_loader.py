@@ -20,7 +20,7 @@ def test_dl(lgnd_test_data):
     return DataLoader(f"{config_dir}/data-loader-config.json", db_config)
 
 
-def test_init(test_filedb):
+def test_init(test_dl):
     pass
 
 
@@ -31,6 +31,15 @@ def test_simple_load(test_dl):
 
     assert isinstance(data, lgdo.Table)
     assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
+
+
+def test_simple_chunked_load(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_output(columns=["timestamp"])
+    for data in test_dl.next(chunk_size=2):
+        assert len(data) == 2
+        assert isinstance(data, lgdo.Table)
+        assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
 
 
 def test_load_wfs(test_dl):

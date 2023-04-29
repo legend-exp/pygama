@@ -510,6 +510,7 @@ class FileDB:
             columns.append([v.decode("utf-8") for v in ov])
         self.columns = columns
 
+    # TODO: rename to write() or dump() and make it accept an i/o stream
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
         """Serializes database to disk.
 
@@ -601,3 +602,30 @@ class FileDB:
             "<< DataFrame >>\n" + self.df.__repr__()
         )
         return string
+
+    def get_table_name(self, tier: str, tb: str) -> str:
+        """Get the table name for a tier given its table identifier.
+
+        Parameters
+        ----------
+        tier
+            specify the tier whose table format will be used.
+        tb
+            the table identifier that will be passed to the table format.
+
+        Returns
+        -------
+        table_name
+            the name of the table in `tier` with table identifier `tb`
+        """
+        template = self.table_format[tier]
+        fm = string.Formatter()
+        parse_arr = np.array(list(fm.parse(template)))
+        names = list(parse_arr[:, 1])
+        if len(names) > 0:
+            keyword = names[0]
+            args = {keyword: tb}
+            table_name = template.format(**args)
+        else:
+            table_name = template
+        return table_name
