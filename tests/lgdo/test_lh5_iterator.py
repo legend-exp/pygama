@@ -83,14 +83,14 @@ def test_friend(more_lgnd_files):
         more_lgnd_files[0],
         "ch000/raw",
         entry_list=[[0, 2, 4, 6, 8], [1, 3, 5, 7, 9]],
-        field_mask=["waveform", "baseline"]
+        field_mask=["waveform", "baseline"],
         buffer_len=5
     )
     lh5_it = LH5Iterator(
         more_lgnd_files[1],
         "ch000/hit",
         entry_list=[[0, 2, 4, 6, 8], [1, 3, 5, 7, 9]],
-        field_mask=["hit_par1"]
+        field_mask=["hit_par1"],
         buffer_len=5,
         friend=lh5_raw_it
     )
