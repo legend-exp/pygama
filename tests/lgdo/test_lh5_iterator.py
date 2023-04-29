@@ -97,7 +97,7 @@ def test_friend(more_lgnd_files):
         friend=lh5_raw_it
     )
 
-    lh5_obj, n_rows = lht_it.read(0)
+    lh5_obj, n_rows = lh5_it.read(0)
 
     assert n_rows==10
     assert isinstance(lh5_obj, lgdo.Table)
