@@ -28,8 +28,8 @@ class WaveformBrowser:
 
     def __init__(
         self,
-        files_in: str | list[str],
-        lh5_group: str,
+        files_in: str | list[str] | lgdo.LH5Iterator,
+        lh5_group: str | list[str] = "",
         base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[int] | list[list[int]] = None,
@@ -53,11 +53,13 @@ class WaveformBrowser:
         Parameters
         ----------
         files_in
-            name of file or list of names to browse. Can use wildcards.
+            name of file or list of files to browse. Can use wildcards. Can
+            also pass an LH5Iterator
 
         lh5_group
-            name of LH5 group in file to browse.
-
+            HDF5 group(s) to read. If a list is provided for both lh5_files
+            and group, they must be the same size. If a file is wild-carded,
+            the same group will be assigned to each file found
         base_path
             base path for file. See :class:`~.lgdo.lh5_store.LH5Store`.
 
@@ -149,17 +151,20 @@ class WaveformBrowser:
         self.next_entry = 0
 
         # data i/o initialization
-        # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
-        # remove this hack once VOV support is properly implemented
-        self.lh5_it = lh5.LH5Iterator(
-            files_in,
-            lh5_group,
-            base_path=base_path,
-            entry_list=entry_list,
-            entry_mask=entry_mask,
-            field_mask={"tracelist": False},
-            buffer_len=buffer_len,
-        )
+        if isinstance(files_in, lh5.LH5Iterator):
+            self.lh5_it = files_in
+        else:
+            # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
+            # remove this hack once VOV support is properly implemented
+            self.lh5_it = lh5.LH5Iterator(
+                files_in,
+                lh5_group,
+                base_path=base_path,
+                entry_list=entry_list,
+                entry_mask=entry_mask,
+                field_mask={"tracelist": False},
+                buffer_len=buffer_len,
+            )
 
         # Get the input buffer and read the first chunk
         self.lh5_in, _ = self.lh5_it.read(0)
