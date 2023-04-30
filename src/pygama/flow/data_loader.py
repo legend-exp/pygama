@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pygama.lgdo import Array, LH5Store, Struct, Table
+from pygama.lgdo import Array, LH5Store, LH5Iterator, Struct, Table
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 
 from . import utils
@@ -1234,6 +1234,91 @@ class DataLoader:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"
                     )
+
+    def load_iterator(
+        self,
+        entry_list: pd.DataFrame = None,
+        tcm_level: str = None,
+        buffer_len: int = 3200,
+    ) -> lgdo.LH5Iterator:
+        """Creates an :class:LH5Iterator that will load the requested columns 
+        in `self.output_columns` for the entries in the given `entry_list` in
+        chunks. This is more memory efficient than filling a whole table and
+        is recommended for use when loading waveforms.
+
+        Parameters
+        ----------
+        entry_list
+            the output of :meth:`.build_entry_list`. If ``None``, builds it
+            according to the current configuration.
+        tcm_level
+            which TCM was used to create the ``entry_list``.
+        buffer_len
+            how many entries to load in a single chunk
+
+        Returns
+        -------
+        data
+            LH5 Iterator, which yields (lh5 table, entry, n_entries) when
+            iterated over.
+        """
+        if entry_list is None:
+            entry_list = self.build_entry_list(
+                tcm_level=tcm_level, save_output_columns=True
+            )
+
+        if tcm_level is None:
+            parent = self.levels[0]
+            child = None
+            load_levels = [parent]
+        else:
+            parent = self.tcms[tcm_level]["parent"]
+            child = self.tcms[tcm_level]["child"]
+            load_levels = [parent, child]
+
+        if self.merge_files:
+            tables = entry_list[f"{parent}_table"].unique()
+            field_mask = []
+            for col in self.output_columns:
+                if col not in entry_list.columns:
+                    field_mask.append(col)
+
+            col_tiers = self.get_tiers_for_col(field_mask)
+            col_dict = entry_list.to_dict("list")
+
+            lh5_it = None
+            for level in load_levels:
+                for tier in self.tiers[level]:
+                    # Build list of files/tables/entries
+                    lh5_files = []
+                    tb_names = []
+                    idx_list = []
+                    for tb in tables:
+                        if tb not in col_tiers[tier]:
+                            continue
+                        gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
+                        lh5_files += [
+                            os.path.join(self.filedb.tier_dirs[tier].lstrip("/"),
+                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"))
+                            for file in gb.groups.keys()
+                        ]
+                        tb_names += [self.filedb.get_table_name(tier, tb)] * len(gb)
+                        idx_list += [list(entry_list.loc[i, f"{level}_idx"]) for i in gb.groups.values()]
+
+                    # Create iterator for this tier and friend to other tiers
+                    lh5_it = LH5Iterator(
+                        lh5_files=lh5_files,
+                        groups=tb_names,
+                        base_path=self.data_dir,
+                        entry_list=idx_list,
+                        field_mask=field_mask,
+                        buffer_len=buffer_len,
+                        friend=lh5_it
+                    )
+
+            return lh5_it
+        else:  # not merge_files
+            raise NotImplementedError
 
     def load_detector(self, det_id):
         """
