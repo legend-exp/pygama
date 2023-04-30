@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from pygama.lgdo import Array, LH5Store, LH5Iterator, Struct, Table
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
+from pygama.vis import WaveformBrowser
 
 from . import utils
 from .file_db import FileDB
@@ -1354,11 +1355,82 @@ class DataLoader:
         """
         raise NotImplementedError
 
-    def browse(self, query, dsp_config=None):
+    # TODO: automatically get the dsp_config/par_database used for
+    #   processing when these are set to None
+    def browse(
+        self,
+        entry_list: pd.DataFrame = None,
+        dsp_config = None,
+        par_database: str | dict = None,
+        aux_values: pd.DataFrame = None,
+        lines: str | list[str] = "waveform",
+        styles: dict[str, list] | str = None,
+        legend: str | list[str] = None,
+        legend_opts: dict = None,
+        n_drawn: int = 1,
+        x_unit: pint.Unit | str = None,
+        x_lim: tuple[float | str | pint.Quantity] = None,
+        y_lim: tuple[float | str | pint.Quantity] = None,
+        norm: str = None,
+        align: str = None,
+        buffer_len: int = 128,
+        block_width: int = 8,
+        ):
         """
-        Interface between DataLoader and WaveformBrowser.
+        Interface between :class:DataLoader and :class:WaveformBrowser.
         """
-        raise NotImplementedError
+        if entry_list is None:
+            entry_list = self.build_entry_list()
+
+        parent = self.levels[0]
+        tables = entry_list[f"{parent}_table"].unique()
+        col_dict = entry_list.to_dict("list")
+
+        lh5_it = None
+        for tier in self.tiers[parent]:
+            # Build list of files/tables/entries
+            lh5_files = []
+            tb_names = []
+            idx_list = []
+            for tb in tables:
+                gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
+                lh5_files += [
+                    os.path.join(self.filedb.tier_dirs[tier].lstrip("/"),
+                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"))
+                    for file in gb.groups.keys()
+                ]
+                tb_names += [self.filedb.get_table_name(tier, tb)] * len(gb)
+                idx_list += [list(entry_list.loc[i, f"{parent}_idx"]) for i in gb.groups.values()]
+
+            # Create iterator for this tier and friend to other tiers
+            lh5_it = LH5Iterator(
+                lh5_files=lh5_files,
+                groups=tb_names,
+                base_path=self.data_dir,
+                entry_list=idx_list,
+                buffer_len=buffer_len,
+                field_mask={"tracelist": False},
+                friend=lh5_it
+            )
+            
+        return WaveformBrowser(
+            lh5_it,
+            dsp_config = dsp_config,
+            database = par_database,
+            aux_values = aux_values,
+            lines = lines,
+            styles = styles,
+            legend = legend,
+            legend_opts = legend_opts,
+            n_drawn = n_drawn,
+            x_unit = x_unit,
+            x_lim = x_lim,
+            y_lim = y_lim,
+            norm = norm,
+            align = align,
+            buffer_len = buffer_len,
+            block_width = block_width,
+        )
 
     # -------------- Helper Functions ----------------#
     def get_tiers_for_col(
