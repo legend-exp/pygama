@@ -273,6 +273,7 @@ class WaveformBrowser:
         self.y_lim = y_lim
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
+        self.n_stored = 0
 
         # Set limit and convert to x-unit if needed; also set x_unit if needed
         if self.x_lim is not None:
@@ -498,7 +499,7 @@ class WaveformBrowser:
             if styles is None:
                 styles = default_style
 
-            for line, sty in zip(lines, styles):
+            for line, sty in zip(lines, itertools.cycle(styles)):
                 if sty is not None:
                     line.update(sty)
                 if line.get_figure() is not None:
@@ -597,7 +598,7 @@ class WaveformBrowser:
     ) -> tuple[int, int]:
         """Draw the next `n_wfs` waveforms (default `self.n_drawn`). See
         :meth:`draw_next`."""
-        entries = self.find_next(append)
+        entries = self.find_next(n_wfs, append)
         self.draw_current(clear)
         return entries
 
