@@ -37,6 +37,7 @@ class DataLoader:
     .. code-block:: json
 
         {
+            "filedb": "path/to/filedb.h5"
             "levels": {
                 "hit": {
                     "tiers": ["raw", "dsp", "hit"]
@@ -54,8 +55,7 @@ class DataLoader:
                 "evt": {
                     "tiers": ["evt"]
                 }
-            },
-            "channel_map": {}
+            }
         }
 
 
@@ -63,18 +63,24 @@ class DataLoader:
     --------
 
     >>> from pygama.flow import DataLoader
-    >>> dl = DataLoader("loader-config.json", "filedb-config.json")
+    >>> dl = DataLoader("loader-config.json")
     >>> dl.set_files("file_status == 26 and timestamp == '20220716T130443Z'")
     >>> dl.set_datastreams([3, 6, 8], "ch")
     >>> dl.set_cuts({"hit": "daqenergy > 1000 and AoE > 3", "evt": "muon_veto == False"})
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load()
 
+    Be careful, :meth:`.load()` loads data in memory regardless of its size. If
+    loading a lot of data (e.g. waveforms), you might want to do it in chunks.
+    :class:`.next()` does exactly this:
+
+    >>> for chunk in dl.load():
+    ...   run_my_processing(chunk)
 
     Advanced Usage:
 
     >>> from pygama.flow import DataLoader
-    >>> dl = DataLoader("loader-config.json", "filedb-config.json")
+    >>> dl = DataLoader("loader-config.json", filedb="filedb-config.json")  # or any value accepted by the FileDB constructor
     >>> dl.set_files("all")
     >>> dl.set_datastreams([0], "ch")
     >>> dl.set_cuts({"hit": "wf_max > 30000"})
@@ -87,7 +93,7 @@ class DataLoader:
     def __init__(
         self,
         config: str | dict,
-        filedb: str | dict | FileDB,
+        filedb: str | dict | FileDB = None,
         file_query: str = None,
     ) -> None:
         """
@@ -103,6 +109,9 @@ class DataLoader:
             - an LH5 file containing a :class:`.FileDB` (see also
               :meth:`.FileDB.to_disk`).
             - a :class:`.FileDB` configuration dictionary or JSON file.
+
+            If ``None``, uses the value of the ``filedb`` key in `config` to
+            instantiate a :class:`.FileDB` object.
 
         file_query
             string query that should operate on columns of a :class:`.FileDB`.
@@ -123,26 +132,42 @@ class DataLoader:
         self.aoesa_to_vov = False
         self.data = None
 
+        # already set FileDB, if supplied
         if isinstance(filedb, FileDB):
             self.filedb = filedb
-        else:
+        elif filedb is not None:
             self.filedb = FileDB(filedb)
 
         # load things if available
         if config is not None:
-            if isinstance(config, str):
-                with open(config) as f:
-                    config = json.load(f)
             self.set_config(config)
 
         # set the file_list
         if file_query is not None:
             self.file_list = list(self.filedb.df.query(file_query).index)
 
-    # --------- Get/Set/Reset Functions ----------#
+    def set_config(self, config: dict | str) -> None:
+        """Load configuration dictionary.
 
-    def set_config(self, config: dict) -> None:
-        """Load configuration dictionary."""
+        ``$_`` expands to the config file location, if possible, otherwise the
+        current working directory.
+        """
+
+        # define directory for $_ path substitution later in the config
+        # - if a JSON file is provided, it is set to the directory where the
+        #   file is located
+        # - if a dict is provided, it is set to the current directory
+        config_dir = os.getcwd()
+        if isinstance(config, str):
+            config_dir = os.path.dirname(config)
+            with open(config) as f:
+                config = json.load(f)
+
+        # look for info in configuration if FileDB is not set
+        if self.filedb is None:
+            # expand $_ variables
+            value = string.Template(config["filedb"]).substitute({"_": config_dir})
+            self.filedb = FileDB(value)
 
         if not os.path.isdir(self.filedb.data_dir):
             raise FileNotFoundError(
@@ -156,6 +181,7 @@ class DataLoader:
         self.cut_priority = {}
         self.evts = {}
         self.tcms = {}
+
         for level in self.levels:
             self.tiers[level] = config["levels"][level]["tiers"]
             # Set cut priority
@@ -174,15 +200,6 @@ class DataLoader:
                     )
             else:
                 self.cut_priority[level] = 0
-
-        # Set channel map
-        if isinstance(config["channel_map"], dict):
-            self.channel_map = config["channel_map"]
-        elif isinstance(config["channel_map"], str):
-            with open(config["channel_map"]) as f:
-                self.channel_map = json.load(f)
-        else:
-            log.warning("Channel map must be dict or path to JSON file")
 
     def set_files(self, query: str | list[str]) -> None:
         """Apply a file selection.
@@ -238,7 +255,6 @@ class DataLoader:
         """
         return self.filedb.df.iloc[self.file_list]
 
-    # TODO Make this able to handle more complicated requests
     def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
         """Apply selection on data streams (or channels).
 
@@ -374,8 +390,6 @@ class DataLoader:
         self.output_columns = None
         self.aoesa_to_vov = False
         self.data = None
-
-    # ------------- Applying Cuts/Loading Data --------------#
 
     # TODO: mode
     def build_entry_list(
@@ -613,12 +627,13 @@ class DataLoader:
                         for col in tb_df.columns:
                             if col in for_output:
                                 f_entries.loc[keep_idx, col] = tb_df[col].tolist()
-                    # end for each table loop
-                # end for each level loop
+
             if mode == "any":
                 if drop_idx is not None:
                     f_entries.drop(index=drop_idx, inplace=True)
+
             f_entries.reset_index(inplace=True, drop=True)
+
             if in_memory:
                 entries[file] = f_entries
             if output_file:
@@ -631,7 +646,6 @@ class DataLoader:
                     sto.write_object(
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
-            # end for each file loop
 
         if in_memory:
             if self.merge_files:
@@ -847,7 +861,7 @@ class DataLoader:
             size of each entry and the amount of memory available on the
             system.
         entry_list, **kwargs
-            keyword arguments forwarded to :meth:`.load`.
+            keyword argument forwarded to :meth:`.load`.
 
         Returns
         -------
@@ -1432,7 +1446,6 @@ class DataLoader:
             block_width = block_width,
         )
 
-    # -------------- Helper Functions ----------------#
     def get_tiers_for_col(
         self, columns: list | np.ndarray, merge_files: bool = None
     ) -> dict:

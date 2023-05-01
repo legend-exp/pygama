@@ -1,5 +1,5 @@
 {
-  "data_dir": "generated/tier",
+  "data_dir": "lh5/prod-ref-l200/generated/tier",
   "tier_dirs": {
     "raw": "/raw",
     "dsp": "/dsp",
