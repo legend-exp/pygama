@@ -1318,13 +1318,13 @@ class LH5Iterator(Iterator):
         """Helper to get cumulative file length of file"""
         if i_file < 0:
             return 0
-        l = self.file_map[i_file]
-        if l == np.iinfo("i").max:
-            l = self._get_file_cumlen(i_file - 1) + self.lh5_st.read_n_rows(
+        fcl = self.file_map[i_file]
+        if fcl == np.iinfo("i").max:
+            fcl = self._get_file_cumlen(i_file - 1) + self.lh5_st.read_n_rows(
                 self.groups[i_file], self.lh5_files[i_file]
             )
-            self.file_map[i_file] = l
-        return l
+            self.file_map[i_file] = fcl
+        return fcl
 
     def _get_file_cumentries(self, i_file: int) -> int:
         """Helper to get cumulative iterator entries in file"""
@@ -1352,7 +1352,7 @@ class LH5Iterator(Iterator):
     def get_file_entrylist(self, i_file: int) -> np.ndarray:
         """Helper to get entry list for file"""
         # If no entry list is provided
-        if self.local_entry_list == None:
+        if self.local_entry_list is None:
             return None
 
         elist = self.local_entry_list[i_file]

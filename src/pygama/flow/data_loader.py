@@ -1255,7 +1255,7 @@ class DataLoader:
         entry_list: pd.DataFrame = None,
         tcm_level: str = None,
         buffer_len: int = 3200,
-    ) -> lgdo.LH5Iterator:
+    ) -> LH5Iterator:
         """Creates an :class:LH5Iterator that will load the requested columns
         in `self.output_columns` for the entries in the given `entry_list` in
         chunks. This is more memory efficient than filling a whole table and
@@ -1299,7 +1299,6 @@ class DataLoader:
                     field_mask.append(col)
 
             col_tiers = self.get_tiers_for_col(field_mask)
-            col_dict = entry_list.to_dict("list")
 
             lh5_it = None
             for level in load_levels:
@@ -1387,9 +1386,9 @@ class DataLoader:
         legend: str | list[str] = None,
         legend_opts: dict = None,
         n_drawn: int = 1,
-        x_unit: pint.Unit | str = None,
-        x_lim: tuple[float | str | pint.Quantity] = None,
-        y_lim: tuple[float | str | pint.Quantity] = None,
+        x_unit: pint.Unit | str = None, # noqa: F821
+        x_lim: tuple[float | str | pint.Quantity] = None, # noqa: F821
+        y_lim: tuple[float | str | pint.Quantity] = None, # noqa: F821
         norm: str = None,
         align: str = None,
         buffer_len: int = 128,
@@ -1403,7 +1402,6 @@ class DataLoader:
 
         parent = self.levels[0]
         tables = entry_list[f"{parent}_table"].unique()
-        col_dict = entry_list.to_dict("list")
 
         lh5_it = None
         for tier in self.tiers[parent]:
