@@ -538,14 +538,19 @@ class FileDB:
                         _columns += [cols]
                         new_idx = len(_columns) - 1
 
+                        def _replace_idx(row, idx, new_idx, tier):
+                            col = row[f"{tier}_col_idx"]
+                            if col is None:
+                                return None
+                            else:
+                                return [new_idx if x == idx else x for x in col]
+
                         # now go through the new dataframe and update the old index
                         # everywhere in the {tier}_col_idx columns
                         for tier in list(_cfg["tier_dirs"].keys()):
                             df[f"{tier}_col_idx"] = df.apply(
-                                lambda row, idx=idx, new_idx=new_idx, tier=tier: [
-                                    new_idx if x == idx else x
-                                    for x in row[f"{tier}_col_idx"]
-                                ],
+                                _replace_idx,
+                                args=(idx, new_idx, tier),
                                 axis=1,
                             )
             else:
