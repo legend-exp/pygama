@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pygama.lgdo import Array, LH5Store, LH5Iterator, Struct, Table
+from pygama.lgdo import Array, LH5Iterator, LH5Store, Struct, Table
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 from pygama.vis import WaveformBrowser
 
@@ -1256,7 +1256,7 @@ class DataLoader:
         tcm_level: str = None,
         buffer_len: int = 3200,
     ) -> lgdo.LH5Iterator:
-        """Creates an :class:LH5Iterator that will load the requested columns 
+        """Creates an :class:LH5Iterator that will load the requested columns
         in `self.output_columns` for the entries in the given `entry_list` in
         chunks. This is more memory efficient than filling a whole table and
         is recommended for use when loading waveforms.
@@ -1313,12 +1313,17 @@ class DataLoader:
                             continue
                         gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                         lh5_files += [
-                            os.path.join(self.filedb.tier_dirs[tier].lstrip("/"),
-                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"))
+                            os.path.join(
+                                self.filedb.tier_dirs[tier].lstrip("/"),
+                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                            )
                             for file in gb.groups.keys()
                         ]
                         tb_names += [self.filedb.get_table_name(tier, tb)] * len(gb)
-                        idx_list += [list(entry_list.loc[i, f"{level}_idx"]) for i in gb.groups.values()]
+                        idx_list += [
+                            list(entry_list.loc[i, f"{level}_idx"])
+                            for i in gb.groups.values()
+                        ]
 
                     # Create iterator for this tier and friend to other tiers
                     lh5_it = LH5Iterator(
@@ -1328,7 +1333,7 @@ class DataLoader:
                         entry_list=idx_list,
                         field_mask=field_mask,
                         buffer_len=buffer_len,
-                        friend=lh5_it
+                        friend=lh5_it,
                     )
 
             return lh5_it
@@ -1374,7 +1379,7 @@ class DataLoader:
     def browse(
         self,
         entry_list: pd.DataFrame = None,
-        dsp_config = None,
+        dsp_config=None,
         par_database: str | dict = None,
         aux_values: pd.DataFrame = None,
         lines: str | list[str] = "waveform",
@@ -1389,7 +1394,7 @@ class DataLoader:
         align: str = None,
         buffer_len: int = 128,
         block_width: int = 8,
-        ):
+    ):
         """
         Interface between :class:DataLoader and :class:WaveformBrowser.
         """
@@ -1409,12 +1414,16 @@ class DataLoader:
             for tb in tables:
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 lh5_files += [
-                    os.path.join(self.filedb.tier_dirs[tier].lstrip("/"),
-                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"))
+                    os.path.join(
+                        self.filedb.tier_dirs[tier].lstrip("/"),
+                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                    )
                     for file in gb.groups.keys()
                 ]
                 tb_names += [self.filedb.get_table_name(tier, tb)] * len(gb)
-                idx_list += [list(entry_list.loc[i, f"{parent}_idx"]) for i in gb.groups.values()]
+                idx_list += [
+                    list(entry_list.loc[i, f"{parent}_idx"]) for i in gb.groups.values()
+                ]
 
             # Create iterator for this tier and friend to other tiers
             lh5_it = LH5Iterator(
@@ -1424,26 +1433,26 @@ class DataLoader:
                 entry_list=idx_list,
                 buffer_len=buffer_len,
                 field_mask={"tracelist": False},
-                friend=lh5_it
+                friend=lh5_it,
             )
-            
+
         return WaveformBrowser(
             lh5_it,
-            dsp_config = dsp_config,
-            database = par_database,
-            aux_values = aux_values,
-            lines = lines,
-            styles = styles,
-            legend = legend,
-            legend_opts = legend_opts,
-            n_drawn = n_drawn,
-            x_unit = x_unit,
-            x_lim = x_lim,
-            y_lim = y_lim,
-            norm = norm,
-            align = align,
-            buffer_len = buffer_len,
-            block_width = block_width,
+            dsp_config=dsp_config,
+            database=par_database,
+            aux_values=aux_values,
+            lines=lines,
+            styles=styles,
+            legend=legend,
+            legend_opts=legend_opts,
+            n_drawn=n_drawn,
+            x_unit=x_unit,
+            x_lim=x_lim,
+            y_lim=y_lim,
+            norm=norm,
+            align=align,
+            buffer_len=buffer_len,
+            block_width=block_width,
         )
 
     def get_tiers_for_col(

@@ -9,9 +9,9 @@ import glob
 import logging
 import os
 import sys
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 from collections import defaultdict
-from typing import Any, Union, Iterator
+from typing import Any, Iterator, Union
 
 import h5py
 import numba as nb
@@ -1255,9 +1255,9 @@ class LH5Iterator(Iterator):
             )
 
         # Map to last row in each file
-        self.file_map = np.full(len(self.lh5_files), np.iinfo('i').max, 'i')
+        self.file_map = np.full(len(self.lh5_files), np.iinfo("i").max, "i")
         # Map to last iterator entry for each file
-        self.entry_map = np.full(len(self.lh5_files), np.iinfo('i').max, 'i')
+        self.entry_map = np.full(len(self.lh5_files), np.iinfo("i").max, "i")
         self.buffer_len = buffer_len
 
         if len(self.lh5_files) > 0:
@@ -1286,13 +1286,13 @@ class LH5Iterator(Iterator):
             entry_list = list(entry_list)
             if isinstance(entry_list[0], int):
                 self.local_entry_list = [None] * len(self.file_map)
-                self.global_entry_list = np.array(entry_list, 'i')
+                self.global_entry_list = np.array(entry_list, "i")
                 self.global_entry_list.sort()
 
             else:
                 self.local_entry_list = [[]] * len(self.file_map)
                 for i_file, local_list in enumerate(entry_list):
-                    self.local_entry_list[i_file] = np.array(local_list, 'i')
+                    self.local_entry_list[i_file] = np.array(local_list, "i")
                     self.local_entry_list[i_file].sort()
 
         elif entry_mask is not None:
@@ -1313,22 +1313,25 @@ class LH5Iterator(Iterator):
                 raise ValueError("Friend must be an LH5Iterator")
             self.lh5_buffer.join(friend.lh5_buffer)
         self.friend = friend
-    
+
     def _get_file_cumlen(self, i_file: int) -> int:
         """Helper to get cumulative file length of file"""
-        if(i_file<0): return 0
+        if i_file < 0:
+            return 0
         l = self.file_map[i_file]
-        if l == np.iinfo('i').max:
-            l = (self._get_file_cumlen(i_file-1)
-                 + self.lh5_st.read_n_rows(self.groups[i_file], self.lh5_files[i_file]))
+        if l == np.iinfo("i").max:
+            l = self._get_file_cumlen(i_file - 1) + self.lh5_st.read_n_rows(
+                self.groups[i_file], self.lh5_files[i_file]
+            )
             self.file_map[i_file] = l
         return l
 
     def _get_file_cumentries(self, i_file: int) -> int:
         """Helper to get cumulative iterator entries in file"""
-        if(i_file<0): return 0
+        if i_file < 0:
+            return 0
         n = self.entry_map[i_file]
-        if n == np.iinfo('i').max:
+        if n == np.iinfo("i").max:
             elist = self.get_file_entrylist(i_file)
             fcl = self._get_file_cumlen(i_file)
             if elist is None:
@@ -1342,7 +1345,7 @@ class LH5Iterator(Iterator):
                     n = np.searchsorted(file_entries, fcl, "right")
                 else:
                     n = len(file_entries)
-                n += self._get_file_cumentries(i_file-1)
+                n += self._get_file_cumentries(i_file - 1)
             self.entry_map[i_file] = n
         return n
 
@@ -1355,23 +1358,25 @@ class LH5Iterator(Iterator):
         elist = self.local_entry_list[i_file]
         if elist is None:
             # Get local entrylist for this file from global entry list
-            f_start = self._get_file_cumlen(i_file-1)
+            f_start = self._get_file_cumlen(i_file - 1)
             f_end = self._get_file_cumlen(i_file)
-            i_start = self._get_file_cumentries(i_file-1)
+            i_start = self._get_file_cumentries(i_file - 1)
             i_stop = np.searchsorted(self.global_entry_list, f_end, "right")
-            elist = np.array(self.global_entry_list[i_start:i_stop], 'i') - f_start
+            elist = np.array(self.global_entry_list[i_start:i_stop], "i") - f_start
             self.local_entry_list[i_file] = elist
         return elist
-    
+
     def get_global_entrylist(self) -> np.ndarray:
         """Get global entry list, constructing it if needed"""
         if self.global_entry_list is None and self.local_entry_list is not None:
-            self.global_entry_list = np.zeros(len(self), 'i')
+            self.global_entry_list = np.zeros(len(self), "i")
             for i_file in range(len(self.lh5_files)):
-                i_start = self.get_file_cumentries(i_file-1)
+                i_start = self.get_file_cumentries(i_file - 1)
                 i_stop = self.get_file_cumentries(i_file)
-                f_start = self.get_file_cumlen(i_file-1)
-                self.global_entry_list[i_start:i_stop] = self.get_file_entrylist(i_file) + f_start
+                f_start = self.get_file_cumlen(i_file - 1)
+                self.global_entry_list[i_start:i_stop] = (
+                    self.get_file_entrylist(i_file) + f_start
+                )
         return self.global_entry_list
 
     def read(self, entry: int) -> tuple[LGDO, int]:
@@ -1379,16 +1384,18 @@ class LH5Iterator(Iterator):
         LH5 buffer and number of rows read."""
         self.n_rows = 0
         i_file = np.searchsorted(self.entry_map, entry, "right")
-        
+
         # if file hasn't been opened yet, search through files
         # sequentially until we find the right one
-        if i_file<len(self.lh5_files) and self.entry_map[i_file]==np.iinfo('i').max:
-            while i_file < len(self.lh5_files) and entry >= self._get_file_cumentries(i_file):
-                i_file+=1
+        if i_file < len(self.lh5_files) and self.entry_map[i_file] == np.iinfo("i").max:
+            while i_file < len(self.lh5_files) and entry >= self._get_file_cumentries(
+                i_file
+            ):
+                i_file += 1
 
         if i_file == len(self.lh5_files):
             return (self.lh5_buffer, self.n_rows)
-        local_entry = entry - self._get_file_cumentries(i_file-1)
+        local_entry = entry - self._get_file_cumentries(i_file - 1)
 
         while self.n_rows < self.buffer_len and i_file < len(self.file_map):
             # Loop through files
@@ -1410,10 +1417,10 @@ class LH5Iterator(Iterator):
             local_entry = 0
 
         self.current_entry = entry
-        
+
         if self.friend is not None:
             self.friend.read(entry)
-        
+
         return (self.lh5_buffer, self.n_rows)
 
     def reset_field_mask(self, mask):
@@ -1424,7 +1431,11 @@ class LH5Iterator(Iterator):
 
     def __len__(self) -> int:
         """Return the total number of entries."""
-        return self._get_file_cumentries(len(self.lh5_files)-1) if len(self.entry_map) > 0 else 0
+        return (
+            self._get_file_cumentries(len(self.lh5_files) - 1)
+            if len(self.entry_map) > 0
+            else 0
+        )
 
     def __iter__(self) -> Iterator:
         """Loop through entries in blocks of size buffer_len."""
@@ -1437,9 +1448,10 @@ class LH5Iterator(Iterator):
         and n_rows read."""
         buf, n_rows = self.read(self.next_entry)
         self.next_entry = self.current_entry + n_rows
-        if n_rows==0:
+        if n_rows == 0:
             raise StopIteration
         return (buf, self.current_entry, n_rows)
+
 
 @nb.njit(parallel=False, fastmath=True)
 def _make_fd_idx(starts, stops, idx):

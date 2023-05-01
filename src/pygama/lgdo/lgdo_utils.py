@@ -109,11 +109,11 @@ def expand_path(path: str, list: bool = False, base_path: str = None) -> str | l
         Unique absolute path, or list of all absolute paths
     """
 
-    if base_path is not None and base_path!="":
+    if base_path is not None and base_path != "":
         base_path = os.path.expanduser(os.path.expandvars(base_path))
         path = os.path.join(base_path, path)
     paths = glob.glob(os.path.expanduser(os.path.expandvars(path)))
-    if base_path is not None and base_path!="":
+    if base_path is not None and base_path != "":
         paths = [os.path.relpath(p, base_path) for p in paths]
 
     if not list:
