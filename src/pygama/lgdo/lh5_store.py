@@ -1301,8 +1301,7 @@ class LH5Iterator(Iterator):
                 entry_mask = entry_mask.values
             if isinstance(entry_mask, np.ndarray):
                 self.local_entry_list = [None] * len(self.file_map)
-                self.global_entry_list = entry_list
-                self.local_entry_list = np.nonzero(entry_mask[f_start:f_end])[0]
+                self.global_entry_list = np.nonzero(entry_mask)[0]
             else:
                 self.local_entry_list = [[]] * len(self.file_map)
                 for i_file, local_mask in enumerate(entry_mask):
