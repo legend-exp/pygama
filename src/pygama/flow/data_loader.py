@@ -79,7 +79,7 @@ class DataLoader:
     Advanced Usage:
 
     >>> from pygama.flow import DataLoader
-    >>> dl = DataLoader("loader-config.json", filedb="filedb-config.json")
+    >>> dl = DataLoader("loader-config.json", filedb="filedb-config.json")  # or any value accepted by the FileDB constructor
     >>> dl.set_files("all")
     >>> dl.set_datastreams([0], "ch")
     >>> dl.set_cuts({"hit": "wf_max > 30000"})
