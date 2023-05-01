@@ -113,8 +113,9 @@ class FileDB:
         ----------
         config
             dictionary or path to JSON file specifying data directories, tiers,
-            and file name templates. Can also be path to existing LH5 file
-            containing :class:`FileDB` object serialized by :meth:`.to_disk()`.
+            and file name templates. Can also be path (or list of paths or
+            regular expression) to existing LH5 file containing :class:`FileDB`
+            object serialized by :meth:`.to_disk()`.
         scan
             whether the file database should scan the directory containing
             `raw` files to fill its rows with file keys.
@@ -280,9 +281,7 @@ class FileDB:
         self.set_file_sizes()
 
     def set_file_status(self) -> None:
-        """
-        Add a column to the dataframe with a bit corresponding to whether each
-        tier's file exists.
+        """Add a column with a bit corresponding to whether each tier's file exists.
 
         For example, if we have tiers `raw`, `dsp`, and `hit`, but only the
         `raw` file has been produced, ``file_status`` would be 4 (``0b100`` in
@@ -305,10 +304,9 @@ class FileDB:
         self.df["file_status"] = self.df.apply(check_status, axis=1)
 
     def set_file_sizes(self) -> None:
-        """
-        Add columns (for each tier) to the database containing the
-        corresponding file size in bytes as reported by
-        :func:`os.path.getsize`.
+        """Add columns for each tier containing the corresponding file size in bytes.
+
+        As reported by :func:`os.path.getsize`.
         """
 
         def get_size(row, tier):
@@ -331,8 +329,7 @@ class FileDB:
         override: bool = False,
         dir_files_conform: bool = False,
     ) -> list[str]:
-        """Open files in the database to read (and store) available tables (and
-        columns therein) names.
+        """Open files to read (and store) available tables (and columns therein) names.
 
         Adds the available table names in each tier as a column in the
         dataframe by searching for group names that match the configured
@@ -487,6 +484,11 @@ class FileDB:
 
         Overrides the dataframe, configuration dictionary and columns with the
         information from a file created by :meth:`to_disk`.
+
+        Parameters
+        ----------
+        path
+            file or file pattern (or list of the latter).
         """
         log.debug(f"reading FileDB from disk at {path}")
 
@@ -566,7 +568,6 @@ class FileDB:
         utils.inplace_sort(self.df, self.sortby)
 
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
-        pass
         """Serializes database to disk.
 
         Parameters
