@@ -265,7 +265,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
-            log.warning("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
+            log.info("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
             i_0 = np.argmax(hist)
             mu = bin_centres[i_0]
             height = hist[i_0]
@@ -302,7 +302,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
                 method="fit_slopes",
             )[0]
             if sigma == 0:
-                log.warning("get_hpge_E_peak_par_guess: sigma estimation failed")
+                log.info("get_hpge_E_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None:
                     sigma = sigma_guess
                 else:
@@ -326,7 +326,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
         pars, cov = pgf.gauss_mode_width_max(hist, bins, var)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
-            log.warning("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
+            log.info("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
             sigma_guess = None
 
         else:

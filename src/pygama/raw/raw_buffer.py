@@ -97,7 +97,7 @@ class RawBuffer:
         :meth:`dict.keys`, i.e.  ``raw_buffer.lgdo.keys()``.
     out_stream
         the output stream to which the :class:`.RawBuffer`\ 's LGDO should be
-        sent or written. A colon (``,``) can be used to separate the stream
+        sent or written. A colon (``:``) can be used to separate the stream
         name/address from an in-stream path/port:
         - file example: ``/path/filename.lh5:/group``
         - socket example: ``198.0.0.100:8000``

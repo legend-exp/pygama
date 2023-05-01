@@ -142,7 +142,7 @@ def gen_pars_dict(pars, deg, energy_param):
         }
     else:
         out_dict = {}
-        log.warning(f"hit_dict not implemented for deg = {deg}")
+        log.error(f"hit_dict not implemented for deg = {deg}")
 
     return out_dict
 
