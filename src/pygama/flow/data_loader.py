@@ -1386,9 +1386,9 @@ class DataLoader:
         legend: str | list[str] = None,
         legend_opts: dict = None,
         n_drawn: int = 1,
-        x_unit: pint.Unit | str = None, # noqa: F821
-        x_lim: tuple[float | str | pint.Quantity] = None, # noqa: F821
-        y_lim: tuple[float | str | pint.Quantity] = None, # noqa: F821
+        x_unit: pint.Unit | str = None,  # noqa: F821
+        x_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
+        y_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
         norm: str = None,
         align: str = None,
         buffer_len: int = 128,
