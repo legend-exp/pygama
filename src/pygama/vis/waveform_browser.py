@@ -171,12 +171,8 @@ class WaveformBrowser:
 
         self.aux_vals = aux_values
         # Apply entry selection to aux_vals if needed
-        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it):
-            entries = []
-            for i, f_entries in enumerate(self.lh5_it.entry_list):
-                entry_offset = self.lh5_it.file_map[i - 1] if i > 0 else 0
-                entries += [entry_offset + entry for entry in f_entries]
-            self.aux_vals = self.aux_vals.iloc[entries].reset_index()
+        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it.get_global_entrylist()):
+            self.aux_vals = self.aux_vals.iloc[self.lh5_it.get_global_entrylist()].reset_index()
 
         # initialize objects to draw: dict from name to list of 2DLines
         if isinstance(lines, str):

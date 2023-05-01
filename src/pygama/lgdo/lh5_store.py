@@ -1329,13 +1329,13 @@ class LH5Iterator(Iterator):
         if(i_file<0): return 0
         n = self.entry_map[i_file]
         if n == np.iinfo('i').max:
-            elist = self._get_file_entrylist(i_file)
+            elist = self.get_file_entrylist(i_file)
             fcl = self._get_file_cumlen(i_file)
             if elist is None:
                 # no entry list provided
                 n = fcl
             else:
-                file_entries = self._get_file_entrylist(i_file)
+                file_entries = self.get_file_entrylist(i_file)
                 # check that file entries fall inside of file
                 if file_entries[-1] >= fcl:
                     logging.warning(f"Found entries out of range for file {i_file}")
@@ -1346,7 +1346,7 @@ class LH5Iterator(Iterator):
             self.entry_map[i_file] = n
         return n
 
-    def _get_file_entrylist(self, i_file: int) -> list:
+    def get_file_entrylist(self, i_file: int) -> np.ndarray:
         """Helper to get entry list for file"""
         # If no entry list is provided
         if self.local_entry_list == None:
@@ -1362,6 +1362,17 @@ class LH5Iterator(Iterator):
             elist = np.array(self.global_entry_list[i_start:i_stop], 'i') - f_start
             self.local_entry_list[i_file] = elist
         return elist
+    
+    def get_global_entrylist(self) -> np.ndarray:
+        """Get global entry list, constructing it if needed"""
+        if self.global_entry_list is None and self.local_entry_list is not None:
+            self.global_entry_list = np.zeros(len(self), 'i')
+            for i_file in range(len(self.lh5_files)):
+                i_start = self.get_file_cumentries(i_file-1)
+                i_stop = self.get_file_cumentries(i_file)
+                f_start = self.get_file_cumlen(i_file-1)
+                self.global_entry_list[i_start:i_stop] = self.get_file_entrylist(i_file) + f_start
+        return self.global_entry_list
 
     def read(self, entry: int) -> tuple[LGDO, int]:
         """Read the nextlocal chunk of events, starting at entry. Return the
@@ -1381,7 +1392,7 @@ class LH5Iterator(Iterator):
 
         while self.n_rows < self.buffer_len and i_file < len(self.file_map):
             # Loop through files
-            local_idx = self._get_file_entrylist(i_file)
+            local_idx = self.get_file_entrylist(i_file)
             i_local = local_idx[local_entry] if local_idx is not None else local_entry
             self.lh5_buffer, n_rows = self.lh5_st.read_object(
                 self.groups[i_file],
