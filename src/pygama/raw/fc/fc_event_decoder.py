@@ -7,7 +7,6 @@ from typing import Any
 import fcutils
 
 from pygama import lgdo
-from pygama.lgdo.compression import RadwareSigcompress
 from pygama.raw.data_decoder import DataDecoder
 
 log = logging.getLogger(__name__)
@@ -77,7 +76,6 @@ fc_decoded_values = {
         "dt": 16,  # override if a different clock rate is used
         "dt_units": "ns",
         "t0_units": "ns",
-        "compression": {"values": RadwareSigcompress(codec_shift=-32768)},
     },
 }
 """Default FlashCam Event decoded values.

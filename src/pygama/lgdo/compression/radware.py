@@ -31,7 +31,7 @@ class RadwareSigcompress(WaveformCodec):
     """Offset added to the input waveform before encoding.
 
     The `radware-sigcompress` algorithm is limited to encoding of 16-bit
-    integer values. In certain cases (notably, with *unsigned* 19-bit integer
+    integer values. In certain cases (notably, with *unsigned* 16-bit integer
     values), shifting incompatible data by a fixed amount circumvents the
     issue.
     """
