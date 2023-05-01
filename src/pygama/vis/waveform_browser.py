@@ -250,13 +250,14 @@ class WaveformBrowser:
         if self.aux_vals is not None:
             outputs = [o for o in outputs if o not in self.aux_vals]
 
-        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(
+        self.proc_chain, field_mask, self.lh5_out = build_processing_chain(
             self.lh5_in,
             dsp_config,
             db_dict=database,
             outputs=outputs,
             block_width=block_width,
         )
+        self.lh5_it.reset_field_mask(field_mask)
         self.proc_chain.execute()
 
         # Check if all of our outputs can be found
@@ -361,16 +362,18 @@ class WaveformBrowser:
                 self.find_entry(idx)
             return
 
-        if entry > len(self.lh5_it):
-            if not safe:
-                raise IndexError
-            else:
-                return
-
         # Get our current position in the I/O buffers; update if needed
         i_tb = entry - self.lh5_it.current_entry
         if not (self.lh5_it.n_rows > i_tb >= 0):
             self.lh5_it.read(entry)
+
+            # Check if entry is out of range
+            if self.lh5_it.n_rows == 0:
+                if safe:
+                    raise IndexError
+                else:
+                    return
+
             self.proc_chain.execute()
             i_tb = 0
 
