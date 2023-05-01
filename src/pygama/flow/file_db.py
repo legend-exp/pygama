@@ -121,7 +121,6 @@ class FileDB:
         """
         self.df = None
 
-        # TODO: better error message
         config_path = None
         if isinstance(config, str):
             config_path = config
@@ -498,6 +497,9 @@ class FileDB:
         paths = []
         for p in path:
             paths += lgdo.lgdo_utils.expand_path(p, list=True)
+
+        if not paths:
+            raise FileNotFoundError(path)
 
         sto = lh5.LH5Store()
         # objects that will be used to configure the FileDB at the end
