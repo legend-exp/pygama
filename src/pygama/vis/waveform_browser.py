@@ -28,7 +28,7 @@ class WaveformBrowser:
 
     def __init__(
         self,
-        files_in: str | list[str] | lgdo.LH5Iterator, # noqa: F821
+        files_in: str | list[str] | lgdo.LH5Iterator,  # noqa: F821
         lh5_group: str | list[str] = "",
         base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
