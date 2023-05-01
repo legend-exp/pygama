@@ -11,7 +11,7 @@ import os
 import sys
 from bisect import bisect_left, bisect_right
 from collections import defaultdict
-from typing import Any, Union
+from typing import Any, Union, Iterator
 
 import h5py
 import numba as nb
@@ -1160,7 +1160,7 @@ def load_dfs(
     )
 
 
-class LH5Iterator:
+class LH5Iterator(Iterator):
     """
     A class for iterating through one or more LH5 files, one block of entries
     at a time. This also accepts an entry list/mask to enable event selection,
@@ -1272,6 +1272,7 @@ class LH5Iterator:
 
         self.n_rows = 0
         self.current_entry = 0
+        self.next_entry = 0
 
         self.field_mask = field_mask
 
@@ -1366,14 +1367,20 @@ class LH5Iterator:
         """Return the total number of entries."""
         return self.entry_map[-1] if len(self.entry_map) > 0 else 0
 
-    def __iter__(self) -> tuple[LGDO, int, int]:
+    def __iter__(self) -> Iterator:
         """Loop through entries in blocks of size buffer_len."""
-        entry = 0
-        while entry < len(self):
-            buf, n_rows = self.read(entry)
-            yield (buf, entry, n_rows)
-            entry += n_rows
+        self.current_entry = 0
+        self.next_entry = 0
+        return self
 
+    def __next__(self) -> tuple[LGDO, int, int]:
+        """Read next buffer_len entries and return lh5_table, iterator entry
+        and n_rows read."""
+        buf, n_rows = self.read(self.next_entry)
+        self.next_entry = self.current_entry + n_rows
+        if n_rows==0:
+            raise StopIteration
+        return (buf, self.current_entry, n_rows)
 
 @nb.njit(parallel=False, fastmath=True)
 def _make_fd_idx(starts, stops, idx):
