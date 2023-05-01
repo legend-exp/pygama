@@ -30,7 +30,6 @@ def test_aoeesa_init():
         VectorOfVectors(shape_guess=(100, 1000), dtype="uint16")
     )
     assert isinstance(voev.decoded_size, Scalar)
-    assert len(voev.decoded_size) == 1
     assert voev.attrs["datatype"] == "array_of_encoded_equalsized_arrays<1,1>{real}"
     assert len(voev) == 100
 

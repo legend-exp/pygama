@@ -57,7 +57,7 @@ def test_add_field():
     tbl.add_field("a", lgdo.Array(np.array([1, 2, 3])), use_obj_size=True)
     assert tbl.size == 3
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(TypeError):
         tbl.add_field("s", lgdo.Scalar(value=69))
 
 

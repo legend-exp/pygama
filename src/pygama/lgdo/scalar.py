@@ -42,9 +42,6 @@ class Scalar(LGDO):
     def form_datatype(self) -> str:
         return self.datatype_name()
 
-    def __len__(self) -> int:
-        return 1
-
     def __eq__(self, other: Scalar) -> bool:
         if isinstance(other, Scalar):
             return self.value == other.value and self.attrs == self.attrs
