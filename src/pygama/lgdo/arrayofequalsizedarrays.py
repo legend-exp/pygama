@@ -4,12 +4,14 @@ corresponding utilities.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
-import numpy
+import numpy as np
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.lgdo_utils import get_element_type
+from . import lgdo_utils as utils
+from . import vectorofvectors as vov
+from .array import Array
 
 
 class ArrayOfEqualSizedArrays(Array):
@@ -22,9 +24,9 @@ class ArrayOfEqualSizedArrays(Array):
     def __init__(
         self,
         dims: tuple[int, ...] = None,
-        nda: numpy.ndarray = None,
+        nda: np.ndarray = None,
         shape: tuple[int, ...] = (),
-        dtype: numpy.dtype = None,
+        dtype: np.dtype = None,
         fill_val: int | float = None,
         attrs: dict[str, Any] = None,
     ) -> None:
@@ -82,8 +84,50 @@ class ArrayOfEqualSizedArrays(Array):
         nd = str(len(self.nda.shape))
         if self.dims is not None:
             nd = ",".join([str(i) for i in self.dims])
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:
         return len(self.nda)
+
+    def __iter__(self) -> Iterator[np.array]:
+        return self.nda.__iter__()
+
+    def __next__(self) -> np.ndarray:
+        return self.nda.__next__()
+
+    def to_vov(self, cumulative_length: np.ndarray = None) -> vov.VectorOfVectors:
+        """Convert (and eventually resize) to :class:`.vectorofvectors.VectorOfVectors`.
+
+        Parameters
+        ----------
+        cumulative_length
+            cumulative length array of the output vector of vectors. Each
+            vector in the output is filled with values found in the
+            :class:`ArrayOfEqualSizedArrays`, starting from the first index. if
+            ``None``, use all of the original 2D array and make vectors of
+            equal size.
+        """
+        attrs = self.getattrs()
+
+        if cumulative_length is None:
+            return vov.VectorOfVectors(
+                flattened_data=self.nda.flatten(),
+                cumulative_length=(np.arange(self.nda.shape[0], dtype="uint32") + 1)
+                * self.nda.shape[1],
+                attrs=attrs,
+            )
+
+        if not isinstance(cumulative_length, np.ndarray):
+            cumulative_length = np.array(cumulative_length)
+
+        flattened_data = self.nda[
+            np.arange(self.nda.shape[1])
+            < np.diff(cumulative_length, prepend=0)[:, None]
+        ]
+
+        return vov.VectorOfVectors(
+            flattened_data=flattened_data,
+            cumulative_length=cumulative_length,
+            attrs=attrs,
+        )

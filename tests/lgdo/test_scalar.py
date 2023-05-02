@@ -21,3 +21,13 @@ def test_init():
 
     with pytest.raises(ValueError):
         lgdo.Scalar(value=42, attrs={"datatype": "string"})
+
+
+def test_getattrs():
+    scalar = lgdo.Scalar(value=42, attrs={"attr1": 1})
+    assert scalar.getattrs() == {"attr1": 1}
+    assert scalar.getattrs(True) == {"attr1": 1, "datatype": "real"}
+
+
+def test_equality():
+    assert lgdo.Scalar(value=42) == lgdo.Scalar(value=42)

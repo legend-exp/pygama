@@ -18,26 +18,58 @@ class DataDecoder:
     r"""Decodes packets from a data stream.
 
     Most decoders will repeatedly decode the same set of values from each
-    packet.  The values that get decoded need to be described by a dict called
-    `decoded_values` that helps determine how to set up the buffers and write
-    them to file. :class:`~.lgdo.table.Table`\ s are made whose columns
-    correspond to the elements of `decoded_values`, and packet data gets pushed
-    to the end of the table one row at a time. See
+    packet.  The values that get decoded need to be described by a dict stored
+    in `self.decoded_values` that helps determine how to set up the buffers and
+    write them to file as :class:`~.lgdo.LGDO`\ s. :class:`~.lgdo.table.Table`\ s
+    are made whose columns correspond to the elements of `decoded_values`, and
+    packet data gets pushed to the end of the table one row at a time.
+
+    Any key-value entry in a configuration dictionary attached to an element
+    of `decoded_values` is typically interpreted as an attribute to be attached
+    to the corresponding LGDO. This feature can be for example exploited to
+    specify the data compression algorithm used by
+    :meth:`~.lgdo.lh5_store.LH5Store.write_object` to write LGDOs to disk.
+
+    For example ::
+
+      from pygama.lgdo.compression import RadwareSigcompress
+
+      FCEventDecoder.decoded_values = {
+        "packet_id": {"dtype": "uint32", "compression": "gzip"},
+        # ...
+        "waveform": {
+          "dtype": "uint16",
+          "datatype": "waveform",
+          # ...
+          "compression": {"values": RadwareSigcompress(codec_shift=-32768)},
+        }
+      }
+
+    LGDOs corresponding to ``packet_id`` and ``waveform`` will have their
+    `compression` attribute set as ``"gzip"`` and
+    ``RadwareSigcompress(codec_shift=-32768)``, respectively. Before being
+    written to disk, they will compressed with the HDF5 built-in Gzip filter
+    and with the :class:`~.lgdo.compression.radware.RadwareSigcompress`
+    waveform compressor.
+
+    Examples
+    --------
+    See `decoded_values` attributes of
     :class:`~.fc.fc_event_decoder.FCEventDecoder` or
-    :class:`~.orca.orca_digitizers.ORCAStruck3302` for an example.
+    :class:`~.orca.orca_digitizers.ORSIS3316WaveformDecoder`.
 
     Some decoders (like for file headers) do not need to push to a table, so they
     do not need `decoded_values`. Such classes should still derive from
     :class:`DataDecoder` and define how data gets formatted into LGDO's.
 
     Subclasses should define a method for decoding data to a buffer like
-    ``decode_packet(packet, raw_buffer_list, packet_id)``.
-    This function should return the number of bytes read.
+    ``decode_packet(packet, raw_buffer_list, packet_id)``.  This function
+    should return the number of bytes read.
 
-    Garbage collection writes binary data as an array of :obj:`~numpy.uint32`\ s to a
-    variable-length array in the output file. If a problematic packet is found,
-    call :meth:`.put_in_garbage`. User should set up an enum or bitbank of garbage
-    codes to be stored along with the garbage packets.
+    Garbage collection writes binary data as an array of :obj:`~numpy.uint32`\ s
+    to a variable-length array in the output file. If a problematic packet is
+    found, call :meth:`.put_in_garbage`. User should set up an enum or bitbank
+    of garbage codes to be stored along with the garbage packets.
     """
 
     def __init__(
@@ -110,7 +142,8 @@ class DataDecoder:
 
         if not hasattr(self, "decoded_values"):
             raise AttributeError(
-                type(self).__name__, ":no decoded_values available for setting up table"
+                type(self).__name__
+                + ": no decoded_values available for setting up table"
             )
 
         data_obj = lgdo.Table(size=size)
@@ -123,7 +156,7 @@ class DataDecoder:
             # get the dtype
             if "dtype" not in attrs:
                 raise AttributeError(
-                    type(self).__name__, ": must specify dtype for", field
+                    type(self).__name__ + ": must specify dtype for", field
                 )
 
             dtype = attrs.pop("dtype")
@@ -147,6 +180,8 @@ class DataDecoder:
                 dt = attrs.pop("dt")
                 dt_units = attrs.pop("dt_units")
                 wf_len = attrs.pop("wf_len")
+                compression = attrs.pop("compression", None)
+
                 wf_table = lgdo.WaveformTable(
                     size=size,
                     t0=0,
@@ -157,6 +192,19 @@ class DataDecoder:
                     dtype=dtype,
                     attrs=attrs,
                 )
+                if compression is not None:
+                    if not isinstance(compression, dict):
+                        raise RuntimeError(
+                            "waveform/compression attribute must be a dictionary"
+                        )
+
+                    if "values" in compression:
+                        wf_table.values.attrs["compression"] = compression["values"]
+                    if "t0" in compression:
+                        wf_table.t0.attrs["compression"] = compression["t0"]
+                    if "dt" in compression:
+                        wf_table.dt.attrs["compression"] = compression["dt"]
+
                 data_obj.add_field(field, wf_table)
                 continue
 
@@ -199,7 +247,7 @@ class DataDecoder:
     def put_in_garbage(self, packet: int, packet_id: int, code: int) -> None:
         i_row = self.garbage_table.loc
         p8 = np.frombuffer(packet, dtype="uint8")
-        self.garbage_table["packets"].set_vector(i_row, p8)
+        self.garbage_table["packets"]._set_vector_unsafe(i_row, p8)
         self.garbage_table["packet_id"].nda[i_row] = packet_id
         self.garbage_table["garbage_codes"].nda[i_row] = code
         self.garbage_table.push_row()

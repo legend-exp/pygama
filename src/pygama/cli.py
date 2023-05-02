@@ -92,13 +92,16 @@ def add_lh5ls_parser(subparsers):
     parser_lh5ls.add_argument(
         "lh5_group", nargs="?", help="""LH5 group.""", default="/"
     )
+    parser_lh5ls.add_argument(
+        "--attributes", "-a", action="store_true", help="""Print HDF5 attributes too"""
+    )
     parser_lh5ls.set_defaults(func=lh5_show_cli)
 
 
 def lh5_show_cli(args):
     """Passes command line arguments to :func:`.lgdo.lh5_store.show`."""
 
-    show(args.lh5_file, args.lh5_group)
+    show(args.lh5_file, args.lh5_group, attrs=args.attributes)
 
 
 def add_build_raw_parser(subparsers):

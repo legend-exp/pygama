@@ -46,12 +46,34 @@ def test_init():
     assert len(wft.values) == 10
 
     wft = WaveformTable(
+        values=lgdo.VectorOfEncodedVectors(
+            encoded_data=lgdo.VectorOfVectors(shape_guess=(10, 1000), dtype=np.ubyte),
+            decoded_size=lgdo.Array(shape=10, fill_val=6),
+        )
+    )
+    assert (wft.t0.nda == np.zeros(10)).all()
+    assert (wft.dt.nda == np.full(10, fill_value=1)).all()
+    assert isinstance(wft.values, lgdo.VectorOfEncodedVectors)
+    assert len(wft.values) == 10
+
+    wft = WaveformTable(
         t0=[1, 1, 1], dt=[2, 2, 2], values=lgdo.ArrayOfEqualSizedArrays(shape=(3, 1000))
     )
     assert (wft.t0.nda == np.full(3, fill_value=1)).all()
     assert (wft.dt.nda == np.full(3, fill_value=2)).all()
     assert isinstance(wft.values, lgdo.ArrayOfEqualSizedArrays)
     assert wft.values.nda.shape == (3, 1000)
+
+    wft = WaveformTable(
+        values=lgdo.ArrayOfEncodedEqualSizedArrays(
+            encoded_data=lgdo.VectorOfVectors(shape_guess=(10, 1000), dtype=np.ubyte),
+            decoded_size=10,
+        )
+    )
+    assert (wft.t0.nda == np.zeros(10)).all()
+    assert (wft.dt.nda == np.full(10, fill_value=1)).all()
+    assert isinstance(wft.values, lgdo.ArrayOfEncodedEqualSizedArrays)
+    assert len(wft.values) == 10
 
     wft = WaveformTable(t0=[1, 1, 1], dt=[2, 2, 2], wf_len=1000)
     assert (wft.t0.nda == np.full(3, fill_value=1)).all()

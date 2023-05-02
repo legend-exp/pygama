@@ -1,24 +1,46 @@
 import numpy as np
 import pytest
 
-import pygama.lgdo as lgdo
+from pygama import lgdo
+from pygama.lgdo import VectorOfVectors
 
 
 @pytest.fixture()
 def lgdo_vov():
-    return lgdo.VectorOfVectors(
+    return VectorOfVectors(
         flattened_data=lgdo.Array(
             nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1])
         ),
         cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
     )
+    # [1 2]
+    # [3 4 5]
+    # [2]
+    # [4 8 9 7]
+    # [5 3 1]
 
 
 def test_init(lgdo_vov):
-    lol = [[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]]
-    test = lgdo.VectorOfVectors(listoflists=lol)
-    assert (test.flattened_data.nda == lgdo_vov.flattened_data.nda).all()
-    assert (test.cumulative_length.nda == lgdo_vov.cumulative_length.nda).all()
+    assert len(VectorOfVectors(dtype="ubyte")) == 0
+
+    vov = VectorOfVectors(shape_guess=(10, 20), dtype="int32", fill_val=2)
+    assert vov.flattened_data == lgdo.Array(shape=(10 * 20,), fill_val=2, dtype="int32")
+    assert vov.cumulative_length == lgdo.Array(
+        np.arange(20, 10 * 20 + 1, 20, dtype="uint32")
+    )
+
+    test = VectorOfVectors([[1, 2], [3, 4, 5], [2], [4, 8, 9, 7], [5, 3, 1]])
+    assert test == lgdo_vov
+    assert len(test) == 5
+
+    vov = VectorOfVectors(
+        cumulative_length=np.array([5, 10, 15], dtype="uint32"), dtype="ubyte"
+    )
+    assert len(vov.flattened_data) == 15
+    assert len(vov[-1]) == 5
+
+    vov = VectorOfVectors(shape_guess=(5, 0), dtype="int32")
+    assert vov.cumulative_length == lgdo.Array([0, 0, 0, 0, 0])
 
 
 def test_datatype_name(lgdo_vov):
@@ -39,12 +61,34 @@ def test_values(lgdo_vov):
     ]
 
     for i in range(len(desired)):
-        assert (desired[i] == list(lgdo_vov)[i]).all()
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+    assert np.array_equal(lgdo_vov[-1], desired[-1])
+    assert np.array_equal(lgdo_vov[-2], desired[-2])
+
+    vov = VectorOfVectors([[1, 2]], dtype="uint32")
+    assert np.array_equal(vov[-1], [1, 2])
 
 
 def test_resize(lgdo_vov):
     lgdo_vov.resize(3)
     assert len(lgdo_vov.cumulative_length) == 3
+    assert len(lgdo_vov.flattened_data) == lgdo_vov.cumulative_length[-1]
+
+    desired = [np.array([1, 2]), np.array([3, 4, 5]), np.array([2])]
+
+    for i in range(len(lgdo_vov)):
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+    lgdo_vov.resize(5)
+    assert len(lgdo_vov) == 5
+    assert len(lgdo_vov[3]) == 0
+    assert len(lgdo_vov[4]) == 0
+    assert lgdo_vov == VectorOfVectors([[1, 2], [3, 4, 5], [2], [], []])
+
+    vov = VectorOfVectors(dtype="i")
+    vov.resize(3)
+    assert vov == VectorOfVectors([[], [], []], dtype="i")
 
 
 def test_aoesa(lgdo_vov):
@@ -59,11 +103,24 @@ def test_aoesa(lgdo_vov):
         ]
     )
     assert isinstance(arr, lgdo.ArrayOfEqualSizedArrays)
+    assert arr.dtype == np.float64
     assert np.array_equal(arr.nda, desired, True)
+
+    vov = VectorOfVectors(
+        flattened_data=lgdo.Array(
+            nda=np.array([1, 2, 3, 4, 5, 2, 4, 8, 9, 7, 5, 3, 1], dtype="int16")
+        ),
+        cumulative_length=lgdo.Array(nda=np.array([2, 5, 6, 10, 13])),
+    )
+    aoesa = vov.to_aoesa()
+    assert aoesa.dtype == np.float64
+
+    aoesa = vov.to_aoesa(preserve_dtype=True)
+    assert aoesa.dtype == np.int16
 
 
 def test_set_vector(lgdo_vov):
-    lgdo_vov.set_vector(0, np.zeros(2))
+    lgdo_vov[0] = np.zeros(2)
 
     desired = [
         np.zeros(2),
@@ -74,7 +131,89 @@ def test_set_vector(lgdo_vov):
     ]
 
     for i in range(len(desired)):
-        assert (desired[i] == list(lgdo_vov)[i]).all()
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+    with pytest.raises(ValueError):
+        lgdo_vov[0] = np.zeros(3)
+
+    lgdo_vov[1] = np.zeros(3)
+
+    desired = [
+        np.zeros(2),
+        np.zeros(3),
+        np.array([2]),
+        np.array([4, 8, 9, 7]),
+        np.array([5, 3, 1]),
+    ]
+
+    for i in range(len(desired)):
+        assert np.array_equal(desired[i], lgdo_vov[i])
+
+
+def test_append(lgdo_vov):
+    lgdo_vov.append(np.zeros(3))
+    assert np.array_equal(lgdo_vov[-1], np.zeros(3))
+
+    vov = VectorOfVectors(dtype="int64")
+    vov.append(np.zeros(3))
+    assert vov == VectorOfVectors([[0, 0, 0]])
+
+
+def test_insert(lgdo_vov):
+    lgdo_vov.insert(2, np.zeros(3))
+    assert lgdo_vov == VectorOfVectors(
+        [
+            [1, 2],
+            [3, 4, 5],
+            [0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+    vov = VectorOfVectors(shape_guess=(3, 5), dtype="int32", fill_val=0)
+    vov.insert(2, [1, 2, 3])
+    assert np.array_equal(vov.cumulative_length, [5, 10, 13, 18])
+    assert np.array_equal(vov[2], [1, 2, 3])
+
+
+def test_replace(lgdo_vov):
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(3))
+    assert vov == VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(2))
+    assert vov == VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
+
+    vov = lgdo.copy(lgdo_vov)
+    vov.replace(1, np.zeros(4))
+    assert vov == VectorOfVectors(
+        [
+            [1, 2],
+            [0, 0, 0, 0],
+            [2],
+            [4, 8, 9, 7],
+            [5, 3, 1],
+        ]
+    )
 
 
 def test_iter(lgdo_vov):
@@ -117,11 +256,15 @@ def test_build_cl_and_explodes():
     assert (lgdo.explode([3, 4], [5, 7]) == array_exp).all()
     assert (lgdo.explode(cl, range(len(cl))) == exp).all()
     # explode_arrays
-    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))])
-    assert len(out_arrays) == 2
-    assert (out_arrays[0] == array_exp).all()
-    assert (out_arrays[1] == exp).all()
-    out_arrays = lgdo.explode_arrays(cl, [array, range(len(cl))], out_arrays=out_arrays)
-    assert len(out_arrays) == 2
-    assert (out_arrays[0] == array_exp).all()
-    assert (out_arrays[1] == exp).all()
+    arrays_out = lgdo.explode_arrays(cl, [array, range(len(cl))])
+    assert len(arrays_out) == 2
+    assert (arrays_out[0] == array_exp).all()
+    assert (arrays_out[1] == exp).all()
+    arrays_out = lgdo.explode_arrays(cl, [array, range(len(cl))], arrays_out=arrays_out)
+    assert len(arrays_out) == 2
+    assert (arrays_out[0] == array_exp).all()
+    assert (arrays_out[1] == exp).all()
+
+
+def test_copy(lgdo_vov):
+    assert lgdo_vov == lgdo.copy(lgdo_vov)

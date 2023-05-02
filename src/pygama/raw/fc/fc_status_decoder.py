@@ -6,34 +6,24 @@ from pygama.raw.data_decoder import DataDecoder, RawBuffer
 
 
 class FCStatusDecoder(DataDecoder):
-    """
-    Decode FlashCam digitizer status data.
-    """
+    """Decode FlashCam digitizer status data."""
 
     def __init__(self, *args, **kwargs) -> None:
         self.decoded_values = {
-            "status": {  # 0: Errors occurred, 1: no errors
-                "dtype": "int32",
-            },
-            "statustime": {  # fc250 seconds, microseconds, dummy, startsec startusec
-                "dtype": "float32",
-                "units": "s",
-            },
-            "cputime": {  # CPU seconds, microseconds, dummy, startsec startusec
-                "dtype": "float64",
-                "units": "s",
-            },
-            "startoffset": {  # fc250 seconds, microseconds, dummy, startsec startusec
-                "dtype": "float32",
-                "units": "s",
-            },
-            "cards": {  # Total number of cards (number of status data to follow)
-                "dtype": "int32",
-            },
-            "size": {  # Size of each status data
-                "dtype": "int32",
-            },
-            "environment": {  # FC card-wise environment status
+            # 0: Errors occurred, 1: no errors
+            "status": {"dtype": "int32"},
+            # fc250 seconds, microseconds, dummy, startsec startusec
+            "statustime": {"dtype": "float32", "units": "s"},
+            # CPU seconds, microseconds, dummy, startsec startusec
+            "cputime": {"dtype": "float64", "units": "s"},
+            # fc250 seconds, microseconds, dummy, startsec startusec
+            "startoffset": {"dtype": "float32", "units": "s"},
+            # Total number of cards (number of status data to follow)
+            "cards": {"dtype": "int32"},
+            # Size of each status data
+            "size": {"dtype": "int32"},
+            # FC card-wise environment status
+            "environment": {
                 # Array contents:
                 # [0-4] Temps in mDeg
                 # [5-10] Voltages in mV
@@ -45,24 +35,23 @@ class FCStatusDecoder(DataDecoder):
                 "datatype": "array_of_equalsized_arrays<1,1>{real}",
                 "length": 16,
             },
-            "totalerrors": {  # FC card-wise list DAQ errors during data taking
-                "dtype": "uint32",
-            },
-            "enverrors": {
-                "dtype": "uint32",
-            },
-            "ctierrors": {
-                "dtype": "uint32",
-            },
-            "linkerrors": {
-                "dtype": "uint32",
-            },
+            # FC card-wise list DAQ errors during data taking
+            "totalerrors": {"dtype": "uint32"},
+            "enverrors": {"dtype": "uint32"},
+            "ctierrors": {"dtype": "uint32"},
+            "linkerrors": {"dtype": "uint32"},
             "othererrors": {
                 "dtype": "uint32",
                 "datatype": "array_of_equalsized_arrays<1,1>{real}",
                 "length": 5,
             },
         }
+        """Default FlashCam status decoded values.
+
+        Warning
+        -------
+        This configuration can be dynamically modified by the decoder at runtime.
+        """
         super().__init__(*args, **kwargs)
 
     def decode_packet(

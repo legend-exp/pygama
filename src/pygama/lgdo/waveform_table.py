@@ -10,10 +10,11 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
+from .table import Table
+from .vectorofvectors import VectorOfVectors
 
 log = logging.getLogger(__name__)
 
@@ -31,9 +32,9 @@ class WaveformTable(Table):
       Implemented as an LGDO :class:`.Array` with optional attribute ``units``.
     * ``values[i]`` is the ``i``'th waveform in the table. Internally, the
       waveforms values may be either an LGDO :class:`.ArrayOfEqualSizedArrays`\
-      ``<1,1>`` or as an LGDO :class:`.VectorOfVectors` that supports
-      waveforms of unequal length. Can optionally be given a ``units``
-      attribute.
+      ``<1,1>``, an LGDO :class:`.VectorOfVectors` or
+      :class:`.VectorOfEncodedVectors` that supports waveforms of unequal
+      length. Can optionally be given a ``units`` attribute.
 
     Note
     ----
@@ -114,6 +115,7 @@ class WaveformTable(Table):
             if nda.shape != shape:
                 nda.resize(shape, refcheck=True)
             t0 = Array(nda=nda)
+
         if t0_units is not None:
             t0.attrs["units"] = f"{t0_units}"
 
@@ -129,15 +131,21 @@ class WaveformTable(Table):
         if dt_units is not None:
             dt.attrs["units"] = f"{dt_units}"
 
-        if not isinstance(values, ArrayOfEqualSizedArrays) and not isinstance(
-            values, VectorOfVectors
+        if not isinstance(
+            values,
+            (
+                ArrayOfEqualSizedArrays,
+                VectorOfVectors,
+                VectorOfEncodedVectors,
+                ArrayOfEncodedEqualSizedArrays,
+            ),
         ):
             if isinstance(values, np.ndarray):
                 try:
                     wf_len = values.shape[1]
                 except Exception:
                     wf_len = None
-            if wf_len is None:  # VectorOfVectors
+            if wf_len is None:  # make a VectorOfVectors
                 shape_guess = (size, 100)
                 if dtype is None:
                     dtype = np.dtype(np.float64)
@@ -155,7 +163,7 @@ class WaveformTable(Table):
                         cumulative_length=cumulative_length,
                         dtype=dtype,
                     )
-            else:  # ArrayOfEqualSizedArrays
+            else:  # make a ArrayOfEqualSizedArrays
                 shape = (size, wf_len)
                 if dtype is None:
                     dtype = (
@@ -243,15 +251,10 @@ class WaveformTable(Table):
         string = ""
 
         for i in range(self.size):
-            if isinstance(self.values, VectorOfVectors):
-                string += f"{self.values.get_vector(i)}"
-            else:
-                string += f"{self.values.nda[i]}"
-
-            string += f", dt={self.dt.nda[i]}"
+            string += f"{self.values[i]}, dt={self.dt[i]}"
             if self.dt_units:
                 string += f" {self.dt_units}"
-            string += f", t0={self.t0.nda[i]}"
+            string += f", t0={self.t0[i]}"
             if self.t0_units:
                 string += f" {self.t0_units}"
             if i < self.size - 1:
