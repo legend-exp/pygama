@@ -14,27 +14,15 @@ log = logging.getLogger(__name__)
 # put decoded values here where they can be used also by the orca decoder
 fc_decoded_values = {
     # packet index in file
-    "packet_id": {
-        "dtype": "uint32",
-    },
+    "packet_id": {"dtype": "uint32"},
     # index of event
-    "eventnumber": {
-        "dtype": "int32",
-    },
+    "eventnumber": {"dtype": "int32"},
     # time since epoch
-    "timestamp": {
-        "dtype": "float64",
-        "units": "s",
-    },
+    "timestamp": {"dtype": "float64", "units": "s"},
     # time since beginning of file
-    "runtime": {
-        "dtype": "float64",
-        "units": "s",
-    },
+    "runtime": {"dtype": "float64", "units": "s"},
     # number of triggered adc channels
-    "numtraces": {
-        "dtype": "int32",
-    },
+    "numtraces": {"dtype": "int32"},
     # list of triggered adc channels
     "tracelist": {
         "dtype": "int16",
@@ -42,82 +30,44 @@ fc_decoded_values = {
         "length_guess": 16,
     },
     # fpga baseline
-    "baseline": {
-        "dtype": "uint16",
-    },
+    "baseline": {"dtype": "uint16"},
     # fpga energy
-    "daqenergy": {
-        "dtype": "uint16",
-    },
+    "daqenergy": {"dtype": "uint16"},
     # right now, index of the trigger (trace)
-    "channel": {
-        "dtype": "uint32",
-    },
+    "channel": {"dtype": "uint32"},
     # PPS timestamp in sec
-    "ts_pps": {
-        "dtype": "int32",
-    },
+    "ts_pps": {"dtype": "int32"},
     # clock ticks
-    "ts_ticks": {
-        "dtype": "int32",
-    },
+    "ts_ticks": {"dtype": "int32"},
     # max clock ticks
-    "ts_maxticks": {
-        "dtype": "int32",
-    },
+    "ts_maxticks": {"dtype": "int32"},
     # the offset in sec between the master and unix
-    "mu_offset_sec": {
-        "dtype": "int32",
-    },
+    "mu_offset_sec": {"dtype": "int32"},
     # the offset in usec between master and unix
-    "mu_offset_usec": {
-        "dtype": "int32",
-    },
+    "mu_offset_usec": {"dtype": "int32"},
     # the calculated sec which must be added to the master
-    "to_master_sec": {
-        "dtype": "int32",
-    },
+    "to_master_sec": {"dtype": "int32"},
     # the delta time between master and unix in usec
-    "delta_mu_usec": {
-        "dtype": "int32",
-    },
+    "delta_mu_usec": {"dtype": "int32"},
     # the abs(time) between master and unix in usec
-    "abs_delta_mu_usec": {
-        "dtype": "int32",
-    },
+    "abs_delta_mu_usec": {"dtype": "int32"},
     # startsec
-    "to_start_sec": {
-        "dtype": "int32",
-    },
+    "to_start_sec": {"dtype": "int32"},
     # startusec
-    "to_start_usec": {
-        "dtype": "int32",
-    },
+    "to_start_usec": {"dtype": "int32"},
     # start pps of the next dead window
-    "dr_start_pps": {
-        "dtype": "int32",
-    },
+    "dr_start_pps": {"dtype": "int32"},
     # start ticks of the next dead window
-    "dr_start_ticks": {
-        "dtype": "int32",
-    },
+    "dr_start_ticks": {"dtype": "int32"},
     # stop pps of the next dead window
-    "dr_stop_pps": {
-        "dtype": "int32",
-    },
+    "dr_stop_pps": {"dtype": "int32"},
     # stop ticks of the next dead window
-    "dr_stop_ticks": {
-        "dtype": "int32",
-    },
+    "dr_stop_ticks": {"dtype": "int32"},
     # maxticks of the dead window
-    "dr_maxticks": {
-        "dtype": "int32",
-    },
+    "dr_maxticks": {"dtype": "int32"},
     # current dead time calculated from deadregion (dr) fields.
     # Give the total dead time if summed up.
-    "deadtime": {
-        "dtype": "float64",
-    },
+    "deadtime": {"dtype": "float64"},
     # waveform data
     "waveform": {
         "dtype": "uint16",
@@ -128,12 +78,18 @@ fc_decoded_values = {
         "t0_units": "ns",
     },
 }
+"""Default FlashCam Event decoded values.
+
+Re-used by :class:`~.raw.orca.orca_flashcam.ORFlashCamWaveformDecoder`.
+
+Warning
+-------
+This configuration can be dynamically modified by the decoder at runtime.
+"""
 
 
 class FCEventDecoder(DataDecoder):
-    """
-    Decode FlashCam digitizer event data.
-    """
+    """Decode FlashCam digitizer event data."""
 
     def __init__(self, *args, **kwargs) -> None:
         # these are read for every event (decode_event)
@@ -226,7 +182,9 @@ class FCEventDecoder(DataDecoder):
                 ii
             ] = fcio.runtime  # the time since the beginning of the file in seconds
             tbl["numtraces"].nda[ii] = fcio.numtraces  # number of triggered adcs
-            tbl["tracelist"].set_vector(ii, fcio.tracelist)  # list of triggered adcs
+            tbl["tracelist"]._set_vector_unsafe(
+                ii, fcio.tracelist
+            )  # list of triggered adcs
             tbl["baseline"].nda[ii] = fcio.baseline[
                 iwf
             ]  # the fpga baseline values for each channel in LSB

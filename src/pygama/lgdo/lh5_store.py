@@ -18,19 +18,24 @@ import numba as nb
 import numpy as np
 import pandas as pd
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo_utils import expand_path, parse_datatype
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import VectorOfVectors
-from pygama.lgdo.waveform_table import WaveformTable
+from . import compression as compress
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .compression import WaveformCodec
+from .encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
+from .fixedsizearray import FixedSizeArray
+from .lgdo_utils import expand_path, parse_datatype
+from .scalar import Scalar
+from .struct import Struct
+from .table import Table
+from .vectorofvectors import VectorOfVectors
+from .waveform_table import WaveformTable
 
 LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
 log = logging.getLogger(__name__)
+
+DEFAULT_HDF5_COMPRESSION = None
 
 
 class LH5Store:
@@ -164,6 +169,7 @@ class LH5Store:
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         obj_buf: LGDO = None,
         obj_buf_start: int = 0,
+        decompress: bool = True,
     ) -> tuple[LGDO, int]:
         """Read LH5 object data from a file.
 
@@ -209,6 +215,10 @@ class LH5Store:
         obj_buf_start
             Start location in ``obj_buf`` for read. For concatenating data to
             array-like objects.
+        decompress
+            Decompress data encoded with pygama's compression routines right
+            after reading. The option has no effect on data encoded with HDF5
+            built-in filters, which is always decompressed upstream by HDF5.
 
         Returns
         -------
@@ -220,7 +230,7 @@ class LH5Store:
             ``table.loc``.
         """
         # Handle list-of-files recursively
-        if not isinstance(lh5_file, (str, h5py._hl.files.File)):
+        if not isinstance(lh5_file, (str, h5py.File)):
             lh5_file = list(lh5_file)
             n_rows_read = 0
             for i, h5f in enumerate(lh5_file):
@@ -251,6 +261,7 @@ class LH5Store:
                     field_mask=field_mask,
                     obj_buf=obj_buf,
                     obj_buf_start=obj_buf_start,
+                    decompress=decompress,
                 )
                 n_rows_read += n_rows_read_i
                 if n_rows_read >= n_rows or obj_buf is None:
@@ -259,16 +270,15 @@ class LH5Store:
                 obj_buf_start += n_rows_read_i
             return obj_buf, n_rows_read
 
-        # start read from single file. fail if the object is not found
-        log.debug(
-            f"reading '{name}' from {lh5_file}"
-            + (f" with field mask {field_mask}" if field_mask else "")
-        )
-
         # get the file from the store
         h5f = self.gimme_file(lh5_file, "r")
         if not h5f or name not in h5f:
-            raise KeyError(f"'{name}' not in {lh5_file}")
+            raise KeyError(f"'{name}' not in {h5f.filename}")
+
+        log.debug(
+            f"reading {h5f.filename}:{name}[{start_row}:{n_rows}], decompress = {decompress}, "
+            + (f" with field mask {field_mask}" if field_mask else "")
+        )
 
         # make idx a proper tuple if it's not one already
         if not (isinstance(idx, tuple) and len(idx) == 1):
@@ -335,7 +345,12 @@ class LH5Store:
                 # table... Maybe should emit a warning? Or allow them to be
                 # dicts keyed by field name?
                 obj_dict[field], _ = self.read_object(
-                    name + "/" + field, h5f, start_row=start_row, n_rows=n_rows, idx=idx
+                    name + "/" + field,
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    decompress=decompress,
                 )
             # modify datatype in attrs if a field_mask was used
             attrs = dict(h5f[name].attrs)
@@ -364,6 +379,7 @@ class LH5Store:
             for field in elements:
                 if not field_mask[field]:
                     continue
+
                 fld_buf = None
                 if obj_buf is not None:
                     if not isinstance(obj_buf, Table) or field not in obj_buf:
@@ -373,6 +389,7 @@ class LH5Store:
 
                     else:
                         fld_buf = obj_buf[field]
+
                 col_dict[field], n_rows_read = self.read_object(
                     name + "/" + field,
                     h5f,
@@ -381,10 +398,13 @@ class LH5Store:
                     idx=idx,
                     obj_buf=fld_buf,
                     obj_buf_start=obj_buf_start,
+                    decompress=decompress,
                 )
                 if obj_buf is not None and obj_buf_start + n_rows_read > len(obj_buf):
                     obj_buf.resize(obj_buf_start + n_rows_read)
+
                 rows_read.append(n_rows_read)
+
             # warn if all columns don't read in the same number of rows
             if len(rows_read) > 0:
                 n_rows_read = rows_read[0]
@@ -395,7 +415,7 @@ class LH5Store:
             for n in rows_read[1:]:
                 if n != n_rows_read:
                     log.warning(
-                        f"Table '{name}' got strange n_rows_read = {n}, {n_rows_read} was expected"
+                        f"Table '{name}' got strange n_rows_read = {n}, {n_rows_read} was expected ({rows_read})"
                     )
 
             # modify datatype in attrs if a field_mask was used
@@ -422,6 +442,7 @@ class LH5Store:
                     )
                 else:
                     table = Table(col_dict=col_dict, attrs=attrs)
+
                 # set (write) loc to end of tree
                 table.loc = n_rows_read
                 return table, n_rows_read
@@ -438,6 +459,91 @@ class LH5Store:
                         f"attrs mismatch. obj_buf.attrs: "
                         f"{obj_buf.attrs}, h5f[{name}].attrs: {attrs}"
                     )
+                return obj_buf, n_rows_read
+
+        # ArrayOfEncodedEqualSizedArrays and VectorOfEncodedVectors
+        for cond, enc_lgdo in [
+            (
+                datatype == "array_of_encoded_equalsized_arrays",
+                ArrayOfEncodedEqualSizedArrays,
+            ),
+            (elements.startswith("encoded_array"), VectorOfEncodedVectors),
+        ]:
+            if cond:
+                if (
+                    not decompress
+                    and obj_buf is not None
+                    and not isinstance(obj_buf, enc_lgdo)
+                ):
+                    raise ValueError(f"obj_buf for '{name}' not a {enc_lgdo}")
+
+                # read out decoded_size, either a Scalar or an Array
+                decoded_size_buf = encoded_data_buf = None
+                if obj_buf is not None and not decompress:
+                    decoded_size_buf = obj_buf.decoded_size
+                    encoded_data_buf = obj_buf.encoded_data
+
+                decoded_size, _ = self.read_object(
+                    f"{name}/decoded_size",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    obj_buf=None if decompress else decoded_size_buf,
+                    obj_buf_start=0 if decompress else obj_buf_start,
+                )
+
+                # read out encoded_data, a VectorOfVectors
+                encoded_data, n_rows_read = self.read_object(
+                    f"{name}/encoded_data",
+                    h5f,
+                    start_row=start_row,
+                    n_rows=n_rows,
+                    idx=idx,
+                    obj_buf=None if decompress else encoded_data_buf,
+                    obj_buf_start=0 if decompress else obj_buf_start,
+                )
+
+                # return the still encoded data in the buffer object, if there
+                if obj_buf is not None and not decompress:
+                    return obj_buf, n_rows_read
+
+                # otherwise re-create the encoded LGDO
+                rawdata = enc_lgdo(
+                    encoded_data=encoded_data,
+                    decoded_size=decoded_size,
+                    attrs=h5f[name].attrs,
+                )
+
+                # already return if no decompression is requested
+                if not decompress:
+                    return rawdata, n_rows_read
+
+                # if no buffer, decode and return
+                elif obj_buf is None and decompress:
+                    return compress.decode(rawdata), n_rows_read
+
+                # use the (decoded object type) buffer otherwise
+                if enc_lgdo == VectorOfEncodedVectors and not isinstance(
+                    obj_buf, VectorOfVectors
+                ):
+                    raise ValueError(
+                        f"obj_buf for decoded '{name}' not a VectorOfVectors"
+                    )
+                elif enc_lgdo == ArrayOfEncodedEqualSizedArrays and not isinstance(
+                    obj_buf, ArrayOfEqualSizedArrays
+                ):
+                    raise ValueError(
+                        f"obj_buf for decoded '{name}' not an ArrayOfEqualSizedArrays"
+                    )
+
+                # FIXME: not a good idea. an in place decoding version
+                # of decode would be needed to avoid extra memory
+                # allocations
+                # FIXME: obj_buf_start??? Write a unit test
+                for i, wf in enumerate(compress.decode(rawdata)):
+                    obj_buf[i] = wf
+
                 return obj_buf, n_rows_read
 
         # VectorOfVectors
@@ -615,9 +721,6 @@ class LH5Store:
                 if len(obj_buf) < buf_size:
                     obj_buf.resize(buf_size)
                 dest_sel = np.s_[obj_buf_start:buf_size]
-                # NOTE: if your script fails on this line, it may be because you
-                # have to apply this patch to h5py (or update h5py, if it's
-                # fixed): https://github.com/h5py/h5py/issues/1792
                 h5f[name].read_direct(obj_buf.nda, source_sel, dest_sel)
                 nda = obj_buf.nda
             else:
@@ -665,8 +768,35 @@ class LH5Store:
         n_rows: int = None,
         wo_mode: str = "append",
         write_start: int = 0,
+        hdf5_compression: str | h5py.filters.FilterRefBase = DEFAULT_HDF5_COMPRESSION,
     ) -> None:
         """Write an LGDO into an LH5 file.
+
+        If the `obj` :class:`.LGDO` has a `compression` attribute, its value is
+        interpreted as the algorithm to be used to compress `obj` before
+        writing to disk. The type of `compression` can be:
+
+        string, kwargs dictionary, hdf5plugin filter
+          interpreted as the name of a built-in or custom `HDF5 compression
+          filter <https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline>`_
+          (``"gzip"``, ``"lzf"``, :mod:`hdf5plugin` filter object etc.) and
+          passed directly to :meth:`h5py.Group.create_dataset`.
+
+        :class:`.WaveformCodec` object
+          If `obj` is a :class:`.WaveformTable`, compress its `values` using
+          this algorithm. More documentation about the supported waveform
+          compression algorithms at :mod:`.lgdo.compression`.
+
+        Note
+        ----
+        The `compression` attribute takes precedence over the
+        `hdf5_compression` argument and is not written to disk.
+
+        Note
+        ----
+        HDF5 compression is skipped for the `encoded_data` dataset of
+        :class:`.VectorOfEncodedVectors` and
+        :class`.ArrayOfEncodedEqualSizedArrays`.
 
         Parameters
         ----------
@@ -702,7 +832,17 @@ class LH5Store:
         write_start
             row in the output file (if already existing) to start overwriting
             from.
+        hdf5_compression
+            HDF5 compression filter to be applied before writing non-scalar
+            datasets. **Ignored if compression is specified as an `obj`
+            attribute.**
         """
+        log.debug(
+            f"writing {repr(obj)}[{start_row}:{n_rows}] as "
+            f"{lh5_file}:{group}/{name}[{write_start}:], "
+            f"mode = {wo_mode}, hdf5_compression = {hdf5_compression}"
+        )
+
         if wo_mode == "write_safe":
             wo_mode = "w"
         if wo_mode == "append":
@@ -771,8 +911,26 @@ class LH5Store:
                     del group[key]
 
             for field in obj.keys():
+                # eventually compress waveform table values with pygama's
+                # custom codecs before writing
+                # if waveformtable.values.attrs["compression"] is a string,
+                # interpret it as an HDF5 built-in filter
+                obj_fld = None
+                if (
+                    isinstance(obj, WaveformTable)
+                    and field == "values"
+                    and not isinstance(obj.values, VectorOfEncodedVectors)
+                    and not isinstance(obj.values, ArrayOfEncodedEqualSizedArrays)
+                    and "compression" in obj.values.attrs
+                    and isinstance(obj.values.attrs["compression"], WaveformCodec)
+                ):
+                    codec = obj.values.attrs["compression"]
+                    obj_fld = compress.encode(obj.values, codec=codec)
+                else:
+                    obj_fld = obj[field]
+
                 self.write_object(
-                    obj[field],
+                    obj_fld,
                     field,
                     lh5_file,
                     group=group,
@@ -780,6 +938,7 @@ class LH5Store:
                     n_rows=n_rows,
                     wo_mode=wo_mode,
                     write_start=write_start,
+                    hdf5_compression=hdf5_compression,
                 )
             return
 
@@ -796,6 +955,36 @@ class LH5Store:
             ds = group.create_dataset(name, shape=(), data=obj.value)
             ds.attrs.update(obj.attrs)
             return
+
+        # vector of encoded vectors
+        elif isinstance(obj, (VectorOfEncodedVectors, ArrayOfEncodedEqualSizedArrays)):
+            group = self.gimme_group(
+                name, group, grp_attrs=obj.attrs, overwrite=(wo_mode == "o")
+            )
+
+            self.write_object(
+                obj.encoded_data,
+                "encoded_data",
+                lh5_file,
+                group=group,
+                start_row=start_row,
+                n_rows=n_rows,
+                wo_mode=wo_mode,
+                write_start=write_start,
+                hdf5_compression=None,  # data is already compressed!
+            )
+
+            self.write_object(
+                obj.decoded_size,
+                "decoded_size",
+                lh5_file,
+                group=group,
+                start_row=start_row,
+                n_rows=n_rows,
+                wo_mode=wo_mode,
+                write_start=write_start,
+                hdf5_compression=hdf5_compression,
+            )
 
         # vector of vectors
         elif isinstance(obj, VectorOfVectors):
@@ -830,6 +1019,7 @@ class LH5Store:
                 n_rows=fd_n_rows,
                 wo_mode=wo_mode,
                 write_start=offset,
+                hdf5_compression=hdf5_compression,
             )
 
             # now offset is used to give appropriate in-file values for
@@ -840,7 +1030,8 @@ class LH5Store:
             # Add offset to obj.cumulative_length itself to avoid memory allocation.
             # Then subtract it off after writing! (otherwise it will be changed
             # upon return)
-            obj.cumulative_length.nda += offset
+            cl_dtype = obj.cumulative_length.nda.dtype.type
+            obj.cumulative_length.nda += cl_dtype(offset)
 
             self.write_object(
                 obj.cumulative_length,
@@ -851,8 +1042,9 @@ class LH5Store:
                 n_rows=n_rows,
                 wo_mode=wo_mode,
                 write_start=write_start,
+                hdf5_compression=hdf5_compression,
             )
-            obj.cumulative_length.nda -= offset
+            obj.cumulative_length.nda -= cl_dtype(offset)
 
             return
 
@@ -860,10 +1052,13 @@ class LH5Store:
         elif isinstance(obj, Array):
             if n_rows is None or n_rows > obj.nda.shape[0] - start_row:
                 n_rows = obj.nda.shape[0] - start_row
+
             nda = obj.nda[start_row : start_row + n_rows]
+
             # hack to store bools as uint8 for c / Julia compliance
             if nda.dtype.name == "bool":
                 nda = nda.astype(np.uint8)
+
             # need to create dataset from ndarray the first time for speed
             # creating an empty dataset and appending to that is super slow!
             if (wo_mode != "a" and write_start == 0) or name not in group:
@@ -871,12 +1066,36 @@ class LH5Store:
                 if wo_mode == "o" and name in group:
                     log.debug(f"overwriting {name} in {group}")
                     del group[name]
-                ds = group.create_dataset(name, data=nda, maxshape=maxshape)
-                ds.attrs.update(obj.attrs)
+
+                # create HDF5 dataset
+                # - compress using the 'compression' LGDO attribute, if
+                #   available
+                # - otherwise use "hdf5_compression"
+                # - attach HDF5 dataset attributes, but not "compression"!
+                comp_algo = obj.attrs.get("compression", hdf5_compression)
+                comp_kwargs = {}
+                if isinstance(comp_algo, str):
+                    comp_kwargs = {"compression": comp_algo}
+                elif comp_algo is not None:
+                    comp_kwargs = comp_algo
+
+                ds = group.create_dataset(
+                    name, data=nda, maxshape=maxshape, **comp_kwargs
+                )
+
+                _attrs = obj.getattrs(datatype=True)
+                _attrs.pop("compression", None)
+                ds.attrs.update(_attrs)
                 return
 
             # Now append or overwrite
             ds = group[name]
+            if not isinstance(ds, h5py.Dataset):
+                raise RuntimeError(
+                    f"existing HDF5 object '{name}' in group '{group}'"
+                    " is not a dataset! Cannot overwrite or append"
+                )
+
             old_len = ds.shape[0]
             if wo_mode == "a":
                 write_start = old_len
@@ -927,7 +1146,7 @@ class LH5Store:
                     rows_read = n_rows_read
                 elif rows_read != n_rows_read:
                     log.warning(
-                        f"table '{name}' got strange n_rows_read = {rows_read}, "
+                        f"'{field}' field in table '{name}' has {rows_read} rows, "
                         f"{n_rows_read} was expected"
                     )
             return rows_read
@@ -935,6 +1154,13 @@ class LH5Store:
         # length of vector of vectors is the length of its cumulative_length
         if elements.startswith("array"):
             return self.read_n_rows(f"{name}/cumulative_length", h5f)
+
+        # length of vector of encoded vectors is the length of its decoded_size
+        if (
+            elements.startswith("encoded_array")
+            or datatype == "array_of_encoded_equalsized_arrays"
+        ):
+            return self.read_n_rows(f"{name}/encoded_data", h5f)
 
         # return array length (without reading the array!)
         if "array" in datatype:
@@ -988,6 +1214,7 @@ def ls(lh5_file: str | h5py.Group, lh5_group: str = "") -> list[str]:
 def show(
     lh5_file: str | h5py.Group,
     lh5_group: str = "/",
+    attrs: bool = False,
     indent: str = "",
     header: bool = True,
 ) -> None:
@@ -999,6 +1226,8 @@ def show(
         the LH5 file.
     lh5_group
         print only contents of this HDF5 group.
+    attrs
+        print the HDF5 attributes too.
     indent
         indent the diagram with this string.
     header
@@ -1044,9 +1273,13 @@ def show(
     while True:
         val = lh5_file[key]
         # we want to print the LGDO datatype
-        attr = val.attrs.get("datatype", default="no datatype")
-        if attr == "no datatype" and isinstance(val, h5py.Group):
-            attr = "HDF5 group"
+        dtype = val.attrs.get("datatype", default="no datatype")
+        if dtype == "no datatype" and isinstance(val, h5py.Group):
+            dtype = "HDF5 group"
+
+        attrs_d = dict(val.attrs)
+        attrs_d.pop("datatype", "")
+        attrs = "── " + str(attrs_d) if attrs_d else ""
 
         # is this the last key?
         killme = False
@@ -1058,7 +1291,7 @@ def show(
         else:
             char = "├──"
 
-        print(f"{indent}{char} \033[1m{key}\033[0m · {attr}")  # noqa: T201
+        print(f"{indent}{char} \033[1m{key}\033[0m · {dtype} {attrs}")  # noqa: T201
 
         # if it's a group, call this function recursively
         if isinstance(val, h5py.Group):

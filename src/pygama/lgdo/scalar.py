@@ -7,8 +7,8 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo import LGDO
-from pygama.lgdo.lgdo_utils import get_element_type
+from .lgdo import LGDO
+from .lgdo_utils import get_element_type
 
 log = logging.getLogger(__name__)
 
@@ -42,10 +42,15 @@ class Scalar(LGDO):
     def form_datatype(self) -> str:
         return self.datatype_name()
 
+    def __eq__(self, other: Scalar) -> bool:
+        if isinstance(other, Scalar):
+            return self.value == other.value and self.attrs == self.attrs
+        else:
+            return False
+
     def __str__(self) -> str:
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
-        return f"{str(self.value)} with attrs={repr(tmp_attrs)}"
+        attrs = self.getattrs()
+        return f"{str(self.value)} with attrs={repr(attrs)}"
 
     def __repr__(self) -> str:
         return (

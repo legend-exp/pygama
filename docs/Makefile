@@ -9,7 +9,6 @@ apidoc: clean-apidoc
 	sphinx-apidoc \
       --private \
       --module-first \
-      --maxdepth 10 \
       --force \
       --output-dir "$(SOURCEDIR)/api" \
       ../src/pygama \

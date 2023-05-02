@@ -422,23 +422,28 @@ def expand_rblist_json_dict(json_dict: dict, kw_dict: dict[str, str]) -> None:
 
 
 def write_to_lh5_and_clear(
-    raw_buffers: list[RawBuffer], lh5_store: LH5Store = None, wo_mode: str = "append"
+    raw_buffers: list[RawBuffer], lh5_store: LH5Store = None, **kwargs
 ) -> None:
-    r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears
-    them.
+    r"""Write a list of :class:`.RawBuffer`\ s to LH5 files and then clears them.
 
     Parameters
     ----------
-    raw_buffers : list(RawBuffer)
-        The list of RawBuffers to be written to file. Note this is not a
-        RawBufferList because the RawBuffers may not have the same structure.
-        If a raw_buffer has a `proc_spec` attribute, then :meth:`.buffer_processor.buffer_processor.buffer_processor`
-        is used to process that raw_buffer.
-    lh5_store : LH5Store or None
+    raw_buffers
+        The list of ``RawBuffer``\ s to be written to file. Note: this is not a
+        :class:`.RawBufferList` because the raw buffers may not have the
+        same structure.  If a raw buffer has a `proc_spec` attribute, then
+        :meth:`.buffer_processor.buffer_processor.buffer_processor` is used to
+        process that buffer.
+    lh5_store
         Allows user to send in a store holding a collection of already open
-        files (saves some time opening / closing files)
-    wo_mode : str
-        write mode, see also :meth:`.lgdo.lh5_store.LH5Store.write_object`
+        files (saves some time opening / closing files).
+    **kwargs
+        keyword-arguments forwarded to
+        :meth:`.lgdo.lh5_store.LH5Store.write_object`.
+
+    See Also
+    --------
+    .lgdo.lh5_store.LH5Store.write_object
     """
     if lh5_store is None:
         lh5_store = lgdo.LH5Store()
@@ -470,7 +475,7 @@ def write_to_lh5_and_clear(
                 filename,
                 group=group,
                 n_rows=rb.loc,
-                wo_mode=wo_mode,
+                **kwargs,
             )
         # and clear
         rb.loc = 0

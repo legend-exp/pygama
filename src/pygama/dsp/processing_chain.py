@@ -1748,13 +1748,13 @@ def build_processing_chain(
         buf_in = lh5_in.get(input_par)
         if buf_in is None:
             log.warning(
-                f"I don't know what to do with {input_par}. Building output without it!"
+                f"I don't know what to do with '{input_par}'. Building output without it!"
             )
         try:
             proc_chain.link_input_buffer(input_par, buf_in)
         except Exception as e:
             raise ProcessingChainError(
-                f"Exception raised while linking input buffer {input_par}."
+                f"Exception raised while linking input buffer '{input_par}'."
             ) from e
 
     # now add the processors

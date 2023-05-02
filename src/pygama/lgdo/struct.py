@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from pygama.lgdo import LGDO
+from .lgdo import LGDO
 
 log = logging.getLogger(__name__)
 
@@ -85,10 +85,9 @@ class Struct(LGDO, dict):
                 string += f" '{k}': {v},\n"
         string += "}"
 
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
-        if tmp_attrs:
-            string += f" with attrs={tmp_attrs}"
+        attrs = self.getattrs()
+        if attrs:
+            string += f" with attrs={attrs}"
 
         np.set_printoptions(threshold=thr_orig)
 
