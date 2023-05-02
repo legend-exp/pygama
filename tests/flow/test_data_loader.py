@@ -22,9 +22,13 @@ def test_init_variants(test_filedb):
     assert DataLoader(str(config_dir), test_filedb).config is not None
     assert (
         DataLoader(
-            f"{config_dir}/data-loader-config-nested.json[nest1/nest2]", test_filedb
+            f"{config_dir}/nested/data-loader-config-nested.json[nest1/nest2]",
+            test_filedb,
         ).config
         is not None
+    )
+    assert (
+        DataLoader(f"{config_dir}/nested[nest1/nest2]", test_filedb).config is not None
     )
 
 
