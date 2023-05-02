@@ -651,14 +651,6 @@ class FileDB:
         for col in self.df.columns:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
-    def __repr__(self) -> str:
-        string = (
-            "<< Columns >>\n" + self.columns.__repr__() + "\n"
-            "\n"
-            "<< DataFrame >>\n" + self.df.__repr__()
-        )
-        return string
-
     def get_table_name(self, tier: str, tb: str) -> str:
         """Get the table name for a tier given its table identifier.
 
@@ -685,3 +677,34 @@ class FileDB:
         else:
             table_name = template
         return table_name
+
+    def get_table_columns(
+        self, table: str | int, tier: str, ifile: int = 0
+    ) -> list[str]:
+        """Return list of columns in table `table`, tier `tier`.
+
+        Assumes that the table contents do not change across data files. If
+        desired, `ifile` (default is 0) can be used to select a different file.
+        """
+        tables = self.df.iloc[ifile][f"{tier}_tables"]
+        if tables is None:
+            return []
+
+        table_idx = tables.index(table)
+        col_idx = self.df.iloc[ifile][f"{tier}_col_idx"][table_idx]
+        return self.columns[col_idx]
+
+    def __repr__(self) -> str:
+        string = f"FileDB(data_dir={self.data_dir}, tiers={self.tier_dirs}, "
+
+        if self.df is not None:
+            string += "df=DataFrame(...), "
+        else:
+            string += "df=None, "
+
+        if self.columns is not None:
+            string += "columns=[...]"
+        else:
+            string += "columns=None"
+
+        return string + ")"

@@ -99,7 +99,13 @@ class DataLoader:
         Parameters
         ----------
         config
-            configuration dictionary or JSON file, see above for specifications.
+            configuration dictionary or JSON file, see above for a specification.
+            Accepts strings in the following format: ::
+
+              path/to/config.json[field1/field2/...]]
+
+            to specify the location of the :class:`DataLoader` configuration in
+            the ``config.json`` dictionary, if not at the first level.
 
         filedb
             the loader needs a file database. It can be specified in multiple ways:
@@ -158,9 +164,31 @@ class DataLoader:
         # - if a dict is provided, it is set to the current directory
         config_dir = os.getcwd()
         if isinstance(config, str):
-            config_dir = os.path.dirname(config)
+            # the config string supports this syntax:
+            #  file.json[level1/level2[/...]]
+            # to specify where the data loader config shall be found in the
+            # json file
+            config_loc = None
+            m = re.match(r"^(.*)\[(.*)\]$", config)
+            if m is not None:
+                g = m.groups()
+                config = g[0]
+                config_loc = g[1].split("/")
+
+            # if a directory is provided, try looking for a file named
+            # config.json
+            if os.path.isdir(config):
+                config_dir = config
+                config = os.path.join(config, "config.json")
+            else:
+                config_dir = os.path.dirname(config)
+
             with open(config) as f:
                 config = json.load(f)
+
+            if config_loc is not None:
+                for loc in config_loc:
+                    config = config[loc]
 
         # look for info in configuration if FileDB is not set
         if self.filedb is None:

@@ -1,12 +1,10 @@
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 from pandas.testing import assert_frame_equal
 
 from pygama.flow import FileDB
-from pygama.flow.utils import to_datetime, to_unixtime
 
 config_dir = Path(__file__).parent / "configs"
 
@@ -170,11 +168,11 @@ def test_serialization(test_filedb_full):
     assert_frame_equal(db.df, db2.df)
 
 
-def test_key_to_datetime():
-    assert to_datetime("20220716T105236Z") == datetime(
-        2022, 7, 16, 10, 52, 36, tzinfo=timezone.utc
-    )
-
-
-def test_key_to_unixtime():
-    assert to_unixtime("20220716T105236Z") == 1657968756
+def test_get_table_columns(test_filedb_full):
+    db = test_filedb_full
+    cols = db.get_table_columns(1, "dsp")
+    assert cols == ["bl_mean", "bl_std"]
+    with pytest.raises(KeyError):
+        db.get_table_columns(1, "blah")
+    with pytest.raises(ValueError):
+        db.get_table_columns(9999, "raw")
