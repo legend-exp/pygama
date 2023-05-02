@@ -14,7 +14,6 @@ from collections import defaultdict
 from typing import Any, Union
 
 import h5py
-import hdf5plugin
 import numba as nb
 import numpy as np
 import pandas as pd
@@ -36,7 +35,7 @@ LGDO = Union[Array, Scalar, Struct, VectorOfVectors]
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HDF5_COMPRESSION = hdf5plugin.Blosc()
+DEFAULT_HDF5_COMPRESSION = None
 
 
 class LH5Store:
