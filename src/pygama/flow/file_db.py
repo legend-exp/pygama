@@ -678,14 +678,16 @@ class FileDB:
             table_name = template
         return table_name
 
-    def get_table_columns(self, table: str, tier: str, ifile: int = 0) -> list[str]:
+    def get_table_columns(
+        self, table: str | int, tier: str, ifile: int = 0
+    ) -> list[str]:
         """Return list of columns in table `table`, tier `tier`.
 
         Assumes that the table contents do not change across data files. If
         desired, `ifile` (default is 0) can be used to select a different file.
         """
         tables = self.df.iloc[ifile][f"{tier}_tables"]
-        if tables is None or table not in tables:
+        if tables is None:
             return []
 
         table_idx = tables.index(table)
