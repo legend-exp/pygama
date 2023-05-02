@@ -652,12 +652,19 @@ class FileDB:
             self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
 
     def __repr__(self) -> str:
-        string = (
-            "<< Columns >>\n" + self.columns.__repr__() + "\n"
-            "\n"
-            "<< DataFrame >>\n" + self.df.__repr__()
-        )
-        return string
+        string = "FileDB(" f"data_dir={self.data_dir}, " f"tiers={self.tier_dirs}, "
+
+        if self.df is not None:
+            string += "df=DataFrame(...), "
+        else:
+            string += "df=None, "
+
+        if self.columns is not None:
+            string += "columns=[...]"
+        else:
+            string += "columns=None"
+
+        return string + ")"
 
     def get_table_name(self, tier: str, tb: str) -> str:
         """Get the table name for a tier given its table identifier.
