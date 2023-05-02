@@ -18,6 +18,20 @@ def test_init(test_dl):
     pass
 
 
+def test_init_variants(test_filedb):
+    assert DataLoader(str(config_dir), test_filedb).config is not None
+    assert (
+        DataLoader(
+            f"{config_dir}/nested/data-loader-config-nested.json[nest1/nest2]",
+            test_filedb,
+        ).config
+        is not None
+    )
+    assert (
+        DataLoader(f"{config_dir}/nested[nest1/nest2]", test_filedb).config is not None
+    )
+
+
 def test_simple_load(test_dl):
     test_dl.set_files("all")
     test_dl.set_output(columns=["timestamp"])
