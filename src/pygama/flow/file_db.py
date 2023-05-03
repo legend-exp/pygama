@@ -177,17 +177,26 @@ class FileDB:
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
-        self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
-
         self.sortby = self.config.get("sortby", "timestamp")
 
-        # Handle environment variables
-        data_dir = os.path.expandvars(self.config["data_dir"])
+        # expand/substitute variables in data_dir and tier_dirs
+        # $_ expands to the location of the config file
+        config_dir = os.path.dirname(str(config_path))
 
-        # Relative paths are interpreted relative to the configuration file
+        data_dir = lgdo.lgdo_utils.expand_path(
+            self.config["data_dir"], substitute={"_", config_dir}
+        )
+
+        tier_dirs = self.config["tier_dirs"]
+        for k, val in tier_dirs.items():
+            tier_dirs[k] = lgdo.lgdo_utils.expand_vars(
+                val, substitute={"_", config_dir}
+            )
+        self.tier_dirs = tier_dirs
+
+        # relative paths are also interpreted relative to the configuration file
         if not data_dir.startswith("/"):
-            config_dir = os.path.dirname(config_path)
             data_dir = os.path.join(config_dir, data_dir.lstrip("/"))
             data_dir = os.path.abspath(data_dir)
         self.data_dir = data_dir
