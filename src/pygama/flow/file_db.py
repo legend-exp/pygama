@@ -182,7 +182,9 @@ class FileDB:
 
         # expand/substitute variables in data_dir and tier_dirs
         # $_ expands to the location of the config file
-        config_dir = os.path.dirname(str(config_path))
+        config_dir = None
+        if config_path is not None:
+            config_dir = os.path.dirname(str(config_path))
 
         data_dir = lgdo.lgdo_utils.expand_path(
             self.config["data_dir"], substitute={"_", config_dir}
