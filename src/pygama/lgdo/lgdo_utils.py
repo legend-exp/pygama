@@ -121,6 +121,26 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         return datatype, None, element_description.split(",")
 
 
+def expand_vars(expr: str, substitute: dict[str, str] = None) -> str:
+    """Expand (environment) variables.
+
+    Parameters
+    ----------
+    expr
+        string expression, which may include (environment) variables prefixed by
+        ``$``.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
+    """
+    if substitute is None:
+        substitute = {}
+
+    # expand env variables first
+    # then try using provided mapping
+    return string.Template(os.path.expandvars(expr)).safe_substitute(substitute)
+
+
 def expand_path(
     path: str, substitute: dict[str, str] = None, list: bool = False
 ) -> str | list:
@@ -143,14 +163,7 @@ def expand_path(
         Unique absolute path, or list of all absolute paths
     """
 
-    if substitute is None:
-        substitute = {}
-
-    # expand env variables first
-    _path = os.path.expandvars(path)
-
-    # then try using provided mapping
-    _path = string.Template(_path).safe_substitute(substitute)
+    _path = expand_vars(path, substitute)
 
     # then expand wildcards
     paths = glob.glob(os.path.expanduser(_path))
