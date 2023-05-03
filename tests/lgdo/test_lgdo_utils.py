@@ -68,4 +68,19 @@ def test_expand_path(lgnd_test_data):
         lgdo_utils.expand_path(f"{base_dir}/*.lh5")
 
     # Check if it finds a list of files correctly
-    assert sorted(lgdo_utils.expand_path(f"{base_dir}/*.lh5", True)) == sorted(files)
+    assert sorted(lgdo_utils.expand_path(f"{base_dir}/*.lh5", list=True)) == sorted(
+        files
+    )
+
+    # Check env variable expansion
+    os.environ["PYGAMATESTBASEDIR"] = base_dir
+    assert lgdo_utils.expand_path("$PYGAMATESTBASEDIR/*20220716T104550Z*") == files[0]
+
+    # Check user variable expansion
+    assert (
+        lgdo_utils.expand_path(
+            "$PYGAMATESTBASEDIR2/*20220716T104550Z*",
+            substitute={"PYGAMATESTBASEDIR2": base_dir},
+        )
+        == files[0]
+    )

@@ -1,11 +1,10 @@
-"""
-Implements utilities for LEGEND Data Objects.
-"""
+"""Implements utilities for LEGEND Data Objects."""
 from __future__ import annotations
 
 import glob
 import logging
 import os
+import string
 
 import numpy as np
 
@@ -122,8 +121,10 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         return datatype, None, element_description.split(",")
 
 
-def expand_path(path: str, list: bool = False) -> str | list:
-    """Expand environment variables and wildcards to return absolute path
+def expand_path(
+    path: str, substitute: dict[str, str] = None, list: bool = False
+) -> str | list:
+    """Expand (environment) variables and wildcards to return absolute paths.
 
     Parameters
     ----------
@@ -132,6 +133,9 @@ def expand_path(path: str, list: bool = False) -> str | list:
     list
         if ``True``, return a list. If ``False``, return a string; if ``False``
         and a unique file is not found, raise an exception.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
 
     Returns
     -------
@@ -139,7 +143,18 @@ def expand_path(path: str, list: bool = False) -> str | list:
         Unique absolute path, or list of all absolute paths
     """
 
-    paths = glob.glob(os.path.expanduser(os.path.expandvars(path)))
+    if substitute is None:
+        substitute = {}
+
+    # expand env variables first
+    _path = os.path.expandvars(path)
+
+    # then try using provided mapping
+    _path = string.Template(_path).safe_substitute(substitute)
+
+    # then expand wildcards
+    paths = glob.glob(os.path.expanduser(_path))
+
     if not list:
         if len(paths) == 0:
             raise FileNotFoundError(f"could not find path matching {path}")

@@ -1456,7 +1456,7 @@ class LH5Iterator:
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
-            lh5_files = expand_path(lh5_files, True)
+            lh5_files = expand_path(lh5_files, list=True)
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
 
@@ -1465,7 +1465,7 @@ class LH5Iterator:
                 "entry_list and entry_mask arguments are mutually exclusive"
             )
 
-        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
+        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, list=True)]
 
         # Map to last row in each file
         self.file_map = np.array(
