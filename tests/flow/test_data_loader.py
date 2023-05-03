@@ -142,3 +142,12 @@ def test_set_cuts(test_dl):
     data = test_dl.load()
 
     assert (data["hit_table"].nda == [12, 13, 12, 13]).all()
+
+def test_browse(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_output(
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "bl_mean", "hit_par1"]
+    )
+    wb = test_dl.browse()
+
+    wb.draw_next()
