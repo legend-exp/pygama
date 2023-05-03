@@ -28,8 +28,8 @@ class WaveformBrowser:
 
     def __init__(
         self,
-        files_in: str | list[str],
-        lh5_group: str,
+        files_in: str | list[str] | lgdo.LH5Iterator,  # noqa: F821
+        lh5_group: str | list[str] = "",
         base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[int] | list[list[int]] = None,
@@ -53,11 +53,13 @@ class WaveformBrowser:
         Parameters
         ----------
         files_in
-            name of file or list of names to browse. Can use wildcards.
+            name of file or list of files to browse. Can use wildcards. Can
+            also pass an LH5Iterator
 
         lh5_group
-            name of LH5 group in file to browse.
-
+            HDF5 group(s) to read. If a list is provided for both lh5_files
+            and group, they must be the same size. If a file is wild-carded,
+            the same group will be assigned to each file found
         base_path
             base path for file. See :class:`~.lgdo.lh5_store.LH5Store`.
 
@@ -149,29 +151,32 @@ class WaveformBrowser:
         self.next_entry = 0
 
         # data i/o initialization
-        # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
-        # remove this hack once VOV support is properly implemented
-        self.lh5_it = lh5.LH5Iterator(
-            files_in,
-            lh5_group,
-            base_path=base_path,
-            entry_list=entry_list,
-            entry_mask=entry_mask,
-            field_mask={"tracelist": False},
-            buffer_len=buffer_len,
-        )
+        if isinstance(files_in, lh5.LH5Iterator):
+            self.lh5_it = files_in
+        else:
+            # HACK: do not read VOV "tracelist", cannot be handled correctly by LH5Iterator
+            # remove this hack once VOV support is properly implemented
+            self.lh5_it = lh5.LH5Iterator(
+                files_in,
+                lh5_group,
+                base_path=base_path,
+                entry_list=entry_list,
+                entry_mask=entry_mask,
+                field_mask={"tracelist": False},
+                buffer_len=buffer_len,
+            )
 
         # Get the input buffer and read the first chunk
         self.lh5_in, _ = self.lh5_it.read(0)
 
         self.aux_vals = aux_values
         # Apply entry selection to aux_vals if needed
-        if self.aux_vals is not None and len(self.aux_vals) > len(self.lh5_it):
-            entries = []
-            for i, f_entries in enumerate(self.lh5_it.entry_list):
-                entry_offset = self.lh5_it.file_map[i - 1] if i > 0 else 0
-                entries += [entry_offset + entry for entry in f_entries]
-            self.aux_vals = self.aux_vals.iloc[entries].reset_index()
+        if self.aux_vals is not None and len(self.aux_vals) > len(
+            self.lh5_it.get_global_entrylist()
+        ):
+            self.aux_vals = self.aux_vals.iloc[
+                self.lh5_it.get_global_entrylist()
+            ].reset_index()
 
         # initialize objects to draw: dict from name to list of 2DLines
         if isinstance(lines, str):
@@ -245,13 +250,14 @@ class WaveformBrowser:
         if self.aux_vals is not None:
             outputs = [o for o in outputs if o not in self.aux_vals]
 
-        self.proc_chain, self.lh5_it.field_mask, self.lh5_out = build_processing_chain(
+        self.proc_chain, field_mask, self.lh5_out = build_processing_chain(
             self.lh5_in,
             dsp_config,
             db_dict=database,
             outputs=outputs,
             block_width=block_width,
         )
+        self.lh5_it.reset_field_mask(field_mask)
         self.proc_chain.execute()
 
         # Check if all of our outputs can be found
@@ -268,6 +274,7 @@ class WaveformBrowser:
         self.y_lim = y_lim
         self.auto_x_lim = [np.inf, -np.inf]
         self.auto_y_lim = [np.inf, -np.inf]
+        self.n_stored = 0
 
         # Set limit and convert to x-unit if needed; also set x_unit if needed
         if self.x_lim is not None:
@@ -355,16 +362,18 @@ class WaveformBrowser:
                 self.find_entry(idx)
             return
 
-        if entry > len(self.lh5_it):
-            if not safe:
-                raise IndexError
-            else:
-                return
-
         # Get our current position in the I/O buffers; update if needed
         i_tb = entry - self.lh5_it.current_entry
         if not (self.lh5_it.n_rows > i_tb >= 0):
             self.lh5_it.read(entry)
+
+            # Check if entry is out of range
+            if self.lh5_it.n_rows == 0:
+                if safe:
+                    raise IndexError
+                else:
+                    return
+
             self.proc_chain.execute()
             i_tb = 0
 
@@ -493,7 +502,7 @@ class WaveformBrowser:
             if styles is None:
                 styles = default_style
 
-            for line, sty in zip(lines, styles):
+            for line, sty in zip(lines, itertools.cycle(styles)):
                 if sty is not None:
                     line.update(sty)
                 if line.get_figure() is not None:
@@ -592,7 +601,7 @@ class WaveformBrowser:
     ) -> tuple[int, int]:
         """Draw the next `n_wfs` waveforms (default `self.n_drawn`). See
         :meth:`draw_next`."""
-        entries = self.find_next(append)
+        entries = self.find_next(n_wfs, append)
         self.draw_current(clear)
         return entries
 

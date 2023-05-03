@@ -72,3 +72,47 @@ def test_lgnd_waveform_table_fancy_idx(lgnd_file):
     lh5_obj, n_rows = lh5_it.read(0)
     assert isinstance(lh5_obj, lgdo.WaveformTable)
     assert len(lh5_obj) == 5
+
+
+@pytest.fixture(scope="module")
+def more_lgnd_files(lgnd_test_data):
+    return [
+        [
+            lgnd_test_data.get_path(
+                "lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_raw.lh5"
+            ),
+            lgnd_test_data.get_path(
+                "lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_raw.lh5"
+            ),
+        ],
+        [
+            lgnd_test_data.get_path(
+                "lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_hit.lh5"
+            ),
+            lgnd_test_data.get_path(
+                "lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_hit.lh5"
+            ),
+        ],
+    ]
+
+
+def test_friend(more_lgnd_files):
+    lh5_raw_it = LH5Iterator(
+        more_lgnd_files[0],
+        "ch000/raw",
+        field_mask=["waveform", "baseline"],
+        buffer_len=5,
+    )
+    lh5_it = LH5Iterator(
+        more_lgnd_files[1],
+        "ch000/hit",
+        field_mask=["hit_par1"],
+        buffer_len=5,
+        friend=lh5_raw_it,
+    )
+
+    lh5_obj, n_rows = lh5_it.read(0)
+
+    assert n_rows == 2
+    assert isinstance(lh5_obj, lgdo.Table)
+    assert set(lh5_obj.keys()) == {"waveform", "baseline", "hit_par1"}

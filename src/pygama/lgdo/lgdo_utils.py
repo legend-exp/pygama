@@ -142,7 +142,10 @@ def expand_vars(expr: str, substitute: dict[str, str] = None) -> str:
 
 
 def expand_path(
-    path: str, substitute: dict[str, str] = None, list: bool = False
+    path: str,
+    substitute: dict[str, str] = None,
+    list: bool = False,
+    base_path: str = None,
 ) -> str | list:
     """Expand (environment) variables and wildcards to return absolute paths.
 
@@ -156,6 +159,8 @@ def expand_path(
     substitute
         use this dictionary to substitute variables. Environment variables take
         precedence.
+    base_path
+        name of base path. Returned paths will be relative to base.
 
     Returns
     -------
@@ -163,10 +168,18 @@ def expand_path(
         Unique absolute path, or list of all absolute paths
     """
 
+    if base_path is not None and base_path != "":
+        base_path = os.path.expanduser(os.path.expandvars(base_path))
+        path = os.path.join(base_path, path)
+
+    # first expand variables
     _path = expand_vars(path, substitute)
 
     # then expand wildcards
     paths = glob.glob(os.path.expanduser(_path))
+
+    if base_path is not None and base_path != "":
+        paths = [os.path.relpath(p, base_path) for p in paths]
 
     if not list:
         if len(paths) == 0:
