@@ -193,9 +193,7 @@ class FileDB:
 
         tier_dirs = self.config["tier_dirs"]
         for k, val in tier_dirs.items():
-            tier_dirs[k] = lgdo.lgdo_utils.expand_vars(
-                val, substitute=subst_vars
-            )
+            tier_dirs[k] = lgdo.lgdo_utils.expand_vars(val, substitute=subst_vars)
         self.tier_dirs = tier_dirs
 
     def scan_files(self, dirs: list[str] = None) -> None:
