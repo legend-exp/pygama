@@ -182,26 +182,21 @@ class FileDB:
 
         # expand/substitute variables in data_dir and tier_dirs
         # $_ expands to the location of the config file
-        config_dir = None
+        subst_vars = {}
         if config_path is not None:
-            config_dir = os.path.dirname(str(config_path))
+            subst_vars["_"] = os.path.dirname(str(config_path))
 
         data_dir = lgdo.lgdo_utils.expand_path(
-            self.config["data_dir"], substitute={"_", config_dir}
+            self.config["data_dir"], substitute=subst_vars
         )
+        self.data_dir = data_dir
 
         tier_dirs = self.config["tier_dirs"]
         for k, val in tier_dirs.items():
             tier_dirs[k] = lgdo.lgdo_utils.expand_vars(
-                val, substitute={"_", config_dir}
+                val, substitute=subst_vars
             )
         self.tier_dirs = tier_dirs
-
-        # relative paths are also interpreted relative to the configuration file
-        if not data_dir.startswith("/"):
-            data_dir = os.path.join(config_dir, data_dir.lstrip("/"))
-            data_dir = os.path.abspath(data_dir)
-        self.data_dir = data_dir
 
     def scan_files(self, dirs: list[str] = None) -> None:
         """Scan the directory containing files from the lowest tier and fill the dataframe.
