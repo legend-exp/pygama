@@ -224,7 +224,7 @@ def decode(
     return sig_out
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _set_hton_u16(a: NDArray[ubyte], i: int, x: int) -> int:
     """Store an unsigned 16-bit integer value in an array of unsigned 8-bit integers.
 
@@ -239,7 +239,7 @@ def _set_hton_u16(a: NDArray[ubyte], i: int, x: int) -> int:
     return x
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     """Read unsigned 16-bit integer values from an array of unsigned 8-bit integers.
 
@@ -251,27 +251,27 @@ def _get_hton_u16(a: NDArray[ubyte], i: int) -> uint16:
     return uint16(a[i_1] << 8 | a[i_2])
 
 
-@numba.jit("uint16(uint32)")
+@numba.jit("uint16(uint32)", nopython=True)
 def _get_high_u16(x: uint32) -> uint16:
     return uint16(x >> 16)
 
 
-@numba.jit("uint32(uint32, uint16)")
+@numba.jit("uint32(uint32, uint16)", nopython=True)
 def _set_high_u16(x: uint32, y: uint16) -> uint32:
     return uint32(x & 0x0000FFFF | (y << 16))
 
 
-@numba.jit("uint16(uint32)")
+@numba.jit("uint16(uint32)", nopython=True)
 def _get_low_u16(x: uint32) -> uint16:
     return uint16(x >> 0)
 
 
-@numba.jit("uint32(uint32, uint16)")
+@numba.jit("uint32(uint32, uint16)", nopython=True)
 def _set_low_u16(x: uint32, y: uint16) -> uint32:
     return uint32(x & 0xFFFF0000 | (y << 0))
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _radware_sigcompress_encode(
     sig_in: NDArray,
     sig_out: NDArray[ubyte],
@@ -467,7 +467,7 @@ def _radware_sigcompress_encode(
     return 2 * iso  # number of bytes in compressed signal data
 
 
-@numba.jit
+@numba.jit(nopython=True)
 def _radware_sigcompress_decode(
     sig_in: NDArray[ubyte],
     sig_out: NDArray,

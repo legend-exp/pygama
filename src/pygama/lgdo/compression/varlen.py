@@ -256,19 +256,25 @@ def decode(
         raise ValueError("unsupported input signal type")
 
 
-@numba.vectorize(["uint64(int64)", "uint32(int32)", "uint16(int16)"])
+@numba.vectorize(
+    ["uint64(int64)", "uint32(int32)", "uint16(int16)"],
+    nopython=True,
+)
 def zigzag_encode(x: int | NDArray[int]) -> int | NDArray[int]:
     """ZigZag-encode [#WikiZZ]_ signed integer numbers."""
     return (x >> 31) ^ (x << 1)
 
 
-@numba.vectorize(["int64(uint64)", "int32(uint32)", "int16(uint16)"])
+@numba.vectorize(
+    ["int64(uint64)", "int32(uint32)", "int16(uint16)"],
+    nopython=True,
+)
 def zigzag_decode(x: int | NDArray[int]) -> int | NDArray[int]:
     """ZigZag-decode [#WikiZZ]_ signed integer numbers."""
     return (x >> 1) ^ -(x & 1)
 
 
-@numba.jit(["uint32(int64, byte[:])"])
+@numba.jit(["uint32(int64, byte[:])"], nopython=True)
 def uleb128_encode(x: int, encx: NDArray[ubyte]) -> int:
     """Compute a variable-length representation of an unsigned integer.
 
@@ -301,7 +307,7 @@ def uleb128_encode(x: int, encx: NDArray[ubyte]) -> int:
     return i + 1
 
 
-@numba.jit(["UniTuple(uint32, 2)(byte[:])"])
+@numba.jit(["UniTuple(uint32, 2)(byte[:])"], nopython=True)
 def uleb128_decode(encx: NDArray[ubyte]) -> (int, int):
     """Decode a variable-length integer into an unsigned integer.
 
@@ -346,6 +352,7 @@ def uleb128_decode(encx: NDArray[ubyte]) -> (int, int):
         "void(int64[:], byte[:], uint32[:])",
     ],
     "(n),(m),()",
+    nopython=True,
 )
 def uleb128_zigzag_diff_array_encode(
     sig_in: NDArray[int], sig_out: NDArray[ubyte], nbytes: int
@@ -395,6 +402,7 @@ def uleb128_zigzag_diff_array_encode(
         "void(byte[:], uint32[:], int64[:], uint32[:])",
     ],
     "(n),(),(m),()",
+    nopython=True,
 )
 def uleb128_zigzag_diff_array_decode(
     sig_in: NDArray[ubyte],

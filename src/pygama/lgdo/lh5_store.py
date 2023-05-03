@@ -9,9 +9,9 @@ import glob
 import logging
 import os
 import sys
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 from collections import defaultdict
-from typing import Any, Union
+from typing import Any, Iterator, Union
 
 import h5py
 import numba as nb
@@ -79,7 +79,7 @@ class LH5Store:
         if isinstance(lh5_file, h5py.File):
             return lh5_file
         if mode == "r":
-            lh5_file = expand_path(lh5_file)
+            lh5_file = expand_path(lh5_file, base_path=self.base_path)
         if lh5_file in self.files.keys():
             return self.files[lh5_file]
         if self.base_path != "":
@@ -1393,7 +1393,7 @@ def load_dfs(
     )
 
 
-class LH5Iterator:
+class LH5Iterator(Iterator):
     """
     A class for iterating through one or more LH5 files, one block of entries
     at a time. This also accepts an entry list/mask to enable event selection,
@@ -1422,12 +1422,13 @@ class LH5Iterator:
     def __init__(
         self,
         lh5_files: str | list[str],
-        group: str,
+        groups: str | list[str],
         base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[bool] | list[list[bool]] = None,
         field_mask: dict[str, bool] | list[str] | tuple[str] = None,
         buffer_len: int = 3200,
+        friend: LH5Iterator = None,
     ) -> None:
         """
         Parameters
@@ -1435,10 +1436,10 @@ class LH5Iterator:
         lh5_files
             file or files to read from. May include wildcards and environment
             variables.
-        group
-            HDF5 group to read.
-        base_path
-            HDF5 path to prepend.
+        groups
+            HDF5 group(s) to read. If a list is provided for both lh5_files
+            and group, they must be the same size. If a file is wild-carded,
+            the same group will be assigned to each file found
         entry_list
             list of entry numbers to read. If a nested list is provided,
             expect one top-level list for each file, containing a list of
@@ -1451,101 +1452,190 @@ class LH5Iterator:
             more details.
         buffer_len
             number of entries to read at a time while iterating through files.
+        friend
+            a ''friend'' LH5Iterator that will be read in parallel with this.
+            The friend should have the same length and entry list. A single
+            LH5 table containing columns from both iterators will be returned.
         """
         self.lh5_st = LH5Store(base_path=base_path, keep_open=True)
 
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
-            lh5_files = expand_path(lh5_files, True)
+            lh5_files = [lh5_files]
+            if isinstance(groups, list):
+                lh5_files *= len(groups)
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
+
+        if isinstance(groups, str):
+            groups = [groups] * len(lh5_files)
+        elif not isinstance(groups, list):
+            raise ValueError("group must be a string or list of strings")
+
+        if not len(groups) == len(lh5_files):
+            raise ValueError("lh5_files and groups must have same length")
+
+        self.lh5_files = []
+        self.groups = []
+        for f, g in zip(lh5_files, groups):
+            f_exp = expand_path(f, True, base_path)
+            self.lh5_files += f_exp
+            self.groups += [g] * len(f_exp)
 
         if entry_list is not None and entry_mask is not None:
             raise ValueError(
                 "entry_list and entry_mask arguments are mutually exclusive"
             )
 
-        self.lh5_files = [f for f_wc in lh5_files for f in expand_path(f_wc, True)]
-
         # Map to last row in each file
-        self.file_map = np.array(
-            [self.lh5_st.read_n_rows(group, f) for f in self.lh5_files], "int64"
-        ).cumsum()
-        self.group = group
+        self.file_map = np.full(len(self.lh5_files), np.iinfo("i").max, "i")
+        # Map to last iterator entry for each file
+        self.entry_map = np.full(len(self.lh5_files), np.iinfo("i").max, "i")
         self.buffer_len = buffer_len
 
         if len(self.lh5_files) > 0:
+            f = self.lh5_files[0]
+            g = self.groups[0]
             self.lh5_buffer = self.lh5_st.get_buffer(
-                self.group,
-                self.lh5_files[0],
+                g,
+                f,
                 size=self.buffer_len,
                 field_mask=field_mask,
             )
+            self.file_map[0] = self.lh5_st.read_n_rows(g, f)
         else:
             raise RuntimeError(f"can't open any files from {lh5_files}")
 
         self.n_rows = 0
         self.current_entry = 0
+        self.next_entry = 0
 
         self.field_mask = field_mask
 
         # List of entry indices from each file
-        self.entry_list = None
+        self.local_entry_list = None
+        self.global_entry_list = None
         if entry_list is not None:
             entry_list = list(entry_list)
             if isinstance(entry_list[0], int):
-                entry_list.sort()
-                i_start = 0
-                self.entry_list = []
-                for f_end in self.file_map:
-                    i_stop = bisect_right(entry_list, f_end, lo=i_start)
-                    self.entry_list.append(entry_list[i_start:i_stop])
-                    i_start = i_stop
+                self.local_entry_list = [None] * len(self.file_map)
+                self.global_entry_list = np.array(entry_list, "i")
+                self.global_entry_list.sort()
 
             else:
-                self.entry_list = [[]] * len(self.file_map)
+                self.local_entry_list = [[]] * len(self.file_map)
                 for i_file, local_list in enumerate(entry_list):
-                    self.entry_list[i_file] = list(local_list)
+                    self.local_entry_list[i_file] = np.array(local_list, "i")
+                    self.local_entry_list[i_file].sort()
 
         elif entry_mask is not None:
             # Convert entry mask into an entry list
             if isinstance(entry_mask, pd.Series):
                 entry_mask = entry_mask.values
             if isinstance(entry_mask, np.ndarray):
-                self.entry_list = []
-                f_start = 0
-                for f_end in self.file_map:
-                    self.entry_list.append(
-                        list(np.nonzero(entry_mask[f_start:f_end])[0])
-                    )
-                    f_start = f_end
+                self.local_entry_list = [None] * len(self.file_map)
+                self.global_entry_list = np.nonzero(entry_mask)[0]
             else:
-                self.entry_list = [[]] * len(self.file_map)
+                self.local_entry_list = [[]] * len(self.file_map)
                 for i_file, local_mask in enumerate(entry_mask):
-                    self.entry_list[i_file] = list(np.nonzero(local_mask)[0])
+                    self.local_entry_list[i_file] = np.nonzero(local_mask)[0]
 
-        # Map to last entry of each file
-        self.entry_map = (
-            self.file_map
-            if self.entry_list is None
-            else np.array([len(elist) for elist in self.entry_list]).cumsum()
-        )
+        # Attach the friend
+        if friend is not None:
+            if not isinstance(friend, LH5Iterator):
+                raise ValueError("Friend must be an LH5Iterator")
+            self.lh5_buffer.join(friend.lh5_buffer)
+        self.friend = friend
+
+    def _get_file_cumlen(self, i_file: int) -> int:
+        """Helper to get cumulative file length of file"""
+        if i_file < 0:
+            return 0
+        fcl = self.file_map[i_file]
+        if fcl == np.iinfo("i").max:
+            fcl = self._get_file_cumlen(i_file - 1) + self.lh5_st.read_n_rows(
+                self.groups[i_file], self.lh5_files[i_file]
+            )
+            self.file_map[i_file] = fcl
+        return fcl
+
+    def _get_file_cumentries(self, i_file: int) -> int:
+        """Helper to get cumulative iterator entries in file"""
+        if i_file < 0:
+            return 0
+        n = self.entry_map[i_file]
+        if n == np.iinfo("i").max:
+            elist = self.get_file_entrylist(i_file)
+            fcl = self._get_file_cumlen(i_file)
+            if elist is None:
+                # no entry list provided
+                n = fcl
+            else:
+                file_entries = self.get_file_entrylist(i_file)
+                # check that file entries fall inside of file
+                if file_entries[-1] >= fcl:
+                    logging.warning(f"Found entries out of range for file {i_file}")
+                    n = np.searchsorted(file_entries, fcl, "right")
+                else:
+                    n = len(file_entries)
+                n += self._get_file_cumentries(i_file - 1)
+            self.entry_map[i_file] = n
+        return n
+
+    def get_file_entrylist(self, i_file: int) -> np.ndarray:
+        """Helper to get entry list for file"""
+        # If no entry list is provided
+        if self.local_entry_list is None:
+            return None
+
+        elist = self.local_entry_list[i_file]
+        if elist is None:
+            # Get local entrylist for this file from global entry list
+            f_start = self._get_file_cumlen(i_file - 1)
+            f_end = self._get_file_cumlen(i_file)
+            i_start = self._get_file_cumentries(i_file - 1)
+            i_stop = np.searchsorted(self.global_entry_list, f_end, "right")
+            elist = np.array(self.global_entry_list[i_start:i_stop], "i") - f_start
+            self.local_entry_list[i_file] = elist
+        return elist
+
+    def get_global_entrylist(self) -> np.ndarray:
+        """Get global entry list, constructing it if needed"""
+        if self.global_entry_list is None and self.local_entry_list is not None:
+            self.global_entry_list = np.zeros(len(self), "i")
+            for i_file in range(len(self.lh5_files)):
+                i_start = self.get_file_cumentries(i_file - 1)
+                i_stop = self.get_file_cumentries(i_file)
+                f_start = self.get_file_cumlen(i_file - 1)
+                self.global_entry_list[i_start:i_stop] = (
+                    self.get_file_entrylist(i_file) + f_start
+                )
+        return self.global_entry_list
 
     def read(self, entry: int) -> tuple[LGDO, int]:
-        """Read the next chunk of events, starting at entry. Return the
+        """Read the nextlocal chunk of events, starting at entry. Return the
         LH5 buffer and number of rows read."""
-        i_file = np.searchsorted(self.entry_map, entry, "right")
-        local_entry = entry
-        if i_file > 0:
-            local_entry -= self.entry_map[i_file - 1]
         self.n_rows = 0
+        i_file = np.searchsorted(self.entry_map, entry, "right")
+
+        # if file hasn't been opened yet, search through files
+        # sequentially until we find the right one
+        if i_file < len(self.lh5_files) and self.entry_map[i_file] == np.iinfo("i").max:
+            while i_file < len(self.lh5_files) and entry >= self._get_file_cumentries(
+                i_file
+            ):
+                i_file += 1
+
+        if i_file == len(self.lh5_files):
+            return (self.lh5_buffer, self.n_rows)
+        local_entry = entry - self._get_file_cumentries(i_file - 1)
 
         while self.n_rows < self.buffer_len and i_file < len(self.file_map):
             # Loop through files
-            local_idx = self.entry_list[i_file] if self.entry_list is not None else None
+            local_idx = self.get_file_entrylist(i_file)
             i_local = local_idx[local_entry] if local_idx is not None else local_entry
             self.lh5_buffer, n_rows = self.lh5_st.read_object(
-                self.group,
+                self.groups[i_file],
                 self.lh5_files[i_file],
                 start_row=i_local,
                 n_rows=self.buffer_len - self.n_rows,
@@ -1560,19 +1650,40 @@ class LH5Iterator:
             local_entry = 0
 
         self.current_entry = entry
+
+        if self.friend is not None:
+            self.friend.read(entry)
+
         return (self.lh5_buffer, self.n_rows)
+
+    def reset_field_mask(self, mask):
+        """Replaces the field mask of this iterator and any friends with mask"""
+        self.field_mask = mask
+        if self.friend is not None:
+            self.friend.reset_field_mask(mask)
 
     def __len__(self) -> int:
         """Return the total number of entries."""
-        return self.entry_map[-1] if len(self.entry_map) > 0 else 0
+        return (
+            self._get_file_cumentries(len(self.lh5_files) - 1)
+            if len(self.entry_map) > 0
+            else 0
+        )
 
-    def __iter__(self) -> tuple[LGDO, int, int]:
+    def __iter__(self) -> Iterator:
         """Loop through entries in blocks of size buffer_len."""
-        entry = 0
-        while entry < len(self):
-            buf, n_rows = self.read(entry)
-            yield (buf, entry, n_rows)
-            entry += n_rows
+        self.current_entry = 0
+        self.next_entry = 0
+        return self
+
+    def __next__(self) -> tuple[LGDO, int, int]:
+        """Read next buffer_len entries and return lh5_table, iterator entry
+        and n_rows read."""
+        buf, n_rows = self.read(self.next_entry)
+        self.next_entry = self.current_entry + n_rows
+        if n_rows == 0:
+            raise StopIteration
+        return (buf, self.current_entry, n_rows)
 
 
 @nb.njit(parallel=False, fastmath=True)
