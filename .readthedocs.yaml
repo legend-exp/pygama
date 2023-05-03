@@ -20,7 +20,6 @@ build:
         --private
         --module-first
         --force
-        --maxdepth 10
         --output-dir docs/source/api
         src/pygama
         src/pygama/_version.py

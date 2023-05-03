@@ -1478,7 +1478,7 @@ class LH5Iterator(Iterator):
         self.lh5_files = []
         self.groups = []
         for f, g in zip(lh5_files, groups):
-            f_exp = expand_path(f, True, base_path)
+            f_exp = expand_path(f, list=True, base_path=base_path)
             self.lh5_files += f_exp
             self.groups += [g] * len(f_exp)
 

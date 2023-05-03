@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pygama.lgdo import Array, LH5Iterator, LH5Store, Struct, Table
+from pygama.lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
 from pygama.vis import WaveformBrowser
 
@@ -194,7 +194,9 @@ class DataLoader:
         # look for info in configuration if FileDB is not set
         if self.filedb is None:
             # expand $_ variables
-            value = string.Template(config["filedb"]).substitute({"_": config_dir})
+            value = lgdo_utils.expand_vars(
+                config["filedb"], substitute={"_": config_dir}
+            )
             self.filedb = FileDB(value)
 
         if not os.path.isdir(self.filedb.data_dir):

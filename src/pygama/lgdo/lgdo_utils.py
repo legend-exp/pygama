@@ -1,11 +1,10 @@
-"""
-Implements utilities for LEGEND Data Objects.
-"""
+"""Implements utilities for LEGEND Data Objects."""
 from __future__ import annotations
 
 import glob
 import logging
 import os
+import string
 
 import numpy as np
 
@@ -122,8 +121,38 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         return datatype, None, element_description.split(",")
 
 
-def expand_path(path: str, list: bool = False, base_path: str = None) -> str | list:
-    """Expand environment variables and wildcards to return absolute path
+def expand_vars(expr: str, substitute: dict[str, str] = None) -> str:
+    """Expand (environment) variables.
+
+    Note
+    ----
+    Malformed variable names and references to non-existing variables are left
+    unchanged.
+
+    Parameters
+    ----------
+    expr
+        string expression, which may include (environment) variables prefixed by
+        ``$``.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
+    """
+    if substitute is None:
+        substitute = {}
+
+    # expand env variables first
+    # then try using provided mapping
+    return string.Template(os.path.expandvars(expr)).safe_substitute(substitute)
+
+
+def expand_path(
+    path: str,
+    substitute: dict[str, str] = None,
+    list: bool = False,
+    base_path: str = None,
+) -> str | list:
+    """Expand (environment) variables and wildcards to return absolute paths.
 
     Parameters
     ----------
@@ -132,6 +161,9 @@ def expand_path(path: str, list: bool = False, base_path: str = None) -> str | l
     list
         if ``True``, return a list. If ``False``, return a string; if ``False``
         and a unique file is not found, raise an exception.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
     base_path
         name of base path. Returned paths will be relative to base.
 
@@ -140,11 +172,16 @@ def expand_path(path: str, list: bool = False, base_path: str = None) -> str | l
     path or list of paths
         Unique absolute path, or list of all absolute paths
     """
-
     if base_path is not None and base_path != "":
         base_path = os.path.expanduser(os.path.expandvars(base_path))
         path = os.path.join(base_path, path)
-    paths = glob.glob(os.path.expanduser(os.path.expandvars(path)))
+
+    # first expand variables
+    _path = expand_vars(path, substitute)
+
+    # then expand wildcards
+    paths = glob.glob(os.path.expanduser(_path))
+
     if base_path is not None and base_path != "":
         paths = [os.path.relpath(p, base_path) for p in paths]
 

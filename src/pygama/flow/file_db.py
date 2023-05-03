@@ -177,20 +177,24 @@ class FileDB:
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
         self.file_format = self.config["file_format"]
-        self.tier_dirs = self.config["tier_dirs"]
         self.table_format = self.config["table_format"]
-
         self.sortby = self.config.get("sortby", "timestamp")
 
-        # Handle environment variables
-        data_dir = os.path.expandvars(self.config["data_dir"])
+        # expand/substitute variables in data_dir and tier_dirs
+        # $_ expands to the location of the config file
+        subst_vars = {}
+        if config_path is not None:
+            subst_vars["_"] = os.path.dirname(str(config_path))
 
-        # Relative paths are interpreted relative to the configuration file
-        if not data_dir.startswith("/"):
-            config_dir = os.path.dirname(config_path)
-            data_dir = os.path.join(config_dir, data_dir.lstrip("/"))
-            data_dir = os.path.abspath(data_dir)
+        data_dir = lgdo.lgdo_utils.expand_path(
+            self.config["data_dir"], substitute=subst_vars
+        )
         self.data_dir = data_dir
+
+        tier_dirs = self.config["tier_dirs"]
+        for k, val in tier_dirs.items():
+            tier_dirs[k] = lgdo.lgdo_utils.expand_vars(val, substitute=subst_vars)
+        self.tier_dirs = tier_dirs
 
     def scan_files(self, dirs: list[str] = None) -> None:
         """Scan the directory containing files from the lowest tier and fill the dataframe.
