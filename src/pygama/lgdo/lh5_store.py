@@ -1462,7 +1462,7 @@ class LH5Iterator(Iterator):
         # List of files, with wildcards and env vars expanded
         if isinstance(lh5_files, str):
             lh5_files = [lh5_files]
-            if isinstance(groups, list=True):
+            if isinstance(groups, list):
                 lh5_files *= len(groups)
         elif not isinstance(lh5_files, list):
             raise ValueError("lh5_files must be a string or list of strings")
