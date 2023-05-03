@@ -143,6 +143,7 @@ def test_set_cuts(test_dl):
 
     assert (data["hit_table"].nda == [12, 13, 12, 13]).all()
 
+
 def test_browse(test_dl):
     test_dl.set_files("all")
     test_dl.set_output(
