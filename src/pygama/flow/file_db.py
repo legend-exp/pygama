@@ -533,9 +533,11 @@ class FileDB:
             # read in dataframe
             df = pd.read_hdf(p, key="dataframe")
 
+            # first iteration
             if _columns is None:
                 _columns = columns
                 _df = df
+                continue
             elif _columns != columns:
                 log.debug("found inconsistent FileDB, trying to merge")
                 # if columns are not the same, need to merge the two dataframes
@@ -561,9 +563,9 @@ class FileDB:
                                 args=(idx, new_idx, tier),
                                 axis=1,
                             )
-            else:
-                # if columns are the same, assume we can safely concat the dataframes
-                _df = pd.concat([_df, df], ignore_index=True, copy=False)
+
+            # now we can safely concat the dataframes
+            _df = pd.concat([_df, df], ignore_index=True, copy=False)
 
         self.set_config(_cfg)
         self.df = _df
