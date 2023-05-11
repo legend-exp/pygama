@@ -132,6 +132,7 @@ __all__ = [
     "soft_pileup_corr",
     "soft_pileup_corr_bl",
     "time_point_thresh",
+    "interpolated_time_point_thresh",
     "asym_trap_filter",
     "trap_filter",
     "trap_norm",
