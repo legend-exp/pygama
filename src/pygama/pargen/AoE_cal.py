@@ -1249,6 +1249,8 @@ def cal_aoe(
         log.error("A/E calibration failed")
         mu_pars = np.full(2, np.nan)
         sigma_pars = np.full(3, np.nan)
+        results_dict = {}
+        classifier = np.full_like(aoe, np.nan)
 
     try:
         cut = get_aoe_cut_fit(
