@@ -1247,8 +1247,8 @@ def cal_aoe(
 
     except:
         log.error("A/E calibration failed")
-        mean_pars = np.full(2, np.nan)
-        sigma_pars = np.full(2, np.nan)
+        mu_pars = np.full(2, np.nan)
+        sigma_pars = np.full(3, np.nan)
 
     try:
         cut = get_aoe_cut_fit(
