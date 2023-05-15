@@ -244,6 +244,8 @@ class DataLoader:
             supported by :meth:`pandas.DataFrame.query`. In addition, the
             ``all`` keyword is supported to select all files in the database.
             If list of strings, will be interpreted as key (cycle timestamp) list.
+        append
+            if True, appends files to the existing file_list instead of overwriting
 
         Note
         ----
@@ -299,6 +301,8 @@ class DataLoader:
         word
             the type of identifier used in ds. Should be a key in the given
             channel map or a word defined in the configuration file.
+        append
+            if True, appends datastreams to the existing table_list instead of overwriting
 
         Example
         -------
@@ -342,6 +346,8 @@ class DataLoader:
             structured as ``dict[tier] = cut_expr``. If passing a list, each
             item in the array should be able to be applied on one level of
             tables. The cuts at different levels will be joined with an AND.
+        append
+            if True, appends cuts to the existing cuts instead of overwriting
 
         Example
         -------
@@ -356,7 +362,7 @@ class DataLoader:
                     raise ValueError(
                         r"cuts dictionary must be in the format \{ level: string \}"
                     )
-                if key in self.cuts.keys():
+                if key in self.cuts.keys() and append:
                     self.cuts[key] += " and " + value
                 else:
                     self.cuts[key] = value
