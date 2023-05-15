@@ -923,13 +923,6 @@ class LH5Store:
                     del group[key]
 
             for field in obj.keys():
-<<<<<<< HEAD
-                # Convert keys to string for dataset names
-                f = str(field)
-                self.write_object(
-                    obj[field],
-                    f,
-=======
                 # eventually compress waveform table values with pygama's
                 # custom codecs before writing
                 # if waveformtable.values.attrs["compression"] is a string,
@@ -948,10 +941,11 @@ class LH5Store:
                 else:
                     obj_fld = obj[field]
 
+                # Convert keys to string for dataset names
+                f = str(field)
                 self.write_object(
                     obj_fld,
-                    field,
->>>>>>> 9115270d8fcaf1b31bd6ae70b9b1bb0c35dc17e9
+                    f,
                     lh5_file,
                     group=group,
                     start_row=start_row,
