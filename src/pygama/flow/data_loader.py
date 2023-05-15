@@ -287,7 +287,9 @@ class DataLoader:
         """
         return self.filedb.df.iloc[self.file_list]
 
-    def set_datastreams(self, ds: list | tuple | np.ndarray, word: str, append: bool = False) -> None:
+    def set_datastreams(
+        self, ds: list | tuple | np.ndarray, word: str, append: bool = False
+    ) -> None:
         """Apply selection on data streams (or channels).
 
         Sets `self.table_list`.
@@ -1043,7 +1045,6 @@ class DataLoader:
             table_length = len(entry_list)
 
             for tb, level in product(tables, load_levels):
-                    
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
                 el_idx = list(gb.groups.values())
@@ -1097,7 +1098,7 @@ class DataLoader:
                     )
         else:  # not merge_files
             if in_memory:
-                load_out = Struct(attrs={'keys_dtype':'int'})
+                load_out = Struct(attrs={"keys_dtype": "int"})
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
