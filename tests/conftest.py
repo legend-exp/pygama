@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from legend_testdata import LegendTestData
+from legendtestdata import LegendTestData
 
 from pygama.dsp import build_dsp
 from pygama.raw import build_raw

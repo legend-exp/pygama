@@ -19,6 +19,14 @@ functions. The basic data object classes are:
   Implemented as a pair of :class:`.Array`: :attr:`flattened_data` holding the
   raw data, and :attr:`cumulative_length` whose ith element is the sum of the
   lengths of the vectors with ``index <= i``
+* :class:`.VectorOfEncodedVectors`: an array of variable length *encoded*
+  arrays. Implemented as a :class:`.VectorOfVectors` :attr:`encoded_data`
+  holding the encoded vectors and an :class:`.Array` :attr:`decoded_size`
+  specifying the size of each decoded vector. Mainly used to represent a list
+  of compressed waveforms.
+* :class:`.ArrayOfEncodedEqualSizedArrays`: an array of equal sized encoded
+  arrays. Similar to :class:`.VectorOfEncodedVectors` except for
+  :attr:`decoded_size`, which is now a scalar.
 * :class:`.Struct`: a dictionary containing LGDO objects. Derives from
   :class:`dict`
 * :class:`.Table`: a :class:`.Struct` whose elements ("columns") are all array
@@ -30,32 +38,37 @@ browsed easily in python like any `HDF5 <https://www.hdfgroup.org>`_ file using
 `h5py <https://www.h5py.org>`_.
 """
 
-from pygama.lgdo.array import Array
-from pygama.lgdo.arrayofequalsizedarrays import ArrayOfEqualSizedArrays
-from pygama.lgdo.fixedsizearray import FixedSizeArray
-from pygama.lgdo.lgdo import LGDO
-from pygama.lgdo.lh5_store import LH5Iterator, LH5Store, load_dfs, load_nda, ls, show
-from pygama.lgdo.scalar import Scalar
-from pygama.lgdo.struct import Struct
-from pygama.lgdo.table import Table
-from pygama.lgdo.vectorofvectors import (
+from pygama.lgdo.waveform_table import WaveformTable
+
+from .array import Array
+from .arrayofequalsizedarrays import ArrayOfEqualSizedArrays
+from .encoded import ArrayOfEncodedEqualSizedArrays, VectorOfEncodedVectors
+from .fixedsizearray import FixedSizeArray
+from .lgdo import LGDO
+from .lgdo_utils import copy
+from .lh5_store import LH5Iterator, LH5Store, load_dfs, load_nda, ls, show
+from .scalar import Scalar
+from .struct import Struct
+from .table import Table
+from .vectorofvectors import (
     VectorOfVectors,
     build_cl,
     explode,
     explode_arrays,
     explode_cl,
 )
-from pygama.lgdo.waveform_table import WaveformTable
 
 __all__ = [
     "Array",
     "ArrayOfEqualSizedArrays",
+    "ArrayOfEncodedEqualSizedArrays",
     "FixedSizeArray",
     "LGDO",
     "Scalar",
     "Struct",
     "Table",
     "VectorOfVectors",
+    "VectorOfEncodedVectors",
     "WaveformTable",
     "LH5Iterator",
     "LH5Store",
@@ -67,6 +80,7 @@ __all__ = [
     "explode",
     "explode_arrays",
     "explode_cl",
+    "copy",
 ]
 
 import numpy as np

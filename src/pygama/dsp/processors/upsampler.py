@@ -50,7 +50,6 @@ def upsampler(w_in: np.ndarray, upsample: float, w_out: np.ndarray) -> None:
 @guvectorize(
     ["void(float32[:], char, float32[:])", "void(float64[:], char, float64[:])"],
     "(n),(),(m)",
-    nopython=True,
     **nb_kwargs,
 )
 def interpolating_upsampler(

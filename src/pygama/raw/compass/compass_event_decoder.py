@@ -12,46 +12,27 @@ log = logging.getLogger(__name__)
 
 
 def get_bc(board: int, channel: int) -> int:
-    """
-    Create a standard hash for the board and channel of a CoMPASS file
-    """
+    """Create a standard hash for the board and channel of a CoMPASS file."""
     return (board << 9) + (channel & 0xF)
 
 
 compass_decoded_values = {
     # packet index in file
-    "packet_id": {
-        "dtype": "uint32",
-    },
+    "packet_id": {"dtype": "uint32"},
     # ID of board
-    "board": {
-        "dtype": "uint32",
-    },
+    "board": {"dtype": "uint32"},
     # ID of channel recording data
-    "channel": {
-        "dtype": "uint32",
-    },
+    "channel": {"dtype": "uint32"},
     # Timestamp of event
-    "timestamp": {
-        "dtype": "float64",
-        "units": "ps",
-    },
+    "timestamp": {"dtype": "float64", "units": "ps"},
     # Energy of event
-    "energy": {
-        "dtype": "uint32",
-    },
+    "energy": {"dtype": "uint32"},
     # Energy short of event
-    "energy_short": {
-        "dtype": "uint32",
-    },
+    "energy_short": {"dtype": "uint32"},
     # Flags that the digitizer raised
-    "flags": {
-        "dtype": "uint32",
-    },
+    "flags": {"dtype": "uint32"},
     # number of samples in a waveform
-    "num_samples": {
-        "dtype": "int64",
-    },
+    "num_samples": {"dtype": "int64"},
     # waveform data
     "waveform": {
         "dtype": "uint16",
@@ -62,6 +43,12 @@ compass_decoded_values = {
         "t0_units": "ns",
     },
 }
+"""Default CoMPASS Event decoded values.
+
+Warning
+-------
+This configuration can be dynamically modified by the decoder at runtime.
+"""
 
 
 class CompassEventDecoder(DataDecoder):

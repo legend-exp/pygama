@@ -5,12 +5,13 @@ corresponding utilities.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
 
-from pygama.lgdo.lgdo import LGDO
-from pygama.lgdo.lgdo_utils import get_element_type
+from . import lgdo_utils as utils
+from .lgdo import LGDO
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +68,13 @@ class Array(LGDO):
                 nda = np.zeros(shape, dtype=dtype)
             else:
                 nda = np.full(shape, fill_val, dtype=dtype)
+
+        elif isinstance(nda, Array):
+            nda = nda.nda
+
+        elif not isinstance(nda, np.ndarray):
+            nda = np.array(nda)
+
         self.nda = nda
         self.dtype = self.nda.dtype
 
@@ -78,29 +86,55 @@ class Array(LGDO):
     def form_datatype(self) -> str:
         dt = self.datatype_name()
         nd = str(len(self.nda.shape))
-        et = get_element_type(self)
+        et = utils.get_element_type(self)
         return dt + "<" + nd + ">{" + et + "}"
 
     def __len__(self) -> int:
         return len(self.nda)
 
     def resize(self, new_size: int) -> None:
-        """Resize the array to `new_size`."""
         new_shape = (new_size,) + self.nda.shape[1:]
-        self.nda.resize(new_shape, refcheck=True)
+        return self.nda.resize(new_shape, refcheck=True)
+
+    def append(self, value: np.ndarray) -> None:
+        self.resize(len(self) + 1)
+        self.nda[-1] = value
+
+    def insert(self, i: int, value: int | float) -> None:
+        self.nda = np.insert(self.nda, i, value)
+
+    def __getitem__(self, key):
+        return self.nda[key]
+
+    def __setitem__(self, key, value):
+        return self.nda.__setitem__(key, value)
+
+    def __eq__(self, other: Array) -> bool:
+        if isinstance(other, Array):
+            return self.attrs == other.attrs and np.array_equal(self.nda, other.nda)
+        else:
+            return False
+
+    def __iter__(self) -> Iterator:
+        yield from self.nda
 
     def __str__(self) -> str:
-        tmp_attrs = self.attrs.copy()
-        tmp_attrs.pop("datatype")
+        attrs = self.getattrs()
         string = str(self.nda)
-        if len(tmp_attrs) > 0:
-            string += f" with attrs={tmp_attrs}"
+        if attrs:
+            string += f" with attrs={attrs}"
         return string
 
     def __repr__(self) -> str:
         return (
             self.__class__.__name__
             + "("
-            + np.array2string(self.nda, prefix=self.__class__.__name__ + " ")
+            + np.array2string(
+                self.nda,
+                prefix=self.__class__.__name__ + " ",
+                formatter={
+                    "int": lambda x: f"0x{x:02x}" if self.dtype == np.ubyte else str(x)
+                },
+            )
             + f", attrs={repr(self.attrs)})"
         )

@@ -17,6 +17,7 @@ repos:
   - id: check-json
   - id: check-toml
   - id: check-docstring-first
+    exclude: ^src/pygama/raw/(fc/fc_event_decoder.py|compass/compass_event_decoder.py)$
   - id: debug-statements
   - id: end-of-file-fixer
   - id: forbid-new-submodules

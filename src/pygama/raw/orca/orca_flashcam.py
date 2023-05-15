@@ -75,6 +75,12 @@ class ORFlashCamListenerConfigDecoder(OrcaDecoder):
                 "length_guess": int(2400 / 6),  # max number of boards
             },
         }
+        """Default FlashCam (read out by ORCA) config decoded values.
+
+        Warning
+        -------
+        This configuration can be dynamically modified by the decoder at runtime.
+        """
         super().__init__(header=header, **kwargs)
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
@@ -183,27 +189,18 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
             "packet_id": {"dtype": "uint32"},
             "readout_id": {"dtype": "uint16"},
             "fcid": {"dtype": "uint16"},
-            "status": {  # 0: Errors occurred, 1: no errors
-                "dtype": "int32",
-            },
-            "statustime": {  # fc250 seconds, microseconds
-                "dtype": "float32",
-                "units": "s",
-            },
-            "cputime": {  # CPU seconds, microseconds
-                "dtype": "float64",
-                "units": "s",
-            },
-            "startoffset": {  # startsec startusec
-                "dtype": "float32",
-                "units": "s",
-            },
-            "n_cards": {  # Total number of cards (number of status data to follow)
-                "dtype": "int32",
-            },
-            "card_data_size": {  # Size of each status data
-                "dtype": "int32",
-            },
+            # 0: Errors occurred, 1: no errors
+            "status": {"dtype": "int32"},
+            # fc250 seconds, microseconds
+            "statustime": {"dtype": "float32", "units": "s"},
+            # CPU seconds, microseconds
+            "cputime": {"dtype": "float64", "units": "s"},
+            # startsec startusec
+            "startoffset": {"dtype": "float32", "units": "s"},
+            # Total number of cards (number of status data to follow)
+            "n_cards": {"dtype": "int32"},
+            # Size of each status data
+            "card_data_size": {"dtype": "int32"},
             "card_id": {
                 "dtype": "uint32",
                 "datatype": "array<1>{array<1>{real}}",  # vector of vectors
@@ -315,6 +312,12 @@ class ORFlashCamListenerStatusDecoder(OrcaDecoder):
                 "length_guess": int(256 * 2400 / 6),  # 256*max number of boards
             },
         }
+        """Default FlashCam (read out by ORCA) status decoded values.
+
+        Warning
+        -------
+        This configuration can be dynamically modified by the decoder at runtime.
+        """
         super().__init__(header=header, **kwargs)
 
     def get_decoded_values(self, key: int = None) -> dict[str, Any]:
@@ -455,6 +458,7 @@ class ORFlashCamWaveformDecoder(OrcaDecoder):
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # start with the values defined in fcdaq
         self.decoded_values_template = copy.deepcopy(fc_decoded_values)
+        """A custom copy of :obj:`.raw.fc.fc_event_decoder.fc_decoded_values`."""
         # add header values from Orca
         self.decoded_values_template.update(
             {

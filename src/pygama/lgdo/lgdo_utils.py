@@ -1,13 +1,14 @@
-"""
-Implements utilities for LEGEND Data Objects.
-"""
+"""Implements utilities for LEGEND Data Objects."""
 from __future__ import annotations
 
 import glob
 import logging
 import os
+import string
 
 import numpy as np
+
+from .. import lgdo
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +57,36 @@ def get_element_type(obj: object) -> str:
     )
 
 
+def copy(obj: lgdo.LGDO, dtype: np.dtype = None) -> lgdo.LGDO:
+    """Return a copy of an LGDO.
+
+    Parameters
+    ----------
+    obj
+        the LGDO to be copied.
+    dtype
+        NumPy dtype to be used for the copied object.
+
+    """
+    if dtype is None:
+        dtype = obj.dtype
+
+    if isinstance(obj, lgdo.Array):
+        return lgdo.Array(
+            np.array(obj.nda, dtype=dtype, copy=True), attrs=dict(obj.attrs)
+        )
+
+    if isinstance(obj, lgdo.VectorOfVectors):
+        return lgdo.VectorOfVectors(
+            flattened_data=copy(obj.flattened_data, dtype=dtype),
+            cumulative_length=copy(obj.cumulative_length),
+            attrs=dict(obj.attrs),
+        )
+
+    else:
+        raise ValueError(f"copy of {type(obj)} not supported")
+
+
 def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]]:
     """Parse datatype string and return type, dimensions and elements.
 
@@ -90,24 +121,70 @@ def parse_datatype(datatype: str) -> tuple[str, tuple[int, ...], str | list[str]
         return datatype, None, element_description.split(",")
 
 
-def expand_path(path: str, list: bool = False) -> str | list:
-    """Expand environment variables and wildcards to return absolute path
+def expand_vars(expr: str, substitute: dict[str, str] = None) -> str:
+    """Expand (environment) variables.
+
+    Note
+    ----
+    Malformed variable names and references to non-existing variables are left
+    unchanged.
+
+    Parameters
+    ----------
+    expr
+        string expression, which may include (environment) variables prefixed by
+        ``$``.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
+    """
+    if substitute is None:
+        substitute = {}
+
+    # expand env variables first
+    # then try using provided mapping
+    return string.Template(os.path.expandvars(expr)).safe_substitute(substitute)
+
+
+def expand_path(
+    path: str,
+    substitute: dict[str, str] = None,
+    list: bool = False,
+    base_path: str = None,
+) -> str | list:
+    """Expand (environment) variables and wildcards to return absolute paths.
 
     Parameters
     ----------
     path
-        name of path, which may include environment variables and wildcards
+        name of path, which may include environment variables and wildcards.
     list
-        if True, return a list. If False, return a string; if False and a
-        unique file is not found, raise an Exception
+        if ``True``, return a list. If ``False``, return a string; if ``False``
+        and a unique file is not found, raise an exception.
+    substitute
+        use this dictionary to substitute variables. Environment variables take
+        precedence.
+    base_path
+        name of base path. Returned paths will be relative to base.
 
     Returns
     -------
     path or list of paths
         Unique absolute path, or list of all absolute paths
     """
+    if base_path is not None and base_path != "":
+        base_path = os.path.expanduser(os.path.expandvars(base_path))
+        path = os.path.join(base_path, path)
 
-    paths = glob.glob(os.path.expanduser(os.path.expandvars(path)))
+    # first expand variables
+    _path = expand_vars(path, substitute)
+
+    # then expand wildcards
+    paths = glob.glob(os.path.expanduser(_path))
+
+    if base_path is not None and base_path != "":
+        paths = [os.path.relpath(p, base_path) for p in paths]
+
     if not list:
         if len(paths) == 0:
             raise FileNotFoundError(f"could not find path matching {path}")

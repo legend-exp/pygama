@@ -52,6 +52,12 @@ class ORSIS3302DecoderForEnergy(OrcaDecoder):
                 "t0_units": "ns",
             },
         }
+        """Default Struck SIS3302 (read out by ORCA) waveform decoded values.
+
+        Warning
+        -------
+        This configuration can be dynamically modified by the decoder at runtime.
+        """
         self.decoded_values = {}
         super().__init__(header=header, **kwargs)
         self.skipped_channels = {}
@@ -212,92 +218,29 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
     def __init__(self, header: OrcaHeader = None, **kwargs) -> None:
         # store an entry for every event
         self.decoded_values_template = {
-            "packet_id": {
-                "dtype": "uint32",
-            },
-            "energy": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "peakHighValue": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "peakHighIndex": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum1": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "information": {
-                "dtype": "uint32",
-            },
-            "accSum2": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum3": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum4": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum5": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum6": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum7": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "accSum8": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "mawMax": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "mawBefore": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "mawAfter": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "startEnergy": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "maxEnergy": {
-                "dtype": "uint32",
-                "units": "adc",
-            },
-            "energy_first": {
-                "dtype": "uint32",
-            },
-            "timestamp": {
-                "dtype": "uint64",
-                "units": "clock_ticks",
-            },
-            "crate": {
-                "dtype": "uint8",
-            },
-            "card": {
-                "dtype": "uint8",
-            },
-            "channel": {
-                "dtype": "uint8",
-            },
+            "packet_id": {"dtype": "uint32"},
+            "energy": {"dtype": "uint32", "units": "adc"},
+            "peakHighValue": {"dtype": "uint32", "units": "adc"},
+            "peakHighIndex": {"dtype": "uint32", "units": "adc"},
+            "accSum1": {"dtype": "uint32", "units": "adc"},
+            "information": {"dtype": "uint32"},
+            "accSum2": {"dtype": "uint32", "units": "adc"},
+            "accSum3": {"dtype": "uint32", "units": "adc"},
+            "accSum4": {"dtype": "uint32", "units": "adc"},
+            "accSum5": {"dtype": "uint32", "units": "adc"},
+            "accSum6": {"dtype": "uint32", "units": "adc"},
+            "accSum7": {"dtype": "uint32", "units": "adc"},
+            "accSum8": {"dtype": "uint32", "units": "adc"},
+            "mawMax": {"dtype": "uint32", "units": "adc"},
+            "mawBefore": {"dtype": "uint32", "units": "adc"},
+            "mawAfter": {"dtype": "uint32", "units": "adc"},
+            "startEnergy": {"dtype": "uint32", "units": "adc"},
+            "maxEnergy": {"dtype": "uint32", "units": "adc"},
+            "energy_first": {"dtype": "uint32"},
+            "timestamp": {"dtype": "uint64", "units": "clock_ticks"},
+            "crate": {"dtype": "uint8"},
+            "card": {"dtype": "uint8"},
+            "channel": {"dtype": "uint8"},
             # waveform data
             "waveform": {
                 "dtype": "uint16",
@@ -308,6 +251,12 @@ class ORSIS3316WaveformDecoder(OrcaDecoder):
                 "t0_units": "ns",
             },
         }
+        """Default Struck SIS3316 (read out by ORCA) waveform decoded values.
+
+        Warning
+        -------
+        This configuration can be dynamically modified by the decoder at runtime.
+        """
 
         self.decoded_values = {}
         self.skipped_channels = {}

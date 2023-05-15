@@ -30,6 +30,20 @@ class LGDO(ABC):
         """Return this LGDO's datatype attribute string."""
         pass
 
+    def getattrs(self, datatype: bool = False) -> dict:
+        """Return a copy of the LGDO attributes dictionary.
+
+        Parameters
+        ----------
+        datatype
+            if ``False``, remove ``datatype`` attribute from the output
+            dictionary.
+        """
+        d = dict(self.attrs)
+        if not datatype:
+            d.pop("datatype", None)
+        return d
+
     def __str__(self) -> str:
         return repr(self)
 

@@ -46,6 +46,21 @@ def test_parse_datatype():
         assert pd_dt_tuple == dt_tuple
 
 
+def test_expand_vars():
+    # Check env variable expansion
+    os.environ["PYGAMATESTBASEDIR"] = "a_random_string"
+    assert lgdo_utils.expand_vars("$PYGAMATESTBASEDIR/blah") == "a_random_string/blah"
+
+    # Check user variable expansion
+    assert (
+        lgdo_utils.expand_vars(
+            "$PYGAMATESTBASEDIR2/blah",
+            substitute={"PYGAMATESTBASEDIR2": "a_random_string"},
+        )
+        == "a_random_string/blah"
+    )
+
+
 def test_expand_path(lgnd_test_data):
     files = [
         lgnd_test_data.get_path(
@@ -68,4 +83,6 @@ def test_expand_path(lgnd_test_data):
         lgdo_utils.expand_path(f"{base_dir}/*.lh5")
 
     # Check if it finds a list of files correctly
-    assert sorted(lgdo_utils.expand_path(f"{base_dir}/*.lh5", True)) == sorted(files)
+    assert sorted(lgdo_utils.expand_path(f"{base_dir}/*.lh5", list=True)) == sorted(
+        files
+    )
