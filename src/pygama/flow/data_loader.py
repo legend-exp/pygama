@@ -231,7 +231,7 @@ class DataLoader:
             else:
                 self.cut_priority[level] = 0
 
-    def set_files(self, query: str | list[str]) -> None:
+    def set_files(self, query: str | list[str], append: bool = False) -> None:
         """Apply a file selection.
 
         Sets `self.file_list`, which is a list of indices corresponding to the
@@ -273,10 +273,10 @@ class DataLoader:
         if not inds:
             log.warning("no files matching selection found")
 
-        if self.file_list is None:
-            self.file_list = inds
-        else:
+        if append and self.file_list is not None:
             self.file_list += inds
+        else:
+            self.file_list = inds
 
     def get_file_list(self) -> pd.DataFrame:
         """
@@ -285,7 +285,7 @@ class DataLoader:
         """
         return self.filedb.df.iloc[self.file_list]
 
-    def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
+    def set_datastreams(self, ds: list | tuple | np.ndarray, word: str, append: bool = False) -> None:
         """Apply selection on data streams (or channels).
 
         Sets `self.table_list`.
@@ -304,7 +304,7 @@ class DataLoader:
         -------
         >>> dl.set_datastreams(np.arange(40, 45), "ch")
         """
-        if self.table_list is None:
+        if self.table_list is None or not append:
             self.table_list = {}
 
         ds = list(ds)
@@ -331,7 +331,7 @@ class DataLoader:
             # look for word in channel map
             raise NotImplementedError
 
-    def set_cuts(self, cuts: dict | list) -> None:
+    def set_cuts(self, cuts: dict | list, append: bool = False) -> None:
         """Apply a selection on columns in the data tables.
 
         Parameters
@@ -347,7 +347,7 @@ class DataLoader:
         -------
         >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
         """
-        if self.cuts is None:
+        if self.cuts is None or not append:
             self.cuts = {}
         if isinstance(cuts, dict):
             # verify the correct structure
