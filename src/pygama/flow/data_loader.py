@@ -1047,6 +1047,7 @@ class DataLoader:
             table_length = len(entry_list)
 
             for tb, level in product(tables, load_levels):
+                    
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
                 el_idx = list(gb.groups.values())
@@ -1189,6 +1190,8 @@ class DataLoader:
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.close()
+            if load_out:
+                load_out.update_datatype()
 
             if in_memory:
                 if self.output_format == "lgdo.Table":

@@ -58,7 +58,7 @@ def test_no_merge(test_dl):
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
-    assert isinstance(data, dict)
+    assert isinstance(data, lgdo.Struct)
     assert isinstance(data[0], lgdo.Table)
     assert len(data) == 2
     assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp"]
