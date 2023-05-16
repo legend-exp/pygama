@@ -1355,7 +1355,7 @@ class DataLoader:
                         ]
 
                     # Create iterator for this tier and friend to other tiers
-                    if len(lh5_files)>0:
+                    if len(lh5_files) > 0:
                         lh5_it = LH5Iterator(
                             lh5_files=lh5_files,
                             groups=tb_names,
