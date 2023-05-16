@@ -277,6 +277,7 @@ class DataLoader:
 
         if append and self.file_list is not None:
             self.file_list += inds
+            self.file_list = sorted(list(set(self.file_list)))
         else:
             self.file_list = inds
 
@@ -328,6 +329,7 @@ class DataLoader:
                 found = True
                 if level in self.table_list.keys():
                     self.table_list[level] += ds
+                    self.table_list[level] = sorted(list(set(self.table_list[level])))
                 else:
                     self.table_list[level] = ds
 
