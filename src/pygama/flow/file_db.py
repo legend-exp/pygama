@@ -508,11 +508,26 @@ class FileDB:
             raise FileNotFoundError(path)
 
         sto = lh5.LH5Store()
-        # objects that will be used to configure the FileDB at the end
+        # objects/accumulators that will be used to configure the FileDB at the end
         _cfg = None
         _df = None
         _columns = None
 
+        # function needed later in the loop
+        def _replace_idx(row, trans, tier):
+            col = row[f"{tier}_col_idx"]
+            if col is None:
+                return None
+
+            col = np.array(col)
+            new_col = np.copy(col)
+
+            for idx, new_idx in trans.items():
+                new_col[np.where(col == idx)] = new_idx
+
+            return new_col.tolist()
+
+        # loop over the files
         for p in paths:
             cfg, _ = sto.read_object("config", p)
             cfg = json.loads(cfg.value.decode())
@@ -538,31 +553,35 @@ class FileDB:
                 _columns = columns
                 _df = df
                 continue
+
             elif _columns != columns:
                 log.debug("found inconsistent FileDB, trying to merge")
                 # if columns are not the same, need to merge the two dataframes
-                # in the right way
+                # in the right way. loop over new columns
+                idx_trans = {}
                 for idx, cols in enumerate(columns):
+                    new_idx = None
+
+                    # the columns might be a new entry...
                     if cols not in _columns:
                         # add the new column at the end and save its index
                         _columns += [cols]
                         new_idx = len(_columns) - 1
+                    # ...or just located (at a different index?) in the
+                    # existing column list
+                    else:
+                        new_idx = _columns.index(cols)
 
-                        def _replace_idx(row, idx, new_idx, tier):
-                            col = row[f"{tier}_col_idx"]
-                            if col is None:
-                                return None
-                            else:
-                                return [new_idx if x == idx else x for x in col]
+                    idx_trans[idx] = new_idx
 
-                        # now go through the new dataframe and update the old index
-                        # everywhere in the {tier}_col_idx columns
-                        for tier in list(_cfg["tier_dirs"].keys()):
-                            df[f"{tier}_col_idx"] = df.apply(
-                                _replace_idx,
-                                args=(idx, new_idx, tier),
-                                axis=1,
-                            )
+                # now go through the new dataframe and update the old index
+                # everywhere in the {tier}_col_idx columns
+                for tier in list(_cfg["tier_dirs"].keys()):
+                    df[f"{tier}_col_idx"] = df.apply(
+                        _replace_idx,
+                        args=(idx_trans, tier),
+                        axis=1,
+                    )
 
             # now we can safely concat the dataframes
             _df = pd.concat([_df, df], ignore_index=True, copy=False)

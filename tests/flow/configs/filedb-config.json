@@ -15,10 +15,10 @@
     "tcm": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_tcm.lh5"
   },
   "table_format": {
-    "raw": "ch{ch:03d}/raw",
-    "dsp": "ch{ch:03d}/dsp",
-    "hit": "ch{ch:03d}/hit",
+    "raw": "ch{ch:07d}/raw",
+    "dsp": "ch{ch:07d}/dsp",
+    "hit": "ch{ch:07d}/hit",
     "evt": "{grp}/evt",
-    "tcm": "hardware_tcm"
+    "tcm": "hardware_tcm_1"
   }
 }
