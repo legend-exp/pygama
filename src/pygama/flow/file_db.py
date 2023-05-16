@@ -506,6 +506,9 @@ class FileDB:
 
         if not paths:
             raise FileNotFoundError(path)
+            
+        # Need order of fileDBs to be consistent
+        paths = sorted(paths)
 
         sto = lh5.LH5Store()
         # objects that will be used to configure the FileDB at the end
@@ -533,7 +536,7 @@ class FileDB:
             # read in dataframe
             df = pd.read_hdf(p, key="dataframe")
 
-            # first iteration
+            # Get column list from first dataframe
             if _columns is None:
                 _columns = columns
                 _df = df
@@ -542,18 +545,37 @@ class FileDB:
                 log.debug("found inconsistent FileDB, trying to merge")
                 # if columns are not the same, need to merge the two dataframes
                 # in the right way
-                for idx, cols in enumerate(columns):
-                    if cols not in _columns:
-                        # add the new column at the end and save its index
-                        _columns += [cols]
-                        new_idx = len(_columns) - 1
+                if len(columns) >= len(_columns):
+                    # Need to check that columns in each dataframe match our list
+                    for idx, cols in enumerate(columns):
+                        new_idx = 0
+                        if cols not in _columns:
+                            # current dataframe has a column not in our list
+                            # add the new column at the end and save its index
+                            _columns += [cols]
+                            new_idx = len(_columns) - 1    
+                        elif idx < _columns.index(cols):
+                            # column is in our list, but out of order
+                            # find and save index of column in our list
+                            new_idx = _columns.index(cols)
+                        else:
+                            # columns match up, don't need to do anything
+                            continue
 
                         def _replace_idx(row, idx, new_idx, tier):
                             col = row[f"{tier}_col_idx"]
+                            new_col = []
                             if col is None:
                                 return None
                             else:
-                                return [new_idx if x == idx else x for x in col]
+                                for x in col:
+                                    if x == new_idx:
+                                        new_col.append(idx)
+                                    elif x == idx:
+                                        new_col.append(new_idx)
+                                    else:
+                                        new_col.append(x)
+                                return new_col
 
                         # now go through the new dataframe and update the old index
                         # everywhere in the {tier}_col_idx columns
