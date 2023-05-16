@@ -64,15 +64,15 @@ def test_expand_vars():
 def test_expand_path(lgnd_test_data):
     files = [
         lgnd_test_data.get_path(
-            "lh5/prod-ref-l200/generated/tier/dsp/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_dsp.lh5"
+            "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_dsp.lh5"
         ),
         lgnd_test_data.get_path(
-            "lh5/prod-ref-l200/generated/tier/dsp/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_dsp.lh5"
+            "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r001/l200-p03-r001-cal-20230318T012228Z-tier_dsp.lh5"
         ),
     ]
     base_dir = os.path.dirname(files[0])
 
-    assert lgdo_utils.expand_path(f"{base_dir}/*20220716T104550Z*") == files[0]
+    assert lgdo_utils.expand_path(f"{base_dir}/*20230318T012144Z*") == files[0]
 
     # Should fail if file not found
     with pytest.raises(FileNotFoundError):
