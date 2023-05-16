@@ -506,7 +506,7 @@ class FileDB:
 
         if not paths:
             raise FileNotFoundError(path)
-            
+
         # Need order of fileDBs to be consistent
         paths = sorted(paths)
 
@@ -553,7 +553,7 @@ class FileDB:
                             # current dataframe has a column not in our list
                             # add the new column at the end and save its index
                             _columns += [cols]
-                            new_idx = len(_columns) - 1    
+                            new_idx = len(_columns) - 1
                         elif idx < _columns.index(cols):
                             # column is in our list, but out of order
                             # find and save index of column in our list
