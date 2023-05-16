@@ -2,7 +2,11 @@ import copy
 import inspect
 import os
 import re
+import shutil
+import uuid
+from getpass import getuser
 from pathlib import Path
+from tempfile import gettempdir
 
 import numpy as np
 import pytest
@@ -12,12 +16,27 @@ from pygama.dsp import build_dsp
 from pygama.raw import build_raw
 
 config_dir = Path(__file__).parent / "dsp" / "configs"
+_tmptestdir = os.path.join(
+    gettempdir(), "pygama-tests-" + getuser() + str(uuid.uuid4())
+)
+
+
+@pytest.fixture(scope="session")
+def tmptestdir():
+    os.mkdir(_tmptestdir)
+    yield _tmptestdir
+    shutil.rmtree(_tmptestdir)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if exitstatus is True:
+        os.rmdir(_tmptestdir)
 
 
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("39f9927")
+    ldata.checkout("c089a59")
     return ldata
 
 
