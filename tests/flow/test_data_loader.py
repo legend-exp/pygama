@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -77,14 +78,15 @@ def test_no_merge(test_dl):
 
     assert isinstance(data, dict)
     assert isinstance(data[0], lgdo.Table)
-    assert len(data) == 2
+    assert len(data) == 4  # 4 files
     assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp"]
 
 
 def test_outputs(test_dl):
-    test_dl.set_files("all")
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_datastreams([1057600, 1059201], "ch")
     test_dl.set_output(
-        fmt="pd.DataFrame", columns=["timestamp", "channel", "bl_mean", "hit_par1"]
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "energies", "energy_in_pe"]
     )
     data = test_dl.load()
 
@@ -95,22 +97,22 @@ def test_outputs(test_dl):
         "file",
         "timestamp",
         "channel",
-        "bl_mean",
-        "hit_par1",
+        "energies",
+        "energy_in_pe",
     ]
 
 
 def test_any_mode(test_dl):
     test_dl.filedb.scan_tables_columns()
-    test_dl.set_files("all")
-    test_dl.set_cuts({"hit": "daqenergy == 634"})
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_cuts({"hit": "daqenergy == 10221"})
     el = test_dl.build_entry_list(tcm_level="tcm", mode="any")
 
-    assert len(el) == 42
+    assert len(el) == 6
 
 
 def test_set_files(test_dl):
-    test_dl.set_files("timestamp == '20220716T104550Z'")
+    test_dl.set_files("timestamp == '20230318T012144Z'")
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
@@ -118,36 +120,38 @@ def test_set_files(test_dl):
 
 
 def test_set_keylist(test_dl):
-    test_dl.set_files(["20220716T104550Z", "20220716T104550Z"])
+    test_dl.set_files(["20230318T012144Z", "20230318T012228Z"])
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
-    assert len(data) == 1
+    assert len(data) == 2
 
 
 def test_set_datastreams(test_dl):
-    test_dl.set_files("all")
-    test_dl.set_datastreams([1, 3, 8], "ch")
-    test_dl.set_output(columns=["channel"], merge_files=False)
+    channels = [1084803, 1084804, 1121600]
+    test_dl.set_files("timestamp == '20230318T012144Z'")
+    test_dl.set_datastreams(channels, "ch")
+    test_dl.set_output(columns=["eventnumber"], fmt="pd.DataFrame", merge_files=False)
     data = test_dl.load()
 
-    assert (data[0]["hit_table"].nda == [1, 3, 8]).all()
-    assert (data[0]["channel"].nda == [1, 3, 8]).all()
+    assert np.array_equal(data[0]["hit_table"].unique(), channels)
 
 
 def test_set_cuts(test_dl):
-    test_dl.set_files("all")
-    test_dl.set_cuts({"hit": "card == 3"})
-    test_dl.set_output(columns=["card"])
+    test_dl.set_files("type == 'cal'")
+    test_dl.set_cuts({"hit": "is_valid_cal == False"})
+    test_dl.set_datastreams([1084803], "ch")
+    test_dl.set_output(columns=["is_valid_cal"], fmt="pd.DataFrame")
     data = test_dl.load()
 
-    assert (data["hit_table"].nda == [12, 13, 12, 13]).all()
+    assert (data.is_valid_cal == False).all()  # noqa: E712
 
 
 def test_browse(test_dl):
-    test_dl.set_files("all")
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_datastreams([1057600, 1059201], "ch")
     test_dl.set_output(
-        fmt="pd.DataFrame", columns=["timestamp", "channel", "bl_mean", "hit_par1"]
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "energies", "energy_in_pe"]
     )
     wb = test_dl.browse()
 
