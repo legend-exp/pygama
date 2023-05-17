@@ -12,7 +12,7 @@ import time
 
 import h5py
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 import pygama
 import pygama.lgdo as lgdo

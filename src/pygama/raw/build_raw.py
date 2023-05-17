@@ -8,7 +8,7 @@ import time
 
 import hdf5plugin
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from pygama import lgdo
 from pygama.lgdo.lh5_store import DEFAULT_HDF5_COMPRESSION

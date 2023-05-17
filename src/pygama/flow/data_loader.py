@@ -13,7 +13,7 @@ from typing import Iterator
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from pygama.lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
 from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
@@ -421,7 +421,6 @@ class DataLoader:
         self.aoesa_to_vov = False
         self.data = None
 
-    # TODO: mode
     def build_entry_list(
         self,
         tcm_level: str = None,
@@ -523,8 +522,22 @@ class DataLoader:
 
         sto = LH5Store()
 
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar = tqdm(
+                desc="Building entry list",
+                total=len(self.file_list),
+                delay=2,
+                unit="keys",
+            )
+
         # Make the entry list for each file
         for file in self.file_list:
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.update()
+                progress_bar.set_postfix(
+                    key=self.filedb.df.iloc[file][self.filedb.sortby]
+                )
+
             # Get the TCM specified
             # Assumes that each TCM level only has one tier
             tcm_tier = self.tiers[tcm_level][0]
@@ -677,6 +690,9 @@ class DataLoader:
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
 
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar.close()
+
         if in_memory:
             if self.merge_files:
                 entries = pd.concat(entries.values(), ignore_index=True)
@@ -749,7 +765,7 @@ class DataLoader:
                 desc="Building entry list",
                 total=len(self.file_list),
                 delay=2,
-                unit=" keys",
+                unit="keys",
             )
 
         # now we loop over the files in our list
@@ -838,6 +854,7 @@ class DataLoader:
 
                     if tb_table is None:
                         continue
+
                     # convert to DataFrame and apply cuts
                     tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)
@@ -861,7 +878,6 @@ class DataLoader:
                     sto.write_object(
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
-            # end file loop
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -1036,6 +1052,18 @@ class DataLoader:
                 attr_dict[key] = None
             table_length = len(entry_list)
 
+            tot_iter = 0
+            for _, level in product(tables, load_levels):
+                for _ in self.tiers[level]:
+                    tot_iter += 1
+
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar = tqdm(
+                    desc="Loading data",
+                    total=tot_iter,
+                    delay=2,
+                )
+
             for tb, level in product(tables, load_levels):
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
@@ -1043,8 +1071,13 @@ class DataLoader:
                 idx_mask = [list(entry_list.loc[i, f"{level}_idx"]) for i in el_idx]
 
                 for tier in self.tiers[level]:
+                    if log.getEffectiveLevel() >= logging.INFO:
+                        progress_bar.update()
+                        progress_bar.set_postfix(table=tb, tier=tier)
+
                     if tb not in col_tiers[tier]:
                         continue
+
                     tb_name = self.filedb.get_table_name(tier, tb)
                     tier_paths = [
                         os.path.join(
@@ -1074,6 +1107,9 @@ class DataLoader:
                         self.aoesa_to_vov,
                     )
 
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.close()
+
             # Convert col_dict to lgdo.Table
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
@@ -1097,7 +1133,7 @@ class DataLoader:
                     desc="Loading data",
                     total=len(entry_list),
                     delay=2,
-                    unit=" keys",
+                    unit="keys",
                 )
 
             # now loop over the output of build_entry_list()
@@ -1407,26 +1443,23 @@ class DataLoader:
     # TODO: automatically get the dsp_config/par_database used for
     #   processing when these are set to None
     def browse(
-        self,
-        entry_list: pd.DataFrame = None,
-        dsp_config=None,
-        par_database: str | dict = None,
-        aux_values: pd.DataFrame = None,
-        lines: str | list[str] = "waveform",
-        styles: dict[str, list] | str = None,
-        legend: str | list[str] = None,
-        legend_opts: dict = None,
-        n_drawn: int = 1,
-        x_unit: pint.Unit | str = None,  # noqa: F821
-        x_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
-        y_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
-        norm: str = None,
-        align: str = None,
-        buffer_len: int = 128,
-        block_width: int = 8,
-    ):
-        """
-        Interface between :class:DataLoader and :class:WaveformBrowser.
+        self, entry_list: pd.DataFrame = None, buffer_len: int = 128, **kwargs
+    ) -> WaveformBrowser:
+        """Return a :class:`.WaveformBrowser` object for waveform inspection.
+
+        Parameters
+        ----------
+        entry_list
+            the output of :meth:`.build_entry_list`. If ``None``, builds it
+            according to the current configuration.
+        buffer_len
+            number of waveforms to keep in memory at a time.
+        **kwargs
+            keyword arguments forwarded to :class:`.WaveformBrowser`.
+
+        See Also
+        --------
+        .WaveformBrowser
         """
         if entry_list is None:
             entry_list = self.build_entry_list()
@@ -1465,24 +1498,7 @@ class DataLoader:
                 friend=lh5_it,
             )
 
-        return WaveformBrowser(
-            lh5_it,
-            dsp_config=dsp_config,
-            database=par_database,
-            aux_values=aux_values,
-            lines=lines,
-            styles=styles,
-            legend=legend,
-            legend_opts=legend_opts,
-            n_drawn=n_drawn,
-            x_unit=x_unit,
-            x_lim=x_lim,
-            y_lim=y_lim,
-            norm=norm,
-            align=align,
-            buffer_len=buffer_len,
-            block_width=block_width,
-        )
+        return WaveformBrowser(lh5_it, buffer_len=buffer_len, **kwargs)
 
     def get_tiers_for_col(
         self, columns: list | np.ndarray, merge_files: bool = None
