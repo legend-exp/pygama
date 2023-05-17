@@ -421,7 +421,6 @@ class DataLoader:
         self.aoesa_to_vov = False
         self.data = None
 
-    # TODO: mode
     def build_entry_list(
         self,
         tcm_level: str = None,
@@ -523,8 +522,22 @@ class DataLoader:
 
         sto = LH5Store()
 
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar = tqdm(
+                desc="Building entry list",
+                total=len(self.file_list),
+                delay=2,
+                unit=" keys",
+            )
+
         # Make the entry list for each file
         for file in self.file_list:
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.update()
+                progress_bar.set_postfix(
+                    key=self.filedb.df.iloc[file][self.filedb.sortby]
+                )
+
             # Get the TCM specified
             # Assumes that each TCM level only has one tier
             tcm_tier = self.tiers[tcm_level][0]
@@ -676,6 +689,9 @@ class DataLoader:
                     sto.write_object(
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
+
+        if log.getEffectiveLevel() >= logging.INFO:
+            progress_bar.close()
 
         if in_memory:
             if self.merge_files:
@@ -838,6 +854,7 @@ class DataLoader:
 
                     if tb_table is None:
                         continue
+
                     # convert to DataFrame and apply cuts
                     tb_df = tb_table.get_dataframe()
                     tb_df.query(cut, inplace=True)
@@ -861,7 +878,6 @@ class DataLoader:
                     sto.write_object(
                         f_struct, f"entries/{file}", output_file, wo_mode="a"
                     )
-            # end file loop
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -1036,7 +1052,19 @@ class DataLoader:
                 attr_dict[key] = None
             table_length = len(entry_list)
 
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar = tqdm(
+                    desc="Loading data",
+                    total=len(product(tables, load_levels)),
+                    delay=2,
+                    unit=" keys",
+                )
+
             for tb, level in product(tables, load_levels):
+                if log.getEffectiveLevel() >= logging.INFO:
+                    progress_bar.update()
+                    progress_bar.set_postfix(key=f"{tb}, {level}")
+
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
                 el_idx = list(gb.groups.values())
@@ -1073,6 +1101,9 @@ class DataLoader:
                         table_length,
                         self.aoesa_to_vov,
                     )
+
+            if log.getEffectiveLevel() >= logging.INFO:
+                progress_bar.close()
 
             # Convert col_dict to lgdo.Table
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
