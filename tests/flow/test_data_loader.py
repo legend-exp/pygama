@@ -142,6 +142,24 @@ def test_set_cuts(test_dl):
     data = test_dl.load()
 
     assert (data["hit_table"].nda == [12, 13, 12, 13]).all()
+    
+def test_setter_overwrite(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_datastreams([1, 3, 8], "ch")
+    test_dl.set_cuts({"hit": "card == 3"})
+    test_dl.set_output(columns=["card"])
+
+    data = test_dl.load().get_dataframe()
+    
+    assert pd.unique(data['card']) == np.array([3])
+    
+    test_dl.set_files('timestamp == 20220716T104550Z')
+    test_dl.set_datastreams([1, 8], "ch")
+    test_dl.set_cuts({"hit": "card == 3 or card == 8"})
+    
+    data2 = test_dl.load().get_dataframe()
+    
+    assert pd.unique(data2['card']) == np.array([8])
 
 
 def test_browse(test_dl):
