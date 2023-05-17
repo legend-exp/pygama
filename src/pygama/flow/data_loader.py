@@ -1100,7 +1100,7 @@ class DataLoader:
                     )
         else:  # not merge_files
             if in_memory:
-                load_out = Struct(attrs={"keys_dtype": "int"})
+                load_out = Struct(attrs={"int_keys": True})
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
@@ -1231,7 +1231,7 @@ class DataLoader:
             raise NotImplementedError
         else:  # Not merge_files
             if in_memory:
-                load_out = {}
+                load_out = Struct(attrs={"int_keys": True})
             for file, f_entries in entry_list.items():
                 field_mask = []
                 f_table = None

@@ -344,16 +344,9 @@ class LH5Store:
                 # fields. If they all had shared indexing, they should be in a
                 # table... Maybe should emit a warning? Or allow them to be
                 # dicts keyed by field name?
-                if "keys_dtype" in h5f[name].attrs:
-                    keys_dtype = dict(h5f[name].attrs)["keys_dtype"]
-                    if keys_dtype == "str":
-                        f = str(field)
-                    elif keys_dtype == "int":
+                if "int_keys" in h5f[name].attrs:
+                    if dict(h5f[name].attrs)["int_keys"]:
                         f = int(field)
-                    elif keys_dtype == "float":
-                        f = float(field)
-                    elif keys_dtype == "bool":
-                        f = bool(field)
                 else:
                     f = str(field)
                 obj_dict[f], _ = self.read_object(
