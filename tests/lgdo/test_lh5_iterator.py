@@ -79,18 +79,18 @@ def more_lgnd_files(lgnd_test_data):
     return [
         [
             lgnd_test_data.get_path(
-                "lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_raw.lh5"
+                "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
             ),
             lgnd_test_data.get_path(
-                "lh5/prod-ref-l200/generated/tier/raw/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_raw.lh5"
+                "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012228Z-tier_raw.lh5"
             ),
         ],
         [
             lgnd_test_data.get_path(
-                "lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T104550Z-tier_hit.lh5"
+                "lh5/prod-ref-l200/generated/tier/hit/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_hit.lh5"
             ),
             lgnd_test_data.get_path(
-                "lh5/prod-ref-l200/generated/tier/hit/cal/p01/r014/l60-p01-r014-cal-20220716T105236Z-tier_hit.lh5"
+                "lh5/prod-ref-l200/generated/tier/hit/cal/p03/r001/l200-p03-r001-cal-20230318T012228Z-tier_hit.lh5"
             ),
         ],
     ]
@@ -99,20 +99,20 @@ def more_lgnd_files(lgnd_test_data):
 def test_friend(more_lgnd_files):
     lh5_raw_it = LH5Iterator(
         more_lgnd_files[0],
-        "ch000/raw",
+        "ch1084803/raw",
         field_mask=["waveform", "baseline"],
         buffer_len=5,
     )
     lh5_it = LH5Iterator(
         more_lgnd_files[1],
-        "ch000/hit",
-        field_mask=["hit_par1"],
+        "ch1084803/hit",
+        field_mask=["is_valid_0vbb"],
         buffer_len=5,
         friend=lh5_raw_it,
     )
 
     lh5_obj, n_rows = lh5_it.read(0)
 
-    assert n_rows == 2
+    assert n_rows == 5
     assert isinstance(lh5_obj, lgdo.Table)
-    assert set(lh5_obj.keys()) == {"waveform", "baseline", "hit_par1"}
+    assert set(lh5_obj.keys()) == {"waveform", "baseline", "is_valid_0vbb"}
