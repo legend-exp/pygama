@@ -947,7 +947,7 @@ class ProcessingChain:
             )
 
     # type cast variable
-    def _astype(var: ProcChainVar, dtype: str) -> ProcChainVar: # noqa: N805
+    def _astype(var: ProcChainVar, dtype: str) -> ProcChainVar:  # noqa: N805
         dtype = np.dtype(dtype)
         if var is None:
             return None
@@ -964,7 +964,16 @@ class ProcessingChain:
                 var.unit,
                 var.is_coord,
             )
-            var.proc_chain._proc_managers.append(ProcessorManager(var.proc_chain, np.copyto, [out, var], kw_params={"casting":"'unsafe'"}, signature="(),(),()", types=f"{dtype.char}{var.dtype.char}"))
+            var.proc_chain._proc_managers.append(
+                ProcessorManager(
+                    var.proc_chain,
+                    np.copyto,
+                    [out, var],
+                    kw_params={"casting": "'unsafe'"},
+                    signature="(),(),()",
+                    types=f"{dtype.char}{var.dtype.char}",
+                )
+            )
             return out
 
     # dict of functions that can be parsed by get_variable

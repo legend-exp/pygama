@@ -1,10 +1,10 @@
-from numba import guvectorize
 import numpy as np
+from numba import guvectorize
+from scipy.ndimage import gaussian_filter1d
 
 from pygama.dsp.errors import DSPFatal
 from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 
-from scipy.ndimage import gaussian_filter1d
 
 @guvectorize(
     ["void(float32[:], float32, float32[:])", "void(float64[:], float64, float64[:])"],
@@ -36,7 +36,7 @@ def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
             "unit": "ADC"
         }
     """
-    if np.isnan(t_tau) or t_tau==0:
+    if np.isnan(t_tau) or t_tau == 0:
         raise DSPFatal("t_tau must be a non-zero number")
 
     w_out[:] = np.nan
@@ -51,9 +51,7 @@ def pole_zero(w_in: np.ndarray, t_tau: float, w_out: np.ndarray) -> None:
 
 
 @guvectorize(
-    ["(float32[:], float32[:])", "(float64[:], float64[:])"],
-    "(n),(m)",
-    **nb_kwargs
+    ["(float32[:], float32[:])", "(float64[:], float64[:])"], "(n),(m)", **nb_kwargs
 )
 def derivative(w_in: np.ndarray, w_out: np.ndarray):
     """Calculate time-derivative of pulse by taking finite
@@ -80,22 +78,22 @@ def derivative(w_in: np.ndarray, w_out: np.ndarray):
         }
     """
     n_samp = len(w_in) - len(w_out)
-    if n_samp<0:
+    if n_samp < 0:
         raise DSPFatal("n_samples must be >0")
-    
+
     w_out[:] = np.nan
 
     if np.isnan(w_in).any():
         return
 
     for i_samp in range(len(w_out)):
-        w_out[i_samp] = w_in[i_samp+n_samp] - w_in[i_samp]
+        w_out[i_samp] = w_in[i_samp + n_samp] - w_in[i_samp]
 
 
 @guvectorize(
     ["(float32[:], float32, float32[:])", "(float64[:], float64, float64[:])"],
     "(n),()->(n)",
-    **nb_kwargs(forceobj=True)
+    **nb_kwargs(forceobj=True),
 )
 def gauss_filter(w_in: np.ndarray, sigma: float, w_out: np.ndarray):
     """Convolve the waveform with a gaussian function
@@ -129,6 +127,7 @@ def gauss_filter(w_in: np.ndarray, sigma: float, w_out: np.ndarray):
 
     gaussian_filter1d(w_in, sigma, output=w_out, mode="nearest")
 
+
 def triangle_filter(length: int):
     """Convolve the waveform with a triangle function
 
@@ -136,7 +135,7 @@ def triangle_filter(length: int):
     ----------
     length
         the total number of samples for the triangle kernel
-    
+
     Returns
         gufunc for triangle filter
 
@@ -153,26 +152,23 @@ def triangle_filter(length: int):
             "unit": "ADC"
         }
     """
-    
+
     # build triangular kernel
-    kernel = np.concatenate( [
-        np.arange(1, length//2+1, dtype='f'),
-        np.arange((length+1)//2, 0, -1, dtype='f')
-    ] )
-    kernel /= np.sum(kernel) # normalize
-    
-    @guvectorize(
-        ["(float32[:], float32[:])"],
-        "(n)->(n)",
-        forceobj=True,
-        cache=False
+    kernel = np.concatenate(
+        [
+            np.arange(1, length // 2 + 1, dtype="f"),
+            np.arange((length + 1) // 2, 0, -1, dtype="f"),
+        ]
     )
+    kernel /= np.sum(kernel)  # normalize
+
+    @guvectorize(["(float32[:], float32[:])"], "(n)->(n)", forceobj=True, cache=False)
     def returned_filter(w_in: np.ndarray, w_out: np.ndarray):
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
             return
-    
+
         w_out[:] = np.convolve(w_in, kernel, mode="same")
 
     return returned_filter
