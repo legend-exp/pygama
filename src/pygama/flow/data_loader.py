@@ -1355,15 +1355,16 @@ class DataLoader:
                         ]
 
                     # Create iterator for this tier and friend to other tiers
-                    lh5_it = LH5Iterator(
-                        lh5_files=lh5_files,
-                        groups=tb_names,
-                        base_path=self.data_dir,
-                        entry_list=idx_list,
-                        field_mask=field_mask,
-                        buffer_len=buffer_len,
-                        friend=lh5_it,
-                    )
+                    if len(lh5_files) > 0:
+                        lh5_it = LH5Iterator(
+                            lh5_files=lh5_files,
+                            groups=tb_names,
+                            base_path=self.data_dir,
+                            entry_list=idx_list,
+                            field_mask=field_mask,
+                            buffer_len=buffer_len,
+                            friend=lh5_it,
+                        )
 
             return lh5_it
         else:  # not merge_files
