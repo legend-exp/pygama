@@ -1438,26 +1438,23 @@ class DataLoader:
     # TODO: automatically get the dsp_config/par_database used for
     #   processing when these are set to None
     def browse(
-        self,
-        entry_list: pd.DataFrame = None,
-        dsp_config=None,
-        par_database: str | dict = None,
-        aux_values: pd.DataFrame = None,
-        lines: str | list[str] = "waveform",
-        styles: dict[str, list] | str = None,
-        legend: str | list[str] = None,
-        legend_opts: dict = None,
-        n_drawn: int = 1,
-        x_unit: pint.Unit | str = None,  # noqa: F821
-        x_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
-        y_lim: tuple[float | str | pint.Quantity] = None,  # noqa: F821
-        norm: str = None,
-        align: str = None,
-        buffer_len: int = 128,
-        block_width: int = 8,
-    ):
-        """
-        Interface between :class:DataLoader and :class:WaveformBrowser.
+        self, entry_list: pd.DataFrame = None, buffer_len: int = 128, **kwargs
+    ) -> WaveformBrowser:
+        """Return a :class:`.WaveformBrowser` object for waveform inspection.
+
+        Parameters
+        ----------
+        entry_list
+            the output of :meth:`.build_entry_list`. If ``None``, builds it
+            according to the current configuration.
+        buffer_len
+            number of waveforms to keep in memory at a time.
+        **kwargs
+            keyword arguments forwarded to :class:`.WaveformBrowser`.
+
+        See Also
+        --------
+        .WaveformBrowser
         """
         if entry_list is None:
             entry_list = self.build_entry_list()
@@ -1496,24 +1493,7 @@ class DataLoader:
                 friend=lh5_it,
             )
 
-        return WaveformBrowser(
-            lh5_it,
-            dsp_config=dsp_config,
-            database=par_database,
-            aux_values=aux_values,
-            lines=lines,
-            styles=styles,
-            legend=legend,
-            legend_opts=legend_opts,
-            n_drawn=n_drawn,
-            x_unit=x_unit,
-            x_lim=x_lim,
-            y_lim=y_lim,
-            norm=norm,
-            align=align,
-            buffer_len=buffer_len,
-            block_width=block_width,
-        )
+        return WaveformBrowser(lh5_it, buffer_len=buffer_len, **kwargs)
 
     def get_tiers_for_col(
         self, columns: list | np.ndarray, merge_files: bool = None

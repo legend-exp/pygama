@@ -33,7 +33,7 @@ class WaveformBrowser:
         base_path: str = "",
         entry_list: list[int] | list[list[int]] = None,
         entry_mask: list[int] | list[list[int]] = None,
-        dsp_config: str = None,
+        dsp_config: dict | str = None,
         database: str | dict = None,
         aux_values: pandas.DataFrame = None,
         lines: str | list[str] = "waveform",
