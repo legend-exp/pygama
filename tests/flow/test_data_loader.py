@@ -146,6 +146,7 @@ def test_set_cuts(test_dl):
 
     assert (data.is_valid_cal == False).all()  # noqa: E712
 
+
 def test_setter_overwrite(test_dl):
     test_dl.set_files("all")
     test_dl.set_datastreams([1084803, 1084804, 1121600], "ch")
@@ -153,17 +154,19 @@ def test_setter_overwrite(test_dl):
     test_dl.set_output(columns=["trapEmax"])
 
     data = test_dl.load().get_dataframe()
-    
+
     test_dl.set_files("timestamp == '20230318T012144Z'")
     test_dl.set_datastreams([1084803, 1121600], "ch")
     test_dl.set_cuts({"hit": "trapEmax > 0"})
-    
-    
+
     data2 = test_dl.load().get_dataframe()
-    
-    assert 1084804 not in data2['hit_table']
-    assert len(pd.unique(data2['file'])) == 1
-    assert len(data2.query('hit_table == 1084803')) > len(data.query('hit_table == 1084803'))
+
+    assert 1084804 not in data2["hit_table"]
+    assert len(pd.unique(data2["file"])) == 1
+    assert len(data2.query("hit_table == 1084803")) > len(
+        data.query("hit_table == 1084803")
+    )
+
 
 def test_browse(test_dl):
     test_dl.set_files("type == 'phy'")
