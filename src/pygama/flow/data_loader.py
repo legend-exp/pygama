@@ -527,7 +527,7 @@ class DataLoader:
                 desc="Building entry list",
                 total=len(self.file_list),
                 delay=2,
-                unit=" keys",
+                unit="keys",
             )
 
         # Make the entry list for each file
@@ -765,7 +765,7 @@ class DataLoader:
                 desc="Building entry list",
                 total=len(self.file_list),
                 delay=2,
-                unit=" keys",
+                unit="keys",
             )
 
         # now we loop over the files in our list
@@ -1052,27 +1052,32 @@ class DataLoader:
                 attr_dict[key] = None
             table_length = len(entry_list)
 
+            tot_iter = 0
+            for _, level in product(tables, load_levels):
+                for _ in self.tiers[level]:
+                    tot_iter += 1
+
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
                     desc="Loading data",
-                    total=len(product(tables, load_levels)),
+                    total=tot_iter,
                     delay=2,
-                    unit=" keys",
                 )
 
             for tb, level in product(tables, load_levels):
-                if log.getEffectiveLevel() >= logging.INFO:
-                    progress_bar.update()
-                    progress_bar.set_postfix(key=f"{tb}, {level}")
-
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 files = list(gb.groups.keys())
                 el_idx = list(gb.groups.values())
                 idx_mask = [list(entry_list.loc[i, f"{level}_idx"]) for i in el_idx]
 
                 for tier in self.tiers[level]:
+                    if log.getEffectiveLevel() >= logging.INFO:
+                        progress_bar.update()
+                        progress_bar.set_postfix(table=tb, tier=tier)
+
                     if tb not in col_tiers[tier]:
                         continue
+
                     tb_name = self.filedb.get_table_name(tier, tb)
                     tier_paths = [
                         os.path.join(
@@ -1128,7 +1133,7 @@ class DataLoader:
                     desc="Loading data",
                     total=len(entry_list),
                     delay=2,
-                    unit=" keys",
+                    unit="keys",
                 )
 
             # now loop over the output of build_entry_list()
