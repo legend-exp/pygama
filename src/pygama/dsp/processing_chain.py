@@ -946,8 +946,38 @@ class ProcessingChain:
                 "round() is not implemented for variables, only constants."
             )
 
+    # type cast variable
+    def _astype(var: ProcChainVar, dtype: str) -> ProcChainVar:  # noqa: N805
+        dtype = np.dtype(dtype)
+        if var is None:
+            return None
+        if not isinstance(var, ProcChainVar):
+            raise ProcessingChainError(f"cannot call astype() on {var}")
+        else:
+            name = f"{var.name}.astype(`{dtype.char}`)"
+            out = ProcChainVar(
+                var.proc_chain,
+                name,
+                var.shape,
+                dtype,
+                var.grid,
+                var.unit,
+                var.is_coord,
+            )
+            var.proc_chain._proc_managers.append(
+                ProcessorManager(
+                    var.proc_chain,
+                    np.copyto,
+                    [out, var],
+                    kw_params={"casting": "'unsafe'"},
+                    signature="(),(),()",
+                    types=f"{dtype.char}{var.dtype.char}",
+                )
+            )
+            return out
+
     # dict of functions that can be parsed by get_variable
-    func_list = {"len": _length, "round": _round}
+    func_list = {"len": _length, "round": _round, "astype": _astype}
     module_list = {"np": np, "numpy": np}
 
 
@@ -1018,7 +1048,7 @@ class ProcessorManager:
             raise ProcessingChainError(
                 f"expected {len(dims_list)} arguments from signature "
                 f"{self.signature}; found "
-                f"{len(params)}: ({', '.join([str(par) for par in params])})"
+                f"{len(params)+len(kw_params)}: ({', '.join([str(par) for par in params])})"
             )
 
         dims_dict = {}  # map from dim name -> DimInfo
