@@ -56,9 +56,7 @@ class Struct(LGDO, dict):
         self[name] = obj
         self.update_datatype()
 
-    def remove_field(
-        self, name: str | int, delete: bool = False
-    ) -> None:
+    def remove_field(self, name: str | int, delete: bool = False) -> None:
         """Remove a field from the table.
 
         Parameters
