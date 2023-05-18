@@ -245,7 +245,8 @@ class DataLoader:
             ``all`` keyword is supported to select all files in the database.
             If list of strings, will be interpreted as key (cycle timestamp) list.
         append
-            if True, appends files to the existing file_list instead of overwriting
+            if ``True``, appends files to the existing `self.file_list`
+            instead of overwriting.
 
         Note
         ----
@@ -305,7 +306,8 @@ class DataLoader:
             the type of identifier used in ds. Should be a key in the given
             channel map or a word defined in the configuration file.
         append
-            if True, appends datastreams to the existing table_list instead of overwriting
+            if ``True``, appends datastreams to the existing `self.table_list`
+            instead of overwriting.
 
         Example
         -------

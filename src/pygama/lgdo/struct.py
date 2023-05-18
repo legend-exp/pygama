@@ -51,13 +51,13 @@ class Struct(LGDO, dict):
     def update_datatype(self) -> None:
         self.attrs["datatype"] = self.form_datatype()
 
-    def add_field(self, name: str | int | float | bool, obj: LGDO) -> None:
+    def add_field(self, name: str | int, obj: LGDO) -> None:
         """Add a field to the table."""
         self[name] = obj
         self.update_datatype()
 
     def remove_field(
-        self, name: str | int | float | bool, delete: bool = False
+        self, name: str | int, delete: bool = False
     ) -> None:
         """Remove a field from the table.
 
