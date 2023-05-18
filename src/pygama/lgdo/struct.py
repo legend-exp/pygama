@@ -44,17 +44,19 @@ class Struct(LGDO, dict):
         return "struct"
 
     def form_datatype(self) -> str:
-        return self.datatype_name() + "{" + ",".join(self.keys()) + "}"
+        return (
+            self.datatype_name() + "{" + ",".join([str(k) for k in self.keys()]) + "}"
+        )
 
     def update_datatype(self) -> None:
         self.attrs["datatype"] = self.form_datatype()
 
-    def add_field(self, name: str, obj: LGDO) -> None:
+    def add_field(self, name: str | int, obj: LGDO) -> None:
         """Add a field to the table."""
         self[name] = obj
         self.update_datatype()
 
-    def remove_field(self, name: str, delete: bool = False) -> None:
+    def remove_field(self, name: str | int, delete: bool = False) -> None:
         """Remove a field from the table.
 
         Parameters

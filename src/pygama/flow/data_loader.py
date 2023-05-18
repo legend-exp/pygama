@@ -231,7 +231,7 @@ class DataLoader:
             else:
                 self.cut_priority[level] = 0
 
-    def set_files(self, query: str | list[str]) -> None:
+    def set_files(self, query: str | list[str], append: bool = False) -> None:
         """Apply a file selection.
 
         Sets `self.file_list`, which is a list of indices corresponding to the
@@ -244,6 +244,9 @@ class DataLoader:
             supported by :meth:`pandas.DataFrame.query`. In addition, the
             ``all`` keyword is supported to select all files in the database.
             If list of strings, will be interpreted as key (cycle timestamp) list.
+        append
+            if ``True``, appends files to the existing `self.file_list`
+            instead of overwriting.
 
         Note
         ----
@@ -273,10 +276,11 @@ class DataLoader:
         if not inds:
             log.warning("no files matching selection found")
 
-        if self.file_list is None:
-            self.file_list = inds
-        else:
+        if append and self.file_list is not None:
             self.file_list += inds
+            self.file_list = sorted(list(set(self.file_list)))
+        else:
+            self.file_list = inds
 
     def get_file_list(self) -> pd.DataFrame:
         """
@@ -285,7 +289,9 @@ class DataLoader:
         """
         return self.filedb.df.iloc[self.file_list]
 
-    def set_datastreams(self, ds: list | tuple | np.ndarray, word: str) -> None:
+    def set_datastreams(
+        self, ds: list | tuple | np.ndarray, word: str, append: bool = False
+    ) -> None:
         """Apply selection on data streams (or channels).
 
         Sets `self.table_list`.
@@ -299,12 +305,15 @@ class DataLoader:
         word
             the type of identifier used in ds. Should be a key in the given
             channel map or a word defined in the configuration file.
+        append
+            if ``True``, appends datastreams to the existing `self.table_list`
+            instead of overwriting.
 
         Example
         -------
         >>> dl.set_datastreams(np.arange(40, 45), "ch")
         """
-        if self.table_list is None:
+        if self.table_list is None or not append:
             self.table_list = {}
 
         ds = list(ds)
@@ -324,6 +333,7 @@ class DataLoader:
                 found = True
                 if level in self.table_list.keys():
                     self.table_list[level] += ds
+                    self.table_list[level] = sorted(list(set(self.table_list[level])))
                 else:
                     self.table_list[level] = ds
 
@@ -331,7 +341,7 @@ class DataLoader:
             # look for word in channel map
             raise NotImplementedError
 
-    def set_cuts(self, cuts: dict | list) -> None:
+    def set_cuts(self, cuts: dict | list, append: bool = False) -> None:
         """Apply a selection on columns in the data tables.
 
         Parameters
@@ -342,12 +352,14 @@ class DataLoader:
             structured as ``dict[tier] = cut_expr``. If passing a list, each
             item in the array should be able to be applied on one level of
             tables. The cuts at different levels will be joined with an AND.
+        append
+            if True, appends cuts to the existing cuts instead of overwriting
 
         Example
         -------
         >>> dl.set_cuts({"raw": "daqenergy > 1000", "hit": "AoE > 3"})
         """
-        if self.cuts is None:
+        if self.cuts is None or not append:
             self.cuts = {}
         if isinstance(cuts, dict):
             # verify the correct structure
@@ -356,7 +368,7 @@ class DataLoader:
                     raise ValueError(
                         r"cuts dictionary must be in the format \{ level: string \}"
                     )
-                if key in self.cuts.keys():
+                if key in self.cuts.keys() and append:
                     self.cuts[key] += " and " + value
                 else:
                     self.cuts[key] = value
@@ -1126,7 +1138,7 @@ class DataLoader:
                     )
         else:  # not merge_files
             if in_memory:
-                load_out = {}
+                load_out = Struct(attrs={"int_keys": True})
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar = tqdm(
@@ -1215,13 +1227,15 @@ class DataLoader:
                 f_table = utils.dict_to_table(col_dict, attr_dict)
 
                 if in_memory:
-                    load_out[file] = f_table
+                    load_out.add_field(name=file, obj=f_table)
                 if output_file:
                     sto.write_object(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
                 progress_bar.close()
+            if load_out:
+                load_out.update_datatype()
 
             if in_memory:
                 if self.output_format == "lgdo.Table":
@@ -1255,7 +1269,7 @@ class DataLoader:
             raise NotImplementedError
         else:  # Not merge_files
             if in_memory:
-                load_out = {}
+                load_out = Struct(attrs={"int_keys": True})
             for file, f_entries in entry_list.items():
                 field_mask = []
                 f_table = None

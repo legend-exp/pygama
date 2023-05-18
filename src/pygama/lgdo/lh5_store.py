@@ -344,7 +344,12 @@ class LH5Store:
                 # fields. If they all had shared indexing, they should be in a
                 # table... Maybe should emit a warning? Or allow them to be
                 # dicts keyed by field name?
-                obj_dict[field], _ = self.read_object(
+                if "int_keys" in h5f[name].attrs:
+                    if dict(h5f[name].attrs)["int_keys"]:
+                        f = int(field)
+                else:
+                    f = str(field)
+                obj_dict[f], _ = self.read_object(
                     name + "/" + field,
                     h5f,
                     start_row=start_row,
@@ -929,9 +934,11 @@ class LH5Store:
                 else:
                     obj_fld = obj[field]
 
+                # Convert keys to string for dataset names
+                f = str(field)
                 self.write_object(
                     obj_fld,
-                    field,
+                    f,
                     lh5_file,
                     group=group,
                     start_row=start_row,

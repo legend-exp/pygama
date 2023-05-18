@@ -225,7 +225,7 @@ class Table(Struct):
                 if not hasattr(column, "nda"):
                     raise ValueError(f"column {col} does not have an nda")
                 else:
-                    df[prefix + col] = column.nda.tolist()
+                    df[prefix + str(col)] = column.nda.tolist()
 
         return df
 
