@@ -76,7 +76,7 @@ def test_no_merge(test_dl):
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
-    assert isinstance(data, dict)
+    assert isinstance(data, lgdo.Struct)
     assert isinstance(data[0], lgdo.Table)
     assert len(data) == 4  # 4 files
     assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp"]
@@ -145,6 +145,27 @@ def test_set_cuts(test_dl):
     data = test_dl.load()
 
     assert (data.is_valid_cal == False).all()  # noqa: E712
+
+
+def test_setter_overwrite(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_datastreams([1084803, 1084804, 1121600], "ch")
+    test_dl.set_cuts({"hit": "trapEmax > 5000"})
+    test_dl.set_output(columns=["trapEmax"])
+
+    data = test_dl.load().get_dataframe()
+
+    test_dl.set_files("timestamp == '20230318T012144Z'")
+    test_dl.set_datastreams([1084803, 1121600], "ch")
+    test_dl.set_cuts({"hit": "trapEmax > 0"})
+
+    data2 = test_dl.load().get_dataframe()
+
+    assert 1084804 not in data2["hit_table"]
+    assert len(pd.unique(data2["file"])) == 1
+    assert len(data2.query("hit_table == 1084803")) > len(
+        data.query("hit_table == 1084803")
+    )
 
 
 def test_browse(test_dl):
