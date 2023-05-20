@@ -1084,7 +1084,13 @@ class ProcessorManager:
             # check if arr_dims can be broadcast to match fun_dims
             for i in range(max(len(fun_dims), len(arr_dims))):
                 fd = fun_dims[-i - 1] if i < len(fun_dims) else None
-                ad = arr_dims[-i - 1] if i < len(arr_dims) else self.proc_chain._block_width if i==len(arr_dims) else None
+                ad = (
+                    arr_dims[-i - 1]
+                    if i < len(arr_dims)
+                    else self.proc_chain._block_width
+                    if i == len(arr_dims)
+                    else None
+                )
 
                 if isinstance(fd, str):
                     if fd in dims_dict:

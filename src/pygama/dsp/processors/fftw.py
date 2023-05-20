@@ -6,8 +6,9 @@ import numpy as np
 from numba import guvectorize
 from pyfftw import FFTW
 
-from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
 from pygama.dsp.processing_chain import ProcChainVar
+from pygama.dsp.utils import numba_defaults_kwargs as nb_kwargs
+
 
 def dft(w_in: np.ndarray | ProcChainVar, w_out: np.ndarray | ProcChainVar) -> Callable:
     """Perform discrete Fourier transforms using the FFTW library.
@@ -57,17 +58,17 @@ def dft(w_in: np.ndarray | ProcChainVar, w_out: np.ndarray | ProcChainVar) -> Ca
     if isinstance(w_in, ProcChainVar) and isinstance(w_out, ProcChainVar):
         c = w_in.dtype.kind
         s = w_in.dtype.itemsize
-        if c=="f":
+        if c == "f":
             w_out.update_auto(
-                shape = w_in.shape[:-1] + (w_in.shape[-1]//2 + 1,),
-                dtype = np.dtype(f"c{2*s}"),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape[:-1] + (w_in.shape[-1] // 2 + 1,),
+                dtype=np.dtype(f"c{2*s}"),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
-        elif c=="c":
+        elif c == "c":
             w_out.update_auto(
-                shape = w_in.shape,
-                dtype = np.dtype(f"c{s}"),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape,
+                dtype=np.dtype(f"c{s}"),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
         w_in = w_in.buffer
         w_out = w_out.buffer
@@ -144,16 +145,18 @@ def inv_dft(w_in: np.ndarray, w_out: np.ndarray) -> Callable:
     # if we have a ProcChainVar, set up the output and get numpy arrays
     if isinstance(w_in, ProcChainVar) and isinstance(w_out, ProcChainVar):
         s = w_in.dtype.itemsize
-        if w_out.dtype=="auto":
+        if w_out.dtype == "auto":
             w_out.update_auto(
-                shape = w_in.shape[:-1] + (2*(w_in.shape[-1]-1),),
-                dtype = np.dtype(f"f{s//2}"),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape[:-1] + (2 * (w_in.shape[-1] - 1),),
+                dtype=np.dtype(f"f{s//2}"),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
         else:
             w_out.update_auto(
-                shape = w_in.shape if w_out.dtype.kind=="c" else w_in.shape[:-1] + (2*(w_in.shape[-1]-1),),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape
+                if w_out.dtype.kind == "c"
+                else w_in.shape[:-1] + (2 * (w_in.shape[-1] - 1),),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
         w_in = w_in.buffer
         w_out = w_out.buffer
@@ -231,25 +234,23 @@ def psd(w_in: np.ndarray, w_out: np.ndarray) -> Callable:
     if isinstance(w_in, ProcChainVar) and isinstance(w_out, ProcChainVar):
         c = w_in.dtype.kind
         s = w_in.dtype.itemsize
-        if c=="f":
+        if c == "f":
             w_out.update_auto(
-                shape = w_in.shape[:-1] + (w_in.shape[-1]//2 + 1,),
-                dtype = np.dtype(f"f{s}"),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape[:-1] + (w_in.shape[-1] // 2 + 1,),
+                dtype=np.dtype(f"f{s}"),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
-        elif c=="c":
+        elif c == "c":
             w_out.update_auto(
-                shape = w_in.shape,
-                dtype = np.dtype(f"f{s//2}"),
-                period = 1./w_in.period/w_in.shape[-1]
+                shape=w_in.shape,
+                dtype=np.dtype(f"f{s//2}"),
+                period=1.0 / w_in.period / w_in.shape[-1],
             )
         w_in = w_in.buffer
         w_out = w_out.buffer
 
     # build intermediate array for the dft, which will be abs'd to get the PSD
-    w_dft = np.ndarray(
-        w_out.shape, np.dtype(f"c{w_in.dtype.itemsize*2}")
-    )
+    w_dft = np.ndarray(w_out.shape, np.dtype(f"c{w_in.dtype.itemsize*2}"))
     try:
         dft_fun = FFTW(w_in, w_dft, axes=(-1,), direction="FFTW_FORWARD")
     except ValueError:
