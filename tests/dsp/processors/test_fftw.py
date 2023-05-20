@@ -9,7 +9,7 @@ def test_dft(compare_numba_vs_python):
     """Testing function for the discrete fourier transform."""
 
     # set up arrays to use
-    w_in = np.ones(shape=(16, 100), dtype="float32")
+    w_in = np.zeros(shape=(16, 100), dtype="float32")
     w_dft = np.zeros(shape=(16, 51), dtype="complex64")
 
     # ensure the DSPFatal is raised for incorrect shaps/types
@@ -21,6 +21,8 @@ def test_dft(compare_numba_vs_python):
     w_expected[:, 0] = 100.
     
     dft_func = dft(w_in, w_dft)
+    w_in[:] = 1.
+
     assert np.allclose(
         compare_numba_vs_python(dft_func, w_in, w_dft),
         w_expected,
@@ -34,7 +36,7 @@ def test_inv_dft(compare_numba_vs_python):
     """Testing function for the inverse discrete fourier transform."""
 
     # set up arrays to use
-    w_in = np.ones(shape=(16, 51), dtype="complex64")
+    w_in = np.zeros(shape=(16, 51), dtype="complex64")
     w_inv_dft = np.zeros(shape=(16, 100), dtype="float32")
 
     # ensure the DSPFatal is raised for incorrect shaps/types
@@ -46,6 +48,8 @@ def test_inv_dft(compare_numba_vs_python):
     w_expected[:, 0] = 1.
     
     inv_dft_func = inv_dft(w_in, w_inv_dft)
+    w_in[:] = 1.
+
     assert np.allclose(
         compare_numba_vs_python(inv_dft_func, w_in, w_inv_dft),
         w_expected,
@@ -59,7 +63,7 @@ def test_psd(compare_numba_vs_python):
     """Testing function for the power spectral density."""
 
     # set up arrays to use
-    w_in = np.ones(shape=(16, 100), dtype="float32")
+    w_in = np.zeros(shape=(16, 100), dtype="float32")
     w_psd = np.zeros(shape=(16, 51), dtype="float32")
 
     # ensure the DSPFatal is raised for incorrect shaps/types
@@ -71,6 +75,8 @@ def test_psd(compare_numba_vs_python):
     w_expected[:, 0] = 100.
     
     psd_func = psd(w_in, w_psd)
+    w_in[:] = 1.
+
     assert np.allclose(
         compare_numba_vs_python(psd_func, w_in, w_psd),
         w_expected,
