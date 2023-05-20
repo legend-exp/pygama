@@ -1092,7 +1092,7 @@ class ProcessorManager:
                         if not ad or this_dim.length != ad:
                             raise ProcessingChainError(
                                 f"failed to broadcast array dimensions for "
-                                f"{func.__name}. Could not find consistent value "
+                                f"{func.__name__}. Could not find consistent value "
                                 f"for dimension {fd}"
                             )
                         if not this_dim.grid:
