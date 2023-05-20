@@ -1165,6 +1165,7 @@ class ProcessorManager:
         ):
             dim_list = outerdims.copy()
             for d in dims.split(","):
+                d = d.strip()
                 if not d:
                     continue
                 if d not in dims_dict:
