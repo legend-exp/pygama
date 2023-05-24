@@ -17,20 +17,19 @@ from pygama.raw import build_raw
 
 config_dir = Path(__file__).parent / "dsp" / "configs"
 _tmptestdir = os.path.join(
-    gettempdir(), "pygama-tests-" + getuser() + str(uuid.uuid4())
+    gettempdir(), f"pygama-tests-{getuser()}-{str(uuid.uuid4())}"
 )
 
 
 @pytest.fixture(scope="session")
 def tmptestdir():
     os.mkdir(_tmptestdir)
-    yield _tmptestdir
-    shutil.rmtree(_tmptestdir)
+    return _tmptestdir
 
 
 def pytest_sessionfinish(session, exitstatus):
-    if exitstatus is True:
-        os.rmdir(_tmptestdir)
+    if exitstatus == 0:
+        shutil.rmtree(_tmptestdir)
 
 
 @pytest.fixture(scope="session")
