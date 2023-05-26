@@ -342,14 +342,14 @@ def test_scan_tables_columns(test_filedb_full):
     ]
 
 
-def test_serialization(test_filedb_full):
+def test_serialization(test_filedb_full, tmptestdir):
     db = test_filedb_full
-    db.to_disk("/tmp/filedb.lh5", wo_mode="of")
+    db.to_disk(f"{tmptestdir}/filedb.lh5", wo_mode="of")
 
     with pytest.raises(RuntimeError):
-        db.to_disk("/tmp/filedb.lh5")
+        db.to_disk(f"{tmptestdir}/filedb.lh5")
 
-    db2 = FileDB("/tmp/filedb.lh5")
+    db2 = FileDB(f"{tmptestdir}/filedb.lh5")
     assert_frame_equal(db.df, db2.df)
 
 

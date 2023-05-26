@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 
-import pygama.evt.tcm as ptcm
-import pygama.lgdo as lgdo
+import lgdo as lgdo
+
+from . import tcm as ptcm
 
 
 def build_tcm(

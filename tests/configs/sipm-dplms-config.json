@@ -10,26 +10,26 @@
   "processors": {
     "wf_gaus": {
       "function": "gaussian_filter1d",
-      "module": "pygama.dsp.processors.gaussian_filter1d",
+      "module": "pygama.dsp.processors",
       "args": ["waveform", "wf_gaus(len(waveform))"],
       "init_args": ["1", "4.0"],
       "unit": "ADC"
     },
     "curr": {
       "function": "avg_current",
-      "module": "pygama.dsp.processors.moving_windows",
+      "module": "pygama.dsp.processors",
       "args": ["wf_gaus", 5, "curr(len(wf_gaus)-5)"],
       "unit": "ADC"
     },
     "hist_weights , hist_borders": {
       "function": "histogram",
-      "module": "pygama.dsp.processors.histogram",
+      "module": "pygama.dsp.processors",
       "args": ["curr", "hist_weights(100)", "hist_borders(101)"],
       "unit": ["none", "ADC"]
     },
     "fwhm, idx_out_c, max_out": {
       "function": "histogram_stats",
-      "module": "pygama.dsp.processors.histogram",
+      "module": "pygama.dsp.processors",
       "args": [
         "hist_weights",
         "hist_borders",
@@ -42,7 +42,7 @@
     },
     "vt_max_candidate_out, vt_min_out, n_max_out, n_min_out": {
       "function": "get_multi_local_extrema",
-      "module": "pygama.dsp.processors.get_multi_local_extrema",
+      "module": "pygama.dsp.processors",
       "args": [
         "curr",
         5,
@@ -59,7 +59,7 @@
     },
     "trigger_pos, no_out": {
       "function": "peak_snr_threshold",
-      "module": "pygama.dsp.processors.peak_snr_threshold",
+      "module": "pygama.dsp.processors",
       "args": [
         "curr",
         "vt_max_candidate_out",
@@ -72,7 +72,7 @@
     },
     "energies": {
       "function": "multi_a_filter",
-      "module": "pygama.dsp.processors.multi_a_filter",
+      "module": "pygama.dsp.processors",
       "args": ["curr", "trigger_pos", "energies"],
       "unit": ["ADC"]
     },
@@ -111,13 +111,13 @@
     },
     "h_weights , h_borders": {
       "function": "histogram",
-      "module": "pygama.dsp.processors.histogram",
+      "module": "pygama.dsp.processors",
       "args": ["wf_dplms", "h_weights(100)", "h_borders(101)"],
       "unit": ["none", "ADC"]
     },
     "fwhm_d, idx_out_d, max_out_d": {
       "function": "histogram_stats",
-      "module": "pygama.dsp.processors.histogram",
+      "module": "pygama.dsp.processors",
       "args": [
         "h_weights",
         "h_borders",
@@ -130,7 +130,7 @@
     },
     "vt_max_candidate_out_d, vt_min_out_d, n_max_out_d, n_min_out_d": {
       "function": "get_multi_local_extrema",
-      "module": "pygama.dsp.processors.get_multi_local_extrema",
+      "module": "pygama.dsp.processors",
       "args": [
         "wf_dplms",
         10,
@@ -145,7 +145,7 @@
     },
     "trigger_pos_dplms, no_out_d": {
       "function": "peak_snr_threshold",
-      "module": "pygama.dsp.processors.peak_snr_threshold",
+      "module": "pygama.dsp.processors",
       "args": [
         "wf_dplms",
         "vt_max_candidate_out_d",
@@ -158,7 +158,7 @@
     },
     "energies_dplms": {
       "function": "multi_a_filter",
-      "module": "pygama.dsp.processors.multi_a_filter",
+      "module": "pygama.dsp.processors",
       "args": ["wf_dplms", "trigger_pos_dplms", "energies_dplms"],
       "unit": ["ADC"]
     }

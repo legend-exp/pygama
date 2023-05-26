@@ -15,6 +15,7 @@ import matplotlib as mpl
 from scipy.stats import binned_statistic
 
 mpl.use("agg")
+import lgdo.lh5_store as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,7 +24,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts

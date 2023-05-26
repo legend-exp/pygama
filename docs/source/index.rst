@@ -49,7 +49,5 @@ Next steps
 .. toctree::
    :maxdepth: 1
 
-   manuals/index
-   tutorials
    Package API reference <api/modules>
    developer

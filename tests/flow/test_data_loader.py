@@ -1,10 +1,10 @@
 from pathlib import Path
 
+import lgdo
 import numpy as np
 import pandas as pd
 import pytest
 
-from pygama import lgdo
 from pygama.flow import DataLoader
 
 config_dir = Path(__file__).parent / "configs"

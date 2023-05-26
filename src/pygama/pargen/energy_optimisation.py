@@ -13,6 +13,7 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
+import lgdo.lh5_store as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,7 +26,6 @@ from scipy.stats import chisquare, norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts

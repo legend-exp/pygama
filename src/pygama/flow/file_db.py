@@ -9,13 +9,12 @@ import string
 import warnings
 
 import h5py
+import lgdo
 import numpy as np
 import pandas as pd
+from lgdo import Array, Scalar, VectorOfVectors
+from lgdo import lh5_store as lh5
 from parse import parse
-
-from pygama import lgdo
-from pygama.lgdo import Array, Scalar, VectorOfVectors
-from pygama.lgdo import lh5_store as lh5
 
 from . import utils
 

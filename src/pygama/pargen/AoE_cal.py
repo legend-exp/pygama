@@ -12,6 +12,7 @@ import pathlib
 import matplotlib as mpl
 
 mpl.use("agg")
+import lgdo.lh5_store as lh5
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
@@ -21,7 +22,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.ecal_th as thc

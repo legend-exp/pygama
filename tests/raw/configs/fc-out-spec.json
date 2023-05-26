@@ -1,8 +1,0 @@
-{
-  "FCEventDecoder": {
-    "spms": {
-      "key_list": [[2, 4]],
-      "out_stream": "/tmp/L200-comm-20211130-phy-spms.lh5"
-    }
-  }
-}

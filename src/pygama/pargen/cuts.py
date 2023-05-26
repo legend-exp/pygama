@@ -9,11 +9,11 @@ import json
 import logging
 import os
 
+import lgdo.lh5_store as lh5
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-import pygama.lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc

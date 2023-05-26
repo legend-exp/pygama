@@ -9,8 +9,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-
-from pygama.lgdo import LH5Iterator, LH5Store, ls
+from lgdo import LH5Iterator, LH5Store, ls
 
 log = logging.getLogger(__name__)
 

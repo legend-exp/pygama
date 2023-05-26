@@ -7,13 +7,13 @@ import os
 import sys
 
 import numpy as np
+from daq2lh5 import build_raw
+from dspeed import build_dsp
+from lgdo import show
 
 import pygama
 import pygama.logging
-from pygama.dsp import build_dsp
 from pygama.hit import build_hit
-from pygama.lgdo import show
-from pygama.raw import build_raw
 
 
 def pygama_cli():
