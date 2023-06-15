@@ -50,4 +50,20 @@ Next steps
    :maxdepth: 1
 
    Package API reference <api/modules>
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Related projects
+
+   LEGEND Data Objects <https://legend-pydataobj.readthedocs.io>
+   Decoding Digitizer Data <https://legend-daq2lh5.readthedocs.io>
+   Digital Signal Processing <https://dspeed.readthedocs.io>
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Development
+
+   Source Code <https://github.com/legend-exp/pygama>
+   License <https://github.com/legend-exp/pygama/blob/main/LICENSE>
+   Changelog <https://github.com/legend-exp/pygama/releases>
    developer
