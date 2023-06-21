@@ -344,7 +344,7 @@ def moving_slope(length):
         if np.isnan(w_in).any():
             return
         
-         if len(kernel) > len(w_in):
+        if len(kernel) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
 
         w_out[:] =  np.convolve(w_in, kernel, "valid")
