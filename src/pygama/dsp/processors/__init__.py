@@ -60,7 +60,7 @@ several advantages:
 """
 
 from .bl_subtract import bl_subtract
-from .convolutions import cusp_filter, t0_filter, zac_filter, moving_slope
+from .convolutions import cusp_filter, moving_slope, t0_filter, zac_filter
 from .dplms import dplms
 from .dwt import discrete_wavelet_transform
 from .fftw import dft, inv_dft, psd
@@ -143,5 +143,5 @@ __all__ = [
     "windower",
     "time_over_threshold",
     "dplms",
-    "moving_slope"
+    "moving_slope",
 ]

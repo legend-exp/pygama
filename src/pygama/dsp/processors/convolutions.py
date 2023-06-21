@@ -287,8 +287,9 @@ def t0_filter(rise: int, fall: int) -> Callable:
 
     return t0_filter_out
 
+
 def moving_slope(length):
-    """Calculates the linear slope of a waveform in sections of length 
+    """Calculates the linear slope of a waveform in sections of length
 
     Note
     ----
@@ -321,32 +322,30 @@ def moving_slope(length):
     if np.floor(length) != length:
         raise DSPFatal("The length of the filter must be an integer")
 
-    sum_x = length*(length+1)/2
-    sum_x2 = length*(length+1)*(2*length+1)/6
-    
-    kernel = ((np.arange(1,length+1,1)*length) - (np.ones(length)*sum_x))
-    kernel /= (length * sum_x2 - sum_x * sum_x)
+    sum_x = length * (length + 1) / 2
+    sum_x2 = length * (length + 1) * (2 * length + 1) / 6
+
+    kernel = (np.arange(1, length + 1, 1) * length) - (np.ones(length) * sum_x)
+    kernel /= length * sum_x2 - sum_x * sum_x
     kernel = kernel[::-1]
-    
+
     @guvectorize(
-        ["void(float32[:], float32[:])", 
-         "void(float64[:], float64[:])"],
+        ["void(float32[:], float32[:])", "void(float64[:], float64[:])"],
         "(n),(m)",
         **nb_kwargs(
             cache=False,
             forceobj=True,
-        )
+        ),
     )
-    
     def moving_slope_out(w_in, w_out):
         w_out[:] = np.nan
 
         if np.isnan(w_in).any():
             return
-        
+
         if len(kernel) > len(w_in):
             raise DSPFatal("The filter is longer than the input waveform")
 
-        w_out[:] =  np.convolve(w_in, kernel, "valid")
-    
+        w_out[:] = np.convolve(w_in, kernel, "valid")
+
     return moving_slope_out
