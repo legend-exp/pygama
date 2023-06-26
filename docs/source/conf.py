@@ -13,7 +13,6 @@ copyright = "2023, the LEGEND Collaboration"
 version = get_distribution("pygama").version
 
 extensions = [
-    "sphinx.ext.githubpages",
     "sphinx.ext.autodoc",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",

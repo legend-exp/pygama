@@ -5,8 +5,7 @@ from multiprocessing import get_context
 from pprint import pprint
 
 import numpy as np
-
-from pygama.dsp import build_processing_chain
+from dspeed import build_processing_chain
 
 log = logging.getLogger(__name__)
 

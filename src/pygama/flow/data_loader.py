@@ -13,11 +13,10 @@ from typing import Iterator
 
 import numpy as np
 import pandas as pd
+from dspeed.vis import WaveformBrowser
+from lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
+from lgdo.types.vectorofvectors import build_cl, explode_arrays, explode_cl
 from tqdm.auto import tqdm
-
-from pygama.lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
-from pygama.lgdo.vectorofvectors import build_cl, explode_arrays, explode_cl
-from pygama.vis import WaveformBrowser
 
 from . import utils
 from .file_db import FileDB

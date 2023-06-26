@@ -8,14 +8,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
-
-from pygama.lgdo import (
-    Array,
-    ArrayOfEqualSizedArrays,
-    Table,
-    VectorOfVectors,
-    WaveformTable,
-)
+from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, WaveformTable
 
 log = logging.getLogger(__name__)
 

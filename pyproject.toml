@@ -13,7 +13,7 @@ write_to = "src/pygama/_version.py"
 minversion = "6.0"
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
-filterwarnings = "error"
+filterwarnings = ["error", "ignore::DeprecationWarning"]
 log_cli_level = "info"
 testpaths = "tests"
 

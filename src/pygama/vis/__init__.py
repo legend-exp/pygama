@@ -1,7 +1,5 @@
-"""
-This subpackage implements utilities to visualize data.
-"""
+"""This subpackage implements utilities to visualize data."""
 
-from pygama.vis.waveform_browser import WaveformBrowser
+from dspeed.vis.waveform_browser import WaveformBrowser
 
 __all__ = ["WaveformBrowser"]
