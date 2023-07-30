@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
 from scipy.signal import find_peaks_cwt, medfilt
+from iminuit import Minuit, cost
 
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
@@ -87,7 +88,7 @@ def hpge_find_E_peaks(
             sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == np.inf
             or sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == 0
         ):
-            print(
+            log.debug(
                 "hpge_find_E_peaks: can safely ignore previous covariance warning, not used"
             )
         pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
@@ -99,7 +100,7 @@ def hpge_find_E_peaks(
     )
 
     if len(ixtup) != len(peaks_keV):
-        log.warning(
+        log.info(
             f"hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks"
         )
     return detected_max_locs[ixtup], peaks_keV[iytup], pars
@@ -365,12 +366,12 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func):
                 method="fit_slopes",
             )[0]
             if sigma == 0:
-                log.warning("get_hpge_E_peak_par_guess: sigma estimation failed")
+                log.info("get_hpge_E_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None:
                     sigma = sigma_guess
                 else:
                     return []
-        sigma = sigma * 0.6  # roughly remove some amount due to tail
+        sigma = sigma * 0.8  # roughly remove some amount due to tail
 
         # for now hard-coded
         htail = 1.0 / 5
@@ -430,11 +431,11 @@ def get_hpge_E_bounds(func):
         return [
             (0, None),
             (None, None),
-            (None, None),
+            (0, None),
             (0, 1),
-            (0, None),
-            (0, None),
             (None, None),
+            (0, None),
+            (-1, 1),
             (None, None),
             (None, None),
             (None, None),
@@ -448,9 +449,9 @@ def get_hpge_E_bounds(func):
         return [
             (0, None),
             (None, None),
-            (None, None),
             (0, None),
-            (None, None),
+            (0, None),
+            (-1, 1),
             (None, None),
             (None, None),
             (None, None),
@@ -469,7 +470,7 @@ def hpge_fit_E_peaks(
     funcs=pgf.gauss_step_cdf,
     method="unbinned",
     gof_funcs=None,
-    n_events=15000,
+    n_events=None,
     allowed_p_val=0.05,
     uncal_is_int=False,
     simplex=False,
@@ -517,6 +518,7 @@ def hpge_fit_E_peaks(
     ranges = []
     errors = []
     p_vals = []
+    valid_pks = []
 
     for i_peak in range(len(mode_guesses)):
         # get args for this peak
@@ -549,15 +551,21 @@ def hpge_fit_E_peaks(
                 bounds = get_hpge_E_bounds(func_i)
                 fixed, mask = get_hpge_E_fixed(func_i)
 
-                pars_i, errs_i, cov_i = pgf.fit_unbinned(
-                    func_i,
-                    energies,
-                    guess=par_guesses,
-                    Extended=True,
-                    fixed=fixed,
-                    simplex=simplex,
-                    bounds=bounds,
-                )
+                cost_func = cost.ExtendedUnbinnedNLL(energies, func_i)
+                m = Minuit(cost_func, *par_guesses)
+                m.limits = bounds
+                for fix in fixed:
+                    m.fixed[fix] = True
+                if simplex == True:
+                    m.simplex().migrad()
+                else:
+                    m.migrad()
+                m.minos()
+
+                pars_i = m.values
+                errs_i = m.errors
+                cov_i = m.covariance
+
             else:
                 hist, bins, var = pgh.get_hist(
                     E_uncal, bins=n_bins_i, range=(Euc_min, Euc_max)
@@ -587,6 +595,7 @@ def hpge_fit_E_peaks(
             errs_i = np.array(errs_i)[mask]
             cov_i = np.array(cov_i)[mask, :][:, mask]
 
+            valid_pks.append(True)
             total_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
             if (
                 sum(sum(c) if c is not None else 0 for c in cov_i) == np.inf
@@ -596,27 +605,32 @@ def hpge_fit_E_peaks(
                 log.debug(
                     f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}"
                 )
-                pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] =False
+                #pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif (np.abs(errs_i / pars_i) < 1e-7).any():
                 log.debug(
                     f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low"
                 )
-                pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] =False
+                #pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif np.abs(total_events[0] - np.sum(hist)) / np.sum(hist) > 0.1:
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit"
                 )
-                pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] =False
+                #pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif p_val < allowed_p_val:
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
                 )
-                pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] =False
+                #pars_i, errs_i, cov_i, p_val = None, None, None, None
 
         except:
+            valid_pks.append(False)
             pars_i, errs_i, cov_i, p_val = None, None, None, None
 
         # get binning
@@ -636,6 +650,7 @@ def hpge_fit_E_peaks(
         np.array(binws),
         np.array(ranges),
         np.array(p_vals),
+        np.array(valid_pks, dtype=bool),
     )
 
 
@@ -704,13 +719,11 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
         pars = np.array([scale, 0])
         cov = np.array([[scale_cov, 0], [0, 0]])
     else:
-        mu_ns = np.ones(len(mus))
         dmudEs = np.zeros(len(mus))
         for n in range(len(E_scale_pars) - 1):
-            dmudEs += mu_ns * E_scale_pars[-n - 1]
-            mu_ns *= mus
-        E_weights = dmudEs / np.sqrt(mu_vars)
-        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=E_weights, cov=True)
+            dmudEs += E_scale_pars[n]*mus**(len(E_scale_pars)-2-n)
+        E_weights = dmudEs * mu_vars
+        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=1/E_weights, cov=True)
     return pars, cov
 
 
@@ -725,7 +738,7 @@ def hpge_E_calibration(
     gof_funcs=None,
     method="unbinned",
     gof_func=None,
-    n_events=15000,
+    n_events=None,
     simplex=False,
     allowed_p_val=0.05,
     verbose=True,
@@ -916,7 +929,7 @@ def hpge_E_calibration(
             for r, d in zip(range_keV, der)
         ]
 
-    pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals = hpge_fit_E_peaks(
+    pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks = hpge_fit_E_peaks(
         E_uncal,
         got_peaks_locs,
         range_uncal,
@@ -935,16 +948,17 @@ def hpge_E_calibration(
     results["pk_binws"] = pk_binws
     results["pk_ranges"] = pk_ranges
     results["pk_pvals"] = pk_pvals
+    results["pk_validities"] = valid_pks
     # Drop failed fits
-    fitidx = [i is not None for i in pk_pars]
+    fitidx = [i == True for i in valid_pks]
     fitted_peaks_keV = results["fitted_keV"] = got_peaks_keV[fitidx]
     funcs = [f for i, f in zip(fitidx, funcs) if i]
-    pk_pars = results["pk_pars"] = np.asarray(pk_pars, dtype=object)[fitidx]  # ragged
-    pk_errors = results["pk_errors"] = np.asarray(pk_errors, dtype=object)[fitidx]
-    pk_covs = results["pk_covs"] = np.asarray(pk_covs, dtype=object)[fitidx]
-    pk_binws = results["pk_binws"] = np.asarray(pk_binws)[fitidx]
-    pk_ranges = results["pk_ranges"] = np.asarray(pk_ranges)[fitidx]
-    pk_pvals = results["pk_pvals"] = np.asarray(pk_pvals)[fitidx]
+    pk_pars = np.asarray(pk_pars, dtype=object)[fitidx]  # ragged
+    pk_errors =  np.asarray(pk_errors, dtype=object)[fitidx]
+    pk_covs = np.asarray(pk_covs, dtype=object)[fitidx]
+    pk_binws =  np.asarray(pk_binws)[fitidx]
+    pk_ranges =  np.asarray(pk_ranges)[fitidx]
+    pk_pvals =  np.asarray(pk_pvals)[fitidx]
     log.info(f"{sum(fitidx)} peaks fitted:")
     for i, (Ei, parsi, errorsi, covsi) in enumerate(
         zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs)

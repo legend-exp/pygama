@@ -9,11 +9,11 @@ import json
 import logging
 import os
 
-import lgdo.lh5_store as lh5
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+import lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
@@ -348,7 +348,9 @@ def find_pulser_properties(df, energy="daqenergy"):
                 ):
                     pulser_e = e
                     period = stats.mode(tsl).mode[0]
-                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+                    if period > 0.1:
+                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+
 
                 else:
                     continue
