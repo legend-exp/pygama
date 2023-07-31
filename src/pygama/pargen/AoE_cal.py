@@ -328,7 +328,7 @@ class standard_aoe_with_high_tail(PDF):
         
         return [fixed for field,fixed in self._replace_values(fixed_dict, **kwargs).items()]
     
-    def width(pars, errs, cov):
+    def width(self, pars, errs, cov):
 
         fwhm,fwhm_err = pgf.radford_fwhm(pars[2], pars[3], np.abs(pars[4]),cov=cov[:7,:7])
         return fwhm /2.355, fwhm_err/2.355
@@ -809,7 +809,7 @@ def fit_time_means(tstamps, means, reses):
     out_dict = {}
     current_tstamps = []
     current_means = []
-    current_errs = []
+    current_reses = []
     rolling_mean = means[np.where((np.abs(np.diff(means))<(0.4*np.array(reses)[1:]))
                                   &(~np.isnan(np.abs(np.diff(means))<(0.4*np.array(reses)[1:]))))[0][0]]
     for i,tstamp in enumerate(tstamps):
@@ -835,7 +835,7 @@ def fit_time_means(tstamps, means, reses):
         out_dict[tstamp] = rolling_mean
     return out_dict
 
-def aoe_timecorr(df, energy_param, current_param, pdf = caoe.standard_aoe, plot_dict={} , display=0):
+def aoe_timecorr(df, energy_param, current_param, pdf = standard_aoe, plot_dict={} , display=0):
     if "timestamp" in df:
         tstamps = sorted(np.unique(df["timestamp"]))
         if len(tstamps)>1:
@@ -845,7 +845,7 @@ def aoe_timecorr(df, energy_param, current_param, pdf = caoe.standard_aoe, plot_
             res_errs = []
             final_tstamps=[]
             for tstamp, time_df in df.groupby("timestamp", sort=True):
-                pars, errs, cov = caoe.unbinned_aoe_fit(
+                pars, errs, cov = unbinned_aoe_fit(
                     time_df.query(f"is_usable_fits & cuspEmax_ctc_cal>1000 & cuspEmax_ctc_cal<1300")["AoE_uncorr"],
                     pdf=pdf,
                     display=display)
