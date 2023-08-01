@@ -12,8 +12,8 @@ import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
-from scipy.signal import find_peaks_cwt, medfilt
 from iminuit import Minuit, cost
+from scipy.signal import find_peaks_cwt, medfilt
 
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
@@ -605,29 +605,29 @@ def hpge_fit_E_peaks(
                 log.debug(
                     f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}"
                 )
-                valid_pks[-1] =False
-                #pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] = False
+                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif (np.abs(errs_i / pars_i) < 1e-7).any():
                 log.debug(
                     f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low"
                 )
-                valid_pks[-1] =False
-                #pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] = False
+                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif np.abs(total_events[0] - np.sum(hist)) / np.sum(hist) > 0.1:
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit"
                 )
-                valid_pks[-1] =False
-                #pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] = False
+                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif p_val < allowed_p_val:
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
                 )
-                valid_pks[-1] =False
-                #pars_i, errs_i, cov_i, p_val = None, None, None, None
+                valid_pks[-1] = False
+                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
         except:
             valid_pks.append(False)
@@ -721,9 +721,9 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     else:
         dmudEs = np.zeros(len(mus))
         for n in range(len(E_scale_pars) - 1):
-            dmudEs += E_scale_pars[n]*mus**(len(E_scale_pars)-2-n)
+            dmudEs += E_scale_pars[n] * mus ** (len(E_scale_pars) - 2 - n)
         E_weights = dmudEs * mu_vars
-        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=1/E_weights, cov=True)
+        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights, cov=True)
     return pars, cov
 
 
@@ -929,7 +929,15 @@ def hpge_E_calibration(
             for r, d in zip(range_keV, der)
         ]
 
-    pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks = hpge_fit_E_peaks(
+    (
+        pk_pars,
+        pk_errors,
+        pk_covs,
+        pk_binws,
+        pk_ranges,
+        pk_pvals,
+        valid_pks,
+    ) = hpge_fit_E_peaks(
         E_uncal,
         got_peaks_locs,
         range_uncal,
@@ -954,11 +962,11 @@ def hpge_E_calibration(
     fitted_peaks_keV = results["fitted_keV"] = got_peaks_keV[fitidx]
     funcs = [f for i, f in zip(fitidx, funcs) if i]
     pk_pars = np.asarray(pk_pars, dtype=object)[fitidx]  # ragged
-    pk_errors =  np.asarray(pk_errors, dtype=object)[fitidx]
+    pk_errors = np.asarray(pk_errors, dtype=object)[fitidx]
     pk_covs = np.asarray(pk_covs, dtype=object)[fitidx]
-    pk_binws =  np.asarray(pk_binws)[fitidx]
-    pk_ranges =  np.asarray(pk_ranges)[fitidx]
-    pk_pvals =  np.asarray(pk_pvals)[fitidx]
+    pk_binws = np.asarray(pk_binws)[fitidx]
+    pk_ranges = np.asarray(pk_ranges)[fitidx]
+    pk_pvals = np.asarray(pk_pvals)[fitidx]
     log.info(f"{sum(fitidx)} peaks fitted:")
     for i, (Ei, parsi, errorsi, covsi) in enumerate(
         zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs)

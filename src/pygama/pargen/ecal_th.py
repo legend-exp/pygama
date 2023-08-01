@@ -15,6 +15,7 @@ import matplotlib as mpl
 from scipy.stats import binned_statistic
 
 mpl.use("agg")
+import lgdo.lh5_store as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,7 +24,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
 
-import lgdo.lh5_store as lh5
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
@@ -176,7 +176,7 @@ class calibrate_parameter:
         pgf.extended_gauss_step_pdf,
         pgf.extended_gauss_step_pdf,
         pgf.extended_gauss_step_pdf,
-        pgf.extended_radford_pdf
+        pgf.extended_radford_pdf,
     ]
     gof_funcs = [
         # pgf.gauss_step_pdf,
@@ -198,7 +198,7 @@ class calibrate_parameter:
         threshold: int = 0,
         p_val: float = 0,
         n_events: int = None,
-        simplex:bool=True,
+        simplex: bool = True,
         deg: int = 1,
     ):
         self.data = data
@@ -209,7 +209,7 @@ class calibrate_parameter:
         self.n_events = n_events
         self.deg = deg
         self.plot_options = plot_options
-        self.simplex=simplex
+        self.simplex = simplex
 
         self.output_dict = {}
         self.hit_dict = {}
@@ -475,7 +475,9 @@ class calibrate_parameter:
             }
 
             pk_errs_dict = {
-                peak: self.results["pk_errors"][self.results["pk_validities"]][i].tolist()
+                peak: self.results["pk_errors"][self.results["pk_validities"]][
+                    i
+                ].tolist()
                 for i, peak in enumerate(self.results["fitted_keV"])
             }
 
@@ -579,16 +581,15 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
     mus = [
-        pgf.get_mu_func(func_i, pars_i)
-        if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars) 
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
+        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
 
     fig = plt.figure()
     derco = np.polyder(np.poly1d(ecal_class.pars)).coefficients
     der = [pgf.poly(5, derco) for Ei in fitted_peaks]
     for i, peak in enumerate(mus):
-        range_adu = 5/der[i]
+        range_adu = 5 / der[i]
         # plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
         plt.subplot(n_rows, ncols, i + 1)
         binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
@@ -600,7 +601,6 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
 
         counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
         if pk_pars[i] is not None:
-            
             fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(bs)
             plt.plot(bin_cs, fit_vals)
             plt.step(
@@ -611,9 +611,15 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
                 ],
             )
 
-            plt.annotate(get_peak_label(fitted_peaks[i]), (0.02,0.9) ,xycoords = 'axes fraction')
-            plt.annotate(f"{fitted_peaks[i]:.1f} keV", (0.02,0.8) ,xycoords = 'axes fraction')
-            plt.annotate(f"p-value : {p_vals[i]:.4f}", (0.02,0.7) ,xycoords = 'axes fraction')
+            plt.annotate(
+                get_peak_label(fitted_peaks[i]), (0.02, 0.9), xycoords="axes fraction"
+            )
+            plt.annotate(
+                f"{fitted_peaks[i]:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
+            )
+            plt.annotate(
+                f"p-value : {p_vals[i]:.4f}", (0.02, 0.7), xycoords="axes fraction"
+            )
             plt.xlabel("Energy (keV)")
             plt.ylabel("Counts")
             plt.legend(loc="upper left", frameon=False)
@@ -809,15 +815,13 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
     mus = [
-        pgf.get_mu_func(func_i, pars_i)
-        if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars) 
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
+        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
-    
+
     mu_errs = [
-        pgf.get_mu_func(func_i, pars_i)
-        if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_errs) 
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
+        for func_i, pars_i in zip(fitted_gof_funcs, pk_errs)
     ]
 
     plt.rcParams["figure.figsize"] = figsize
@@ -839,7 +843,8 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
     ax2.errorbar(
         fitted_peaks,
         pgf.poly(np.array(mus), ecal_class.pars) - fitted_peaks,
-        yerr = pgf.poly(np.array(mus)+np.array(mu_errs), ecal_class.pars)-pgf.poly(np.array(mus), ecal_class.pars),
+        yerr=pgf.poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
+        - pgf.poly(np.array(mus), ecal_class.pars),
         linestyle=" ",
         marker="x",
         c="b",
@@ -1003,7 +1008,15 @@ def energy_cal_th(
     plot_dict = {}
     for energy_param in energy_params:
         ecal = calibrate_parameter(
-            data, energy_param, plot_options, guess_keV, threshold, p_val, n_events, simplex, deg
+            data,
+            energy_param,
+            plot_options,
+            guess_keV,
+            threshold,
+            p_val,
+            n_events,
+            simplex,
+            deg,
         )
         ecal.calibrate_parameter()
         output_dict.update(ecal.output_dict)
