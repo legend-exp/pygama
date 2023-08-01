@@ -653,23 +653,20 @@ def load_aoe(
             else:
                 file_df = table.eval(cal_dict).get_dataframe()
             file_df["timestamp"] = np.full(len(file_df),tstamp,dtype=object)
-            
             params.append("timestamp")
             df.append(file_df)
             all_files += tfiles
             
         df = pd.concat(df)
-        ids = tag_pulser(all_files, lh5_path)
-        df["is_not_pulser"] = ids
-        params.append("is_not_pulser")
                 
     elif isinstance(files, list):
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(cal_dict).get_dataframe()
-        ids = tag_pulser(tfiles, lh5_path)
-        df["is_not_pulser"] = ids
-        params.append("is_not_pulser")
         all_files = files
+    
+    ids = tag_pulser(all_files, lh5_path)
+    df["is_not_pulser"] = ids
+    params.append("is_not_pulser")
     
     for col in list(df.keys()):
         if col not in params:
@@ -863,6 +860,9 @@ def aoe_timecorr(df, energy_param, current_param, pdf = standard_aoe, plot_dict=
                 "parameters": {"a": mean_dict[tstamp]},
             }} for tstamp in mean_dict
             }
+            res_dict = {"times":tstamps, "mean":means,
+                 "mean_errs":errors, "res": reses, 
+                 "res_errs":res_errs}
             if display>0:
                 fig1, ax = plt.subplots(1,1)
                 ax.errorbar([datetime.strptime(tstamp, '%Y%m%dT%H%M%SZ') for tstamp in tstamps],
@@ -898,15 +898,12 @@ def aoe_timecorr(df, energy_param, current_param, pdf = standard_aoe, plot_dict=
                     plt.show()
                 else:
                     plt.close()
-                return df, out_dict, {"times":tstamps, "mean":means,
-                 "mean_errs":errors, "res": reses, 
-                 "res_errs":res_errs},  plot_dict
+                return df, out_dict, res_dict,  plot_dict
             else:
-                return df, out_dict, {"times":tstamps, "mean":means, 
-                "mean_errs":errors , "res": reses, "res_errs":res_errs}
+                return df, out_dict, res_dict
     else:
         pars, errs, cov = unbinned_aoe_fit(
-            data.query("is_usable_fits & cuspEmax_ctc_cal>1000 & cuspEmax_ctc_cal<1300")["AoE_uncorr"])
+            df.query("is_usable_fits & cuspEmax_ctc_cal>1000 & cuspEmax_ctc_cal<1300")["AoE_uncorr"])
         df["AoE_timecorr"]=df["AoE_uncorr"]/pars["mu"]
         out_dict = {
         "AoE_Timecorr": {
@@ -914,10 +911,13 @@ def aoe_timecorr(df, energy_param, current_param, pdf = standard_aoe, plot_dict=
             "parameters": {"a": pars["mu"]},
         }
         }
+        res_err = (pars["sigma"]/pars["mu"])*np.sqrt(errs["sigma"]/pars["sigma"] + errs["mu"]/pars["mu"])
+        fit_result = {"times":[np.nan], "mean":[pars["mu"]], "mean_errs":[errs["mu"]], 
+                    "res": [pars["sigma"]/pars["mu"]], "res_errs":[res_err]}
         if display>0:
-            return df, out_dict, {"times":[np.nan], "mean":[pars[1]], "res": [pars[2]/pars[1]]}, plot_dict
+            return df, out_dict, fit_result, plot_dict
         else:
-            return df, out_dict, {"times":[np.nan], "mean":[pars[1]], "res": [pars[2]/pars[1]]}
+            return df, out_dict, fit_result
 
  
 def pol1(x: np.array, a: float, b: float) -> np.array:
