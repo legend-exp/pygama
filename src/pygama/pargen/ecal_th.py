@@ -173,9 +173,9 @@ class calibrate_parameter:
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
+        pgf.extended_gauss_step_pdf,
+        pgf.extended_gauss_step_pdf,
+        pgf.extended_gauss_step_pdf,
         pgf.extended_radford_pdf,
     ]
     gof_funcs = [
@@ -183,9 +183,9 @@ class calibrate_parameter:
         pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
+        pgf.gauss_step_pdf,
+        pgf.gauss_step_pdf,
+        pgf.gauss_step_pdf,
         pgf.radford_pdf,
     ]
 
@@ -197,7 +197,8 @@ class calibrate_parameter:
         guess_keV: float | None = None,
         threshold: int = 0,
         p_val: float = 0,
-        n_events: int = 15000,
+        n_events: int = None,
+        simplex: bool = True,
         deg: int = 1,
     ):
         self.data = data
@@ -208,6 +209,7 @@ class calibrate_parameter:
         self.n_events = n_events
         self.deg = deg
         self.plot_options = plot_options
+        self.simplex = simplex
 
         self.output_dict = {}
         self.hit_dict = {}
@@ -332,7 +334,7 @@ class calibrate_parameter:
                 gof_funcs=self.gof_funcs,
                 n_events=self.n_events,
                 allowed_p_val=self.p_val,
-                simplex=True,
+                simplex=self.simplex,
                 verbose=False,
             )
             pk_pars = self.results["pk_pars"]
@@ -371,7 +373,7 @@ class calibrate_parameter:
                 gof_funcs=self.gof_funcs,
                 n_events=self.n_events,
                 allowed_p_val=self.p_val,
-                simplex=True,
+                simplex=self.simplex,
                 verbose=False,
             )
         except:
@@ -391,7 +393,7 @@ class calibrate_parameter:
                     gof_funcs=self.gof_funcs,
                     n_events=self.n_events,
                     allowed_p_val=0,
-                    simplex=True,
+                    simplex=self.simplex,
                     verbose=False,
                 )
                 if self.pars is None:
@@ -409,8 +411,10 @@ class calibrate_parameter:
                     "2.6_fwhm_err": np.nan,
                     "eres_pars": self.fit_pars.tolist(),
                     "fitted_peaks": np.nan,
+                    "p_vals": np.nan,
                     "fwhms": np.nan,
                     "peak_fit_pars": np.nan,
+                    "peak_fit_errs": np.nan,
                     "total_fep": len(
                         self.data.query(
                             f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624"
@@ -449,6 +453,8 @@ class calibrate_parameter:
                     "fitted_peaks": np.nan,
                     "fwhms": np.nan,
                     "peak_fit_pars": np.nan,
+                    "peak_fit_errs": np.nan,
+                    "p_vals": np.nan,
                     "total_fep": np.nan,
                     "total_dep": np.nan,
                     "pass_fep": np.nan,
@@ -464,7 +470,14 @@ class calibrate_parameter:
             )
 
             pk_rs_dict = {
-                peak: self.results["pk_pars"][i].tolist()
+                peak: self.results["pk_pars"][self.results["pk_validities"]][i].tolist()
+                for i, peak in enumerate(self.results["fitted_keV"])
+            }
+
+            pk_errs_dict = {
+                peak: self.results["pk_errors"][self.results["pk_validities"]][
+                    i
+                ].tolist()
                 for i, peak in enumerate(self.results["fitted_keV"])
             }
 
@@ -487,6 +500,8 @@ class calibrate_parameter:
                 "fitted_peaks": self.results["fitted_keV"].tolist(),
                 "fwhms": self.results["pk_fwhms"].tolist(),
                 "peak_fit_pars": pk_rs_dict,
+                "peak_fit_errs": pk_errs_dict,
+                "p_vals": self.results["pk_pvals"].tolist(),
                 "total_fep": len(
                     self.data.query(
                         f"{self.energy_param}_cal>2604&{self.energy_param}_cal<2624"
@@ -555,7 +570,7 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
-    fitted_peaks = ecal_class.results["fitted_keV"]
+    fitted_peaks = ecal_class.results["got_peaks_keV"]
     pk_pars = ecal_class.results["pk_pars"]
     pk_ranges = ecal_class.results["pk_ranges"]
     p_vals = ecal_class.results["pk_pvals"]
@@ -566,15 +581,15 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
     mus = [
-        pgf.get_mu_func(func_i, pars_i)
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
-    fwhms = ecal_class.results["pk_fwhms"][:, 0]
-    dfwhms = ecal_class.results["pk_fwhms"][:, 1]
 
     fig = plt.figure()
-    range_adu = 5 / ecal_class.pars[0]  # 10keV window around peak in adu
+    derco = np.polyder(np.poly1d(ecal_class.pars)).coefficients
+    der = [pgf.poly(5, derco) for Ei in fitted_peaks]
     for i, peak in enumerate(mus):
+        range_adu = 5 / der[i]
         # plt.subplot(math.ceil((len(mus)) / 2), 2, i + 1)
         plt.subplot(n_rows, ncols, i + 1)
         binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 1)
@@ -585,47 +600,33 @@ def plot_fits(ecal_class, figsize=[12, 8], fontsize=12, ncols=3, n_rows=3):
         energies = energies.iloc[: ecal_class.n_events]
 
         counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
-        fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(bs)
-        plt.plot(bin_cs, fit_vals)
-        plt.step(
-            bin_cs,
-            [
-                (fval - count) / count if count != 0 else (fval - count)
-                for count, fval in zip(counts, fit_vals)
-            ],
-        )
-        plt.plot(
-            [bin_cs[10]],
-            [0],
-            label=get_peak_label(fitted_peaks[i]),
-            linestyle="None",
-        )
-        plt.plot(
-            [bin_cs[10]],
-            [0],
-            label=f"{fitted_peaks[i]:.1f} keV",
-            linestyle="None",
-        )
-        plt.plot(
-            [bin_cs[10]],
-            [0],
-            label=f"{fwhms[i]:.2f} +- {dfwhms[i]:.2f} keV",
-            linestyle="None",
-        )
-        plt.plot(
-            [bin_cs[10]],
-            [0],
-            label=f"p-value : {p_vals[i]:.2f}",
-            linestyle="None",
-        )
+        if pk_pars[i] is not None:
+            fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i]) * np.diff(bs)
+            plt.plot(bin_cs, fit_vals)
+            plt.step(
+                bin_cs,
+                [
+                    (fval - count) / count if count != 0 else (fval - count)
+                    for count, fval in zip(counts, fit_vals)
+                ],
+            )
 
-        plt.xlabel("Energy (keV)")
-        plt.ylabel("Counts")
-        plt.legend(loc="upper left", frameon=False)
-        plt.xlim([peak - range_adu, peak + range_adu])
-        locs, labels = plt.xticks()
-        new_locs, new_labels = get_peak_labels(locs, ecal_class.pars)
-        plt.xticks(ticks=new_locs, labels=new_labels)
+            plt.annotate(
+                get_peak_label(fitted_peaks[i]), (0.02, 0.9), xycoords="axes fraction"
+            )
+            plt.annotate(
+                f"{fitted_peaks[i]:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
+            )
+            plt.annotate(
+                f"p-value : {p_vals[i]:.4f}", (0.02, 0.7), xycoords="axes fraction"
+            )
+            plt.xlabel("Energy (keV)")
+            plt.ylabel("Counts")
+            plt.legend(loc="upper left", frameon=False)
+            plt.xlim([peak - range_adu, peak + range_adu])
+            locs, labels = plt.xticks()
+            new_locs, new_labels = get_peak_labels(locs, ecal_class.pars)
+            plt.xticks(ticks=new_locs, labels=new_labels)
 
     plt.tight_layout()
     plt.close()
@@ -805,7 +806,8 @@ def bin_stability(ecal_class, time_slice=180, energy_range=[2585, 2660]):
 
 def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
     pk_pars = ecal_class.results["pk_pars"]
-    fitted_peaks = ecal_class.results["fitted_keV"]
+    fitted_peaks = ecal_class.results["got_peaks_keV"]
+    pk_errs = ecal_class.results["pk_errors"]
 
     fitted_gof_funcs = []
     for i, peak in enumerate(ecal_class.glines):
@@ -813,8 +815,13 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
     mus = [
-        pgf.get_mu_func(func_i, pars_i)
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
+    ]
+
+    mu_errs = [
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
+        for func_i, pars_i in zip(fitted_gof_funcs, pk_errs)
     ]
 
     plt.rcParams["figure.figsize"] = figsize
@@ -824,7 +831,7 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
 
-    cal_bins = np.arange(0, np.nanmax(mus) * 1.1, 10)
+    cal_bins = np.linspace(0, np.nanmax(mus) * 1.1, 20)
 
     ax1.scatter(fitted_peaks, mus, marker="x", c="b")
 
@@ -833,10 +840,12 @@ def plot_cal_fit(ecal_class, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
     ax1.grid()
     ax1.set_xlim([erange[0], erange[1]])
     ax1.set_ylabel("Energy (ADC)")
-    ax2.plot(
+    ax2.errorbar(
         fitted_peaks,
         pgf.poly(np.array(mus), ecal_class.pars) - fitted_peaks,
-        lw=0,
+        yerr=pgf.poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
+        - pgf.poly(np.array(mus), ecal_class.pars),
+        linestyle=" ",
         marker="x",
         c="b",
     )
@@ -980,8 +989,9 @@ def energy_cal_th(
     guess_keV: float | None = None,
     threshold: int = 0,
     p_val: float = 0,
-    n_events: int = 15000,
+    n_events: int = None,
     final_cut_field: str = "is_valid_cal",
+    simplex: bool = True,
     deg: int = 1,
 ) -> tuple(dict, dict):
     data = load_data(
@@ -998,7 +1008,15 @@ def energy_cal_th(
     plot_dict = {}
     for energy_param in energy_params:
         ecal = calibrate_parameter(
-            data, energy_param, plot_options, guess_keV, threshold, p_val, n_events, deg
+            data,
+            energy_param,
+            plot_options,
+            guess_keV,
+            threshold,
+            p_val,
+            n_events,
+            simplex,
+            deg,
         )
         ecal.calibrate_parameter()
         output_dict.update(ecal.output_dict)

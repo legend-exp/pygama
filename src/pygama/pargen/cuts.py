@@ -348,7 +348,8 @@ def find_pulser_properties(df, energy="daqenergy"):
                 ):
                     pulser_e = e
                     period = stats.mode(tsl).mode[0]
-                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+                    if period > 0.1:
+                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
 
                 else:
                     continue

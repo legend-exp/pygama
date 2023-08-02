@@ -167,7 +167,7 @@ def fit_unbinned(func, data, guess=None,
         m.simplex().migrad()
     else:
         m.migrad()
-    m.hesse()
+    m.minos()
     return m.values, m.errors, m.covariance
 
 def goodness_of_fit(hist, bins, var, func, pars, method='var', scale_bins=False):
