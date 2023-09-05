@@ -873,8 +873,13 @@ class DataLoader:
                     tb_df[f"{low_level}_idx"] = tb_df.index
 
                 # final DataFrame
-                f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[entry_cols]
-                # end tb loop
+                if f_entries.empty:
+                    f_entries = tb_df
+                else:
+                    f_entries = pd.concat((f_entries, tb_df), ignore_index=True)[
+                        entry_cols
+                    ]
+
             if self.merge_files:
                 f_entries["file"] = file
             if in_memory:
