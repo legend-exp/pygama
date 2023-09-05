@@ -20,11 +20,22 @@ def generate_tcm_cols(
     coincidence data (e.g. hit times from different channels). Returns 3
     :class:`numpy.ndarray`\ s representing a vector-of-vector-like structure:
     two flattened arrays ``array_id`` (e.g. channel number) and  ``array_idx``
-    (e.g. hit ID) that specify the location in the input ``coin_data`` of each
-    datum belonging to a coincidence event, and a ``cumulative_length`` array
-    that specifies which rows of the other two output arrays correspond to
-    which coincidence event. These can be used to retrieve other data at the
-    same tier as the input data into coincidence structures.
+    (e.g. hit index) that specify the location in the input ``coin_data`` of
+    each datum belonging to a coincidence event, and a ``cumulative_length``
+    array that specifies which rows of the other two output arrays correspond
+    to which coincidence event. These can be used to retrieve other data at
+    the same tier as the input data into coincidence structures.
+
+    The 0'th entry of ``cumulative_length`` contains the number of hits in the
+    zeroth coincidence event, and the i'th entry is set to
+    ``cumulative_length[i-1]`` plus the number of hits in the i'th event.
+    Thus, the hits of the i'th event can be found in rows
+    ``cumulative_length[i-1]`` to ``cumulative_length[i] - 1`` of ``array_id``
+    and ``array_idx``.
+
+    An example: ``cumulative_length = [4, 7, ...]``.  Then rows 0 to 3 in
+    `array_id` and `array_idx` correspond to the hits in event 0, rows 4 to 6
+    correspond to event 1, and so on.
 
     Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
     and :meth:`pandas.DataFrame.diff` functions:
