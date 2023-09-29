@@ -13,9 +13,15 @@
 
 *pygama* is a Python package for:
 
-* converting physics data acquisition system output to [LH5-format](https://github.com/legend-exp/legend-data-format-specs) HDF5 files
-* performing bulk digital signal processing (DSP) on time-series data
-* optimizing DSP routines and tuning associated analysis parameters
-* generating and selecting high-level event data for further analysis
+- converting physics data acquisition system output to
+  [LH5-format](https://legend-exp.github.io/legend-data-format-specs) HDF5
+  files (functionality provided by the
+  [legend-pydataobj](https://legend-pydataobj.readthedocs.io) and
+  [legend-daq2lh5](https://legend-daq2lh5.readthedocs.io) packages)
+- performing bulk digital signal processing (DSP) on time-series data
+  (functionality provided by the [dspeed](https://dspeed.readthedocs.io)
+  package)
+- optimizing DSP routines and tuning associated analysis parameters
+- generating and selecting high-level event data for further analysis
 
 Check out the [online documentation](https://pygama.readthedocs.io).
