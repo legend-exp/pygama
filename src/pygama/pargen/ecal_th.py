@@ -89,32 +89,34 @@ def gen_pars_dict(pars, deg, energy_param):
 
     return out_dict
 
+
 class fwhm_linear:
-    def func(x,a,b):
+    def func(x, a, b):
         return np.sqrt(a + b * x)
-    
+
     def string_func(input_param):
         return f"(a+b*{input_param})**(0.5)"
-    
+
     def guess(xs, ys, y_errs):
-        return [np.nanmin(ys), 10**-3] 
-    
+        return [np.nanmin(ys), 10**-3]
+
     def bounds():
-        return [(0,None),(0,None)]
-    
+        return [(0, None), (0, None)]
+
+
 class fwhm_quadratic:
-    
     def func(x, a, b, c):
-        return np.sqrt(a + b * x + c*x**2)
-    
+        return np.sqrt(a + b * x + c * x**2)
+
     def string_func(input_param):
         return f"(a+b*{input_param}+c*{input_param}**2)**(0.5)"
-    
+
     def guess(xs, ys, y_errs):
-        return [np.nanmin(ys), 10**-3, 10**-5] 
-    
+        return [np.nanmin(ys), 10**-3, 10**-5]
+
     def bounds():
-        return [(0,None),(0,None),(0,None)]
+        return [(0, None), (0, None), (0, None)]
+
 
 class calibrate_parameter:
     glines = [
@@ -161,7 +163,7 @@ class calibrate_parameter:
     def __init__(
         self,
         energy_param,
-        selection_string = "is_usable",
+        selection_string="is_usable",
         plot_options: dict = None,
         guess_keV: float | None = None,
         threshold: int = 0,
@@ -169,7 +171,7 @@ class calibrate_parameter:
         n_events: int = None,
         simplex: bool = True,
         deg: int = 1,
-        cal_energy_param:str = None
+        cal_energy_param: str = None,
     ):
         self.energy_param = energy_param
         if cal_energy_param is None:
@@ -228,7 +230,7 @@ class calibrate_parameter:
         try:
             if 2614.50 not in fwhm_peaks:
                 raise RuntimeError
-        
+
             c_lin = cost.LeastSquares(
                 fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_linear.func
             )
@@ -240,57 +242,61 @@ class calibrate_parameter:
             m_lin.hesse()
 
             rng = np.random.default_rng(1)
-            pars_b = rng.multivariate_normal(m_lin.values, 
-                                             m_lin.covariance, size=1000)
+            pars_b = rng.multivariate_normal(m_lin.values, m_lin.covariance, size=1000)
             fits = np.array([fwhm_linear.func(fwhm_peaks, *par_b) for par_b in pars_b])
             qbb_vals = np.array([fwhm_linear.func(2039.0, *par_b) for par_b in pars_b])
             qbb_err = np.nanstd(qbb_vals)
             predicted_fwhms = fwhm_linear.func(fwhm_peaks, *m_lin.values)
             fit_qbb = fwhm_linear.func(2039.0, *m_lin.values)
-            
-            p_val = scipy.stats.chi2.sf(m_lin.fval, len(fwhm_peaks)-len(m_lin.values))
-            
-            self.fwhm_fit_linear = {"function":fwhm_linear.__name__,
-                                   "module":fwhm_linear.__module__,
-                                   "expression":fwhm_linear.string_func("x"),
-                                    "Qbb_fwhm(keV)": fit_qbb,
-                                    "Qbb_fwhm_err(keV)":qbb_err,
-                                   "pars":m_lin.values,
-                                   "errors":m_lin.errors,
-                                   "cov":m_lin.covariance,
-                                    "csqr": (m_lin.fval, len(fwhm_peaks)-len(m_lin.values)),
-                                   "p_val":p_val}
 
-            
+            p_val = scipy.stats.chi2.sf(m_lin.fval, len(fwhm_peaks) - len(m_lin.values))
+
+            self.fwhm_fit_linear = {
+                "function": fwhm_linear.__name__,
+                "module": fwhm_linear.__module__,
+                "expression": fwhm_linear.string_func("x"),
+                "Qbb_fwhm(keV)": fit_qbb,
+                "Qbb_fwhm_err(keV)": qbb_err,
+                "pars": m_lin.values,
+                "errors": m_lin.errors,
+                "cov": m_lin.covariance,
+                "csqr": (m_lin.fval, len(fwhm_peaks) - len(m_lin.values)),
+                "p_val": p_val,
+            }
+
             log.info(f'FWHM linear fit: {self.fwhm_fit_linear["pars"].to_dict()}')
             log.info(f"FWHM fit values:")
             log.info(f"\t   Energy   | FWHM (keV)  | Predicted (keV)")
             for i, (peak, fwhm, fwhme) in enumerate(
-                    zip(fwhm_peaks, fit_fwhms, fit_dfwhms)
-                ):
-                    log.info(
-                        f"\t{i}".ljust(4)
-                        + str(peak).ljust(9)
-                        + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
-                        +f"| {fwhm_linear.func(peak, *self.fwhm_fit_linear['pars']):.2f}".ljust(5)
-                    )    
-                
+                zip(fwhm_peaks, fit_fwhms, fit_dfwhms)
+            ):
+                log.info(
+                    f"\t{i}".ljust(4)
+                    + str(peak).ljust(9)
+                    + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
+                    + f"| {fwhm_linear.func(peak, *self.fwhm_fit_linear['pars']):.2f}".ljust(
+                        5
+                    )
+                )
+
             log.info(
                 f"FWHM energy resolution at Qbb (linear fit): {fit_qbb:1.2f} +- {qbb_err:1.2f} keV"
-                )
+            )
         except RuntimeError:
             log.error(f"FWHM linear fit failed for {self.energy_param}")
             pars, errs, cov = return_nans(fwhm_linear.func)
-            self.fwhm_fit_linear = {"function":fwhm_linear.__name__,
-                               "module":fwhm_linear.__module__,
-                               "expression":fwhm_linear.string_func("x"),
-                                "Qbb_fwhm(keV)": np.nan,
-                                "Qbb_fwhm_err(keV)":np.nan,
-                               "pars":pars,
-                               "errors":errs,
-                               "cov":cov,
-                                "csqr":(np.nan, np.nan),
-                                "p_val":0}
+            self.fwhm_fit_linear = {
+                "function": fwhm_linear.__name__,
+                "module": fwhm_linear.__module__,
+                "expression": fwhm_linear.string_func("x"),
+                "Qbb_fwhm(keV)": np.nan,
+                "Qbb_fwhm_err(keV)": np.nan,
+                "pars": pars,
+                "errors": errs,
+                "cov": cov,
+                "csqr": (np.nan, np.nan),
+                "p_val": 0,
+            }
             log.error("FWHM linear fit failed to converge")
         try:
             if 2614.50 not in fwhm_peaks:
@@ -299,51 +305,63 @@ class calibrate_parameter:
                 fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_quadratic.func
             )
             c_quad.loss = "soft_l1"
-            m_quad = Minuit(c_quad, *fwhm_quadratic.guess(fwhm_peaks, fit_fwhms, fit_dfwhms))
+            m_quad = Minuit(
+                c_quad, *fwhm_quadratic.guess(fwhm_peaks, fit_fwhms, fit_dfwhms)
+            )
             m_quad.limits = fwhm_quadratic.bounds()
             m_quad.simplex()
             m_quad.migrad()
             m_quad.hesse()
-            
+
             rng = np.random.default_rng(1)
-            pars_b = rng.multivariate_normal(m_quad.values, 
-                                             m_quad.covariance, size=1000)
-            fits = np.array([fwhm_quadratic.func(fwhm_peaks, *par_b) for par_b in pars_b])
-            qbb_vals = np.array([fwhm_quadratic.func(2039.0, *par_b) for par_b in pars_b])
+            pars_b = rng.multivariate_normal(
+                m_quad.values, m_quad.covariance, size=1000
+            )
+            fits = np.array(
+                [fwhm_quadratic.func(fwhm_peaks, *par_b) for par_b in pars_b]
+            )
+            qbb_vals = np.array(
+                [fwhm_quadratic.func(2039.0, *par_b) for par_b in pars_b]
+            )
             qbb_err = np.nanstd(qbb_vals)
             predicted_fwhms = fwhm_quadratic.func(fwhm_peaks, *m_quad.values)
             fit_qbb = fwhm_quadratic.func(2039.0, *m_quad.values)
-            
-            p_val = scipy.stats.chi2.sf(m_quad.fval, len(fwhm_peaks)-len(m_quad.values))
 
-            self.fwhm_fit_quadratic = {"function":fwhm_quadratic.__name__,
-                                   "module":fwhm_quadratic.__module__,
-                                   "expression":fwhm_quadratic.string_func("x"),
-                                    "Qbb_fwhm(keV)": fit_qbb,
-                                    "Qbb_fwhm_err(keV)":qbb_err,
-                                   "pars":m_quad.values,
-                                   "errors":m_quad.errors,
-                                   "cov":m_quad.covariance,
-                                    "csqr": (m_quad.fval, len(fwhm_peaks)-len(m_quad.values)),
-                                    "p_val":p_val
-                                    }
+            p_val = scipy.stats.chi2.sf(
+                m_quad.fval, len(fwhm_peaks) - len(m_quad.values)
+            )
+
+            self.fwhm_fit_quadratic = {
+                "function": fwhm_quadratic.__name__,
+                "module": fwhm_quadratic.__module__,
+                "expression": fwhm_quadratic.string_func("x"),
+                "Qbb_fwhm(keV)": fit_qbb,
+                "Qbb_fwhm_err(keV)": qbb_err,
+                "pars": m_quad.values,
+                "errors": m_quad.errors,
+                "cov": m_quad.covariance,
+                "csqr": (m_quad.fval, len(fwhm_peaks) - len(m_quad.values)),
+                "p_val": p_val,
+            }
             log.info(f'FWHM quadratic fit: {self.fwhm_fit_quadratic["pars"].to_dict()}')
             log.info(
                 f"FWHM energy resolution at Qbb (quadratic fit): {fit_qbb:1.2f} +- {qbb_err:1.2f} keV"
-                )
+            )
         except RuntimeError:
             log.error(f"FWHM quadratic fit failed for {self.energy_param}")
             pars, errs, cov = return_nans(fwhm_quadratic.func)
-            self.fwhm_fit_quadratic = {"function":fwhm_quadratic.__name__,
-                               "module":fwhm_quadratic.__module__,
-                               "expression":fwhm_quadratic.string_func("x"),
-                               "Qbb_fwhm(keV)": np.nan,
-                                "Qbb_fwhm_err(keV)":np.nan,
-                               "pars":pars,
-                               "errors":errs,
-                               "cov":cov,
-                                 "csqr":(np.nan, np.nan),
-                                "p_val":0}
+            self.fwhm_fit_quadratic = {
+                "function": fwhm_quadratic.__name__,
+                "module": fwhm_quadratic.__module__,
+                "expression": fwhm_quadratic.string_func("x"),
+                "Qbb_fwhm(keV)": np.nan,
+                "Qbb_fwhm_err(keV)": np.nan,
+                "pars": pars,
+                "errors": errs,
+                "cov": cov,
+                "csqr": (np.nan, np.nan),
+                "p_val": 0,
+            }
             log.error("FWHM quadratic fit failed to converge")
 
     def gen_pars_dict(self):
@@ -373,63 +391,69 @@ class calibrate_parameter:
             return {}
         else:
             fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["pars"] = fwhm_linear['pars'].to_dict()
-            fwhm_linear["errors"] = fwhm_linear['errors'].to_dict()
+            fwhm_linear["pars"] = fwhm_linear["pars"].to_dict()
+            fwhm_linear["errors"] = fwhm_linear["errors"].to_dict()
             fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
             fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["pars"] = fwhm_quad['pars'].to_dict()
-            fwhm_quad["errors"] = fwhm_quad['errors'].to_dict()
+            fwhm_quad["pars"] = fwhm_quad["pars"].to_dict()
+            fwhm_quad["errors"] = fwhm_quad["errors"].to_dict()
             fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
 
-            pk_dict = {Ei:{"function":func_i.__name__,
-                       "module":func_i.__module__,
-                       "pars(uncal)":parsi.to_dict(),
-                       "errs(uncal)":errorsi.to_dict(),
-                       "p_val": pvali,
-                       "fwhm (keV)": list(fwhmi)}
-                       for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
-                        zip(self.results["fitted_keV"], 
-                            self.results["pk_pars"][self.results["pk_validities"]], 
-                            self.results["pk_errors"][self.results["pk_validities"]], 
-                            self.results["pk_pvals"][self.results["pk_validities"]],
-                            self.results["pk_fwhms"],
-                            self.funcs)
-                        )}
+            pk_dict = {
+                Ei: {
+                    "function": func_i.__name__,
+                    "module": func_i.__module__,
+                    "pars(uncal)": parsi.to_dict(),
+                    "errs(uncal)": errorsi.to_dict(),
+                    "p_val": pvali,
+                    "fwhm (keV)": list(fwhmi),
+                }
+                for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
+                    zip(
+                        self.results["fitted_keV"],
+                        self.results["pk_pars"][self.results["pk_validities"]],
+                        self.results["pk_errors"][self.results["pk_validities"]],
+                        self.results["pk_pvals"][self.results["pk_validities"]],
+                        self.results["pk_fwhms"],
+                        self.funcs,
+                    )
+                )
+            }
 
             return {
-                    "total_fep": len(
-                        data.query(
-                            f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624"
-                        )
-                    ),
-                    "total_dep": len(
-                        data.query(
-                            f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597"
-                        )
-                    ),
-                    "pass_fep": len(
-                        data.query(
-                            f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624&{self.selection_string}"
-                        )
-                    ),
-                    "pass_dep": len(
-                        data.query(
-                            f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597&{self.selection_string}"
-                        )
-                    ),
-                    "eres_linear": fwhm_linear,
-                    "eres_quadratic":fwhm_quad, 
-                    "fitted_peaks": self.results["fitted_keV"].tolist(),
-                    "pk_fits":pk_dict
-                }
+                "total_fep": len(
+                    data.query(
+                        f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624"
+                    )
+                ),
+                "total_dep": len(
+                    data.query(
+                        f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597"
+                    )
+                ),
+                "pass_fep": len(
+                    data.query(
+                        f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624&{self.selection_string}"
+                    )
+                ),
+                "pass_dep": len(
+                    data.query(
+                        f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597&{self.selection_string}"
+                    )
+                ),
+                "eres_linear": fwhm_linear,
+                "eres_quadratic": fwhm_quad,
+                "fitted_peaks": self.results["fitted_keV"].tolist(),
+                "pk_fits": pk_dict,
+            }
 
     def calibrate_parameter(self, data):
         kev_ranges = self.range_keV.copy()
         if self.guess_keV is None:
             self.guess_keV = 2620 / np.nanpercentile(
-                data.query(f"{self.selection_string} & {self.energy_param}>{self.threshold}")[
-                    self.energy_param
-                ],
+                data.query(
+                    f"{self.selection_string} & {self.energy_param}>{self.threshold}"
+                )[self.energy_param],
                 99,
             )
 
@@ -457,8 +481,8 @@ class calibrate_parameter:
             if self.pars is None:
                 raise ValueError
 
-            for i, peak in enumerate(self.results["got_peaks_keV"]):  
-                idx = np.where(peak ==self.glines)[0][0]
+            for i, peak in enumerate(self.results["got_peaks_keV"]):
+                idx = np.where(peak == self.glines)[0][0]
                 self.funcs[idx] = fitted_funcs[i]
                 if fitted_funcs[i] == pgf.extended_radford_pdf:
                     self.gof_funcs[idx] = pgf.radford_pdf
@@ -469,7 +493,10 @@ class calibrate_parameter:
             fitted_peaks = np.array([])
             fitted_funcs = np.array([])
 
-        if len(fitted_peaks) != len(self.glines) or self.gof_funcs[-1]==pgf.gauss_step_pdf:
+        if (
+            len(fitted_peaks) != len(self.glines)
+            or self.gof_funcs[-1] == pgf.gauss_step_pdf
+        ):
             if self.glines[-1] in fitted_peaks:
                 if fitted_funcs[-1] == pgf.extended_gauss_step_pdf:
                     self.funcs = [pgf.extended_gauss_step_pdf for entry in self.glines]
@@ -489,7 +516,10 @@ class calibrate_parameter:
                         > 0.05
                     ):
                         index = np.where(self.glines == peak)[0][0]
-                        kev_ranges[i] = (kev_ranges[index][0] - 5, kev_ranges[index][1] - 5)
+                        kev_ranges[i] = (
+                            kev_ranges[index][0] - 5,
+                            kev_ranges[index][1] - 5,
+                        )
                 except:
                     pass
 
@@ -513,8 +543,8 @@ class calibrate_parameter:
                 log.debug("Calibrated found")
                 log.info(f"Calibration pars are {self.pars}")
 
-                for i, peak in enumerate(self.results["got_peaks_keV"]):  
-                    idx = np.where(peak ==self.glines)[0][0]
+                for i, peak in enumerate(self.results["got_peaks_keV"]):
+                    idx = np.where(peak == self.glines)[0][0]
                     self.funcs[idx] = fitted_funcs[i]
                     if fitted_funcs[i] == pgf.extended_radford_pdf:
                         self.gof_funcs[idx] = pgf.radford_pdf
@@ -522,23 +552,19 @@ class calibrate_parameter:
                         self.gof_funcs[idx] = pgf.gauss_step_pdf
                 if self.pars is None:
                     raise ValueError
-            
+
             except:
                 self.pars = np.full(self.deg + 1, np.nan)
                 self.results = None
-                
-                log.error(
-                        f"Calibration failed completely for {self.energy_param}"
-                    )   
+
+                log.error(f"Calibration failed completely for {self.energy_param}")
         else:
             log.debug("Calibrated found")
             log.info(f"Calibration pars are {self.pars}")
         if ~np.isnan(self.pars).all():
             self.fit_energy_res()
         self.hit_dict[self.cal_energy_param] = self.gen_pars_dict()
-        data[f"{self.energy_param}_cal"] = pgf.poly(
-                    data[self.energy_param], self.pars
-                )
+        data[f"{self.energy_param}_cal"] = pgf.poly(data[self.energy_param], self.pars)
 
     def fill_plot_dict(self, data, plot_dict={}):
         for key, item in self.plot_options.items():
@@ -547,7 +573,6 @@ class calibrate_parameter:
             else:
                 plot_dict[key] = item["function"](self, data)
         return plot_dict
-
 
 
 class high_stats_fitting(calibrate_parameter):
@@ -568,11 +593,11 @@ class high_stats_fitting(calibrate_parameter):
         2614.50,
         3125,
         3198,
-        3474
-    ]   # gamma lines used for calibration
+        3474,
+    ]  # gamma lines used for calibration
     range_keV = [
         (10, 10),
-        (30,30),
+        (30, 30),
         (30, 30),
         (30, 30),
         (30, 15),
@@ -588,9 +613,9 @@ class high_stats_fitting(calibrate_parameter):
         (30, 30),
         (30, 30),
         (30, 30),
-    ]   # side bands width
+    ]  # side bands width
     funcs = [
-        pgf.extended_gauss_step_pdf, #probably should be gauss on exp
+        pgf.extended_gauss_step_pdf,  # probably should be gauss on exp
         pgf.extended_gauss_step_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
@@ -629,8 +654,15 @@ class high_stats_fitting(calibrate_parameter):
         pgf.gauss_step_pdf,
     ]
 
-    def __init__(self, energy_param, selection_string, threshold, p_val, 
-                 plot_options={}, simplex=False):
+    def __init__(
+        self,
+        energy_param,
+        selection_string,
+        threshold,
+        p_val,
+        plot_options={},
+        simplex=False,
+    ):
         self.energy_param = energy_param
         self.cal_energy_param = energy_param
         self.selection_string = selection_string
@@ -640,69 +672,86 @@ class high_stats_fitting(calibrate_parameter):
         self.simplex = simplex
         self.results = {}
         self.plot_dict = {}
-        self.n_events=None
+        self.n_events = None
         self.output_dict = {}
-        self.pars=[1,0]
-            
+        self.pars = [1, 0]
+
     def get_results_dict(self, data):
         if self.results:
             fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["pars"] = fwhm_linear['pars'].to_dict()
-            fwhm_linear["errors"] = fwhm_linear['errors'].to_dict()
+            fwhm_linear["pars"] = fwhm_linear["pars"].to_dict()
+            fwhm_linear["errors"] = fwhm_linear["errors"].to_dict()
             fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
             fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["pars"] = fwhm_quad['pars'].to_dict()
-            fwhm_quad["errors"] = fwhm_quad['errors'].to_dict()
+            fwhm_quad["pars"] = fwhm_quad["pars"].to_dict()
+            fwhm_quad["errors"] = fwhm_quad["errors"].to_dict()
             fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
-            
-            pk_dict = {Ei:{"function":func_i.__name__,
-                    "module":func_i.__module__,
-                    "pars(cal)":parsi.to_dict(),
-                    "errs(cal)":errorsi.to_dict(),
+
+            pk_dict = {
+                Ei: {
+                    "function": func_i.__name__,
+                    "module": func_i.__module__,
+                    "pars(cal)": parsi.to_dict(),
+                    "errs(cal)": errorsi.to_dict(),
                     "p_val": pvali,
-                    "fwhm (keV)": list(fwhmi)}
-                    for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
-                        zip(self.results["fitted_keV"], 
-                            self.results["pk_pars"][self.results["pk_validities"]], 
-                            self.results["pk_errors"][self.results["pk_validities"]], 
-                            self.results["pk_pvals"][self.results["pk_validities"]],
-                            self.results["pk_fwhms"],
-                            self.funcs)
-                        )}
-            
+                    "fwhm (keV)": list(fwhmi),
+                }
+                for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
+                    zip(
+                        self.results["fitted_keV"],
+                        self.results["pk_pars"][self.results["pk_validities"]],
+                        self.results["pk_errors"][self.results["pk_validities"]],
+                        self.results["pk_pvals"][self.results["pk_validities"]],
+                        self.results["pk_fwhms"],
+                        self.funcs,
+                    )
+                )
+            }
+
             return {
-                    "eres_linear": fwhm_linear,
-                    "eres_quadratic":fwhm_quad, 
-                    "fitted_peaks": self.results["fitted_keV"].tolist(),
-                    "pk_fits":pk_dict
+                "eres_linear": fwhm_linear,
+                "eres_quadratic": fwhm_quad,
+                "fitted_peaks": self.results["fitted_keV"].tolist(),
+                "pk_fits": pk_dict,
             }
         else:
             return {}
-        
 
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
-            n_bins = [int((self.range_keV[i][1]+self.range_keV[i][0]) /0.2) for i in range(len(self.glines))]
-            pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks, pk_funcs = cal.hpge_fit_E_peaks(
-            data.query(self.selection_string)[self.energy_param],
-            self.glines,
-            self.range_keV,
-            n_bins=n_bins,
-            funcs=self.funcs,
-            method="unbinned",
-            gof_funcs=self.gof_funcs,
-            n_events=None,
-            allowed_p_val=self.p_val
-        )
-            for idx, peak in enumerate(self.glines):  
-                #idx = np.where(peak ==self.glines)[0][0]
+            n_bins = [
+                int((self.range_keV[i][1] + self.range_keV[i][0]) / 0.2)
+                for i in range(len(self.glines))
+            ]
+            (
+                pk_pars,
+                pk_errors,
+                pk_covs,
+                pk_binws,
+                pk_ranges,
+                pk_pvals,
+                valid_pks,
+                pk_funcs,
+            ) = cal.hpge_fit_E_peaks(
+                data.query(self.selection_string)[self.energy_param],
+                self.glines,
+                self.range_keV,
+                n_bins=n_bins,
+                funcs=self.funcs,
+                method="unbinned",
+                gof_funcs=self.gof_funcs,
+                n_events=None,
+                allowed_p_val=self.p_val,
+            )
+            for idx, peak in enumerate(self.glines):
+                # idx = np.where(peak ==self.glines)[0][0]
                 self.funcs[idx] = pk_funcs[idx]
                 if pk_funcs[idx] == pgf.extended_radford_pdf:
                     self.gof_funcs[idx] = pgf.radford_pdf
                 else:
-                    self.gof_funcs[idx] = pgf.gauss_step_pdf        
-            
+                    self.gof_funcs[idx] = pgf.gauss_step_pdf
+
             self.results["got_peaks_keV"] = self.glines
             self.results["pk_pars"] = pk_pars
             self.results["pk_errors"] = pk_errors
@@ -710,13 +759,15 @@ class high_stats_fitting(calibrate_parameter):
             self.results["pk_binws"] = pk_binws
             self.results["pk_ranges"] = pk_ranges
             self.results["pk_pvals"] = pk_pvals
-             
 
             for i, pk in enumerate(self.results["got_peaks_keV"]):
                 try:
-                    if self.results["pk_pars"][i]["n_sig"]<10:
+                    if self.results["pk_pars"][i]["n_sig"] < 10:
                         valid_pks[i] = False
-                    elif 2*self.results["pk_errors"][i]["n_sig"]>self.results["pk_pars"][i]["n_sig"]:
+                    elif (
+                        2 * self.results["pk_errors"][i]["n_sig"]
+                        > self.results["pk_pars"][i]["n_sig"]
+                    ):
                         valid_pks[i] = False
                 except:
                     pass
@@ -724,16 +775,16 @@ class high_stats_fitting(calibrate_parameter):
             self.results["pk_validities"] = valid_pks
 
             # Drop failed fits
-            fitted_peaks_keV = self.results["fitted_keV"] = np.asarray(self.glines)[valid_pks]
+            fitted_peaks_keV = self.results["fitted_keV"] = np.asarray(self.glines)[
+                valid_pks
+            ]
             pk_pars = np.asarray(pk_pars, dtype=object)[valid_pks]  # ragged
-            pk_errors  = np.asarray(pk_errors, dtype=object)[valid_pks]
+            pk_errors = np.asarray(pk_errors, dtype=object)[valid_pks]
             pk_covs = np.asarray(pk_covs, dtype=object)[valid_pks]
             pk_binws = np.asarray(pk_binws)[valid_pks]
             pk_ranges = np.asarray(pk_ranges)[valid_pks]
             pk_pvals = np.asarray(pk_pvals)[valid_pks]
             pk_funcs = np.asarray(pk_funcs)[valid_pks]
-            
-            
 
             log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
             for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
@@ -778,7 +829,6 @@ class high_stats_fitting(calibrate_parameter):
         except:
             self.results = {}
             log.debug(f"high stats fitting failed")
-        
 
 
 def get_peak_labels(
@@ -814,7 +864,9 @@ def get_peak_label(peak: float) -> str:
         return ""
 
 
-def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, binning_keV=5):
+def plot_fits(
+    ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, binning_keV=5
+):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -828,7 +880,6 @@ def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, 
         if peak in fitted_peaks:
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
-
     mus = [
         pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
@@ -841,7 +892,7 @@ def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, 
         range_adu = 5 / der[i]
         plt.subplot(nrows, ncols, i + 1)
         try:
-            binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 0.1/ der[i])
+            binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 0.1 / der[i])
             bin_cs = (binning[1:] + binning[:-1]) / 2
             energies = data.query(
                 f"{ecal_class.energy_param}>{pk_ranges[i][0]}&{ecal_class.energy_param}<{pk_ranges[i][1]}&{ecal_class.selection_string}"
@@ -850,7 +901,9 @@ def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, 
 
             counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
             if pk_pars[i] is not None:
-                fit_vals = fitted_gof_funcs[i](bin_cs, *pk_pars[i][:-1], 0) * np.diff(bs)[0]
+                fit_vals = (
+                    fitted_gof_funcs[i](bin_cs, *pk_pars[i][:-1], 0) * np.diff(bs)[0]
+                )
                 plt.plot(bin_cs, fit_vals)
                 plt.step(
                     bin_cs,
@@ -861,7 +914,9 @@ def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, 
                 )
 
                 plt.annotate(
-                    get_peak_label(fitted_peaks[i]), (0.02, 0.9), xycoords="axes fraction"
+                    get_peak_label(fitted_peaks[i]),
+                    (0.02, 0.9),
+                    xycoords="axes fraction",
                 )
                 plt.annotate(
                     f"{fitted_peaks[i]:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
@@ -885,7 +940,13 @@ def plot_fits(ecal_class, data, figsize=[12, 8], fontsize=12, ncols=3, nrows=3, 
 
 
 def plot_2614_timemap(
-    ecal_class, data, figsize=[12, 8], fontsize=12, erange=[2580, 2630], dx=1, time_dx=180
+    ecal_class,
+    data,
+    figsize=[12, 8],
+    fontsize=12,
+    erange=[2580, 2630],
+    dx=1,
+    time_dx=180,
 ):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
@@ -945,9 +1006,7 @@ def plot_pulser_timemap(
 
     else:
         mean = np.nanpercentile(selection[ecal_class.cal_energy_param], 50)
-        spread = mean - np.nanpercentile(
-            selection[ecal_class.cal_energy_param], 10
-        )
+        spread = mean - np.nanpercentile(selection[ecal_class.cal_energy_param], 10)
 
         plt.hist2d(
             selection["timestamp"],
@@ -1150,27 +1209,53 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
 
     qbb_line_vx = [2039.0, 2039.0]
     qbb_line_vy = [
-        0.9 * np.nanmin(fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"])),
-        np.nanmax([ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]])
+        0.9
+        * np.nanmin(
+            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"])
+        ),
+        np.nanmax(
+            [
+                ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
+                ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
+            ]
+        ),
     ]
     qbb_line_hx = [erange[0], 2039.0]
 
     ax1.plot(
-        fwhm_slope_bins, fwhm_linear.func(fwhm_slope_bins, 
-                                          *ecal_class.fwhm_fit_linear["pars"]), lw=1, c="g",
-        label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err(keV)"]:1.2f} keV'
+        fwhm_slope_bins,
+        fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]),
+        lw=1,
+        c="g",
+        label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err(keV)"]:1.2f} keV',
     )
     ax1.plot(
-        fwhm_slope_bins, fwhm_quadratic.func(fwhm_slope_bins, 
-                                             *ecal_class.fwhm_fit_quadratic["pars"]), lw=1, c="b",
-        label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err(keV)"]:1.2f} keV'
+        fwhm_slope_bins,
+        fwhm_quadratic.func(fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["pars"]),
+        lw=1,
+        c="b",
+        label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err(keV)"]:1.2f} keV',
     )
-    ax1.plot(qbb_line_hx, [ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
-                           ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"]], 
-             lw=1, c="r", ls="--")
-    ax1.plot(qbb_line_hx, [ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
-                           ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]], 
-             lw=1, c="r", ls="--")
+    ax1.plot(
+        qbb_line_hx,
+        [
+            ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
+            ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
+        ],
+        lw=1,
+        c="r",
+        ls="--",
+    )
+    ax1.plot(
+        qbb_line_hx,
+        [
+            ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
+            ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
+        ],
+        lw=1,
+        c="r",
+        ls="--",
+    )
     ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
 
     ax1.legend(loc="upper left", frameon=False)
@@ -1182,27 +1267,42 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     else:
         ax1.set_ylim(
             [
-                0.9 * np.nanmin(fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"])),
-                1.1 * np.nanmax(fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"])),
+                0.9
+                * np.nanmin(
+                    fwhm_linear.func(
+                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]
+                    )
+                ),
+                1.1
+                * np.nanmax(
+                    fwhm_linear.func(
+                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]
+                    )
+                ),
             ]
         )
     ax1.set_xlim(erange)
     ax1.set_ylabel("FWHM energy resolution (keV)")
     ax2.plot(
         fwhm_peaks,
-        (fit_fwhms - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["pars"])) / fit_dfwhms,
+        (fit_fwhms - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["pars"]))
+        / fit_dfwhms,
         lw=0,
         marker="x",
         c="g",
     )
     ax2.plot(
         fwhm_peaks,
-        (fit_fwhms - fwhm_quadratic.func(fwhm_peaks, *ecal_class.fwhm_fit_quadratic["pars"])) / fit_dfwhms,
+        (
+            fit_fwhms
+            - fwhm_quadratic.func(fwhm_peaks, *ecal_class.fwhm_fit_quadratic["pars"])
+        )
+        / fit_dfwhms,
         lw=0,
         marker="x",
         c="b",
     )
-    ax2.plot(erange,[0,0], color="black",lw=0.5)
+    ax2.plot(erange, [0, 0], color="black", lw=0.5)
     ax2.set_xlabel("Energy (keV)")
     ax2.set_ylabel("Normalised Residuals")
     plt.tight_layout()
@@ -1218,9 +1318,7 @@ def bin_spectrum(ecal_class, data, erange=[0, 3000], dx=2):
             data.query(ecal_class.selection_string)[ecal_class.cal_energy_param], bins
         )[0],
         "cut_counts": np.histogram(
-            data.query("~is_valid_cal&is_not_pulser")[
-                ecal_class.cal_energy_param
-            ],
+            data.query("~is_valid_cal&is_not_pulser")[ecal_class.cal_energy_param],
             bins,
         )[0],
         "pulser_counts": np.histogram(
@@ -1236,9 +1334,7 @@ def bin_survival_fraction(ecal_class, data, erange=[0, 3000], dx=6):
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
     counts_fail, bins_fail, _ = pgh.get_hist(
-        data.query("~is_valid_cal&is_not_pulser")[
-            ecal_class.cal_energy_param
-        ],
+        data.query("~is_valid_cal&is_not_pulser")[ecal_class.cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
     sf = 100 * (counts_pass + 10 ** (-6)) / (counts_pass + counts_fail + 10 ** (-6))
@@ -1247,7 +1343,7 @@ def bin_survival_fraction(ecal_class, data, erange=[0, 3000], dx=6):
 
 def energy_cal_th(
     files: list[str],
-    energy_params: list[str] ,
+    energy_params: list[str],
     lh5_path: str = "dsp",
     hit_dict: dict = {},
     cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
@@ -1260,12 +1356,11 @@ def energy_cal_th(
     guess_keV: float | None = None,
     deg: int = 1,
 ) -> tuple(dict, dict, dict, dict):
-
     data = load_data(
         files,
         lh5_path,
         hit_dict,
-        params = energy_params + list(cut_parameters) + ["timestamp"]
+        params=energy_params + list(cut_parameters) + ["timestamp"],
     )
 
     data, hit_dict = apply_cuts(data, hit_dict, cut_parameters, final_cut_field)
@@ -1290,8 +1385,7 @@ def energy_cal_th(
         hit_dict.update(ecal.hit_dict)
         full_object_dict[ecal.cal_energy_param] = ecal
         if ~np.isnan(ecal.pars).all():
-           plot_dict[ecal.cal_energy_param] = ecal.fill_plot_dict(data)
-        
+            plot_dict[ecal.cal_energy_param] = ecal.fill_plot_dict(data)
 
     log.info(f"Finished all calibrations")
     return hit_dict, results_dict, plot_dict, full_object_dict
@@ -1309,12 +1403,11 @@ def partition_energy_cal_th(
     final_cut_field: str = "is_valid_cal",
     simplex: bool = True,
 ) -> tuple(dict, dict, dict, dict):
-
     data = load_data(
         files,
         lh5_path,
         hit_dict,
-        params = energy_params + [final_cut_field] + ["timestamp"]
+        params=energy_params + [final_cut_field] + ["timestamp"],
     )
 
     results_dict = {}
