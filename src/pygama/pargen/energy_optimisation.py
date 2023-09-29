@@ -1038,11 +1038,12 @@ def event_selection(
         e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
 
         e_ranges = (int(peak_loc - e_lower_lim), int(e_upper_lim - peak_loc))
-        params, errors, covs, bins, ranges, p_val, valid_pks = pgc.hpge_fit_E_peaks(
+        params, errors, covs, bins, ranges, p_val, valid_pks, pk_funcs = pgc.hpge_fit_E_peaks(
             energy,
             [peak_loc],
             [e_ranges],
             n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
+            uncal_is_int=True
         )
         if params[0] is None:
             log.debug("Fit failed, using max guess")
