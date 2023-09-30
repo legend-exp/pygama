@@ -1045,7 +1045,7 @@ def event_selection(
             n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
             uncal_is_int=True
         )
-        if params[0] is None:
+        if params[0] is None or np.isnan(params[0]).any():
             log.debug("Fit failed, using max guess")
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
