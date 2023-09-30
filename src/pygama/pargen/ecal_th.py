@@ -613,24 +613,26 @@ class high_stats_fitting(calibrate_parameter):
         (30, 30),
         (30, 30),
         (30, 30),
-    ]   # side bands width
-    binning=[0.02,
-            0.02,
-            0.02,
-            0.02,
-            0.2,
-            0.2,
-            0.02,
-            0.2,
-            0.2,
-            0.2,
-            0.1,
-            0.1,
-            0.1,
-            0.02,
-            0.2,
-            0.2,
-            0.2]
+    ]  # side bands width
+    binning = [
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.2,
+        0.2,
+        0.02,
+        0.2,
+        0.2,
+        0.2,
+        0.1,
+        0.1,
+        0.1,
+        0.02,
+        0.2,
+        0.2,
+        0.2,
+    ]
     funcs = [
         pgf.extended_gauss_step_pdf,  # probably should be gauss on exp
         pgf.extended_gauss_step_pdf,
@@ -679,7 +681,7 @@ class high_stats_fitting(calibrate_parameter):
         p_val,
         plot_options={},
         simplex=False,
-        tail_weight=20
+        tail_weight=20,
     ):
         self.energy_param = energy_param
         self.cal_energy_param = energy_param
@@ -692,9 +694,9 @@ class high_stats_fitting(calibrate_parameter):
         self.plot_dict = {}
         self.n_events = None
         self.output_dict = {}
-        self.pars=[1,0]
-        self.tail_weight=tail_weight
-            
+        self.pars = [1, 0]
+        self.tail_weight = tail_weight
+
     def get_results_dict(self, data):
         if self.results:
             fwhm_linear = self.fwhm_fit_linear.copy()
@@ -739,20 +741,32 @@ class high_stats_fitting(calibrate_parameter):
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
-            n_bins = [int((self.range_keV[i][1]+self.range_keV[i][0]) /self.binning[i]) for i in range(len(self.glines))]
-            pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks, pk_funcs = cal.hpge_fit_E_peaks(
-            data.query(self.selection_string)[self.energy_param],
-            self.glines,
-            self.range_keV,
-            n_bins=n_bins,
-            funcs=self.funcs,
-            method="unbinned",
-            gof_funcs=self.gof_funcs,
-            n_events=None,
-            allowed_p_val=self.p_val,
-            tail_weight=20
-        )
-            for idx, peak in enumerate(self.glines):  
+            n_bins = [
+                int((self.range_keV[i][1] + self.range_keV[i][0]) / self.binning[i])
+                for i in range(len(self.glines))
+            ]
+            (
+                pk_pars,
+                pk_errors,
+                pk_covs,
+                pk_binws,
+                pk_ranges,
+                pk_pvals,
+                valid_pks,
+                pk_funcs,
+            ) = cal.hpge_fit_E_peaks(
+                data.query(self.selection_string)[self.energy_param],
+                self.glines,
+                self.range_keV,
+                n_bins=n_bins,
+                funcs=self.funcs,
+                method="unbinned",
+                gof_funcs=self.gof_funcs,
+                n_events=None,
+                allowed_p_val=self.p_val,
+                tail_weight=20,
+            )
+            for idx, peak in enumerate(self.glines):
                 self.funcs[idx] = pk_funcs[idx]
                 if pk_funcs[idx] == pgf.extended_radford_pdf:
                     self.gof_funcs[idx] = pgf.radford_pdf
@@ -1409,7 +1423,7 @@ def partition_energy_cal_th(
     n_events: int = None,
     final_cut_field: str = "is_valid_cal",
     simplex: bool = True,
-    tail_weight:int=20
+    tail_weight: int = 20,
 ) -> tuple(dict, dict, dict, dict):
     data = load_data(
         files,
@@ -1429,7 +1443,7 @@ def partition_energy_cal_th(
             p_val,
             plot_options,
             simplex,
-            tail_weight
+            tail_weight,
         )
         ecal.fit_peaks(data)
         results_dict[energy_param] = ecal.get_results_dict(data)
