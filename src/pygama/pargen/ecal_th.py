@@ -615,7 +615,7 @@ class high_stats_fitting(calibrate_parameter):
         (30, 30),
     ]   # side bands width
     binning=[0.02,
-            0.02, 
+            0.02,
             0.02,
             0.02,
             0.2,
