@@ -692,14 +692,9 @@ class high_stats_fitting(calibrate_parameter):
         self.plot_dict = {}
         self.n_events = None
         self.output_dict = {}
-<<<<<<< HEAD
         self.pars=[1,0]
         self.tail_weight=tail_weight
             
-=======
-        self.pars = [1, 0]
-
->>>>>>> 96f2e2905ecae15f0b5e117a874b35005028a996
     def get_results_dict(self, data):
         if self.results:
             fwhm_linear = self.fwhm_fit_linear.copy()
@@ -744,7 +739,6 @@ class high_stats_fitting(calibrate_parameter):
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
-<<<<<<< HEAD
             n_bins = [int((self.range_keV[i][1]+self.range_keV[i][0]) /self.binning[i]) for i in range(len(self.glines))]
             pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks, pk_funcs = cal.hpge_fit_E_peaks(
             data.query(self.selection_string)[self.energy_param],
@@ -759,34 +753,6 @@ class high_stats_fitting(calibrate_parameter):
             tail_weight=20
         )
             for idx, peak in enumerate(self.glines):  
-=======
-            n_bins = [
-                int((self.range_keV[i][1] + self.range_keV[i][0]) / 0.2)
-                for i in range(len(self.glines))
-            ]
-            (
-                pk_pars,
-                pk_errors,
-                pk_covs,
-                pk_binws,
-                pk_ranges,
-                pk_pvals,
-                valid_pks,
-                pk_funcs,
-            ) = cal.hpge_fit_E_peaks(
-                data.query(self.selection_string)[self.energy_param],
-                self.glines,
-                self.range_keV,
-                n_bins=n_bins,
-                funcs=self.funcs,
-                method="unbinned",
-                gof_funcs=self.gof_funcs,
-                n_events=None,
-                allowed_p_val=self.p_val,
-            )
-            for idx, peak in enumerate(self.glines):
-                # idx = np.where(peak ==self.glines)[0][0]
->>>>>>> 96f2e2905ecae15f0b5e117a874b35005028a996
                 self.funcs[idx] = pk_funcs[idx]
                 if pk_funcs[idx] == pgf.extended_radford_pdf:
                     self.gof_funcs[idx] = pgf.radford_pdf
