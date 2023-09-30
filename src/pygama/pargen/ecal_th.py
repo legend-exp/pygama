@@ -615,7 +615,7 @@ class high_stats_fitting(calibrate_parameter):
         (30, 30),
     ]   # side bands width
     binning=[0.02,
-            0.02, 
+            0.02,
             0.02,
             0.02,
             0.2,
@@ -695,7 +695,7 @@ class high_stats_fitting(calibrate_parameter):
 <<<<<<< HEAD
         self.pars=[1,0]
         self.tail_weight=tail_weight
-            
+
 =======
         self.pars = [1, 0]
 
@@ -758,7 +758,7 @@ class high_stats_fitting(calibrate_parameter):
             allowed_p_val=self.p_val,
             tail_weight=20
         )
-            for idx, peak in enumerate(self.glines):  
+            for idx, peak in enumerate(self.glines):
 =======
             n_bins = [
                 int((self.range_keV[i][1] + self.range_keV[i][0]) / 0.2)

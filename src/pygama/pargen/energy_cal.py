@@ -490,7 +490,7 @@ class tail_prior:
 <<<<<<< HEAD
         self.data=data
         self.tail_weight = tail_weight
-        
+
 =======
         self.data = data
         # self.x = np.asarray(x)
@@ -515,7 +515,7 @@ class tail_prior:
         return 100 * np.log(htail + 0.1)  # len(self.data)/
 
 <<<<<<< HEAD
-    def __call__(self, n_sig, mu, sigma, htail, 
+    def __call__(self, n_sig, mu, sigma, htail,
                                            tau, n_bkg, hstep,
                                             lower_range ,upper_range,  components):
         return self.tail_weight * np.log(htail+0.1) #len(self.data)/
@@ -698,7 +698,7 @@ def hpge_fit_E_peaks(
                 )
                 if func_i == pgf.extended_radford_pdf or pgf.extended_gauss_step_pdf:
 <<<<<<< HEAD
-                    pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(energies, hist, bins, var, 
+                    pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(energies, hist, bins, var,
                                                                                 func_i, gof_func_i, simplex, mode_guess,
                                                                                 tail_weight=tail_weight)
 =======
