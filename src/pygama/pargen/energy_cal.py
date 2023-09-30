@@ -479,10 +479,10 @@ class tail_prior:
     verbose=0
     errordef = Minuit.LIKELIHOOD  # for Minuit to compute errors correctly
 
-    def __init__(self, data, model):
+    def __init__(self, data, model, tail_weight=100):
         self.model = model  # model predicts y for given x
         self.data=data
-        #self.x = np.asarray(x)
+        self.tail_weight = tail_weight
         
     def _call(self, *pars):
         return self.__call__( *pars[0])
@@ -490,15 +490,15 @@ class tail_prior:
     def __call__(self, n_sig, mu, sigma, htail, 
                                            tau, n_bkg, hstep,
                                             lower_range ,upper_range,  components):
-        return 100 * np.log(htail+0.1) #len(self.data)/
+        return self.tail_weight * np.log(htail+0.1) #len(self.data)/
 
-def staged_fit(energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess):
+def staged_fit(energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess, tail_weight=100):
     par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i, mode_guess)
     bounds = get_hpge_E_bounds(func_i, par_guesses)
     fixed, mask = get_hpge_E_fixed(func_i)  
     
     if func_i == pgf.extended_radford_pdf or func_i == pgf.radford_pdf:
-        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i) +tail_prior(energies, func_i)
+        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i) +tail_prior(energies, func_i, tail_weight=tail_weight)
         m = Minuit(cost_func, *par_guesses)
         m.limits = bounds
         for fix in fixed:
@@ -577,6 +577,7 @@ def hpge_fit_E_peaks(
     allowed_p_val=0.05,
     uncal_is_int=False,
     simplex=False,
+    tail_weight=100
 ):
     """Fit the Energy peaks specified using the function given
 
@@ -654,7 +655,8 @@ def hpge_fit_E_peaks(
                 )
                 if func_i == pgf.extended_radford_pdf or pgf.extended_gauss_step_pdf:
                     pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(energies, hist, bins, var, 
-                                                                                func_i, gof_func_i, simplex, mode_guess)
+                                                                                func_i, gof_func_i, simplex, mode_guess,
+                                                                                tail_weight=tail_weight)
                 else:
                 
                     par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
