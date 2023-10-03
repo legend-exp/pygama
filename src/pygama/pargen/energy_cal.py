@@ -929,6 +929,7 @@ def hpge_E_calibration(
     n_events=None,
     simplex=False,
     allowed_p_val=0.05,
+    tail_weight=100,
     verbose=True,
 ):
     """Calibrate HPGe data to a set of known peaks
@@ -1139,6 +1140,7 @@ def hpge_E_calibration(
         uncal_is_int=False,
         simplex=simplex,
         allowed_p_val=allowed_p_val,
+        tail_weight=tail_weight,
     )
     results["pk_pars"] = pk_pars
     results["pk_errors"] = pk_errors
