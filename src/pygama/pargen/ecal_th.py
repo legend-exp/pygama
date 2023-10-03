@@ -134,8 +134,8 @@ class calibrate_parameter:
         (20, 20),
         (30, 30),
         (30, 30),
-        (40, 25),
-        (25, 40),
+        (40, 20),
+        (20, 40),
         (40, 40),
         (60, 60),
     ]  # side bands width
@@ -257,8 +257,8 @@ class calibrate_parameter:
                 "expression": fwhm_linear.string_func("x"),
                 "Qbb_fwhm(keV)": fit_qbb,
                 "Qbb_fwhm_err(keV)": qbb_err,
-                "pars": m_lin.values,
-                "errors": m_lin.errors,
+                "parameters": m_lin.values,
+                "uncertainties": m_lin.errors,
                 "cov": m_lin.covariance,
                 "csqr": (m_lin.fval, len(fwhm_peaks) - len(m_lin.values)),
                 "p_val": p_val,
@@ -291,8 +291,8 @@ class calibrate_parameter:
                 "expression": fwhm_linear.string_func("x"),
                 "Qbb_fwhm(keV)": np.nan,
                 "Qbb_fwhm_err(keV)": np.nan,
-                "pars": pars,
-                "errors": errs,
+                "parameters": pars,
+                "uncertainties": errs,
                 "cov": cov,
                 "csqr": (np.nan, np.nan),
                 "p_val": 0,
@@ -337,8 +337,8 @@ class calibrate_parameter:
                 "expression": fwhm_quadratic.string_func("x"),
                 "Qbb_fwhm(keV)": fit_qbb,
                 "Qbb_fwhm_err(keV)": qbb_err,
-                "pars": m_quad.values,
-                "errors": m_quad.errors,
+                "parameters": m_quad.values,
+                "uncertainties": m_quad.errors,
                 "cov": m_quad.covariance,
                 "csqr": (m_quad.fval, len(fwhm_peaks) - len(m_quad.values)),
                 "p_val": p_val,
@@ -356,8 +356,8 @@ class calibrate_parameter:
                 "expression": fwhm_quadratic.string_func("x"),
                 "Qbb_fwhm(keV)": np.nan,
                 "Qbb_fwhm_err(keV)": np.nan,
-                "pars": pars,
-                "errors": errs,
+                "parameters": pars,
+                "uncertainties": errs,
                 "cov": cov,
                 "csqr": (np.nan, np.nan),
                 "p_val": 0,
@@ -391,22 +391,22 @@ class calibrate_parameter:
             return {}
         else:
             fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["pars"] = fwhm_linear["pars"].to_dict()
-            fwhm_linear["errors"] = fwhm_linear["errors"].to_dict()
+            fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
+            fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
             fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
             fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["pars"] = fwhm_quad["pars"].to_dict()
-            fwhm_quad["errors"] = fwhm_quad["errors"].to_dict()
+            fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
+            fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
             fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
 
             pk_dict = {
                 Ei: {
                     "function": func_i.__name__,
                     "module": func_i.__module__,
-                    "pars(uncal)": parsi.to_dict(),
-                    "errs(uncal)": errorsi.to_dict(),
+                    "parameters_in_ADC": parsi.to_dict(),
+                    "uncertainties_in_ADC": errorsi.to_dict(),
                     "p_val": pvali,
-                    "fwhm (keV)": list(fwhmi),
+                    "fwhm_in_keV": list(fwhmi),
                 }
                 for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
                     zip(
@@ -613,24 +613,26 @@ class high_stats_fitting(calibrate_parameter):
         (30, 30),
         (30, 30),
         (30, 30),
-    ]   # side bands width
-    binning=[0.02,
-            0.02,
-            0.02,
-            0.02,
-            0.2,
-            0.2,
-            0.02,
-            0.2,
-            0.2,
-            0.2,
-            0.1,
-            0.1,
-            0.1,
-            0.02,
-            0.2,
-            0.2,
-            0.2]
+    ]  # side bands width
+    binning = [
+        0.02,
+        0.02,
+        0.02,
+        0.02,
+        0.2,
+        0.2,
+        0.02,
+        0.2,
+        0.2,
+        0.2,
+        0.1,
+        0.1,
+        0.1,
+        0.02,
+        0.2,
+        0.2,
+        0.2,
+    ]
     funcs = [
         pgf.extended_gauss_step_pdf,  # probably should be gauss on exp
         pgf.extended_gauss_step_pdf,
@@ -679,7 +681,7 @@ class high_stats_fitting(calibrate_parameter):
         p_val,
         plot_options={},
         simplex=False,
-        tail_weight=20
+        tail_weight=20,
     ):
         self.energy_param = energy_param
         self.cal_energy_param = energy_param
@@ -692,28 +694,28 @@ class high_stats_fitting(calibrate_parameter):
         self.plot_dict = {}
         self.n_events = None
         self.output_dict = {}
-        self.pars=[1,0]
-        self.tail_weight=tail_weight
-            
+        self.pars = [1, 0]
+        self.tail_weight = tail_weight
+
     def get_results_dict(self, data):
         if self.results:
             fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["pars"] = fwhm_linear["pars"].to_dict()
-            fwhm_linear["errors"] = fwhm_linear["errors"].to_dict()
+            fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
+            fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
             fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
             fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["pars"] = fwhm_quad["pars"].to_dict()
-            fwhm_quad["errors"] = fwhm_quad["errors"].to_dict()
+            fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
+            fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
             fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
 
             pk_dict = {
                 Ei: {
                     "function": func_i.__name__,
                     "module": func_i.__module__,
-                    "pars(cal)": parsi.to_dict(),
-                    "errs(cal)": errorsi.to_dict(),
+                    "parameters_in_keV": parsi.to_dict(),
+                    "uncertainties_in_keV": errorsi.to_dict(),
                     "p_val": pvali,
-                    "fwhm (keV)": list(fwhmi),
+                    "fwhm_in_keV": list(fwhmi),
                 }
                 for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
                     zip(
@@ -739,20 +741,32 @@ class high_stats_fitting(calibrate_parameter):
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
-            n_bins = [int((self.range_keV[i][1]+self.range_keV[i][0]) /self.binning[i]) for i in range(len(self.glines))]
-            pk_pars, pk_errors, pk_covs, pk_binws, pk_ranges, pk_pvals, valid_pks, pk_funcs = cal.hpge_fit_E_peaks(
-            data.query(self.selection_string)[self.energy_param],
-            self.glines,
-            self.range_keV,
-            n_bins=n_bins,
-            funcs=self.funcs,
-            method="unbinned",
-            gof_funcs=self.gof_funcs,
-            n_events=None,
-            allowed_p_val=self.p_val,
-            tail_weight=20
-        )
-            for idx, peak in enumerate(self.glines):  
+            n_bins = [
+                int((self.range_keV[i][1] + self.range_keV[i][0]) / self.binning[i])
+                for i in range(len(self.glines))
+            ]
+            (
+                pk_pars,
+                pk_errors,
+                pk_covs,
+                pk_binws,
+                pk_ranges,
+                pk_pvals,
+                valid_pks,
+                pk_funcs,
+            ) = cal.hpge_fit_E_peaks(
+                data.query(self.selection_string)[self.energy_param],
+                self.glines,
+                self.range_keV,
+                n_bins=n_bins,
+                funcs=self.funcs,
+                method="unbinned",
+                gof_funcs=self.gof_funcs,
+                n_events=None,
+                allowed_p_val=self.p_val,
+                tail_weight=20,
+            )
+            for idx, peak in enumerate(self.glines):
                 self.funcs[idx] = pk_funcs[idx]
                 if pk_funcs[idx] == pgf.extended_radford_pdf:
                     self.gof_funcs[idx] = pgf.radford_pdf
@@ -1218,7 +1232,7 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     qbb_line_vy = [
         0.9
         * np.nanmin(
-            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"])
+            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"])
         ),
         np.nanmax(
             [
@@ -1231,14 +1245,16 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
 
     ax1.plot(
         fwhm_slope_bins,
-        fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]),
+        fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
         lw=1,
         c="g",
         label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err(keV)"]:1.2f} keV',
     )
     ax1.plot(
         fwhm_slope_bins,
-        fwhm_quadratic.func(fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["pars"]),
+        fwhm_quadratic.func(
+            fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["parameters"]
+        ),
         lw=1,
         c="b",
         label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err(keV)"]:1.2f} keV',
@@ -1266,7 +1282,7 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
 
     ax1.legend(loc="upper left", frameon=False)
-    if np.isnan(ecal_class.fwhm_fit_linear["pars"]).all():
+    if np.isnan(ecal_class.fwhm_fit_linear["parameters"]).all():
         [
             0.9 * np.nanmin(fit_fwhms),
             1.1 * np.nanmax(fit_fwhms),
@@ -1277,13 +1293,13 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
                 0.9
                 * np.nanmin(
                     fwhm_linear.func(
-                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]
+                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
                     )
                 ),
                 1.1
                 * np.nanmax(
                     fwhm_linear.func(
-                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["pars"]
+                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
                     )
                 ),
             ]
@@ -1292,7 +1308,10 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     ax1.set_ylabel("FWHM energy resolution (keV)")
     ax2.plot(
         fwhm_peaks,
-        (fit_fwhms - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["pars"]))
+        (
+            fit_fwhms
+            - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"])
+        )
         / fit_dfwhms,
         lw=0,
         marker="x",
@@ -1302,7 +1321,9 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
         fwhm_peaks,
         (
             fit_fwhms
-            - fwhm_quadratic.func(fwhm_peaks, *ecal_class.fwhm_fit_quadratic["pars"])
+            - fwhm_quadratic.func(
+                fwhm_peaks, *ecal_class.fwhm_fit_quadratic["parameters"]
+            )
         )
         / fit_dfwhms,
         lw=0,
@@ -1376,7 +1397,7 @@ def energy_cal_th(
     plot_dict = {}
     full_object_dict = {}
     for energy_param in energy_params:
-        ecal = calibrate_parameter(
+        full_object_dict[energy_param] = calibrate_parameter(
             energy_param,
             f"{final_cut_field}&is_not_pulser",
             plot_options,
@@ -1387,12 +1408,15 @@ def energy_cal_th(
             simplex,
             deg,
         )
-        ecal.calibrate_parameter(data)
-        results_dict[ecal.cal_energy_param] = ecal.get_results_dict(data)
-        hit_dict.update(ecal.hit_dict)
-        full_object_dict[ecal.cal_energy_param] = ecal
-        if ~np.isnan(ecal.pars).all():
-            plot_dict[ecal.cal_energy_param] = ecal.fill_plot_dict(data)
+        full_object_dict[energy_param].calibrate_parameter(data)
+        results_dict[
+            full_object_dict[energy_param].cal_energy_param
+        ] = full_object_dict[energy_param].get_results_dict(data)
+        hit_dict.update(full_object_dict[energy_param].hit_dict)
+        if ~np.isnan(full_object_dict[energy_param].pars).all():
+            plot_dict[full_object_dict[energy_param].cal_energy_param] = (
+                full_object_dict[energy_param].fill_plot_dict(data).copy()
+            )
 
     log.info(f"Finished all calibrations")
     return hit_dict, results_dict, plot_dict, full_object_dict
@@ -1409,7 +1433,7 @@ def partition_energy_cal_th(
     n_events: int = None,
     final_cut_field: str = "is_valid_cal",
     simplex: bool = True,
-    tail_weight:int=20
+    tail_weight: int = 20,
 ) -> tuple(dict, dict, dict, dict):
     data = load_data(
         files,
@@ -1422,20 +1446,23 @@ def partition_energy_cal_th(
     plot_dict = {}
     full_object_dict = {}
     for energy_param in energy_params:
-        ecal = high_stats_fitting(
+        full_object_dict[energy_param] = high_stats_fitting(
             energy_param,
             f"{final_cut_field}&is_not_pulser",
             threshold,
             p_val,
             plot_options,
             simplex,
-            tail_weight
+            tail_weight,
         )
-        ecal.fit_peaks(data)
-        results_dict[energy_param] = ecal.get_results_dict(data)
-        full_object_dict[energy_param] = ecal
+        full_object_dict[energy_param].fit_peaks(data)
+        results_dict[energy_param] = full_object_dict[energy_param].get_results_dict(
+            data
+        )
         if ecal.results:
-            plot_dict[energy_param] = ecal.fill_plot_dict(data)
+            plot_dict[energy_param] = (
+                full_object_dict[energy_param].fill_plot_dict(data).copy()
+            )
 
     log.info(f"Finished all calibrations")
     return results_dict, plot_dict, full_object_dict
