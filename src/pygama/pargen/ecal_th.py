@@ -172,6 +172,7 @@ class calibrate_parameter:
         simplex: bool = True,
         deg: int = 1,
         cal_energy_param: str = None,
+        tail_weight=100,
     ):
         self.energy_param = energy_param
         if cal_energy_param is None:
@@ -186,6 +187,7 @@ class calibrate_parameter:
         self.deg = deg
         self.plot_options = plot_options
         self.simplex = simplex
+        self.tail_weight = tail_weight
 
         self.output_dict = {}
         self.hit_dict = {}
@@ -474,6 +476,7 @@ class calibrate_parameter:
                 n_events=self.n_events,
                 allowed_p_val=self.p_val,
                 simplex=self.simplex,
+                tail_weight=self.tail_weight,
                 verbose=False,
             )
             pk_pars = self.results["pk_pars"]
@@ -494,19 +497,7 @@ class calibrate_parameter:
             found_peaks = np.array([])
             fitted_peaks = np.array([])
             fitted_funcs = np.array([])
-
-        if (
-            len(fitted_peaks) != len(self.glines)
-            or self.gof_funcs[-1] == pgf.gauss_step_pdf
-        ):
-            if self.glines[-1] in fitted_peaks:
-                if fitted_funcs[-1] == pgf.extended_gauss_step_pdf:
-                    self.funcs = [pgf.extended_gauss_step_pdf for entry in self.glines]
-                    self.gof_funcs = [pgf.gauss_step_pdf for entry in self.glines]
-
-            for i, peak in enumerate(self.glines):
-                if peak not in fitted_peaks:
-                    kev_ranges[i] = (kev_ranges[i][0] - 5, kev_ranges[i][1] - 5)
+        if len(fitted_peaks) != len(self.glines):
             for i, peak in enumerate(self.glines):
                 if peak not in fitted_peaks:
                     kev_ranges[i] = (kev_ranges[i][0] - 5, kev_ranges[i][1] - 5)
@@ -518,13 +509,12 @@ class calibrate_parameter:
                         > 0.05
                     ):
                         index = np.where(self.glines == peak)[0][0]
-                        kev_ranges[i] = (
+                        kev_ranges[index] = (
                             kev_ranges[index][0] - 5,
                             kev_ranges[index][1] - 5,
                         )
                 except:
                     pass
-
             try:
                 self.pars, self.cov, self.results = cal.hpge_E_calibration(
                     data.query(self.selection_string)[self.energy_param],
@@ -537,6 +527,7 @@ class calibrate_parameter:
                     n_events=self.n_events,
                     allowed_p_val=self.p_val,
                     simplex=self.simplex,
+                    tail_weight=self.tail_weight,
                     verbose=False,
                 )
                 fitted_peaks = self.results["fitted_keV"]
@@ -934,6 +925,7 @@ def plot_fits(
                         (fval - count) / count if count != 0 else (fval - count)
                         for count, fval in zip(counts, fit_vals)
                     ],
+                    where="mid",
                 )
 
                 plt.annotate(
@@ -1384,6 +1376,7 @@ def energy_cal_th(
     final_cut_field: str = "is_valid_cal",
     simplex: bool = True,
     guess_keV: float | None = None,
+    tail_weight=100,
     deg: int = 1,
 ) -> tuple(dict, dict, dict, dict):
     data = load_data(
@@ -1409,6 +1402,7 @@ def energy_cal_th(
             n_events,
             simplex,
             deg,
+            tail_weight=tail_weight,
         )
         full_object_dict[energy_param].calibrate_parameter(data)
         results_dict[
@@ -1461,7 +1455,7 @@ def partition_energy_cal_th(
         results_dict[energy_param] = full_object_dict[energy_param].get_results_dict(
             data
         )
-        if results_dict[energy_param].results:
+        if full_object_dict[energy_param].results:
             plot_dict[energy_param] = (
                 full_object_dict[energy_param].fill_plot_dict(data).copy()
             )
