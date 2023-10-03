@@ -264,7 +264,7 @@ class calibrate_parameter:
                 "p_val": p_val,
             }
 
-            log.info(f'FWHM linear fit: {self.fwhm_fit_linear["pars"].to_dict()}')
+            log.info(f'FWHM linear fit: {self.fwhm_fit_linear["parameters"].to_dict()}')
             log.info(f"FWHM fit values:")
             log.info(f"\t   Energy   | FWHM (keV)  | Predicted (keV)")
             for i, (peak, fwhm, fwhme) in enumerate(
