@@ -1461,7 +1461,7 @@ def partition_energy_cal_th(
         results_dict[energy_param] = full_object_dict[energy_param].get_results_dict(
             data
         )
-        if ecal.results:
+        if results_dict[energy_param].results:
             plot_dict[energy_param] = (
                 full_object_dict[energy_param].fill_plot_dict(data).copy()
             )
