@@ -274,7 +274,7 @@ class calibrate_parameter:
                     f"\t{i}".ljust(4)
                     + str(peak).ljust(9)
                     + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
-                    + f"| {fwhm_linear.func(peak, *self.fwhm_fit_linear['pars']):.2f}".ljust(
+                    + f"| {fwhm_linear.func(peak, *self.fwhm_fit_linear['parameters']):.2f}".ljust(
                         5
                     )
                 )
@@ -343,7 +343,9 @@ class calibrate_parameter:
                 "csqr": (m_quad.fval, len(fwhm_peaks) - len(m_quad.values)),
                 "p_val": p_val,
             }
-            log.info(f'FWHM quadratic fit: {self.fwhm_fit_quadratic["pars"].to_dict()}')
+            log.info(
+                f'FWHM quadratic fit: {self.fwhm_fit_quadratic["parameters"].to_dict()}'
+            )
             log.info(
                 f"FWHM energy resolution at Qbb (quadratic fit): {fit_qbb:1.2f} +- {qbb_err:1.2f} keV"
             )
