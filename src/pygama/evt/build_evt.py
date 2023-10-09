@@ -38,20 +38,23 @@ def num_and_pars(value: str, par_dic: dict):
 
 
 def evaluate_expression(
+    f_tcm: str,
     f_evt: str,
     f_hit: str,
     f_dsp: str,
     chns: list,
     mode: str,
     expr: str,
+    nrows: int,
     para: dict = None,
     defv=np.nan,
-    nrows: int = None,
 ) -> np.ndarray:
     """
     Evaluates the expression defined by the user across all channels according to the mode
     Parameters
     ----------
+    f_tcm
+       Path to tcm tier file
     f_evt
        Path to event tier file
     f_hit
@@ -77,12 +80,7 @@ def evaluate_expression(
        Only affects "first", "last" modes. In that cases the rawid of the resulting values channel is returned as well.
     """
     # define dimension of output array
-    n = (
-        nrows
-        if nrows is not None
-        else store.LH5Store().read_n_rows(chns[0] + "/dsp/", f_dsp)
-    )
-    out = np.full(n, defv, dtype=type(defv))
+    out = np.full(nrows, defv, dtype=type(defv))
     out_chs = np.zeros(len(out), dtype=int)
     outt = np.zeros(len(out))
 
@@ -115,8 +113,17 @@ def evaluate_expression(
         ch_comp = None
         if os.path.exists(f_evt) and mode in store.ls(f_evt):
             ch_comp = store.load_nda(f_evt, [mode])[mode]
+        
+        # load TCM data to define an event
+        nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
+        ids =nda['array_id']
+        idx =nda['array_idx']
+        # cl = nda['cumulative_length']
 
         for ch in chns:
+            # get index list for this channel to be loaded
+            idx_ch = idx[ids==int(ch[2:])]
+
             # find fields in either dsp, hit
             var = store.load_nda(
                 f_hit,
@@ -126,6 +133,7 @@ def evaluate_expression(
                     if e.split("/")[-1] in exprl
                 ],
                 ch + "/hit/",
+                idx_ch
             )
             dsp_dic = store.load_nda(
                 f_dsp,
@@ -135,48 +143,54 @@ def evaluate_expression(
                     if e.split("/")[-1] in exprl
                 ],
                 ch + "/dsp/",
+                idx_ch
             )
             var = dsp_dic | var_ph | var
 
             # evaluate expression
             res = eval(expr, var)
+
+            # if it is not a nparray it could be a single value
+            # expand accordingly
             if not isinstance(res, np.ndarray):
                 res = np.full(len(out), res, dtype=type(res))
 
-            # append to out according to mode
+            # get unification condition if present in mode
             if len(ops) > 0:
                 limarr = eval(
                     "".join(["res", ops[0], "lim"]),
                     {"res": res, "lim": float(mode.split(ops[0])[-1])},
                 )
             else:
-                limarr = np.ones(len(out)).astype(bool)
+                limarr = np.ones(len(res)).astype(bool)
+            
+            # append to out according to mode
             if "first" in mode:
                 if ch == chns[0]:
                     outt[:] = np.inf
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/")["tp_0_est"]
-                out = np.where((t0 < outt) & (limarr), res, out)
-                out_chs = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs)
-                outt = np.where((t0 < outt) & (limarr), t0, outt)
+                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/",idx_ch)["tp_0_est"]
+                out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
+                out_chs[idx_ch] = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+                outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
             elif "last" in mode:
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/")["tp_0_est"]
-                out = np.where((t0 > outt) & (limarr), res, out)
-                out_chs = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs)
-                outt = np.where((t0 > outt) & (limarr), t0, outt)
+                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/",idx_ch)["tp_0_est"]
+                out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
+                out_chs[idx_ch] = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+                outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
             elif "tot" in mode:
                 if res.dtype == bool:
                     res = res.astype(int)
-                out += np.where(limarr, res, out)
+                out[idx_ch] = np.where(limarr, res+out[idx_ch], out[idx_ch])
             elif mode == "any":
                 if res.dtype != bool:
                     res = res.astype(bool)
-                out = out | res
+                out[idx_ch] = out[idx_ch] | res
             elif mode == "all":
                 if res.dtype != bool:
                     res = res.astype(bool)
-                out = out & res
+                out[idx_ch] = out[idx_ch] & res
             elif ch_comp is not None:
-                out = np.where(int(ch[2:]) == ch_comp, res, out)
+                out[idx_ch] = np.where(int(ch[2:]) == ch_comp, res, out[idx_ch])
             else:
                 raise ValueError(mode + " not a valid mode")
 
@@ -184,6 +198,7 @@ def evaluate_expression(
 
 
 def build_evt(
+    f_tcm: str,
     f_dsp: str,
     f_hit: str,
     f_evt: str,
@@ -197,6 +212,8 @@ def build_evt(
 
     Parameters
     ----------
+    f_tcm
+        input LH5 file of the tcm level
     f_dsp
         input LH5 file of the dsp level
     f_hit
@@ -292,9 +309,12 @@ def build_evt(
             chns[k] = [f"ch{chmap.map('name')[e]['daq']['rawid']}" for e in v]
 
     # do operations
-    first_iter, nrows = True, None
+    first_iter = True
+
+    # get number of rows from TCM file
+    nrows = len(store.load_nda(f_tcm,['cumulative_length'],'hardware_tcm_1/')['cumulative_length'])
     log.info(
-        f"Applying'{len(tbl_cfg['operations'].keys())} operations' to dsp file {f_dsp} and hit file {f_hit} to create evt file {f_evt}"
+        f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
     )
     for k, v in tbl_cfg["operations"].items():
         log.debug("Processing field" + k)
@@ -336,15 +356,16 @@ def build_evt(
                 defaultv = v["initial"]
 
             res, chs = evaluate_expression(
+                f_tcm,
                 f_evt,
                 f_hit,
                 f_dsp,
                 chns_e,
                 v["mode"],
                 v["expression"],
-                pars,
-                defaultv,
                 nrows,
+                pars,
+                defaultv
             )
             lstore.write_object(obj=Array(res), name=k, lh5_file=f_evt, wo_mode=wo_mode)
 
@@ -360,7 +381,4 @@ def build_evt(
 
         if first_iter:
             first_iter = False
-        if not nrows:
-            nrows = len(res)
-
     log.info("Done")
