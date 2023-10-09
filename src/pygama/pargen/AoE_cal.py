@@ -1547,8 +1547,8 @@ class cal_aoe:
             m.hesse()
 
             self.dt_res_dict["dt_fit"] = {
-                "parameters": m.values,
-                "uncertainties": m.errors,
+                "pars": m.values,
+                "errs": m.errors,
                 "object": m,
             }
             aoe_grp1 = self.dt_res_dict[
@@ -1801,8 +1801,8 @@ class cal_aoe:
             "func": self.mean_func.__name__,
             "module": self.mean_func.__module__,
             "expression": self.mean_func.string_func("x"),
-            "parameters": mu_pars.to_dict(),
-            "uncertainties": mu_errs.to_dict(),
+            "pars": mu_pars.to_dict(),
+            "errs": mu_errs.to_dict(),
             "p_val_mu": p_val_mu,
             "csqr_mu": (csqr_mu, dof_mu),
         }
@@ -1811,8 +1811,8 @@ class cal_aoe:
             "func": self.sigma_func.__name__,
             "module": self.sigma_func.__module__,
             "expression": self.sigma_func.string_func("x"),
-            "parameters": sig_pars.to_dict(),
-            "uncertainties": sig_errs.to_dict(),
+            "pars": sig_pars.to_dict(),
+            "errs": sig_errs.to_dict(),
             "p_val_mu": p_val_sig,
             "csqr_mu": (csqr_sig, dof_sig),
         }
@@ -1820,8 +1820,8 @@ class cal_aoe:
         self.energy_corr_res_dict["dep_fit"] = {
             "func": self.pdf.__name__,
             "module": self.pdf.__module__,
-            "parameters": dep_pars.to_dict(),
-            "uncertainties": dep_err.to_dict(),
+            "pars": dep_pars.to_dict(),
+            "errs": dep_err.to_dict(),
         }
 
         self.update_cal_dicts(
@@ -1831,7 +1831,7 @@ class cal_aoe:
                     "parameters": mu_pars.to_dict(),
                 },
                 "AoE_Classifier": {
-                    "expression": f"AoE_Corrected/({self.sigma_func.string_func(self.cal_energy_param)})",
+                    "expression": f"(AoE_Corrected-1)/({self.sigma_func.string_func(self.cal_energy_param)})",
                     "parameters": sig_pars.to_dict(),
                 },
             }
@@ -1918,8 +1918,8 @@ class cal_aoe:
             p = sigmoid_fit.func(xs, *m1.values)
             self.cut_fit = {
                 "function": sigmoid_fit.__name__,
-                "parameters": m1.values.to_dict(),
-                "uncertainties": m1.errors.to_dict(),
+                "pars": m1.values.to_dict(),
+                "errs": m1.errors.to_dict(),
             }
             self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * self.dep_acc)))], 3)
             log.info(f"Cut found at {self.low_cut_val}")
@@ -2238,12 +2238,12 @@ def drifttime_corr_plot(
         final_df = dep_events.query(aoe_class.dt_res_dict["final_selection"])
 
         plt.subplot(2, 2, 1)
-        aoe_pars = aoe_class.dt_res_dict["aoe_fit1"]["parameters"]
+        aoe_pars = aoe_class.dt_res_dict["aoe_fit1"]["pars"]
 
         xs = np.linspace(aoe_pars["lower_range"], aoe_pars["upper_range"], 100)
         counts, aoe_bins, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp1"]}&{aoe_param}<{aoe_pars["upper_range"]}&{aoe_param}>{aoe_pars["lower_range"]}'
+                f'{aoe_class.dt_res_dict["aoe_grp1"]}&({aoe_param}<{aoe_pars["upper_range"]})&({aoe_param}>{aoe_pars["lower_range"]})'
             )[aoe_param],
             bins=400,
             histtype="step",
@@ -2258,12 +2258,12 @@ def drifttime_corr_plot(
         plt.xlabel("A/E")
         plt.ylabel("counts")
 
-        aoe_pars2 = aoe_class.dt_res_dict["aoe_fit2"]["parameters"]
+        aoe_pars2 = aoe_class.dt_res_dict["aoe_fit2"]["pars"]
         plt.subplot(2, 2, 2)
         xs = np.linspace(aoe_pars2["lower_range"], aoe_pars2["upper_range"], 100)
         counts, aoe_bins2, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp2"]}&{aoe_param}<{aoe_pars2["upper_range"]}&{aoe_param}>{aoe_pars2["lower_range"]}'
+                f'{aoe_class.dt_res_dict["aoe_grp2"]}&({aoe_param}<{aoe_pars2["upper_range"]})&({aoe_param}>{aoe_pars2["lower_range"]})'
             )[aoe_param],
             bins=400,
             histtype="step",
@@ -2300,8 +2300,7 @@ def drifttime_corr_plot(
         plt.plot(
             pgh.get_bin_centers(bins),
             drift_time_distribution.pdf(
-                pgh.get_bin_centers(bins),
-                *aoe_class.dt_res_dict["dt_fit"]["parameters"],
+                pgh.get_bin_centers(bins), *aoe_class.dt_res_dict["dt_fit"]["pars"]
             )
             * np.diff(bins)[0],
             label="fit",
@@ -2447,17 +2446,17 @@ def plot_mean_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
         )
 
         ax1.plot(
-            aoe_class.energy_corr_fits.index,
+            aoe_class.energy_corr_fits.index.to_numpy(),
             aoe_class.mean_func.func(
-                aoe_class.energy_corr_fits.index,
-                **aoe_class.energy_corr_res_dict["mean_fits"]["parameters"],
+                aoe_class.energy_corr_fits.index.to_numpy(),
+                **aoe_class.energy_corr_res_dict["mean_fits"]["pars"],
             ),
             label="linear model",
         )
         ax1.errorbar(
             1592,
-            aoe_class.energy_corr_res_dict["dep_fit"]["parameters"]["mu"],
-            yerr=aoe_class.energy_corr_res_dict["dep_fit"]["uncertainties"]["mu"],
+            aoe_class.energy_corr_res_dict["dep_fit"]["pars"]["mu"],
+            yerr=aoe_class.energy_corr_res_dict["dep_fit"]["errs"]["mu"],
             label="DEP",
             color="green",
             linestyle=" ",
@@ -2473,12 +2472,12 @@ def plot_mean_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
                 aoe_class.energy_corr_fits["mean"]
                 - aoe_class.mean_func.func(
                     aoe_class.energy_corr_fits.index,
-                    **aoe_class.energy_corr_res_dict["mean_fits"]["parameters"],
+                    **aoe_class.energy_corr_res_dict["mean_fits"]["pars"],
                 )
             )
             / aoe_class.mean_func.func(
                 aoe_class.energy_corr_fits.index,
-                **aoe_class.energy_corr_res_dict["mean_fits"]["parameters"],
+                **aoe_class.energy_corr_res_dict["mean_fits"]["pars"],
             ),
             lw=1,
             c="b",
@@ -2487,13 +2486,13 @@ def plot_mean_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
             1592,
             100
             * (
-                aoe_class.energy_corr_res_dict["dep_fit"]["parameters"]["mu"]
+                aoe_class.energy_corr_res_dict["dep_fit"]["pars"]["mu"]
                 - aoe_class.mean_func.func(
-                    1592, **aoe_class.energy_corr_res_dict["mean_fits"]["parameters"]
+                    1592, **aoe_class.energy_corr_res_dict["mean_fits"]["pars"]
                 )
             )
             / aoe_class.mean_func.func(
-                1592, **aoe_class.energy_corr_res_dict["mean_fits"]["parameters"]
+                1592, **aoe_class.energy_corr_res_dict["mean_fits"]["pars"]
             ),
             lw=1,
             c="g",
@@ -2521,7 +2520,7 @@ def plot_sigma_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
             label="data",
             linestyle=" ",
         )
-        sig_pars = aoe_class.energy_corr_res_dict["sigma_fits"]["parameters"]
+        sig_pars = aoe_class.energy_corr_res_dict["sigma_fits"]["pars"]
         if aoe_class.sigma_func == sigma_fit:
             label = f'sqrt model: \nsqrt({sig_pars["a"]:1.4f}+({sig_pars["b"]:1.1f}/E)^{sig_pars["c"]:1.1f})'
         elif aoe_class.sigma_func == sigma_fit_quadratic:
@@ -2529,14 +2528,16 @@ def plot_sigma_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
         else:
             raise ValueError("unknown sigma function")
         ax1.plot(
-            aoe_class.energy_corr_fits.index,
-            aoe_class.sigma_func.func(aoe_class.energy_corr_fits.index, **sig_pars),
+            aoe_class.energy_corr_fits.index.to_numpy(),
+            aoe_class.sigma_func.func(
+                aoe_class.energy_corr_fits.index.to_numpy(), **sig_pars
+            ),
             label=label,
         )
         ax1.errorbar(
             1592,
-            aoe_class.energy_corr_res_dict["dep_fit"]["parameters"]["sigma"],
-            yerr=aoe_class.energy_corr_res_dict["dep_fit"]["uncertainies"]["sigma"],
+            aoe_class.energy_corr_res_dict["dep_fit"]["pars"]["sigma"],
+            yerr=aoe_class.energy_corr_res_dict["dep_fit"]["errs"]["sigma"],
             label="DEP",
             color="green",
             linestyle=" ",
@@ -2560,7 +2561,7 @@ def plot_sigma_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
             1592,
             100
             * (
-                aoe_class.energy_corr_res_dict["dep_fit"]["parameters"]["sigma"]
+                aoe_class.energy_corr_res_dict["dep_fit"]["pars"]["sigma"]
                 - aoe_class.sigma_func.func(1592, **sig_pars)
             )
             / aoe_class.sigma_func.func(1592, **sig_pars),
@@ -2589,9 +2590,9 @@ def plot_cut_fit(aoe_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
         )
 
         plt.plot(
-            aoe_class.cut_fits.index,
+            aoe_class.cut_fits.index.to_numpy(),
             sigmoid_fit.func(
-                aoe_class.cut_fits.index.to_numpy(), **aoe_class.cut_fit["parameters"]
+                aoe_class.cut_fits.index.to_numpy(), **aoe_class.cut_fit["pars"]
             ),
         )
         plt.hlines(
