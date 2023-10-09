@@ -98,7 +98,7 @@ def evaluate_expression(
     if mode == "func":
         # evaluate expression
         func, params = expr.split("(")
-        params = [f_hit, f_dsp, chns] + [
+        params = [f_hit, f_dsp, f_tcm, chns] + [
             num_and_pars(e, var_ph) for e in params[:-1].split(",")
         ]
 
