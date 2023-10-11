@@ -10,7 +10,7 @@ additional parameters are free to the user and need to be defined in the JSON
 """
 
 import numpy as np
-
+import warnings
 import pygama.lgdo.lh5_store as store
 
 
@@ -129,6 +129,10 @@ def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
 
 
 def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, trail):
+    # ignore stupid numpy warnings
+    warnings.filterwarnings('ignore', r'All-NaN slice encountered')
+    warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
+
     predf = store.load_nda(f_hit, ["energy_in_pe", "timestamp"], chs[0] + "/hit/")
 
     peshape = (predf["energy_in_pe"]).shape

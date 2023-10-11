@@ -97,8 +97,12 @@ def evaluate_expression(
     if os.path.exists(f_evt):
         var_ph = store.load_nda(
             f_evt,
-            [e.split("/")[-1] for e in store.ls(f_evt,group) if e.split("/")[-1] in exprl],
-            group
+            [
+                e.split("/")[-1]
+                for e in store.ls(f_evt, group)
+                if e.split("/")[-1] in exprl
+            ],
+            group,
         )
     if para:
         var_ph = var_ph | para
@@ -119,18 +123,20 @@ def evaluate_expression(
         # evaluate operator in mode
         ops = re.findall(r"([<>]=?|==)", mode)
         ch_comp = None
-        if os.path.exists(f_evt) and mode in [e.split("/")[-1] for e in store.ls(f_evt,group)]:
-            ch_comp = store.load_nda(f_evt, [mode],group)[mode]
-        
+        if os.path.exists(f_evt) and mode in [
+            e.split("/")[-1] for e in store.ls(f_evt, group)
+        ]:
+            ch_comp = store.load_nda(f_evt, [mode], group)[mode]
+
         # load TCM data to define an event
-        nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-        ids =nda['array_id']
-        idx =nda['array_idx']
+        nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+        ids = nda["array_id"]
+        idx = nda["array_idx"]
         # cl = nda['cumulative_length']
 
         for ch in chns:
             # get index list for this channel to be loaded
-            idx_ch = idx[ids==int(ch[2:])]
+            idx_ch = idx[ids == int(ch[2:])]
 
             # find fields in either dsp, hit
             var = store.load_nda(
@@ -141,7 +147,7 @@ def evaluate_expression(
                     if e.split("/")[-1] in exprl
                 ],
                 ch + "/hit/",
-                idx_ch
+                idx_ch,
             )
             dsp_dic = store.load_nda(
                 f_dsp,
@@ -151,7 +157,7 @@ def evaluate_expression(
                     if e.split("/")[-1] in exprl
                 ],
                 ch + "/dsp/",
-                idx_ch
+                idx_ch,
             )
             var = dsp_dic | var_ph | var
 
@@ -171,24 +177,32 @@ def evaluate_expression(
                 )
             else:
                 limarr = np.ones(len(res)).astype(bool)
-            
+
             # append to out according to mode
             if "first" in mode:
                 if ch == chns[0]:
                     outt[:] = np.inf
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/",idx_ch)["tp_0_est"]
+                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)[
+                    "tp_0_est"
+                ]
                 out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
-                out_chs[idx_ch] = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+                out_chs[idx_ch] = np.where(
+                    (t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch]
+                )
                 outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
             elif "last" in mode:
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/",idx_ch)["tp_0_est"]
+                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)[
+                    "tp_0_est"
+                ]
                 out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
-                out_chs[idx_ch] = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+                out_chs[idx_ch] = np.where(
+                    (t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch]
+                )
                 outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
             elif "tot" in mode:
                 if res.dtype == bool:
                     res = res.astype(int)
-                out[idx_ch] = np.where(limarr, res+out[idx_ch], out[idx_ch])
+                out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
             elif mode == "any":
                 if res.dtype != bool:
                     res = res.astype(bool)
@@ -325,7 +339,11 @@ def build_evt(
     first_iter = True
 
     # get number of rows from TCM file
-    nrows = len(store.load_nda(f_tcm,['cumulative_length'],'hardware_tcm_1/')['cumulative_length'])
+    nrows = len(
+        store.load_nda(f_tcm, ["cumulative_length"], "hardware_tcm_1/")[
+            "cumulative_length"
+        ]
+    )
     log.info(
         f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
     )
@@ -341,17 +359,17 @@ def build_evt(
                     f_evt,
                     [
                         e.split("/")[-1]
-                        for e in store.ls(f_evt,group)
+                        for e in store.ls(f_evt, group)
                         if e.split("/")[-1] in exprl
                     ],
-                    group
+                    group,
                 )
             if "parameters" in v.keys():
                 var = var | v["parameters"]
             res = Array(eval(v["expression"], var))
             lstore.write_object(
                 obj=res,
-                name=group+k,
+                name=group + k,
                 lh5_file=f_evt,
                 wo_mode=wo_mode,  # if first_iter else "append"
             )
@@ -380,9 +398,11 @@ def build_evt(
                 nrows,
                 group,
                 pars,
-                defaultv
+                defaultv,
             )
-            lstore.write_object(obj=Array(res), name=group+k, lh5_file=f_evt, wo_mode=wo_mode)
+            lstore.write_object(
+                obj=Array(res), name=group + k, lh5_file=f_evt, wo_mode=wo_mode
+            )
 
             # if get_ch true flag in a first/last mode operation also obtain channel field
             if (
@@ -391,7 +411,10 @@ def build_evt(
                 and v["get_ch"]
             ):
                 lstore.write_object(
-                    obj=Array(chs), name=group+k + "_id", lh5_file=f_evt, wo_mode=wo_mode
+                    obj=Array(chs),
+                    name=group + k + "_id",
+                    lh5_file=f_evt,
+                    wo_mode=wo_mode,
                 )
 
         if first_iter:
