@@ -46,6 +46,7 @@ def evaluate_expression(
     mode: str,
     expr: str,
     nrows: int,
+    group: str,
     para: dict = None,
     defv=np.nan,
 ) -> np.ndarray:
@@ -74,10 +75,16 @@ def evaluate_expression(
        - "single": !!!NOT IMPLEMENTED!!!. Channels are not combined, but result saved for each channel. field name gets channel id as suffix.
     expr
        The expression. That can be any mathematical equation/comparison. If mode == func, the expression needs to be a special processing function defined in modules (e.g. "modules.spm.get_energy). In the expression parameters from either hit, dsp, evt tier (from operations performed before this one! --> JSON operations order matters), or from the "parameters" field can be used.
+    nrows
+       Number of rows to be processed.
+    group
+        lh5 root group name
     para
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
     getch
        Only affects "first", "last" modes. In that cases the rawid of the resulting values channel is returned as well.
+    defv
+        default value of evaluation
     """
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
@@ -90,7 +97,8 @@ def evaluate_expression(
     if os.path.exists(f_evt):
         var_ph = store.load_nda(
             f_evt,
-            [e.split("/")[-1] for e in store.ls(f_evt) if e.split("/")[-1] in exprl],
+            [e.split("/")[-1] for e in store.ls(f_evt,group) if e.split("/")[-1] in exprl],
+            group
         )
     if para:
         var_ph = var_ph | para
@@ -111,8 +119,8 @@ def evaluate_expression(
         # evaluate operator in mode
         ops = re.findall(r"([<>]=?|==)", mode)
         ch_comp = None
-        if os.path.exists(f_evt) and mode in store.ls(f_evt):
-            ch_comp = store.load_nda(f_evt, [mode])[mode]
+        if os.path.exists(f_evt) and mode in [e.split("/")[-1] for e in store.ls(f_evt,group)]:
+            ch_comp = store.load_nda(f_evt, [mode],group)[mode]
         
         # load TCM data to define an event
         nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
@@ -205,6 +213,7 @@ def build_evt(
     meta_path: str = None,
     evt_config: str | dict = None,
     wo_mode: str = "write_safe",
+    group: str = "/evt/",
 ) -> None:
     """
     Transform data from the hit and dsp levels which a channel sorted
@@ -271,6 +280,10 @@ def build_evt(
                 }
             }
         }
+    wo_mode
+        writing mode
+    group
+        lh5 root group name
     """
     lstore = store.LH5Store()
     tbl_cfg = evt_config
@@ -328,16 +341,17 @@ def build_evt(
                     f_evt,
                     [
                         e.split("/")[-1]
-                        for e in store.ls(f_evt)
+                        for e in store.ls(f_evt,group)
                         if e.split("/")[-1] in exprl
                     ],
+                    group
                 )
             if "parameters" in v.keys():
                 var = var | v["parameters"]
             res = Array(eval(v["expression"], var))
             lstore.write_object(
                 obj=res,
-                name=k,
+                name=group+k,
                 lh5_file=f_evt,
                 wo_mode=wo_mode,  # if first_iter else "append"
             )
@@ -364,10 +378,11 @@ def build_evt(
                 v["mode"],
                 v["expression"],
                 nrows,
+                group,
                 pars,
                 defaultv
             )
-            lstore.write_object(obj=Array(res), name=k, lh5_file=f_evt, wo_mode=wo_mode)
+            lstore.write_object(obj=Array(res), name=group+k, lh5_file=f_evt, wo_mode=wo_mode)
 
             # if get_ch true flag in a first/last mode operation also obtain channel field
             if (
@@ -376,7 +391,7 @@ def build_evt(
                 and v["get_ch"]
             ):
                 lstore.write_object(
-                    obj=Array(chs), name=k + "_id", lh5_file=f_evt, wo_mode=wo_mode
+                    obj=Array(chs), name=group+k + "_id", lh5_file=f_evt, wo_mode=wo_mode
                 )
 
         if first_iter:
