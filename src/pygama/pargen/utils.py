@@ -114,10 +114,6 @@ def load_data(
     keys = [key.split("/")[-1] for key in keys]
     params = get_params(keys + list(df.keys()), params)
 
-    ids = tag_pulser(all_files, lh5_path)
-    df["is_not_pulser"] = ids[masks]
-    params.append("is_not_pulser")
-
     for col in list(df.keys()):
         if col not in params:
             df.drop(col, inplace=True, axis=1)
@@ -128,3 +124,38 @@ def load_data(
             df[param] = lh5.load_nda(all_files, [param], lh5_path)[param][masks]
     log.debug(f"data loaded")
     return df
+
+
+def get_pulser_ids(tcm_file, channel, multiplicity_threshold):
+    if isinstance(channel, str):
+        if channel[:2] == "ch":
+            channel = int(channel[2:])
+        else:
+            chan = int(channel)
+    else:
+        chan = channel
+    if isinstance(tcm_file, list):
+        mask = np.array([], dtype=bool)
+        for file in tcm_file:
+            _, file_mask = get_pulser_ids(file, chan, multiplicity_threshold)
+            mask = np.append(mask, file_mask)
+        ids = np.where(mask)[0]
+    else:
+        data = lh5.load_dfs(tcm_file, ["array_id", "array_idx"], "hardware_tcm_1")
+        cum_length = lh5.load_nda(tcm_file, ["cumulative_length"], "hardware_tcm_1")[
+            "cumulative_length"
+        ]
+        cum_length = np.append(np.array([0]), cum_length)
+        n_channels = np.diff(cum_length)
+        evt_numbers = np.repeat(np.arange(0, len(cum_length) - 1), np.diff(cum_length))
+        evt_mult = np.repeat(np.diff(cum_length), np.diff(cum_length))
+        data["evt_number"] = evt_numbers
+        data["evt_mult"] = evt_mult
+        high_mult_events = np.where(n_channels > multiplicity_threshold)[0]
+
+        ids = data.query(f"array_id=={channel} and evt_number in @high_mult_events")[
+            "array_idx"
+        ].to_numpy()
+        mask = np.zeros(len(data.query(f"array_id==1104000")), dtype="bool")
+        mask[ids] = True
+    return ids, mask
