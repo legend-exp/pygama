@@ -1230,8 +1230,8 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
         ),
         np.nanmax(
             [
-                ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
-                ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
+                ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
+                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
             ]
         ),
     ]
@@ -1242,7 +1242,7 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
         fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
         lw=1,
         c="g",
-        label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err(keV)"]:1.2f} keV',
+        label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err_in_keV"]:1.2f} keV',
     )
     ax1.plot(
         fwhm_slope_bins,
@@ -1251,13 +1251,13 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
         ),
         lw=1,
         c="b",
-        label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err(keV)"]:1.2f} keV',
+        label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err_in_keV"]:1.2f} keV',
     )
     ax1.plot(
         qbb_line_hx,
         [
-            ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
-            ecal_class.fwhm_fit_linear["Qbb_fwhm(keV)"],
+            ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
+            ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
         ],
         lw=1,
         c="r",
@@ -1266,8 +1266,8 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     ax1.plot(
         qbb_line_hx,
         [
-            ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
-            ecal_class.fwhm_fit_quadratic["Qbb_fwhm(keV)"],
+            ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
+            ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
         ],
         lw=1,
         c="r",
