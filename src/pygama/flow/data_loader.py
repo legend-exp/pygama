@@ -620,6 +620,8 @@ class DataLoader:
                         tables = self.table_list[level]
                     else:
                         continue
+                if tables is None:
+                    continue
 
                 # Cut any rows of TCM not relating to requested tables
                 if level == parent:
