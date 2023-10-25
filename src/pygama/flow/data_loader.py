@@ -605,9 +605,12 @@ class DataLoader:
 
             # Perform cuts specified for child or parent level, in that order
             for level in [child, parent]:
-                if self.cuts is None or level not in self.cuts.keys():
-                    continue
-                cut = self.cuts[level]
+                # Extract the cut condition if given, otherwise set to ""
+                cut = ""
+                if self.cuts is not None:
+                    if level in self.cuts.keys():
+                        cut = self.cuts[level]
+
                 col_tiers = self.get_tiers_for_col(cut_cols[level], merge_files=False)
 
                 # Tables in first tier of event should be the same for all tiers in one level
@@ -615,6 +618,11 @@ class DataLoader:
                 if self.table_list is not None:
                     if level in self.table_list.keys():
                         tables = self.table_list[level]
+                    else:
+                        continue
+                if tables is None:
+                    continue
+
                 # Cut any rows of TCM not relating to requested tables
                 if level == parent:
                     f_entries.query(f"{level}_table in {tables}", inplace=True)
