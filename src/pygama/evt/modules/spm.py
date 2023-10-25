@@ -9,9 +9,11 @@ functions must take as the first 3 args in order:
 additional parameters are free to the user and need to be defined in the JSON
 """
 
-import numpy as np
 import warnings
-import pygama.lgdo.lh5_store as store
+
+import numpy as np
+
+import lgdo.lh5_store as store
 
 
 # get LAr energy per event over all channels
@@ -21,13 +23,15 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     sum = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for ch in chs:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(ch[2:])]
-        df = store.load_nda(f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/",idx_ch)
+        idx_ch = idx[ids == int(ch[2:])]
+        df = store.load_nda(
+            f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/", idx_ch
+        )
         mask = (
             (df["trigger_pos"] < tma[:, None] / 16)
             & (df["trigger_pos"] > tmi[:, None] / 16)
@@ -48,13 +52,15 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     maj = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for ch in chs:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(ch[2:])]
-        df = store.load_nda(f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/",idx_ch)
+        idx_ch = idx[ids == int(ch[2:])]
+        df = store.load_nda(
+            f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/", idx_ch
+        )
         mask = (
             (df["trigger_pos"] < tma[:, None] / 16)
             & (df["trigger_pos"] > tmi[:, None] / 16)
@@ -76,12 +82,12 @@ def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     sum = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for ch in chs:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(ch[2:])]
+        idx_ch = idx[ids == int(ch[2:])]
         df = store.load_nda(
             f_hit, ["energy_in_pe_dplms", "trigger_pos_dplms"], ch + "/hit/", idx_ch
         )
@@ -105,14 +111,14 @@ def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
     tma = trig + tmax
     maj = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for ch in chs:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(ch[2:])]
+        idx_ch = idx[ids == int(ch[2:])]
         df = store.load_nda(
-            f_hit, ["energy_in_pe_dplms", "trigger_pos_dplms"], ch + "/hit/",idx_ch
+            f_hit, ["energy_in_pe_dplms", "trigger_pos_dplms"], ch + "/hit/", idx_ch
         )
         mask = (
             (df["trigger_pos_dplms"] < tma[:, None] / 16)
@@ -130,8 +136,8 @@ def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
 
 def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, trail):
     # ignore stupid numpy warnings
-    warnings.filterwarnings('ignore', r'All-NaN slice encountered')
-    warnings.filterwarnings('ignore', r'invalid value encountered in true_divide')
+    warnings.filterwarnings("ignore", r"All-NaN slice encountered")
+    warnings.filterwarnings("ignore", r"invalid value encountered in true_divide")
 
     predf = store.load_nda(f_hit, ["energy_in_pe", "timestamp"], chs[0] + "/hit/")
 
@@ -145,14 +151,17 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
     tma = tge + tmax
 
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for i in range(len(chs)):
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(chs[i][2:])]
+        idx_ch = idx[ids == int(chs[i][2:])]
         df = store.load_nda(
-            f_hit, ["energy_in_pe", "trigger_pos", "timestamp"], chs[i] + "/hit/", idx_ch
+            f_hit,
+            ["energy_in_pe", "trigger_pos", "timestamp"],
+            chs[i] + "/hit/",
+            idx_ch,
         )
         mask = (
             (df["trigger_pos"] < tma[:, None] / 16)
@@ -209,13 +218,15 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = tge + tmax
 
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm,['array_id','array_idx'],'hardware_tcm_1/')
-    ids =nda['array_id']
-    idx =nda['array_idx']
+    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
+    ids = nda["array_id"]
+    idx = nda["array_idx"]
     for i in range(len(chs)):
         # get index list for this channel to be loaded
-        idx_ch = idx[ids==int(chs[i][2:])]
-        df = store.load_nda(f_hit, ["energy_in_pe", "trigger_pos"], chs[i] + "/hit/",idx_ch)
+        idx_ch = idx[ids == int(chs[i][2:])]
+        df = store.load_nda(
+            f_hit, ["energy_in_pe", "trigger_pos"], chs[i] + "/hit/", idx_ch
+        )
         mask = (
             (df["trigger_pos"] < tma[:, None] / 16)
             & (df["trigger_pos"] > tmi[:, None] / 16)

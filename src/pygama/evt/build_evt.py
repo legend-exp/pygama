@@ -49,7 +49,7 @@ def evaluate_expression(
     group: str,
     para: dict = None,
     defv=np.nan,
-) -> np.ndarray:
+) -> dict:
     """
     Evaluates the expression defined by the user across all channels according to the mode
     Parameters
@@ -86,11 +86,6 @@ def evaluate_expression(
     defv
         default value of evaluation
     """
-    # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
-    out_chs = np.zeros(len(out), dtype=int)
-    outt = np.zeros(len(out))
-
     # find parameters in evt file or in parameters
     exprl = re.findall(r"[a-zA-Z_$][\w$]*", expr)
     var_ph = {}
@@ -118,105 +113,397 @@ def evaluate_expression(
         p, m = func.rsplit(".", 1)
         met = getattr(import_module(p), m)
         out = met(*params)
+        return {"values": out}
 
     else:
-        # evaluate operator in mode
+        # evaluate possible operator in mode
         ops = re.findall(r"([<>]=?|==)", mode)
-        ch_comp = None
-        if os.path.exists(f_evt) and mode in [
-            e.split("/")[-1] for e in store.ls(f_evt, group)
-        ]:
-            ch_comp = store.load_nda(f_evt, [mode], group)[mode]
+        op, mode_lim = None, None
+        if len(ops) == 1:
+            op = ops[0]
+            mode_lim = float(mode.split(op)[-1])
+        elif len(ops) > 1:
+            raise ValueError(mode + " contains invalid operator")
 
         # load TCM data to define an event
         nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
         ids = nda["array_id"]
         idx = nda["array_idx"]
-        # cl = nda['cumulative_length']
 
-        for ch in chns:
-            # get index list for this channel to be loaded
-            idx_ch = idx[ids == int(ch[2:])]
-
-            # find fields in either dsp, hit
-            var = store.load_nda(
+        # switch through modes
+        if "first" in mode:
+            return evaluate_to_first(
+                idx,
+                ids,
                 f_hit,
-                [
-                    e.split("/")[-1]
-                    for e in store.ls(f_hit, ch + "/hit/")
-                    if e.split("/")[-1] in exprl
-                ],
-                ch + "/hit/",
-                idx_ch,
-            )
-            dsp_dic = store.load_nda(
                 f_dsp,
-                [
-                    e.split("/")[-1]
-                    for e in store.ls(f_dsp, ch + "/dsp/")
-                    if e.split("/")[-1] in exprl
-                ],
-                ch + "/dsp/",
-                idx_ch,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                mode_lim,
+                op,
+                var_ph,
+                defv,
             )
-            var = dsp_dic | var_ph | var
+        elif "last" in mode:
+            return evaluate_to_last(
+                idx,
+                ids,
+                f_hit,
+                f_dsp,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                mode_lim,
+                op,
+                var_ph,
+                defv,
+            )
+        elif "tot" in mode:
+            return evaluate_to_tot(
+                idx,
+                ids,
+                f_hit,
+                f_dsp,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                mode_lim,
+                op,
+                var_ph,
+                defv,
+            )
+        elif "any" == mode:
+            return evaluate_to_any(
+                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, var_ph, defv
+            )
+        elif "all" == mode:
+            return evaluate_to_all(
+                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, var_ph, defv
+            )
+        elif os.path.exists(f_evt) and mode in [
+            e.split("/")[-1] for e in store.ls(f_evt, group)
+        ]:
+            ch_comp = store.load_nda(f_evt, [mode], group)[mode]
+            return evaluate_at_channel(
+                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, ch_comp, var_ph, defv
+            )
 
-            # evaluate expression
-            res = eval(expr, var)
+        else:
+            raise ValueError(mode + " not a valid mode")
 
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
 
-            # get unification condition if present in mode
-            if len(ops) > 0:
-                limarr = eval(
-                    "".join(["res", ops[0], "lim"]),
-                    {"res": res, "lim": float(mode.split(ops[0])[-1])},
-                )
-            else:
-                limarr = np.ones(len(res)).astype(bool)
+def find_parameters(
+    f_hit: str, f_dsp: str, ch: str, idx_ch: np.ndarray, exprl: list
+) -> dict:
+    # find fields in either dsp, hit
+    var = store.load_nda(
+        f_hit,
+        [
+            e.split("/")[-1]
+            for e in store.ls(f_hit, ch + "/hit/")
+            if e.split("/")[-1] in exprl
+        ],
+        ch + "/hit/",
+        idx_ch,
+    )
+    dsp_dic = store.load_nda(
+        f_dsp,
+        [
+            e.split("/")[-1]
+            for e in store.ls(f_dsp, ch + "/dsp/")
+            if e.split("/")[-1] in exprl
+        ],
+        ch + "/dsp/",
+        idx_ch,
+    )
+    return dsp_dic | var
 
-            # append to out according to mode
-            if "first" in mode:
-                if ch == chns[0]:
-                    outt[:] = np.inf
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)[
-                    "tp_0_est"
-                ]
-                out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
-                out_chs[idx_ch] = np.where(
-                    (t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch]
-                )
-                outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
-            elif "last" in mode:
-                t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)[
-                    "tp_0_est"
-                ]
-                out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
-                out_chs[idx_ch] = np.where(
-                    (t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch]
-                )
-                outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
-            elif "tot" in mode:
-                if res.dtype == bool:
-                    res = res.astype(int)
-                out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
-            elif mode == "any":
-                if res.dtype != bool:
-                    res = res.astype(bool)
-                out[idx_ch] = out[idx_ch] | res
-            elif mode == "all":
-                if res.dtype != bool:
-                    res = res.astype(bool)
-                out[idx_ch] = out[idx_ch] & res
-            elif ch_comp is not None:
-                out[idx_ch] = np.where(int(ch[2:]) == ch_comp, res, out[idx_ch])
-            else:
-                raise ValueError(mode + " not a valid mode")
 
-    return out, out_chs
+def evaluate_to_first(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    mode_lim: int | float,
+    op: str = None,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+    out_chs = np.zeros(len(out), dtype=int)
+    outt = np.zeros(len(out))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # get unification condition if present in mode
+        if op is not None:
+            limarr = eval(
+                "".join(["res", op, "lim"]),
+                {"res": res, "lim": mode_lim},
+            )
+        else:
+            limarr = np.ones(len(res)).astype(bool)
+
+        # append to out according to mode == first
+        if ch == chns[0]:
+            outt[:] = np.inf
+        t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)["tp_0_est"]
+        out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
+        out_chs[idx_ch] = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+        outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
+
+    return {"values": out, "channels": out_chs}
+
+
+def evaluate_to_last(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    mode_lim: int | float,
+    op: str = None,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+    out_chs = np.zeros(len(out), dtype=int)
+    outt = np.zeros(len(out))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # get unification condition if present in mode
+        if op is not None:
+            limarr = eval(
+                "".join(["res", op, "lim"]),
+                {"res": res, "lim": mode_lim},
+            )
+        else:
+            limarr = np.ones(len(res)).astype(bool)
+
+        # append to out according to mode == last
+        t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)["tp_0_est"]
+        out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
+        out_chs[idx_ch] = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
+        outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
+
+    return {"values": out, "channels": out_chs}
+
+
+def evaluate_to_tot(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    mode_lim: int | float,
+    op: str = None,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # get unification condition if present in mode
+        if op is not None:
+            limarr = eval(
+                "".join(["res", op, "lim"]),
+                {"res": res, "lim": mode_lim},
+            )
+        else:
+            limarr = np.ones(len(res)).astype(bool)
+
+        # append to out according to mode == tot
+        if res.dtype == bool:
+            res = res.astype(int)
+        out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
+
+    return {"values": out}
+
+
+def evaluate_to_any(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # append to out according to mode == any
+        if res.dtype != bool:
+            res = res.astype(bool)
+        out[idx_ch] = out[idx_ch] | res
+
+    return {"values": out}
+
+
+def evaluate_to_all(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # append to out according to mode == all
+        if res.dtype != bool:
+            res = res.astype(bool)
+        out[idx_ch] = out[idx_ch] & res
+
+    return {"values": out}
+
+
+def evaluate_at_channel(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    expr: str,
+    exprl: list,
+    nrows: int,
+    ch_comp: np.ndarray,
+    var_ph: dict = None,
+    defv=np.nan,
+) -> dict:
+    # define dimension of output array
+    out = np.full(nrows, defv, dtype=type(defv))
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # append to out according to mode == any
+        out[idx_ch] = np.where(int(ch[2:]) == ch_comp, res, out[idx_ch])
+
+    return {"values": out}
+
+
+def evaluate_to_vector(
+    f_tcm: str,
+    f_evt: str,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    mode: str,
+    expr: str,
+    nrows: int,
+    group: str,
+    para: dict = None,
+    defv=np.nan,
+) -> dict:
+    raise NotImplementedError
 
 
 def build_evt(
@@ -373,6 +660,8 @@ def build_evt(
                 lh5_file=f_evt,
                 wo_mode=wo_mode,  # if first_iter else "append"
             )
+
+        # Else we build the event entry
         else:
             if isinstance(v["channels"], str):
                 chns_e = chns[v["channels"]]
@@ -387,7 +676,7 @@ def build_evt(
             if "initial" in v.keys() and not v["initial"] == "np.nan":
                 defaultv = v["initial"]
 
-            res, chs = evaluate_expression(
+            result = evaluate_expression(
                 f_tcm,
                 f_evt,
                 f_hit,
@@ -401,7 +690,10 @@ def build_evt(
                 defaultv,
             )
             lstore.write_object(
-                obj=Array(res), name=group + k, lh5_file=f_evt, wo_mode=wo_mode
+                obj=Array(result["values"]),
+                name=group + k,
+                lh5_file=f_evt,
+                wo_mode=wo_mode,
             )
 
             # if get_ch true flag in a first/last mode operation also obtain channel field
@@ -409,9 +701,10 @@ def build_evt(
                 "get_ch" in v.keys()
                 and ("first" in v["mode"] or "last" in v["mode"])
                 and v["get_ch"]
+                and "channels" in result.keys()
             ):
                 lstore.write_object(
-                    obj=Array(chs),
+                    obj=Array(result["channels"]),
                     name=group + k + "_id",
                     lh5_file=f_evt,
                     wo_mode=wo_mode,
