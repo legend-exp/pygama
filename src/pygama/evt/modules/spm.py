@@ -11,9 +11,8 @@ additional parameters are free to the user and need to be defined in the JSON
 
 import warnings
 
-import numpy as np
-
 import lgdo.lh5_store as store
+import numpy as np
 
 
 # get LAr energy per event over all channels

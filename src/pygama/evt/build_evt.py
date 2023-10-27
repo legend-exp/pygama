@@ -10,11 +10,10 @@ import os
 import re
 from importlib import import_module
 
+import lgdo.lh5_store as store
 import numpy as np
 from legendmeta import LegendMetadata
-
-import pygama.lgdo.lh5_store as store
-from pygama.lgdo import Array
+from lgdo import Array, VectorOfVectors
 
 log = logging.getLogger(__name__)
 
@@ -71,8 +70,8 @@ def evaluate_expression(
        - "tot": The sum of all channels across an event. It  is possible to add a condition (e.g. "tot>10"). Only channels fulfilling this condition are considered in the time evaluation. If no channel fullfilles the condition, zero is returned for this event. Booleans are treated as integers 0/1.
        - "any": Logical or between all channels. Non boolean values are True for values != 0 and False for values == 0.
        - "all": Logical and between all channels. Non boolean values are True for values != 0 and False for values == 0.
-       - ch_field: A previously generated channel_id field (i.e. from the get_ch flag) can be given here, and the value of this specific channels is used.
-       - "single": !!!NOT IMPLEMENTED!!!. Channels are not combined, but result saved for each channel. field name gets channel id as suffix.
+       - ch_field: A previously generated channel_id field (i.e. from the get_ch flag) can be given here, and the value of this specific channels is used. if ch_field is a VectorOfVectors, the channel list is ignored. If ch_field is an Array, the intersection of the passed channels list and the Array is formed. If a channel is not in the Array, the default is used.
+       - "vov": Channels are not combined, but result saved as VectorOfVectors. Use of getch is recommended. It  is possible (and recommended) to add a condition (e.g. "vov>10"). Only channels fulfilling this condition are saved.
     expr
        The expression. That can be any mathematical equation/comparison. If mode == func, the expression needs to be a special processing function defined in modules (e.g. "modules.spm.get_energy). In the expression parameters from either hit, dsp, evt tier (from operations performed before this one! --> JSON operations order matters), or from the "parameters" field can be used.
     nrows
@@ -81,8 +80,6 @@ def evaluate_expression(
         lh5 root group name
     para
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
-    getch
-       Only affects "first", "last" modes. In that cases the rawid of the resulting values channel is returned as well.
     defv
         default value of evaluation
     """
@@ -176,6 +173,10 @@ def evaluate_expression(
                 var_ph,
                 defv,
             )
+        elif "vov" in mode:
+            return evaluate_to_vector(
+                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, mode_lim, op, var_ph
+            )
         elif "any" == mode:
             return evaluate_to_any(
                 idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, var_ph, defv
@@ -187,10 +188,21 @@ def evaluate_expression(
         elif os.path.exists(f_evt) and mode in [
             e.split("/")[-1] for e in store.ls(f_evt, group)
         ]:
-            ch_comp = store.load_nda(f_evt, [mode], group)[mode]
-            return evaluate_at_channel(
-                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, ch_comp, var_ph, defv
-            )
+            lstore = store.LH5Store()
+            ch_comp, _ = lstore.read_object(group + mode, f_evt)
+            if isinstance(ch_comp, Array):
+                return evaluate_at_channel(
+                    idx, ids, f_hit, f_dsp, chns, expr, exprl, ch_comp, var_ph, defv
+                )
+            elif isinstance(ch_comp, VectorOfVectors):
+                return evaluate_at_channel_vov(
+                    idx, ids, f_hit, f_dsp, expr, exprl, ch_comp, var_ph
+                )
+            else:
+                raise NotImplementedError(
+                    type(ch_comp)
+                    + " not supported (only Array and VectorOfVectors are supported)"
+                )
 
         else:
             raise ValueError(mode + " not a valid mode")
@@ -461,13 +473,11 @@ def evaluate_at_channel(
     chns: list,
     expr: str,
     exprl: list,
-    nrows: int,
-    ch_comp: np.ndarray,
+    ch_comp: Array,
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
+    out = np.full(len(ch_comp), defv, dtype=type(defv))
 
     for ch in chns:
         # get index list for this channel to be loaded
@@ -484,26 +494,120 @@ def evaluate_at_channel(
         if not isinstance(res, np.ndarray):
             res = np.full(len(out), res, dtype=type(res))
 
-        # append to out according to mode == any
-        out[idx_ch] = np.where(int(ch[2:]) == ch_comp, res, out[idx_ch])
+        out[idx_ch] = np.where(int(ch[2:]) == ch_comp.nda, res, out[idx_ch])
 
     return {"values": out}
 
 
+def evaluate_at_channel_vov(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    expr: str,
+    exprl: list,
+    ch_comp: VectorOfVectors,
+    var_ph: dict = None,
+) -> dict:
+    # blow up vov to aoesa
+    out = ch_comp.to_aoesa().nda
+
+    chns = np.unique(out[~np.isnan(out)]).astype(int)
+
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == ch]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, f"ch{ch}", idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # see in which events the current channel is present
+        mask = (out == ch).any(axis=1)
+        out[out == ch] = res[mask]
+
+    # ok now implode the table again
+    out = VectorOfVectors(
+        flattened_data=out.flatten()[~np.isnan(out.flatten())].astype(res.dtype),
+        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
+    )
+    return {"values": out, "channels": ch_comp}
+
+
 def evaluate_to_vector(
-    f_tcm: str,
-    f_evt: str,
+    idx: np.ndarray,
+    ids: np.ndarray,
     f_hit: str,
     f_dsp: str,
     chns: list,
-    mode: str,
     expr: str,
+    exprl: list,
     nrows: int,
-    group: str,
-    para: dict = None,
-    defv=np.nan,
+    mode_lim: int | float,
+    op: str = None,
+    var_ph: dict = None,
 ) -> dict:
-    raise NotImplementedError
+    """
+    Allows the evaluation as a vector of vectors.
+    Returns a dictionary of values: VoV of requested values
+    and channels: VoV of same dimensions with requested channel_id
+    """
+    # raise NotImplementedError
+
+    # define dimension of output array
+    out = np.full((nrows, len(chns)), np.nan)
+    out_chs = np.full((nrows, len(chns)), np.nan)
+
+    i = 0
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        # find fields in either dsp, hit
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        res = eval(expr, var)
+
+        # if it is not a nparray it could be a single value
+        # expand accordingly
+        if not isinstance(res, np.ndarray):
+            res = np.full(len(out), res, dtype=type(res))
+
+        # get unification condition if present in mode
+        if op is not None:
+            limarr = eval(
+                "".join(["res", op, "lim"]),
+                {"res": res, "lim": mode_lim},
+            )
+        else:
+            limarr = np.ones(len(res)).astype(bool)
+
+        # append to out according to mode == vov
+        out[:, i][limarr] = res[limarr]
+        out_chs[:, i][limarr] = int(ch[2:])
+
+        i += 1
+
+    # This can be smarter
+    # shorten to vov (FUTURE: replace with awkward)
+    out = VectorOfVectors(
+        flattened_data=out.flatten()[~np.isnan(out.flatten())],
+        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
+    )
+    out_chs = VectorOfVectors(
+        flattened_data=out_chs.flatten()[~np.isnan(out_chs.flatten())].astype(int),
+        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out_chs), axis=1)),
+    )
+
+    return {"values": out, "channels": out_chs}
 
 
 def build_evt(
@@ -531,7 +635,7 @@ def build_evt(
     f_evt
         name of the output file
     evt_config
-        dictionary or name of JSON file defining evt fields. Channel lists can be defined by the user or by using the keyword "meta" followed by the system (geds/spms) and the usability (on,no_psd,ac,off) separated by underscores (e.g. "meta_geds_on") in the "channels" dictionary. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "mode" defines how the channels should be combined (see evaluate_expression). For first/last modes a "get_ch" flag can be defined, if true an additional field with the sufix "_id" is returned containing the rawid of the respective value in the field without the suffix. "expression" defnies the mathematical/special function to apply (see evaluate_expression), "parameters" defines any other parameter used in expression  For example:
+        name of JSON file defining evt fields. Channel lists can be defined by the user or by using the keyword "meta" followed by the system (geds/spms) and the usability (on,no_psd,ac,off) separated by underscores (e.g. "meta_geds_on") in the "channels" dictionary. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "mode" defines how the channels should be combined (see evaluate_expression). For first/last modes a "get_ch" flag can be defined, if true an additional field with the sufix "_id" is returned containing the rawid of the respective value in the field without the suffix. "expression" defnies the mathematical/special function to apply (see evaluate_expression), "parameters" defines any other parameter used in expression. For example:
 
         .. code-block::json
 
@@ -553,6 +657,12 @@ def build_evt(
                     "get_ch": true,
                     "expression": "cuspEmax_ctc_cal",
                     "initial": "np.nan"
+                },
+                "energy_on":{
+                    "channels": ["geds_on"],
+                    "mode": "vov>25",
+                    "get_ch": true,
+                    "expression": "cuspEmax_ctc_cal"
                 },
                 "aoe":{
                     "channels": ["geds_on"],
@@ -637,8 +747,9 @@ def build_evt(
     for k, v in tbl_cfg["operations"].items():
         log.debug("Processing field" + k)
 
-        # if channels not defined in operation, it can only be an operation on the evt level.
-        if "channels" not in v.keys():
+        # if mode not defined in operation, it can only be an operation on the evt level.
+        # TODO need to adapt to handle VoVs
+        if "mode" not in v.keys():
             exprl = re.findall(r"[a-zA-Z_$][\w$]*", v["expression"])
             var = {}
             if os.path.exists(f_evt):
@@ -663,7 +774,9 @@ def build_evt(
 
         # Else we build the event entry
         else:
-            if isinstance(v["channels"], str):
+            if "channels" not in v.keys():
+                chns_e = []
+            elif isinstance(v["channels"], str):
                 chns_e = chns[v["channels"]]
             elif isinstance(v["channels"], list):
                 chns_e = list(
@@ -689,22 +802,25 @@ def build_evt(
                 pars,
                 defaultv,
             )
+
+            obj = result["values"]
+            if isinstance(obj, np.ndarray):
+                obj = Array(result["values"])
             lstore.write_object(
-                obj=Array(result["values"]),
+                obj=obj,
                 name=group + k,
                 lh5_file=f_evt,
                 wo_mode=wo_mode,
             )
 
-            # if get_ch true flag in a first/last mode operation also obtain channel field
-            if (
-                "get_ch" in v.keys()
-                and ("first" in v["mode"] or "last" in v["mode"])
-                and v["get_ch"]
-                and "channels" in result.keys()
-            ):
+            # if get_ch flag is true and exists and result dic contains channels entry
+            # write also channels information
+            if "get_ch" in v.keys() and v["get_ch"] and "channels" in result.keys():
+                obj = result["channels"]
+                if isinstance(obj, np.ndarray):
+                    obj = Array(result["channels"])
                 lstore.write_object(
-                    obj=Array(result["channels"]),
+                    obj=obj,
                     name=group + k + "_id",
                     lh5_file=f_evt,
                     wo_mode=wo_mode,
