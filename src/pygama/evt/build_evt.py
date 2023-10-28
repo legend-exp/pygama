@@ -108,7 +108,7 @@ def evaluate_expression(
 
         # load function dynamically
         p, m = func.rsplit(".", 1)
-        met = getattr(import_module(p), m)
+        met = getattr(import_module(p, package=__package__), m)
         out = met(*params)
         return {"values": out}
 
@@ -615,8 +615,8 @@ def build_evt(
     f_dsp: str,
     f_hit: str,
     f_evt: str,
+    evt_config: str | dict,
     meta_path: str = None,
-    evt_config: str | dict = None,
     wo_mode: str = "write_safe",
     group: str = "/evt/",
 ) -> None:
@@ -635,7 +635,7 @@ def build_evt(
     f_evt
         name of the output file
     evt_config
-        name of JSON file defining evt fields. Channel lists can be defined by the user or by using the keyword "meta" followed by the system (geds/spms) and the usability (on,no_psd,ac,off) separated by underscores (e.g. "meta_geds_on") in the "channels" dictionary. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "mode" defines how the channels should be combined (see evaluate_expression). For first/last modes a "get_ch" flag can be defined, if true an additional field with the sufix "_id" is returned containing the rawid of the respective value in the field without the suffix. "expression" defnies the mathematical/special function to apply (see evaluate_expression), "parameters" defines any other parameter used in expression. For example:
+        name of JSON file or dict defining evt fields. Channel lists can be defined by the user or by using the keyword "meta" followed by the system (geds/spms) and the usability (on,no_psd,ac,off) separated by underscores (e.g. "meta_geds_on") in the "channels" dictionary. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "mode" defines how the channels should be combined (see evaluate_expression). For first/last modes a "get_ch" flag can be defined, if true an additional field with the sufix "_id" is returned containing the rawid of the respective value in the field without the suffix. "expression" defnies the mathematical/special function to apply (see evaluate_expression), "parameters" defines any other parameter used in expression. For example:
 
         .. code-block::json
 
@@ -698,9 +698,16 @@ def build_evt(
     """
     lstore = store.LH5Store()
     tbl_cfg = evt_config
+    if not isinstance(tbl_cfg, (str, dict)):
+        raise TypeError()
     if isinstance(tbl_cfg, str):
         with open(tbl_cfg) as f:
             tbl_cfg = json.load(f)
+
+    if "channels" not in tbl_cfg.keys():
+        raise ValueError("channel field needs to be specified in the config")
+    if "operations" not in tbl_cfg.keys():
+        raise ValueError("operations field needs to be specified in the config")
 
     # create channel list according to config
     # This can be either read from the meta data
@@ -712,6 +719,7 @@ def build_evt(
         lmeta = LegendMetadata()
     chmap = lmeta.channelmap(re.search(r"\d{8}T\d{6}Z", f_dsp).group(0))
     chns = {}
+
     for k, v in tbl_cfg["channels"].items():
         if isinstance(v, str):
             if "meta" in v:
@@ -736,6 +744,8 @@ def build_evt(
     first_iter = True
 
     # get number of rows from TCM file
+    if "hardware_tcm_1" not in store.ls(f_tcm):
+        raise ValueError(f"TCM {f_tcm} doesn't contain hardware_tcm_1 field.")
     nrows = len(
         store.load_nda(f_tcm, ["cumulative_length"], "hardware_tcm_1/")[
             "cumulative_length"
@@ -769,7 +779,7 @@ def build_evt(
                 obj=res,
                 name=group + k,
                 lh5_file=f_evt,
-                wo_mode=wo_mode,  # if first_iter else "append"
+                wo_mode=wo_mode,
             )
 
         # Else we build the event entry

@@ -137,6 +137,7 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
     # ignore stupid numpy warnings
     warnings.filterwarnings("ignore", r"All-NaN slice encountered")
     warnings.filterwarnings("ignore", r"invalid value encountered in true_divide")
+    warnings.filterwarnings("ignore", r"invalid value encountered in divide")
 
     predf = store.load_nda(f_hit, ["energy_in_pe", "timestamp"], chs[0] + "/hit/")
 

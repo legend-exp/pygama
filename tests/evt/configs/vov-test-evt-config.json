@@ -1,0 +1,24 @@
+{
+  "channels": {
+    "geds_on": ["V00048A", "V01240A", "V00048B"]
+  },
+  "operations": {
+    "energy": {
+      "channels": "geds_on",
+      "mode": "vov>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal"
+    },
+    "aoe": {
+      "mode": "energy_id",
+      "expression": "AoE_Classifier"
+    },
+    "multiplicity": {
+      "channels": "geds_on",
+      "mode": "tot",
+      "expression": "cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "channels": {
+    "geds_on": ["V00048A", "V01240A", "V00048B"]
+  },
+  "operations": {
+    "multiplicity": {
+      "channels": "geds_on",
+      "mode": "tot",
+      "expression": "cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0
+    },
+    "energy": {
+      "channels": "geds_on",
+      "mode": "first>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal",
+      "initial": "np.nan"
+    },
+    "energy_aux": {
+      "channels": "geds_on",
+      "mode": "last>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal",
+      "initial": "np.nan"
+    },
+    "energy_sum": {
+      "channels": "geds_on",
+      "mode": "tot>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal",
+      "initial": 0.0
+    },
+    "is_usable_aoe": {
+      "channels": "geds_on",
+      "mode": "energy_id",
+      "expression": "True",
+      "initial": false
+    },
+    "aoe": {
+      "channels": "geds_on",
+      "mode": "energy_id",
+      "expression": "AoE_Classifier",
+      "initial": "np.nan"
+    },
+    "is_aoe_rejected": {
+      "channels": "geds_on",
+      "mode": "energy_id",
+      "expression": "~(AoE_Double_Sided_Cut)",
+      "initial": false
+    }
+  }
+}

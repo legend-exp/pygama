@@ -1,0 +1,39 @@
+{
+  "channels": {
+    "spms_on": ["S024", "S036", "S012"],
+    "geds_on": ["V00048A", "V01240A", "V00048B"]
+  },
+  "operations": {
+    "energy_first": {
+      "channels": ["geds_on"],
+      "mode": "first>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal",
+      "initial": "np.nan"
+    },
+    "t0": {
+      "channels": ["geds_on"],
+      "mode": "energy_first_id",
+      "expression": "tp_0_est",
+      "initial": 0.0
+    },
+    "lar_energy": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_energy(0.5,t0,48000,1000,5000)"
+    },
+    "lar_multiplicity": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_majority(0.5,t0,48000,1000,5000)"
+    },
+    "is_lar_rejected": {
+      "expression": "(lar_energy >4) | (lar_multiplicity > 4) "
+    },
+    "lar_classifier": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_etc(0.5,t0,48000,100,6000,80,1)"
+    }
+  }
+}
