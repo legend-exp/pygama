@@ -1,7 +1,7 @@
 {
   "channels": {
-    "spms_on": ["S024", "S036", "S012"],
-    "geds_on": ["V00048A", "V01240A", "V00048B"]
+    "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
   },
   "operations": {
     "energy_first": {

@@ -12,7 +12,6 @@ from importlib import import_module
 
 import lgdo.lh5_store as store
 import numpy as np
-from legendmeta import LegendMetadata
 from lgdo import Array, VectorOfVectors
 
 log = logging.getLogger(__name__)
@@ -51,6 +50,7 @@ def evaluate_expression(
 ) -> dict:
     """
     Evaluates the expression defined by the user across all channels according to the mode
+
     Parameters
     ----------
     f_tcm
@@ -77,12 +77,13 @@ def evaluate_expression(
     nrows
        Number of rows to be processed.
     group
-        lh5 root group name
+       lh5 root group name
     para
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
     defv
-        default value of evaluation
+       default value of evaluation
     """
+
     # find parameters in evt file or in parameters
     exprl = re.findall(r"[a-zA-Z_$][\w$]*", expr)
     var_ph = {}
@@ -639,63 +640,65 @@ def build_evt(
 
         .. code-block::json
 
-        {
-            "channels": {
-                "geds_on": "meta_geds_on",
-                "geds_no_psd": "meta_geds_no_psd",
-                "geds_ac": "meta_geds_ac",
-                "spms_on": "meta_spms_on",
-                "pulser": "PULS01",
-                "baseline": "BSLN01",
-                "muon": "MUON01",
-                "ts_master":"S060"
-            },
-            "operations": {
-                "energy":{
-                    "channels": ["geds_on","geds_no_psd","geds_ac"],
-                    "mode": "first>25",
-                    "get_ch": true,
-                    "expression": "cuspEmax_ctc_cal",
-                    "initial": "np.nan"
+            {
+                "channels": {
+                    "geds_on": "meta_geds_on",
+                    "geds_no_psd": "meta_geds_no_psd",
+                    "geds_ac": "meta_geds_ac",
+                    "spms_on": "meta_spms_on",
+                    "pulser": "PULS01",
+                    "baseline": "BSLN01",
+                    "muon": "MUON01",
+                    "ts_master":"S060"
                 },
-                "energy_on":{
-                    "channels": ["geds_on"],
-                    "mode": "vov>25",
-                    "get_ch": true,
-                    "expression": "cuspEmax_ctc_cal"
-                },
-                "aoe":{
-                    "channels": ["geds_on"],
-                    "mode": "energy_id",
-                    "expression": "AoE_Classifier",
-                    "initial": "np.nan"
-                },
-                "is_muon_tagged":{
-                    "channels": "muon",
-                    "mode": "any",
-                    "expression": "wf_max>a",
-                    "parameters": {"a":15100},
-                    "initial": false
-                },
-                "multiplicity":{
-                    "channels":  ["geds_on","geds_no_psd","geds_ac"],
-                    "mode": "tot",
-                    "expression": "cuspEmax_ctc_cal > a",
-                    "parameters": {"a":25},
-                    "initial": 0
-                },
-                "lar_energy":{
-                    "channels": "spms_on",
-                    "mode": "func",
-                    "expression": "modules.spm.get_energy(0.5,t0,48000,1000,5000)"
+                "operations": {
+                    "energy":{
+                        "channels": ["geds_on","geds_no_psd","geds_ac"],
+                        "mode": "first>25",
+                        "get_ch": true,
+                        "expression": "cuspEmax_ctc_cal",
+                        "initial": "np.nan"
+                    },
+                    "energy_on":{
+                        "channels": ["geds_on"],
+                        "mode": "vov>25",
+                        "get_ch": true,
+                        "expression": "cuspEmax_ctc_cal"
+                    },
+                    "aoe":{
+                        "channels": ["geds_on"],
+                        "mode": "energy_id",
+                        "expression": "AoE_Classifier",
+                        "initial": "np.nan"
+                    },
+                    "is_muon_tagged":{
+                        "channels": "muon",
+                        "mode": "any",
+                        "expression": "wf_max>a",
+                        "parameters": {"a":15100},
+                        "initial": false
+                    },
+                    "multiplicity":{
+                        "channels":  ["geds_on","geds_no_psd","geds_ac"],
+                        "mode": "tot",
+                        "expression": "cuspEmax_ctc_cal > a",
+                        "parameters": {"a":25},
+                        "initial": 0
+                    },
+                    "lar_energy":{
+                        "channels": "spms_on",
+                        "mode": "func",
+                        "expression": "modules.spm.get_energy(0.5,t0,48000,1000,5000)"
+                    }
                 }
             }
-        }
+
     wo_mode
         writing mode
     group
         lh5 root group name
     """
+
     lstore = store.LH5Store()
     tbl_cfg = evt_config
     if not isinstance(tbl_cfg, (str, dict)):
@@ -713,16 +716,18 @@ def build_evt(
     # This can be either read from the meta data
     # or a list of channel names
     log.debug("Creating channel dictionary")
-    if meta_path:
-        lmeta = LegendMetadata(path=meta_path)
-    else:
-        lmeta = LegendMetadata()
-    chmap = lmeta.channelmap(re.search(r"\d{8}T\d{6}Z", f_dsp).group(0))
+
     chns = {}
 
     for k, v in tbl_cfg["channels"].items():
         if isinstance(v, str):
+            # only import legend meta data when needed.
+            # LEGEND collaborators can use the meta keyword
+            # Why for users w/o access to the LEGEND meta data this is still working
             if "meta" in v:
+                lm = import_module("legendmeta")
+                lmeta = lm.LegendMetadata(path=meta_path)
+                chmap = lmeta.channelmap(re.search(r"\d{8}T\d{6}Z", f_dsp).group(0))
                 m, sys, usa = v.split("_", 2)
                 tmp = [
                     f"ch{e}"
@@ -736,12 +741,9 @@ def build_evt(
                     == usa
                 ]
             else:
-                chns[k] = [f"ch{chmap.map('name')[v]['daq']['rawid']}"]
+                chns[k] = [v]
         elif isinstance(v, list):
-            chns[k] = [f"ch{chmap.map('name')[e]['daq']['rawid']}" for e in v]
-
-    # do operations
-    first_iter = True
+            chns[k] = [e for e in v]
 
     # get number of rows from TCM file
     if "hardware_tcm_1" not in store.ls(f_tcm):
@@ -836,6 +838,4 @@ def build_evt(
                     wo_mode=wo_mode,
                 )
 
-        if first_iter:
-            first_iter = False
     log.info("Done")

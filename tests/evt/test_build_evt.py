@@ -21,7 +21,7 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=lgnd_test_data.get_path("legend/metadata"),
+        meta_path=None,
         evt_config=f"{config_dir}/basic-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -58,7 +58,7 @@ def test_lar_module(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=lgnd_test_data.get_path("legend/metadata"),
+        meta_path=None,
         evt_config=f"{config_dir}/module-test-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -82,7 +82,7 @@ def test_vov(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=lgnd_test_data.get_path("legend/metadata"),
+        meta_path=None,
         evt_config=f"{config_dir}/vov-test-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -108,7 +108,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     f_tcm = lgnd_test_data.get_path(tcm_path)
     f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
     f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    meta_path = lgnd_test_data.get_path("legend/metadata")
+    meta_path = None
     f_config = f"{config_dir}/basic-evt-config.json"
 
     with pytest.raises(ValueError):
@@ -124,19 +124,19 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     with pytest.raises(ValueError):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
 
-    conf = {"channels": {"geds_on": ["V00048A", "V01240A", "V00048B"]}}
+    conf = {"channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]}}
     with pytest.raises(ValueError):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
 
     conf = {
-        "channels": {"geds_on": ["V00048A", "V01240A", "V00048B"]},
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "operations": {},
     }
     build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
     assert not os.path.exists(outfile)
 
     conf = {
-        "channels": {"geds_on": ["V00048A", "V01240A", "V00048B"]},
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "operations": {
             "energy": {
                 "channels": "geds_on",
@@ -151,7 +151,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
 
     conf = {
-        "channels": {"geds_on": ["V00048A", "V01240A", "V00048B"]},
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "operations": {
             "energy": {
                 "channels": "geds_on",
