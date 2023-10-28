@@ -25,6 +25,9 @@ def test_basics(lgnd_test_data, tmptestdir):
         evt_config=f"{config_dir}/basic-evt-config.json",
         wo_mode="o",
         group="/evt/",
+        tcm_group="hardware_tcm_1",
+        dsp_group="/dsp/",
+        hit_group="/hit/",
     )
 
     assert os.path.exists(outfile)
@@ -111,7 +114,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     meta_path = None
     f_config = f"{config_dir}/basic-evt-config.json"
 
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         build_evt(f_dsp, f_tcm, f_hit, outfile, f_config, meta_path)
 
     with pytest.raises(NameError):

@@ -45,6 +45,8 @@ def evaluate_expression(
     expr: str,
     nrows: int,
     group: str,
+    dsp_group: str,
+    hit_group: str,
     para: dict = None,
     defv=np.nan,
 ) -> dict:
@@ -78,6 +80,10 @@ def evaluate_expression(
        Number of rows to be processed.
     group
        lh5 root group name
+    dsp_group
+        lh5 root group in dsp file
+    hit_group
+        lh5 root group in hit file
     para
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
     defv
@@ -134,7 +140,9 @@ def evaluate_expression(
                 idx,
                 ids,
                 f_hit,
+                hit_group,
                 f_dsp,
+                dsp_group,
                 chns,
                 expr,
                 exprl,
@@ -149,7 +157,9 @@ def evaluate_expression(
                 idx,
                 ids,
                 f_hit,
+                hit_group,
                 f_dsp,
+                dsp_group,
                 chns,
                 expr,
                 exprl,
@@ -164,7 +174,9 @@ def evaluate_expression(
                 idx,
                 ids,
                 f_hit,
+                hit_group,
                 f_dsp,
+                dsp_group,
                 chns,
                 expr,
                 exprl,
@@ -176,15 +188,49 @@ def evaluate_expression(
             )
         elif "vov" in mode:
             return evaluate_to_vector(
-                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, mode_lim, op, var_ph
+                idx,
+                ids,
+                f_hit,
+                hit_group,
+                f_dsp,
+                dsp_group,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                mode_lim,
+                op,
+                var_ph,
             )
         elif "any" == mode:
             return evaluate_to_any(
-                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, var_ph, defv
+                idx,
+                ids,
+                f_hit,
+                hit_group,
+                f_dsp,
+                dsp_group,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                var_ph,
+                defv,
             )
         elif "all" == mode:
             return evaluate_to_all(
-                idx, ids, f_hit, f_dsp, chns, expr, exprl, nrows, var_ph, defv
+                idx,
+                ids,
+                f_hit,
+                hit_group,
+                f_dsp,
+                dsp_group,
+                chns,
+                expr,
+                exprl,
+                nrows,
+                var_ph,
+                defv,
             )
         elif os.path.exists(f_evt) and mode in [
             e.split("/")[-1] for e in store.ls(f_evt, group)
@@ -193,11 +239,31 @@ def evaluate_expression(
             ch_comp, _ = lstore.read_object(group + mode, f_evt)
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
-                    idx, ids, f_hit, f_dsp, chns, expr, exprl, ch_comp, var_ph, defv
+                    idx,
+                    ids,
+                    f_hit,
+                    hit_group,
+                    f_dsp,
+                    dsp_group,
+                    chns,
+                    expr,
+                    exprl,
+                    ch_comp,
+                    var_ph,
+                    defv,
                 )
             elif isinstance(ch_comp, VectorOfVectors):
                 return evaluate_at_channel_vov(
-                    idx, ids, f_hit, f_dsp, expr, exprl, ch_comp, var_ph
+                    idx,
+                    ids,
+                    f_hit,
+                    hit_group,
+                    f_dsp,
+                    dsp_group,
+                    expr,
+                    exprl,
+                    ch_comp,
+                    var_ph,
                 )
             else:
                 raise NotImplementedError(
@@ -210,27 +276,33 @@ def evaluate_expression(
 
 
 def find_parameters(
-    f_hit: str, f_dsp: str, ch: str, idx_ch: np.ndarray, exprl: list
+    f_hit: str,
+    f_dsp: str,
+    ch: str,
+    idx_ch: np.ndarray,
+    exprl: list,
+    dsp_group: str,
+    hit_group: str,
 ) -> dict:
     # find fields in either dsp, hit
     var = store.load_nda(
         f_hit,
         [
             e.split("/")[-1]
-            for e in store.ls(f_hit, ch + "/hit/")
+            for e in store.ls(f_hit, ch + hit_group)
             if e.split("/")[-1] in exprl
         ],
-        ch + "/hit/",
+        ch + hit_group,
         idx_ch,
     )
     dsp_dic = store.load_nda(
         f_dsp,
         [
             e.split("/")[-1]
-            for e in store.ls(f_dsp, ch + "/dsp/")
+            for e in store.ls(f_dsp, ch + dsp_group)
             if e.split("/")[-1] in exprl
         ],
-        ch + "/dsp/",
+        ch + dsp_group,
         idx_ch,
     )
     return dsp_dic | var
@@ -240,7 +312,9 @@ def evaluate_to_first(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -259,7 +333,10 @@ def evaluate_to_first(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -293,7 +370,9 @@ def evaluate_to_last(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -313,7 +392,10 @@ def evaluate_to_last(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -345,7 +427,9 @@ def evaluate_to_tot(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -363,7 +447,10 @@ def evaluate_to_tot(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -394,7 +481,9 @@ def evaluate_to_any(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -410,7 +499,10 @@ def evaluate_to_any(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -432,7 +524,9 @@ def evaluate_to_all(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -448,7 +542,10 @@ def evaluate_to_all(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -470,7 +567,9 @@ def evaluate_at_channel(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -485,7 +584,10 @@ def evaluate_at_channel(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -504,7 +606,9 @@ def evaluate_at_channel_vov(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     expr: str,
     exprl: list,
     ch_comp: VectorOfVectors,
@@ -520,7 +624,12 @@ def evaluate_at_channel_vov(
         idx_ch = idx[ids == ch]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, f"ch{ch}", idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(
+                f_hit, f_dsp, f"ch{ch}", idx_ch, exprl, dsp_group, hit_group
+            )
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -546,7 +655,9 @@ def evaluate_to_vector(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
+    hit_group: str,
     f_dsp: str,
+    dsp_group: str,
     chns: list,
     expr: str,
     exprl: list,
@@ -572,7 +683,10 @@ def evaluate_to_vector(
         idx_ch = idx[ids == int(ch[2:])]
 
         # find fields in either dsp, hit
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = (
+            find_parameters(f_hit, f_dsp, ch, idx_ch, exprl, dsp_group, hit_group)
+            | var_ph
+        )
 
         # evaluate expression
         res = eval(expr, var)
@@ -620,6 +734,9 @@ def build_evt(
     meta_path: str = None,
     wo_mode: str = "write_safe",
     group: str = "/evt/",
+    tcm_group: str = "/hardware_tcm_1/",
+    dsp_group: str = "/dsp/",
+    hit_group: str = "/hit/",
 ) -> None:
     """
     Transform data from the hit and dsp levels which a channel sorted
@@ -633,6 +750,7 @@ def build_evt(
         input LH5 file of the dsp level
     f_hit
         input LH5 file of the hit level
+
     f_evt
         name of the output file
     evt_config
@@ -697,6 +815,12 @@ def build_evt(
         writing mode
     group
         lh5 root group name
+    tcm_group
+        lh5 root group in tcm file
+    dsp_group
+        lh5 root group in dsp file
+    hit_group
+        lh5 root group in hit file
     """
 
     lstore = store.LH5Store()
@@ -745,13 +869,8 @@ def build_evt(
         elif isinstance(v, list):
             chns[k] = [e for e in v]
 
-    # get number of rows from TCM file
-    if "hardware_tcm_1" not in store.ls(f_tcm):
-        raise ValueError(f"TCM {f_tcm} doesn't contain hardware_tcm_1 field.")
     nrows = len(
-        store.load_nda(f_tcm, ["cumulative_length"], "hardware_tcm_1/")[
-            "cumulative_length"
-        ]
+        store.load_nda(f_tcm, ["cumulative_length"], tcm_group)["cumulative_length"]
     )
     log.info(
         f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
@@ -811,6 +930,8 @@ def build_evt(
                 v["expression"],
                 nrows,
                 group,
+                dsp_group,
+                hit_group,
                 pars,
                 defaultv,
             )
