@@ -12,14 +12,28 @@
     },
     "energy": {
       "channels": "geds_on",
-      "mode": "first>25",
+      "mode": ["first>25", "tp_0_est"],
       "get_ch": true,
       "expression": "cuspEmax_ctc_cal",
       "initial": "np.nan"
     },
+    "energy_any_above1MeV": {
+      "channels": "geds_on",
+      "mode": "any",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal>1000",
+      "initial": false
+    },
+    "energy_all_above1MeV": {
+      "channels": "geds_on",
+      "mode": "all",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal>1000",
+      "initial": false
+    },
     "energy_aux": {
       "channels": "geds_on",
-      "mode": "last>25",
+      "mode": ["last>25", "tp_0_est"],
       "get_ch": true,
       "expression": "cuspEmax_ctc_cal",
       "initial": "np.nan"

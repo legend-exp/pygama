@@ -32,7 +32,7 @@ def test_basics(lgnd_test_data, tmptestdir):
 
     assert os.path.exists(outfile)
     assert (
-        len(ls(outfile, "/evt/")) == 9
+        len(ls(outfile, "/evt/")) == 11
     )  # 7 operations of which 2 are requesting channel field
     nda = load_nda(
         outfile, ["energy", "energy_aux", "energy_sum", "multiplicity"], "/evt/"
@@ -68,11 +68,15 @@ def test_lar_module(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 7
-    assert (
-        np.max(load_nda(outfile, ["lar_multiplicity"], "/evt/")["lar_multiplicity"])
-        <= 3
+    assert len(ls(outfile, "/evt/")) == 10
+    nda = load_nda(
+        outfile,
+        ["lar_multiplicity", "lar_multiplicity_dplms", "t0", "lar_time_shift"],
+        "/evt/",
     )
+    assert np.max(nda["lar_multiplicity"]) <= 3
+    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
+    assert ((nda["lar_time_shift"] + nda["t0"]) >= 0).all()
 
 
 def test_vov(lgnd_test_data, tmptestdir):
@@ -143,7 +147,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         "operations": {
             "energy": {
                 "channels": "geds_on",
-                "mode": "first>pineapple",
+                "mode": ["first>pineapple", "tp_0_est"],
                 "get_ch": True,
                 "expression": "cuspEmax_ctc_cal",
                 "initial": "np.nan",
@@ -158,7 +162,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         "operations": {
             "energy": {
                 "channels": "geds_on",
-                "mode": "first>25",
+                "mode": ["first>25", "tp_0_est"],
                 "get_ch": True,
                 "expression": "cuspEmax_ctc_cal$cuspEmax_ctc_cal",
                 "initial": "np.nan",
@@ -166,4 +170,19 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         },
     }
     with pytest.raises(SyntaxError):
+        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+
+    conf = {
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "operations": {
+            "energy": {
+                "channels": "geds_on",
+                "mode": ["first>25", "coconut"],
+                "get_ch": True,
+                "expression": "cuspEmax_ctc_cal",
+                "initial": "np.nan",
+            }
+        },
+    }
+    with pytest.raises(ValueError):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)

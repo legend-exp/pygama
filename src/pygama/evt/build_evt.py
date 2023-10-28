@@ -41,7 +41,7 @@ def evaluate_expression(
     f_hit: str,
     f_dsp: str,
     chns: list,
-    mode: str,
+    mod: str | list,
     expr: str,
     nrows: int,
     group: str,
@@ -90,6 +90,12 @@ def evaluate_expression(
        default value of evaluation
     """
 
+    # set modus variables
+    mode, sorter = mod, None
+    if isinstance(mod, list):
+        mode = mod[0]
+        sorter = mod[1]
+
     # find parameters in evt file or in parameters
     exprl = re.findall(r"[a-zA-Z_$][\w$]*", expr)
     var_ph = {}
@@ -135,7 +141,45 @@ def evaluate_expression(
         idx = nda["array_idx"]
 
         # switch through modes
-        if "first" in mode:
+        if os.path.exists(f_evt) and mode in [
+            e.split("/")[-1] for e in store.ls(f_evt, group)
+        ]:
+            lstore = store.LH5Store()
+            ch_comp, _ = lstore.read_object(group + mode, f_evt)
+            if isinstance(ch_comp, Array):
+                return evaluate_at_channel(
+                    idx,
+                    ids,
+                    f_hit,
+                    hit_group,
+                    f_dsp,
+                    dsp_group,
+                    chns,
+                    expr,
+                    exprl,
+                    ch_comp,
+                    var_ph,
+                    defv,
+                )
+            elif isinstance(ch_comp, VectorOfVectors):
+                return evaluate_at_channel_vov(
+                    idx,
+                    ids,
+                    f_hit,
+                    hit_group,
+                    f_dsp,
+                    dsp_group,
+                    expr,
+                    exprl,
+                    ch_comp,
+                    var_ph,
+                )
+            else:
+                raise NotImplementedError(
+                    type(ch_comp)
+                    + " not supported (only Array and VectorOfVectors are supported)"
+                )
+        elif "first" in mode:
             return evaluate_to_first(
                 idx,
                 ids,
@@ -148,6 +192,7 @@ def evaluate_expression(
                 exprl,
                 nrows,
                 mode_lim,
+                sorter,
                 op,
                 var_ph,
                 defv,
@@ -165,6 +210,7 @@ def evaluate_expression(
                 exprl,
                 nrows,
                 mode_lim,
+                sorter,
                 op,
                 var_ph,
                 defv,
@@ -232,45 +278,6 @@ def evaluate_expression(
                 var_ph,
                 defv,
             )
-        elif os.path.exists(f_evt) and mode in [
-            e.split("/")[-1] for e in store.ls(f_evt, group)
-        ]:
-            lstore = store.LH5Store()
-            ch_comp, _ = lstore.read_object(group + mode, f_evt)
-            if isinstance(ch_comp, Array):
-                return evaluate_at_channel(
-                    idx,
-                    ids,
-                    f_hit,
-                    hit_group,
-                    f_dsp,
-                    dsp_group,
-                    chns,
-                    expr,
-                    exprl,
-                    ch_comp,
-                    var_ph,
-                    defv,
-                )
-            elif isinstance(ch_comp, VectorOfVectors):
-                return evaluate_at_channel_vov(
-                    idx,
-                    ids,
-                    f_hit,
-                    hit_group,
-                    f_dsp,
-                    dsp_group,
-                    expr,
-                    exprl,
-                    ch_comp,
-                    var_ph,
-                )
-            else:
-                raise NotImplementedError(
-                    type(ch_comp)
-                    + " not supported (only Array and VectorOfVectors are supported)"
-                )
-
         else:
             raise ValueError(mode + " not a valid mode")
 
@@ -320,6 +327,7 @@ def evaluate_to_first(
     exprl: list,
     nrows: int,
     mode_lim: int | float,
+    sorter: str,
     op: str = None,
     var_ph: dict = None,
     defv=np.nan,
@@ -358,7 +366,15 @@ def evaluate_to_first(
         # append to out according to mode == first
         if ch == chns[0]:
             outt[:] = np.inf
-        t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)["tp_0_est"]
+
+        # find if sorter is in hit or dsp
+        if sorter in [e.split("/")[-1] for e in store.ls(f_dsp, ch + dsp_group)]:
+            t0 = store.load_nda(f_dsp, [sorter], ch + dsp_group, idx_ch)[sorter]
+        elif sorter in [e.split("/")[-1] for e in store.ls(f_hit, ch + hit_group)]:
+            t0 = store.load_nda(f_hit, [sorter], ch + hit_group, idx_ch)[sorter]
+        else:
+            raise ValueError(f"Couldn't find sorter {sorter}")
+
         out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
         out_chs[idx_ch] = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
         outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
@@ -378,6 +394,7 @@ def evaluate_to_last(
     exprl: list,
     nrows: int,
     mode_lim: int | float,
+    sorter: str,
     op: str = None,
     var_ph: dict = None,
     defv=np.nan,
@@ -415,7 +432,14 @@ def evaluate_to_last(
             limarr = np.ones(len(res)).astype(bool)
 
         # append to out according to mode == last
-        t0 = store.load_nda(f_dsp, ["tp_0_est"], ch + "/dsp/", idx_ch)["tp_0_est"]
+        # find if sorter is in hit or dsp
+        if sorter in [e.split("/")[-1] for e in store.ls(f_dsp, ch + dsp_group)]:
+            t0 = store.load_nda(f_dsp, [sorter], ch + dsp_group, idx_ch)[sorter]
+        elif sorter in [e.split("/")[-1] for e in store.ls(f_hit, ch + hit_group)]:
+            t0 = store.load_nda(f_hit, [sorter], ch + hit_group, idx_ch)[sorter]
+        else:
+            raise ValueError(f"Couldn't find sorter {sorter}")
+
         out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
         out_chs[idx_ch] = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
         outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
