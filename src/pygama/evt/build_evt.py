@@ -1012,3 +1012,93 @@ def build_evt(
                 )
 
     log.info("Done")
+
+
+def skim_evt(
+    f_evt: str,
+    expression: str,
+    params: dict = None,
+    f_out: str = None,
+    wo_mode="n",
+    evt_group="/evt/",
+) -> None:
+    """
+    Skimms events from a evt file which are fullfling the expression, discards all other events.
+
+    Parameters
+    ----------
+    f_evt
+        input LH5 file of the evt level
+    expression
+        skimming expression. Can contain variabels from event file or from the params dictionary.
+    f_out
+        output LH5 file. Can be None if wo_mode is set to overwrite f_evt.
+    wo_mode
+        Write mode: "o"/"overwrite" overwrites f_evt. "n"/"new" writes to a new file specified in f_out.
+    evt_group
+        lh5 root group of the evt file
+    """
+
+    if wo_mode not in ["o", "overwrite", "n", "new"]:
+        raise ValueError(
+            wo_mode
+            + " is a invalid writing mode. Valid options are: 'o', 'overwrite','n','new'"
+        )
+    lstore = store.LH5Store()
+    fields = store.ls(f_evt, evt_group)
+    nrows = lstore.read_n_rows(fields[0], f_evt)
+    # load fields in expression
+    exprl = re.findall(r"[a-zA-Z_$][\w$]*", expression)
+    var = {}
+
+    flds = [
+        e.split("/")[-1]
+        for e in store.ls(f_evt, evt_group)
+        if e.split("/")[-1] in exprl
+    ]
+    var = {e: lstore.read_object(evt_group + e, f_evt)[0] for e in flds}
+
+    # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
+    arr_keys = []
+    for key, value in var.items():
+        if isinstance(value, VectorOfVectors):
+            var[key] = value.to_aoesa().nda
+        elif isinstance(value, Array):
+            var[key] = value.nda
+            arr_keys.append(key)
+
+    # now we also need to set dimensions if we have an expression
+    # consisting of a mix of VoV and Arrays
+    if len(arr_keys) > 0 and not set(arr_keys) == set(var.keys()):
+        for key in arr_keys:
+            var[key] = var[key][:, None]
+
+    if params is not None:
+        var = var | params
+    res = eval(expression, var)
+
+    if res.shape != (nrows,):
+        raise ValueError(
+            f"The expression must result to 1D with length = event number. Current shape is {res.shape}"
+        )
+
+    res = res.astype(bool)
+    idx_list = np.arange(nrows, dtype=int)[res]
+
+    of = f_out
+    if wo_mode in ["o", "overwrite"]:
+        of = f_evt
+    of_tmp = of.replace(of.split("/")[-1], ".tmp_" + of.split("/")[-1])
+
+    for fld in fields:
+        ob, _ = lstore.read_object(fld, f_evt, idx=idx_list)
+        lstore.write_object(
+            obj=ob,
+            name=fld,
+            lh5_file=of_tmp,
+            wo_mode="o",
+        )
+
+    if os.path.exists(of):
+        os.remove(of)
+    os.rename(of_tmp, of)

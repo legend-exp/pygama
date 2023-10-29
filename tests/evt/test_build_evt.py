@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from lgdo import Array, VectorOfVectors, load_nda, ls
 
-from pygama.evt import build_evt
+from pygama.evt import build_evt, skim_evt
 
 config_dir = Path(__file__).parent / "configs"
 
@@ -192,3 +192,28 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     }
     with pytest.raises(ValueError):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+
+
+def test_skimming(lgnd_test_data, tmptestdir):
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    f_tcm = lgnd_test_data.get_path(tcm_path)
+    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
+    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
+    meta_path = None
+    f_config = f"{config_dir}/vov-test-evt-config.json"
+    build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, meta_path)
+
+    lstore = store.LH5Store()
+    ac = lstore.read_object("/evt/multiplicity", outfile)[0].nda
+    ac = len(ac[ac == 3])
+
+    outfile_skm = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
+
+    skim_evt(outfile, "multiplicity == 3", None, outfile_skm, "n")
+    assert ac == len(lstore.read_object("/evt/energy", outfile_skm)[0].to_aoesa().nda)
+
+    skim_evt(outfile, "multiplicity == 3", None, None, "o")
+    assert ac == len(lstore.read_object("/evt/energy", outfile)[0].to_aoesa().nda)
