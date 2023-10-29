@@ -19,6 +19,15 @@
       "expression": "cuspEmax_ctc_cal > a",
       "parameters": { "a": 25 },
       "initial": 0
+    },
+    "energy_times_aoe": {
+      "expression": "energy*aoe"
+    },
+    "energy_times_multiplicity": {
+      "expression": "energy*multiplicity"
+    },
+    "multiplicity_squared": {
+      "expression": "multiplicity*multiplicity"
     }
   }
 }

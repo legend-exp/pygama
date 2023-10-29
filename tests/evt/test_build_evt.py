@@ -96,14 +96,20 @@ def test_vov(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 4
+    assert len(ls(outfile, "/evt/")) == 7
     lstore = store.LH5Store()
     vov_ene, _ = lstore.read_object("/evt/energy", outfile)
     vov_aoe, _ = lstore.read_object("/evt/aoe", outfile)
     arr_ac, _ = lstore.read_object("/evt/multiplicity", outfile)
+    vov_aoeene, _ = lstore.read_object("/evt/energy_times_aoe", outfile)
+    vov_eneac, _ = lstore.read_object("/evt/energy_times_multiplicity", outfile)
+    arr_ac2, _ = lstore.read_object("/evt/multiplicity_squared", outfile)
     assert isinstance(vov_ene, VectorOfVectors)
     assert isinstance(vov_aoe, VectorOfVectors)
     assert isinstance(arr_ac, Array)
+    assert isinstance(vov_aoeene, VectorOfVectors)
+    assert isinstance(vov_eneac, VectorOfVectors)
+    assert isinstance(arr_ac2, Array)
     assert (np.diff(vov_ene.cumulative_length.nda, prepend=[0]) == arr_ac.nda).all()
 
 

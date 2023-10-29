@@ -903,23 +903,51 @@ def build_evt(
         log.debug("Processing field" + k)
 
         # if mode not defined in operation, it can only be an operation on the evt level.
-        # TODO need to adapt to handle VoVs
         if "mode" not in v.keys():
             exprl = re.findall(r"[a-zA-Z_$][\w$]*", v["expression"])
             var = {}
             if os.path.exists(f_evt):
-                var = store.load_nda(
-                    f_evt,
-                    [
-                        e.split("/")[-1]
-                        for e in store.ls(f_evt, group)
-                        if e.split("/")[-1] in exprl
-                    ],
-                    group,
-                )
+                flds = [
+                    e.split("/")[-1]
+                    for e in store.ls(f_evt, group)
+                    if e.split("/")[-1] in exprl
+                ]
+                var = {e: lstore.read_object(group + e, f_evt)[0] for e in flds}
+
+                # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
+                arr_keys = []
+                for key, value in var.items():
+                    if isinstance(value, VectorOfVectors):
+                        var[key] = value.to_aoesa().nda
+                    elif isinstance(value, Array):
+                        var[key] = value.nda
+                        arr_keys.append(key)
+
+                # now we also need to set dimensions if we have an expression
+                # consisting of a mix of VoV and Arrays
+                if len(arr_keys) > 0 and not set(arr_keys) == set(var.keys()):
+                    for key in arr_keys:
+                        var[key] = var[key][:, None]
+
             if "parameters" in v.keys():
                 var = var | v["parameters"]
-            res = Array(eval(v["expression"], var))
+            res = eval(v["expression"], var)
+
+            # now check what dimension we have after the evaluation
+            if len(res.shape) == 1:
+                res = Array(res)
+            elif len(res.shape) == 2:
+                res = VectorOfVectors(
+                    flattened_data=res.flatten()[~np.isnan(res.flatten())],
+                    cumulative_length=np.cumsum(
+                        np.count_nonzero(~np.isnan(res), axis=1)
+                    ),
+                )
+            else:
+                raise NotImplementedError(
+                    f"Currently only 2d formats are supported, the evaluated array has the dimension {res.shape}"
+                )
+
             lstore.write_object(
                 obj=res,
                 name=group + k,
