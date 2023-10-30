@@ -15,7 +15,7 @@ from typing import Callable
 import matplotlib as mpl
 
 mpl.use("agg")
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates

@@ -69,7 +69,7 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`~.lgdo.lh5_store.write_object`.
+        forwarded to :meth:`~.lgdo.lh5.write_object`.
     """
     store = LH5Store()
 

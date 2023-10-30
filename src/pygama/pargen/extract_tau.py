@@ -15,7 +15,7 @@ import matplotlib as mpl
 
 mpl.use("agg")
 import lgdo
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 

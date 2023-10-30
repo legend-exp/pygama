@@ -14,7 +14,9 @@ from typing import Iterator
 import numpy as np
 import pandas as pd
 from dspeed.vis import WaveformBrowser
-from lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
+from lgdo.lh5 import LH5Iterator, LH5Store
+from lgdo.lh5.utils import expand_vars
+from lgdo.types import Array, Struct, Table
 from lgdo.types.vectorofvectors import build_cl, explode_arrays, explode_cl
 from tqdm.auto import tqdm
 
@@ -193,9 +195,7 @@ class DataLoader:
         # look for info in configuration if FileDB is not set
         if self.filedb is None:
             # expand $_ variables
-            value = lgdo_utils.expand_vars(
-                config["filedb"], substitute={"_": config_dir}
-            )
+            value = expand_vars(config["filedb"], substitute={"_": config_dir})
             self.filedb = FileDB(value)
 
         if not os.path.isdir(self.filedb.data_dir):

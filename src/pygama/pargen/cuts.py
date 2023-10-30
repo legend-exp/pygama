@@ -9,7 +9,7 @@ import json
 import logging
 import os
 
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
 from scipy import stats

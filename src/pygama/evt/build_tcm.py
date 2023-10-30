@@ -49,7 +49,7 @@ def build_tcm(
     out_name
         name for the TCM table in the output file.
     wo_mode
-        mode to send to :meth:`~.lgdo.lh5_store.LH5Store.write_object`.
+        mode to send to :meth:`~.lgdo.lh5.LH5Store.write_object`.
 
     See Also
     --------

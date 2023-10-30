@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-import lgdo.lh5_store as store
+import lgdo.lh5 as store
 import numpy as np
 import pytest
 from lgdo import LH5Store, ls

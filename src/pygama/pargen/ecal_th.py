@@ -15,7 +15,7 @@ import matplotlib as mpl
 from scipy.stats import binned_statistic
 
 mpl.use("agg")
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

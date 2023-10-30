@@ -13,7 +13,7 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
