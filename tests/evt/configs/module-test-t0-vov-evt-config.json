@@ -1,0 +1,53 @@
+{
+  "channels": {
+    "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  },
+  "operations": {
+    "energy": {
+      "channels": "geds_on",
+      "mode": "vov>25",
+      "get_ch": true,
+      "expression": "cuspEmax_ctc_cal"
+    },
+    "t0": {
+      "channels": ["geds_on"],
+      "mode": "energy_id",
+      "expression": "tp_0_est",
+      "initial": 0.0
+    },
+    "lar_energy": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_energy(0.5,t0,48000,1000,5000)"
+    },
+    "lar_multiplicity": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_majority(0.5,t0,48000,1000,5000)"
+    },
+    "is_lar_rejected": {
+      "expression": "(lar_energy >4) | (lar_multiplicity > 4) "
+    },
+    "lar_classifier": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_etc(0.5,t0,48000,100,6000,80,1)"
+    },
+    "lar_energy_dplms": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_energy_dplms(0.5,t0,48000,1000,5000)"
+    },
+    "lar_multiplicity_dplms": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_majority_dplms(0.5,t0,48000,1000,5000)"
+    },
+    "lar_time_shift": {
+      "channels": "spms_on",
+      "mode": "func",
+      "expression": ".modules.spm.get_time_shift(0.5,t0,48000,1000,5000)"
+    }
+  }
+}

@@ -100,15 +100,7 @@ def evaluate_expression(
     exprl = re.findall(r"[a-zA-Z_$][\w$]*", expr)
     var_ph = {}
     if os.path.exists(f_evt):
-        var_ph = store.load_nda(
-            f_evt,
-            [
-                e.split("/")[-1]
-                for e in store.ls(f_evt, group)
-                if e.split("/")[-1] in exprl
-            ],
-            group,
-        )
+        var_ph = load_vars_to_nda(f_evt, group, exprl)
     if para:
         var_ph = var_ph | para
 
@@ -292,27 +284,39 @@ def find_parameters(
     hit_group: str,
 ) -> dict:
     # find fields in either dsp, hit
-    var = store.load_nda(
-        f_hit,
-        [
-            e.split("/")[-1]
-            for e in store.ls(f_hit, ch + hit_group)
-            if e.split("/")[-1] in exprl
-        ],
-        ch + hit_group,
-        idx_ch,
-    )
-    dsp_dic = store.load_nda(
-        f_dsp,
-        [
-            e.split("/")[-1]
-            for e in store.ls(f_dsp, ch + dsp_group)
-            if e.split("/")[-1] in exprl
-        ],
-        ch + dsp_group,
-        idx_ch,
-    )
+    var = load_vars_to_nda(f_hit, ch + hit_group, exprl)
+    dsp_dic = load_vars_to_nda(f_dsp, ch + dsp_group, exprl)
+
     return dsp_dic | var
+
+
+def load_vars_to_nda(f_evt: str, group: str, exprl: list) -> dict:
+    lstore = store.LH5Store()
+    flds = [
+        e.split("/")[-1] for e in store.ls(f_evt, group) if e.split("/")[-1] in exprl
+    ]
+    var = {e: lstore.read_object(group + e, f_evt)[0] for e in flds}
+
+    # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
+    arr_keys = []
+    for key, value in var.items():
+        if isinstance(value, VectorOfVectors):
+            var[key] = value.to_aoesa().nda
+        elif isinstance(value, Array):
+            var[key] = value.nda
+            if var[key].ndim > 2:
+                raise ValueError("Dim > 2 not supported")
+            if var[key].ndim == 1:
+                arr_keys.append(key)
+        else:
+            raise ValueError(f"{type(value)} not supported")
+
+    # now we also need to set dimensions if we have an expression
+    # consisting of a mix of VoV and Arrays
+    if len(arr_keys) > 0 and not set(arr_keys) == set(var.keys()):
+        for key in arr_keys:
+            var[key] = var[key][:, None]
+    return var
 
 
 def evaluate_to_first(
@@ -907,27 +911,7 @@ def build_evt(
             exprl = re.findall(r"[a-zA-Z_$][\w$]*", v["expression"])
             var = {}
             if os.path.exists(f_evt):
-                flds = [
-                    e.split("/")[-1]
-                    for e in store.ls(f_evt, group)
-                    if e.split("/")[-1] in exprl
-                ]
-                var = {e: lstore.read_object(group + e, f_evt)[0] for e in flds}
-
-                # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
-                arr_keys = []
-                for key, value in var.items():
-                    if isinstance(value, VectorOfVectors):
-                        var[key] = value.to_aoesa().nda
-                    elif isinstance(value, Array):
-                        var[key] = value.nda
-                        arr_keys.append(key)
-
-                # now we also need to set dimensions if we have an expression
-                # consisting of a mix of VoV and Arrays
-                if len(arr_keys) > 0 and not set(arr_keys) == set(var.keys()):
-                    for key in arr_keys:
-                        var[key] = var[key][:, None]
+                var = load_vars_to_nda(f_evt, group, exprl)
 
             if "parameters" in v.keys():
                 var = var | v["parameters"]

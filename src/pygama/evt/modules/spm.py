@@ -13,11 +13,24 @@ import warnings
 
 import lgdo.lh5_store as store
 import numpy as np
+from lgdo import Array, VectorOfVectors
 
 
 # get LAr energy per event over all channels
 def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
-    trig = np.where(np.isnan(trgr), tdefault, trgr)
+    trig = trgr
+    if isinstance(trgr, VectorOfVectors):
+        trig = trig.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        trig = trig.nda
+    if isinstance(trig, np.ndarray) and trig.ndim == 2:
+        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
+        trig = np.nanmin(trig, axis=1)
+
+    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
+        trig = np.where(np.isnan(trig), tdefault, trig)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
     tmi = trig - tmin
     tma = trig + tmax
     sum = np.zeros(len(trig))
@@ -46,7 +59,19 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
 
 # get LAr majority per event over all channels
 def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
-    trig = np.where(np.isnan(trgr), tdefault, trgr)
+    trig = trgr
+    if isinstance(trgr, VectorOfVectors):
+        trig = trig.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        trig = trig.nda
+    if isinstance(trig, np.ndarray) and trig.ndim == 2:
+        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
+        trig = np.nanmin(trig, axis=1)
+
+    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
+        trig = np.where(np.isnan(trig), tdefault, trig)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
     tmi = trig - tmin
     tma = trig + tmax
     maj = np.zeros(len(trig))
@@ -76,7 +101,19 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
 
 # get LAr energy per event over all channels
 def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
-    trig = np.where(np.isnan(trgr), tdefault, trgr)
+    trig = trgr
+    if isinstance(trgr, VectorOfVectors):
+        trig = trig.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        trig = trig.nda
+    if isinstance(trig, np.ndarray) and trig.ndim == 2:
+        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
+        trig = np.nanmin(trig, axis=1)
+
+    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
+        trig = np.where(np.isnan(trig), tdefault, trig)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
     tmi = trig - tmin
     tma = trig + tmax
     sum = np.zeros(len(trig))
@@ -105,7 +142,19 @@ def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
 
 # get LAr majority per event over all channels
 def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
-    trig = np.where(np.isnan(trgr), tdefault, trgr)
+    trig = trgr
+    if isinstance(trgr, VectorOfVectors):
+        trig = trig.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        trig = trig.nda
+    if isinstance(trig, np.ndarray) and trig.ndim == 2:
+        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
+        trig = np.nanmin(trig, axis=1)
+
+    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
+        trig = np.where(np.isnan(trig), tdefault, trig)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
     tmi = trig - tmin
     tma = trig + tmax
     maj = np.zeros(len(trig))
@@ -146,7 +195,20 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
     pes = np.zeros([len(chs), peshape[0], peshape[1]])
     times = np.zeros([len(chs), peshape[0], peshape[1]])
 
-    tge = np.where(np.isnan(trgr), tdefault, trgr)
+    tge = trgr
+    if isinstance(trgr, VectorOfVectors):
+        tge = tge.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        tge = tge.nda
+    if isinstance(tge, np.ndarray) and tge.ndim == 2:
+        tge = np.where(np.isnan(tge).all(axis=1)[:, None], tdefault, tge)
+        tge = np.nanmin(tge, axis=1)
+
+    elif isinstance(tge, np.ndarray) and tge.ndim == 1:
+        tge = np.where(np.isnan(tge), tdefault, tge)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
+
     tmi = tge - tmin
     tma = tge + tmax
 
@@ -213,7 +275,20 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     peshape = (predf["energy_in_pe"]).shape
     times = np.zeros([len(chs), peshape[0], peshape[1]])
 
-    tge = np.where(np.isnan(trgr), tdefault, trgr)
+    tge = trgr
+    if isinstance(trgr, VectorOfVectors):
+        tge = tge.to_aoesa().nda
+    elif isinstance(trgr, Array):
+        tge = tge.nda
+    if isinstance(tge, np.ndarray) and tge.ndim == 2:
+        tge = np.where(np.isnan(tge).all(axis=1)[:, None], tdefault, tge)
+        tge = np.nanmin(tge, axis=1)
+
+    elif isinstance(tge, np.ndarray) and tge.ndim == 1:
+        tge = np.where(np.isnan(tge), tdefault, tge)
+    else:
+        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
+
     tmi = tge - tmin
     tma = tge + tmax
 

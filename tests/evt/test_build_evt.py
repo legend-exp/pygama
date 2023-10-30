@@ -79,6 +79,33 @@ def test_lar_module(lgnd_test_data, tmptestdir):
     assert ((nda["lar_time_shift"] + nda["t0"]) >= 0).all()
 
 
+def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    build_evt(
+        f_tcm=lgnd_test_data.get_path(tcm_path),
+        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
+        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+        f_evt=outfile,
+        meta_path=None,
+        evt_config=f"{config_dir}/module-test-t0-vov-evt-config.json",
+        wo_mode="o",
+        group="/evt/",
+    )
+
+    assert os.path.exists(outfile)
+    assert len(ls(outfile, "/evt/")) == 10
+    nda = load_nda(
+        outfile,
+        ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"],
+        "/evt/",
+    )
+    assert np.max(nda["lar_multiplicity"]) <= 3
+    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
+
+
 def test_vov(lgnd_test_data, tmptestdir):
     outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
