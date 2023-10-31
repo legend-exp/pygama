@@ -1293,9 +1293,9 @@ def compton_sf_sweep(
 class cal_aoe:
     def __init__(
         self,
-        cal_dicts: dict,
-        cal_energy_param: str,
-        eres_func: callable,
+        cal_dicts: dict = {},
+        cal_energy_param: str = "cuspEmax_ctc_cal",
+        eres_func: callable = lambda x: 1,
         pdf=standard_aoe,
         selection_string: str = "",
         dt_corr: bool = False,
@@ -1347,17 +1347,17 @@ class cal_aoe:
     def aoe_timecorr(self, df, aoe_param, output_name="AoE_Timecorr", display=0):
         log.info("Starting A/E time correction")
         self.timecorr_df = pd.DataFrame(
-            columns=["timestamp", "mean", "mean_err", "res", "res_err"]
+            columns=["run_timestamp", "mean", "mean_err", "res", "res_err"]
         )
         try:
-            if "timestamp" in df:
-                tstamps = sorted(np.unique(df["timestamp"]))
+            if "run_timestamp" in df:
+                tstamps = sorted(np.unique(df["run_timestamp"]))
                 means = []
                 errors = []
                 reses = []
                 res_errs = []
                 final_tstamps = []
-                for tstamp, time_df in df.groupby("timestamp", sort=True):
+                for tstamp, time_df in df.groupby("run_timestamp", sort=True):
                     try:
                         pars, errs, cov = unbinned_aoe_fit(
                             time_df.query(
@@ -1372,7 +1372,7 @@ class cal_aoe:
                                 pd.DataFrame(
                                     [
                                         {
-                                            "timestamp": tstamp,
+                                            "run_timestamp": tstamp,
                                             "mean": pars["mu"],
                                             "mean_err": errs["mu"],
                                             "res": pars["sigma"] / pars["mu"],
@@ -1393,7 +1393,7 @@ class cal_aoe:
                                 pd.DataFrame(
                                     [
                                         {
-                                            "timestamp": tstamp,
+                                            "run_timestamp": tstamp,
                                             "mean": np.nan,
                                             "mean_err": np.nan,
                                             "res": np.nan,
@@ -1403,7 +1403,7 @@ class cal_aoe:
                                 ),
                             ]
                         )
-                self.timecorr_df.set_index("timestamp", inplace=True)
+                self.timecorr_df.set_index("run_timestamp", inplace=True)
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
                     np.array(self.timecorr_df["mean"]),
@@ -1411,7 +1411,7 @@ class cal_aoe:
                 )
 
                 df[output_name] = df[aoe_param] / np.array(
-                    [time_dict[tstamp] for tstamp in df["timestamp"]]
+                    [time_dict[tstamp] for tstamp in df["run_timestamp"]]
                 )
                 self.update_cal_dicts(
                     {
