@@ -225,7 +225,6 @@ def dsp_preprocess_decay_const(
     double_pz: bool = False,
     display: int = 0,
     opt_dict: dict = None,
-    threshold: int = 5000,
     wf_field: str = "waveform",
     wf_plot: str = "wf_pz",
     norm_param: str = "pz_mean",

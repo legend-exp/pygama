@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.stats
+from iminuit import Minuit, cost
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
@@ -28,7 +29,7 @@ import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.energy_cal as cal
-from pygama.pargen.utils import *
+from pygama.pargen.utils import load_data, return_nans
 
 log = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class calibrate_parameter:
     def __init__(
         self,
         energy_param,
-        selection_string="is_usable",
+        selection_string="",
         plot_options: dict = None,
         guess_keV: float | None = None,
         threshold: int = 0,
@@ -1355,7 +1356,7 @@ def bin_spectrum(
             data.query(ecal_class.selection_string)[ecal_class.cal_energy_param], bins
         )[0],
         "cut_counts": np.histogram(
-            data.querydata.query(f"(~{cut_field})&(~{pulser_field})")[
+            data.query(f"(~{cut_field})&(~{pulser_field})")[
                 ecal_class.cal_energy_param
             ],
             bins,
