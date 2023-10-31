@@ -1297,7 +1297,7 @@ class cal_aoe:
         cal_energy_param: str,
         eres_func: callable,
         pdf=standard_aoe,
-        selection_string: str = "is_valid_cal&is_not_pulser",
+        selection_string: str = "",
         dt_corr: bool = False,
         dep_acc: float = 0.9,
         dep_correct: bool = False,
@@ -2814,75 +2814,3 @@ def plot_classifier(
     plt.ylim(yrange)
     plt.close()
     return fig
-
-
-def aoe_calibration(
-    files,
-    lh5_path: str,
-    cal_dicts: dict,
-    current_param: str,
-    energy_param: str,
-    cal_energy_param: str,
-    eres_func: Callable,
-    pdf: Callable = standard_aoe,
-    cut_field: str = "is_valid_cal",
-    dt_corr: bool = False,
-    dep_correct: bool = False,
-    dt_cut: dict = None,
-    high_cut_val: int = 3,
-    mean_func: Callable = pol1,
-    sigma_func: Callable = sigma_fit,
-    dep_acc: float = 0.9,
-    dt_param: str = "dt_eff",
-    comptBands_width: int = 20,
-    plot_options: dict = {},
-    threshold: int = 800,
-):
-    params = [
-        current_param,
-        "tp_0_est",
-        "tp_99",
-        dt_param,
-        energy_param,
-        cal_energy_param,
-        cut_field,
-    ]
-
-    aoe = cal_aoe(
-        cal_dicts,
-        cal_energy_param,
-        eres_func,
-        pdf,
-        f"{cut_field}&is_not_pulser",
-        dt_corr,
-        dep_acc,
-        dep_correct,
-        dt_cut,
-        dt_param,
-        high_cut_val,
-        mean_func,
-        sigma_func,
-        comptBands_width,
-        plot_options,
-    )
-    if dt_cut is not None:
-        params.append(dt_cut["out_param"])
-
-    data = load_data(
-        files, lh5_path, aoe.cal_dicts, params, cal_energy_param, threshold
-    )
-
-    data["AoE_Uncorr"] = np.divide(data[current_param], data[energy_param])
-
-    aoe.update_cal_dicts(
-        {
-            "AoE_Uncorr": {
-                "expression": f"{current_param}/{energy_param}",
-                "parameters": {},
-            }
-        }
-    )
-
-    aoe.calibrate(data, "AoE_Uncorr")
-    log.info(f"Calibrated A/E")
-    return cal_dicts, aoe.get_results_dict(), aoe.fill_plot_dict(data), aoe
