@@ -18,7 +18,7 @@ from scipy.signal import find_peaks_cwt, medfilt
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 import pygama.math.utils as pgu
-from pygama.pargen.utils import *
+from pygama.pargen.utils import return_nans
 
 log = logging.getLogger(__name__)
 
@@ -827,6 +827,10 @@ def hpge_fit_E_peaks(
     return (pars, errors, covs, binws, ranges, p_vals, valid_pks, out_funcs)
 
 
+def poly_wrapper(x, *pars):
+    return pgf.poly(x, pars)
+
+
 def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     """Find best fit of poly(E) = mus +/- sqrt(mu_vars)
     Compare to hpge_fit_E_cal_func which fits for E = poly(mu)
@@ -857,9 +861,7 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
         errs = np.diag(np.sqrt(cov))
     else:
         poly_pars = np.polyfit(Es_keV, mus, deg=deg, w=1 / np.sqrt(mu_vars))
-        c = cost.LeastSquares(
-            Es_keV, mus, np.sqrt(mu_vars), lambda x, *pars: pgf.poly(x, pars)
-        )
+        c = cost.LeastSquares(Es_keV, mus, np.sqrt(mu_vars), poly_wrapper)
         m = Minuit(c, *poly_pars)
         m.simplex()
         m.migrad()
@@ -910,9 +912,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
             dmudEs += E_scale_pars[n] * mus ** (len(E_scale_pars) - 2 - n)
         E_weights = dmudEs * mu_vars
         poly_pars = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights)
-        c = cost.LeastSquares(
-            mus, Es_keV, E_weights, lambda x, *pars: pgf.poly(x, pars)
-        )
+        c = cost.LeastSquares(mus, Es_keV, E_weights, poly_wrapper)
         m = Minuit(c, *poly_pars)
         m.simplex()
         m.migrad()
@@ -1202,7 +1202,7 @@ def hpge_E_calibration(
         results["pk_cal_cov"] = cov
     except ValueError:
         log.error("Failed to fit enough peaks to get accurate calibration")
-        return None, None, results
+        return None, None, None, results
 
     # Invert the E scale fit to get a calibration function
     pars, errs, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
