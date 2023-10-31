@@ -8,8 +8,6 @@ import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost, util
 
-import pygama.pargen.cuts as cts
-
 log = logging.getLogger(__name__)
 
 
@@ -24,27 +22,6 @@ def return_nans(input):
         c = cost.UnbinnedNLL(np.array([0]), input.pdf)
         m = Minuit(c, *[np.nan for arg in args])
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
-
-
-def tag_pulser(files, lh5_path):
-    pulser_df = lh5.load_dfs(files, ["timestamp", "trapTmax"], lh5_path)
-    pulser_props = cts.find_pulser_properties(pulser_df, energy="trapTmax")
-    if len(pulser_props) > 0:
-        final_mask = None
-        for entry in pulser_props:
-            e_cut = (pulser_df.trapTmax.values < entry[0] + entry[1]) & (
-                pulser_df.trapTmax.values > entry[0] - entry[1]
-            )
-            if final_mask is None:
-                final_mask = e_cut
-            else:
-                final_mask = final_mask | e_cut
-        ids = ~(final_mask)
-        log.debug(f"pulser found: {pulser_props}")
-    else:
-        ids = np.ones(len(pulser_df), dtype=bool)
-        log.debug(f"no pulser found")
-    return ids
 
 
 def get_params(file_params, param_list):
@@ -67,6 +44,7 @@ def load_data(
     params=["cuspEmax"],
     cal_energy_param: str = "cuspEmax_ctc_cal",
     threshold=None,
+    return_selection_mask=False,
 ) -> tuple(np.array, np.array, np.array, np.array):
     """
     Loads in the A/E parameters needed and applies calibration constants to energy
@@ -84,8 +62,8 @@ def load_data(
                 file_df = table.eval(cal_dict[tstamp]).get_dataframe()
             else:
                 file_df = table.eval(cal_dict).get_dataframe()
-            file_df["timestamp"] = np.full(len(file_df), tstamp, dtype=object)
-            params.append("timestamp")
+            file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
+            params.append("run_timestamp")
             if threshold is not None:
                 mask = file_df[cal_energy_param] < threshold
 
@@ -123,13 +101,16 @@ def load_data(
         if param not in df:
             df[param] = lh5.load_nda(all_files, [param], lh5_path)[param][masks]
     log.debug(f"data loaded")
-    return df
+    if return_selection_mask:
+        return df, masks
+    else:
+        return df
 
 
-def get_pulser_ids(tcm_file, channel, multiplicity_threshold):
+def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
     if isinstance(channel, str):
         if channel[:2] == "ch":
-            channel = int(channel[2:])
+            chan = int(channel[2:])
         else:
             chan = int(channel)
     else:
@@ -137,7 +118,7 @@ def get_pulser_ids(tcm_file, channel, multiplicity_threshold):
     if isinstance(tcm_file, list):
         mask = np.array([], dtype=bool)
         for file in tcm_file:
-            _, file_mask = get_pulser_ids(file, chan, multiplicity_threshold)
+            _, file_mask = get_tcm_pulser_ids(file, chan, multiplicity_threshold)
             mask = np.append(mask, file_mask)
         ids = np.where(mask)[0]
     else:
