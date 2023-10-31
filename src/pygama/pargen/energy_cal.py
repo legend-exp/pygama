@@ -553,7 +553,7 @@ def staged_fit(
             m.values["htail"] < 0.01
             or m.values["htail"] < 2 * m.errors["htail"]
             or np.isnan(m.values).any()
-        ):  # or
+        ):  # switch to stat test
             func_i = pgf.extended_gauss_step_pdf
             gof_func_i = pgf.gauss_step_pdf
             pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(
@@ -776,7 +776,6 @@ def hpge_fit_E_peaks(
                     f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}"
                 )
                 valid_pks[i_peak] = False
-                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif valid_fit == False:
                 log.debug(
@@ -791,21 +790,18 @@ def hpge_fit_E_peaks(
                     f"hpge_fit_E_peaks: failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low"
                 )
                 valid_pks[i_peak] = False
-                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif np.abs(total_events[0] - np.sum(hist)) / np.sum(hist) > 0.1:
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit"
                 )
                 valid_pks[i_peak] = False
-                # pars_i, errs_i, cov_i, p_val = None, None, None, None
 
             elif p_val < allowed_p_val or np.isnan(p_val):
                 log.debug(
                     f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
                 )
                 valid_pks[i_peak] = False
-                # pars_i, errs_i, cov_i, p_val = None, None, None, None
             else:
                 valid_pks[i_peak] = True
 
@@ -814,7 +810,7 @@ def hpge_fit_E_peaks(
                 f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, unknown error"
             )
             valid_pks[i_peak] = False
-            pars_i, errs_i, cov_i = return_nans(func_i)  # None, None, None, None
+            pars_i, errs_i, cov_i = return_nans(func_i)
             p_val = 0
 
         # get binning
@@ -858,9 +854,20 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
         scale, scale_cov = pgu.fit_simple_scaling(Es_keV, mus, var=mu_vars)
         pars = np.array([scale, 0])
         cov = np.array([[scale_cov, 0], [0, 0]])
+        errs = np.diag(np.sqrt(cov))
     else:
-        pars, cov = np.polyfit(Es_keV, mus, deg=deg, w=1 / np.sqrt(mu_vars), cov=True)
-    return pars, cov
+        poly_pars = np.polyfit(Es_keV, mus, deg=deg, w=1 / np.sqrt(mu_vars))
+        c = cost.LeastSquares(
+            Es_keV, mus, np.sqrt(mu_vars), lambda x, *pars: pgf.poly(x, pars)
+        )
+        m = Minuit(c, *poly_pars)
+        m.simplex()
+        m.migrad()
+        m.hesse()
+        pars = m.values
+        cov = m.covariance
+        errs = m.errors
+    return pars, errs, cov
 
 
 def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
@@ -878,7 +885,8 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     Es_keV : array
         energies to fit to, in keV
     E_scale_pars : array
-        ???
+        Parameters from the escale fit (keV to ADC) used for calculating
+        uncertainties
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
@@ -895,13 +903,24 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
         scale, scale_cov = pgu.fit_simple_scaling(mus, Es_keV, var=E_vars)
         pars = np.array([scale, 0])
         cov = np.array([[scale_cov, 0], [0, 0]])
+        errs = np.diag(np.sqrt(cov))
     else:
         dmudEs = np.zeros(len(mus))
         for n in range(len(E_scale_pars) - 1):
             dmudEs += E_scale_pars[n] * mus ** (len(E_scale_pars) - 2 - n)
         E_weights = dmudEs * mu_vars
-        pars, cov = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights, cov=True)
-    return pars, cov
+        poly_pars = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights)
+        c = cost.LeastSquares(
+            mus, Es_keV, E_weights, lambda x, *pars: pgf.poly(x, pars)
+        )
+        m = Minuit(c, *poly_pars)
+        m.simplex()
+        m.migrad()
+        m.hesse()
+        pars = m.values
+        errs = m.errors
+        cov = m.covariance
+    return pars, errs, cov
 
 
 def hpge_E_calibration(
@@ -1177,15 +1196,16 @@ def hpge_E_calibration(
     mu_vars = np.asarray(mu_vars) ** 2
 
     try:
-        pars, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
+        pars, errs, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
         results["pk_cal_pars"] = pars
+        results["pk_cal_errs"] = errs
         results["pk_cal_cov"] = cov
     except ValueError:
         log.error("Failed to fit enough peaks to get accurate calibration")
         return None, None, results
 
     # Invert the E scale fit to get a calibration function
-    pars, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
+    pars, errs, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
 
     # Finally, calculate fwhms in keV
     uncal_fwhms = [
