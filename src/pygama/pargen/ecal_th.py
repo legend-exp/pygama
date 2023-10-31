@@ -48,9 +48,10 @@ def apply_cuts(
     hit_dict,
     cut_parameters=None,
     final_cut_field: str = "is_valid_cal",
+    pulser_field="is_pulser",
 ):
     if cut_parameters is not None:
-        cut_dict = cts.generate_cuts(data.query("is_not_pulser"), cut_parameters)
+        cut_dict = cts.generate_cuts(data.query(f"(~{pulser_field})"), cut_parameters)
         hit_dict.update(
             cts.cut_dict_to_hit_dict(cut_dict, final_cut_field=final_cut_field)
         )
@@ -61,7 +62,7 @@ def apply_cuts(
     else:
         data[final_cut_field] = np.ones(len(data), dtype=bool)
 
-    events_pqc = len(data.query(f"{final_cut_field}&is_not_pulser"))
+    events_pqc = len(data.query(f"{final_cut_field}&(~{pulser_field})"))
     log.debug(f"{events_pqc} events valid for calibration")
 
     return data, hit_dict
@@ -1003,7 +1004,14 @@ def plot_2614_timemap(
 
 
 def plot_pulser_timemap(
-    ecal_class, data, figsize=[12, 8], fontsize=12, dx=0.2, time_dx=180, n_spread=3
+    ecal_class,
+    data,
+    pulser_field="is_pulser",
+    figsize=[12, 8],
+    fontsize=12,
+    dx=0.2,
+    time_dx=180,
+    n_spread=3,
 ):
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
@@ -1014,7 +1022,7 @@ def plot_pulser_timemap(
         time_dx,
     )
 
-    selection = data.query(f"~is_not_pulser")
+    selection = data.query(pulser_field)
     fig = plt.figure()
     if len(selection) == 0:
         pass
@@ -1047,8 +1055,8 @@ def plot_pulser_timemap(
     return fig
 
 
-def bin_pulser_stability(ecal_class, data, time_slice=180):
-    selection = data.query(f"~is_not_pulser")
+def bin_pulser_stability(ecal_class, data, pulser_field="is_pulser", time_slice=180):
+    selection = data.query(pulser_field)
 
     utime_array = data["timestamp"]
     select_energies = selection[ecal_class.cal_energy_param].to_numpy()
@@ -1332,7 +1340,14 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     return fig
 
 
-def bin_spectrum(ecal_class, data, erange=[0, 3000], dx=2):
+def bin_spectrum(
+    ecal_class,
+    data,
+    cut_field="is_valid_cal",
+    pulser_field="is_pulser",
+    erange=[0, 3000],
+    dx=2,
+):
     bins = np.arange(erange[0], erange[1] + dx, dx)
     return {
         "bins": pgh.get_bin_centers(bins),
@@ -1340,125 +1355,33 @@ def bin_spectrum(ecal_class, data, erange=[0, 3000], dx=2):
             data.query(ecal_class.selection_string)[ecal_class.cal_energy_param], bins
         )[0],
         "cut_counts": np.histogram(
-            data.query("~is_valid_cal&is_not_pulser")[ecal_class.cal_energy_param],
+            data.querydata.query(f"(~{cut_field})&(~{pulser_field})")[
+                ecal_class.cal_energy_param
+            ],
             bins,
         )[0],
         "pulser_counts": np.histogram(
-            data.query("~is_not_pulser")[ecal_class.cal_energy_param],
+            data.query(pulser_field)[ecal_class.cal_energy_param],
             bins,
         )[0],
     }
 
 
-def bin_survival_fraction(ecal_class, data, erange=[0, 3000], dx=6):
+def bin_survival_fraction(
+    ecal_class,
+    data,
+    cut_field="is_valid_cal",
+    pulser_field="is_pulser",
+    erange=[0, 3000],
+    dx=6,
+):
     counts_pass, bins_pass, _ = pgh.get_hist(
         data.query(ecal_class.selection_string)[ecal_class.cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
     counts_fail, bins_fail, _ = pgh.get_hist(
-        data.query("~is_valid_cal&is_not_pulser")[ecal_class.cal_energy_param],
+        data.query(f"(~{cut_field})&(~{pulser_field})")[ecal_class.cal_energy_param],
         bins=np.arange(erange[0], erange[1] + dx, dx),
     )
     sf = 100 * (counts_pass + 10 ** (-6)) / (counts_pass + counts_fail + 10 ** (-6))
     return {"bins": pgh.get_bin_centers(bins_pass), "sf": sf}
-
-
-def energy_cal_th(
-    files: list[str],
-    energy_params: list[str],
-    lh5_path: str = "dsp",
-    hit_dict: dict = {},
-    cut_parameters: dict[str, int] = {"bl_mean": 4, "bl_std": 4, "pz_std": 4},
-    plot_options: dict = None,
-    threshold: int = 0,
-    p_val: float = 0,
-    n_events: int = None,
-    final_cut_field: str = "is_valid_cal",
-    simplex: bool = True,
-    guess_keV: float | None = None,
-    tail_weight=100,
-    deg: int = 1,
-) -> tuple(dict, dict, dict, dict):
-    data = load_data(
-        files,
-        lh5_path,
-        hit_dict,
-        params=energy_params + list(cut_parameters) + ["timestamp"],
-    )
-
-    data, hit_dict = apply_cuts(data, hit_dict, cut_parameters, final_cut_field)
-
-    results_dict = {}
-    plot_dict = {}
-    full_object_dict = {}
-    for energy_param in energy_params:
-        full_object_dict[energy_param] = calibrate_parameter(
-            energy_param,
-            f"{final_cut_field}&is_not_pulser",
-            plot_options,
-            guess_keV,
-            threshold,
-            p_val,
-            n_events,
-            simplex,
-            deg,
-            tail_weight=tail_weight,
-        )
-        full_object_dict[energy_param].calibrate_parameter(data)
-        results_dict[
-            full_object_dict[energy_param].cal_energy_param
-        ] = full_object_dict[energy_param].get_results_dict(data)
-        hit_dict.update(full_object_dict[energy_param].hit_dict)
-        if ~np.isnan(full_object_dict[energy_param].pars).all():
-            plot_dict[full_object_dict[energy_param].cal_energy_param] = (
-                full_object_dict[energy_param].fill_plot_dict(data).copy()
-            )
-
-    log.info(f"Finished all calibrations")
-    return hit_dict, results_dict, plot_dict, full_object_dict
-
-
-def partition_energy_cal_th(
-    files: list[str],
-    energy_params: list[str],
-    lh5_path: str = "dsp",
-    hit_dict: dict = {},
-    plot_options: dict = None,
-    threshold: int = 0,
-    p_val: float = 0,
-    n_events: int = None,
-    final_cut_field: str = "is_valid_cal",
-    simplex: bool = True,
-    tail_weight: int = 20,
-) -> tuple(dict, dict, dict, dict):
-    data = load_data(
-        files,
-        lh5_path,
-        hit_dict,
-        params=energy_params + [final_cut_field] + ["timestamp"],
-    )
-
-    results_dict = {}
-    plot_dict = {}
-    full_object_dict = {}
-    for energy_param in energy_params:
-        full_object_dict[energy_param] = high_stats_fitting(
-            energy_param,
-            f"{final_cut_field}&is_not_pulser",
-            threshold,
-            p_val,
-            plot_options,
-            simplex,
-            tail_weight,
-        )
-        full_object_dict[energy_param].fit_peaks(data)
-        results_dict[energy_param] = full_object_dict[energy_param].get_results_dict(
-            data
-        )
-        if full_object_dict[energy_param].results:
-            plot_dict[energy_param] = (
-                full_object_dict[energy_param].fill_plot_dict(data).copy()
-            )
-
-    log.info(f"Finished all calibrations")
-    return results_dict, plot_dict, full_object_dict
