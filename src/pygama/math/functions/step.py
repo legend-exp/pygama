@@ -258,10 +258,10 @@ class step_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 0, sigma: float =1) -> np.ndarray:
         return nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
 
-    # Because step is only defined on a user specified range, we don't need to return a different norm_pdf, just alias get_pdf and get_cdf
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, hstep: float, mu: float, sigma: float) -> np.ndarray: 
+    # Because step is only defined on a user specified range, we don't need to return a different pdf_norm, just alias get_pdf and get_cdf
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, hstep: float, mu: float, sigma: float) -> np.ndarray: 
         return nb_step_pdf(x, mu, sigma, hstep, x_lower, x_upper)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, hstep: float, mu: float, sigma: float) -> np.ndarray: 
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, hstep: float, mu: float, sigma: float) -> np.ndarray: 
         return nb_step_cdf(x, mu, sigma, hstep, x_lower, x_upper)
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 1, sigma: float= 1) -> np.ndarray:

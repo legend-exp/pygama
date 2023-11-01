@@ -158,10 +158,10 @@ class linear_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_cdf(x, x_lower, x_upper, m, b)
 
-    # Because this function is already normalized over its limited support, we need to alias get_pdf as norm_pdf 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
+    # Because this function is already normalized over its limited support, we need to alias get_pdf as pdf_norm 
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_pdf(x, x_lower, x_upper, m, b) 
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_cdf(x, x_lower, x_upper, m, b)
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:

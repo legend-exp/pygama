@@ -201,10 +201,10 @@ class crystal_ball_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
         return nb_crystal_ball_cdf(x, beta, m, mu, sigma)
 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_pdf(x, x_lower, x_upper, beta, m, mu, sigma)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_cdf(x, x_lower, x_upper, beta, m, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, x_lower, x_upper, beta, m, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, x_lower, x_upper, beta, m, mu, sigma)
 
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:

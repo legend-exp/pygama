@@ -20,7 +20,7 @@ def test_step_pdf():
     # compute the unnormalized step function
     scipy_step = 1 + hstep * (
         norm.cdf(x, mu, sigma) * 2 - 1
-    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 norm_cdf(x*sqrt(2))-1
+    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 cdf_norm(x*sqrt(2))-1
 
     # compute the normalization for the step function
     maximum = (np.amax(x) - mu) / sigma
@@ -53,7 +53,7 @@ def test_step_pdf():
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig, rtol=1e-8)
 
-    y_norm = step.norm_pdf(x, x[0], x[-1], hstep, mu, sigma)
+    y_norm = step.pdf_norm(x, x[0], x[-1], hstep, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y, rtol=1e-8)
 
@@ -110,6 +110,6 @@ def test_step_cdf():
     y_ext = step.cdf_ext(x, n_sig, hstep, lower_range, upper_range, mu, sigma)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
 
-    y_norm = step.norm_cdf(x, x[0], x[-1], hstep, mu, sigma)
+    y_norm = step.cdf_norm(x, x[0], x[-1], hstep, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y, rtol=1e-8)

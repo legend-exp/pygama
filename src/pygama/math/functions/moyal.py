@@ -139,10 +139,10 @@ class moyal_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_cdf(x, mu, sigma)
 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_pdf(x, x_lower, x_upper, mu, sigma)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_cdf(x, x_lower, x_upper, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, x_lower, x_upper, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, x_lower, x_upper, mu, sigma)
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_scaled_cdf(np.array([x_hi]), mu, sigma, area)[0]-nb_moyal_scaled_cdf(np.array([x_lo]), mu, sigma, area)[0], nb_moyal_scaled_pdf(x, mu, sigma, area)

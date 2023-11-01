@@ -22,7 +22,7 @@ dx = np.diff(xe)
 
 
 def test_unbinned_nll():
-    c = cost.UnbinnedNLL(xmix, exgauss.norm_pdf)
+    c = cost.UnbinnedNLL(xmix, exgauss.pdf_norm)
 
     m = Minuit(c, x_lower=-20, x_upper=20, tau=1, mu=0, sigma=3)
     m.limits["tau"] = (0.1, 3)
@@ -63,7 +63,7 @@ def test_extended_unbinned_nll():
 
 
 def test_binned_nll():
-    c = cost.BinnedNLL(n, xe, exgauss.norm_cdf)
+    c = cost.BinnedNLL(n, xe, exgauss.cdf_norm)
 
     m = Minuit(c, x_lower=-20, x_upper=20, tau=1, mu=0, sigma=3)
     m.limits["tau"] = (0.1, 3)

@@ -27,7 +27,7 @@ def test_moyal_pdf():
     assert np.allclose(y_sig, n_sig, rtol=1e-3)
 
     normalization = np.diff(scipy_moyal.cdf(x[np.array([0, -1])], mu, sigma))
-    y_norm = moyal.norm_pdf(x, x[0], x[-1], mu, sigma)
+    y_norm = moyal.pdf_norm(x, x[0], x[-1], mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -51,6 +51,6 @@ def test_moyal_cdf():
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
 
     normalization = np.diff(scipy_moyal.cdf(x[np.array([0, -1])], mu, sigma))
-    y_norm = moyal.norm_cdf(x, x[0], x[-1], mu, sigma)
+    y_norm = moyal.cdf_norm(x, x[0], x[-1], mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

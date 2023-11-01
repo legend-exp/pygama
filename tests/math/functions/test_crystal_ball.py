@@ -31,7 +31,7 @@ def test_crystalball_pdf():
     normalization = np.diff(
         scipy_crystal_ball.cdf(x[np.array([0, -1])], beta, m, mu, sigma)
     )
-    y_norm = crystal_ball.norm_pdf(x, x[0], x[-1], beta, m, mu, sigma)
+    y_norm = crystal_ball.pdf_norm(x, x[0], x[-1], beta, m, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -59,6 +59,6 @@ def test_crystalball_cdf():
     normalization = np.diff(
         scipy_crystal_ball.cdf(x[np.array([0, -1])], beta, m, mu, sigma)
     )
-    y_norm = crystal_ball.norm_cdf(x, x[0], x[-1], beta, m, mu, sigma)
+    y_norm = crystal_ball.cdf_norm(x, x[0], x[-1], beta, m, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

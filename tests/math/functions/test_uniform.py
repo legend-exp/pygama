@@ -26,7 +26,7 @@ def test_uniform_pdf():
     assert np.array_equal(y_ext, 20 * scipy_y)
     assert np.array_equal(y_sig, 20)
 
-    y_norm = uniform.norm_pdf(x, x[0], x[-1], a, b)
+    y_norm = uniform.pdf_norm(x, x[0], x[-1], a, b)
 
     assert np.allclose(y_norm, y_direct, rtol=1e-8)
 
@@ -49,6 +49,6 @@ def test_uniform_cdf():
     y_ext = uniform.cdf_ext(x, n_sig, a, b)
     assert np.allclose(y_ext, 20 * scipy_y, rtol=1e-8)
 
-    y_norm = uniform.norm_cdf(x, x[0], x[-1], a, b)
+    y_norm = uniform.cdf_norm(x, x[0], x[-1], a, b)
 
     assert np.allclose(y_norm, y_direct, rtol=1e-8)

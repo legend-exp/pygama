@@ -153,10 +153,10 @@ class uniform_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, a: float = np.inf, b: float = np.inf) -> np.ndarray:
         return nb_uniform_cdf(x, a, b)
 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, a: float, b: float) -> np.ndarray: 
-        return self._norm_pdf(x, x_lower, x_upper, a, b)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, a: float, b: float) -> np.ndarray: 
-        return self._norm_cdf(x, x_lower, x_upper, a, b)
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, a: float, b: float) -> np.ndarray: 
+        return self._pdf_norm(x, x_lower, x_upper, a, b)
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, a: float, b: float) -> np.ndarray: 
+        return self._cdf_norm(x, x_lower, x_upper, a, b)
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, a: float = np.inf, b: float = np.inf) -> np.ndarray:
         return np.sum(nb_uniform_scaled_cdf(np.array([x_lo, x_hi]), a, b, area)), nb_uniform_scaled_pdf(x, a, b, area)

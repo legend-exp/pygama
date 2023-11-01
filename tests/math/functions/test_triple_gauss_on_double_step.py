@@ -56,7 +56,7 @@ def test_triple_gauss_on_double_step_pdf():
     scipy_y_step = (
         n_bkg1 * norm.cdf(x, mu_1, sigma_1) * 2 / 18
         + n_bkg2 * norm.cdf(x, mu_2, sigma_2) * 2 / 18
-    )  # pdf = (1+erf(x/np.sqrt(2)))/18; erf(x) = 2 norm_cdf(x*sqrt(2))-1
+    )  # pdf = (1+erf(x/np.sqrt(2)))/18; erf(x) = 2 cdf_norm(x*sqrt(2))-1
     scipy_y_gauss = (
         n_sig1 * norm.pdf(x, mu_1, sigma_1)
         + n_sig2 * norm.pdf(x, mu_2, sigma_2)

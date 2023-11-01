@@ -25,7 +25,7 @@ def test_gauss_on_step_pdf():
     # compute the unnormalized step function
     scipy_step = 1 + hstep * (
         norm.cdf(x, mu, sigma) * 2 - 1
-    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 norm_cdf(x*sqrt(2))-1
+    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 cdf_norm(x*sqrt(2))-1
 
     # compute the normalization for the step function
     maximum = (np.amax(x) - mu) / sigma

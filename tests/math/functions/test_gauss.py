@@ -27,7 +27,7 @@ def test_gaussian_pdf():
     assert np.allclose(y_sig, n_sig, rtol=1e-8)
 
     normalization = np.diff(scipy_gaussian.cdf(x[np.array([0, -1])], mu, sigma))
-    y_norm = gaussian.norm_pdf(x, x[0], x[-1], mu, sigma)
+    y_norm = gaussian.pdf_norm(x, x[0], x[-1], mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -51,6 +51,6 @@ def test_gaussian_cdf():
     assert np.allclose(y_ext, 20 * scipy_y, rtol=1e-8)
 
     normalization = np.diff(scipy_gaussian.cdf(x[np.array([0, -1])], mu, sigma))
-    y_norm = gaussian.norm_cdf(x, x[0], x[-1], mu, sigma)
+    y_norm = gaussian.cdf_norm(x, x[0], x[-1], mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

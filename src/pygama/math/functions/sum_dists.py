@@ -754,7 +754,7 @@ class sum_dists(rv_continuous):
         return args
 
 
-    def norm_pdf(self, x, *args, **kwds):
+    def pdf_norm(self, x, *args, **kwds):
         r"""
         Normalize a pdf on a subset of its support, typically over a fit-range. 
 
@@ -767,7 +767,7 @@ class sum_dists(rv_continuous):
 
         Returns 
         -------
-        norm_pdf 
+        pdf_norm 
             The pdf that is normalized on a smaller range 
 
         Notes 
@@ -797,7 +797,7 @@ class sum_dists(rv_continuous):
         else:
             return self.get_pdf(x, params)/norm
     
-    def norm_cdf(self, x, *args, **kwds):
+    def cdf_norm(self, x, *args, **kwds):
         r"""
         Derive a cdf from a pdf that is normalized on a subset of its support, typically over a fit-range. 
 
@@ -810,7 +810,7 @@ class sum_dists(rv_continuous):
 
         Returns 
         -------
-        norm_pdf 
+        pdf_norm 
             The pdf that is normalized on a smaller range 
 
         Notes 
@@ -1043,10 +1043,10 @@ class sum_dist_frozen(rv_frozen):
     def cdf_ext(self, x):
         return self.dist.cdf_ext(np.array(x), *self.args, **self.kwds)
 
-    def norm_pdf(self, x):
-        return self.dist.norm_pdf(np.array(x), *self.args, **self.kwds)
-    def norm_cdf(self, x):
-        return self.dist.norm_cdf(np.array(x), *self.args, **self.kwds)
+    def pdf_norm(self, x):
+        return self.dist.pdf_norm(np.array(x), *self.args, **self.kwds)
+    def cdf_norm(self, x):
+        return self.dist.cdf_norm(np.array(x), *self.args, **self.kwds)
     
             
     def draw_pdf(self, x: np.ndarray, **kwargs) -> None:

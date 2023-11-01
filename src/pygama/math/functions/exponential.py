@@ -151,10 +151,10 @@ class exponential_gen(pygama_continuous):
         return nb_exponential_cdf(x, lamb, mu, sigma)
 
     # needed so that we can hack iminuit's introspection to function parameter names... unless
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float,  lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._norm_pdf(x, x_lower, x_upper, lamb, mu, sigma)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._norm_cdf(x, x_lower, x_upper, lamb, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float,  lamb: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._pdf_norm(x, x_lower, x_upper, lamb, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, lamb: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._cdf_norm(x, x_lower, x_upper, lamb, mu, sigma)
 
     def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
         return nb_exponential_scaled_cdf(np.array([x_hi]), lamb, mu, sigma, area)[0]-nb_exponential_scaled_cdf(np.array([x_lo]), lamb, mu, sigma, area)[0], nb_exponential_scaled_pdf(x, lamb, mu, sigma, area)

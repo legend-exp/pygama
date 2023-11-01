@@ -32,7 +32,7 @@ def test_exgauss_pdf():
     normalization = np.diff(
         1 - exponnorm.cdf(-1 * x[np.array([0, -1])], tau / sigma, -1 * mu, sigma)
     )
-    y_norm = exgauss.norm_pdf(x, x[0], x[-1], tau, mu, sigma)
+    y_norm = exgauss.pdf_norm(x, x[0], x[-1], tau, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -59,5 +59,5 @@ def test_exgauss_cdf():
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
 
     normalization = np.diff(scipy_y[np.array([0, -1])])
-    y_norm = exgauss.norm_cdf(x, x[0], x[-1], tau, mu, sigma)
+    y_norm = exgauss.cdf_norm(x, x[0], x[-1], tau, mu, sigma)
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

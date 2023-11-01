@@ -29,7 +29,7 @@ def test_linear_pdf():
     assert np.array_equal(y_ext, n_sig * scipy_y)
     assert np.array_equal(y_sig, n_sig)
 
-    norm_y = linear.norm_pdf(x, x[0], x[-1], m, b)
+    norm_y = linear.pdf_norm(x, x[0], x[-1], m, b)
     assert np.array_equal(norm_y, scipy_y)
 
 
@@ -53,5 +53,5 @@ def test_linear_cdf():
     y_ext = linear.cdf_ext(x, n_sig, np.inf, np.inf, m, b)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
 
-    norm_y = linear.norm_cdf(x, x[0], x[-1], m, b)
+    norm_y = linear.cdf_norm(x, x[0], x[-1], m, b)
     assert np.allclose(norm_y, scipy_y)
