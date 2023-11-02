@@ -137,6 +137,6 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
         ids = data.query(f"array_id=={channel} and evt_number in @high_mult_events")[
             "array_idx"
         ].to_numpy()
-        mask = np.zeros(len(data.query(f"array_id==1104000")), dtype="bool")
+        mask = np.zeros(len(data.query(f"array_id=={channel}")), dtype="bool")
         mask[ids] = True
     return ids, mask
