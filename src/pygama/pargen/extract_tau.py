@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 def load_data(
     raw_file: list[str],
     lh5_path: str,
+    pulser_mask=None,
     n_events: int = 10000,
     threshold: int = 5000,
     wf_field: str = "waveform",
@@ -38,24 +39,27 @@ def load_data(
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
 
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
-    if len(pulser_props) > 0:
-        final_mask = None
-        for entry in pulser_props:
-            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
-                df.daqenergy.values > entry[0] - entry[1]
-            )
-            if final_mask is None:
-                final_mask = e_cut
-            else:
-                final_mask = final_mask | e_cut
-        ids = ~(final_mask)
-        log.debug(f"pulser found: {pulser_props}")
+    if pulser_mask is None:
+        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+        if len(pulser_props) > 0:
+            final_mask = None
+            for entry in pulser_props:
+                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                    df.daqenergy.values > entry[0] - entry[1]
+                )
+                if final_mask is None:
+                    final_mask = e_cut
+                else:
+                    final_mask = final_mask | e_cut
+            ids = final_mask
+            log.debug(f"pulser found: {pulser_props}")
+        else:
+            log.debug("no_pulser")
+            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
     else:
-        log.debug("no_pulser")
-        ids = np.ones(len(df.daqenergy.values), dtype=bool)
+        ids = pulser_mask
 
-    cuts = np.where((df.daqenergy.values > threshold) & (ids))[0]
+    cuts = np.where((df.daqenergy.values > threshold) & (~ids))[0]
 
     waveforms = sto.read_object(
         f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events
@@ -216,13 +220,11 @@ def get_dpz_consts(grid_out, opt_dict):
 
 
 def dsp_preprocess_decay_const(
-    raw_files: list[str],
+    tb_data,
     dsp_config: dict,
-    lh5_path: str,
     double_pz: bool = False,
     display: int = 0,
     opt_dict: dict = None,
-    threshold: int = 5000,
     wf_field: str = "waveform",
     wf_plot: str = "wf_pz",
     norm_param: str = "pz_mean",
@@ -245,7 +247,6 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = load_data(raw_files, lh5_path, wf_field=wf_field, threshold=threshold)
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
     cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)

@@ -915,6 +915,7 @@ def event_selection(
     peak_idxs,
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    pulser_mask=None,
     energy_parameter="trapTmax",
     wf_field: str = "waveform",
     n_events=10000,
@@ -928,23 +929,26 @@ def event_selection(
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
 
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
-    if len(pulser_props) > 0:
-        final_mask = None
-        for entry in pulser_props:
-            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
-                df.daqenergy.values > entry[0] - entry[1]
-            )
-            if final_mask is None:
-                final_mask = e_cut
-            else:
-                final_mask = final_mask | e_cut
-        ids = final_mask
-        log.debug(f"pulser found: {pulser_props}")
+    if pulser_mask is None:
+        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+        if len(pulser_props) > 0:
+            final_mask = None
+            for entry in pulser_props:
+                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                    df.daqenergy.values > entry[0] - entry[1]
+                )
+                if final_mask is None:
+                    final_mask = e_cut
+                else:
+                    final_mask = final_mask | e_cut
+            ids = final_mask
+            log.debug(f"pulser found: {pulser_props}")
+        else:
+            log.debug("no_pulser")
+            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+        # Get events around peak using raw file values
     else:
-        log.debug("no_pulser")
-        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
-    # Get events around peak using raw file values
+        ids = pulser_mask
     initial_mask = (df.daqenergy.values > threshold) & (~ids)
     rough_energy = df.daqenergy.values[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
@@ -1038,13 +1042,23 @@ def event_selection(
         e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
 
         e_ranges = (int(peak_loc - e_lower_lim), int(e_upper_lim - peak_loc))
-        params, errors, covs, bins, ranges, p_val, valid_pks = pgc.hpge_fit_E_peaks(
+        (
+            params,
+            errors,
+            covs,
+            bins,
+            ranges,
+            p_val,
+            valid_pks,
+            pk_funcs,
+        ) = pgc.hpge_fit_E_peaks(
             energy,
             [peak_loc],
             [e_ranges],
             n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
+            uncal_is_int=True,
         )
-        if params[0] is None:
+        if params[0] is None or np.isnan(params[0]).any():
             log.debug("Fit failed, using max guess")
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
