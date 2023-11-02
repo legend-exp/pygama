@@ -489,14 +489,25 @@ class tail_prior:
         self.model = model  # model predicts y for given x
         self.data = data
         self.tail_weight = tail_weight
-    
+
     def _call(self, *pars):
         return self.__call__(*pars[0])
 
-    def __call__(self, n_sig, mu, sigma, htail,
-                                           tau, n_bkg, hstep,
-                                            lower_range ,upper_range,  components):
+    def __call__(
+        self,
+        n_sig,
+        mu,
+        sigma,
+        htail,
+        tau,
+        n_bkg,
+        hstep,
+        lower_range,
+        upper_range,
+        components,
+    ):
         return self.tail_weight * np.log(htail + 0.1)  # len(self.data)/
+
 
 def staged_fit(
     energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess, tail_weight=100
