@@ -529,7 +529,9 @@ class DataLoader:
                             and save_output_columns
                         ):
                             for_output.append(term)
-            col_tiers_dict[level] = self.get_tiers_for_col(cut_cols[level], merge_files=False)
+            col_tiers_dict[level] = self.get_tiers_for_col(
+                cut_cols[level], merge_files=False
+            )
 
         if save_output_columns:
             entry_cols += for_output
