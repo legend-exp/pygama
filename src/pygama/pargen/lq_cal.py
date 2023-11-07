@@ -273,7 +273,7 @@ class cal_lq:
         """
         Calculates the average LQ value for DEP events for each specified run
         timestamp. Applies a time normalization based on the average LQ value
-        in the DEP accross all timestamps.
+        in the DEP across all timestamps.
         """
 
         log.info("Starting LQ time correction")
@@ -661,7 +661,7 @@ def plot_drift_time_correction(
     lq_class, data, lq_param="LQ_Timecorr", figsize=[12, 8], fontsize=12
 ) -> plt.figure:
     """Plots a 2D histogram of LQ versus effective drift time in a 6 keV
-    window around the DEP. Additioanlly plots the fit results for the
+    window around the DEP. Additionally plots the fit results for the
     drift time correction."""
 
     plt.rcParams["figure.figsize"] = figsize
