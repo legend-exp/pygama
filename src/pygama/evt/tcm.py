@@ -84,7 +84,7 @@ def generate_tcm_cols(
         array_id = np.full_like(array, array_id, dtype=int)
         col_dict = {"array_id": array_id, "coin_data": array}
         if array_idxs is not None:
-            col_dict["array_idx"] = array_idxs[ii]
+            col_dict["array_idx"] = array_idxs.astype(int)[ii]
         dfs.append(pd.DataFrame(col_dict, copy=False))  # don't copy the data!
 
     # concat and sort
