@@ -128,6 +128,17 @@ def nb_poisson_scaled_cdf(x: np.ndarray, lamb: float, mu: int, area: float) -> n
     
 class poisson_gen(rv_discrete):
 
+    def __init__(self, *args, **kwargs):
+        self.x_lo = 0
+        self.x_hi = np.inf
+        super().__init__()
+
+    def set_x_lo(self, x_lo):
+        self.x_lo = x_lo
+
+    def set_x_hi(self, x_hi):
+        self.x_hi = x_hi
+
     def _pmf(self, x, lamb):
         x.flags.writeable = True
         return nb_poisson_pmf(x, lamb[0], 0)
@@ -140,8 +151,8 @@ class poisson_gen(rv_discrete):
     def get_cdf(self, x, lamb, mu):
         return nb_poisson_cdf(x, lamb, mu)
 
-    def pmf_ext(self, x, area, x_lo, x_hi, lamb, mu):
-        return nb_poisson_scaled_cdf(np.array([x_hi]), lamb, mu, area)[0]-nb_poisson_scaled_cdf(np.array([x_lo]), lamb, mu, area)[0], nb_poisson_scaled_pmf(x, lamb, mu, area)
+    def pmf_ext(self, x, area, lamb, mu):
+        return nb_poisson_scaled_cdf(np.array([self.x_hi]), lamb, mu, area)[0]-nb_poisson_scaled_cdf(np.array([self.x_lo]), lamb, mu, area)[0], nb_poisson_scaled_pmf(x, lamb, mu, area)
     def cdf_ext(self, x, area, lamb, mu):
         return nb_poisson_scaled_cdf(x, lamb, mu, area)
 

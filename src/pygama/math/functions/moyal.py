@@ -127,6 +127,11 @@ def nb_moyal_scaled_cdf(x: np.ndarray, mu: float, sigma: float, area: float) -> 
 
 class moyal_gen(pygama_continuous):
 
+    def __init__(self, *args, **kwargs):
+        self.x_lo = -1*np.inf
+        self.x_hi = np.inf
+        super().__init__(self)
+
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True
         return nb_moyal_pdf(x, 0, 1)
@@ -139,13 +144,13 @@ class moyal_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_cdf(x, mu, sigma)
 
-    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._pdf_norm(x, x_lower, x_upper, mu, sigma)
-    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._cdf_norm(x, x_lower, x_upper, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, self.x_lo, self.x_hi, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, self.x_lo, self.x_hi, mu, sigma)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_moyal_scaled_cdf(np.array([x_hi]), mu, sigma, area)[0]-nb_moyal_scaled_cdf(np.array([x_lo]), mu, sigma, area)[0], nb_moyal_scaled_pdf(x, mu, sigma, area)
+    def pdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
+        return nb_moyal_scaled_cdf(np.array([self.x_hi]), mu, sigma, area)[0]-nb_moyal_scaled_cdf(np.array([self.x_lo]), mu, sigma, area)[0], nb_moyal_scaled_pdf(x, mu, sigma, area)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_scaled_cdf(x, mu, sigma, area)
 

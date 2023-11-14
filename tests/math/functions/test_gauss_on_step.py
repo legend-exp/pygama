@@ -11,8 +11,8 @@ def test_gauss_on_step_pdf():
     mu = 0.4
     sigma = 1.1
     hstep = 0.75
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
@@ -20,7 +20,7 @@ def test_gauss_on_step_pdf():
         [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
     )
 
-    y_direct = gauss_on_step.get_pdf(x, pars)
+    y_direct = gauss_on_step.get_pdf(x, *pars)
 
     # compute the unnormalized step function
     scipy_step = 1 + hstep * (
@@ -51,12 +51,17 @@ def test_gauss_on_step_pdf():
     assert isinstance(gauss_on_step, sum_dists)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    x_lo = -100
-    x_hi = 100
-    pars = np.insert(pars, 0, [x_lo, x_hi])
-    y_sig, y_ext = gauss_on_step.pdf_ext(x, pars)
+    x_lo = lower_range
+    x_hi = upper_range
+    gauss_on_step.set_x_hi(x_hi)
+    gauss_on_step.set_x_lo(x_lo)
+
+    y_sig, y_ext = gauss_on_step.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
+
+    y_sig = gauss_on_step.pdf_norm(x, *pars)
+    assert np.allclose(y_ext, scipy_y, rtol=1e-8)
 
 
 def test_gauss_on_step_cdf():
@@ -65,8 +70,8 @@ def test_gauss_on_step_cdf():
     mu = 0.56
     sigma = 1.009
     hstep = 0.753
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
@@ -74,7 +79,7 @@ def test_gauss_on_step_cdf():
         [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
     )
 
-    y_direct = gauss_on_step.get_cdf(x, pars)
+    y_direct = gauss_on_step.get_cdf(x, *pars)
 
     # Compute the normalization of the pdf
     maximum = (np.amax(x) - mu) / sigma
@@ -109,14 +114,21 @@ def test_gauss_on_step_cdf():
     scipy_y_step = unnormalized_cdf / pdf_normalization
 
     scipy_y_gauss = norm.cdf(x, mu, sigma)
-    scipy_y = (1 / (n_sig + n_bkg)) * (n_sig * scipy_y_gauss + n_bkg * scipy_y_step)
-
-    # for the extended cdf, we actually do not want to normalize by the sum of the areas, this is because iminuit takes a total unnormalized cdf for extended binned fits
-    scipy_y_ext = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
+    # for the cdf, we actually do not want to normalize by the sum of the areas, this is because iminuit takes a total unnormalized cdf for extended binned fits
+    scipy_y = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
 
     assert isinstance(gauss_on_step, sum_dists)
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    y_ext = gauss_on_step.cdf_ext(x, pars)
-    assert np.allclose(y_ext, scipy_y_ext, rtol=1e-8)
+    y_ext = gauss_on_step.cdf_ext(x, *pars)
+    assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
+    gauss_on_step.set_x_lo(lower_range)
+    gauss_on_step.set_x_hi(upper_range)
+    y_norm = gauss_on_step.cdf_norm(x, *pars)
+    scipy_y_norm = (1 / (n_sig + n_bkg)) * (
+        n_sig * scipy_y_gauss + n_bkg * scipy_y_step
+    )
+
+    assert np.allclose(y_norm, scipy_y_norm, rtol=1e-8)

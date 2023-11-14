@@ -24,14 +24,20 @@ def test_crystalball_pdf():
     n_sig = 20
     x_lo = -10000
     x_hi = 10000
-    y_sig, y_ext = crystal_ball.pdf_ext(x, n_sig, x_lo, x_hi, beta, m, mu, sigma)
+    crystal_ball.set_x_lo(x_lo)
+    crystal_ball.set_x_hi(x_hi)
+
+    y_sig, y_ext = crystal_ball.pdf_ext(x, n_sig, beta, m, mu, sigma)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig, rtol=1e-8)
+
+    crystal_ball.set_x_lo(x[0])
+    crystal_ball.set_x_hi(x[-1])
 
     normalization = np.diff(
         scipy_crystal_ball.cdf(x[np.array([0, -1])], beta, m, mu, sigma)
     )
-    y_norm = crystal_ball.pdf_norm(x, x[0], x[-1], beta, m, mu, sigma)
+    y_norm = crystal_ball.pdf_norm(x, beta, m, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -56,9 +62,12 @@ def test_crystalball_cdf():
     y_ext = crystal_ball.cdf_ext(x, n_sig, beta, m, mu, sigma)
     assert np.allclose(y_ext, 20 * scipy_y, rtol=1e-8)
 
+    crystal_ball.set_x_lo(x[0])
+    crystal_ball.set_x_hi(x[-1])
+
     normalization = np.diff(
         scipy_crystal_ball.cdf(x[np.array([0, -1])], beta, m, mu, sigma)
     )
-    y_norm = crystal_ball.cdf_norm(x, x[0], x[-1], beta, m, mu, sigma)
+    y_norm = crystal_ball.cdf_norm(x, beta, m, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

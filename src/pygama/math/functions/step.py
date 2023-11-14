@@ -123,11 +123,7 @@ def nb_step_pdf(x: np.ndarray,  mu: float, sigma: float, hstep: float, lower_ran
         The upper range on which to normalize the step PDF
 
     """
-
-    if lower_range == np.inf and upper_range == np.inf:
-        integral = nb_step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
-    else:
-        integral = nb_step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
+    integral = nb_step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
     norm = integral[1]-integral[0]
 
     z = np.empty_like(x, dtype=np.float64)
@@ -171,11 +167,7 @@ def nb_step_cdf(x: np.ndarray, mu: float, sigma: float, hstep: float, lower_rang
         The upper range on which to normalize the step PDF
 
     """
-
-    if lower_range == np.inf and upper_range == np.inf:
-        integral = nb_step_int(np.array([np.nanmin(x), np.nanmax(x)]), mu, sigma, hstep)
-    else:
-        integral = nb_step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
+    integral = nb_step_int(np.array([lower_range, upper_range]), mu, sigma, hstep)
     norm = integral[1]-integral[0]
 
     integrated_pdf = nb_step_int(x, mu, sigma, hstep)
@@ -246,16 +238,24 @@ def nb_step_scaled_cdf(x: np.ndarray, mu: float, sigma: float, hstep: float, low
 
 class step_gen(pygama_continuous):
 
-    def _pdf(self, x: np.ndarray, hstep: float, lower_range: float, upper_range: float) -> np.ndarray:
-        x.flags.writeable = True
-        return nb_step_pdf(x, 0, 1, hstep[0], lower_range[0], upper_range[0])
-    def _cdf(self, x: np.ndarray, hstep: float, lower_range: float, upper_range: float) -> np.ndarray:
-        x.flags.writeable = True
-        return nb_step_cdf(x, 0, 1, hstep[0], lower_range[0], upper_range[0])
+    def _argcheck(self, lower_range, upper_range, hstep, mu, sigma):
+        return (upper_range>lower_range)
+        
+    def __init__(self, *args, **kwargs):
+        self.x_lo = None
+        self.x_hi = None
+        super().__init__(self)
 
-    def get_pdf(self, x: np.ndarray, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 0, sigma: float = 1) -> np.ndarray:
+    def _pdf(self, x: np.ndarray, lower_range: float, upper_range: float, hstep: float, mu, sigma) -> np.ndarray:
+        x.flags.writeable = True
+        return nb_step_pdf(x, mu[0], sigma[0], hstep[0], lower_range[0], upper_range[0])
+    def _cdf(self, x: np.ndarray, lower_range: float, upper_range: float, hstep: float, mu, sigma) -> np.ndarray:
+        x.flags.writeable = True
+        return nb_step_cdf(x, mu[0], sigma[0], hstep[0], lower_range[0], upper_range[0])
+
+    def get_pdf(self, x: np.ndarray, lower_range: float, upper_range: float, hstep: float, mu: float, sigma: float) -> np.ndarray:
         return nb_step_pdf(x, mu, sigma, hstep, lower_range, upper_range)
-    def get_cdf(self, x: np.ndarray, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 0, sigma: float =1) -> np.ndarray:
+    def get_cdf(self, x: np.ndarray, lower_range: float, upper_range: float,  hstep: float, mu: float, sigma: float) -> np.ndarray:
         return nb_step_cdf(x, mu, sigma, hstep, lower_range, upper_range)
 
     # Because step is only defined on a user specified range, we don't need to return a different pdf_norm, just alias get_pdf and get_cdf
@@ -264,12 +264,12 @@ class step_gen(pygama_continuous):
     def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, hstep: float, mu: float, sigma: float) -> np.ndarray: 
         return nb_step_cdf(x, mu, sigma, hstep, x_lower, x_upper)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 1, sigma: float= 1) -> np.ndarray:
-        return nb_step_scaled_cdf(np.array([x_lo, x_hi]), mu, sigma, hstep, lower_range, upper_range, area)[1]-nb_step_scaled_cdf(np.array([x_lo, x_hi]), mu, sigma, hstep, lower_range, upper_range, area)[0], nb_step_scaled_pdf(x,  mu, sigma, hstep, lower_range, upper_range, area)
-    def cdf_ext(self, x: np.ndarray, area: float, hstep: float, lower_range: float = np.inf, upper_range: float = np.inf, mu: float = 0 , sigma: float =1) -> np.ndarray:
+    def pdf_ext(self, x: np.ndarray, area: float, hstep: float, lower_range: float, upper_range: float, mu: float, sigma: float) -> np.ndarray:
+        return nb_step_scaled_cdf(np.array([self.x_lo, self.x_hi]), mu, sigma, hstep, lower_range, upper_range, area)[1]-nb_step_scaled_cdf(np.array([self.x_lo, self.x_hi]), mu, sigma, hstep, lower_range, upper_range, area)[0], nb_step_scaled_pdf(x, mu, sigma, hstep, lower_range, upper_range, area)
+    def cdf_ext(self, x: np.ndarray, area: float, hstep: float, lower_range: float, upper_range: float, mu: float, sigma: float) -> np.ndarray:
         return nb_step_scaled_cdf(x, mu, sigma, hstep, lower_range, upper_range, area)
 
     def required_args(self) -> tuple[str, str, str, str, str]:
-        return "hstep", "lower_range", "upper_range", "mu", "sigma"
+        return  "lower_range", "upper_range", "hstep", "mu", "sigma"
 
 step = step_gen(name='step')

@@ -22,7 +22,11 @@ def test_poisson_pdf():
     n_sig = 20
     x_lo = 0
     x_hi = 12
-    y_sig, y_ext = poisson.pmf_ext(x, n_sig, x_lo, x_hi, lamb, mu)
+
+    poisson.set_x_lo(x_lo)
+    poisson.set_x_hi(x_hi)
+
+    y_sig, y_ext = poisson.pmf_ext(x, n_sig, lamb, mu)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig, rtol=1e-3)
 

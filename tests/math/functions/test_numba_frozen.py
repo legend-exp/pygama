@@ -29,7 +29,10 @@ def test_numba_frozen():
     area = 10
     x_lo = -20
     x_hi = 20
-    numba_extended_pdf_area, numba_extended_pdf = gauss.pdf_ext(x, area, x_lo, x_hi)
+    gauss.set_x_lo(x_lo)
+    gauss.set_x_hi(x_hi)
+
+    numba_extended_pdf_area, numba_extended_pdf = gauss.pdf_ext(x, area)
     assert np.allclose(numba_extended_pdf_area, area, rtol=1e-3)
     assert np.allclose(numba_extended_pdf, area * scipy_pdf)
 

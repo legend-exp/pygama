@@ -189,6 +189,11 @@ def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, beta: float, m: float
 
 class crystal_ball_gen(pygama_continuous): 
 
+    def __init__(self, *args, **kwargs):
+        self.x_lo = -1*np.inf
+        self.x_hi = np.inf
+        super().__init__(self)
+
     def _pdf(self, x: np.ndarray, beta: float, m: float) -> np.ndarray:
         x.flags.writeable = True
         return nb_crystal_ball_pdf(x, beta[0], m[0], 0, 1)
@@ -201,14 +206,14 @@ class crystal_ball_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
         return nb_crystal_ball_cdf(x, beta, m, mu, sigma)
 
-    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._pdf_norm(x, x_lower, x_upper, beta, m, mu, sigma)
-    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._cdf_norm(x, x_lower, x_upper, beta, m, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, self.x_lo, self.x_hi, beta, m, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, self.x_lo, self.x_hi, beta, m, mu, sigma)
 
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_crystal_ball_scaled_cdf(np.array([x_hi]), area, beta, m, mu, sigma)[0]-nb_crystal_ball_scaled_cdf(np.array([x_lo]), area, beta, m, mu, sigma)[0], nb_crystal_ball_scaled_pdf(x, area, beta, m, mu, sigma)
+    def pdf_ext(self, x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+        return nb_crystal_ball_scaled_cdf(np.array([self.x_hi]), area, beta, m, mu, sigma)[0]-nb_crystal_ball_scaled_cdf(np.array([self.x_lo]), area, beta, m, mu, sigma)[0], nb_crystal_ball_scaled_pdf(x, area, beta, m, mu, sigma)
     def cdf_ext(self, x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
         return nb_crystal_ball_scaled_cdf(x, area, beta, m, mu, sigma)
 

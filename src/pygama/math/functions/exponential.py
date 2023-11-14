@@ -138,6 +138,11 @@ def nb_exponential_scaled_cdf(x: np.ndarray, lamb: float, mu: float, sigma: floa
 
 class exponential_gen(pygama_continuous):
 
+    def __init__(self, *args, **kwargs):
+        self.x_lo = 0
+        self.x_hi = np.inf
+        super().__init__(self)
+
     def _pdf(self, x: np.ndarray, lamb: float) -> np.ndarray:
         x.flags.writeable = True
         return nb_exponential_pdf(x, lamb[0], 0, 1)
@@ -151,13 +156,13 @@ class exponential_gen(pygama_continuous):
         return nb_exponential_cdf(x, lamb, mu, sigma)
 
     # needed so that we can hack iminuit's introspection to function parameter names... unless
-    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float,  lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._pdf_norm(x, x_lower, x_upper, lamb, mu, sigma)
-    def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._cdf_norm(x, x_lower, x_upper, lamb, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._pdf_norm(x, self.x_lo, self.x_hi, lamb, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._cdf_norm(x, self.x_lo, self.x_hi, lamb, mu, sigma)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_exponential_scaled_cdf(np.array([x_hi]), lamb, mu, sigma, area)[0]-nb_exponential_scaled_cdf(np.array([x_lo]), lamb, mu, sigma, area)[0], nb_exponential_scaled_pdf(x, lamb, mu, sigma, area)
+    def pdf_ext(self, x: np.ndarray, area: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
+        return nb_exponential_scaled_cdf(np.array([self.x_hi]), lamb, mu, sigma, area)[0]-nb_exponential_scaled_cdf(np.array([self.x_lo]), lamb, mu, sigma, area)[0], nb_exponential_scaled_pdf(x, lamb, mu, sigma, area)
     def cdf_ext(self, x: np.ndarray, area: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
         return nb_exponential_scaled_cdf(x, lamb, mu, sigma, area)
     

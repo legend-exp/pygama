@@ -40,7 +40,7 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     """
     # optimize this to find max value
     def neg_hpge_peak_peak_bgfree(E, sigma, htail, tau):
-        return -gauss_on_exgauss.get_pdf(np.array([E]), np.array([0, sigma, htail, tau]))[0]
+        return -gauss_on_exgauss.get_pdf(np.array([E]), *np.array([0, sigma, htail, tau]))[0]
 
     if htail<0 or htail>1:
         raise ValueError("htail outside allowed limits of 0 and 1")
@@ -53,7 +53,7 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
 
     # root find this to find the half-max energies
     def hpge_peak_peak_bgfree_halfmax(E, sigma, htail, tau, half_max):
-        return gauss_on_exgauss.get_pdf(np.array([E]), np.array([0, sigma, htail, tau]))[0] - half_max
+        return gauss_on_exgauss.get_pdf(np.array([E]), *np.array([0, sigma, htail, tau]))[0] - half_max
 
     try:
         lower_hm = brentq( hpge_peak_peak_bgfree_halfmax,

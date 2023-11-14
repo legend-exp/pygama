@@ -19,6 +19,18 @@ class numba_frozen(rv_frozen):
     Essentially, an overloading of the definition of rv_continuous_frozen so that our pygama class instantiations have 
     access to both the slower scipy methods, as well as the faster pygama methods (like get_pdf)
     """
+
+    def set_x_lo(self, x_lo):
+        """
+        Set the lower bound of a fitting range and store it in the state.
+        """
+        self.x_lo = x_lo
+
+    def set_x_hi(self, x_hi):
+        """
+        Set the upper bound of a fitting range and store it in the state.
+        """
+        self.x_hi = x_hi
     
     def pdf(self, x: np.ndarray) -> np.ndarray:
         r"""
@@ -56,7 +68,7 @@ class numba_frozen(rv_frozen):
 
         return self.dist.get_cdf(np.array(x), *self.args, **self.kwds)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float) -> tuple[float, np.ndarray]:
+    def pdf_ext(self, x: np.ndarray, area: float) -> tuple[float, np.ndarray]:
         r"""
         Direct access to numba-fied extended pdfs, a fast function
 
@@ -65,7 +77,7 @@ class numba_frozen(rv_frozen):
         integral, scaled support normalized pdf
         """
 
-        return self.dist.pdf_ext(np.array(x), area, x_lo, x_hi, *self.args, **self.kwds)
+        return self.dist.pdf_ext(np.array(x), area, *self.args, **self.kwds)
 
     def cdf_ext(self, x: np.ndarray, area: float) -> np.ndarray:
         r"""
@@ -78,7 +90,7 @@ class numba_frozen(rv_frozen):
 
         return self.dist.cdf_ext(np.array(x), area, *self.args, **self.kwds)
     
-    def pdf_norm(self, x, x_lower, x_upper):
+    def pdf_norm(self, x):
         r"""
         Direct access to numba-fied pdfs, a fast function. Normalized on a fit range
 
@@ -86,7 +98,7 @@ class numba_frozen(rv_frozen):
         -------
         fit-range normalized pdf
         """
-        return self.dist.pdf_norm(x, x_lower, x_upper, *self.args, **self.kwds)
+        return self.dist.pdf_norm(x, *self.args, **self.kwds)
     
     def cdf_norm(self, x, x_lower, x_upper):
         r"""
@@ -96,7 +108,7 @@ class numba_frozen(rv_frozen):
         -------
         fit-range normalized cdf
         """
-        return self.dist.cdf_norm(x, x_lower, x_upper, *self.args, **self.kwds)
+        return self.dist.cdf_norm(x, *self.args, **self.kwds)
     
     def required_args(self) -> tuple:
         r"""
@@ -115,6 +127,18 @@ class pygama_continuous(rv_continuous):
     Subclass rv_continuous, and modify the instantiation so that we call an overloaded
     version of rv_continuous_frozen that has direct access to pygama numbafied functions
     """
+
+    def set_x_lo(self, x_lo):
+        """
+        Set the lower bound of a fitting range and store it in the state.
+        """
+        self.x_lo = x_lo
+
+    def set_x_hi(self, x_hi):
+        """
+        Set the upper bound of a fitting range and store it in the state.
+        """
+        self.x_hi = x_hi
 
     def _pdf_norm(self, x, x_lower, x_upper, *args, **kwds):
         r"""

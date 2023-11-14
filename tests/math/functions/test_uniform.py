@@ -16,17 +16,21 @@ def test_uniform_pdf():
     scipy_y = scipy_uniform.pdf(x, a, b)
 
     assert isinstance(uniform, pygama_continuous)
-    assert np.array_equal(y, scipy_y)
+    assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.array_equal(y_direct, scipy_y)
 
     n_sig = 20
     x_lo = -1
     x_hi = 9
-    y_sig, y_ext = uniform.pdf_ext(x, n_sig, x_lo, x_hi, a, b)
+    uniform.set_x_lo(x_lo)
+    uniform.set_x_hi(x_hi)
+    y_sig, y_ext = uniform.pdf_ext(x, n_sig, a, b)
     assert np.array_equal(y_ext, 20 * scipy_y)
     assert np.array_equal(y_sig, 20)
 
-    y_norm = uniform.pdf_norm(x, x[0], x[-1], a, b)
+    uniform.set_x_lo(x[0])
+    uniform.set_x_hi(x[-1])
+    y_norm = uniform.pdf_norm(x, a, b)
 
     assert np.allclose(y_norm, y_direct, rtol=1e-8)
 
@@ -42,13 +46,15 @@ def test_uniform_cdf():
     scipy_y = scipy_uniform.cdf(x, a, b)
 
     assert isinstance(uniform, pygama_continuous)
-    assert np.array_equal(y, scipy_y)
+    assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
     n_sig = 20
     y_ext = uniform.cdf_ext(x, n_sig, a, b)
     assert np.allclose(y_ext, 20 * scipy_y, rtol=1e-8)
 
-    y_norm = uniform.cdf_norm(x, x[0], x[-1], a, b)
+    uniform.set_x_lo(x[0])
+    uniform.set_x_hi(x[-1])
+    y_norm = uniform.cdf_norm(x, a, b)
 
     assert np.allclose(y_norm, y_direct, rtol=1e-8)

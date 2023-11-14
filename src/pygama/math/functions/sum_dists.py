@@ -4,11 +4,11 @@ A class that creates the sum of distributions, with methods for scipy computed :
 .. code-block:: python
 
     mu1, mu2, sigma = range(3)
-    moyal_add = sum_dists(moyal, [mu1, sigma], moyal, [mu2, sigma], areas = [0.75, 0.25]) # create two moyals that share a sigma, 
+    moyal_add = sum_dists([(moyal, [mu1, sigma]), (moyal, [mu2, sigma])], [3], "fracs") # create two moyals that share a sigma and differ by a fraction, 
     x = np.arange(-10,10)
-    pars = np.array([1,2,2]) # corresponds to mu1 = 1, mu2 = 2, sigma = 2
-    moyal_add.pdf(x, pars)
-    moyal_add.draw_pdf(x, pars)
+    pars = np.array([1, 2, 2, 0.1]) # corresponds to mu1 = 1, mu2 = 2, sigma = 2, frac=0.1
+    moyal_add.pdf(x, *pars)
+    moyal_add.draw_pdf(x, *pars)
     moyal_add.get_req_args()
 
 
@@ -19,887 +19,393 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from pygama.math.functions.pygama_continuous import pygama_continuous
+from typing import Tuple
+from iminuit.util import make_func_code
 
 from scipy._lib._util import getfullargspec_no_self as _getfullargspec
-
-def get_idx(idx_array, frac_flag): 
+def get_dists_and_par_idxs(dists_and_pars_array: np.array(tuple, tuple)) -> Tuple[np.array, np.array]:
     r"""
-    Create separate arrays of parameter indices for the shape parameters, the area, the fracs, and the total area
-
-    This is done because the user can pass a combination of areas and fracs during a method call, or can send them in
-    during class initialization. So we need to know what array the actual values of the fracs and areas will be in.
-
-    This will return None for an array index whose values are not located in the parameter array passed to a method call
-    This allows :func:`link_pars` to use either the default 1s for the missing areas/fracs/total_area, or user-specified values (passed using keywords). 
-    """
-    
-    if frac_flag is None:
-        shape_par_idx = idx_array
-        area_idx = None
-        frac_idx = None
-        total_area_idx = None
-    
-    elif frac_flag == "fracs":
-        shape_par_idx = []
-        frac_idx = []
-        total_area_idx = []
-        for i in range(len(idx_array)-1):
-            shape_par_idx.append(np.array(idx_array[i][:-1]))
-            frac_idx.append(np.array(idx_array[i][-1]))
-        # The last array contains an extra element at the end, the id of the total area
-        # todo: put a check in here so that we make sure that a total area was passed
-
-        shape_par_idx.append(np.array(idx_array[-1][:-2]))
-        frac_idx.append(np.array(idx_array[-1][-2]))
-        total_area_idx.append(np.array(idx_array[-1][-1]))
-        area_idx = None
-        # put check that we for sure did get a total_area element! 
-    
-    elif frac_flag == "areas":
-        shape_par_idx = []
-        area_idx = []
-        for i in range(len(idx_array)):
-            shape_par_idx.append(np.array(idx_array[i][:-1]))
-            area_idx.append(np.array(idx_array[i][-1]))
-        frac_idx = None
-        total_area_idx = None
-    
-    else:
-        shape_par_idx = []
-        area_idx = []
-        frac_idx = []
-        total_area_idx = []
-        for i in range(len(idx_array)-1):
-            shape_par_idx.append(np.array(idx_array[i][:-2]))
-            area_idx.append(np.array(idx_array[i][-2]))
-            frac_idx.append(np.array(idx_array[i][-1]))
-        # The last array contains an extra element at the end, the id of the total area
-        shape_par_idx.append(np.array(idx_array[-1][:-3]))
-        area_idx.append(np.array(idx_array[-1][-3]))
-        frac_idx.append(np.array(idx_array[-1][-2]))
-        total_area_idx.append(np.array(idx_array[-1][-1]))
-    
-    return shape_par_idx, area_idx, frac_idx, total_area_idx
-
-
-def _precompute_shape_par_idx(shape_par_idx, dists):
-    r"""
-    Check that each distribution has received the correct number of shape and location parameters
+    Split the array of tuples passed to the :func:`sum_dists` constructor into separate arrays with one containing only the
+    distributions and the other containing the parameter index arrays. Also performs some sanity checks.
 
     Parameters
     ----------
-    shape_par_idx 
-        An array of arrays, each containing the indices of the eventual parameters the function call will take
-        from a single parameter array
-
-    dists 
-        An array of pygama_continuous distributions, each must have the required_args method! 
+    dists_and_pars_array 
+        An array of tuples, each tuple contains a distribution and the indices of the parameters 
+        in the :func:`sum_dists` call that correspond to that distribution
 
     Returns
     -------
-    shape_par_idx
+    dists, par_idxs
         Returned only if every distribution has the correct number of required arguments 
-    """ 
-
-    if len(shape_par_idx) != len(dists):
-        raise ValueError("Number of distributions does not match number of parameter arrays")
-        
-    for i in range(len(shape_par_idx)):
-        if len(shape_par_idx[i]) != len(dists[i].required_args()):
-            raise ValueError(f"distribution {dists[i]} at index {i} does not have the required number of shape\
-            and location parameters, it should take f{dists[i].required_args()} as input arguments")
-        else:
-            pass
-    return np.array(shape_par_idx, dtype = 'object')
-
-def _precompute_fracs(fracs, dists):
-    r"""
-    When initializing a summed dist, check the number of fracs provided.
-    If len(fracs) = len(dists)-1, then the remaining frac must be 1-sum(fracs)
-    If len(fracs) = len(dists), return the fracs as given
-    Otherwise, raise an error. 
     """
-
-    if len(dists) < 2:
-        raise ValueError("Cannot sum fewer than 2 distributions.")
-        
-    if len(fracs) == len(dists)-1 : 
-        remaining_frac = 1 - np.sum(fracs)
-        return fracs + [remaining_frac]
+    # can only sum two dists at once, check:
+    if len(dists_and_pars_array) != 2:
+        raise ValueError("Can only sum two distributions at once.")
     
-    if len(fracs) == len(dists):
-        return fracs
-    
-    else: 
-        raise ValueError("Not enough fractions supplied.")
-        
-        
+    dists = []
+    par_idxs = []
 
-# We cannot precompute the support, because the support of some dists depends on the actual value
-# of the shape parameter, it is just better to compute and check the support and check it in one step in the function call
+    # Check that each tuple in the dists_and_pars_array is of length two
+    for dist_and_pars in dists_and_pars_array:
+        if len(dist_and_pars) != 2:
+            raise ValueError("Each tuple needs a distribution and a parameter index array.")
+        else:
+            dists.append(dist_and_pars[0])
+            par_idxs.append(np.array(dist_and_pars[1]))
 
-        
-# Overload the scipy parse_arg_template to allow for different ranges for uniform sampling in the rvs method 
-parse_arg_template = """
-def _parse_args(self, %(shape_arg_str)s %(locscale_in)s):
-    return (%(shape_arg_str)s), %(locscale_out)s
-def _parse_args_rvs(self, %(shape_arg_str)s %(locscale_in)s, size=None, low=0.0, high=1.0):
-    return self._argcheck_rvs(%(shape_arg_str)s %(locscale_out)s, size=size, low=low, high=high)
-def _parse_args_stats(self, %(shape_arg_str)s %(locscale_in)s, moments='mv'):
-    return (%(shape_arg_str)s), %(locscale_out)s, moments
-"""
-        
+    return dists, par_idxs
+
+def get_areas_fracs(params: np.array, area_frac_idxs: np.array, frac_flag: bool, area_flag: bool, one_area_flag: bool) -> Tuple[np.array, np.array]:
+    r"""
+    Grab the value(s) of either the fraction or the areas passed in the params array from the :func:`sum_dists` call. 
+    If :func:`sum_dists` is in "fracs" mode, then this grabs `f` from the params array and returns fracs = [f, 1-f] and areas of unity. 
+    If :func:`sum_dists` is in "areas" mode, then this grabs `s, b` from the params array and returns unity fracs and areas = [s, b]
+    If :func:`sum_dists` is in "one_area" mode, then this grabs `s` from the params array and returns unity fracs and areas = [s, 1]
+
+    Parameters
+    ----------
+    params 
+        An array containing the shape values from a :func:`sum_dists` call
+    area_frac_idxs
+        An array containing the indices of either the fracs or the areas present in the params array
+    frac_flag
+        A boolean telling if :func:`sum_dists` is in fracs mode or not
+    area_flag
+        A boolean telling if :func:`sum_dists` is in areas mode or not
+    one_area_flag 
+        A boolean telling if :func:`sum_dists` is to apply only area to one distribution
+
+    Returns
+    -------
+    fracs, areas
+        Values of the fractions and the areas to post-multiply the sum of the distributions with
+    """
+    if frac_flag:
+        fracs = np.array([params[area_frac_idxs[0]], 1-params[area_frac_idxs[0]]])
+        areas = np.array([1, 1])
+    elif area_flag:
+        fracs = np.array([1, 1])
+        areas = np.array([*params[area_frac_idxs]])
+    elif one_area_flag:
+        fracs = np.array([1, 1])
+        areas = np.array([*params[area_frac_idxs], 1])
+
+    else:
+        fracs = np.array([1, 1])
+        areas = np.array([1, 1])
+
+    return fracs, areas
+
+def get_parameter_names(dists: np.array, par_idxs: np.array) -> np.array:
+    r"""
+    Returns an array of the names of the required parameters for an instance of :func:`sum_dists`
+    Works by calling :func:`.required_args` for each distribution present in the sum. 
+    If a parameter is shared between distributions its name is only added once. 
+    If two parameters are required and share a name, then the second parameter gets an added index at the end.
+
+    Parameters
+    ----------
+    dists 
+        An array containing the distributions in this instance of :func:`sum_dists`
+    par_idxs
+        An array of arrays, each array contains the indices of the parameters in the :func:`sum_dists` call that correspond to that distribution
+
+    Returns
+    -------
+    param_names
+        An array containing the required parameter names
+    """
+    param_names = []
+    overall_par_idxs = []
+    for i in range(len(dists)):
+        mask = ~np.isin(par_idxs[i], overall_par_idxs) # get indices of the required args that are not included yet 
+        prereq_names = np.array(dists[i].required_args())[mask]
+        req_names = []
+        # Check for duplicate names
+        for name in prereq_names:
+            if name in param_names:
+                if name[-1].isdigit():
+                    name = name[:-1] + f"{int(name[-1])+1}"
+                else:
+                    name = name + "1"
+            req_names.append(name)
+                
+
+        param_names.extend(req_names)
+        overall_par_idxs.extend(par_idxs[i])
+    return param_names
+
+
 class sum_dists(rv_continuous):
     r"""
-    Initialize and rv_continuous method so that we gain access to computable methods. 
-    Also precompute the fracs of the linear combination, as well as the support of the
-    sum of the distributions. 
+    Initialize an rv_continuous method so that we gain access to scipy computable methods. 
+    Precompute the support of the sum of the distributions. 
 
-    The correct way to initialize is sum_dists(d1, p1, d2, p2, ..., dn, pn, frac_flag)
+    The correct way to initialize is sum_dists([(d1, [p1]), (d2, [p2])], [area_idx_1/frac_idx, area_idx_2/], frac_flag)
     Where d_i is a distribution and p_i is a parameter index array for that distribution.
 
     Parameter index arrays contain indices that slice a single parameter array that is passed to method calls. 
-    For example, if the user will eventually pass parameters=[mu, sigma, frac1, frac2] to function.get_pdf(x, parameters)
-    and the first distribution takes mu, sigma, frac1 as its parameters, then p1=[0,1,2]. If the second distribution takes mu, sigma, frac2
-    then its parameter index array would be p2=[0, 1, 3] because frac2 is the index 3 entry in parameters. 
+    For example, if the user will eventually pass parameters=[mu, sigma, tau, frac] to function.get_pdf(x, parameters)
+    and the first distribution takes (mu, sigma) as its parameters, then p1=[0,1]. If the second distribution takes (tau, mu, sigma)
+    then its parameter index array would be p2=[2, 0, 1] because tau is the index 2 entry in parameters. 
 
-    Each par array can contain [shape, mu, sigma, area, frac] with area and frac being optional, and
-    depend on the flag sent to the constructor, but *must be placed in that order*. 
+    Each par array can contain [shape, mu, sigma], and *must be placed in that order*. 
+
+    The single parameter array passed to function calls should follow the ordering convention [shapes, frac/areas]
 
     There are 4 flag options:
 
-    1. flag = "areas", areas passed as fit variables, global fracs optional (but can be passed by kwarg, default all to 1)
-    2. flag = "fracs", fracs and total area passed as fit variables, global areas optional (but can be passed by kwarg, default all to 1)
-        by default, the total area is just a parameter of the last distribution. I.e. dist1, [shapes, mu, sigma, frac1], ..., distn, [shapes, mu, sigma, frac2, total_area]
-    3. flag = "both", fracs and areas passed as fit variables. dist1, [shapes, mu, sigma, area1, frac1], ..., distn, [shapes, mu, sigma, area_n, frac_n, total_area]
-    4. flag = None, no areas or fracs passed as fit variables, all default to 1
-
+    1. flag = "areas", two areas passed as fit variables
+    2. flag = "fracs", one fraction is passed a a fit variable, with the convention that sum_dists performs f*dist_1 + (1-f)*dist_2
+    3. flag = "one_area", one area is passed a a fit variable, with the convention that sum_dists performs area*dist_1 + 1*dist_2
+    4. flag = None, no areas or fracs passed as fit variables, both are normalized to unity.
 
     Notes 
     -----
-    dists are the unfrozen pygama distributions
+    dists must be unfrozen pygama distributions of the type :func:`pygama_continuous`
     """
-    def __init__(self, *args, **kwargs): 
 
-        if (len(args)%2) != 0: 
-            raise ValueError("Incorrect number of distributions and parameter arrays given")
-            
-        # Read in the args
-        dists = args[::2] # the even arguments, d1, d2,
-        idx_array = np.array(args[1::2], dtype=object) # the odd arguments, containing arrays of indices
-
-        # Read in the kwargs
-        self.components = kwargs.pop('components', False)
-        self.frac_flag = kwargs.pop('frac_flag', None)
-        # The fracs, areas, and total_area are set to 1s so that if any one of frac, area, total_area is missing from the idx_arrays,
-        # then we just multiply by 1 when we compute the sum of total_area*frac*area*distribution
-        self.areas = kwargs.pop('areas', np.ones(len(dists)))
-        self.fracs = kwargs.pop('fracs', np.ones(len(dists)))
-        self.total_area = kwargs.pop('total_area', 1)
-        
-        # Check that the dists are in fact distributions
-        for i in range(len(dists)):
-            if not isinstance(dists[i], pygama_continuous):
-                raise ValueError(f"Distribution at index {i} has value {dists[i]},\
-                and is an array and not a pygama_continuous distribution")
-                
-        # Now, create the arrays of indices corresponding to the shape pars, and whichever area and/or fracs are present
-        shape_par_idx, area_idx, frac_idx, total_area_idx = get_idx(idx_array, self.frac_flag)
-        
-        fracs = self.fracs
-        self.dists = dists
-
-        # Perform some checks that ensure we are splitting up parameter arrays correctly 
-        self.fracs = _precompute_fracs(fracs, dists)
-        self.shape_par_idx = _precompute_shape_par_idx(shape_par_idx, dists)
-
-        self.area_idx = area_idx
-        self.frac_idx = frac_idx
-        self.total_area_idx = total_area_idx
-
-        # We need this so that scipy methods don't get angry
-        self.shapes = None
-        
-        super().__init__(self)
-        
-    
-    # overload a couple of scipy methods to allow for an array of shape arguments instead of a tuple
-    # this is needed for when scipy calls the public pdf method, before it calls the private _pdf
-    def _argcheck(self, *args):
-        r"""
-        Default check for correct values on args and keywords.
-        Returns condition array of 1's where arguments are correct and
-        0's where they are not.
-
-        Pygama needs to overload this to extend it to arrays of arguments, 
-        based on how the sum_dists class is built
+    def set_x_lo(self, x_lo: float) -> None:
         """
-
-        cond = 1
-        for arg in args:
-            cond = np.logical_and(cond, (np.asarray(arg) > 0))
-        if isinstance(cond, np.ndarray):
-            return cond.all() # overload the scipy definition, check that we're good for all argument values in the array
-        else:
-            return cond
-        
-    # overload a couple of scipy methods to allow for an array of shape arguments instead of a tuple
-    # this is needed to create good random variables
-    def _argcheck_rvs(self, *args, **kwargs):
-        # Handle broadcasting and size validation of the rvs method.
-        # Subclasses should not have to override this method.
-        # The rule is that if `size` is not None, then `size` gives the
-        # shape of the result (integer values of `size` are treated as
-        # tuples with length 1; i.e. `size=3` is the same as `size=(3,)`.)
-        #
-        # `args` is expected to contain the shape parameters (if any), the
-        # location and the scale in a flat tuple (e.g. if there are two
-        # shape parameters `a` and `b`, `args` will be `(a, b, loc, scale)`).
-        # The only keyword argument expected is 'size'.
-        size = kwargs.get('size', None)
-        low = kwargs.get('low', 0.0)
-        high = kwargs.get('high', 1.0)
-
-        args = list(args)
-        params = args[0]
-        result = []
-        for element in args:
-            if isinstance(element, np.ndarray):
-                result.extend(element)
-            else:
-                result.append(element)
-
-        args = result
-
-        all_bcast = np.broadcast_arrays(*args)
-    
-
-
-        def squeeze_left(a):
-            while a.ndim > 0 and a.shape[0] == 1:
-                a = a[0]
-            return a
-
-        # Eliminate trivial leading dimensions.  In the convention
-        # used by numpy's random variate generators, trivial leading
-        # dimensions are effectively ignored.  In other words, when `size`
-        # is given, trivial leading dimensions of the broadcast parameters
-        # in excess of the number of dimensions  in size are ignored, e.g.
-        #   >>> np.random.normal([[1, 3, 5]], [[[[0.01]]]], size=3)
-        #   array([ 1.00104267,  3.00422496,  4.99799278])
-        # If `size` is not given, the exact broadcast shape is preserved:
-        #   >>> np.random.normal([[1, 3, 5]], [[[[0.01]]]])
-        #   array([[[[ 1.00862899,  3.00061431,  4.99867122]]]])
-        #
-        all_bcast = [squeeze_left(a) for a in all_bcast]
-        bcast_shape = all_bcast[0].shape
-        bcast_ndim = all_bcast[0].ndim
-
-        if size is None:
-            size_ = bcast_shape
-        else:
-            size_ = tuple(np.atleast_1d(size))
-
-        # Check compatibility of size_ with the broadcast shape of all
-        # the parameters.  This check is intended to be consistent with
-        # how the numpy random variate generators (e.g. np.random.normal,
-        # np.random.beta) handle their arguments.   The rule is that, if size
-        # is given, it determines the shape of the output.  Broadcasting
-        # can't change the output size.
-
-        # This is the standard broadcasting convention of extending the
-        # shape with fewer dimensions with enough dimensions of length 1
-        # so that the two shapes have the same number of dimensions.
-        ndiff = bcast_ndim - len(size_)
-        if ndiff < 0:
-            bcast_shape = (1,)*(-ndiff) + bcast_shape
-        elif ndiff > 0:
-            size_ = (1,)*ndiff + size_
-
-        # This compatibility test is not standard.  In "regular" broadcasting,
-        # two shapes are compatible if for each dimension, the lengths are the
-        # same or one of the lengths is 1.  Here, the length of a dimension in
-        # size_ must not be less than the corresponding length in bcast_shape.
-        ok = all([bcdim == 1 or bcdim == szdim
-                  for (bcdim, szdim) in zip(bcast_shape, size_)])
-        if not ok:
-            raise ValueError("size does not match the broadcast shape of "
-                             "the parameters. %s, %s, %s" % (size, size_,
-                                                             bcast_shape))
-
-        param_bcast = all_bcast[:-2]
-        loc_bcast = all_bcast[-2]
-        scale_bcast = all_bcast[-1]
-        
-        param_bcast = np.array([params])
-        
-
-        return param_bcast, loc_bcast, scale_bcast, size_, low, high
-    
-    # overload scipy's vectorization, we don't need to vectorize on the parameter array fed to ppf
-    # In fact, we only want vectorization over input X, the params should be the same for each
-    def _attach_methods(self):
-        r"""
-        Attaches dynamically created methods to the rv_continuous instance.
+        Set the internal state of the lower bound of this distribution
         """
+        self.x_lo = x_lo
 
-        # _attach_methods is responsible for calling _attach_argparser_methods
-        self._attach_argparser_methods()
-
-        # nin correction
-        self._ppfvec = np.vectorize(self._ppf_single, otypes='d', excluded = [3]) # exclude vectorization over params in position 3
-        self._ppfvec.nin = self.numargs + 1
-        self.vecentropy = np.vectorize(self._entropy, otypes='d', excluded = [1])
-        self._cdfvec = np.vectorize(self._cdf_single, otypes='d', excluded = [1])
-        self._cdfvec.nin = self.numargs + 1
-
-        if self.moment_type == 0:
-            self.generic_moment = np.vectorize(self._mom0_sc, otypes='d', excluded = [1])
-        else:
-            self.generic_moment = np.vectorize(self._mom1_sc, otypes='d', excluded = [1])
-        # Because of the *args argument of _mom0_sc, vectorize cannot count the
-        # number of arguments correctly.
-        self.generic_moment.nin = self.numargs + 1
-
-            
-    # Need this to be called from the super init, because the super init needs the newly defined parse_arg_template   
-    def _construct_argparser(self, meths_to_inspect, locscale_in, locscale_out):
-        r"""
-        Construct the parser string for the shape arguments.
-        This method should be called in __init__ of a class for each
-        distribution. It creates the `_parse_arg_template` attribute that is
-        then used by `_attach_argparser_methods` to dynamically create and
-        attach the `_parse_args`, `_parse_args_stats`, `_parse_args_rvs`
-        methods to the instance.
-        If self.shapes is a non-empty string, interprets it as a
-        comma-separated list of shape parameters.
-        Otherwise inspects the call signatures of `meths_to_inspect`
-        and constructs the argument-parsing functions from these.
-        In this case also sets `shapes` and `numargs`.
+    def set_x_hi(self, x_hi: float) -> None:
         """
-
-        if self.shapes:
-            # sanitize the user-supplied shapes
-            if not isinstance(self.shapes, str):
-                raise TypeError('shapes must be a string.')
-
-            shapes = self.shapes.replace(',', ' ').split()
-
-            for field in shapes:
-                if keyword.iskeyword(field):
-                    raise SyntaxError('keywords cannot be used as shapes.')
-                if not re.match('^[_a-zA-Z][_a-zA-Z0-9]*$', field):
-                    raise SyntaxError(
-                        'shapes must be valid python identifiers')
-        else:
-            # find out the call signatures (_pdf, _cdf etc), deduce shape
-            # arguments. Generic methods only have 'self, x', any further args
-            # are shapes.
-            shapes_list = []
-            for meth in meths_to_inspect:
-                shapes_args = _getfullargspec(meth)  # NB does not contain self
-                args = shapes_args.args[1:]       # peel off 'x', too
-
-                if args:
-                    shapes_list.append(args)
-
-                    # *args or **kwargs are not allowed w/automatic shapes
-                    if shapes_args.varargs is not None:
-                        raise TypeError(
-                            '*args are not allowed w/out explicit shapes')
-                    if shapes_args.varkw is not None:
-                        raise TypeError(
-                            '**kwds are not allowed w/out explicit shapes')
-                    if shapes_args.kwonlyargs:
-                        raise TypeError(
-                            'kwonly args are not allowed w/out explicit shapes')
-                    if shapes_args.defaults is not None:
-                        raise TypeError('defaults are not allowed for shapes')
-
-            if shapes_list:
-                shapes = shapes_list[0]
-                
-                # make sure the signatures are consistent
-                for item in shapes_list:
-                    if item != shapes:
-                        raise TypeError('Shape arguments are inconsistent.')
-            else:
-                shapes = []
-
-        # have the arguments, construct the method from template
-        shapes_str = ', '.join(shapes) + ', ' if shapes else ''  # NB: not None
-        dct = dict(shape_arg_str=shapes_str,
-                   locscale_in=locscale_in,
-                   locscale_out=locscale_out,
-                   )
-
-        # this string is used by _attach_argparser_methods
-        self._parse_arg_template = parse_arg_template % dct
-        
-
-        self.shapes = ', '.join(shapes) if shapes else None
-        if not hasattr(self, 'numargs'):
-            # allows more general subclassing with *args
-            self.numargs = len(shapes)
-    
-    # Need to overload ppf to allow for scaling so that rvs will work as expected 
-    def _ppf(self, q, shift, scale, *args):
-        return self._ppfvec(q, shift, scale, *args)
-    
-    def _ppf_to_solve(self, x, q, shift, scale, *args):
-        return scale*(self.get_cdf(*(np.array([x]), )+args)-shift)-q
-    
-    # We need to even subclass _rvs because the default is to uniform sample over [0,1]...
-    def _rvs(self, *args, size=None, random_state=None, low = 0.0, high = 1.0):
-        # This method must handle size being a tuple, and it must
-        # properly broadcast *args and size.  size might be
-        # an empty tuple, which means a scalar random variate is to be
-        # generated.
-
-        # Use basic inverse cdf algorithm for RV generation as default.
-        U = random_state.uniform(low=low, high=high, size=size) # allow the user to overload the lows and highs
-        
-        # because sums of cdfs are not normalized, we need to shift the distribution accordingly:
-        shift = self.get_cdf(np.array([-1000]), *args)
-        scale = 1/(self.get_cdf(np.array([1000]), *args)-shift)
-        Y = self._ppf(U, shift, scale, *args)
-        return Y
-   
-    # need to overload this function to allow access to the lows and highs
-    def rvs(self, *args, **kwds):
-        r"""
-        Random variates of given type.
-
-        Parameters
-        ----------
-        arg1, arg2, arg3,... : array_like
-            The shape parameter(s) for the distribution (see docstring of the
-            instance object for more information).
-        loc : array_like, optional
-            Location parameter (default=0).
-        scale : array_like, optional
-            Scale parameter (default=1).
-        size : int or tuple of ints, optional
-            Defining number of random variates (default is 1).
-        low : float
-            The lower bound to sample a uniform distribution
-        high : float
-            The upper bound to sample a uniform distribution
-        random_state : {None, int, `numpy.random.Generator`,
-                        `numpy.random.RandomState`}, optional
-            If `seed` is None (or `np.random`), the `numpy.random.RandomState`
-            singleton is used.
-            If `seed` is an int, a new ``RandomState`` instance is used,
-            seeded with `seed`.
-            If `seed` is already a ``Generator`` or ``RandomState`` instance
-            then that instance is used.
-
-        Returns
-        -------
-        rvs : ndarray or scalar
-            Random variates of given `size`.
+        Set the internal state of the upper bound of this distribution
         """
-
-        discrete = kwds.pop('discrete', None)
-        rndm = kwds.pop('random_state', None)
-        args, loc, scale, size, low, high = self._parse_args_rvs(*args, **kwds) # unpack optional low and high kwds
-        cond = np.logical_and(self._argcheck(*args), (scale >= 0))
-        ### don't need this check anymore
-        
-#         if not np.all(cond):
-#             message = ("Domain error in arguments. The `scale` parameter must "
-#                        "be positive for all distributions, and many "
-#                        "distributions have restrictions on shape parameters. "
-#                        f"Please see the `scipy.stats.{self.name}` "
-#                        "documentation for details.")
-#             raise ValueError(message)
-
-        if np.all(scale == 0):
-
-            return loc*ones(size, 'd')
-
-        # extra gymnastics needed for a custom random_state
-        if rndm is not None:
-            random_state_saved = self._random_state
-            random_state = check_random_state(rndm)
-        else:
-            random_state = self._random_state
-
-        vals = self._rvs(*args, size=size, random_state=random_state, low=low, high=high)
-
-        vals = vals * scale + loc
-
-        # do not forget to restore the _random_state
-        if rndm is not None:
-            self._random_state = random_state_saved
-
-        # Cast to int if discrete
-        if discrete and not isinstance(self, rv_sample):
-            if size == ():
-                vals = int(vals)
-            else:
-                vals = vals.astype(np.int64)
-
-        return vals
+        self.x_hi = x_hi
 
 
-    def _pdf(self, x, params): 
-        
-        # params is an array containing the shape params, as well as potentially areas and fracs
-
-        pdfs = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
-        
-
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-        
-        probs = [pdfs[i].pdf(x, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(pdfs))]
-        
-        prefactor = total_area*fracs*areas 
-        
-        if self.components:
-            probs = (probs.T*prefactor).T
-            return probs
-        else:
-            probs = prefactor@probs
-            return probs
-
-    
-    def _cdf(self, x, params):
-        
-        cdfs = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
-        
-        # right now, params COULD contain areas and/or fracs... split it off
-        
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-        
-
-
-        probs = [cdfs[i].cdf(x, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(cdfs))]
-        
-        prefactor = total_area*fracs*areas 
-
-        if self.components:
-            probs = (probs.T*prefactor).T
-            return probs
-        else:
-            probs = prefactor@probs
-            return probs
-    
-    
-
-    def get_pdf(self, x, params):
-        pdfs = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
-        
-        # right now, params COULD contain areas and/or fracs... split it off
-        
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-        
-        probs = [pdfs[i].get_pdf(x, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(pdfs))]
-        
-        prefactor = total_area*fracs*areas 
-
-        if self.components:
-            probs = (probs.T*prefactor).T
-            return probs
-        else:
-            probs = prefactor@probs
-            return probs
-    
-    def get_cdf(self, x, params):
-        cdfs = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
-        
-        # right now, params COULD contain areas and/or fracs... split it off
-        
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-        
-        probs = [cdfs[i].get_cdf(x, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(cdfs))]
-        
-        prefactor = total_area*fracs*areas 
-
-        if self.components:
-            probs = (probs.T*prefactor).T
-            return probs
-        else:
-            probs = prefactor@probs
-            return probs
-    
-    def pdf_ext(self, x, params):
-        r"""
-        Extended probability distribution. 
+    def _argcheck(self, *args) -> bool:
+        """
+        Check that each distribution gets its own valid arguments. 
 
         Notes
         -----
-        Params can have x_lo, x_hi as the first two parameters, and the rest of the shape parameters in the rest of the array
-        If params is the same length as the required params, the x_lo and x_hi are interpreted to be the max and min of the input array x
-        
+        This overloads the :func:`scipy` definition so that the methods :func:`.pdf` work.
         """
+        args = np.array(args)
+        cond = True
+        for i, dist in enumerate(self.dists):
+            cond = np.logical_and(cond, dist._argcheck(*args[self.par_idxs[i]]))
+        return cond
+
+
+    def __init__(self, dists_and_pars_array, area_frac_idxs, flag, parameter_names=None):
+        self.components = False # do we want users to ever ask for the components back...
+
+        # Extract the distributions and parameter index arrays from the constructor
+        dists, par_idxs = get_dists_and_par_idxs(dists_and_pars_array)
+
+        self.dists = dists
+        self.par_idxs = par_idxs
+        self.area_frac_idxs = area_frac_idxs
+
+        # Get the parameter names for later introspection
+        shapes = get_parameter_names(dists, par_idxs)
+
+        # Check that the dists are in fact distributions
+        for i in range(len(dists)):
+            if (not isinstance(dists[i], pygama_continuous)) and (not isinstance(dists[i], sum_dists)):
+                raise ValueError(f"Distribution at index {i} has value {dists[i]},\
+                and is an array and not a pygama_continuous distribution")
+        
+        # Set the internal state depending on what flag was passed
+        if flag == "fracs":
+            if len(area_frac_idxs) != 1:
+                raise ValueError("sum_dists only accepts the parameter position of one fraction.")
+            self.frac_flag = True
+            self.area_flag = False
+            self.one_area_flag = False
+            shapes = np.insert(shapes, area_frac_idxs[0], "f") # add frac name to the shapes
+        elif flag == "areas":
+            if len(area_frac_idxs) != 2:
+                raise ValueError("sum_dists needs two parameter indicies of areas.")
+            self.frac_flag = False
+            self.area_flag = True
+            self.one_area_flag = False
+            shapes = np.insert(shapes, area_frac_idxs, ["s", "b"]) # add area names to the shapes
+        elif flag == "one_area":
+            # needed so that we can create sum_dists from sum_dists without having an overall area to the second dist
+            # Sets the area of the second dist to 1
+            if len(area_frac_idxs) != 1:
+                raise ValueError("sum_dists needs one parameter index of an area.")
+            self.frac_flag = False
+            self.area_flag = False
+            self.one_area_flag = True
+            shapes = np.insert(shapes, area_frac_idxs, ["s"]) # add area name to the shapes
+        else:
+            self.frac_flag = False
+            self.area_flag = False
+            self.one_area_flag = False
+
+
+        # Set the support by taking the largest possible union, ignore any NoneTypes
+        self.set_x_lo(np.nanmax(np.array([dists[0].x_lo, dists[1].x_lo], dtype=np.float64)))
+        self.set_x_hi(np.nanmin(np.array([dists[0].x_hi, dists[1].x_hi], dtype=np.float64)))
+
+
+        # override the parameter names if string is passed to the constructor
+        if parameter_names != None:
+            shapes = parameter_names
+
+
+        self.req_args = shapes
+
+        # set atttributes for the methods so that Iminuit can introspect parameter names
+        shape_dict = {}
+        for i in shapes:
+            shape_dict[i] = None
+
+        x_shapes = ["x", *shapes] # add the x values to the parameter names that are being passed, Iminuit assumes that this is in the first position
+
+        # Need to set both the `_parameters` and `func_code` depending on what version of Iminuit is used
+        self.get_pdf.__func__._parameters = shape_dict
+        self.get_pdf.__func__.func_code = make_func_code(x_shapes)
+
+        self.pdf_ext.__func__._parameters = shape_dict
+        self.pdf_ext.__func__.func_code =  make_func_code(x_shapes)
+
+        self.pdf_norm.__func__._parameters = shape_dict
+        self.pdf_norm.__func__.func_code = make_func_code(x_shapes)
+
+        self.get_cdf.__func__._parameters = shape_dict
+        self.get_cdf.__func__.func_code = make_func_code(x_shapes)
+
+        self.cdf_ext.__func__._parameters = shape_dict
+        self.cdf_ext.__func__.func_code =  make_func_code(x_shapes)
+
+        self.cdf_norm.__func__._parameters = shape_dict
+        self.cdf_norm.__func__.func_code = make_func_code(x_shapes)
+
+        # Scipy requires the argument names as one string with commas inbetween each parameter name
+        shapes = ','.join(str(x) for x in shapes)
+
+
+        super().__init__(self, shapes=shapes)
+
+    def _pdf(self, x, *params):
+        pdfs = self.dists 
+        params = np.array(params)[:,0] # scipy ravels the parameter array...
+
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
+
+        if self.components:
+            return areas[0]*fracs[0]*pdfs[0].pdf(x, *params[self.par_idxs[0]]), areas[1]*fracs[1]*pdfs[1].pdf(x, *params[self.par_idxs[1]])
+
+        else:
+            # This is faster than list comprehension
+            probs = areas[0]*fracs[0]*pdfs[0].pdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*pdfs[1].pdf(x, *params[self.par_idxs[1]])
+            return probs
+
+    def _cdf(self, x, *params):
+        cdfs = self.dists
+        params = np.array(params)[:,0] 
+
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
+
+        if self.components:
+            return areas[0]*fracs[0]*cdfs[0].cdf(x, *params[self.par_idxs[0]]) , areas[1]*fracs[1]*cdfs[1].cdf(x, *params[self.par_idxs[1]])
+
+        else:
+            # This is faster than list comprehension
+            probs = areas[0]*fracs[0]*cdfs[0].cdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*cdfs[1].cdf(x, *params[self.par_idxs[1]])
+            return probs
+
+
+    def get_pdf(self, x, *params):
+        pdfs = self.dists 
+        params = np.array(params)
+
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
+        
+        if self.components:
+            return areas[0]*fracs[0]*pdfs[0].get_pdf(x, *params[self.par_idxs[0]]), areas[1]*fracs[1]*pdfs[1].get_pdf(x, *params[self.par_idxs[1]])
+
+        else:
+            # This is faster than list comprehension
+            probs = areas[0]*fracs[0]*pdfs[0].get_pdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*pdfs[1].get_pdf(x, *params[self.par_idxs[1]])
+            return probs
+
+    def get_cdf(self, x, *params):
+        cdfs = self.dists
+        params = np.array(params)
+
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
+
+        if self.components:
+            return areas[0]*fracs[0]*cdfs[0].get_cdf(x, *params[self.par_idxs[0]]) , areas[1]*fracs[1]*cdfs[1].get_cdf(x, *params[self.par_idxs[1]])
+
+        else:
+            # This is faster than list comprehension
+            probs = areas[0]*fracs[0]*cdfs[0].get_cdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*cdfs[1].get_cdf(x, *params[self.par_idxs[1]])
+            return probs
+        
+
+    def pdf_norm(self, x, *params):
+
+        norm = np.diff(self.get_cdf(np.array([self.x_lo, self.x_hi]), *params))
+
+        if norm == 0:
+            return np.full_like(x, np.inf)
+        else:
+            return self.get_pdf(x, *params)/norm
+
+    def cdf_norm(self, x, *params):
+
+        norm = np.diff(self.get_cdf(np.array([self.x_lo, self.x_hi]), *params))
+        
+        if norm == 0:
+            return np.full_like(x, np.inf)
+        else:
+            return (self.get_cdf(x, *params))/norm
+
+
+    def pdf_ext(self, x, *params):
+        #NOTE: do we want to pass x_lower and x_upper here or have the user set them before the function call and store as the state? 
         pdf_exts = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
+        params = np.array(params)
 
-        # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
-        # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
-        if len(params) == len(self.get_req_args())+2:
-            x_lo = params[0]
-            x_hi = params[1]
-            params = params[2:]
-        else:
-            x_lo = np.amin(x)
-            x_hi = np.amax(x)
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
 
-                
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
+        # sig = areas[0] + areas[1] # this is a hack, it performs faster but may not *always* be true
+        sig = areas[0]*fracs[0]*np.diff(pdf_exts[0].get_cdf(np.array([self.x_lo, self.x_hi]), *params[self.par_idxs[0]]))[0] + areas[1]*fracs[1]*np.diff(pdf_exts[1].get_cdf(np.array([self.x_lo, self.x_hi]), *params[self.par_idxs[1]]))[0]
         
-        prefactor = total_area*fracs*areas 
 
-
-        probs = [pdf_exts[i].pdf_ext(x, 1, x_lo, x_hi, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(pdf_exts))]
-        probs = np.array(probs, dtype = object) # this is going to be very slow! Think of a way around this
-        # Maybe try this 
-        # probs = list(zip(*probs))
-        # sigs = np.array(probs[0])
-        # probs = np.array(probs[1])
-        sigs = probs[:,0]
-        probs = probs[:,1]
-        
-        sigs *= prefactor
-        sigs = np.sum(sigs)
-        
-        
         if self.components:
-            probs = (probs.T*prefactor).T
-            return sigs, probs # returns tuple(sum of signals, frac*dist, frac*dist, ...)
+            return sig, areas[0]*fracs[0]*pdf_exts[0].get_pdf(x, *params[self.par_idxs[0]]) , areas[1]*fracs[1]*pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]]) 
         else:
-            probs = prefactor@probs
-            return sigs, probs # returns tuple(sum of signals, frac*dist + ... +frac*dist )
+            probs = areas[0]*fracs[0]*pdf_exts[0].get_pdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]]) 
 
-    
-    def cdf_ext(self, x, params):
+            return sig, probs
+
+
+    def cdf_ext(self, x, *params):
         cdf_exts = self.dists 
-        fracs = self.fracs 
-        areas = self.areas 
-        total_area = self.total_area
-        
-        shape_par_idx = self.shape_par_idx
-        area_idx = self.area_idx
-        frac_idx = self.frac_idx
-        total_area_idx = self.total_area_idx
-        
-        shape_pars, cum_len, areas, fracs, total_area = self.link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-        
-        prefactor = total_area*fracs*areas
-        
-        probs = [cdf_exts[i].cdf_ext(x, 1, *shape_pars[cum_len[i]:cum_len[i+1]]) for i in range(len(cdf_exts))]
-        
+        params = np.array(params)
+
+        fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
+
         if self.components:
-            probs = (probs.T*prefactor).T
+            return areas[0]*fracs[0]*cdf_exts[0].get_cdf(x, *params[self.par_idxs[0]]) , areas[1]*fracs[1]*cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
+
+        else:
+            # This is faster than list comprehension
+            probs = areas[0]*fracs[0]*cdf_exts[0].get_cdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
             return probs
-        else:
-            probs = prefactor@probs
-            return probs
-        
-    def draw_pdf(self, x: np.ndarray, params, **kwargs) -> None:
-        plt.plot(x, self.get_pdf(x, params))
+
+    def required_args(self):
+        return self.req_args
+
+
+    def draw_pdf(self, x: np.ndarray, *params) -> None:
+        plt.plot(x, self.get_pdf(x, *params))
     
-    def draw_cdf(self, x: np.ndarray, params, **kwargs) -> None:
-        plt.plot(x, self.get_cdf(x, params))
-
-    def get_req_args(self):
-        r""" 
-        This is a default function to get the required args from the distributions in the instance of :class:`sum_dists`.
-        This should be overloaded in user defined functions to ensure that :func:`get_mu`,  :func:`get_fwhm`, :func:`get_total_events`
-        """
-        dists = self.dists 
-        args = []
-        for dist in dists:
-            args.append(dist.required_args())
-        return args
-
-
-    def pdf_norm(self, x, *args, **kwds):
-        r"""
-        Normalize a pdf on a subset of its support, typically over a fit-range. 
-
-        Parameters 
-        ---------- 
-        x 
-            The data
-        args 
-            The parameter array, can start with x_lo, x_hi
-
-        Returns 
-        -------
-        pdf_norm 
-            The pdf that is normalized on a smaller range 
-
-        Notes 
-        ----- 
-        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
-        We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names
-        For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
-        """
-        params = args[0]
-        # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
-        # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
-        if len(params) == len(self.get_req_args())+2:
-            x_lo = params[0]
-            x_hi = params[1]
-            params = params[2:]
-        else:
-            x_lo = np.amin(x)
-            x_hi = np.amax(x)
-
-        if (x_lo == np.inf) and (x_hi == np.inf):
-            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), params))
-        else: 
-            norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), params))
-
-        if norm == 0:
-            return np.full_like(x, np.inf)
-        else:
-            return self.get_pdf(x, params)/norm
-    
-    def cdf_norm(self, x, *args, **kwds):
-        r"""
-        Derive a cdf from a pdf that is normalized on a subset of its support, typically over a fit-range. 
-
-        Parameters 
-        ---------- 
-        x 
-            The data
-        args 
-            The parameter array, can contain x_lo and x_hi at the start of the array
-
-        Returns 
-        -------
-        pdf_norm 
-            The pdf that is normalized on a smaller range 
-
-        Notes 
-        ----- 
-        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
-        We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names. 
-        For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
-        """
-        # We can't pass a separate x_lo, x_hi because then Iminuit wouldn't accept params to be an array as it needs to be... 
-        # So instead, just chuck x_lo, x_hi at the start of params, and then we peel them off 
-        params = args[0]
-        if len(params) == len(self.get_req_args())+2:
-            x_lo = params[0]
-            x_hi = params[1]
-            params = params[2:]
-        else:
-            x_lo = np.amin(x)
-            x_hi = np.amax(x)
-
-        if (x_lo == np.inf) and (x_hi == np.inf):
-            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), params))
-        else: 
-            norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), params))
-        
-        if norm == 0:
-            return np.full_like(x, np.inf)
-        else:
-            return (self.get_cdf(x, params))/norm
-    
-    
-    def link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
-        r"""
-        Overload this if you want to link specific parameters together! 
-        Need to overload by first calling pars, areas, fracs, total_area = super()._link_pars
-        
-        .. code-block:: python
-
-        def _link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
-            shape_pars, cum_len, areas, fracs, total_area = super()._link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area)
-            fracs[1]= 1 - frac1
-            total_area[0] = 1
-            return shape_pars, cum_len, areas, fracs, total_area
-            (mu, sigma, area1, frac1, tau, area2) = range(6)
-
-        gauss_on_exgauss = sum_dists(d1 = gauss, p1 = [mu, sigma, area1, frac1], d2 = exgauss, p2 = [tau, mu, sigma, frac1, area2])
-        pars = [1,2,10,0.75, 0.1, 30]
-        x = np.arange(-10,10)
-        gauss_on_exgauss.pdf(x, pars)
-
-
-        This computes 
-        :math:`10*0.75*gauss(x, mu=1, sigma=2) + 30*(1-0.75)*exgauss(tau = 0.1, mu=1, sigma=2)`
-        Which is what we want it to do...
-        """
-        return self._link_pars(shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area) 
-
-
-    def _link_pars(self, shape_par_idx, area_idx, frac_idx, total_area_idx, params, areas, fracs, total_area):
-        
-        # shape_par_idx can be a jagged array, so we flatten it and get the cumulative lengths of each sub-array
-        shape_pars = params[np.array(np.hstack(shape_par_idx), dtype=int)]
-        
-        # Create the array of cumulative lengths of the original shape_par_idx jagged array
-        cum_len = list([len(x) for x in shape_par_idx])
-        cum_len = [0]+cum_len
-        cum_len = np.cumsum(cum_len)
-        
-        # Depending on what frac_flag is passed, the fracs and areas might be in the param array fed to the method,
-        # or they might be provided by the user during class initialization
-        if (area_idx is None) and (frac_idx is None):
-            # Either the user passed areas and fracs, or they are all defaulting to 1
-            pass
-        
-        if (frac_idx is not None) and (area_idx is None):
-            # Either the user passed areas, or they are all defaulting to 1
-            fracs = params[np.array(frac_idx, dtype=int)]
-            total_area = params[np.array(total_area_idx, dtype=int)] 
-            
-        if (area_idx is not None) and (frac_idx is None):
-            # Either the user passed fracs, or they are all defaulting to 1
-            areas = params[np.array(area_idx, dtype=int)]
-            
-        if (area_idx is not None) and (frac_idx is not None):
-            areas = params[np.array(area_idx, dtype=int)] 
-            fracs = params[np.array(frac_idx, dtype=int)] 
-            total_area = params[np.array(total_area_idx, dtype=int)]
-            
-        return shape_pars, cum_len, areas, fracs, total_area
-
+    def draw_cdf(self, x: np.ndarray, *params) -> None:
+        plt.plot(x, self.get_cdf(x, *params))
 
 
     # Create some convenience functions for fitting 
@@ -924,7 +430,7 @@ class sum_dists(rv_continuous):
         """
 
 
-        req_args = np.array(self.get_req_args())
+        req_args = np.array(self.required_args())
         mu_idx = np.where(req_args == "mu")[0][0]
         mu = pars[mu_idx]
         
@@ -956,9 +462,8 @@ class sum_dists(rv_continuous):
             the value of the fwhm and its error
         """
 
-        req_args = np.array(self.get_req_args())
+        req_args = np.array(self.required_args())
         sigma_idx = np.where(req_args == "sigma")[0][0]
-
 
         if cov is None:
             return pars[sigma_idx]*2*np.sqrt(2*np.log(2))
@@ -986,7 +491,7 @@ class sum_dists(rv_continuous):
             the total number of events in a spectrum and its associated error 
         """
         
-        req_args = np.array(self.get_req_args())
+        req_args = np.array(self.required_args())
         n_sig_idx = np.where(req_args == "n_sig")[0][0]
         n_bkg_idx = np.where(req_args == "n_bkg")[0][0]
 
@@ -997,63 +502,3 @@ class sum_dists(rv_continuous):
             return pars[n_sig_idx]+pars[n_bkg_idx], np.sqrt(cov[n_sig_idx][n_sig_idx]**2 + cov[n_bkg_idx][n_bkg_idx]**2)
         else:
             return pars[n_sig_idx]+pars[n_bkg_idx]
-
-
-
-    # overload the call method so that we can create frozen sum_dists
-    def __call__(self, *args, **kwds):
-        return sum_dist_frozen(self, *args, **kwds)
-
-
-
-
-
-
-class sum_dist_frozen(rv_frozen):
-    r"""
-    Essentially, an overloading of the definition of rv_continuous_frozen so that our pygama class instantiations have 
-    access to both the slower scipy methods, as well as the faster pygama methods (like get_pdf)
-    """
-    
-    def __init__(self, dist, *args, **kwds):
-        self.args = args
-        self.kwds = kwds
-        
-
-        # create a new instance
-        # we don't update the ctor params because they don't make sense for a sum_dist object 
-        self.dist = dist.__class__()
-        
-
-        shapes, _, _ = self.dist._parse_args(*args, **kwds)
-        self.a, self.b = self.dist._get_support(*shapes)
-    
-    def pdf(self, x):
-        return self.dist.pdf(x, *self.args, **self.kwds)
-    
-    def logpdf(self, x):
-        return self.dist.logpdf(x, *self.args, **self.kwds)
-    
-    def get_pdf(self, x):
-        return self.dist.get_pdf(np.array(x), *self.args, **self.kwds)
-    def get_cdf(self, x):
-        return self.dist.get_cdf(np.array(x), *self.args, **self.kwds)
-    def pdf_ext(self, x):
-        return self.dist.pdf_ext(np.array(x), *self.args, **self.kwds)
-    def cdf_ext(self, x):
-        return self.dist.cdf_ext(np.array(x), *self.args, **self.kwds)
-
-    def pdf_norm(self, x):
-        return self.dist.pdf_norm(np.array(x), *self.args, **self.kwds)
-    def cdf_norm(self, x):
-        return self.dist.cdf_norm(np.array(x), *self.args, **self.kwds)
-    
-            
-    def draw_pdf(self, x: np.ndarray, **kwargs) -> None:
-        return self.dist.draw_pdf(x, *self.args, **kwargs)
-    
-    def draw_cdf(self, x: np.ndarray, **kwargs) -> None:
-        return self.dist.draw_cdf(x, *self.args, **kwargs)
-    
-    def get_req_args(self):
-        return self.dist.get_req_args()

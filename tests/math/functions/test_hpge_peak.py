@@ -14,8 +14,8 @@ def test_hpge_peak_pdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.max(x)
     n_sig = 10
     n_bkg = 20
 
@@ -26,7 +26,7 @@ def test_hpge_peak_pdf():
 
     assert isinstance(hpge_peak, sum_dists)
 
-    y_direct = hpge_peak.get_pdf(x, pars)
+    y_direct = hpge_peak.get_pdf(x, *pars)
     scipy_exgauss = htail * exponnorm.pdf(
         -1 * x, tau / sigma, -1 * mu, sigma
     )  # to be equivalent to the scipy version, x -> -x, mu -> -mu, k -> k/sigma
@@ -54,15 +54,10 @@ def test_hpge_peak_pdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    x = np.arange(-100, 100)
-    y_sig, y_ext = hpge_peak.pdf_ext(x, pars)
-    assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
+    hpge_peak.set_x_lo(lower_range)
+    hpge_peak.set_x_hi(upper_range)
 
-    x = np.arange(-10, 10)
-    x_lo = -100
-    x_hi = 100
-    pars = np.insert(pars, 0, [x_lo, x_hi])
-    y_sig, y_ext = hpge_peak.pdf_ext(x, pars)
+    y_sig, y_ext = hpge_peak.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
 
@@ -76,8 +71,8 @@ def test_hpge_peak_cdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.max(x)
     n_sig = 10
     n_bkg = 20
 
@@ -88,7 +83,7 @@ def test_hpge_peak_cdf():
 
     assert isinstance(hpge_peak, sum_dists)
 
-    y_direct = hpge_peak.get_cdf(x, pars)
+    y_direct = hpge_peak.get_cdf(x, *pars)
 
     scipy_exgauss = htail * (
         1 - exponnorm.cdf(-1 * x, tau / sigma, -1 * mu, sigma)
@@ -123,5 +118,5 @@ def test_hpge_peak_cdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-1)
 
-    y_ext = hpge_peak.cdf_ext(x, pars)
+    y_ext = hpge_peak.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-1)

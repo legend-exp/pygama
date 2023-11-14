@@ -219,6 +219,11 @@ def nb_exgauss_scaled_cdf(x: np.ndarray, mu: float, sigma: float, tau: float, ar
 
 class exgauss_gen(pygama_continuous):
 
+    def __init__(self, *args, **kwargs):
+        self.x_lo = -1*np.inf
+        self.x_hi = np.inf
+        super().__init__(self)
+
     def _pdf(self, x: np.ndarray, tau: float, sigma: float) -> np.ndarray:
         x.flags.writeable = True
         return nb_exgauss_pdf(x, 0, 1, tau[0]/sigma[0]) # the scipy parameter k = tau/sigma 
@@ -231,13 +236,13 @@ class exgauss_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, tau: float, mu: float, sigma: float) -> np.ndarray:
         return nb_exgauss_cdf(x, mu, sigma, tau)
 
-    def pdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, tau: float, mu: float, sigma: float) -> np.ndarray:
-        return self._pdf_norm(x, x_lower, x_upper, tau, mu, sigma)
-    def cdf_norm(self, x: np.ndarray,  x_lower: float, x_upper: float, tau: float, mu: float, sigma: float) -> np.ndarray:
-        return self._cdf_norm(x, x_lower, x_upper, tau, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, tau: float, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, self.x_lo, self.x_hi, tau, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, tau: float, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, self.x_lo, self.x_hi, tau, mu, sigma)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, tau: float, mu: float, sigma: float) -> np.ndarray:
-        return np.abs(nb_exgauss_scaled_cdf(np.array([x_hi]), mu, sigma, tau, area)[0]-nb_exgauss_scaled_cdf(np.array([x_lo]), mu, sigma, tau, area)[0]), nb_exgauss_scaled_pdf(x, mu, sigma, tau, area)
+    def pdf_ext(self, x: np.ndarray, area: float, tau: float, mu: float, sigma: float) -> np.ndarray:
+        return np.abs(nb_exgauss_scaled_cdf(np.array([self.x_hi]), mu, sigma, tau, area)[0]-nb_exgauss_scaled_cdf(np.array([self.x_lo]), mu, sigma, tau, area)[0]), nb_exgauss_scaled_pdf(x, mu, sigma, tau, area)
     def cdf_ext(self, x: np.ndarray, area: float, tau: float, mu: float, sigma: float) -> np.ndarray:
         return nb_exgauss_scaled_cdf(x, mu, sigma, tau, area)
 

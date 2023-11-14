@@ -11,11 +11,11 @@ def test_step_pdf():
     mu = 2.3
     sigma = 1.1
     hstep = 0.65
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.amax(x)
 
-    y = step.pdf(x, hstep, lower_range, upper_range, mu, sigma)
-    y_direct = step.get_pdf(x, hstep, lower_range, upper_range, mu, sigma)
+    y = step.pdf(x, lower_range, upper_range, hstep, mu, sigma)
+    y_direct = step.get_pdf(x, lower_range, upper_range, hstep, mu, sigma)
 
     # compute the unnormalized step function
     scipy_step = 1 + hstep * (
@@ -46,14 +46,15 @@ def test_step_pdf():
 
     n_sig = 20
     x_lo = -10
-    x_hi = 10
-    y_sig, y_ext = step.pdf_ext(
-        x, n_sig, x_lo, x_hi, hstep, lower_range, upper_range, mu, sigma
-    )
+    x_hi = 9
+    step.set_x_lo(x_lo)
+    step.set_x_hi(x_hi)
+
+    y_sig, y_ext = step.pdf_ext(x, n_sig, hstep, lower_range, upper_range, mu, sigma)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig, rtol=1e-8)
 
-    y_norm = step.pdf_norm(x, x[0], x[-1], hstep, mu, sigma)
+    y_norm = step.pdf_norm(x, lower_range, upper_range, hstep, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y, rtol=1e-8)
 
@@ -64,11 +65,11 @@ def test_step_cdf():
     mu = 1.1
     sigma = 2.3
     hstep = 4.5
-    lower_range = np.inf
-    upper_range = np.inf
+    lower_range = np.amin(x)
+    upper_range = np.amax(x)
 
-    y = step.cdf(x, hstep, lower_range, upper_range, mu, sigma)
-    y_direct = step.get_cdf(x, hstep, lower_range, upper_range, mu, sigma)
+    y = step.cdf(x, lower_range, upper_range, hstep, mu, sigma)
+    y_direct = step.get_cdf(x, lower_range, upper_range, hstep, mu, sigma)
 
     # Compute the normalization of the pdf
     maximum = (np.amax(x) - mu) / sigma

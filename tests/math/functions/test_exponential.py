@@ -23,12 +23,17 @@ def test_exponential_pdf():
     n_sig = 20
     x_lo = 0
     x_hi = 200
-    y_sig, y_ext = exponential.pdf_ext(x, n_sig, x_lo, x_hi, lamb, mu, sigma)
+    exponential.set_x_lo(x_lo)
+    exponential.set_x_hi(x_hi)
+
+    y_sig, y_ext = exponential.pdf_ext(x, n_sig, lamb, mu, sigma)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig, rtol=1e-3)
 
+    exponential.set_x_lo(x[0])
+    exponential.set_x_hi(x[-1])
     normalization = np.diff(expon.cdf(x[np.array([0, -1])], mu, sigma / lamb))
-    y_norm = exponential.pdf_norm(x, x[0], x[-1], lamb, mu, sigma)
+    y_norm = exponential.pdf_norm(x, lamb, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)
 
@@ -52,7 +57,9 @@ def test_exponential_cdf():
     y_ext = exponential.cdf_ext(x, n_sig, lamb, mu, sigma)
     assert np.allclose(y_ext, n_sig * scipy_y, rtol=1e-8)
 
+    exponential.set_x_lo(x[0])
+    exponential.set_x_hi(x[-1])
     normalization = np.diff(expon.cdf(x[np.array([0, -1])], mu, sigma / lamb))
-    y_norm = exponential.cdf_norm(x, x[0], x[-1], lamb, mu, sigma)
+    y_norm = exponential.cdf_norm(x, lamb, mu, sigma)
 
     assert np.allclose(y_norm, scipy_y / normalization, rtol=1e-8)

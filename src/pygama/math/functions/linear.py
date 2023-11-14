@@ -40,10 +40,6 @@ def nb_linear_pdf(x: np.ndarray, x_lower: float, x_upper: float, m: float, b: fl
     b
         The y-intercept of the linear part
     """
-
-    if x_lower == np.inf and x_upper == np.inf:
-        x_lower = np.amin(x)
-        x_upper = np.amax(x)
     norm = (m/2)*(x_upper**2 - x_lower**2) + b*(x_upper-x_lower)
 
     result = np.empty_like(x, np.float64)
@@ -80,10 +76,6 @@ def nb_linear_cdf(x: np.ndarray, x_lower: float, x_upper: float, m: float, b: fl
     b
         The y-intercept of the linear part
     """
-
-    if x_lower == np.inf and x_upper == np.inf:
-        x_lower = np.amin(x)
-        x_upper = np.amax(x)
     norm = (m/2)*(x_upper**2 - x_lower**2) + b*(x_upper-x_lower)
 
     result = np.empty_like(x, np.float64)
@@ -145,13 +137,21 @@ def nb_linear_scaled_cdf(x: np.ndarray, x_lower: float, x_upper: float, m: float
 
 
 class linear_gen(pygama_continuous):
+    
+    def __init__(self, *args, **kwargs):
+        self.x_lo = None
+        self.x_hi = None
+        super().__init__(self)
 
-    def _pdf(self, x: np.ndarray, x_lower: float, x_upper: float) -> np.ndarray:
+    def _argcheck(self, x_lower, x_upper, m, b):
+        return True
+
+    def _pdf(self, x: np.ndarray, x_lower: float, x_upper: float, m, b) -> np.ndarray:
         x.flags.writeable = True
-        return nb_linear_pdf(x, x_lower[0], x_upper[0],  0, 1)
-    def _cdf(self, x: np.ndarray, x_lower: float, x_upper: float) -> np.ndarray:
+        return nb_linear_pdf(x, x_lower[0], x_upper[0],  m[0], b[0])
+    def _cdf(self, x: np.ndarray, x_lower: float, x_upper: float, m, b) -> np.ndarray:
         x.flags.writeable = True
-        return nb_linear_cdf(x, x_lower[0], x_upper[0], 0, 1)
+        return nb_linear_cdf(x, x_lower[0], x_upper[0], m[0], b[0])
 
     def get_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_pdf(x, x_lower, x_upper, m, b) 
@@ -164,8 +164,8 @@ class linear_gen(pygama_continuous):
     def cdf_norm(self, x: np.ndarray, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_cdf(x, x_lower, x_upper, m, b)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
-        return np.diff(nb_linear_scaled_cdf(np.array([x_lo, x_hi]), x_lower, x_upper, m, b, area))[0], nb_linear_scaled_pdf(x, x_lower, x_upper, m, b, area)
+    def pdf_ext(self, x: np.ndarray, area: float, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
+        return np.diff(nb_linear_scaled_cdf(np.array([self.x_lo, self.x_hi]), x_lower, x_upper, m, b, area))[0], nb_linear_scaled_pdf(x, x_lower, x_upper, m, b, area)
     def cdf_ext(self, x: np.ndarray, area: float, x_lower: float, x_upper: float, m: float, b: float) -> np.ndarray:
         return nb_linear_scaled_cdf(x, x_lower, x_upper, m, b, area)
 
