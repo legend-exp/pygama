@@ -66,7 +66,8 @@ def noise_optimization(
     tb_data = load_data(raw_list, lh5_path, n_events=opt_dict["n_events"])
     t1 = time.time()
     log.info(f"Time to open raw files {t1-t0:.2f} s")
-    if verbose: print(f"Time to open raw files {t1-t0:.2f} s")
+    if verbose:
+        print(f"Time to open raw files {t1-t0:.2f} s")
 
     with open(dsp_proc_chain) as r:
         dsp_proc_chain = json.load(r)
@@ -83,7 +84,8 @@ def noise_optimization(
     ene_pars = [par for par in opt_dict_par.keys()]
     for ene_par in ene_pars[:1]:
         log.info(f"\nRunning optimization for {ene_par} filter")
-        if verbose: print(f"\nRunning optimization for {ene_par} filter")
+        if verbose:
+            print(f"\nRunning optimization for {ene_par} filter")
         wf_par = opt_dict_par[ene_par]["waveform_out"]
         dict_str = opt_dict_par[ene_par]["dict_str"]
         filter_par = opt_dict_par[ene_par]["filter_par"]
@@ -97,13 +99,15 @@ def noise_optimization(
         for i, x in enumerate(samples):
             x = f"{x:.1f}"
             log.info(f"\nCase {i}, par = {x} us")
-            if verbose: print(f"\nCase {i}, par = {x} us")
+            if verbose:
+                print(f"\nCase {i}, par = {x} us")
             par_dsp[lh5_path][dict_str][filter_par] = f"{x}*us"
 
             t2 = time.time()
             dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
             log.info(f"Time to process dsp data {time.time()-t2:.2f} s")
-            if verbose: print(f"Time to process dsp data {time.time()-t2:.2f} s")
+            if verbose:
+                print(f"Time to process dsp data {time.time()-t2:.2f} s")
             energies = dsp_data[ene_str].nda
 
             if opt_dict["perform_fit"]:
@@ -128,7 +132,8 @@ def noise_optimization(
         fom_err_list = np.array(fom_err_list)
 
         guess_par = sample_list[np.nanargmin(fom_list)]
-        if verbose: print(f"guess par: {guess_par:.2f} us")
+        if verbose:
+            print(f"guess par: {guess_par:.2f} us")
 
         tck = splrep(sample_list, fom_list, k=opt_dict["fit_deg"])
 
@@ -138,9 +143,13 @@ def noise_optimization(
         result = minimize(spl_func, guess_par)
         best_par = result.x[0]
         if (best_par < np.min(sample_list)) or (best_par > np.max(sample_list)):
-            log.info(f"Par from minimization not accepted {best_par:.2f}, setting par to guess")
+            log.info(
+                f"Par from minimization not accepted {best_par:.2f}, setting par to guess"
+            )
             if verbose:
-                print(f"Par from minimization not accepted {best_par:.2f}, setting par to guess")
+                print(
+                    f"Par from minimization not accepted {best_par:.2f}, setting par to guess"
+                )
             best_par = guess_par
 
         best_val = spl_func(best_par)
@@ -181,7 +190,8 @@ def noise_optimization(
                 )
                 ax.plot(bc, hist, ds="steps", label=string_res)
                 log.info(string_res)
-                if verbose: print(string_res)
+                if verbose:
+                    print(string_res)
             ax.set_xlabel("energy (ADC)")
             ax.set_ylabel("counts")
             ax.legend(loc="upper right")
@@ -225,7 +235,8 @@ def noise_optimization(
             par_dict_plot["optimization"] = fig
 
     log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
-    if verbose: print(f"Time to complete the optimization {time.time()-t0:.2f} s")
+    if verbose:
+        print(f"Time to complete the optimization {time.time()-t0:.2f} s")
     if display > 0:
         return res_dict, plot_dict
     else:
