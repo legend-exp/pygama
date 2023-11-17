@@ -81,7 +81,7 @@ def noise_optimization(
         plot_dict = {}
         plot_dict["nopt"] = {}
     ene_pars = [par for par in opt_dict_par.keys()]
-    for ene_par in ene_pars:
+    for ene_par in ene_pars[:1]:
         log.info(f"\nRunning optimization for {ene_par} filter")
         if verbose: print(f"\nRunning optimization for {ene_par} filter")
         wf_par = opt_dict_par[ene_par]["waveform_out"]
@@ -224,6 +224,8 @@ def noise_optimization(
                 plt.close()
             par_dict_plot["optimization"] = fig
 
+    log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
+    if verbose: print(f"Time to complete the optimization {time.time()-t0:.2f} s")
     if display > 0:
         return res_dict, plot_dict
     else:
@@ -281,7 +283,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
 
     hist, bins, var = get_hist(energies, range=fit_range, dx=dx)
     guess, bounds = simple_gaussian_guess(hist, bins, pgf.extended_gauss_pdf)
-    fit_range = [guess[1] - sigma_thr * guess[2], guess[1] + sigma_thr * guess[2]]
+    fit_range = [guess[0] - sigma_thr * guess[1], guess[0] + sigma_thr * guess[1]]
 
     energies_fit = energies[(energies > fit_range[0]) & (energies < fit_range[1])]
     pars, errs, cov = pgf.fit_unbinned(
@@ -291,13 +293,13 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
         bounds=bounds,
     )
 
-    mu, mu_err = pars[1], errs[1]
-    fwhm = pars[2] * 2 * np.sqrt(2 * np.log(2))
-    fwhm_err = errs[2] * 2 * np.sqrt(2 * np.log(2))
+    mu, mu_err = pars[0], errs[0]
+    fwhm = pars[1] * 2 * np.sqrt(2 * np.log(2))
+    fwhm_err = errs[1] * 2 * np.sqrt(2 * np.log(2))
 
     hist, bins, var = get_hist(energies_fit, range=fit_range, dx=dx)
     gof_pars = pars
-    gof_pars[0] *= dx
+    gof_pars[2] *= dx
     chisq, dof = pgf.goodness_of_fit(
         hist, bins, None, pgf.gauss_pdf, gof_pars, method="Pearson"
     )
@@ -323,9 +325,9 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
 
     if fit_failed:
         log.debug(f"Returning values from guess")
-        mu = guess[1]
+        mu = guess[0]
         mu_err = 0
-        fwhm = guess[2] * 2 * np.sqrt(2 * np.log(2))
+        fwhm = guess[1] * 2 * np.sqrt(2 * np.log(2))
         fwhm_err = 0
 
     results = {
@@ -366,11 +368,11 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
 
     n_sig = np.sum(hist[min_idx:max_idx])
 
-    guess = [n_sig, mu, sigma]
+    guess = [mu, sigma, n_sig]
     bounds = [
-        (n_sig + n_sig * toll, n_sig + n_sig * toll),
         (mu - sigma, mu + sigma),
         (sigma - sigma * toll, sigma + sigma * toll),
+        (n_sig + n_sig * toll, n_sig + n_sig * toll),
     ]
 
     for i, par in enumerate(inspect.getfullargspec(func)[0][1:]):
