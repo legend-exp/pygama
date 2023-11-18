@@ -28,7 +28,9 @@ from scipy.optimize import minimize
 
 import pygama.math.peak_fitting as pgf
 from pygama.math.histogram import get_hist
+from pygama.pargen.cuts import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
+from pygama.pargen.energy_optimisation import index_data
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -65,12 +67,20 @@ def noise_optimization(
     t0 = time.time()
     tb_data = load_data(raw_list, lh5_path, n_events=opt_dict["n_events"])
     t1 = time.time()
-    log.info(f"Time to open raw files {t1-t0:.2f} s")
+    log.info(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
     if verbose:
-        print(f"Time to open raw files {t1-t0:.2f} s")
+        print(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
 
     with open(dsp_proc_chain) as r:
         dsp_proc_chain = json.load(r)
+
+    dsp_data = run_one_dsp(tb_data, dsp_proc_chain)
+    cut_dict = generate_cuts(dsp_data, parameters=opt_dict["cut_pars"])
+    idxs = get_cut_indexes(dsp_data, cut_dict)
+    tb_data = index_data(tb_data, idxs)
+    log.info(f"... {len(tb_data)} baselines after cuts")
+    if verbose:
+        print(f"... {len(tb_data)} baselines after cuts")
 
     samples = np.arange(opt_dict["start"], opt_dict["stop"], opt_dict["step"])
     samples_val = np.arange(opt_dict["start"], opt_dict["stop"], opt_dict["step_val"])
@@ -79,10 +89,23 @@ def noise_optimization(
 
     res_dict = {}
     if display > 0:
+        freq, pow_spectrum = calculate_fft(tb_data)
+        fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
+        ax.plot(freq, pow_spectrum)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("frequency (MHz)", ha="right", x=1)
+        ax.set_ylabel(f"power spectral density", ha="right", y=1)
+
         plot_dict = {}
         plot_dict["nopt"] = {}
+        plot_dict["nopt"]["fft"] = {}
+        plot_dict["nopt"]["fft"]["frequency"] = freq
+        plot_dict["nopt"]["fft"]["pow_spectrum"] = pow_spectrum
+        plot_dict["nopt"]["fft"]["fig"] = fig
+
     ene_pars = [par for par in opt_dict_par.keys()]
-    for ene_par in ene_pars[:1]:
+    for ene_par in ene_pars:
         log.info(f"\nRunning optimization for {ene_par} filter")
         if verbose:
             print(f"\nRunning optimization for {ene_par} filter")
@@ -265,8 +288,13 @@ def load_data(
     daqenergy = sto.read_object(
         f"{lh5_path}/raw/daqenergy", raw_list, n_rows=n_events, idx=idxs
     )[0]
+    baseline = sto.read_object(
+        f"{lh5_path}/raw/baseline", raw_list, n_rows=n_events, idx=idxs
+    )[0]
 
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "daqenergy": daqenergy})
+    tb_data = lh5.Table(
+        col_dict={"waveform": waveforms, "daqenergy": daqenergy, "baseline": baseline}
+    )
 
     return tb_data
 
@@ -394,3 +422,23 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
             guess.append(0)
             bounds.append(None)
     return guess, bounds
+
+
+def calculate_fft(tb_data, cut=1):
+    bls = tb_data["waveform"].values.nda
+    nev, size = bls.shape
+
+    sample_time_us = float(tb_data["waveform"].dt.nda[0]) / 1000
+    sampling_rate = 1 / sample_time_us
+    fft_size = size // 2 + 1
+
+    frequency = np.linspace(0, sampling_rate / 2, fft_size)
+    power_spectrum = np.zeros(fft_size, dtype=np.float64)
+
+    for bl in bls:
+        fft = np.fft.rfft(bl)
+        abs_fft = np.abs(fft)
+        power_spectrum += np.square(abs_fft)
+    power_spectrum /= nev
+
+    return frequency[cut:], power_spectrum[cut:]
