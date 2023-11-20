@@ -54,10 +54,11 @@ def load_data(
 
     out_df = pd.DataFrame(columns=params)
 
-
     if isinstance(files, dict):
-
-        keys = lh5.ls(files[list(files)[0]][0], lh5_path if lh5_path[-1] == "/" else lh5_path + "/")
+        keys = lh5.ls(
+            files[list(files)[0]][0],
+            lh5_path if lh5_path[-1] == "/" else lh5_path + "/",
+        )
         keys = [key.split("/")[-1] for key in keys]
         if list(files)[0] in cal_dict:
             params = get_params(keys + list(cal_dict[list(files)[0]].keys()), params)
@@ -90,7 +91,6 @@ def load_data(
         df = pd.concat(df)
 
     elif isinstance(files, list):
-
         keys = lh5.ls(files[0], lh5_path if lh5_path[-1] == "/" else lh5_path + "/")
         keys = [key.split("/")[-1] for key in keys]
         params = get_params(keys + list(cal_dict.keys()), params)

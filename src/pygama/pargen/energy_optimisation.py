@@ -956,13 +956,15 @@ def event_selection(
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
     Euc_min = threshold / guess_keV
     Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 5   / guess_keV
+    dEuc = 5 / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
         hist,
         bins,
         var,
-        np.array([238.632, 583.191, 727.330, 860.564, 1592.5, 1620.5, 2103.53, 2614.553]),
+        np.array(
+            [238.632, 583.191, 727.330, 860.564, 1592.5, 1620.5, 2103.53, 2614.553]
+        ),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
@@ -997,9 +999,9 @@ def event_selection(
     idx_list = get_wf_indexes(sort_index, idx_list_lens)
     idxs = np.array(sorted(np.concatenate(masks)))
 
-    input_data = sto.read_object(
-        f"{lh5_path}", raw_files, idx=idxs, n_rows=len(idxs)
-    )[0]
+    input_data = sto.read_object(f"{lh5_path}", raw_files, idx=idxs, n_rows=len(idxs))[
+        0
+    ]
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:
