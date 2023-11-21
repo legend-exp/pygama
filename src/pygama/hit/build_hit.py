@@ -136,10 +136,15 @@ def build_hit(
                 for high_lvl_flag, flags in cfg["aggregations"].items():
                     flags_list = list(flags.values())
                     rev_flags = [
-                        row[::-1] for row in outtbl_obj.get_dataframe(flags_list).values # "bit0" is the rightmost bit --> reverse columns
+                        row[::-1]
+                        for row in outtbl_obj.get_dataframe(
+                            flags_list
+                        ).values  # "bit0" is the rightmost bit --> reverse columns
                     ]
                     int_vals = [
-                        int("".join("1" if val else "0" for val in row), 2) # 2 for binary
+                        int(
+                            "".join("1" if val else "0" for val in row), 2
+                        )  # 2 for binary
                         for row in rev_flags
                     ]
                     int_vals = Array(np.array(int_vals))

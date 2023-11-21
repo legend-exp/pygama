@@ -96,8 +96,8 @@ def test_outputs_specification(dsp_test_file, tmptestdir):
     store = LH5Store()
     obj, _ = store.read_object("/geds/hit", outfile)
     assert list(obj.keys()) == ["calE", "AoE", "A_max"]
-    
-    
+
+
 def test_aggregation_outputs(dsp_test_file, tmptestdir):
     outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
@@ -110,18 +110,23 @@ def test_aggregation_outputs(dsp_test_file, tmptestdir):
 
     sto = LH5Store()
     obj, _ = sto.read_object("/geds/hit", outfile)
-    assert list(obj.keys()) == ["is_valid_rt", "is_valid_t0", "is_valid_tmax", "aggr1", "aggr2"]
-    
+    assert list(obj.keys()) == [
+        "is_valid_rt",
+        "is_valid_t0",
+        "is_valid_tmax",
+        "aggr1",
+        "aggr2",
+    ]
+
     df = store.load_dfs(outfile, ["aggr1", "aggr2"], "geds/hit/")
-    
-    assert df["aggr1"].dtype == 'int'
-    assert df["aggr2"].dtype == 'int'
-    
+
+    assert df["aggr1"].dtype == "int"
+    assert df["aggr2"].dtype == "int"
+
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max numer can be 3
     assert (df["aggr1"] > 7).any() == False
     assert (df["aggr2"] > 3).any() == False
-    
-    
+
 
 def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
     out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
