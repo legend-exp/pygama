@@ -123,9 +123,9 @@ def test_aggregation_outputs(dsp_test_file, tmptestdir):
     assert df["aggr1"].dtype == "int"
     assert df["aggr2"].dtype == "int"
 
-    # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max numer can be 3
-    assert (df["aggr1"] > 7).any() == False
-    assert (df["aggr2"] > 3).any() == False
+    # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
+    assert not (df["aggr1"] > 7).any()
+    assert not (df["aggr2"] > 3).any()
 
 
 def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
