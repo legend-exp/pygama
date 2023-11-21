@@ -9,7 +9,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-from lgdo import LH5Iterator, LH5Store, ls
+from lgdo import Array, LH5Iterator, LH5Store, ls
 
 log = logging.getLogger(__name__)
 
@@ -130,6 +130,20 @@ def build_hit(
             n_rows = min(tot_n_rows - start_row, n_rows)
 
             outtbl_obj = tbl_obj.eval(cfg["operations"])
+
+            # make high level flags
+            if "aggregations" in cfg:
+                for high_lvl_flag, flags in cfg["aggregations"].items():
+                    flags_list = list(flags.values())
+                    rev_flags = [
+                        row[::-1] for row in outtbl_obj.get_dataframe(flags_list).values # "bit0" is the rightmost bit --> reverse columns
+                    ]
+                    int_vals = [
+                        int("".join("1" if val else "0" for val in row), 2) # 2 for binary
+                        for row in rev_flags
+                    ]
+                    int_vals = Array(np.array(int_vals))
+                    outtbl_obj.add_field(high_lvl_flag, int_vals)
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary
