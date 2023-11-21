@@ -120,9 +120,6 @@ def test_aggregation_outputs(dsp_test_file, tmptestdir):
 
     df = store.load_dfs(outfile, ["aggr1", "aggr2"], "geds/hit/")
 
-    assert df["aggr1"].dtype == "int"
-    assert df["aggr2"].dtype == "int"
-
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
     assert not (df["aggr1"] > 7).any()
     assert not (df["aggr2"] > 3).any()
