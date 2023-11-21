@@ -135,20 +135,23 @@ def build_hit(
             if "aggregations" in cfg:
                 for high_lvl_flag, flags in cfg["aggregations"].items():
                     flags_list = list(flags.values())
-                    rev_flags = [
-                        row[::-1]
-                        for row in outtbl_obj.get_dataframe(
-                            flags_list
-                        ).values  # "bit0" is the rightmost bit --> reverse columns
-                    ]
-                    int_vals = [
-                        int(
-                            "".join("1" if val else "0" for val in row), 2
-                        )  # 2 for binary
-                        for row in rev_flags
-                    ]
-                    int_vals = Array(np.array(int_vals))
-                    outtbl_obj.add_field(high_lvl_flag, int_vals)
+                    n_flags = len(flags_list)
+                    if n_flags <= 8:
+                        flag_dtype = np.uint8
+                    elif n_flags <= 16:
+                        flag_dtype = np.uint16
+                    elif n_flags <= 32:
+                        flag_dtype = np.uint32
+                    else:
+                        flag_dtype = np.uint64
+
+                    df_flags = outtbl_obj.get_dataframe(flags_list)
+                    flag_values = df_flags.values.astype(flag_dtype)
+
+                    multiplier = 2 ** np.arange(n_flags, dtype=flag_values.dtype)
+                    flag_out = np.dot(flag_values, multiplier)
+
+                    outtbl_obj.add_field(high_lvl_flag, Array(flag_out))
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary
