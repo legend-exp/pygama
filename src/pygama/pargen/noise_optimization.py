@@ -65,14 +65,16 @@ def noise_optimization(
     """
 
     t0 = time.time()
-    tb_data = load_data(raw_list, lh5_path, n_events=opt_dict["n_events"])
+    tb_data = load_data(
+        raw_list,
+        lh5_path,
+        n_events=opt_dict["n_events"],
+        wf_field=opt_dict["wf_field"],
+    )
     t1 = time.time()
     log.info(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
     if verbose:
         print(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
-
-    with open(dsp_proc_chain) as r:
-        dsp_proc_chain = json.load(r)
 
     dsp_data = run_one_dsp(tb_data, dsp_proc_chain)
     cut_dict = generate_cuts(dsp_data, parameters=opt_dict["cut_pars"])
@@ -89,48 +91,53 @@ def noise_optimization(
 
     res_dict = {}
     if display > 0:
-        freq, pow_spectrum = calculate_fft(tb_data)
+        # fft
+        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
+        psd = np.mean(dsp_data["wf_psd"].values.nda, axis=0)
+        sample_us = float(tb_data[opt_dict["wf_field"]].dt.nda[0]) / 1000
+        freq = np.linspace(0, (1 / sample_us) / 2, len(psd))
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
-        ax.plot(freq, pow_spectrum)
+        ax.plot(freq, psd)
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel("frequency (MHz)", ha="right", x=1)
-        ax.set_ylabel(f"power spectral density", ha="right", y=1)
+        ax.set_xlabel("frequency (MHz)")
+        ax.set_ylabel(f"power spectral density")
 
         plot_dict = {}
         plot_dict["nopt"] = {}
         plot_dict["nopt"]["fft"] = {}
         plot_dict["nopt"]["fft"]["frequency"] = freq
-        plot_dict["nopt"]["fft"]["pow_spectrum"] = pow_spectrum
+        plot_dict["nopt"]["fft"]["psd"] = psd
         plot_dict["nopt"]["fft"]["fig"] = fig
 
+    result_dict = {}
     ene_pars = [par for par in opt_dict_par.keys()]
-    for ene_par in ene_pars:
-        log.info(f"\nRunning optimization for {ene_par} filter")
+    log.info(f"\nRunning optimization for {ene_pars}")
+    if verbose:
+        print(f"\nRunning optimization for {ene_pars}")
+    for i, x in enumerate(samples):
+        x = f"{x:.1f}"
+        log.info(f"\nCase {i}, par = {x} us")
         if verbose:
-            print(f"\nRunning optimization for {ene_par} filter")
-        wf_par = opt_dict_par[ene_par]["waveform_out"]
-        dict_str = opt_dict_par[ene_par]["dict_str"]
-        filter_par = opt_dict_par[ene_par]["filter_par"]
-        ene_str = opt_dict_par[ene_par]["ene_str"]
-        if display > 0:
-            plot_dict["nopt"][dict_str] = {}
-            par_dict_plot = plot_dict["nopt"][dict_str]
-
-        dsp_proc_chain["outputs"] = [ene_str]
-        sample_list, fom_list, fom_err_list = [], [], []
-        for i, x in enumerate(samples):
-            x = f"{x:.1f}"
-            log.info(f"\nCase {i}, par = {x} us")
-            if verbose:
-                print(f"\nCase {i}, par = {x} us")
+            print(f"\nCase {i}, par = {x} us")
+        for ene_par in ene_pars:
+            dict_str = opt_dict_par[ene_par]["dict_str"]
+            filter_par = opt_dict_par[ene_par]["filter_par"]
             par_dsp[lh5_path][dict_str][filter_par] = f"{x}*us"
 
-            t2 = time.time()
-            dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
-            log.info(f"Time to process dsp data {time.time()-t2:.2f} s")
-            if verbose:
-                print(f"Time to process dsp data {time.time()-t2:.2f} s")
+        t2 = time.time()
+        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
+        log.info(f"Time to process dsp data {time.time()-t2:.2f} s")
+        if verbose:
+            print(f"Time to process dsp data {time.time()-t2:.2f} s")
+
+        for ene_par in ene_pars:
+            dict_str = opt_dict_par[ene_par]["dict_str"]
+            ene_str = opt_dict_par[ene_par]["ene_str"]
+            if dict_str not in result_dict:
+                result_dict[dict_str] = {}
+            par_dict_res = result_dict[dict_str]
+
             energies = dsp_data[ene_str].nda
 
             if opt_dict["perform_fit"]:
@@ -142,17 +149,28 @@ def noise_optimization(
                     opt_dict["percentile_high"],
                     opt_dict["n_bootstrap_samples"],
                 )
-            sample_list.append(float(x))
-            fom_list.append(fom_results["fom"])
-            fom_err_list.append(fom_results["fom_err"])
-            if display > 0:
-                par_dict_plot[x] = {}
-                par_dict_plot[x]["energies"] = energies
-                par_dict_plot[x]["fom"] = fom_results["fom"]
-                par_dict_plot[x]["fom_err"] = fom_results["fom_err"]
-        sample_list = np.array(sample_list)
-        fom_list = np.array(fom_list)
-        fom_err_list = np.array(fom_err_list)
+
+            par_dict_res[x] = {}
+            par_dict_res[x]["energies"] = energies
+            par_dict_res[x]["fom"] = fom_results["fom"]
+            par_dict_res[x]["fom_err"] = fom_results["fom_err"]
+
+    for ene_par in ene_pars:
+        log.info(f"\nOptimization for {ene_par}")
+        if verbose:
+            print(f"\nOptimization for {ene_par}")
+        dict_str = opt_dict_par[ene_par]["dict_str"]
+        par_dict_res = result_dict[dict_str]
+        sample_list = np.array([float(x) for x in result_dict[dict_str].keys()])
+        fom_list = np.array(
+            [result_dict[dict_str][x]["fom"] for x in result_dict[dict_str].keys()]
+        )
+        fom_err_list = np.array(
+            [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str].keys()]
+        )
+
+        print(ene_par, sample_list)
+        print(ene_par, fom_list)
 
         guess_par = sample_list[np.nanargmin(fom_list)]
         if verbose:
@@ -188,9 +206,9 @@ def noise_optimization(
         if verbose:
             print(f"best par: {best_par:.2f} ± {best_par_err:.2f} us")
 
-        par_dict_plot["best_par"] = best_par
-        par_dict_plot["best_par_err"] = best_par_err
-        par_dict_plot["best_val"] = best_val
+        par_dict_res["best_par"] = best_par
+        par_dict_res["best_par_err"] = best_par_err
+        par_dict_res["best_val"] = best_val
 
         res_dict[dict_str] = {
             filter_par: f"{best_par:.2f}*us",
@@ -202,8 +220,8 @@ def noise_optimization(
             fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
             for i, x in enumerate(sample_list):
                 x = f"{x:.1f}"
-                energies = par_dict_plot[x]["energies"]
-                par_dict_plot[x].pop("energies")
+                energies = par_dict_res[x]["energies"]
+                par_dict_res[x].pop("energies")
                 hist, bins, var = get_hist(
                     energies, range=plot_range, dx=opt_dict["dx"]
                 )
@@ -218,7 +236,7 @@ def noise_optimization(
             ax.set_xlabel("energy (ADC)")
             ax.set_ylabel("counts")
             ax.legend(loc="upper right")
-            par_dict_plot["distribution"] = fig
+            par_dict_res["distribution"] = fig
             if display > 1:
                 plt.show()
             else:
@@ -255,7 +273,8 @@ def noise_optimization(
                 plt.show()
             else:
                 plt.close()
-            par_dict_plot["optimization"] = fig
+            par_dict_res["optimization"] = fig
+            plot_dict["nopt"][dict_str] = par_dict_res
 
     log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
     if verbose:
@@ -272,6 +291,7 @@ def load_data(
     bls: bool = True,
     n_events: int = 10000,
     threshold: int = 200,
+    wf_field="waveform",
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
 
@@ -283,7 +303,7 @@ def load_data(
         idxs = np.where(energies.nda > threshold)[0]
 
     waveforms = sto.read_object(
-        f"{lh5_path}/raw/waveform", raw_list, n_rows=n_events, idx=idxs
+        f"{lh5_path}/raw/{wf_field}", raw_list, n_rows=n_events, idx=idxs
     )[0]
     daqenergy = sto.read_object(
         f"{lh5_path}/raw/daqenergy", raw_list, n_rows=n_events, idx=idxs
@@ -295,7 +315,6 @@ def load_data(
     tb_data = lh5.Table(
         col_dict={"waveform": waveforms, "daqenergy": daqenergy, "baseline": baseline}
     )
-
     return tb_data
 
 
@@ -422,23 +441,3 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
             guess.append(0)
             bounds.append(None)
     return guess, bounds
-
-
-def calculate_fft(tb_data, cut=1):
-    bls = tb_data["waveform"].values.nda
-    nev, size = bls.shape
-
-    sample_time_us = float(tb_data["waveform"].dt.nda[0]) / 1000
-    sampling_rate = 1 / sample_time_us
-    fft_size = size // 2 + 1
-
-    frequency = np.linspace(0, sampling_rate / 2, fft_size)
-    power_spectrum = np.zeros(fft_size, dtype=np.float64)
-
-    for bl in bls:
-        fft = np.fft.rfft(bl)
-        abs_fft = np.abs(fft)
-        power_spectrum += np.square(abs_fft)
-    power_spectrum /= nev
-
-    return frequency[cut:], power_spectrum[cut:]
