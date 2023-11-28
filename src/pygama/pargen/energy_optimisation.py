@@ -960,7 +960,10 @@ def event_selection(
     dEuc = 1  # / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
-        hist, bins, var, peaks_keV, n_sigma=3
+        hist,
+        bins,
+        var,
+        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2103.53, 2614.553]),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
