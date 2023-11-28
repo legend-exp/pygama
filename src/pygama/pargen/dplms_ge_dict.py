@@ -34,7 +34,6 @@ from pygama.pargen.energy_optimisation import (
     event_selection,
     fom_FWHM,
     fom_FWHM_with_dt_corr_fit,
-    index_data,
 )
 
 log = logging.getLogger(__name__)
@@ -43,8 +42,8 @@ sto = lh5.LH5Store()
 
 def dplms_ge_dict(
     lh5_path: str,
-    fft_files: list[str],
-    cal_files: list[str],
+    raw_fft: lgdo.Table,
+    raw_cal: lgdo.Table,
     dsp_config: dict,
     par_dsp: dict,
     par_dsp_lh5: str,
@@ -60,10 +59,10 @@ def dplms_ge_dict(
     ----------
     lh5_path: str
         Name of channel to process, should be name of lh5 group in raw files
-    fft_files : list[str]
-        raw files with fft data
-    cal_files : list[str]
-        raw files with cal data
+    fft_files : lgdo.Table
+        table with fft data
+    raw_cal : lgdo.Table
+        table with cal data
     dsp_config: dict
         dsp config file
     par_dsp: dict
@@ -80,22 +79,20 @@ def dplms_ge_dict(
 
     t0 = time.time()
     log.info(f"\nSelecting baselines")
-    raw_bls = load_data(fft_files, lh5_path, "bls", n_events=dplms_dict["n_baselines"])
-
-    dsp_bls = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
-    cut_dict = generate_cuts(dsp_bls, parameters=dplms_dict["bls_cut_pars"])
-    idxs = get_cut_indexes(dsp_bls, cut_dict)
+    dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp[lh5_path])
+    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
+    idxs = get_cut_indexes(dsp_fft, cut_dict)
     bl_field = dplms_dict["bl_field"]
-    log.info(f"... {len(dsp_bls[bl_field].values.nda[idxs,:])} baselines after cuts")
+    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
 
-    bls = dsp_bls[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
+    bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
     bls_cut_pars = [par for par in dplms_dict["bls_cut_pars"].keys()]
     for par in bls_cut_pars:
-        bls_par[par] = dsp_bls[par].nda
+        bls_par[par] = dsp_fft[par].nda
     t1 = time.time()
     log.info(
-        f"total events {len(raw_bls)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
+        f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
     )
 
     log.info(
@@ -111,36 +108,16 @@ def dplms_ge_dict(
     log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
 
     log.info("\nSelecting signals")
-    peaks_keV = np.array(dplms_dict["peaks_keV"])
     wsize = dplms_dict["wsize"]
     wf_field = dplms_dict["wf_field"]
+    peaks_keV = np.array(dplms_dict["peaks_keV"])
     kev_widths = [tuple(kev_width) for kev_width in dplms_dict["kev_widths"]]
 
-    raw_cal, idx_list = event_selection(
-        cal_files,
-        f"{lh5_path}/raw",
-        dsp_config,
-        par_dsp[lh5_path],
-        peaks_keV,
-        np.arange(0, len(peaks_keV), 1).tolist(),
-        kev_widths,
-        cut_parameters=dplms_dict["wfs_cut_pars"],
-        n_events=dplms_dict["n_signals"],
-    )
-    t3 = time.time()
-    log.info(
-        f"Time to run event selection {(t3-t2):.2f} s, total events {len(raw_cal)}"
-    )
-
-    raw_cal = index_data(raw_cal, idx_list[-1])
     log.info(f"Produce dsp data for {len(raw_cal)} events")
     dsp_cal = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
-    t4 = time.time()
-    log.info(f"Time to run dsp production {(t4-t3):.2f} s")
+    t3 = time.time()
+    log.info(f"Time to run dsp production {(t3-t2):.2f} s")
 
-    # minimal processing chain
-    with open(dsp_config) as r:
-        dsp_config = json.load(r)
     dsp_config["outputs"] = [ene_par, "dt_eff"]
 
     # dictionary for peak fitting
@@ -155,7 +132,6 @@ def dplms_ge_dict(
     if display > 0:
         plot_dict = {}
         plot_dict["dplms"] = {}
-        fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
 
     # penalized coefficients
     dp_coeffs = dplms_dict["dp_coeffs"]
@@ -209,10 +185,6 @@ def dplms_ge_dict(
         log.info(
             f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area", np.sum(x)
         )
-
-        t_tmp = time.time()
-        dsp_opt = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
-        energies = dsp_opt[ene_par].nda
 
         t_tmp = time.time()
         dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
@@ -447,76 +419,6 @@ def dplms_ge_dict(
         return out_dict, plot_dict
     else:
         return out_dict
-
-
-def load_data(
-    raw_file: list[str],
-    lh5_path: str,
-    sel_type: str,
-    peaks: np.array = [],
-    n_events: int = 5000,
-    e_lower_lim: float = 1200,
-    e_upper_lim: float = 2700,
-) -> lgdo.Table:
-    sto = lh5.LH5Store()
-
-    daqenergy = sto.read_object(f"{lh5_path}/raw/daqenergy", raw_file)[0].nda
-
-    if sel_type == "bls":
-        cuts = np.where(daqenergy == 0)[0]
-        idx_list = []
-        tb_data = sto.read_object(
-            f"{lh5_path}/raw", raw_file, n_rows=n_events, idx=cuts
-        )[0]
-        return tb_data
-    else:
-        pulser_props = find_pulser_properties(df, energy="daqenergy")
-        if len(pulser_props) > 0:
-            final_mask = None
-            for entry in pulser_props:
-                pulser_e, pulser_err = entry[0], entry[1]
-                if pulser_err < 10:
-                    pulser_err = 10
-                e_cut = (daqenergy < pulser_e + pulser_err) & (
-                    daqenergy > pulser_e - pulser_err
-                )
-                if final_mask is None:
-                    final_mask = e_cut
-                else:
-                    final_mask = final_mask | e_cut
-            ids = final_mask
-            log.debug(f"pulser found: {pulser_props}")
-        else:
-            log.debug("no pulser")
-            ids = np.zeros(len(daqenergy), dtype=bool)
-
-        # Get events around peak using raw file values
-        initial_mask = (daqenergy > 0) & (~ids)
-        rough_energy = daqenergy[initial_mask]
-        initial_idxs = np.where(initial_mask)[0]
-
-        guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-        Euc_min = 0  # threshold / guess_keV * 0.6
-        Euc_max = 2620 / guess_keV * 1.1
-        dEuc = 1  # / guess_keV
-        hist, bins, var = get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
-        detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(
-            hist, bins, var, peaks
-        )
-        log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
-        e_lower_lim = (e_lower_lim - roughpars[1]) / roughpars[0]
-        e_upper_lim = (e_upper_lim - roughpars[1]) / roughpars[0]
-        log.debug(f"lower_lim: {e_lower_lim}, upper_lim: {e_upper_lim}")
-        mask = (rough_energy > e_lower_lim) & (rough_energy < e_upper_lim)
-        cuts = initial_idxs[mask][:]
-        log.debug(f"{len(cuts)} events found in energy range")
-        rough_energy = rough_energy[mask]
-        rough_energy = rough_energy[:n_events]
-        rough_energy = rough_energy * roughpars[0] + roughpars[1]
-        tb_data = sto.read_object(
-            f"{lh5_path}/raw", raw_file, n_rows=n_events, idx=cuts
-        )[0]
-        return tb_data, rough_energy
 
 
 def is_valid_centroid(
