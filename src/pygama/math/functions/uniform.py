@@ -87,7 +87,7 @@ def nb_uniform_cdf(x: np.ndarray, a: float, b: float) -> np.ndarray:
 
 
 @nb.njit(**kwd)
-def nb_uniform_scaled_pdf(x: np.ndarray, a: float, b: float, area: float) -> np.ndarray:
+def nb_uniform_scaled_pdf(x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
     r"""
     Scaled uniform probability distribution, w/ args: a, b.
     As a Numba JIT function, it runs slightly faster than
@@ -98,19 +98,19 @@ def nb_uniform_scaled_pdf(x: np.ndarray, a: float, b: float, area: float) -> np.
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     a
         The lower edge of the distribution
     b
         The upper edge of the distribution
-    area
-        The number of counts in the signal
     """ 
 
     return area * nb_uniform_pdf(x, a, b)
 
 
 @nb.njit(**kwd)
-def nb_uniform_scaled_cdf(x: np.ndarray, a: float, b: float, area: float) -> np.ndarray:
+def nb_uniform_scaled_cdf(x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
     r"""
     Uniform cdf scaled by the area, used for extended binned fits 
     As a Numba JIT function, it runs slightly faster than
@@ -121,12 +121,12 @@ def nb_uniform_scaled_cdf(x: np.ndarray, a: float, b: float, area: float) -> np.
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     a
         The lower edge of the distribution
     b
         The upper edge of the distribution
-    area
-        The number of counts in the signal
     """ 
     
     return area * nb_uniform_cdf(x, a, b)
@@ -155,15 +155,15 @@ class uniform_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, a: float, b: float) -> np.ndarray:
         return nb_uniform_cdf(x, a, b)
 
-    def pdf_norm(self, x: np.ndarray, a: float, b: float) -> np.ndarray: 
-        return self._pdf_norm(x, self.x_lo, self.x_hi, a, b)
-    def cdf_norm(self, x: np.ndarray, a: float, b: float) -> np.ndarray: 
-        return self._cdf_norm(x, self.x_lo, self.x_hi, a, b)
+    def pdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, a: float, b: float) -> np.ndarray: 
+        return self._pdf_norm(x, x_lo, x_hi, a, b)
+    def cdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, a: float, b: float) -> np.ndarray: 
+        return self._cdf_norm(x, x_lo, x_hi, a, b)
 
-    def pdf_ext(self, x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
-        return np.sum(nb_uniform_scaled_cdf(np.array([self.x_lo, self.x_hi]), a, b, area)), nb_uniform_scaled_pdf(x, a, b, area)
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi:float, area: float, a: float, b: float) -> np.ndarray:
+        return np.diff(nb_uniform_scaled_cdf(np.array([x_lo, x_hi]), area, a, b))[0], nb_uniform_scaled_pdf(x, area, a, b)
     def cdf_ext(self, x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
-        return nb_uniform_scaled_cdf(x, a, b, area)
+        return nb_uniform_scaled_cdf(x, area, a, b)
 
     def required_args(self) -> tuple[str, str]:
         return "a", "b"

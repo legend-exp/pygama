@@ -9,8 +9,7 @@ import os
 from collections import OrderedDict
 
 import numpy as np
-
-from pygama.lgdo import LH5Iterator, LH5Store, ls
+from lgdo import LH5Iterator, LH5Store, ls
 
 log = logging.getLogger(__name__)
 
@@ -91,7 +90,7 @@ def build_hit(
             with open(tbl_cfg) as f:
                 tbl_cfg = json.load(f)
 
-        for (k, v) in tbl_cfg.items():
+        for k, v in tbl_cfg.items():
             if isinstance(v, str):
                 with open(v) as f:
                     # order in hit configs is important (dependencies)
@@ -120,7 +119,7 @@ def build_hit(
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
 
     first_done = False
-    for (tbl, cfg) in lh5_tables_config.items():
+    for tbl, cfg in lh5_tables_config.items():
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
         tot_n_rows = store.read_n_rows(tbl, infile)
         write_offset = 0

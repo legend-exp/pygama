@@ -1,18 +1,19 @@
+import json
 import os
 from pathlib import Path
 
+import lgdo.lh5_store as store
 import numpy as np
 import pytest
+from lgdo import LH5Store, ls
 
-import pygama.lgdo.lh5_store as store
 from pygama.hit import build_hit
-from pygama.lgdo import LH5Store, ls
 
 config_dir = Path(__file__).parent / "configs"
 
 
-def test_basics(dsp_test_file):
-    outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+def test_basics(dsp_test_file, tmptestdir):
+    outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
     build_hit(
         dsp_test_file,
@@ -44,8 +45,8 @@ def test_illegal_arguments(dsp_test_file):
         )
 
 
-def test_lh5_table_configs(dsp_test_file):
-    outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+def test_lh5_table_configs(dsp_test_file, tmptestdir):
+    outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
     lh5_tables_config = {"/geds/dsp": f"{config_dir}/basic-hit-config.json"}
 
@@ -83,8 +84,8 @@ def test_lh5_table_configs(dsp_test_file):
     assert ls(outfile, "/geds/") == ["geds/hit"]
 
 
-def test_outputs_specification(dsp_test_file):
-    outfile = "/tmp/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+def test_outputs_specification(dsp_test_file, tmptestdir):
+    outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
 
     build_hit(
         dsp_test_file,
@@ -98,8 +99,8 @@ def test_outputs_specification(dsp_test_file):
     assert list(obj.keys()) == ["calE", "AoE", "A_max"]
 
 
-def test_build_hit_spms_basic(dsp_test_file_spm):
-    out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
+def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
+    out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
     build_hit(
         dsp_test_file_spm,
         outfile=out_file,
@@ -115,13 +116,22 @@ def test_build_hit_spms_basic(dsp_test_file_spm):
     ]
 
 
-def test_build_hit_spms_multiconfig(dsp_test_file_spm):
-    out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
+def test_build_hit_spms_multiconfig(dsp_test_file_spm, tmptestdir):
+    out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
+
+    # append the tmptestdir to the start of paths in the spms-hit-multi-config.json
+    with open(f"{config_dir}/spms-hit-multi-config.json") as f:
+        configdict = json.load(f)
+    for key in configdict.keys():
+        configdict[key] = f"{config_dir}/" + configdict[key].split("/")[-1]
+    newdict = json.dumps(configdict)
+    with open(f"{tmptestdir}/spms-hit-multi-config.json", "w") as file:
+        file.write(newdict)
 
     build_hit(
         dsp_test_file_spm,
         outfile=out_file,
-        lh5_tables_config=f"{config_dir}/spms-hit-multi-config.json",
+        lh5_tables_config=f"{tmptestdir}/spms-hit-multi-config.json",
         wo_mode="overwrite",
     )
     assert ls(out_file) == ["ch0", "ch1", "ch2"]
@@ -133,8 +143,8 @@ def test_build_hit_spms_multiconfig(dsp_test_file_spm):
     ]
 
 
-def test_build_hit_spms_calc(dsp_test_file_spm):
-    out_file = "/tmp/L200-comm-20211130-phy-spms_hit.lh5"
+def test_build_hit_spms_calc(dsp_test_file_spm, tmptestdir):
+    out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
 
     build_hit(
         dsp_test_file_spm,

@@ -1,0 +1,328 @@
+{
+  "outputs": [
+    "tp_min",
+    "tp_max",
+    "wf_min",
+    "wf_max",
+    "bl_mean",
+    "bl_std",
+    "bl_slope",
+    "bl_intercept",
+    "pz_slope",
+    "pz_std",
+    "pz_mean",
+    "trapTmax",
+    "tp_0_est",
+    "tp_0_atrap",
+    "tp_10",
+    "tp_20",
+    "tp_50",
+    "tp_80",
+    "tp_90",
+    "tp_99",
+    "tp_100",
+    "tp_01",
+    "tp_95",
+    "A_max",
+    "QDrift",
+    "dt_eff",
+    "tp_aoe_max",
+    "tp_aoe_samp",
+    "trapEmax",
+    "trapEftp",
+    "cuspEmax",
+    "zacEmax",
+    "zacEftp",
+    "cuspEftp"
+  ],
+  "processors": {
+    "tp_min, tp_max, wf_min, wf_max": {
+      "function": "min_max",
+      "module": "dspeed.processors",
+      "args": ["waveform", "tp_min", "tp_max", "wf_min", "wf_max"],
+      "unit": ["ns", "ns", "ADC", "ADC"]
+    },
+    "wf_blsub": {
+      "function": "bl_subtract",
+      "module": "dspeed.processors",
+      "args": ["waveform", "baseline", "wf_blsub"],
+      "unit": "ADC"
+    },
+    "bl_mean , bl_std, bl_slope, bl_intercept": {
+      "function": "linear_slope_fit",
+      "module": "dspeed.processors",
+      "args": [
+        "wf_blsub[0:750]",
+        "bl_mean",
+        "bl_std",
+        "bl_slope",
+        "bl_intercept"
+      ],
+      "unit": ["ADC", "ADC", "ADC", "ADC"]
+    },
+    "wf_pz": {
+      "function": "pole_zero",
+      "module": "dspeed.processors",
+      "args": ["wf_blsub", "db.pz.tau", "wf_pz"],
+      "unit": "ADC",
+      "defaults": { "db.pz.tau": "27460.5" }
+    },
+    "pz_mean , pz_std, pz_slope, pz_intercept": {
+      "function": "linear_slope_fit",
+      "module": "dspeed.processors",
+      "args": ["wf_pz[1500:]", "pz_mean", "pz_std", "pz_slope", "pz_intercept"],
+      "unit": ["ADC", "ADC", "ADC", "ADC"]
+    },
+    "wf_t0_filter": {
+      "function": "t0_filter",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "wf_t0_filter(len(wf_pz), 'f', grid=wf_pz.grid)"],
+      "init_args": ["128*ns/wf_pz.period", "2*us/wf_pz.period"],
+      "unit": "ADC"
+    },
+    "wf_atrap": {
+      "function": "asym_trap_filter",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "128*ns", "4", "2*us", "wf_atrap"],
+      "unit": "ADC"
+    },
+    "conv_tmin ,tp_start, conv_min, conv_max": {
+      "function": "min_max",
+      "module": "dspeed.processors",
+      "args": ["wf_t0_filter", "conv_tmin", "tp_start", "conv_min", "conv_max"],
+      "unit": ["ns", "ns", "ADC", "ADC"]
+    },
+    "tp_0_atrap": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_atrap", "bl_std", "tp_start", 0, "tp_0_atrap"],
+      "unit": "ns"
+    },
+    "tp_0_est": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_t0_filter", "bl_std", "tp_start", 0, "tp_0_est(unit=ns)"],
+      "unit": "ns"
+    },
+    "wf_trap": {
+      "function": "trap_norm",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "db.ttrap.rise", "db.ttrap.flat", "wf_trap"],
+      "unit": "ADC",
+      "defaults": { "db.ttrap.rise": "10*us", "db.ttrap.flat": "3.008*us" }
+    },
+    "trapTmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_trap", 1, "trapTmax"],
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
+      "unit": "ADC"
+    },
+    "wf_etrap": {
+      "function": "trap_norm",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "db.etrap.rise", "db.etrap.flat", "wf_etrap"],
+      "unit": "ADC",
+      "defaults": { "db.etrap.rise": "10*us", "db.etrap.flat": "3.008*us" }
+    },
+    "trapEmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_etrap", 1, "trapEmax"],
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
+      "unit": "ADC"
+    },
+    "trapEftp": {
+      "function": "fixed_time_pickoff",
+      "module": "dspeed.processors",
+      "args": [
+        "wf_etrap",
+        "tp_0_est+db.etrap.rise+db.etrap.flat*db.etrap.sample",
+        "'l'",
+        "trapEftp"
+      ],
+      "unit": "ADC",
+      "defaults": {
+        "db.etrap.rise": "10*us",
+        "db.etrap.flat": "3*us",
+        "db.etrap.sample": "0.8"
+      }
+    },
+    "wf_cusp": {
+      "function": "cusp_filter",
+      "module": "dspeed.processors",
+      "args": ["wf_blsub", "wf_cusp(101, 'f')"],
+      "init_args": [
+        "len(wf_blsub)-100",
+        "db.cusp.sigma/wf_blsub.period",
+        "round(db.cusp.flat/wf_blsub.period)",
+        "db.pz.tau"
+      ],
+      "defaults": {
+        "db.cusp.sigma": "20*us",
+        "db.cusp.flat": "3*us",
+        "db.pz.tau": "27460.5"
+      },
+      "unit": "ADC"
+    },
+    "cuspEmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_cusp", 1, "cuspEmax"],
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
+      "unit": "ADC"
+    },
+    "cuspEftp": {
+      "function": "fixed_time_pickoff",
+      "module": "dspeed.processors",
+      "args": ["wf_cusp", "db.cusp.sample", "'i'", "cuspEftp"],
+      "unit": "ADC",
+      "defaults": { "db.cusp.sample": "50" }
+    },
+    "wf_zac": {
+      "function": "zac_filter",
+      "module": "dspeed.processors",
+      "args": ["wf_blsub", "wf_zac(101, 'f')"],
+      "init_args": [
+        "len(wf_blsub)-100",
+        "db.zac.sigma/wf_blsub.period",
+        "round(db.zac.flat/wf_blsub.period)",
+        "db.pz.tau"
+      ],
+      "defaults": {
+        "db.zac.sigma": "20*us",
+        "db.zac.flat": "3*us",
+        "db.pz.tau": "27460.5"
+      },
+      "unit": "ADC"
+    },
+    "zacEmax": {
+      "function": "amax",
+      "module": "numpy",
+      "args": ["wf_zac", 1, "zacEmax"],
+      "kwargs": { "signature": "(n),()->()", "types": ["fi->f"] },
+      "unit": "ADC"
+    },
+    "zacEftp": {
+      "function": "fixed_time_pickoff",
+      "module": "dspeed.processors",
+      "args": ["wf_zac", "db.zac.sample", "'i'", "zacEftp"],
+      "defaults": { "db.zac.sample": "50" },
+      "unit": "ADC"
+    },
+    "tp_100": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax", "tp_0_est", 1, "tp_100"],
+      "unit": "ns"
+    },
+    "tp_99": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "0.99*trapTmax", "tp_0_est", 1, "tp_99"],
+      "unit": "ns"
+    },
+    "tp_95": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.95", "tp_99", 0, "tp_95"],
+      "unit": "ns"
+    },
+    "tp_90": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.9", "tp_95", 0, "tp_90"],
+      "unit": "ns"
+    },
+    "tp_80": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.8", "tp_90", 0, "tp_80"],
+      "unit": "ns"
+    },
+    "tp_50": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.5", "tp_80", 0, "tp_50"],
+      "unit": "ns"
+    },
+    "tp_20": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.2", "tp_50", 0, "tp_20"],
+      "unit": "ns"
+    },
+    "tp_10": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.1", "tp_20", 0, "tp_10"],
+      "unit": "ns"
+    },
+    "tp_01": {
+      "function": "time_point_thresh",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "trapTmax*0.01", "tp_10", 0, "tp_01"],
+      "unit": "ns"
+    },
+    "wf_trap2": {
+      "function": "trap_norm",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "4*us", "96*ns", "wf_trap2"],
+      "unit": "ADC"
+    },
+    "trapQftp": {
+      "function": "fixed_time_pickoff",
+      "module": "dspeed.processors",
+      "args": ["wf_trap2", "tp_0_est + 8.096*us", "'l'", "trapQftp"],
+      "unit": "ADC"
+    },
+    "QDrift": {
+      "function": "multiply",
+      "module": "numpy",
+      "args": ["trapQftp", "(4*us)/waveform.period", "QDrift"],
+      "unit": "ADC"
+    },
+    "dt_eff": {
+      "function": "divide",
+      "module": "numpy",
+      "args": ["QDrift", "trapTmax", "dt_eff"],
+      "unit": "ns"
+    },
+    "wf_le": {
+      "function": "windower",
+      "module": "dspeed.processors",
+      "args": ["wf_pz", "tp_0_est", "wf_le(301, 'f')"],
+      "unit": "ADC"
+    },
+    "curr": {
+      "function": "avg_current",
+      "module": "dspeed.processors",
+      "args": ["wf_le", 1, "curr(len(wf_le)-1, 'f')"],
+      "unit": "ADC/sample"
+    },
+    "curr_up": {
+      "function": "upsampler",
+      "module": "dspeed.processors",
+      "args": ["curr", "16", "curr_up(4784, 'f')"],
+      "unit": "ADC/sample"
+    },
+    "curr_av": {
+      "function": "moving_window_multi",
+      "module": "dspeed.processors",
+      "args": ["curr_up", "48", 3, 0, "curr_av"],
+      "unit": "ADC/sample"
+    },
+    "aoe_t_min, tp_aoe_max, A_min, A_max": {
+      "function": "min_max",
+      "module": "dspeed.processors",
+      "args": ["curr_av", "aoe_t_min", "tp_aoe_max", "A_min", "A_max"],
+      "unit": ["ns", "ns", "ADC/sample", "ADC/sample"]
+    },
+    "tp_aoe_samp": {
+      "function": "add",
+      "module": "numpy",
+      "args": ["tp_0_est", "tp_aoe_max/16", "tp_aoe_samp"],
+      "unit": "ns"
+    }
+  }
+}

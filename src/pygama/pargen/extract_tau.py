@@ -12,12 +12,14 @@ import pickle as pkl
 from collections import OrderedDict
 
 import matplotlib as mpl
+
+mpl.use("agg")
+import lgdo
+import lgdo.lh5_store as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 
-import pygama
-import pygama.lgdo as lgdo
-import pygama.lgdo.lh5_store as lh5
+import pygama.math.binned_fitting as pgbf
 import pygama.math.histogram as pgh
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
@@ -26,39 +28,52 @@ import pygama.pargen.energy_optimisation as om
 log = logging.getLogger(__name__)
 
 
-def run_tau(
+def load_data(
     raw_file: list[str],
-    config: dict,
     lh5_path: str,
+    pulser_mask=None,
     n_events: int = 10000,
     threshold: int = 5000,
+    wf_field: str = "waveform",
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
 
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
-    if len(pulser_props) > 0:
-        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
-        ids = ~(out_df.isPulser == 1)
-        log.debug(f"pulser found: {pulser_props}")
+    if pulser_mask is None:
+        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+        if len(pulser_props) > 0:
+            final_mask = None
+            for entry in pulser_props:
+                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                    df.daqenergy.values > entry[0] - entry[1]
+                )
+                if final_mask is None:
+                    final_mask = e_cut
+                else:
+                    final_mask = final_mask | e_cut
+            ids = final_mask
+            log.debug(f"pulser found: {pulser_props}")
+        else:
+            log.debug("no_pulser")
+            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
     else:
-        log.debug("no_pulser")
-        ids = np.ones(len(df.daqenergy.values), dtype=bool)
+        ids = pulser_mask
 
-    cuts = np.where((df.daqenergy.values > threshold) & (ids))[0]
+    cuts = np.where((df.daqenergy.values > threshold) & (~ids))[0]
 
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", raw_file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
     )[0]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return tb_data
 
 
-def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -> dict:
-
+def get_decay_constant(
+    slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
+) -> dict:
     """
     Finds the decay constant from the modal value of the tail slope after cuts
     and saves it to the specified json.
@@ -80,26 +95,42 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
 
     pz = tau_dict.get("pz")
 
-    counts, bins, var = pgh.get_hist(slopes, bins=50000, range=(-0.01, 0))
+    counts, bins, var = pgh.get_hist(slopes, bins=100000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
-    tau = round(-1 / (bin_centres[np.argmax(counts)]), 1)
+    high_bin = bin_centres[np.argmax(counts)]
+    try:
+        pars, cov = pgbf.gauss_mode_width_max(
+            counts,
+            bins,
+            n_bins=10,
+            cost_func="Least Squares",
+            inflate_errors=False,
+            gof_method="var",
+        )
+        if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
+            raise ValueError
+        high_bin = pars[0]
+    except:
+        pass
+    tau = round(-1 / (high_bin), 1)
+
+    sampling_rate = wfs["dt"].nda[0]
+    units = wfs["dt"].attrs["units"]
+    tau = f"{tau*sampling_rate}*{units}"
 
     tau_dict["pz"] = {"tau": tau}
-    if plot_path is None:
-        return tau_dict
-    else:
+    if display > 0:
         out_plot_dict = {}
-        pathlib.Path(os.path.dirname(plot_path)).mkdir(parents=True, exist_ok=True)
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
-        bins = 10000  # change if needed
+        bins = np.linspace(-0.01, 0, 100000)  # change if needed
         counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
         plot_max = np.argmax(counts)
-        in_min = plot_max - 10
+        in_min = plot_max - 20
         if in_min < 0:
             in_min = 0
-        in_max = plot_max + 11
+        in_max = plot_max + 21
         if in_max >= len(bins):
             in_min = len(bins) - 1
         plt.xlabel("Slope")
@@ -111,33 +142,27 @@ def get_decay_constant(slopes: np.array, wfs: np.array, plot_path: str = None) -
             bins=200,
             histtype="step",
         )
+        axins.axvline(high_bin, color="red")
         axins.set_xlim(bins[in_min], bins[in_max])
         labels = ax.get_xticklabels()
         ax.set_xticklabels(labels=labels, rotation=45)
         out_plot_dict["slope"] = fig
-        plt.close()
-
-        wf_idxs = np.random.choice(len(wfs), 100)
-        fig2 = plt.figure()
-        for wf_idx in wf_idxs:
-            plt.plot(np.arange(0, len(wfs[wf_idx]), 1), wfs[wf_idx])
-        plt.xlabel("Samples")
-        plt.ylabel("ADU")
-        out_plot_dict["waveforms"] = fig2
-        with open(plot_path, "wb") as f:
-            pkl.dump(out_plot_dict, f)
-        plt.close()
+        if display > 1:
+            plt.show()
+        else:
+            plt.close()
+        return tau_dict, out_plot_dict
+    else:
         return tau_dict
 
 
 def fom_dpz(tb_data, verbosity=0, rand_arg=None):
-
     std = tb_data["pz_std"].nda
-    counts, start_bins, var = pgh.get_hist(std, 10**5)
+    counts, start_bins, var = pgh.get_hist(std, dx=0.1, range=(0, 400))
     max_idx = np.argmax(counts)
     mu = start_bins[max_idx]
     try:
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, cov = pgbf.gauss_mode_width_max(
             counts,
             start_bins,
             mode_guess=mu,
@@ -195,13 +220,14 @@ def get_dpz_consts(grid_out, opt_dict):
 
 
 def dsp_preprocess_decay_const(
-    raw_files: list[str],
+    tb_data,
     dsp_config: dict,
-    lh5_path: str,
     double_pz: bool = False,
-    plot_path: str = None,
+    display: int = 0,
     opt_dict: dict = None,
-    threshold: int = 5000,
+    wf_field: str = "waveform",
+    wf_plot: str = "wf_pz",
+    norm_param: str = "pz_mean",
     cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "bl_slope": 4},
 ) -> dict:
     """
@@ -221,17 +247,21 @@ def dsp_preprocess_decay_const(
     tau_dict : dict
     """
 
-    tb_data = run_tau(raw_files, dsp_config, lh5_path, threshold=threshold)
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
     cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
     log.debug("Generated Cuts:", cut_dict)
     idxs = cts.get_cut_indexes(tb_out, cut_dict)
     log.debug("Applied cuts")
+    log.debug(f"{len(idxs)} events passed cuts")
     slopes = tb_out["tail_slope"].nda
-    wfs = tb_out["wf_blsub"]["values"].nda
     log.debug("Calculating pz constant")
-    tau_dict = get_decay_constant(slopes[idxs], wfs[idxs], plot_path=plot_path)
+    if display > 0:
+        tau_dict, plot_dict = get_decay_constant(
+            slopes[idxs], tb_data[wf_field], display=display
+        )
+    else:
+        tau_dict = get_decay_constant(slopes[idxs], tb_data[wf_field])
     if double_pz == True:
         log.debug("Calculating double pz constants")
         pspace = om.set_par_space(opt_dict)
@@ -240,4 +270,27 @@ def dsp_preprocess_decay_const(
         )
         out_dict = get_dpz_consts(grid_out, opt_dict)
         tau_dict["pz"].update(out_dict["pz"])
-    return tau_dict
+    if display > 0:
+        tb_out = opt.run_one_dsp(tb_data, dsp_config, db_dict=tau_dict)
+        wfs = tb_out[wf_plot]["values"].nda[idxs]
+        wf_idxs = np.random.choice(len(wfs), 100)
+        if norm_param is not None:
+            means = tb_out[norm_param].nda[idxs][wf_idxs]
+            wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
+        else:
+            wfs = wfs[wf_idxs]
+        fig2 = plt.figure()
+        for wf in wfs:
+            plt.plot(np.arange(0, len(wf), 1), wf)
+        plt.axhline(1, color="black")
+        plt.axhline(0, color="black")
+        plt.xlabel("Samples")
+        plt.ylabel("ADU")
+        plot_dict["waveforms"] = fig2
+        if display > 1:
+            plt.show()
+        else:
+            plt.close()
+        return tau_dict, plot_dict
+    else:
+        return tau_dict

@@ -3,15 +3,13 @@ A class that creates the sum of distributions, with methods for scipy computed :
 
 .. code-block:: python
 
-    mu1, mu2, sigma = range(3)
-    moyal_add = sum_dists([(moyal, [mu1, sigma]), (moyal, [mu2, sigma])], [3], "fracs") # create two moyals that share a sigma and differ by a fraction, 
+    mu1, mu2, sigma, frac = range(4)
+    moyal_add = sum_dists([(moyal, [mu1, sigma]), (moyal, [mu2, sigma])], [frac], "fracs") # create two moyals that share a sigma and differ by a fraction, 
     x = np.arange(-10,10)
     pars = np.array([1, 2, 2, 0.1]) # corresponds to mu1 = 1, mu2 = 2, sigma = 2, frac=0.1
     moyal_add.pdf(x, *pars)
     moyal_add.draw_pdf(x, *pars)
-    moyal_add.get_req_args()
-
-
+    moyal_add.required_args()
 """
 
 import numba as nb
@@ -20,7 +18,7 @@ import matplotlib.pyplot as plt
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from pygama.math.functions.pygama_continuous import pygama_continuous
 from typing import Tuple
-from iminuit.util import make_func_code
+import inspect
 
 from scipy._lib._util import getfullargspec_no_self as _getfullargspec
 def get_dists_and_par_idxs(dists_and_pars_array: np.array(tuple, tuple)) -> Tuple[np.array, np.array]:
@@ -97,7 +95,7 @@ def get_areas_fracs(params: np.array, area_frac_idxs: np.array, frac_flag: bool,
 
     return fracs, areas
 
-def get_parameter_names(dists: np.array, par_idxs: np.array) -> np.array:
+def get_parameter_names(dists: np.array, par_idxs: np.array, par_size: int) -> np.array:
     r"""
     Returns an array of the names of the required parameters for an instance of :func:`sum_dists`
     Works by calling :func:`.required_args` for each distribution present in the sum. 
@@ -110,16 +108,19 @@ def get_parameter_names(dists: np.array, par_idxs: np.array) -> np.array:
         An array containing the distributions in this instance of :func:`sum_dists`
     par_idxs
         An array of arrays, each array contains the indices of the parameters in the :func:`sum_dists` call that correspond to that distribution
+    par_size
+        The size of the single parameter index array
 
     Returns
     -------
     param_names
         An array containing the required parameter names
     """
-    param_names = []
+    param_names = np.empty(par_size+1, dtype=object)
     overall_par_idxs = []
     for i in range(len(dists)):
-        mask = ~np.isin(par_idxs[i], overall_par_idxs) # get indices of the required args that are not included yet 
+        mask = ~np.isin(par_idxs[i], overall_par_idxs) # see if indices of the required args that are not included yet 
+        new_idxs = par_idxs[i][mask] # get indices of the required args that are not included yet 
         prereq_names = np.array(dists[i].required_args())[mask]
         req_names = []
         # Check for duplicate names
@@ -132,10 +133,20 @@ def get_parameter_names(dists: np.array, par_idxs: np.array) -> np.array:
             req_names.append(name)
                 
 
-        param_names.extend(req_names)
+        param_names[new_idxs] = req_names
         overall_par_idxs.extend(par_idxs[i])
     return param_names
 
+def copy_signature(signature_to_copy, obj_to_copy_to):
+    """
+    Copy the signature provided in signature_to_copy into the signature for "obj_to_copy_to". 
+    This is necessary so that we can override the signature for the various methods attached to 
+    different objects.
+    """
+    def wrapper(*args, **kwargs):
+        return obj_to_copy_to(*args, **kwargs)
+    wrapper.__signature__ = signature_to_copy
+    return wrapper
 
 class sum_dists(rv_continuous):
     r"""
@@ -147,12 +158,14 @@ class sum_dists(rv_continuous):
 
     Parameter index arrays contain indices that slice a single parameter array that is passed to method calls. 
     For example, if the user will eventually pass parameters=[mu, sigma, tau, frac] to function.get_pdf(x, parameters)
-    and the first distribution takes (mu, sigma) as its parameters, then p1=[0,1]. If the second distribution takes (tau, mu, sigma)
-    then its parameter index array would be p2=[2, 0, 1] because tau is the index 2 entry in parameters. 
+    and the first distribution takes (mu, sigma) as its parameters, then p1=[0,1]. If the second distribution takes (mu, sigma, tau)
+    then its parameter index array would be p2=[0, 1, 2] because tau is the index 2 entry in parameters. 
 
-    Each par array can contain [shape, mu, sigma], and *must be placed in that order*. 
+    Each par array can contain [x_lo, x_hi, mu, sigma, shape], and *must be placed in that order*. 
 
-    The single parameter array passed to function calls should follow the ordering convention [shapes, frac/areas]
+    The single parameter array passed to function calls *must* follow the ordering convention [x_lo, x_hi, frac/areas, shapes_1, frac/areas2, shapes_2]
+    The single parameter array that is passed to :func:`pdf_norm`, :func:`pdf_ext`, and :func:`cdf_norm` calls *must* have x_lo, x_hi 
+    as its first two arguments if none of the distributions require an explicit definition of their support. 
 
     There are 4 flag options:
 
@@ -163,21 +176,8 @@ class sum_dists(rv_continuous):
 
     Notes 
     -----
-    dists must be unfrozen pygama distributions of the type :func:`pygama_continuous`
+    dists must be unfrozen pygama distributions of the type :func:`pygama_continuous` or :func:`sum_dist`.
     """
-
-    def set_x_lo(self, x_lo: float) -> None:
-        """
-        Set the internal state of the lower bound of this distribution
-        """
-        self.x_lo = x_lo
-
-    def set_x_hi(self, x_hi: float) -> None:
-        """
-        Set the internal state of the upper bound of this distribution
-        """
-        self.x_hi = x_hi
-
 
     def _argcheck(self, *args) -> bool:
         """
@@ -194,24 +194,46 @@ class sum_dists(rv_continuous):
         return cond
 
 
-    def __init__(self, dists_and_pars_array, area_frac_idxs, flag, parameter_names=None):
-        self.components = False # do we want users to ever ask for the components back...
-
+    def __init__(self, dists_and_pars_array, area_frac_idxs, flag, parameter_names=None, components=False, support_required=False):
+        """
+        Parameters
+        ----------
+        dists_and_pars_array
+            A list of two tuples, containing [(dist_1, [mu1, sigma1, shapes1]), (dist_2, [mu2, sigma2, shapes2])] to create a sum_dist from
+        area_frac_idxs
+            A list of the indices at which that either the areas or fraction will be placed in the eventual method calls
+        flag
+            One of three strings that initialize :func:`sum_dist` in different modes. Either "fracs", "areas" or "one_area".
+        parameter_names
+            An optional list of strings that contain the parameters names in the order they will appear in method calls 
+        components
+            A boolean that if true will cause methods to return components instead of the sum of the distributions
+        support_required
+            A boolean that if true tells :func:`sum_dist` that x_lo, x_hi will *always* be passed in method calls. 
+        """
         # Extract the distributions and parameter index arrays from the constructor
         dists, par_idxs = get_dists_and_par_idxs(dists_and_pars_array)
 
         self.dists = dists
         self.par_idxs = par_idxs
         self.area_frac_idxs = area_frac_idxs
-
-        # Get the parameter names for later introspection
-        shapes = get_parameter_names(dists, par_idxs)
+        self.components = components
+        self.support_required = support_required
 
         # Check that the dists are in fact distributions
         for i in range(len(dists)):
             if (not isinstance(dists[i], pygama_continuous)) and (not isinstance(dists[i], sum_dists)):
                 raise ValueError(f"Distribution at index {i} has value {dists[i]},\
                 and is an array and not a pygama_continuous distribution")
+
+        # Get the parameter names for later introspection
+        # First, find the length of the eventual single parameter array
+        par_size = 0
+        for par_idx in par_idxs:
+            if np.amax(par_idx)>=par_size:
+                par_size = np.amax(par_idx)
+        par_size = np.amax([par_size, np.amax(area_frac_idxs)]) if len(area_frac_idxs)!= 0 else par_size
+        shapes = get_parameter_names(dists, par_idxs, par_size)
         
         # Set the internal state depending on what flag was passed
         if flag == "fracs":
@@ -220,14 +242,14 @@ class sum_dists(rv_continuous):
             self.frac_flag = True
             self.area_flag = False
             self.one_area_flag = False
-            shapes = np.insert(shapes, area_frac_idxs[0], "f") # add frac name to the shapes
+            shapes[area_frac_idxs[0]] = "f" # add frac name to the shapes
         elif flag == "areas":
             if len(area_frac_idxs) != 2:
-                raise ValueError("sum_dists needs two parameter indicies of areas.")
+                raise ValueError("sum_dists needs two parameter indices of areas.")
             self.frac_flag = False
             self.area_flag = True
             self.one_area_flag = False
-            shapes = np.insert(shapes, area_frac_idxs, ["s", "b"]) # add area names to the shapes
+            shapes[area_frac_idxs] = ["s", "b"] # add area names to the shapes
         elif flag == "one_area":
             # needed so that we can create sum_dists from sum_dists without having an overall area to the second dist
             # Sets the area of the second dist to 1
@@ -236,50 +258,38 @@ class sum_dists(rv_continuous):
             self.frac_flag = False
             self.area_flag = False
             self.one_area_flag = True
-            shapes = np.insert(shapes, area_frac_idxs, ["s"]) # add area name to the shapes
+            shapes[area_frac_idxs]= "s" # add area name to the shapes
         else:
             self.frac_flag = False
             self.area_flag = False
             self.one_area_flag = False
 
-
-        # Set the support by taking the largest possible union, ignore any NoneTypes
-        self.set_x_lo(np.nanmax(np.array([dists[0].x_lo, dists[1].x_lo], dtype=np.float64)))
-        self.set_x_hi(np.nanmin(np.array([dists[0].x_hi, dists[1].x_hi], dtype=np.float64)))
-
-
+        shapes = list(shapes)
         # override the parameter names if string is passed to the constructor
         if parameter_names != None:
             shapes = parameter_names
 
+        # If a support is explicitly passed, flag it.
+        # Record the index of x_lo and x_hi if they are required, if they aren't set them to 0, 1
+        # This is so that :func:`pdf_ext`, :func:`pdf_norm` and :func:`cdf_norm` can find the x_lo, x_hi if support is required, otherwise they take x_lo, x_hi from the start of the parameter array
+        if "x_lo" in shapes or "x_hi" in shapes:
+            self.support_required = True
+            self.x_lo_idx = shapes.index("x_lo")
+            self.x_hi_idx = shapes.index("x_hi")
+            extended_shapes = ["x", *shapes] # get the parameter names for methods that require the fit range passed, like extended fits
+            self.extended_shapes = extended_shapes 
+        else:
+            self.x_lo_idx = 0
+            self.x_hi_idx = 1
+            extended_shapes = ["x", "x_lo", "x_hi", *shapes] # get the parameter names for methods that require the fit range passed, like extended fits
+            self.extended_shapes = extended_shapes 
 
+        # Now that we have inferred or set the shapes, store them so that :func:`required_args` can return them
         self.req_args = shapes
 
         # set atttributes for the methods so that Iminuit can introspect parameter names
-        shape_dict = {}
-        for i in shapes:
-            shape_dict[i] = None
-
         x_shapes = ["x", *shapes] # add the x values to the parameter names that are being passed, Iminuit assumes that this is in the first position
-
-        # Need to set both the `_parameters` and `func_code` depending on what version of Iminuit is used
-        self.get_pdf.__func__._parameters = shape_dict
-        self.get_pdf.__func__.func_code = make_func_code(x_shapes)
-
-        self.pdf_ext.__func__._parameters = shape_dict
-        self.pdf_ext.__func__.func_code =  make_func_code(x_shapes)
-
-        self.pdf_norm.__func__._parameters = shape_dict
-        self.pdf_norm.__func__.func_code = make_func_code(x_shapes)
-
-        self.get_cdf.__func__._parameters = shape_dict
-        self.get_cdf.__func__.func_code = make_func_code(x_shapes)
-
-        self.cdf_ext.__func__._parameters = shape_dict
-        self.cdf_ext.__func__.func_code =  make_func_code(x_shapes)
-
-        self.cdf_norm.__func__._parameters = shape_dict
-        self.cdf_norm.__func__.func_code = make_func_code(x_shapes)
+        self.x_shapes = x_shapes 
 
         # Scipy requires the argument names as one string with commas inbetween each parameter name
         shapes = ','.join(str(x) for x in shapes)
@@ -288,6 +298,9 @@ class sum_dists(rv_continuous):
         super().__init__(self, shapes=shapes)
 
     def _pdf(self, x, *params):
+        """
+        Overload :func:`rv_continuous` definition of pdf in order to access other methods. 
+        """
         pdfs = self.dists 
         params = np.array(params)[:,0] # scipy ravels the parameter array...
 
@@ -302,6 +315,9 @@ class sum_dists(rv_continuous):
             return probs
 
     def _cdf(self, x, *params):
+        """ 
+        Overload :func:`rv_continuous` definition of cdf in order to access other methods. 
+        """
         cdfs = self.dists
         params = np.array(params)[:,0] 
 
@@ -317,6 +333,9 @@ class sum_dists(rv_continuous):
 
 
     def get_pdf(self, x, *params):
+        """
+        Returns the specified sum of all distributions' :func:`get_pdf` methods.
+        """
         pdfs = self.dists 
         params = np.array(params)
 
@@ -331,6 +350,9 @@ class sum_dists(rv_continuous):
             return probs
 
     def get_cdf(self, x, *params):
+        """
+        Returns the specified sum of all distributions' :func:`get_cdf` methods.
+        """
         cdfs = self.dists
         params = np.array(params)
 
@@ -346,8 +368,21 @@ class sum_dists(rv_continuous):
         
 
     def pdf_norm(self, x, *params):
+        """
+        Returns the specified sum of all distributions' :func:`get_pdf` methods, but normalized on a range x_lo to x_hi. Used in unbinned NLL fits.
 
-        norm = np.diff(self.get_cdf(np.array([self.x_lo, self.x_hi]), *params))
+        NOTE: This assumes that x_lo, x_hi are the first two elements in the parameter array, unless x_lo and x_hi are required to define the support
+        of the :func:`sum_dists` for *all* method calls. For :func:`sum_dists` created from a distribution where the support needs 
+        to be explicitly passed, this means that :func:`pdf_norm` sets the fit range equal to the support range. 
+        It also means that summing distributions with two different explicit supports is not allowed, e.g. we cannot sum two step functions with different supports.
+        """
+        # Grab the values of x_lo and x_hi from the parameters. For functions where the support needs to be defined, this can be anywhere in the parameter array
+        # Otherwise, x_lo and x_hi *must* be the first two values passed.
+        x_lo = params[self.x_lo_idx]
+        x_hi = params[self.x_hi_idx]
+        if not self.support_required: params = params[2:] # chop off x_lo, x_hi from the shapes to actually pass to get_cdf
+
+        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *params))
 
         if norm == 0:
             return np.full_like(x, np.inf)
@@ -355,8 +390,21 @@ class sum_dists(rv_continuous):
             return self.get_pdf(x, *params)/norm
 
     def cdf_norm(self, x, *params):
+        """
+        Returns the specified sum of all distributions' :func:`get_cdf` methods, but normalized on a range x_lo to x_hi. Used in binned NLL fits.
 
-        norm = np.diff(self.get_cdf(np.array([self.x_lo, self.x_hi]), *params))
+        NOTE: This assumes that x_lo, x_hi are the first two elements in the parameter array, unless x_lo and x_hi are required to define the support
+        of the :func:`sum_dists` for *all* method calls. For :func:`sum_dists` created from a distribution where the support needs 
+        to be explicitly passed, this means that :func:`cdf_norm` sets the fit range equal to the support range. 
+        It also means that summing distributions with two different explicit supports is not allowed, e.g. we cannot sum two step functions with different supports.
+        """
+        # Grab the values of x_lo and x_hi from the parameters. For functions where the support needs to be defined, this can be anywhere in the parameter array
+        # Otherwise, x_lo and x_hi *must* be the first two values passed.
+        x_lo = params[self.x_lo_idx]
+        x_hi = params[self.x_hi_idx]
+        if not self.support_required: params = params[2:] # chop off x_lo, x_hi from the shapes to actually pass to get_cdf
+
+        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *params))
         
         if norm == 0:
             return np.full_like(x, np.inf)
@@ -365,14 +413,27 @@ class sum_dists(rv_continuous):
 
 
     def pdf_ext(self, x, *params):
-        #NOTE: do we want to pass x_lower and x_upper here or have the user set them before the function call and store as the state? 
+        """
+        Returns the specified sum of all distributions' :func:`pdf_ext` methods, normalized on a range x_lo to x_hi. Used in extended unbinned NLL fits.
+
+        NOTE: This assumes that x_lo, x_hi are the first two elements in the parameter array, unless x_lo and x_hi are required to define the support
+        of the :func:`sum_dists` for *all* method calls. For :func:`sum_dists` created from a distribution where the support needs 
+        to be explicitly passed, this means that :func:`pdf_ext` sets the fit range equal to the support range. 
+        It also means that summing distributions with two different explicit supports is not allowed, e.g. we cannot sum two step functions with different supports.
+        """
         pdf_exts = self.dists 
         params = np.array(params)
+
+        # Grab the values of x_lo and x_hi from the parameters. For functions where the support needs to be defined, this can be anywhere in the parameter array
+        # Otherwise, x_lo and x_hi *must* be the first two values passed.
+        x_lo = params[self.x_lo_idx]
+        x_hi = params[self.x_hi_idx]
+        if not self.support_required: params = params[2:] # chop off x_lo, x_hi from the shapes to actually pass to get_cdf
 
         fracs, areas = get_areas_fracs(params, self.area_frac_idxs, self.frac_flag, self.area_flag, self.one_area_flag)
 
         # sig = areas[0] + areas[1] # this is a hack, it performs faster but may not *always* be true
-        sig = areas[0]*fracs[0]*np.diff(pdf_exts[0].get_cdf(np.array([self.x_lo, self.x_hi]), *params[self.par_idxs[0]]))[0] + areas[1]*fracs[1]*np.diff(pdf_exts[1].get_cdf(np.array([self.x_lo, self.x_hi]), *params[self.par_idxs[1]]))[0]
+        sig = areas[0]*fracs[0]*np.diff(pdf_exts[0].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[0]]))[0] + areas[1]*fracs[1]*np.diff(pdf_exts[1].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[1]]))[0]
         
 
         if self.components:
@@ -384,6 +445,9 @@ class sum_dists(rv_continuous):
 
 
     def cdf_ext(self, x, *params):
+        """ 
+        Returns the specified sum of all distributions' :func:`get_cdf` methods, used in extended binned NLL fits.
+        """
         cdf_exts = self.dists 
         params = np.array(params)
 
@@ -397,7 +461,13 @@ class sum_dists(rv_continuous):
             probs = areas[0]*fracs[0]*cdf_exts[0].get_cdf(x, *params[self.par_idxs[0]]) + areas[1]*fracs[1]*cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
             return probs
 
-    def required_args(self):
+    def required_args(self) -> list:
+        """
+        Returns
+        -------
+        req_args
+            A list of the required arguments for the :func:`sum_dists` instance, either passed by the user, or inferred.
+        """
         return self.req_args
 
 
@@ -502,3 +572,22 @@ class sum_dists(rv_continuous):
             return pars[n_sig_idx]+pars[n_bkg_idx], np.sqrt(cov[n_sig_idx][n_sig_idx]**2 + cov[n_bkg_idx][n_bkg_idx]**2)
         else:
             return pars[n_sig_idx]+pars[n_bkg_idx]
+
+
+    def __getattribute__(self, attr):
+        """
+        Necessary to overload this so that Iminuit can use inspect.signature to get the correct parameter names
+        """
+        value = object.__getattribute__(self, attr)
+
+        if attr in ['get_pdf','get_cdf', 'cdf_ext']:
+            params = [inspect.Parameter(param,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                        for param in self.x_shapes]
+            value = copy_signature(inspect.Signature(params), value)
+        if attr in ['pdf_norm', 'pdf_ext', 'cdf_norm']: # Set these to include the x_lo, x_hi at the correct positions since these always need those params
+            params = [inspect.Parameter(param,
+                            inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                        for param in self.extended_shapes]
+            value = copy_signature(inspect.Signature(params), value)
+        return value

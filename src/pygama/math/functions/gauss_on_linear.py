@@ -15,9 +15,9 @@ m
     The slope of the linear distribution 
 b 
     The y intercept of the linear distribution
-x_lower
+x_lo
     The lower bound on which to normalize the linear distribution
-x_upper
+x_hi
     The upper bound on which to normalize the linear distribution
 
 
@@ -31,7 +31,7 @@ from pygama.math.functions.sum_dists import sum_dists
 from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.linear import linear
 
-(n_sig, mu, sigma, n_bkg, m, b, linear_x_lo, linear_x_hi) = range(8) # the sum_dist array we will pass will be n_sig, mu, sigma, n_bkg, m, b
+(linear_x_lo, linear_x_hi, n_sig, mu, sigma, n_bkg, m, b) = range(8) # the sum_dist array we will pass will be x_lo, x_hi, n_sig, mu, sigma, n_bkg, m, b
 par_array = [(gaussian, [mu, sigma]), (linear, [linear_x_lo, linear_x_hi, m, b])] 
 
-gauss_on_linear = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["n_sig", "mu", "sigma", "n_bkg", "m", "b", "x_lower", "x_upper"])
+gauss_on_linear = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "m", "b"])

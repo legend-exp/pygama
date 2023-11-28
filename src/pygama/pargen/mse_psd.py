@@ -8,11 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from pygama.math.binned_fitting import *
-from pygama.math.distributions import nb_gauss
-from pygama.math.functions import *
-from pygama.math.histogram import get_bin_centers, get_gaussian_guess
-from pygama.math.least_squares import *
+from pygama.math.distributions import *
+from pygama.math.histogram import get_bin_centers
 
 
 def get_avse_cut(e_cal, current, plotFigure=None):
@@ -69,10 +66,10 @@ def get_avse_cut(e_cal, current, plotFigure=None):
         # plt.axvline(a_mode, c="r")
         # plt.title("Energy: {} keV".format(e_cent[i]))
         #
-        # fit = gauss(a_bins_cent[fit_idxs], *p)
+        # fit = nb_gauss(a_bins_cent[fit_idxs], *p)
         # plt.plot(a_bins_cent[fit_idxs], fit, c="g")
 
-        # guess = gauss(a_bins_cent[fit_idxs], *p0)
+        # guess = nb_gauss(a_bins_cent[fit_idxs], *p0)
         # plt.plot(a_bins_cent[fit_idxs], guess, c="r")
 
         # inp = input("q to quit")

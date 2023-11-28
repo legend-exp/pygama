@@ -14,9 +14,9 @@ kwd_parallel = {"parallel": True, "fastmath": True}
 
 
 @nb.njit(**kwd_parallel)
-def nb_exponential_pdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray:
+def nb_exponential_pdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
-    Normalised exponential probability density distribution, w/ args: lamb, mu, sigma. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
+    Normalised exponential probability density distribution, w/ args: mu, sigma, lamb. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
     It computes:
 
 
@@ -32,12 +32,12 @@ def nb_exponential_pdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> n
     ----------
     x
         The input data
-    lamb
-        The rate
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
+    lamb
+        The rate
     """
 
     y = np.empty_like(x, dtype = np.float64)
@@ -51,9 +51,9 @@ def nb_exponential_pdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> n
 
 
 @nb.njit(**kwd_parallel)
-def nb_exponential_cdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray:
+def nb_exponential_cdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
-    Normalised exponential cumulative distribution, w/ args: lamb, mu, sigma. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
+    Normalised exponential cumulative distribution, w/ args:  mu, sigma, lamb. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
     It computes:
 
 
@@ -69,12 +69,12 @@ def nb_exponential_cdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> n
     ----------
     x
         The input data
-    lamb
-        The rate
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
+    lamb
+        The rate
     """
 
     y = np.empty_like(x, dtype = np.float64)
@@ -88,9 +88,9 @@ def nb_exponential_cdf(x: np.ndarray, lamb: float, mu: float, sigma: float) -> n
 
 
 @nb.njit(**kwd)
-def nb_exponential_scaled_pdf(x: np.ndarray, lamb: float, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_exponential_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
-    Scaled exponential probability distribution, w/ args: lamb, mu, sigma, area.
+    Scaled exponential probability distribution, w/ args: area, mu, sigma, lambd.
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
 
@@ -98,21 +98,21 @@ def nb_exponential_scaled_pdf(x: np.ndarray, lamb: float, mu: float, sigma: floa
     ----------
     x
         Input data
-    lamb
-        The rate
+    area
+        The number of counts in the signal
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the signal
+    lamb
+        The rate
     """ 
 
-    return area * nb_exponential_pdf(x, lamb, mu, sigma)
+    return area * nb_exponential_pdf(x, mu, sigma, lamb)
 
 
 @nb.njit(**kwd)
-def nb_exponential_scaled_cdf(x: np.ndarray, lamb: float, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_exponential_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
     Exponential cdf scaled by the area, used for extended binned fits 
     As a Numba JIT function, it runs slightly faster than
@@ -123,17 +123,17 @@ def nb_exponential_scaled_cdf(x: np.ndarray, lamb: float, mu: float, sigma: floa
     ----------
     x
         Input data
-    lamb
-        The rate
+    area
+        The number of counts in the signal
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the signal
+    lamb
+        The rate
     """ 
     
-    return area * nb_exponential_cdf(x, lamb, mu, sigma)
+    return area * nb_exponential_cdf(x, mu, sigma, lamb)
 
 
 class exponential_gen(pygama_continuous):
@@ -143,30 +143,30 @@ class exponential_gen(pygama_continuous):
         self.x_hi = np.inf
         super().__init__(self)
 
-    def _pdf(self, x: np.ndarray, lamb: float) -> np.ndarray:
+    def _pdf(self, x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
         x.flags.writeable = True
-        return nb_exponential_pdf(x, lamb[0], 0, 1)
-    def _cdf(self, x: np.ndarray, lamb: float) -> np.ndarray:
+        return nb_exponential_pdf(x, mu[0], sigma[0], lamb[0])
+    def _cdf(self, x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
         x.flags.writeable = True
-        return nb_exponential_cdf(x, lamb[0], 0, 1)
+        return nb_exponential_cdf(x, mu[0], sigma[0], lamb[0])
 
-    def get_pdf(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_exponential_pdf(x, lamb, mu, sigma) 
-    def get_cdf(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_exponential_cdf(x, lamb, mu, sigma)
+    def get_pdf(self, x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
+        return nb_exponential_pdf(x, mu, sigma, lamb) 
+    def get_cdf(self, x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
+        return nb_exponential_cdf(x, mu, sigma, lamb)
 
     # needed so that we can hack iminuit's introspection to function parameter names... unless
-    def pdf_norm(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._pdf_norm(x, self.x_lo, self.x_hi, lamb, mu, sigma)
-    def cdf_norm(self, x: np.ndarray, lamb: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._cdf_norm(x, self.x_lo, self.x_hi, lamb, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, lamb: float) -> np.ndarray: 
+        return self._pdf_norm(x, x_lo, x_hi, mu, sigma, lamb)
+    def cdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, lamb: float) -> np.ndarray: 
+        return self._cdf_norm(x, x_lo, x_hi, mu, sigma, lamb)
 
-    def pdf_ext(self, x: np.ndarray, area: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_exponential_scaled_cdf(np.array([self.x_hi]), lamb, mu, sigma, area)[0]-nb_exponential_scaled_cdf(np.array([self.x_lo]), lamb, mu, sigma, area)[0], nb_exponential_scaled_pdf(x, lamb, mu, sigma, area)
-    def cdf_ext(self, x: np.ndarray, area: float, lamb: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_exponential_scaled_cdf(x, lamb, mu, sigma, area)
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
+        return np.diff(nb_exponential_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, lamb)), nb_exponential_scaled_pdf(x, area, mu, sigma, lamb)
+    def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
+        return nb_exponential_scaled_cdf(x, area, mu, sigma, lamb)
     
     def required_args(self) -> tuple[str, str, str]:
-        return "lambda", "mu", "sigma"
+        return "mu", "sigma", "lambda"
 
 exponential = exponential_gen(a=0.0, name='exponential')

@@ -3,7 +3,7 @@ from iminuit import Minuit, cost
 from pytest import approx
 from scipy.stats import exponnorm
 
-from pygama.math.functions.exgauss import exgauss
+from pygama.math.distributions import exgauss, hpge_peak
 
 xr = (-20, 20)  # xrange
 
@@ -22,11 +22,10 @@ dx = np.diff(xe)
 
 
 def test_unbinned_nll():
-    exgauss.set_x_lo(-20)
-    exgauss.set_x_hi(20)
     c = cost.UnbinnedNLL(xmix, exgauss.pdf_norm)
 
-    m = Minuit(c, tau=1, mu=0, sigma=3)
+    m = Minuit(c, x_lo=-20, x_hi=20, tau=1, mu=0, sigma=3)
+    m.fixed["x_lo", "x_hi"] = True
     m.limits["tau"] = (0.1, 3)
     m.limits["mu"] = (0, 2)
     m.limits["sigma"] = (0, 1.5)
@@ -42,11 +41,10 @@ def test_unbinned_nll():
 
 
 def test_extended_unbinned_nll():
-    exgauss.set_x_lo(-7)
-    exgauss.set_x_hi(7)
     c = cost.ExtendedUnbinnedNLL(xmix, exgauss.pdf_ext)
 
-    m = Minuit(c, area=100, tau=1, mu=0, sigma=3)
+    m = Minuit(c, x_lo=-7, x_hi=7, tau=1, mu=0, sigma=3, area=100)
+    m.fixed["x_lo", "x_hi"] = True
     m.limits["tau", "mu", "sigma"] = (0.01, 5)
     m.limits["area"] = (0, 2000)
     m.migrad()
@@ -63,11 +61,10 @@ def test_extended_unbinned_nll():
 
 
 def test_binned_nll():
-    exgauss.set_x_lo(-20)
-    exgauss.set_x_hi(20)
     c = cost.BinnedNLL(n, xe, exgauss.cdf_norm)
 
-    m = Minuit(c, tau=1, mu=0, sigma=3)
+    m = Minuit(c, x_lo=-20, x_hi=20, tau=1, mu=0, sigma=3)
+    m.fixed["x_lo", "x_hi"] = True
     m.limits["tau"] = (0.1, 3)
     m.limits["mu"] = (0, 2)
     m.limits["sigma"] = (0, 1.5)
@@ -100,3 +97,18 @@ def test_extended_binned_nll():
     assert tau == approx(fit_tau, 0.1)
     assert mu == approx(fit_mu, 0.1)
     assert sigma == approx(fit_sigma, 0.1)
+
+
+def test_name_introspection():
+    c = cost.ExtendedUnbinnedNLL(xmix, hpge_peak.pdf_ext)
+    m = Minuit(c, xr[0], xr[-1], 100, 1, 2, 0.1, 20, 10, 0.1)
+
+    m.values["n_sig"] = 0
+    m.values["mu"] = 0
+    m.values["sigma"] = 0
+    m.values["htail"] = 0
+    m.values["tau"] = 0
+    m.values["n_bkg"] = 0
+    m.values["hstep"] = 0
+    m.fixed["x_lo"] = 0
+    m.fixed["x_hi"] = 0

@@ -6,19 +6,16 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_gauss_on_step_pdf():
-
     x = np.arange(-10, 10)
     mu = 0.4
     sigma = 1.1
     hstep = 0.75
-    lower_range = np.amin(x)
-    upper_range = np.amax(x)
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
-    pars = np.array(
-        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
-    )
+    pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep], dtype=float)
 
     y_direct = gauss_on_step.get_pdf(x, *pars)
 
@@ -51,11 +48,6 @@ def test_gauss_on_step_pdf():
     assert isinstance(gauss_on_step, sum_dists)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    x_lo = lower_range
-    x_hi = upper_range
-    gauss_on_step.set_x_hi(x_hi)
-    gauss_on_step.set_x_lo(x_lo)
-
     y_sig, y_ext = gauss_on_step.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
@@ -65,19 +57,16 @@ def test_gauss_on_step_pdf():
 
 
 def test_gauss_on_step_cdf():
-
     x = np.arange(-10, 10)
     mu = 0.56
     sigma = 1.009
     hstep = 0.753
-    lower_range = np.amin(x)
-    upper_range = np.amax(x)
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
-    pars = np.array(
-        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
-    )
+    pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep], dtype=float)
 
     y_direct = gauss_on_step.get_cdf(x, *pars)
 
@@ -124,11 +113,20 @@ def test_gauss_on_step_cdf():
     y_ext = gauss_on_step.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
 
-    gauss_on_step.set_x_lo(lower_range)
-    gauss_on_step.set_x_hi(upper_range)
     y_norm = gauss_on_step.cdf_norm(x, *pars)
     scipy_y_norm = (1 / (n_sig + n_bkg)) * (
         n_sig * scipy_y_gauss + n_bkg * scipy_y_step
     )
 
     assert np.allclose(y_norm, scipy_y_norm, rtol=1e-8)
+
+
+def test_required_args():
+    names = gauss_on_step.required_args()
+    assert names[0] == "x_lo"
+    assert names[1] == "x_hi"
+    assert names[2] == "n_sig"
+    assert names[3] == "mu"
+    assert names[4] == "sigma"
+    assert names[5] == "n_bkg"
+    assert names[6] == "hstep"

@@ -11,10 +11,14 @@ on an Exgauss on a step function.
 
 Called with 
 
-hpge_peak.get_pdf(x, n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range)
+hpge_peak.get_pdf(x, x_lo, x_hi, n_sig, mu, sigma, htail, tau, n_bkg, hstep)
 
 Parameters
 ----------
+x_lo
+    Lower bound of the step function
+x_hi
+    Upper bound of the step function
 n_sig
     The area of the gauss on exgauss
 mu
@@ -29,10 +33,6 @@ n_bkg
     The area of the step background
 hstep
     The height of the step function background
-lower_range
-    Lower bound of the step function
-upper_range
-    Upper bound of the step function
 
 Returns 
 -------
@@ -51,10 +51,10 @@ from pygama.math.functions.step import step
 from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 
 
-(n_sig, mu, sigma, frac1, tau, n_bkg, hstep, lower_range, upper_range) = range(9)
-par_array = [(gauss_on_exgauss, [mu, sigma, frac1, tau]), (step, [lower_range, upper_range, hstep, mu, sigma])] 
+(x_lo, x_hi, n_sig, mu, sigma, frac1, tau, n_bkg, hstep) = range(9)
+par_array = [(gauss_on_exgauss, [mu, sigma, frac1, tau]), (step, [x_lo, x_hi, mu, sigma, hstep])] 
 
-hpge_peak = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["n_sig", "mu", "sigma", "htail", "tau", "n_bkg", "hstep", "lower_range", "upper_range"])
+hpge_peak = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "htail", "tau", "n_bkg", "hstep"])
 
 # This is defined here as to avoid a circular import inside `sum_dists`
 def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
@@ -76,19 +76,15 @@ def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
     fwhm, error 
         the value of the fwhm and its error
     """
-    print(type(self))
-    print(self)
-    print(pars)
-
     req_args = np.array(self.required_args())
     sigma_idx = np.where(req_args == "sigma")[0][0]
 
     if ("htail" in req_args) and ("hstep" in req_args): #having both the htail and hstep means it is an exgauss on a step
         htail_idx = np.where(req_args == "htail")[0][0]
         tau_idx = np.where(req_args == "tau")[0][0]
-        # We need to ditch the lower and upper_range columns and rows
+        # We need to ditch the x_lo and x_hi columns and rows
         cov = np.array(cov)
-        dropped_cov = cov[:, :-2][:-2, :]
+        dropped_cov = cov[:, 2:][2:, :]
         
         return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov)
 

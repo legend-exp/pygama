@@ -6,7 +6,6 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_gauss_on_exgauss_pdf():
-
     x = np.arange(-10, 10)
     mu = 1
     sigma = 1
@@ -29,8 +28,7 @@ def test_gauss_on_exgauss_pdf():
 
     x_lo = -100
     x_hi = 100
-    gauss_on_exgauss.set_x_lo(x_lo)
-    gauss_on_exgauss.set_x_hi(x_hi)
+    pars = np.array([x_lo, x_hi, mu, sigma, h_tail, tau], dtype=float)
 
     y_sig, y_ext = gauss_on_exgauss.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
@@ -38,7 +36,6 @@ def test_gauss_on_exgauss_pdf():
 
 
 def test_gauss_on_exgauss_cdf():
-
     x = np.arange(-10, 10)
     mu = 1
     sigma = 1
@@ -63,3 +60,11 @@ def test_gauss_on_exgauss_cdf():
 
     y_ext = gauss_on_exgauss.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
+
+def test_required_args():
+    names = gauss_on_exgauss.required_args()
+    assert names[0] == "mu"
+    assert names[1] == "sigma"
+    assert names[2] == "htail"
+    assert names[3] == "tau"

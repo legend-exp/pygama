@@ -13,6 +13,7 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
+import lgdo.lh5_store as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,8 +26,7 @@ from scipy.stats import chisquare, norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 
-import pygama.lgdo.lh5_store as lh5
-import pygama.math.binned_fitting as pgb
+import pygama.math.binned_fitting as pgbf
 import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
 import pygama.math.hpge_peak_fitting as pghpf
@@ -39,7 +39,15 @@ sto = lh5.LH5Store()
 
 
 def run_optimisation(
-    file, opt_config, dsp_config, cuts, fom, db_dict=None, n_events=8000, **fom_kwargs
+    file,
+    opt_config,
+    dsp_config,
+    cuts,
+    fom,
+    db_dict=None,
+    n_events=8000,
+    wf_field="waveform",
+    **fom_kwargs,
 ):
     """
     Runs optimisation on .lh5 file
@@ -62,9 +70,9 @@ def run_optimisation(
         Number of events to run over
     """
     grid = set_par_space(opt_config)
-    waveforms = sto.read_object("/raw/waveform", file, idx=cuts, n_rows=n_events)[0]
+    waveforms = sto.read_object(f"/raw/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
     baseline = sto.read_object("/raw/baseline", file, idx=cuts, n_rows=n_events)[0]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid(tb_data, dsp_config, grid, fom, db_dict, **fom_kwargs)
 
 
@@ -133,12 +141,12 @@ def run_optimisation_multiprocessed(
         fom_kwargs = form_dict(fom_kwargs, len(grid))
     sto = lh5.LH5Store()
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", file, idx=cuts, n_rows=n_events
+        f"{lh5_path}/{wf_field}", file, idx=cuts, n_rows=n_events
     )[0]
     baseline = sto.read_object(f"{lh5_path}/baseline", file, idx=cuts, n_rows=n_events)[
         0
     ]
-    tb_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid_multiprocess_parallel(
         tb_data,
         dsp_config,
@@ -197,9 +205,9 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         n_bins_range = int((4 * sigma) // dx)
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
-        # the parameter order for hpge_peak.pdf_ext is nsig, mu, sigma, htail, tau, nbkg, hstep, lower_range, upper_range
-        # we could optionally pass x_lo, x_hi, but fit_range will take care of that for us.
         parguess = [
+            fit_range[0],
+            fit_range[1],
             nsig_guess,
             mu,
             sigma,
@@ -207,11 +215,8 @@ def simple_guess(hist, bins, var, func_i, fit_range):
             tau,
             nbkg_guess,
             hstep,
-            fit_range[0],
-            fit_range[1],
         ]
-        # return as an array of an array so that later code works
-        return np.array([parguess])
+        return parguess
 
     elif func_i == pgd.gauss_on_step.pdf_ext:
         mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
@@ -223,21 +228,7 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         n_bins_range = int((4 * sigma) // dx)
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
-        return np.array(
-            [
-                np.array(
-                    [
-                        nsig_guess,
-                        mu,
-                        sigma,
-                        nbkg_guess,
-                        hstep,
-                        fit_range[0],
-                        fit_range[1],
-                    ]
-                )
-            ]
-        )
+        return [fit_range[0], fit_range[1], nsig_guess, mu, sigma, nbkg_guess, hstep]
 
 
 def unbinned_energy_fit(
@@ -251,7 +242,6 @@ def unbinned_energy_fit(
     verbose=False,
     display=0,
 ):
-
     """
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
@@ -265,7 +255,7 @@ def unbinned_energy_fit(
     )
     bin_cs1 = (bins[:-1] + bins[1:]) / 2
     if guess is not None:
-        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
+        x0 = [*guess[:-2], fit_range[0], fit_range[1]]
     else:
         if func == pgd.hpge_peak.pdf_ext:
             x0 = simple_guess(hist1, bins, var, pgd.gauss_on_step.pdf_ext, fit_range)
@@ -273,20 +263,16 @@ def unbinned_energy_fit(
                 print(x0)
             c = cost.ExtendedUnbinnedNLL(energy, pgd.gauss_on_step.pdf_ext)
             m = Minuit(c, *x0)
-            # Fix lower_range, upper_range
-            m.fixed[-2:] = True
+            m.fixed[:2] = True
             m.simplex().migrad()
             m.hesse()
             if guess is not None:
-                x0_rad = [*guess[:-2], fit_range[0], fit_range[1]]
+                x0_rad = [fit_range[0], fit_range[1], *guess[2:]]
             else:
-                x0_rad = simple_guess(hist1, bins, var, func, fit_range)[
-                    0
-                ]  # simple_guess returns an array with the param array in it
-            x0 = m.values[:3]
-            x0 += x0_rad[3:5]
-            x0 += m.values[3:]
-            x0 = np.array([x0])  # x0 must be an array with the param array in it
+                x0_rad = simple_guess(hist1, bins, var, func, fit_range)
+            x0 = m.values[:5]
+            x0 += x0_rad[5:7]
+            x0 += m.values[5:]
         else:
             x0 = simple_guess(hist1, bins, var, func, fit_range)
     if verbose:
@@ -295,48 +281,46 @@ def unbinned_energy_fit(
     m = Minuit(c, *x0)
     if tol is not None:
         m.tol = tol
-    m.fixed[-2:] = True
+    m.fixed[:2] = True
     m.migrad()
     m.hesse()
 
     hist, bins, var = pgh.get_hist(energy, dx=1, range=gof_range)
     bin_cs = (bins[:-1] + bins[1:]) / 2
-    m_fit = func(bin_cs1, np.array(m.values))[
-        1
-    ]  # func is a pdf_ext so it returns sig, pdf
+    m_fit = func(bin_cs1, *m.values)[1]
 
     valid1 = (
         m.valid
         # & m.accurate
         & (~np.isnan(m.errors).any())
-        & (~(np.array(m.errors[:-2]) == 0).all())
+        & (~(np.array(m.errors[2:]) == 0).all())
     )
 
-    cs = pgb.goodness_of_fit(
-        hist, bins, None, gof_func, np.array([m.values[:-2]]), method="Pearson"
+    cs = pgbf.goodness_of_fit(
+        hist, bins, None, gof_func, m.values[2:], method="Pearson"
     )
     cs = cs[0] / cs[1]
     m2 = Minuit(c, *x0)
     if tol is not None:
         m2.tol = tol
-    m2.fixed[-2:] = True
+    m2.fixed[:2] = True
     m2.simplex().migrad()
     m2.hesse()
-    m2_fit = func(bin_cs1, np.array(m2.values))[1]
+    m2_fit = func(bin_cs1, *m2.values)[1]
     valid2 = (
         m2.valid
         # & m2.accurate
-        & (~np.isnan(m2.errors).any())
-        & (~(np.array(m2.errors[:-2]) == 0).all())
+        & (~np.isnan(m.errors).any())
+        & (~(np.array(m2.errors[2:]) == 0).all())
     )
 
-    cs2 = pgb.goodness_of_fit(
-        hist, bins, None, gof_func, np.array([m2.values[:-2]]), method="Pearson"
+    cs2 = pgbf.goodness_of_fit(
+        hist, bins, None, gof_func, m2.values[2:], method="Pearson"
     )
     cs2 = cs2[0] / cs2[1]
 
-    frac_errors1 = np.sum(np.abs(np.array(m.errors)[:-2] / np.array(m.values)[:-2]))
-    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[:-2] / np.array(m2.values)[:-2]))
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[2:] / np.array(m.values)[2:]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[2:] / np.array(m2.values)[2:]))
 
     if verbose:
         print(m)
@@ -344,8 +328,8 @@ def unbinned_energy_fit(
         print(frac_errors1, frac_errors2)
 
     if display > 1:
-        m_fit = gof_func(bin_cs1, np.array(m.values))
-        m2_fit = gof_func(bin_cs1, np.array(m2.values))
+        m_fit = gof_func(bin_cs1, *m.values)
+        m2_fit = gof_func(bin_cs1, *m2.values)
         plt.figure()
         plt.plot(bin_cs1, hist1, label=f"hist")
         plt.plot(bin_cs1, func(bin_cs1, *x0)[1], label=f"Guess")
@@ -359,52 +343,60 @@ def unbinned_energy_fit(
         m = Minuit(c, *x0)
         if tol is not None:
             m.tol = tol
-        m.fixed[-2:] = True
+        m.fixed[:2] = True
         m.limits = pgc.get_hpge_E_bounds(func)
         m.simplex().simplex().migrad()
         m.hesse()
         if verbose:
             print(m)
-        cs = pgb.goodness_of_fit(
-            hist, bins, None, gof_func, np.array([m.values[:-2]]), method="Pearson"
+        cs = pgbf.goodness_of_fit(
+            hist, bins, None, gof_func, m.values[:-2], method="Pearson"
         )
         cs = cs[0] / cs[1]
         valid3 = (
             m.valid
             # & m.accurate
             & (~np.isnan(m.errors).any())
-            & (~(np.array(m.errors[:-2]) == 0).all())
+            & (~(np.array(m.errors[2:]) == 0).all())
         )
-        if valid3 == False:
-            raise RuntimeError
+        if valid3 is False:
+            try:
+                m.minos()
+                valid3 = (
+                    m.valid
+                    & (~np.isnan(m.errors).any())
+                    & (~(np.array(m.errors[2:]) == 0).all())
+                )
+            except:
+                raise RuntimeError
 
-        pars = np.array(m.values)
-        errs = np.array(m.errors)
-        cov = np.array(m.covariance)
+        pars = np.array(m.values)[:-1]
+        errs = np.array(m.errors)[:-1]
+        cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif valid2 == False or cs * 1.05 < cs2:
-        pars = np.array(m.values)
+        pars = np.array(m.values)[:-1]
         errs = np.array(m.errors)[:-2]
-        cov = np.array(m.covariance)
+        cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif valid1 == False or cs2 * 1.05 < cs:
-        pars = np.array(m2.values)
+        pars = np.array(m2.values)[:-1]
         errs = np.array(m2.errors)[:-2]
-        cov = np.array(m2.covariance)
+        cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
     elif frac_errors1 < frac_errors2:
-        pars = np.array(m.values)
+        pars = np.array(m.values)[:-1]
         errs = np.array(m.errors)[:-2]
-        cov = np.array(m.covariance)
+        cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif frac_errors1 > frac_errors2:
-        pars = np.array(m2.values)
+        pars = np.array(m2.values)[:-1]
         errs = np.array(m2.errors)[:-2]
-        cov = np.array(m2.covariance)
+        cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
     else:
@@ -425,7 +417,6 @@ def get_peak_fwhm_with_dt_corr(
     kev=False,
     display=0,
 ):
-
     """
     Applies the drift time correction and fits the peak returns the fwhm, fwhm/max and associated errors,
     along with the number of signal events and the reduced chi square of the fit. Can return result in ADC or keV.
@@ -479,7 +470,7 @@ def get_peak_fwhm_with_dt_corr(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
             plt.plot((bins[1:] + bins[:-1]) / 2, hist)
-            plt.plot(xs, gof_func(xs, np.array(energy_pars)))
+            plt.plot(xs, gof_func(xs, *energy_pars))
             plt.show()
         else:
             energy_pars, energy_err, cov, chisqr = unbinned_energy_fit(
@@ -496,7 +487,7 @@ def get_peak_fwhm_with_dt_corr(
                 fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
                 fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
             else:
-                fwhm = pghpf.radford_fwhm(
+                fwhm = pghpf.hpge_peak_fwhm(
                     energy_pars[2], energy_pars[3], energy_pars[4]
                 )
 
@@ -505,7 +496,7 @@ def get_peak_fwhm_with_dt_corr(
             fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
 
         xs = np.arange(lower_bound, upper_bound, 0.1)
-        y = func(xs, np.array(energy_pars))[1]
+        y = func(xs, *energy_pars)[1]
         max_val = np.amax(y)
 
         fwhm_o_max = fwhm / max_val
@@ -513,7 +504,7 @@ def get_peak_fwhm_with_dt_corr(
         rng = np.random.default_rng(1)
         # generate set of bootstrapped parameters
         par_b = rng.multivariate_normal(energy_pars, cov, size=100)
-        y_max = np.array([func(xs, np.array(p))[1] for p in par_b])
+        y_max = np.array([func(xs, *p)[1] for p in par_b])
         maxs = np.nanmax(y_max, axis=1)
 
         yerr_boot = np.nanstd(y_max, axis=0)
@@ -524,12 +515,12 @@ def get_peak_fwhm_with_dt_corr(
             y_b = np.zeros(len(par_b))
             for i, p in enumerate(par_b):
                 try:
-                    y_b[i] = pghpf.radford_fwhm(p[2], p[3], p[4])  #
+                    y_b[i] = pghpf.hpge_peak_fwhm(p[2], p[3], p[4])  #
                 except:
                     y_b[i] = np.nan
             fwhm_err = np.nanstd(y_b, axis=0)
             if fwhm_err == 0:
-                fwhm, fwhm_err = pghpf.radford_fwhm(
+                fwhm, fwhm_err = pghpf.hpge_peak_fwhm(
                     energy_pars[2],
                     energy_pars[3],
                     energy_pars[4],
@@ -556,7 +547,7 @@ def get_peak_fwhm_with_dt_corr(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
             plt.plot((bins[1:] + bins[:-1]) / 2, hist)
-            plt.plot(xs, gof_func(xs, np.array(energy_pars)))
+            plt.plot(xs, gof_func(xs, *energy_pars))
             plt.fill_between(
                 xs, y - yerr_boot, y + yerr_boot, facecolor="C1", alpha=0.5
             )
@@ -602,6 +593,11 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
+
+    if idxs is not None:
+        Energies = Energies[idxs]
+        dt = dt[idxs]
+
     if np.isnan(Energies).any():
         return {
             "fwhm": np.nan,
@@ -622,10 +618,6 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
-
-    if idxs is not None:
-        Energies = Energies[idxs]
-        dt = dt[idxs]
 
     alphas = np.array(
         [
@@ -691,7 +683,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
 
     # Make sure fit isn't based on only a few points
     if len(fwhms) < 10:
-        log.error("less than 10 fits successful")
+        log.debug("less than 10 fits successful")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -740,7 +732,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             plt.show()
 
     except:
-        log.error("alpha fit failed")
+        log.debug("alpha fit failed")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -752,7 +744,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
         }
 
     if np.isnan(fit_vals).all():
-        log.error("alpha fit all nan")
+        log.debug("alpha fit all nan")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -808,7 +800,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
                 display=display,
             )
         if np.isnan(final_fwhm) or np.isnan(final_err):
-            log.error(f"final fit failed, alpha was {alpha}")
+            log.debug(f"final fit failed, alpha was {alpha}")
         return {
             "fwhm": final_fwhm,
             "fwhm_err": final_err,
@@ -856,7 +848,13 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
         dt = 0
 
     if np.isnan(Energies).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan}
+        return {
+            "fwhm_o_max": np.nan,
+            "max_o_fwhm": np.nan,
+            "chisquare": np.nan,
+            "n_sig": np.nan,
+            "n_sig_err": np.nan,
+        }
 
     (
         _,
@@ -920,7 +918,9 @@ def event_selection(
     peak_idxs,
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    pulser_mask=None,
     energy_parameter="trapTmax",
+    wf_field: str = "waveform",
     n_events=10000,
     threshold=1000,
 ):
@@ -932,15 +932,26 @@ def event_selection(
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
 
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
-    if len(pulser_props) > 0:
-        out_df = cts.tag_pulsers(df, pulser_props, window=0.001)
-        ids = out_df.isPulser == 1
-        log.debug(f"pulser found: {pulser_props}")
+    if pulser_mask is None:
+        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+        if len(pulser_props) > 0:
+            final_mask = None
+            for entry in pulser_props:
+                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                    df.daqenergy.values > entry[0] - entry[1]
+                )
+                if final_mask is None:
+                    final_mask = e_cut
+                else:
+                    final_mask = final_mask | e_cut
+            ids = final_mask
+            log.debug(f"pulser found: {pulser_props}")
+        else:
+            log.debug("no_pulser")
+            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+        # Get events around peak using raw file values
     else:
-        log.debug("no_pulser")
-        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
-    # Get events around peak using raw file values
+        ids = pulser_mask
     initial_mask = (df.daqenergy.values > threshold) & (~ids)
     rough_energy = df.daqenergy.values[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
@@ -948,13 +959,13 @@ def event_selection(
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
     Euc_min = threshold / guess_keV * 0.6
     Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 1 / guess_keV
+    dEuc = 1  # / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
         hist,
         bins,
         var,
-        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2614.553]),
+        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2103.53, 2614.553]),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
@@ -990,18 +1001,20 @@ def event_selection(
     idxs = np.array(sorted(np.concatenate(masks)))
 
     waveforms = sto.read_object(
-        f"{lh5_path}/waveform", raw_files, idx=idxs, n_rows=len(idxs)
+        f"{lh5_path}/{wf_field}", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
     baseline = sto.read_object(
         f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
     )[0]
-    input_data = lh5.Table(col_dict={"waveform": waveforms, "baseline": baseline})
+    input_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:
             dsp_config = json.load(r)
 
-    dsp_config["outputs"] = list(cut_parameters) + [energy_parameter]
+    dsp_config["outputs"] = cts.get_keys(
+        dsp_config["outputs"], list(cut_parameters)
+    ) + [energy_parameter]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
@@ -1009,7 +1022,7 @@ def event_selection(
     cut_dict = cts.generate_cuts(tb_data, cut_parameters)
     log.debug(f"Cuts are: {cut_dict}")
     log.debug("Loaded Cuts")
-    ct_mask = cts.get_cut_indexes(tb_data, cut_dict, "raw")
+    ct_mask = cts.get_cut_indexes(tb_data, cut_dict)
 
     final_events = []
     for peak_idx in peak_idxs:
@@ -1032,13 +1045,23 @@ def event_selection(
         e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
 
         e_ranges = (int(peak_loc - e_lower_lim), int(e_upper_lim - peak_loc))
-        params, errors, covs, bins, ranges, p_val = pgc.hpge_fit_E_peaks(
+        (
+            params,
+            errors,
+            covs,
+            bins,
+            ranges,
+            p_val,
+            valid_pks,
+            pk_funcs,
+        ) = pgc.hpge_fit_E_peaks(
             energy,
             [peak_loc],
             [e_ranges],
             n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
+            uncal_is_int=True,
         )
-        if params[0] is None:
+        if params[0] is None or np.isnan(params[0]).any():
             log.debug("Fit failed, using max guess")
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
@@ -1051,6 +1074,10 @@ def event_selection(
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
+        if len(peak_ids[final_mask]) < 0.5 * n_events:
+            log.warning("Less than half number of specified events found")
+        elif len(peak_ids[final_mask]) < 0.1 * n_events:
+            log.error("Less than 10% number of specified events found")
 
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
@@ -1068,14 +1095,11 @@ def fwhm_slope(x, m0, m1, m2):
 
 
 def interpolate_energy(peak_energies, points, err_points, energy):
-
     nan_mask = np.isnan(points) | (points < 0)
     if len(points[~nan_mask]) < 3:
         return np.nan, np.nan, np.nan
-    elif nan_mask[-1] == True or nan_mask[-2] == True:
-        return np.nan, np.nan, np.nan
     else:
-        param_guess = [0.2, 0.001, 0.000001]  #
+        param_guess = [2, 0.001, 0.000001]  #
         # param_bounds = (0, [10., 1. ])#
         try:
             fit_pars, fit_covs = curve_fit(
@@ -1099,8 +1123,10 @@ def interpolate_energy(peak_energies, points, err_points, energy):
         except:
             return np.nan, np.nan, np.nan
 
-        if nan_mask[-2] == True:
-            qbb_vals += qbb_err
+        if nan_mask[-1] == True or nan_mask[-2] == True:
+            qbb_err = np.nan
+        if qbb_err / fit_qbb > 0.1:
+            qbb_err = np.nan
 
     return fit_qbb, qbb_err, fit_pars
 
@@ -1123,10 +1149,19 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
-    if np.isnan(Energies).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan}
-    if np.isnan(dt).any():
-        return {"fwhm": np.nan, "fwhm_err": np.nan, "alpha": np.nan}
+    if np.isnan(Energies).any() or np.isnan(dt).any():
+        if np.isnan(Energies).any():
+            log.debug(f"nan energy values for peak {peak}")
+        else:
+            log.debug(f"nan dt values for peak {peak}")
+        return {
+            "fwhm": np.nan,
+            "fwhm_err": np.nan,
+            "alpha": np.nan,
+            "chisquare": np.nan,
+            "n_sig": np.nan,
+            "n_sig_err": np.nan,
+        }
 
     if idxs is not None:
         Energies = Energies[idxs]
@@ -1180,11 +1215,11 @@ def single_peak_fom(data, kwarg_dict):
         data, peak_dicts[0], ctc_param, idxs=idx_list[0], display=0
     )
     out_dict["y_val"] = out_dict["fwhm"]
+    out_dict["y_err"] = out_dict["fwhm_err"]
     return out_dict
 
 
 def new_fom(data, kwarg_dict):
-
     peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
@@ -1225,6 +1260,7 @@ def new_fom(data, kwarg_dict):
 
     return {
         "y_val": qbb,
+        "y_err": qbb_err,
         "qbb_fwhm": qbb,
         "qbb_fwhm_err": qbb_err,
         "alpha": alpha,
@@ -1237,27 +1273,25 @@ def new_fom(data, kwarg_dict):
 
 
 OptimiserDimension = namedtuple(
-    "OptimiserDimension", "name parameter min_val max_val unit"
+    "OptimiserDimension", "name parameter min_val max_val rounding unit"
 )
 
 
 class BayesianOptimizer:
-
+    np.random.seed(55)
     lambda_param = 0.01
     eta_param = 0
-    kernel = None
     # FIXME: the following throws a TypeError
     # kernel=ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1, length_scale_bounds="fixed") #+ WhiteKernel(noise_level=0.0111)
 
-    def __init__(self, acq_func, batch_size):
-
+    def __init__(self, acq_func, batch_size, kernel=None):
         self.dims = []
         self.current_iter = 0
 
         self.batch_size = batch_size
         self.iters = 0
 
-        self.gauss_pr = GaussianProcessRegressor(kernel=self.kernel)
+        self.gauss_pr = GaussianProcessRegressor(kernel=kernel)
         self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
         self.distances_ = []
 
@@ -1268,68 +1302,47 @@ class BayesianOptimizer:
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
 
-    def add_dimension(self, name, parameter, min_val, max_val, unit=None):
-        self.dims.append(OptimiserDimension(name, parameter, min_val, max_val, unit))
+    def add_dimension(self, name, parameter, min_val, max_val, rounding=2, unit=None):
+        self.dims.append(
+            OptimiserDimension(name, parameter, min_val, max_val, rounding, unit)
+        )
 
     def get_n_dimensions(self):
         return len(self.dims)
 
-    def add_initial_values(self, x_init, y_init):
+    def add_initial_values(self, x_init, y_init, yerr_init):
         self.x_init = x_init
         self.y_init = y_init
+        self.yerr_init = yerr_init
 
     def _get_expected_improvement(self, x_new):
-
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
-
-        # Using estimates from Gaussian surrogate instead of actual function for
-        # entire prior distribution to avoid cost
 
         mean_y = self.gauss_pr.predict(self.x_init)
         min_mean_y = np.min(mean_y)
-        z = (mean_y_new - min_mean_y - self.eta_param) / (sigma_y_new + 1e-9)  #
-        exp_imp = (mean_y_new - min_mean_y - self.eta_param) * norm.cdf(
-            z
-        ) + sigma_y_new * norm.pdf(z)
+        z = (mean_y_new[0] - min_mean_y - 1) / (sigma_y_new[0] + 1e-9)
+        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(z) + sigma_y_new[
+            0
+        ] * norm.pdf(z)
         return exp_imp
 
     def _get_ucb(self, x_new):
-
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
-
-        return mean_y_new + self.lambda_param * sigma_y_new
+        return mean_y_new[0] + self.lambda_param * sigma_y_new[0]
 
     def _get_lcb(self, x_new):
-
-        # Using estimate from Gaussian surrogate instead of actual function for
-        # a new trial data point to avoid cost
-
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
-        sigma_y_new = sigma_y_new.reshape(-1, 1)[0]
-
-        return mean_y_new - self.lambda_param * sigma_y_new
-
-    def _acquisition_function(self, x):
-        return self.acq_function(x)
+        return mean_y_new[0] - self.lambda_param * sigma_y_new[0]
 
     def _get_next_probable_point(self):
         min_ei = float(sys.maxsize)
         x_optimal = None
-        np.random.seed(55)
         # Trial with an array of random data points
         rands = np.random.uniform(
             np.array([dim.min_val for dim in self.dims]),
@@ -1338,30 +1351,42 @@ class BayesianOptimizer:
         )
         for x_start in rands:
             response = minimize(
-                fun=self._acquisition_function,
+                fun=self.acq_function,
                 x0=x_start,
                 bounds=[(dim.min_val, dim.max_val) for dim in self.dims],
                 method="L-BFGS-B",
             )
-            if response.fun[0] < min_ei:
-                min_ei = response.fun[0]
-                x_optimal = [y.round(2) for y in response.x]
+            if response.fun < min_ei:
+                min_ei = response.fun
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(response.x, self.dims)
+                ]
         if x_optimal in self.x_init and self.iters < 5:
-            self.iters += 1
-            x_optimal, min_ei = self._get_next_probable_point()
+            if self.iters < 5:
+                self.iters += 1
+                x_optimal, min_ei = self._get_next_probable_point()
+            else:
+                perturb = np.random.uniform(
+                    np.array([(dim.max_val - dim.min_val) / 100 for dim in self.dims]),
+                    np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                    (1, len(self.dims)),
+                )
+                x_optimal += perturb
+                x_optimal = [
+                    y.round(dim.rounding) for y, dim in zip(x_optimal[0], self.dims)
+                ]
+                for i, y in enumerate(x_optimal):
+                    if y > self.dims[i].max_val:
+                        x_optimal[i] = self.dims[i].max_val
+                    elif y < self.dims[i].min_val:
+                        x_optimal[i] = self.dims[i].min_val
 
-        if x_optimal in self.x_init and self.iters == 5:
-            x_optimal += np.random.uniform(
-                np.array([0.1 for dim in self.dims]),
-                np.array([1 for dim in self.dims]),
-                (1, len(self.dims)),
-            )
-            x_optimal = [y.round(2) for y in x_optimal[0]]
         return x_optimal, min_ei
 
-    def _extend_prior_with_posterior_data(self, x, y):
+    def _extend_prior_with_posterior_data(self, x, y, yerr):
         self.x_init = np.append(self.x_init, np.array([x]), axis=0)
         self.y_init = np.append(self.y_init, np.array(y), axis=0)
+        self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
 
     def get_first_point(self):
         y_min_ind = np.nanargmin(self.y_init)
@@ -1383,7 +1408,7 @@ class BayesianOptimizer:
         self.current_x = x_new
         self.current_ei = ei
         for i, val in enumerate(x_new):
-            name, parameter, min_val, max_val, unit = self.dims[i]
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             if unit is not None:
                 value_str = f"{val}*{unit}"
             else:
@@ -1397,9 +1422,12 @@ class BayesianOptimizer:
 
     def update(self, results):
         y_val = results["y_val"]
-        self._extend_prior_with_posterior_data(self.current_x, np.array([y_val]))
+        y_err = results["y_err"]
+        self._extend_prior_with_posterior_data(
+            self.current_x, np.array([y_val]), np.array([y_err])
+        )
 
-        if np.isnan(y_val):
+        if np.isnan(y_val) | np.isnan(y_err):
             pass
         else:
             if y_val < self.y_min:
@@ -1416,20 +1444,226 @@ class BayesianOptimizer:
             )
             self.prev_x = self.current_x
 
-        self.best_samples_ = self.best_samples_.append(
-            {"y": self.y_min, "ei": self.optimal_ei}, ignore_index=True
+        self.best_samples_ = pd.concat(
+            [
+                self.best_samples_,
+                pd.DataFrame(
+                    {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
+                ),
+            ],
+            ignore_index=True,
         )
 
     def get_best_vals(self):
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
-            name, parameter, min_val, max_val, unit = self.dims[i]
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             value_str = f"{val}*{unit}"
             if name not in out_dict.keys():
                 out_dict[name] = {parameter: value_str}
             else:
                 out_dict[name][parameter] = value_str
         return out_dict
+
+    def plot(self, init_samples=None):
+        nan_idxs = np.isnan(self.y_init)
+        fail_idxs = np.isnan(self.yerr_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
+            ys = np.zeros_like(points)
+            ys_err = np.zeros_like(points)
+            for i, point in enumerate(points):
+                ys[i], ys_err[i] = self.gauss_pr.predict(
+                    np.array([point]).reshape(1, -1), return_std=True
+                )
+            fig = plt.figure()
+
+            plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
+            plt.scatter(
+                np.array(self.x_init)[fail_idxs],
+                np.array(self.y_init)[fail_idxs],
+                color="green",
+                label="Failed samples",
+            )
+            plt.fill_between(points, ys - ys_err, ys + ys_err, alpha=0.1)
+            if init_samples is not None:
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
+                plt.scatter(
+                    np.array(init_samples)[:, 0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                    label="Init Samples",
+                )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
+
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+            plt.ylabel(f"Kernel Value")
+            plt.legend()
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self.gauss_pr.predict(
+                    points[j].reshape(1, -1), return_std=False
+                )
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+        plt.title(f"{self.dims[0].name} Kernel Prediction")
+        plt.tight_layout()
+        plt.close()
+        return fig
+
+    def plot_acq(self, init_samples=None):
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
+            ys = np.zeros_like(points)
+            for i, point in enumerate(points):
+                ys[i] = self.acq_function(np.array([point]).reshape(1, -1)[0])
+            fig = plt.figure()
+            plt.plot(points, ys)
+            plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
+            if init_samples is not None:
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
+                plt.scatter(
+                    np.array(init_samples)[:, 0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                    label="Init Samples",
+                )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
+
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+            plt.ylabel(f"Acquisition Function Value")
+            plt.legend()
+
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self.acq_function(points[j])
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+        plt.title(f"{self.dims[0].name} Acquisition Space")
+        plt.tight_layout()
+        plt.close()
+        return fig
 
 
 def run_optimisation(
@@ -1489,6 +1723,8 @@ def run_optimisation(
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results
+        if np.isnan(results_dict["y_val"]):
+            log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
         out_results_list.append(results_dict)
 
     return out_param_dict, out_results_list
@@ -1689,7 +1925,6 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
         pathlib.Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
 
         with PdfPages(save_path) as pdf:
-
             keys = list(opt_dict.keys())
             print(keys)
             x_dict = opt_dict[keys[1]]

@@ -8,7 +8,6 @@ from pygama.math.functions.triple_gauss_on_double_step import (
 
 
 def test_triple_gauss_on_double_step_pdf():
-
     x = np.arange(-50, 50)
     mu_1 = 0
     sigma_1 = 1
@@ -21,8 +20,8 @@ def test_triple_gauss_on_double_step_pdf():
     mu_3 = 5
     sigma_3 = 10
 
-    lower_range = np.amin(x)
-    upper_range = np.amax(x)
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig1 = 2
     n_sig2 = 10
     n_sig3 = 4
@@ -31,6 +30,8 @@ def test_triple_gauss_on_double_step_pdf():
 
     pars = np.array(
         [
+            x_lo,
+            x_hi,
             n_sig1,
             mu_1,
             sigma_1,
@@ -44,8 +45,6 @@ def test_triple_gauss_on_double_step_pdf():
             hstep_1,
             n_bkg2,
             hstep_2,
-            lower_range,
-            upper_range,
         ],
         dtype=float,
     )
@@ -88,8 +87,6 @@ def test_triple_gauss_on_double_step_pdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    triple_gauss_on_double_step.set_x_lo(lower_range)
-    triple_gauss_on_double_step.set_x_hi(upper_range)
     y_sig, y_ext = triple_gauss_on_double_step.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(
@@ -98,7 +95,6 @@ def test_triple_gauss_on_double_step_pdf():
 
 
 def test_triple_gauss_on_double_step_cdf():
-
     x = np.arange(-10, 10)
     mu_1 = 0
     sigma_1 = 1
@@ -111,8 +107,8 @@ def test_triple_gauss_on_double_step_cdf():
     mu_3 = 5
     sigma_3 = 10
 
-    lower_range = np.amin(x)
-    upper_range = np.amax(x)
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig1 = 2
     n_sig2 = 10
     n_sig3 = 4
@@ -121,6 +117,8 @@ def test_triple_gauss_on_double_step_cdf():
 
     pars = np.array(
         [
+            x_lo,
+            x_hi,
             n_sig1,
             mu_1,
             sigma_1,
@@ -134,8 +132,6 @@ def test_triple_gauss_on_double_step_cdf():
             hstep_1,
             n_bkg2,
             hstep_2,
-            lower_range,
-            upper_range,
         ],
         dtype=float,
     )
@@ -165,3 +161,22 @@ def test_triple_gauss_on_double_step_cdf():
 
     y_ext = triple_gauss_on_double_step.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
+
+def test_required_args():
+    names = triple_gauss_on_double_step.required_args()
+    assert names[0] == "x_lo"
+    assert names[1] == "x_hi"
+    assert names[2] == "n_sig1"
+    assert names[3] == "mu1"
+    assert names[4] == "sigma1"
+    assert names[5] == "n_sig2"
+    assert names[6] == "mu2"
+    assert names[7] == "sigma2"
+    assert names[8] == "n_sig3"
+    assert names[9] == "mu3"
+    assert names[10] == "sigma3"
+    assert names[11] == "n_bkg1"
+    assert names[12] == "hstep1"
+    assert names[13] == "n_bkg2"
+    assert names[14] == "hstep2"

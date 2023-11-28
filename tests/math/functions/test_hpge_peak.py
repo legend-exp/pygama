@@ -6,7 +6,6 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_hpge_peak_pdf():
-
     x = np.arange(-10, 10)
 
     sigma = 0.2
@@ -14,13 +13,13 @@ def test_hpge_peak_pdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.amin(x)
-    upper_range = np.max(x)
+    x_lo = np.amin(x)
+    x_hi = np.max(x)
     n_sig = 10
     n_bkg = 20
 
     pars = np.array(
-        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
+        [x_lo, x_hi, n_sig, mu, sigma, htail, tau, n_bkg, hstep],
         dtype=float,
     )
 
@@ -54,16 +53,12 @@ def test_hpge_peak_pdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    hpge_peak.set_x_lo(lower_range)
-    hpge_peak.set_x_hi(upper_range)
-
     y_sig, y_ext = hpge_peak.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
 
 
 def test_hpge_peak_cdf():
-
     x = np.arange(-10, 10)
 
     sigma = 0.2
@@ -71,13 +66,13 @@ def test_hpge_peak_cdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.amin(x)
-    upper_range = np.max(x)
+    x_lo = np.amin(x)
+    x_hi = np.max(x)
     n_sig = 10
     n_bkg = 20
 
     pars = np.array(
-        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
+        [x_lo, x_hi, n_sig, mu, sigma, htail, tau, n_bkg, hstep],
         dtype=float,
     )
 
@@ -120,3 +115,16 @@ def test_hpge_peak_cdf():
 
     y_ext = hpge_peak.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-1)
+
+
+def test_required_args():
+    names = hpge_peak.required_args()
+    assert names[0] == "x_lo"
+    assert names[1] == "x_hi"
+    assert names[2] == "n_sig"
+    assert names[3] == "mu"
+    assert names[4] == "sigma"
+    assert names[5] == "htail"
+    assert names[6] == "tau"
+    assert names[7] == "n_bkg"
+    assert names[8] == "hstep"

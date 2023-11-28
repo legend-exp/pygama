@@ -26,6 +26,6 @@ from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.exgauss import exgauss
 
 (mu, sigma, frac, tau) = range(4) # the sum_dist array we will pass will be mu, sigma, frac/htail, tau
-par_array = [(exgauss, [tau, mu, sigma]), (gaussian, [mu, sigma])] 
+par_array = [(exgauss, [mu, sigma, tau]), (gaussian, [mu, sigma])] 
 
 gauss_on_exgauss = sum_dists(par_array, [frac], "fracs", parameter_names = ["mu", "sigma", "htail", "tau"])

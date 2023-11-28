@@ -15,7 +15,7 @@ kwd_parallel = {"parallel": True, "fastmath": True}
 
 
 @nb.njit(**kwd_parallel)
-def nb_crystal_ball_pdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+def nb_crystal_ball_pdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     PDF of a power-law tail plus gaussian. Its range of support is :math:`x\in\mathbb{R}, \beta>0, m>1`. It computes:
 
@@ -40,14 +40,14 @@ def nb_crystal_ball_pdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: 
     ----------
     x
         The input data
-    beta
-        The point where the pdf changes from power-law to Gaussian
-    m
-        The power of the power-law tail
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
+    beta
+        The point where the pdf changes from power-law to Gaussian
+    m
+        The power of the power-law tail
     """
 
     if (beta <= 0) or (m <= 1):
@@ -74,7 +74,7 @@ def nb_crystal_ball_pdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: 
 
 
 @nb.njit(**kwd_parallel)
-def nb_crystal_ball_cdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+def nb_crystal_ball_cdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     CDF for power-law tail plus gaussian. Its range of support is :math:`x\in\mathbb{R}, \beta>0, m>1`. It computes: 
 
@@ -99,14 +99,14 @@ def nb_crystal_ball_cdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: 
     ----------
     x
         The input data
-    beta
-        The point where the cdf changes from power-law to Gaussian
-    m
-        The power of the power-law tail
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
+    beta
+        The point where the cdf changes from power-law to Gaussian
+    m
+        The power of the power-law tail
     """
 
     if (beta <= 0) or (m <= 1):
@@ -136,7 +136,7 @@ def nb_crystal_ball_cdf(x: np.ndarray, beta: float, m: float, mu: float, sigma: 
 
 
 @nb.njit(**kwd)
-def nb_crystal_ball_scaled_pdf(x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+def nb_crystal_ball_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     Scaled PDF of a power-law tail plus gaussian. 
     As a Numba vectorized function, it runs slightly faster than
@@ -146,23 +146,23 @@ def nb_crystal_ball_scaled_pdf(x: np.ndarray, area: float, beta: float, m: float
     ----------
     x
         The input data
-    beta
-        The point where the pdf changes from power-law to Gaussian
-    m
-        The power of the power-law tail
+    area
+        The number of counts in the distribution
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the distribution
+    beta
+        The point where the pdf changes from power-law to Gaussian
+    m
+        The power of the power-law tail
     """
 
-    return area * nb_crystal_ball_pdf(x, beta, m, mu, sigma)
+    return area * nb_crystal_ball_pdf(x, mu, sigma, beta, m)
 
 
 @nb.njit(**kwd)
-def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
+def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     Scaled CDF for power-law tail plus gaussian. Used for extended binned fits. 
     As a Numba vectorized function, it runs slightly faster than
@@ -172,19 +172,19 @@ def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, beta: float, m: float
     ----------
     x
         The input data
-    beta
-        The point where the cdf changes from power-law to Gaussian
-    m
-        The power of the power-law tail
+    area
+        The number of counts in the distribution
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the distribution
+    beta
+        The point where the cdf changes from power-law to Gaussian
+    m
+        The power of the power-law tail
     """
 
-    return area * nb_crystal_ball_cdf(x, beta, m, mu, sigma)
+    return area * nb_crystal_ball_cdf(x, mu, sigma, beta, m)
 
 
 class crystal_ball_gen(pygama_continuous): 
@@ -194,30 +194,30 @@ class crystal_ball_gen(pygama_continuous):
         self.x_hi = np.inf
         super().__init__(self)
 
-    def _pdf(self, x: np.ndarray, beta: float, m: float) -> np.ndarray:
+    def _pdf(self, x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
         x.flags.writeable = True
-        return nb_crystal_ball_pdf(x, beta[0], m[0], 0, 1)
-    def _cdf(self, x: np.ndarray, beta: float, m: float) -> np.ndarray:
+        return nb_crystal_ball_pdf(x, mu[0], sigma[0], beta[0], m[0])
+    def _cdf(self, x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
         x.flags.writeable = True
-        return nb_crystal_ball_cdf(x, beta[0], m[0], 0, 1)
+        return nb_crystal_ball_cdf(x, mu[0], sigma[0], beta[0], m[0])
 
-    def get_pdf(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_crystal_ball_pdf(x, beta, m, mu, sigma)
-    def get_cdf(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_crystal_ball_cdf(x, beta, m, mu, sigma)
+    def get_pdf(self, x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return nb_crystal_ball_pdf(x, mu, sigma, beta, m)
+    def get_cdf(self, x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return nb_crystal_ball_cdf(x, mu, sigma, beta, m)
 
-    def pdf_norm(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._pdf_norm(x, self.x_lo, self.x_hi, beta, m, mu, sigma)
-    def cdf_norm(self, x: np.ndarray, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return self._cdf_norm(x, self.x_lo, self.x_hi, beta, m, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return self._pdf_norm(x, x_lo, x_hi, mu, sigma, beta, m)
+    def cdf_norm(self, x: np.ndarray,  x_lo: float, x_hi: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return self._cdf_norm(x, x_lo, x_hi, mu, sigma, beta, m)
 
 
-    def pdf_ext(self, x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_crystal_ball_scaled_cdf(np.array([self.x_hi]), area, beta, m, mu, sigma)[0]-nb_crystal_ball_scaled_cdf(np.array([self.x_lo]), area, beta, m, mu, sigma)[0], nb_crystal_ball_scaled_pdf(x, area, beta, m, mu, sigma)
-    def cdf_ext(self, x: np.ndarray, area: float, beta: float, m: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_crystal_ball_scaled_cdf(x, area, beta, m, mu, sigma)
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return np.diff(nb_crystal_ball_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, beta, m)), nb_crystal_ball_scaled_pdf(x, area, mu, sigma, beta, m)
+    def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
+        return nb_crystal_ball_scaled_cdf(x, area, mu, sigma, beta, m)
 
     def required_args(self) -> tuple[str, str, str, str]:
-        return "beta", "m", "mu", "sigma"
+        return "mu", "sigma", "beta", "m"
 
 crystal_ball = crystal_ball_gen(name = "crystal_ball")
