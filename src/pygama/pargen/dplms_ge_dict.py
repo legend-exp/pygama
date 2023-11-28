@@ -86,7 +86,7 @@ def dplms_ge_dict(
         lh5_path,
         "bls",
         n_events=dplms_dict["n_baselines"],
-        raw_wf_field=dplms_dict["raw_wf_field"]
+        raw_wf_field=dplms_dict["raw_wf_field"],
     )
 
     dsp_bls = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
@@ -135,7 +135,9 @@ def dplms_ge_dict(
         n_events=dplms_dict["n_signals"],
     )
     t3 = time.time()
-    log.info(f"Time to run event selection {(t3-t2):.2f} s, total events {len(raw_cal)}")
+    log.info(
+        f"Time to run event selection {(t3-t2):.2f} s, total events {len(raw_cal)}"
+    )
 
     raw_cal = index_data(raw_cal, idx_list[-1])
     log.info(f"Produce dsp data for {len(raw_cal)} events")
@@ -259,7 +261,9 @@ def dplms_ge_dict(
             res["alpha"],
             res["chisquare"],
         )
-        log.info(f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, evaluated in {time.time()-t_tmp:.1f} s")
+        log.info(
+            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, evaluated in {time.time()-t_tmp:.1f} s"
+        )
 
         grid_dict[i]["fwhm"] = fwhm
         grid_dict[i]["fwhm_err"] = fwhm_err
@@ -301,7 +305,9 @@ def dplms_ge_dict(
                 pt_coeff,
             ]
         ):
-            log.info(f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}")
+            log.info(
+                f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}"
+            )
         else:
             log.error("Some values are missing in the best case results")
     else:
