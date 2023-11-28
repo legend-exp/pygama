@@ -6,48 +6,54 @@
   "operations": {
     "energy": {
       "channels": "geds_on",
-      "mode": "vov>25",
-      "get_ch": true,
-      "expression": "cuspEmax_ctc_cal"
+      "aggregation_mode": "vov",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal"
+    },
+    "energy_id": {
+      "channels": "geds_on",
+      "aggregation_mode": "vov",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.array_id"
     },
     "t0": {
       "channels": ["geds_on"],
-      "mode": "energy_id",
-      "expression": "tp_0_est",
+      "aggregation_mode": "evt.energy_id",
+      "expression": "dsp.tp_0_est",
       "initial": 0.0
     },
     "lar_energy": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_energy(0.5,t0,48000,1000,5000)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
     },
     "lar_multiplicity": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_majority(0.5,t0,48000,1000,5000)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_majority(0.5,evt.t0,48000,1000,5000)"
     },
     "is_lar_rejected": {
-      "expression": "(lar_energy >4) | (lar_multiplicity > 4) "
+      "expression": "(evt.lar_energy >4) | (evt.lar_multiplicity > 4) "
     },
     "lar_classifier": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_etc(0.5,t0,48000,100,6000,80,1)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_etc(0.5,evt.t0,48000,100,6000,80,1)"
     },
     "lar_energy_dplms": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_energy_dplms(0.5,t0,48000,1000,5000)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_energy_dplms(0.5,evt.t0,48000,1000,5000)"
     },
     "lar_multiplicity_dplms": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_majority_dplms(0.5,t0,48000,1000,5000)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_majority_dplms(0.5,evt.t0,48000,1000,5000)"
     },
     "lar_time_shift": {
       "channels": "spms_on",
-      "mode": "func",
-      "expression": ".modules.spm.get_time_shift(0.5,t0,48000,1000,5000)"
+      "aggregation_mode": "function",
+      "expression": ".modules.spm.get_time_shift(0.5,evt.t0,48000,1000,5000)"
     }
   }
 }

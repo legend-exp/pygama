@@ -5,29 +5,35 @@
   "operations": {
     "energy": {
       "channels": "geds_on",
-      "mode": "vov>25",
-      "get_ch": true,
-      "expression": "cuspEmax_ctc_cal"
+      "aggregation_mode": "vov",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal"
+    },
+    "energy_id": {
+      "channels": "geds_on",
+      "aggregation_mode": "vov",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.array_id"
     },
     "aoe": {
-      "mode": "energy_id",
-      "expression": "AoE_Classifier"
+      "aggregation_mode": "evt.energy_id",
+      "expression": "hit.AoE_Classifier"
     },
     "multiplicity": {
       "channels": "geds_on",
-      "mode": "tot",
-      "expression": "cuspEmax_ctc_cal > a",
+      "aggregation_mode": "sum",
+      "expression": "hit.cuspEmax_ctc_cal > a",
       "parameters": { "a": 25 },
       "initial": 0
     },
     "energy_times_aoe": {
-      "expression": "energy*aoe"
+      "expression": "evt.energy*evt.aoe"
     },
     "energy_times_multiplicity": {
-      "expression": "energy*multiplicity"
+      "expression": "evt.energy*evt.multiplicity"
     },
     "multiplicity_squared": {
-      "expression": "multiplicity*multiplicity"
+      "expression": "evt.multiplicity*evt.multiplicity"
     }
   }
 }

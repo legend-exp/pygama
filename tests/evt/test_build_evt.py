@@ -26,14 +26,10 @@ def test_basics(lgnd_test_data, tmptestdir):
         wo_mode="o",
         group="/evt/",
         tcm_group="hardware_tcm_1",
-        dsp_group="/dsp/",
-        hit_group="/hit/",
     )
 
     assert os.path.exists(outfile)
-    assert (
-        len(ls(outfile, "/evt/")) == 11
-    )  # 7 operations of which 2 are requesting channel field
+    assert len(ls(outfile, "/evt/")) == 10
     nda = load_nda(
         outfile, ["energy", "energy_aux", "energy_sum", "multiplicity"], "/evt/"
     )
@@ -154,7 +150,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     with pytest.raises(RuntimeError):
         build_evt(f_dsp, f_tcm, f_hit, outfile, f_config, meta_path)
 
-    with pytest.raises(NameError):
+    with pytest.raises(RuntimeError):
         build_evt(f_tcm, f_hit, f_dsp, outfile, f_config, meta_path)
 
     with pytest.raises(TypeError):
@@ -170,55 +166,37 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
-        "operations": {},
-    }
-    build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
-    assert not os.path.exists(outfile)
-
-    conf = {
-        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "operations": {
-            "energy": {
+            "foo": {
                 "channels": "geds_on",
-                "mode": ["first>pineapple", "tp_0_est"],
-                "get_ch": True,
-                "expression": "cuspEmax_ctc_cal",
-                "initial": "np.nan",
+                "aggregation_mode": "banana",
+                "expression": "hit.cuspEmax_ctc_cal > a",
+                "parameters": {"a": 25},
+                "initial": 0,
             }
         },
     }
     with pytest.raises(ValueError):
         build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
 
-    conf = {
-        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
-        "operations": {
-            "energy": {
-                "channels": "geds_on",
-                "mode": ["first>25", "tp_0_est"],
-                "get_ch": True,
-                "expression": "cuspEmax_ctc_cal$cuspEmax_ctc_cal",
-                "initial": "np.nan",
-            }
-        },
-    }
-    with pytest.raises(SyntaxError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
 
-    conf = {
-        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
-        "operations": {
-            "energy": {
-                "channels": "geds_on",
-                "mode": ["first>25", "coconut"],
-                "get_ch": True,
-                "expression": "cuspEmax_ctc_cal",
-                "initial": "np.nan",
-            }
-        },
-    }
-    with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+def test_query(lgnd_test_data, tmptestdir):
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    build_evt(
+        f_tcm=lgnd_test_data.get_path(tcm_path),
+        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
+        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+        f_evt=outfile,
+        meta_path=None,
+        evt_config=f"{config_dir}/query-test-evt-config.json",
+        wo_mode="o",
+        group="/evt/",
+        tcm_group="hardware_tcm_1",
+    )
+    assert len(ls(outfile, "/evt/")) == 12
 
 
 def test_skimming(lgnd_test_data, tmptestdir):
@@ -244,3 +222,6 @@ def test_skimming(lgnd_test_data, tmptestdir):
 
     skim_evt(outfile, "multiplicity == 3", None, None, "o")
     assert ac == len(lstore.read_object("/evt/energy", outfile)[0].to_aoesa().nda)
+
+    with pytest.raises(ValueError):
+        skim_evt(outfile, "multiplicity == 3", None, None, "bla")
