@@ -36,7 +36,6 @@ from pygama.pargen.energy_optimisation import (
     fom_FWHM_with_dt_corr_fit,
     index_data,
 )
-from pygama.pargen.noise_optimization import calculate_spread
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -218,30 +217,6 @@ def dplms_ge_dict(
         )
 
         t_tmp = time.time()
-        dsp_opt = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
-        energies = dsp_opt[ene_par].nda
-        enc_results = calculate_spread(energies, 10, 90, 1000)
-        enc, enc_err = enc_results["fom"], enc_results["fom_err"]
-        log.info(
-            f"ENC: mean = {energies.mean():.2f} ADC, FOM = {enc:.2f} ± {enc_err:.2f} ADC, evaluated in {time.time()-t_tmp:.1f} s"
-        )
-        grid_dict[i]["enc"] = enc
-        grid_dict[i]["enc_err"] = enc_err
-
-        if display > 0:
-            hist, bins, var = get_hist(energies, range=(-20, 20), dx=0.1)
-            bc = (bins[:-1] + bins[1:]) / 2.0
-            ax.plot(
-                bc,
-                hist,
-                ds="steps",
-                label=f"{ene_par} - ENC = {enc:.3f} ± {enc_err:.3f} ADC",
-            )
-            ax.set_xlabel("energy (ADC)")
-            ax.set_ylabel("counts")
-            ax.legend(loc="upper right")
-
-        t_tmp = time.time()
         dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
 
         try:
@@ -281,8 +256,6 @@ def dplms_ge_dict(
         min_result = grid_dict[min_idx]
         best_case_values = {key: min_result[key] for key in min_result.keys()}
 
-        enc = best_case_values.get("enc", None)
-        enc_err = best_case_values.get("enc_err", 0)
         fwhm = best_case_values.get("fwhm", None)
         fwhm_err = best_case_values.get("fwhm_err", 0)
         alpha = best_case_values.get("alpha", 0)
@@ -294,8 +267,6 @@ def dplms_ge_dict(
         if all(
             v is not None
             for v in [
-                enc,
-                enc_err,
                 fwhm,
                 fwhm_err,
                 alpha,
@@ -366,9 +337,6 @@ def dplms_ge_dict(
     log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
 
     if display > 0:
-        plot_dict["dplms"]["enc_hist"] = fig
-        plot_dict["dplms"]["enc"] = enc
-        plot_dict["dplms"]["enc_err"] = enc_err
         plot_dict["dplms"]["ref"] = ref
         plot_dict["dplms"]["coefficients"] = x
 
