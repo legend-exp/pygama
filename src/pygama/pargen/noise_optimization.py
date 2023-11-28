@@ -69,7 +69,6 @@ def noise_optimization(
         raw_list,
         lh5_path,
         n_events=opt_dict["n_events"],
-        wf_field=opt_dict["wf_field"],
     )
     t1 = time.time()
     log.info(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
@@ -291,7 +290,6 @@ def load_data(
     bls: bool = True,
     n_events: int = 10000,
     threshold: int = 200,
-    wf_field="waveform",
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
 
@@ -301,20 +299,7 @@ def load_data(
         idxs = np.where(energies.nda == 0)[0]
     else:
         idxs = np.where(energies.nda > threshold)[0]
-
-    waveforms = sto.read_object(
-        f"{lh5_path}/raw/{wf_field}", raw_list, n_rows=n_events, idx=idxs
-    )[0]
-    daqenergy = sto.read_object(
-        f"{lh5_path}/raw/daqenergy", raw_list, n_rows=n_events, idx=idxs
-    )[0]
-    baseline = sto.read_object(
-        f"{lh5_path}/raw/baseline", raw_list, n_rows=n_events, idx=idxs
-    )[0]
-
-    tb_data = lh5.Table(
-        col_dict={"waveform": waveforms, "daqenergy": daqenergy, "baseline": baseline}
-    )
+    tb_data = sto.read_object(f"{lh5_path}/raw", raw_list, n_rows=n_events, idx=idxs)[0]
     return tb_data
 
 
