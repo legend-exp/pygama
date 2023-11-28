@@ -108,8 +108,13 @@ def evaluate_expression(
     if mode == "function":
         # evaluate expression
         func, params = expr.split("(")
+        params = (
+            params.replace("dsp.", "dsp_")
+            .replace("hit.", "hit_")
+            .replace("evt.", "evt_")
+        )
         params = [f_hit, f_dsp, f_tcm, chns] + [
-            num_and_pars(e.replace(".", "_"), var_ph) for e in params[:-1].split(",")
+            num_and_pars(e, var_ph) for e in params[:-1].split(",")
         ]
 
         # load function dynamically
@@ -844,7 +849,6 @@ def build_evt(
     f_hit: str,
     f_evt: str,
     evt_config: str | dict,
-    meta_path: str = None,
     wo_mode: str = "write_safe",
     group: str = "/evt/",
     tcm_group: str = "/hardware_tcm_1/",
@@ -951,28 +955,31 @@ def build_evt(
     chns = {}
 
     for k, v in tbl_cfg["channels"].items():
-        if isinstance(v, str):
-            # only import legend meta data when needed.
-            # LEGEND collaborators can use the meta keyword
-            # Why for users w/o access to the LEGEND meta data this is still working
-            if "meta" in v:
-                lm = import_module("legendmeta")
-                lmeta = lm.LegendMetadata(path=meta_path)
-                chmap = lmeta.channelmap(re.search(r"\d{8}T\d{6}Z", f_dsp).group(0))
-                m, sys, usa = v.split("_", 2)
-                tmp = [
-                    f"ch{e}"
-                    for e in chmap.map("daq.rawid")
-                    if chmap.map("daq.rawid")[e]["system"] == sys
-                ]
-                chns[k] = [
-                    e
-                    for e in tmp
-                    if chmap.map("daq.rawid")[int(e[2:])]["analysis"]["usability"]
-                    == usa
-                ]
-            else:
-                chns[k] = [v]
+        if isinstance(v, dict):
+            # it is a meta module. module_name must exist
+            if "module" not in v.keys():
+                raise ValueError(
+                    "Need module_name to load channel via a meta data module"
+                )
+
+            attr = {}
+            # the time_key argument is set to the time key of the DSP file
+            # in case it is not provided by the config
+            if "time_key" not in v.keys():
+                attr["time_key"] = re.search(r"\d{8}T\d{6}Z", f_dsp).group(0)
+
+            # if "None" do None
+            elif "None" == v["time_key"]:
+                attr["time_key"] = None
+
+            # load module
+            p, m = v["module"].rsplit(".", 1)
+            met = getattr(import_module(p, package=__package__), m)
+            chns[k] = met(v | attr)
+
+        elif isinstance(v, str):
+            chns[k] = [v]
+
         elif isinstance(v, list):
             chns[k] = [e for e in v]
 
@@ -1061,19 +1068,6 @@ def build_evt(
                 lh5_file=f_evt,
                 wo_mode=wo_mode,
             )
-
-            # if get_ch flag is true and exists and result dic contains channels entry
-            # write also channels information
-            # if "get_ch" in v.keys() and v["get_ch"] and "channels" in result.keys():
-            #     obj = result["channels"]
-            #     if isinstance(obj, np.ndarray):
-            #         obj = Array(result["channels"])
-            #     lstore.write_object(
-            #         obj=obj,
-            #         name=group + k + "_id",
-            #         lh5_file=f_evt,
-            #         wo_mode=wo_mode,
-            #     )
 
     log.info("Done")
 

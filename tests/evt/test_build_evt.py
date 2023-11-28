@@ -21,7 +21,6 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=None,
         evt_config=f"{config_dir}/basic-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -57,7 +56,6 @@ def test_lar_module(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=None,
         evt_config=f"{config_dir}/module-test-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -85,7 +83,6 @@ def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=None,
         evt_config=f"{config_dir}/module-test-t0-vov-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -112,7 +109,6 @@ def test_vov(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=None,
         evt_config=f"{config_dir}/vov-test-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -144,25 +140,24 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     f_tcm = lgnd_test_data.get_path(tcm_path)
     f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
     f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    meta_path = None
     f_config = f"{config_dir}/basic-evt-config.json"
 
     with pytest.raises(RuntimeError):
-        build_evt(f_dsp, f_tcm, f_hit, outfile, f_config, meta_path)
+        build_evt(f_dsp, f_tcm, f_hit, outfile, f_config)
 
     with pytest.raises(RuntimeError):
-        build_evt(f_tcm, f_hit, f_dsp, outfile, f_config, meta_path)
+        build_evt(f_tcm, f_hit, f_dsp, outfile, f_config)
 
     with pytest.raises(TypeError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, None, meta_path)
+        build_evt(f_tcm, f_dsp, f_hit, outfile, None)
 
     conf = {"operations": {}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
 
     conf = {"channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
@@ -177,7 +172,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         },
     }
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf, meta_path)
+        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
 
 
 def test_query(lgnd_test_data, tmptestdir):
@@ -190,7 +185,6 @@ def test_query(lgnd_test_data, tmptestdir):
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         f_evt=outfile,
-        meta_path=None,
         evt_config=f"{config_dir}/query-test-evt-config.json",
         wo_mode="o",
         group="/evt/",
@@ -207,9 +201,8 @@ def test_skimming(lgnd_test_data, tmptestdir):
     f_tcm = lgnd_test_data.get_path(tcm_path)
     f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
     f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    meta_path = None
     f_config = f"{config_dir}/vov-test-evt-config.json"
-    build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, meta_path)
+    build_evt(f_tcm, f_dsp, f_hit, outfile, f_config)
 
     lstore = store.LH5Store()
     ac = lstore.read_object("/evt/multiplicity", outfile)[0].nda

@@ -1,88 +1,88 @@
 {
-    "channels": {
-        "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  "channels": {
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  },
+  "operations": {
+    "multiplicity": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "expression": "hit.cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0
     },
-    "operations":{
-        "multiplicity": {
-            "channels": "geds_on",
-            "aggregation_mode": "sum",
-            "expression": "hit.cuspEmax_ctc_cal > a",
-            "parameters": { "a": 25 },
-            "initial": 0
-        },
-        "test_sum": {
-            "channels": "geds_on",
-            "aggregation_mode": "sum",
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_first": {
-            "channels": "geds_on",
-            "aggregation_mode": ["first", "dsp.tp_0_est"],
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_first2": {
-            "channels": "geds_on",
-            "aggregation_mode": ["first", "dsp.tp_0_est"],
-            "expression": "True",
-            "initial": false
-        },
-        "test_last": {
-            "channels": "geds_on",
-            "aggregation_mode": ["last", "dsp.tp_0_est"],
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_last2": {
-            "channels": "geds_on",
-            "aggregation_mode": ["last", "dsp.tp_0_est"],
-            "expression": "True",
-            "initial": false
-        },
-        "test_any": {
-            "channels": "geds_on",
-            "aggregation_mode": "any",
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_any2": {
-            "channels": "geds_on",
-            "aggregation_mode": "any",
-            "query":"hit.cuspEmax_ctc_cal >25",
-            "expression": "True",
-            "initial": false
-        },
-        "test_all": {
-            "channels": "geds_on",
-            "aggregation_mode": "all",
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_all2": {
-            "channels": "geds_on",
-            "aggregation_mode": "all",
-            "query":"hit.cuspEmax_ctc_cal >25",
-            "expression": "True",
-            "initial": false
-        },
-        "test_vov": {
-            "channels": "geds_on",
-            "aggregation_mode": "vov",
-            "query":"evt.multiplicity == 1",
-            "expression": "True",
-            "initial": false
-        },
-        "test_vov2": {
-            "channels": "geds_on",
-            "aggregation_mode": "vov",
-            "expression": "True",
-            "initial": false
-        }
+    "test_sum": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_first": {
+      "channels": "geds_on",
+      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_first2": {
+      "channels": "geds_on",
+      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "expression": "True",
+      "initial": false
+    },
+    "test_last": {
+      "channels": "geds_on",
+      "aggregation_mode": ["last", "dsp.tp_0_est"],
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_last2": {
+      "channels": "geds_on",
+      "aggregation_mode": ["last", "dsp.tp_0_est"],
+      "expression": "True",
+      "initial": false
+    },
+    "test_any": {
+      "channels": "geds_on",
+      "aggregation_mode": "any",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_any2": {
+      "channels": "geds_on",
+      "aggregation_mode": "any",
+      "query": "hit.cuspEmax_ctc_cal >25",
+      "expression": "True",
+      "initial": false
+    },
+    "test_all": {
+      "channels": "geds_on",
+      "aggregation_mode": "all",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_all2": {
+      "channels": "geds_on",
+      "aggregation_mode": "all",
+      "query": "hit.cuspEmax_ctc_cal >25",
+      "expression": "True",
+      "initial": false
+    },
+    "test_vov": {
+      "channels": "geds_on",
+      "aggregation_mode": "vov",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_vov2": {
+      "channels": "geds_on",
+      "aggregation_mode": "vov",
+      "expression": "True",
+      "initial": false
     }
+  }
 }

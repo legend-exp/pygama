@@ -27,7 +27,7 @@
     "lar_energy": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
+      "expression": "pygama.evt.modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
     },
     "lar_multiplicity": {
       "channels": "spms_on",
