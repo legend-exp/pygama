@@ -459,10 +459,11 @@ def load_data(
     e_upper_lim: float = 2700,
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
-    df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], f"{lh5_path}/raw")
+
+    daqenergy = sto.read_object(f"{lh5_path}/raw/daqenergy", raw_file)[0].nda
 
     if sel_type == "bls":
-        cuts = np.where(df.daqenergy.values == 0)[0]
+        cuts = np.where(daqenergy == 0)[0]
         idx_list = []
         tb_data = sto.read_object(
             f"{lh5_path}/raw", raw_file, n_rows=n_events, idx=cuts
@@ -476,8 +477,8 @@ def load_data(
                 pulser_e, pulser_err = entry[0], entry[1]
                 if pulser_err < 10:
                     pulser_err = 10
-                e_cut = (df.daqenergy.values < pulser_e + pulser_err) & (
-                    df.daqenergy.values > pulser_e - pulser_err
+                e_cut = (daqenergy < pulser_e + pulser_err) & (
+                    daqenergy > pulser_e - pulser_err
                 )
                 if final_mask is None:
                     final_mask = e_cut
@@ -487,11 +488,11 @@ def load_data(
             log.debug(f"pulser found: {pulser_props}")
         else:
             log.debug("no pulser")
-            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+            ids = np.zeros(len(daqenergy), dtype=bool)
 
         # Get events around peak using raw file values
-        initial_mask = (df.daqenergy.values > 0) & (~ids)
-        rough_energy = df.daqenergy.values[initial_mask]
+        initial_mask = (daqenergy > 0) & (~ids)
+        rough_energy = daqenergy[initial_mask]
         initial_idxs = np.where(initial_mask)[0]
 
         guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
