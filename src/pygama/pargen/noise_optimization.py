@@ -14,7 +14,6 @@ import time
 from collections import namedtuple
 
 import lgdo
-import lgdo.lh5_store as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,11 +32,10 @@ from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import index_data
 
 log = logging.getLogger(__name__)
-sto = lh5.LH5Store()
 
 
 def noise_optimization(
-    raw_list: list[str],
+    tb_data: lgdo.Table,
     dsp_proc_chain: dict,
     par_dsp: dict,
     opt_dict: dict,
@@ -49,8 +47,8 @@ def noise_optimization(
     This function calculates the optimal filter par.
     Parameters
     ----------
-    raw_list : str
-        raw files to run the macro on
+    tb_data : str
+        raw table to run the macro on
     dsp_proc_chain: str
         Path to minimal dsp config file
     par_dsp: str
@@ -65,16 +63,9 @@ def noise_optimization(
     """
 
     t0 = time.time()
-    tb_data = load_data(
-        raw_list,
-        lh5_path,
-        n_events=opt_dict["n_events"],
-    )
-    t1 = time.time()
-    log.info(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
+    log.info(f"Select baselines {len(tb_data)}")
     if verbose:
-        print(f"Time to open raw files {t1-t0:.2f} s, n. baselines {len(tb_data)}")
-
+        print(f"Select baselines {len(tb_data)}")
     dsp_data = run_one_dsp(tb_data, dsp_proc_chain)
     cut_dict = generate_cuts(dsp_data, parameters=opt_dict["cut_pars"])
     idxs = get_cut_indexes(dsp_data, cut_dict)
@@ -124,11 +115,11 @@ def noise_optimization(
             filter_par = opt_dict_par[ene_par]["filter_par"]
             par_dsp[lh5_path][dict_str][filter_par] = f"{x}*us"
 
-        t2 = time.time()
+        t1 = time.time()
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
-        log.info(f"Time to process dsp data {time.time()-t2:.2f} s")
+        log.info(f"Time to process dsp data {time.time()-t1:.2f} s")
         if verbose:
-            print(f"Time to process dsp data {time.time()-t2:.2f} s")
+            print(f"Time to process dsp data {time.time()-t1:.2f} s")
 
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
@@ -282,25 +273,6 @@ def noise_optimization(
         return res_dict, plot_dict
     else:
         return res_dict
-
-
-def load_data(
-    raw_list: list[str],
-    lh5_path: str,
-    bls: bool = True,
-    n_events: int = 10000,
-    threshold: int = 200,
-) -> lgdo.Table:
-    sto = lh5.LH5Store()
-
-    energies = sto.read_object(f"{lh5_path}/raw/daqenergy", raw_list)[0]
-
-    if bls:
-        idxs = np.where(energies.nda == 0)[0]
-    else:
-        idxs = np.where(energies.nda > threshold)[0]
-    tb_data = sto.read_object(f"{lh5_path}/raw", raw_list, n_rows=n_events, idx=idxs)[0]
-    return tb_data
 
 
 def calculate_spread(energies, percentile_low, percentile_high, n_samples):
