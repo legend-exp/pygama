@@ -939,7 +939,6 @@ def event_selection(
                 else:
                     final_mask = final_mask | e_cut
             ids = final_mask
-            print(f"pulser found: {pulser_props}")
             log.debug(f"pulser found: {pulser_props}")
         else:
             log.debug("no_pulser")
@@ -952,14 +951,13 @@ def event_selection(
     initial_idxs = np.where(initial_mask)[0]
 
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-    Euc_min = 0  # threshold / guess_keV
+    Euc_min = threshold / guess_keV * 0.6
     Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 1 / guess_keV
+    dEuc = 1  # / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
         hist, bins, var, peaks_keV, n_sigma=3
     )
-    print(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
     masks = []
@@ -1073,11 +1071,14 @@ def event_selection(
     return out_events, idx_list
 
 
-def fwhm_slope(x, m0, m1):
+def fwhm_slope(x, m0, m1, m2=None):
     """
     Fit the energy resolution curve
     """
-    return np.sqrt(m0 + m1 * x)
+    if m2 is None:
+        return np.sqrt(m0 + m1 * x)
+    else:
+        return np.sqrt(m0 + m1 * x + m2 * (x**2))
 
 
 def interpolate_energy(peak_energies, points, err_points, energy):
