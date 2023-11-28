@@ -80,13 +80,7 @@ def dplms_ge_dict(
 
     t0 = time.time()
     log.info(f"\nSelecting baselines")
-    raw_bls = load_data(
-        fft_files,
-        lh5_path,
-        "bls",
-        n_events=dplms_dict["n_baselines"],
-        raw_wf_field=dplms_dict["raw_wf_field"],
-    )
+    raw_bls = load_data(fft_files, lh5_path, "bls", n_events=dplms_dict["n_baselines"])
 
     dsp_bls = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
     cut_dict = generate_cuts(dsp_bls, parameters=dplms_dict["bls_cut_pars"])
@@ -215,6 +209,10 @@ def dplms_ge_dict(
         log.info(
             f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area", np.sum(x)
         )
+
+        t_tmp = time.time()
+        dsp_opt = run_one_dsp(raw_bls, dsp_config, db_dict=par_dsp[lh5_path])
+        energies = dsp_opt[ene_par].nda
 
         t_tmp = time.time()
         dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
@@ -459,7 +457,6 @@ def load_data(
     n_events: int = 5000,
     e_lower_lim: float = 1200,
     e_upper_lim: float = 2700,
-    raw_wf_field: str = "waveform",
 ) -> lgdo.Table:
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], f"{lh5_path}/raw")
@@ -467,13 +464,9 @@ def load_data(
     if sel_type == "bls":
         cuts = np.where(df.daqenergy.values == 0)[0]
         idx_list = []
-        waveforms = sto.read_object(
-            f"{lh5_path}/raw/{raw_wf_field}", raw_file, n_rows=n_events, idx=cuts
+        tb_data = sto.read_object(
+            f"{lh5_path}/raw", raw_file, n_rows=n_events, idx=cuts
         )[0]
-        daqenergy = sto.read_object(
-            f"{lh5_path}/raw/daqenergy", raw_file, n_rows=n_events, idx=cuts
-        )[0]
-        tb_data = lh5.Table(col_dict={"waveform": waveforms, "daqenergy": daqenergy})
         return tb_data
     else:
         pulser_props = find_pulser_properties(df, energy="daqenergy")
@@ -495,55 +488,34 @@ def load_data(
         else:
             log.debug("no pulser")
             ids = np.zeros(len(df.daqenergy.values), dtype=bool)
-        if sel_type == "pul":
-            cuts = np.where(ids == True)[0]
-            log.debug(f"{len(cuts)} events found for pulser")
-            waveforms = sto.read_object(
-                f"{lh5_path}/raw/waveform", raw_file, n_rows=n_events, idx=cuts
-            )[0]
-            daqenergy = sto.read_object(
-                f"{lh5_path}/raw/daqenergy", raw_file, n_rows=n_events, idx=cuts
-            )[0]
-            tb_data = lh5.Table(
-                col_dict={"waveform": waveforms, "daqenergy": daqenergy}
-            )
-            return tb_data
-        else:
-            # Get events around peak using raw file values
-            initial_mask = (df.daqenergy.values > 0) & (~ids)
-            rough_energy = df.daqenergy.values[initial_mask]
-            initial_idxs = np.where(initial_mask)[0]
 
-            guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-            Euc_min = 0  # threshold / guess_keV * 0.6
-            Euc_max = 2620 / guess_keV * 1.1
-            dEuc = 1  # / guess_keV
-            hist, bins, var = get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
-            detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(
-                hist, bins, var, peaks
-            )
-            log.debug(
-                f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}"
-            )
-            e_lower_lim = (e_lower_lim - roughpars[1]) / roughpars[0]
-            e_upper_lim = (e_upper_lim - roughpars[1]) / roughpars[0]
-            log.debug(f"lower_lim: {e_lower_lim}, upper_lim: {e_upper_lim}")
-            mask = (rough_energy > e_lower_lim) & (rough_energy < e_upper_lim)
-            cuts = initial_idxs[mask][:]
-            log.debug(f"{len(cuts)} events found in energy range")
-            rough_energy = rough_energy[mask]
-            rough_energy = rough_energy[:n_events]
-            rough_energy = rough_energy * roughpars[0] + roughpars[1]
-            waveforms = sto.read_object(
-                f"{lh5_path}/raw/waveform", raw_file, n_rows=n_events, idx=cuts
-            )[0]
-            daqenergy = sto.read_object(
-                f"{lh5_path}/raw/daqenergy", raw_file, n_rows=n_events, idx=cuts
-            )[0]
-            tb_data = lh5.Table(
-                col_dict={"waveform": waveforms, "daqenergy": daqenergy}
-            )
-            return tb_data, rough_energy
+        # Get events around peak using raw file values
+        initial_mask = (df.daqenergy.values > 0) & (~ids)
+        rough_energy = df.daqenergy.values[initial_mask]
+        initial_idxs = np.where(initial_mask)[0]
+
+        guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
+        Euc_min = 0  # threshold / guess_keV * 0.6
+        Euc_max = 2620 / guess_keV * 1.1
+        dEuc = 1  # / guess_keV
+        hist, bins, var = get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
+        detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(
+            hist, bins, var, peaks
+        )
+        log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
+        e_lower_lim = (e_lower_lim - roughpars[1]) / roughpars[0]
+        e_upper_lim = (e_upper_lim - roughpars[1]) / roughpars[0]
+        log.debug(f"lower_lim: {e_lower_lim}, upper_lim: {e_upper_lim}")
+        mask = (rough_energy > e_lower_lim) & (rough_energy < e_upper_lim)
+        cuts = initial_idxs[mask][:]
+        log.debug(f"{len(cuts)} events found in energy range")
+        rough_energy = rough_energy[mask]
+        rough_energy = rough_energy[:n_events]
+        rough_energy = rough_energy * roughpars[0] + roughpars[1]
+        tb_data = sto.read_object(
+            f"{lh5_path}/raw", raw_file, n_rows=n_events, idx=cuts
+        )[0]
+        return tb_data, rough_energy
 
 
 def is_valid_centroid(
