@@ -742,13 +742,13 @@ class high_stats_fitting(calibrate_parameter):
                                    range=(np.amin(self.glines)*0.8,np.amax(self.glines)*1.1), dx=0.5 )
         (got_peak_locations, 
          got_peak_energies, 
-         roughpars) = hpge_get_E_peaks(
+         roughpars) = cal.hpge_get_E_peaks(
             hist, 
             bins, 
             var, 
             np.array([1,0]),
             n_sigma=3, 
-            peaks_keV=glines)
+            peaks_keV=self.glines)
         
         found_mask = np.in1d(self.glines,got_peak_energies)
         self.results["got_peaks_locs"] = got_peak_locations
@@ -920,14 +920,14 @@ class high_stats_fitting(calibrate_parameter):
         mu_vars = np.asarray(mu_vars) ** 2
 
         try:
-            pars, errs, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=self.deg,
+            pars, errs, cov = cal.hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=self.deg,
                                               fixed = self.fixed)
         except ValueError:
             log.error("Failed to fit enough peaks to get accurate calibration")
             return None, None, None, results
 
         # Invert the E scale fit to get a calibration function
-        self.pars, self.errs, self.cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=self.deg,
+        self.pars, self.errs, self.cov = cal.hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=self.deg,
                                              fixed = self.fixed)
         
         uncal_fwhms = [
@@ -1342,7 +1342,7 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     fig, (ax1, ax2) = plt.subplots(
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
-    ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=0, c="black")
+    ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black")
 
     fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
 
