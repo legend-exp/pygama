@@ -701,7 +701,7 @@ def hpge_fit_E_peaks(
                         mode_guess,
                         tail_weight=tail_weight,
                     )
-                    if pars_i["n_sig"] < 20:
+                    if pars_i["n_sig"] < 100:
                         valid_fit = False
                 else:
                     par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
