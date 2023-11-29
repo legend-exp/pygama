@@ -1,6 +1,7 @@
 """
 This module implements routines to build the evt tier.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -41,10 +42,10 @@ def evaluate_expression(
     f_hit: str,
     f_dsp: str,
     chns: list,
-    mod: str | list,
+    chns_rm: list,
+    mode: str,
     expr: str,
     nrows: int,
-    group: str,
     para: dict = None,
     qry: str = None,
     defv=np.nan,
@@ -64,38 +65,28 @@ def evaluate_expression(
        Path to dsp tier file
     chns
        List of channel names across which expression gets evaluated (form: "ch<rawid>")
+    chns_rm
+       List of channels which get set to default value during evaluation. In function mode they are removed entirely (form: "ch<rawid>")
     mode
        The mode determines how the event entry is calculated across channels. Options are:
-       - "first": The value of the channel in an event triggering first in time (according to tp_0_est) is returned. It  is possible to add a condition (e.g. "first>10"). Only channels fulfilling this condition are considered in the time evaluation. If no channel fullfilles the condition, nan is returned for this event.
-       - "last": The value of the channel in an event triggering last in time (according to tp_0_est) is returned. It  is possible to add a condition (e.g. "last>10"). Only channels fulfilling this condition are considered in the time evaluation. If no channel fullfilles the condition, nan is returned for this event.
-       - "tot": The sum of all channels across an event. It  is possible to add a condition (e.g. "tot>10"). Only channels fulfilling this condition are considered in the time evaluation. If no channel fullfilles the condition, zero is returned for this event. Booleans are treated as integers 0/1.
-       - "any": Logical or between all channels. Non boolean values are True for values != 0 and False for values == 0.
-       - "all": Logical and between all channels. Non boolean values are True for values != 0 and False for values == 0.
-       - ch_field: A previously generated channel_id field (i.e. from the get_ch flag) can be given here, and the value of this specific channels is used. if ch_field is a VectorOfVectors, the channel list is ignored. If ch_field is an Array, the intersection of the passed channels list and the Array is formed. If a channel is not in the Array, the default is used.
-       - "vov": Channels are not combined, but result saved as VectorOfVectors. Use of getch is recommended. It  is possible (and recommended) to add a condition (e.g. "vov>10"). Only channels fulfilling this condition are saved.
+       - "first_at:sorter": aggregates across channels by returning the expression of the channel with smallest value of sorter.
+       - "last_at": aggregates across channels by returning the expression of the channel with largest value of sorter.
+       - "sum": aggregates by summation.
+       - "any": aggregates by logical or.
+       - "all": aggregates by logical and.
+       - "keep_at:ch_field": aggregates according to passed ch_field
+       - "vectorize": Channels are not combined, but result saved as VectorOfVectors.
     qry
-       A query that can set a condition on mode. Can be any tier (i.e. a channelxevents shaped boolean matrix for tiers below event or an events long boolean array at the evt level)
+       A query that can mask the aggregation.
     expr
-       The expression. That can be any mathematical equation/comparison. If mode == func, the expression needs to be a special processing function defined in modules (e.g. "modules.spm.get_energy). In the expression parameters from either hit, dsp, evt tier (from operations performed before this one! --> JSON operations order matters), or from the "parameters" field can be used.
+       The expression. That can be any mathematical equation/comparison. If mode == function, the expression needs to be a special processing function defined in modules (e.g. "modules.spm.get_energy). In the expression parameters from either hit, dsp, evt tier (from operations performed before this one! --> JSON operations order matters), or from the "parameters" field can be used.
     nrows
        Number of rows to be processed.
-    group
-       lh5 root group name
-    dsp_group
-        lh5 root group in dsp file
-    hit_group
-        lh5 root group in hit file
     para
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
     defv
        default value of evaluation
     """
-
-    # set modus variables
-    mode, sorter = mod, None
-    if isinstance(mod, list):
-        mode = mod[0]
-        sorter = mod[1].split(".")
 
     # find parameters in evt file or in parameters
     exprl = re.findall(r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", expr)
@@ -113,7 +104,7 @@ def evaluate_expression(
             .replace("hit.", "hit_")
             .replace("evt.", "evt_")
         )
-        params = [f_hit, f_dsp, f_tcm, chns] + [
+        params = [f_hit, f_dsp, f_tcm, [x for x in chns if x not in chns_rm]] + [
             num_and_pars(e, var_ph) for e in params[:-1].split(",")
         ]
 
@@ -145,12 +136,13 @@ def evaluate_expression(
         # switch through modes
         if (
             os.path.exists(f_evt)
-            and "evt." == mode[:4]
-            and mode.split(".")[-1]
+            and "keep_at:" == mode[:8]
+            and "evt." == mode[8:][:4]
+            and mode[8:].split(".")[-1]
             in [e.split("/")[-1] for e in store.ls(f_evt, "/evt/")]
         ):
             lstore = store.LH5Store()
-            ch_comp, _ = lstore.read_object(mode.replace(".", "/"), f_evt)
+            ch_comp, _ = lstore.read_object(mode[8:].replace(".", "/"), f_evt)
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
                     idx,
@@ -158,6 +150,7 @@ def evaluate_expression(
                     f_hit,
                     f_dsp,
                     chns,
+                    chns_rm,
                     expr,
                     exprl,
                     ch_comp,
@@ -173,7 +166,9 @@ def evaluate_expression(
                     expr,
                     exprl,
                     ch_comp,
+                    chns_rm,
                     var_ph,
+                    defv,
                 )
             else:
                 raise NotImplementedError(
@@ -181,13 +176,19 @@ def evaluate_expression(
                     + " not supported (only Array and VectorOfVectors are supported)"
                 )
 
-        elif "first" == mode:
+        elif "first_at:" in mode:
+            sorter = tuple(
+                re.findall(
+                    r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", mode.split("first_at:")[-1]
+                )[0]
+            )
             return evaluate_to_first(
                 idx,
                 ids,
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
@@ -196,13 +197,19 @@ def evaluate_expression(
                 var_ph,
                 defv,
             )
-        elif "last" == mode:
+        elif "last_at:" in mode:
+            sorter = tuple(
+                re.findall(
+                    r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", mode.split("last_at:")[-1]
+                )[0]
+            )
             return evaluate_to_last(
                 idx,
                 ids,
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
@@ -218,6 +225,7 @@ def evaluate_expression(
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
@@ -225,18 +233,20 @@ def evaluate_expression(
                 var_ph,
                 defv,
             )
-        elif "vov" == mode:
+        elif "vectorize" == mode:
             return evaluate_to_vector(
                 idx,
                 ids,
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
                 nrows,
                 var_ph,
+                defv,
             )
         elif "any" == mode:
             return evaluate_to_any(
@@ -245,6 +255,7 @@ def evaluate_expression(
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
@@ -259,6 +270,7 @@ def evaluate_expression(
                 f_hit,
                 f_dsp,
                 chns,
+                chns_rm,
                 expr,
                 exprl,
                 qry_mask,
@@ -277,6 +289,23 @@ def find_parameters(
     idx_ch: np.ndarray,
     exprl: list,
 ) -> dict:
+    """
+    Wraps :func:`load_vars_to_nda` to return parameters from hit and dsp tiers.
+
+    Parameters
+    ----------
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    ch
+       rawid in the tiers
+    idx_ch
+       index array of entries to be read from files
+    exprl
+       list of tuples (tier, field) to be found in the hit/dsp tiers
+    """
+
     # find fields in either dsp, hit
     var = load_vars_to_nda(f_hit, ch, exprl, idx_ch)
     dsp_dic = load_vars_to_nda(f_dsp, ch, exprl, idx_ch)
@@ -284,22 +313,33 @@ def find_parameters(
     return dsp_dic | var
 
 
-def load_vars_to_nda(
-    f_evt: str, group: str, exprl: list, idx: np.ndarray = None
-) -> dict:
+def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) -> dict:
+    """
+    Maps parameter expressions to parameters if found in f.
+    Blows up VectorOfVectors to ArrayOfEqualSizedArrays.
+
+    Parameters
+    ----------
+    f
+       Path to a LGDO file
+    group
+       additional group in f
+    idx
+       index array of entries to be read from files
+    exprl
+       list of parameter-tuples (root_group, field) to be found in f
+    """
+
     lstore = store.LH5Store()
     var = {
         f"{e[0]}_{e[1]}": lstore.read_object(
             f"{group.replace('/','')}/{e[0]}/{e[1]}",
-            f_evt,
+            f,
             idx=idx,
         )[0]
         for e in exprl
         if e[1]
-        in [
-            x.split("/")[-1]
-            for x in store.ls(f_evt, f"{group.replace('/','')}/{e[0]}/")
-        ]
+        in [x.split("/")[-1] for x in store.ls(f, f"{group.replace('/','')}/{e[0]}/")]
     }
 
     # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
@@ -326,20 +366,164 @@ def load_vars_to_nda(
     return var
 
 
+def get_data_at_channel(
+    ch: str,
+    idx_ch: np.ndarray,
+    expr: str,
+    exprl: list,
+    var_ph: dict,
+    is_evaluated: bool,
+    f_hit: str,
+    f_dsp: str,
+    outsize: int,
+    defv,
+) -> np.ndarray:
+    """
+    Evaluates an expression and returns the result
+
+    Parameters
+    ----------
+    ch
+       rawid of channel to be evaluated
+    idx_ch
+       array of indices to be evaluated
+    expr
+       expression to be evaluated
+    exprl
+       list of parameter-tuples (root_group, field) found in the expression
+    var_ph
+       dict of additional parameters that are not channel dependent
+    is_evaluated
+       if false, the expression does not get evaluated but an array of default values is returned
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    outsize
+       size of the return array
+    defv
+       default value
+    """
+
+    if not is_evaluated:
+        res = np.full(outsize, defv, dtype=type(defv))
+    elif "tcm.array_id" == expr:
+        res = np.full(outsize, int(ch[2:]), dtype=int)
+    else:
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+
+        # evaluate expression
+        # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
+        res = eval(
+            expr.replace("dsp.", "dsp_")
+            .replace("hit.", "hit_")
+            .replace("evt.", "evt_"),
+            var,
+        )
+
+    # if it is not a nparray it could be a single value
+    # expand accordingly
+    if not isinstance(res, np.ndarray):
+        res = np.full(outsize, res, dtype=type(res))
+
+    return res
+
+
+def get_mask_from_query(
+    qry: str | np.ndarray,
+    length: int,
+    ch: str,
+    idx_ch: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+) -> np.ndarray:
+    """
+    Evaluates an query expression and returns a mask accordingly
+
+    Parameters
+    ----------
+    qry
+       query expression
+    length
+       length of the return mask
+    ch
+       rawid of channel to be evaluated
+    idx_ch
+       array of indices to be evaluated
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    """
+
+    # get sub evt based query condition if needed
+    if isinstance(qry, str):
+        qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
+        qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
+        limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
+
+    # or forward the array
+    elif isinstance(qry, np.ndarray):
+        limarr = qry
+
+    # if no condition, it must be true
+    else:
+        limarr = np.ones(length).astype(bool)
+
+    if limarr.dtype != bool:
+        limarr = limarr.astype(bool)
+
+    return limarr
+
+
 def evaluate_to_first(
     idx: np.ndarray,
     ids: np.ndarray,
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
     nrows: int,
-    sorter: list,
+    sorter: tuple,
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates across channels by returning the expression of the channel with smallest value of sorter.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output array
+    sorter
+       tuple of field in hit/dsp/evt tier to evaluate (tier,field)
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
     out_chs = np.zeros(len(out), dtype=int)
@@ -349,41 +533,22 @@ def evaluate_to_first(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        # evaluate at channel
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # evaluate expression
-            # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
-
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
-
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # append to out according to mode == first
         if ch == chns[0]:
@@ -410,14 +575,48 @@ def evaluate_to_last(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
     nrows: int,
-    sorter: list,
+    sorter: tuple,
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates across channels by returning the expression of the channel with largest value of sorter.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output array
+    sorter
+       tuple of field in hit/dsp/evt tier to evaluate (tier,field)
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
     out_chs = np.zeros(len(out), dtype=int)
@@ -426,41 +625,24 @@ def evaluate_to_last(
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
 
-            # evaluate expression
-            # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
+        # evaluate at channel
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
         # append to out according to mode == last
         # find if sorter is in hit or dsp
         t0 = store.load_nda(
@@ -483,6 +665,7 @@ def evaluate_to_tot(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
@@ -490,6 +673,37 @@ def evaluate_to_tot(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates by summation across channels.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output array
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
 
@@ -497,45 +711,26 @@ def evaluate_to_tot(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # evaluate expression
-            # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
-
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # append to out according to mode == tot
         if res.dtype == bool:
             res = res.astype(int)
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
+
         out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
 
     return {"values": out}
@@ -547,6 +742,7 @@ def evaluate_to_any(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
@@ -554,6 +750,37 @@ def evaluate_to_any(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates by logical or operation across channels. If the expression evaluates to a non boolean value it is casted to bool.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output array
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
 
@@ -561,45 +788,26 @@ def evaluate_to_any(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # evaluate expression
-            # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
-
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # append to out according to mode == any
         if res.dtype != bool:
             res = res.astype(bool)
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
+
         out[idx_ch] = out[idx_ch] | (res & limarr)
 
     return {"values": out}
@@ -611,6 +819,7 @@ def evaluate_to_all(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
@@ -618,6 +827,37 @@ def evaluate_to_all(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates by logical and operation across channels. If the expression evaluates to a non boolean value it is casted to bool.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output array
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # define dimension of output array
     out = np.full(nrows, defv, dtype=type(defv))
 
@@ -625,44 +865,26 @@ def evaluate_to_all(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # evaluate expression
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
-
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # append to out according to mode == all
         if res.dtype != bool:
             res = res.astype(bool)
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
+
         out[idx_ch] = out[idx_ch] & res & limarr
 
     return {"values": out}
@@ -674,36 +896,60 @@ def evaluate_at_channel(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     ch_comp: Array,
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
+    """
+    aggregates by evaluating the expression at a given channel
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    ch_comp
+       array of rawids at which the expression is evaluated
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     out = np.full(len(ch_comp), defv, dtype=type(defv))
 
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
-
-            # evaluate expression
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
         out[idx_ch] = np.where(int(ch[2:]) == ch_comp.nda, res, out[idx_ch])
 
@@ -718,43 +964,68 @@ def evaluate_at_channel_vov(
     expr: str,
     exprl: list,
     ch_comp: VectorOfVectors,
+    chns_rm: list,
     var_ph: dict = None,
+    defv=np.nan,
 ) -> dict:
+    """
+    same as :func:`evaluate_at_channel` but evaluates expression at non flat channels VectorOfVectors.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    ch_comp
+       array of rawids at which the expression is evaluated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    """
+
     # blow up vov to aoesa
     out = ch_comp.to_aoesa().nda
 
     chns = np.unique(out[~np.isnan(out)]).astype(int)
-
+    type_name = None
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == ch]
-
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, f"ch{ch}", idx_ch, exprl) | var_ph
-
-            # evaluate expression
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
-
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
+        res = get_data_at_channel(
+            f"ch{ch}",
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            f"ch{ch}" not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
         # see in which events the current channel is present
         mask = (out == ch).any(axis=1)
         out[out == ch] = res[mask]
 
+        if ch == chns[0]:
+            type_name = res.dtype
+
     # ok now implode the table again
     out = VectorOfVectors(
-        flattened_data=out.flatten()[~np.isnan(out.flatten())].astype(res.dtype),
+        flattened_data=out.flatten()[~np.isnan(out.flatten())].astype(type_name),
         cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
     )
     return {"values": out, "channels": ch_comp}
@@ -766,18 +1037,46 @@ def evaluate_to_vector(
     f_hit: str,
     f_dsp: str,
     chns: list,
+    chns_rm: list,
     expr: str,
     exprl: list,
     qry: str | np.ndarray,
     nrows: int,
     var_ph: dict = None,
+    defv=np.nan,
 ) -> dict:
     """
-    Allows the evaluation as a vector of vectors.
-    Returns a dictionary of values: VoV of requested values
-    and channels: VoV of same dimensions with requested channel_id
+    Aggregates by returning a VectorOfVector of evaluated expressions of channels that fulfill a query expression.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output VectorOfVectors
+    ch_comp
+       array of rawids at which the expression is evaluated
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
     """
-    # raise NotImplementedError
 
     # define dimension of output array
     out = np.full((nrows, len(chns)), np.nan)
@@ -788,41 +1087,22 @@ def evaluate_to_vector(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
 
-        if "tcm.array_id" == expr:
-            res = np.full(len(out), int(ch[2:]), dtype=int)
-        else:
-            # find fields in either dsp, hit
-            var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
 
-            # evaluate expression
-            res = eval(
-                expr.replace("dsp.", "dsp_")
-                .replace("hit.", "hit_")
-                .replace("evt.", "evt_"),
-                var,
-            )
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
-            # if it is not a nparray it could be a single value
-            # expand accordingly
-            if not isinstance(res, np.ndarray):
-                res = np.full(len(out), res, dtype=type(res))
-
-        # get sub evt based query condition if needed
-        if isinstance(qry, str):
-            qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-            qry_var = find_parameters(f_hit, f_dsp, ch, idx_ch, qry_lst)
-            limarr = eval(qry.replace("dsp.", "dsp_").replace("hit.", "hit_"), qry_var)
-
-        # or forward the array
-        elif isinstance(qry, np.ndarray):
-            limarr = qry
-
-        # if no condition, it must be true
-        else:
-            limarr = np.ones(len(res)).astype(bool)
-
-        if limarr.dtype != bool:
-            limarr = limarr.astype(bool)
         # append to out according to mode == vov
         out[:, i][limarr] = res[limarr]
         out_chs[:, i][limarr] = int(ch[2:])
@@ -869,60 +1149,54 @@ def build_evt(
     f_evt
         name of the output file
     evt_config
-        name of JSON file or dict defining evt fields. Channel lists can be defined by the user or by using the keyword "meta" followed by the system (geds/spms) and the usability (on,no_psd,ac,off) separated by underscores (e.g. "meta_geds_on") in the "channels" dictionary. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "mode" defines how the channels should be combined (see evaluate_expression). For first/last modes a "get_ch" flag can be defined, if true an additional field with the sufix "_id" is returned containing the rawid of the respective value in the field without the suffix. "expression" defnies the mathematical/special function to apply (see evaluate_expression), "parameters" defines any other parameter used in expression. For example:
+        name of JSON file or dict defining evt fields. Channel lists can be defined by importing a meta module. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "aggregation_mode" defines how the channels should be combined (see evaluate_expression). "expression" defnies the mathematical/special function to apply (see evaluate_expression),
+        "query" defines an expression to mask the aggregation.
+        "parameters" defines any other parameter used in expression. For example:
 
         .. code-block::json
 
             {
                 "channels": {
-                    "geds_on": "meta_geds_on",
-                    "geds_no_psd": "meta_geds_no_psd",
-                    "geds_ac": "meta_geds_ac",
-                    "spms_on": "meta_spms_on",
-                    "pulser": "PULS01",
-                    "baseline": "BSLN01",
-                    "muon": "MUON01",
-                    "ts_master":"S060"
+                    "geds_on": ["ch1084803", "ch1084804", "ch1121600"],
+                    "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
+                    "muon": "ch1027202",
                 },
                 "operations": {
                     "energy":{
-                        "channels": ["geds_on","geds_no_psd","geds_ac"],
-                        "mode": "first>25",
-                        "get_ch": true,
-                        "expression": "cuspEmax_ctc_cal",
-                        "initial": "np.nan"
+                        "channels": "geds_on",
+                        "aggregation_mode": "vectorize",
+                        "query": "hit.cuspEmax_ctc_cal>25",
+                        "expression": "hit.cuspEmax_ctc_cal"
                     },
-                    "energy_on":{
-                        "channels": ["geds_on"],
-                        "mode": "vov>25",
-                        "get_ch": true,
-                        "expression": "cuspEmax_ctc_cal"
+                    "energy_id":{
+                        "channels": "geds_on",
+                        "aggregation_mode": "vectorize",
+                        "query": "hit.cuspEmax_ctc_cal>25",
+                        "expression": "tcm.array_id"
                     },
-                    "aoe":{
-                        "channels": ["geds_on"],
-                        "mode": "energy_id",
-                        "expression": "AoE_Classifier",
-                        "initial": "np.nan"
-                    },
-                    "is_muon_tagged":{
+                    "is_muon_rejected":{
                         "channels": "muon",
-                        "mode": "any",
-                        "expression": "wf_max>a",
+                        "aggregation_mode": "any",
+                        "expression": "dsp.wf_max>a",
                         "parameters": {"a":15100},
                         "initial": false
                     },
                     "multiplicity":{
                         "channels":  ["geds_on","geds_no_psd","geds_ac"],
-                        "mode": "tot",
-                        "expression": "cuspEmax_ctc_cal > a",
+                        "aggregation_mode": "sum",
+                        "expression": "hit.cuspEmax_ctc_cal > a",
                         "parameters": {"a":25},
                         "initial": 0
                     },
+                    "t0":{
+                        "aggregation_mode": "keep_at:evt.energy_id",
+                        "expression": "dsp.tp_0_est"
+                    },
                     "lar_energy":{
                         "channels": "spms_on",
-                        "mode": "func",
-                        "expression": "modules.spm.get_energy(0.5,t0,48000,1000,5000)"
-                    }
+                        "aggregation_mode": "function",
+                        "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
+                    },
                 }
             }
 
@@ -1035,6 +1309,16 @@ def build_evt(
                 chns_e = list(
                     itertools.chain.from_iterable([chns[e] for e in v["channels"]])
                 )
+            chns_rm = []
+            if "exclude_channels" in v.keys():
+                if isinstance(v["exclude_channels"], str):
+                    chns_rm = chns[v["exclude_channels"]]
+                elif isinstance(v["exclude_channels"], list):
+                    chns_rm = list(
+                        itertools.chain.from_iterable(
+                            [chns[e] for e in v["exclude_channels"]]
+                        )
+                    )
 
             pars, qry, defaultv = None, None, np.nan
             if "parameters" in v.keys():
@@ -1050,10 +1334,10 @@ def build_evt(
                 f_hit,
                 f_dsp,
                 chns_e,
+                chns_rm,
                 v["aggregation_mode"],
                 v["expression"],
                 nrows,
-                group,
                 pars,
                 qry,
                 defaultv,

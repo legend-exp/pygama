@@ -19,27 +19,27 @@
     },
     "test_first": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "query": "evt.multiplicity == 1",
       "expression": "True",
       "initial": false
     },
     "test_first2": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "expression": "True",
       "initial": false
     },
     "test_last": {
       "channels": "geds_on",
-      "aggregation_mode": ["last", "dsp.tp_0_est"],
+      "aggregation_mode": "last_at:dsp.tp_0_est",
       "query": "evt.multiplicity == 1",
       "expression": "True",
       "initial": false
     },
     "test_last2": {
       "channels": "geds_on",
-      "aggregation_mode": ["last", "dsp.tp_0_est"],
+      "aggregation_mode": "last_at:dsp.tp_0_est",
       "expression": "True",
       "initial": false
     },
@@ -73,14 +73,14 @@
     },
     "test_vov": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "query": "evt.multiplicity == 1",
       "expression": "True",
       "initial": false
     },
     "test_vov2": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "expression": "True",
       "initial": false
     }

@@ -12,14 +12,14 @@
     },
     "energy": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal",
       "initial": "np.nan"
     },
     "energy_id": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "tcm.array_id",
       "initial": 0
@@ -38,7 +38,7 @@
     },
     "energy_aux": {
       "channels": "geds_on",
-      "aggregation_mode": ["last", "dsp.tp_0_est"],
+      "aggregation_mode": "last_at:dsp.tp_0_est",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal",
       "initial": "np.nan"
@@ -52,19 +52,19 @@
     },
     "is_usable_aoe": {
       "channels": "geds_on",
-      "aggregation_mode": "evt.energy_id",
+      "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "True",
       "initial": false
     },
     "aoe": {
       "channels": "geds_on",
-      "aggregation_mode": "evt.energy_id",
+      "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "hit.AoE_Classifier",
       "initial": "np.nan"
     },
     "is_aoe_rejected": {
       "channels": "geds_on",
-      "aggregation_mode": "evt.energy_id",
+      "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "~(hit.AoE_Double_Sided_Cut)",
       "initial": false
     }

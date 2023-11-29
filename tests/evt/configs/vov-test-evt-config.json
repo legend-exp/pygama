@@ -5,18 +5,18 @@
   "operations": {
     "energy": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal"
     },
     "energy_id": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "tcm.array_id"
     },
     "aoe": {
-      "aggregation_mode": "evt.energy_id",
+      "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "hit.AoE_Classifier"
     },
     "multiplicity": {

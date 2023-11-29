@@ -16,12 +16,17 @@ def legend_meta(params: dict) -> list:
         for e in chmap.map("daq.rawid")
         if chmap.map("daq.rawid")[e]["system"] == params["system"]
     ]
-    if "usability" not in params.keys():
-        return tmp
-    else:
-        return [
+    if "usability" in params.keys():
+        tmp = [
             e
             for e in tmp
             if chmap.map("daq.rawid")[int(e[2:])]["analysis"]["usability"]
             == params["usability"]
         ]
+    if "geds" == params["system"] and "type" in params.keys():
+        tmp = [
+            e
+            for e in tmp
+            if chmap.map("daq.rawid")[int(e[2:])]["type"] == params["type"]
+        ]
+    return tmp

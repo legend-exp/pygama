@@ -6,19 +6,19 @@
   "operations": {
     "energy": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal"
     },
     "energy_id": {
       "channels": "geds_on",
-      "aggregation_mode": "vov",
+      "aggregation_mode": "vectorize",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "tcm.array_id"
     },
     "t0": {
-      "channels": ["geds_on"],
-      "aggregation_mode": "evt.energy_id",
+      "channels": "geds_on",
+      "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "dsp.tp_0_est",
       "initial": 0.0
     },

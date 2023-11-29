@@ -6,21 +6,21 @@
   "operations": {
     "energy_first": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal",
       "initial": "np.nan"
     },
     "energy_first_id": {
       "channels": "geds_on",
-      "aggregation_mode": ["first", "dsp.tp_0_est"],
+      "aggregation_mode": "first_at:dsp.tp_0_est",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "tcm.array_id",
       "initial": 0
     },
     "t0": {
-      "channels": ["geds_on"],
-      "aggregation_mode": "evt.energy_first_id",
+      "channels": "geds_on",
+      "aggregation_mode": "keep_at:evt.energy_first_id",
       "expression": "dsp.tp_0_est",
       "initial": 0.0
     },
