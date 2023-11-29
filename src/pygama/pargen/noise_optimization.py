@@ -81,10 +81,9 @@ def noise_optimization(
 
     res_dict = {}
     if display > 0:
-        # fft
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
         psd = np.mean(dsp_data["wf_psd"].values.nda, axis=0)
-        sample_us = float(tb_data[opt_dict["wf_field"]].dt.nda[0]) / 1000
+        sample_us = float(dsp_data["wf_presum"].dt.nda[0]) / 1000
         freq = np.linspace(0, (1 / sample_us) / 2, len(psd))
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
         ax.plot(freq, psd)
