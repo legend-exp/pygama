@@ -8,7 +8,4 @@ Tutorials are currently available as `Jupyter notebooks on GitHub
    :maxdepth: 2
    :caption: Contents:
 
-   notebooks/LH5Files
-   notebooks/WaveformBrowser
-   notebooks/IntroToDSP
    notebooks/MathTutorial

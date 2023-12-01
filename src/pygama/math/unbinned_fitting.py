@@ -61,5 +61,5 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
         m.simplex().migrad()
     else:
         m.migrad()
-    m.hesse()
+    m.minos()
     return m.values, m.errors, m.covariance

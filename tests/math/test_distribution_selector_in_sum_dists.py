@@ -3,20 +3,18 @@ from pytest import approx
 
 from pygama.math.functions.hpge_peak import hpge_peak
 
-mu, sigma, tau, frac1, n_sig, hstep, lower_range, upper_range, n_bkg = range(9)
-
-n_sig, mu, sigma, frac1, tau, n_bkg, hstep, lower_range, upper_range = range(9)
-pars = [1, 0, 1, 0, 0.1, 0, 0, np.inf, np.inf]
+lower_range, upper_range, n_sig, mu, sigma, frac1, tau, n_bkg, hstep = range(9)
+pars = [np.inf, np.inf, 1, 0, 1, 0, 0.1, 0, 0]
 cov = [
-    [1e-16, 0, 0, 0, 0, 0, 0, 0, 0],  # damp2
-    [0, 1e-16, 0, 0, 0, 0, 0, 0, 0],  # dmu2
-    [0, 0, 1e-02, 0, 0, 0, 0, 0, 0],  # dsig2
-    [0, 0, 0, 1e-16, 0, 0, 0, 0, 0],  # dhtail2
-    [0, 0, 0, 0, 1e-16, 0, 0, 0, 0],  # dtau2
-    [0, 0, 0, 0, 0, 1e-16, 0, 0, 0],  # dbg02
-    [0, 0, 0, 0, 0, 0, 1e-16, 0, 0],  # dhs2
-    [0, 0, 0, 0, 0, 0, 0, 1e-16, 0],  # dlowerrange2
-    [0, 0, 0, 0, 0, 0, 0, 0, 1e-16],  # dupperrange2
+    [1e-16, 0, 0, 0, 0, 0, 0, 0, 0],  # dxlo2
+    [0, 1e-16, 0, 0, 0, 0, 0, 0, 0],  # dxhi2
+    [0, 0, 1e-16, 0, 0, 0, 0, 0, 0],  # damp2
+    [0, 0, 0, 1e-16, 0, 0, 0, 0, 0],  # dmu2
+    [0, 0, 0, 0, 1e-02, 0, 0, 0, 0],  # dsig2
+    [0, 0, 0, 0, 0, 1e-16, 0, 0, 0],  # dhtail2
+    [0, 0, 0, 0, 0, 0, 1e-16, 0, 0],  # dtau2
+    [0, 0, 0, 0, 0, 0, 0, 1e-16, 0],  # dbg02
+    [0, 0, 0, 0, 0, 0, 0, 0, 1e-16],  # dhs2
 ]
 
 

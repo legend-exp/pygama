@@ -6,26 +6,23 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_gauss_on_step_pdf():
-
     x = np.arange(-10, 10)
     mu = 0.4
     sigma = 1.1
     hstep = 0.75
-    lower_range = np.inf
-    upper_range = np.inf
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
-    pars = np.array(
-        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
-    )
+    pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep], dtype=float)
 
-    y_direct = gauss_on_step.get_pdf(x, pars)
+    y_direct = gauss_on_step.get_pdf(x, *pars)
 
     # compute the unnormalized step function
     scipy_step = 1 + hstep * (
         norm.cdf(x, mu, sigma) * 2 - 1
-    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 norm_cdf(x*sqrt(2))-1
+    )  # pdf = (1+erf(x/np.sqrt(2))); erf(x) = 2 cdf_norm(x*sqrt(2))-1
 
     # compute the normalization for the step function
     maximum = (np.amax(x) - mu) / sigma
@@ -51,30 +48,27 @@ def test_gauss_on_step_pdf():
     assert isinstance(gauss_on_step, sum_dists)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    x_lo = -100
-    x_hi = 100
-    pars = np.insert(pars, 0, [x_lo, x_hi])
-    y_sig, y_ext = gauss_on_step.pdf_ext(x, pars)
+    y_sig, y_ext = gauss_on_step.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
 
+    y_sig = gauss_on_step.pdf_norm(x, *pars)
+    assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
 
 def test_gauss_on_step_cdf():
-
     x = np.arange(-10, 10)
     mu = 0.56
     sigma = 1.009
     hstep = 0.753
-    lower_range = np.inf
-    upper_range = np.inf
+    x_lo = np.amin(x)
+    x_hi = np.amax(x)
     n_sig = 2
     n_bkg = 4
 
-    pars = np.array(
-        [n_sig, mu, sigma, n_bkg, hstep, lower_range, upper_range], dtype=float
-    )
+    pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep], dtype=float)
 
-    y_direct = gauss_on_step.get_cdf(x, pars)
+    y_direct = gauss_on_step.get_cdf(x, *pars)
 
     # Compute the normalization of the pdf
     maximum = (np.amax(x) - mu) / sigma
@@ -109,14 +103,30 @@ def test_gauss_on_step_cdf():
     scipy_y_step = unnormalized_cdf / pdf_normalization
 
     scipy_y_gauss = norm.cdf(x, mu, sigma)
-    scipy_y = (1 / (n_sig + n_bkg)) * (n_sig * scipy_y_gauss + n_bkg * scipy_y_step)
-
-    # for the extended cdf, we actually do not want to normalize by the sum of the areas, this is because iminuit takes a total unnormalized cdf for extended binned fits
-    scipy_y_ext = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
+    # for the cdf, we actually do not want to normalize by the sum of the areas, this is because iminuit takes a total unnormalized cdf for extended binned fits
+    scipy_y = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
 
     assert isinstance(gauss_on_step, sum_dists)
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    y_ext = gauss_on_step.cdf_ext(x, pars)
-    assert np.allclose(y_ext, scipy_y_ext, rtol=1e-8)
+    y_ext = gauss_on_step.cdf_ext(x, *pars)
+    assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
+    y_norm = gauss_on_step.cdf_norm(x, *pars)
+    scipy_y_norm = (1 / (n_sig + n_bkg)) * (
+        n_sig * scipy_y_gauss + n_bkg * scipy_y_step
+    )
+
+    assert np.allclose(y_norm, scipy_y_norm, rtol=1e-8)
+
+
+def test_required_args():
+    names = gauss_on_step.required_args()
+    assert names[0] == "x_lo"
+    assert names[1] == "x_hi"
+    assert names[2] == "n_sig"
+    assert names[3] == "mu"
+    assert names[4] == "sigma"
+    assert names[5] == "n_bkg"
+    assert names[6] == "hstep"

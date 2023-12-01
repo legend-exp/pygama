@@ -18,14 +18,27 @@ def generate_tcm_cols(
 
     Generate the columns of a time coincidence map from a list of arrays of
     coincidence data (e.g. hit times from different channels). Returns 3
-    equal-length :class:`numpy.ndarray`\ s containing the coincidence index
-    (e.g. event number), array ID (e.g. channel number), and array index (e.g.
-    hit ID). These can be used to retrieve other data at the same tier as the
-    input data into coincidence structures.
+    :class:`numpy.ndarray`\ s representing a vector-of-vector-like structure:
+    two flattened arrays ``array_id`` (e.g. channel number) and  ``array_idx``
+    (e.g. hit index) that specify the location in the input ``coin_data`` of
+    each datum belonging to a coincidence event, and a ``cumulative_length``
+    array that specifies which rows of the other two output arrays correspond
+    to which coincidence event. These can be used to retrieve other data at
+    the same tier as the input data into coincidence structures.
+
+    The 0'th entry of ``cumulative_length`` contains the number of hits in the
+    zeroth coincidence event, and the i'th entry is set to
+    ``cumulative_length[i-1]`` plus the number of hits in the i'th event.
+    Thus, the hits of the i'th event can be found in rows
+    ``cumulative_length[i-1]`` to ``cumulative_length[i] - 1`` of ``array_id``
+    and ``array_idx``.
+
+    An example: ``cumulative_length = [4, 7, ...]``.  Then rows 0 to 3 in
+    `array_id` and `array_idx` correspond to the hits in event 0, rows 4 to 6
+    correspond to event 1, and so on.
 
     Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
-    :meth:`pandas.DataFrame.groupby`, and
-    :meth:`pandas.DataFrame.cumsum`/:meth:`pandas.DataFrame.count` functions:
+    and :meth:`pandas.DataFrame.diff` functions:
 
     - pull data into a :class:`pandas.DataFrame`
     - sort events by strictly ascending value of `coin_col`
@@ -58,10 +71,11 @@ def generate_tcm_cols(
     Returns
     -------
     col_dict
-        keys are ``coin_idx``, ``array_id``, and  ``array_idx``. ``coin_idx``
-        specifies which rows of the output arrays correspond to the which
-        coincidence event ``array_id`` and ``array_idx`` specify the location
-        in ``coin_data`` of each datum belonging to the coincidence event.
+        keys are ``cumulative_length``, ``array_id``, and  ``array_idx``.
+        ``cumulative_length`` specifies which rows of the other two output
+        arrays correspond to which coincidence event. ``array_id`` and
+        ``array_idx`` specify the location in ``coin_data`` of each datum
+        belonging to the coincidence event.
     """
     dfs = []
     for ii, array in enumerate(coin_data):
@@ -71,7 +85,7 @@ def generate_tcm_cols(
         col_dict = {"array_id": array_id, "coin_data": array}
         if array_idxs is not None:
             col_dict["array_idx"] = array_idxs[ii]
-        dfs.append(pd.DataFrame(col_dict, copy=False))
+        dfs.append(pd.DataFrame(col_dict, copy=False))  # don't copy the data!
 
     # concat and sort
     tcm = pd.concat(dfs).sort_values(["coin_data", "array_id"])

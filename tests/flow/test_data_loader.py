@@ -1,27 +1,36 @@
-import json
 from pathlib import Path
 
+import lgdo
+import numpy as np
 import pandas as pd
 import pytest
 
-from pygama import lgdo
 from pygama.flow import DataLoader
 
 config_dir = Path(__file__).parent / "configs"
 
 
 @pytest.fixture(scope="function")
-def test_dl(lgnd_test_data):
-    with open(config_dir / "filedb-config.json") as f:
-        db_config = json.load(f)
-
-    db_config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
-
-    return DataLoader(f"{config_dir}/data-loader-config.json", db_config)
+def test_dl(test_filedb):
+    return DataLoader(f"{config_dir}/data-loader-config.json", test_filedb)
 
 
-def test_init(test_filedb):
+def test_init(test_dl):
     pass
+
+
+def test_init_variants(test_filedb):
+    assert DataLoader(str(config_dir), test_filedb).config is not None
+    assert (
+        DataLoader(
+            f"{config_dir}/nested/data-loader-config-nested.json[nest1/nest2]",
+            test_filedb,
+        ).config
+        is not None
+    )
+    assert (
+        DataLoader(f"{config_dir}/nested[nest1/nest2]", test_filedb).config is not None
+    )
 
 
 def test_simple_load(test_dl):
@@ -33,21 +42,51 @@ def test_simple_load(test_dl):
     assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
 
 
+def test_simple_chunked_load(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_output(columns=["timestamp"])
+    for data in test_dl.next(chunk_size=2):
+        assert len(data) == 2
+        assert isinstance(data, lgdo.Table)
+        assert list(data.keys()) == ["hit_table", "hit_idx", "file", "timestamp"]
+
+
+def test_load_wfs(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_output(columns=["waveform"], fmt="lgdo.Table")
+    data = test_dl.load()
+    assert isinstance(data, lgdo.Table)
+    assert list(data.keys()) == ["hit_table", "hit_idx", "file", "waveform"]
+
+    test_dl.set_output(columns=["waveform"], fmt="pd.DataFrame")
+    data = test_dl.load()
+    assert isinstance(data, pd.DataFrame)
+    assert list(data.keys()) == [
+        "hit_table",
+        "hit_idx",
+        "file",
+        "waveform_t0",
+        "waveform_dt",
+        "waveform_values",
+    ]
+
+
 def test_no_merge(test_dl):
     test_dl.set_files("all")
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
-    assert isinstance(data, dict)
+    assert isinstance(data, lgdo.Struct)
     assert isinstance(data[0], lgdo.Table)
-    assert len(data) == 2
+    assert len(data) == 4  # 4 files
     assert list(data[0].keys()) == ["hit_table", "hit_idx", "timestamp"]
 
 
 def test_outputs(test_dl):
-    test_dl.set_files("all")
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_datastreams([1057600, 1059201], "ch")
     test_dl.set_output(
-        fmt="pd.DataFrame", columns=["timestamp", "channel", "bl_mean", "hit_par1"]
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "energies", "energy_in_pe"]
     )
     data = test_dl.load()
 
@@ -58,22 +97,22 @@ def test_outputs(test_dl):
         "file",
         "timestamp",
         "channel",
-        "bl_mean",
-        "hit_par1",
+        "energies",
+        "energy_in_pe",
     ]
 
 
 def test_any_mode(test_dl):
     test_dl.filedb.scan_tables_columns()
-    test_dl.set_files("all")
-    test_dl.set_cuts({"hit": "daqenergy == 634"})
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_cuts({"hit": "daqenergy == 10221"})
     el = test_dl.build_entry_list(tcm_level="tcm", mode="any")
 
-    assert len(el) == 42
+    assert len(el) == 6
 
 
 def test_set_files(test_dl):
-    test_dl.set_files("timestamp == '20220716T104550Z'")
+    test_dl.set_files("timestamp == '20230318T012144Z'")
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
@@ -81,27 +120,60 @@ def test_set_files(test_dl):
 
 
 def test_set_keylist(test_dl):
-    test_dl.set_files(["20220716T104550Z", "20220716T104550Z"])
+    test_dl.set_files(["20230318T012144Z", "20230318T012228Z"])
     test_dl.set_output(columns=["timestamp"], merge_files=False)
     data = test_dl.load()
 
-    assert len(data) == 1
+    assert len(data) == 2
 
 
 def test_set_datastreams(test_dl):
-    test_dl.set_files("all")
-    test_dl.set_datastreams([1, 3, 8], "ch")
-    test_dl.set_output(columns=["channel"], merge_files=False)
+    channels = [1084803, 1084804, 1121600]
+    test_dl.set_files("timestamp == '20230318T012144Z'")
+    test_dl.set_datastreams(channels, "ch")
+    test_dl.set_output(columns=["eventnumber"], fmt="pd.DataFrame", merge_files=False)
     data = test_dl.load()
 
-    assert (data[0]["hit_table"].nda == [1, 3, 8]).all()
-    assert (data[0]["channel"].nda == [1, 3, 8]).all()
+    assert np.array_equal(data[0]["hit_table"].unique(), channels)
 
 
 def test_set_cuts(test_dl):
-    test_dl.set_files("all")
-    test_dl.set_cuts({"hit": "card == 3"})
-    test_dl.set_output(columns=["card"])
+    test_dl.set_files("type == 'cal'")
+    test_dl.set_cuts({"hit": "is_valid_cal == False"})
+    test_dl.set_datastreams([1084803], "ch")
+    test_dl.set_output(columns=["is_valid_cal"], fmt="pd.DataFrame")
     data = test_dl.load()
 
-    assert (data["hit_table"].nda == [12, 13, 12, 13]).all()
+    assert (data.is_valid_cal == False).all()  # noqa: E712
+
+
+def test_setter_overwrite(test_dl):
+    test_dl.set_files("all")
+    test_dl.set_datastreams([1084803, 1084804, 1121600], "ch")
+    test_dl.set_cuts({"hit": "trapEmax > 5000"})
+    test_dl.set_output(columns=["trapEmax"])
+
+    data = test_dl.load().get_dataframe()
+
+    test_dl.set_files("timestamp == '20230318T012144Z'")
+    test_dl.set_datastreams([1084803, 1121600], "ch")
+    test_dl.set_cuts({"hit": "trapEmax > 0"})
+
+    data2 = test_dl.load().get_dataframe()
+
+    assert 1084804 not in data2["hit_table"]
+    assert len(pd.unique(data2["file"])) == 1
+    assert len(data2.query("hit_table == 1084803")) > len(
+        data.query("hit_table == 1084803")
+    )
+
+
+def test_browse(test_dl):
+    test_dl.set_files("type == 'phy'")
+    test_dl.set_datastreams([1057600, 1059201], "ch")
+    test_dl.set_output(
+        fmt="pd.DataFrame", columns=["timestamp", "channel", "energies", "energy_in_pe"]
+    )
+    wb = test_dl.browse()
+
+    wb.draw_next()

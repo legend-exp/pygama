@@ -6,13 +6,13 @@ from pathlib import Path
 from pkg_resources import get_distribution
 
 sys.path.insert(0, Path("../../src").resolve().as_posix())
+sys.path.append(Path("extensions").resolve().as_posix())
 
 project = "pygama"
-copyright = "2020, the LEGEND Collaboration"
+copyright = "2023, the LEGEND Collaboration"
 version = get_distribution("pygama").version
 
 extensions = [
-    "sphinx.ext.githubpages",
     "sphinx.ext.autodoc",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
@@ -22,6 +22,7 @@ extensions = [
     "nbsphinx",
     "myst_parser",
     "IPython.sphinxext.ipython_console_highlighting",
+    "numbadoc",
 ]
 
 source_suffix = {
@@ -38,8 +39,6 @@ html_theme_options = {
     "source_directory": "docs/source",
 }
 html_title = f"{project} {version}"
-
-autodoc_default_options = {"ignore-module-all": True}
 
 # sphinx-napoleon
 # enforce consistent usage of NumPy-style docstrings
@@ -63,7 +62,15 @@ intersphinx_mapping = {
     "pint": ("https://pint.readthedocs.io/en/stable", None),
 }
 
+suppress_warnings = [
+    # "histogram" is defined both in pygama.dsp.processors.histogram.histogram
+    # and in pygama.math.histogram, leading to a Sphinx cross-referencing
+    # warning.  I don't know how to fix this properly
+    "ref.python",
+]
+
 # sphinx-autodoc
+autodoc_default_options = {"ignore-module-all": True}
 # Include __init__() docstring in class docstring
 autoclass_content = "both"
 autodoc_typehints = "both"

@@ -6,7 +6,6 @@ import pygama.math.functions.error_function as pgfef
 
 
 def test_erf():
-
     x = np.arange(-10, 12)
 
     y = pgfef.nb_erf(x)
@@ -17,7 +16,6 @@ def test_erf():
 
 
 def test_erfc():
-
     x = np.arange(-10, 12)
 
     y = pgfef.nb_erfc(x)

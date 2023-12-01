@@ -6,9 +6,13 @@ all: apidoc
 	sphinx-build -M html "$(SOURCEDIR)" "$(BUILDDIR)" -W --keep-going
 
 apidoc: clean-apidoc
-	sphinx-apidoc --private --module-first --force \
+	sphinx-apidoc \
+      --private \
+      --module-first \
+      --force \
       --output-dir "$(SOURCEDIR)/api" \
-      ../src/pygama ../src/pygama/_version.py
+      ../src/pygama \
+      ../src/pygama/_version.py
 
 clean-apidoc:
 	rm -rf "$(SOURCEDIR)/api"

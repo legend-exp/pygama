@@ -20,9 +20,9 @@ def factorial(nn):
     return res
 
 @nb.njit(**kwd_parallel)
-def nb_poisson_pmf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
+def nb_poisson_pmf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     r"""
-    Normalised Poisson distribution, w/ args: lamb, mu.
+    Normalised Poisson distribution, w/ args: mu, lamb.
     The range of support is :math:`\mathbb{N}`, with :math:`lamb` :math:`\in (0,\infty)`, :math:`\mu \in \mathbb{N}`
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
@@ -34,10 +34,10 @@ def nb_poisson_pmf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
     ----------
     x : integer array-like
         The input data
-    lamb
-        The rate
     mu
         Amount to shift the distribution
+    lamb
+        The rate
     """
     
     y = np.empty_like(x, dtype = np.float64)
@@ -51,9 +51,9 @@ def nb_poisson_pmf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
 
 
 @nb.njit(**kwd_parallel)
-def nb_poisson_cdf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
+def nb_poisson_cdf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     r"""
-    Normalised Poisson cumulative distribution, w/ args: lamb, mu.
+    Normalised Poisson cumulative distribution, w/ args: mu, lamb.
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
 
@@ -64,10 +64,10 @@ def nb_poisson_cdf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
     ----------
     x : integer array-like
         The input data
-    lamb
-        The rate
     mu
         Amount to shift the distribution
+    lamb
+        The rate
     """
 
     y = np.empty_like(x, dtype = np.float64)
@@ -83,7 +83,7 @@ def nb_poisson_cdf(x: np.ndarray, lamb: float, mu: int) -> np.ndarray:
 
 
 @nb.njit(**kwd)
-def nb_poisson_scaled_pmf(x: np.ndarray, lamb: float, mu: int, area: float) -> np.ndarray:
+def nb_poisson_scaled_pmf(x: np.ndarray, area: float, mu: int, lamb: float) -> np.ndarray:
     r"""
     Scaled Poisson probability distribution, w/ args: lamb, mu.
     As a Numba JIT function, it runs slightly faster than
@@ -93,19 +93,19 @@ def nb_poisson_scaled_pmf(x: np.ndarray, lamb: float, mu: int, area: float) -> n
     ----------
     x : integer array-like
         The input data
-    lamb
-        The rate
-    mu
-        Amount to shift the distribution
     area
         The number of counts in the signal
+    mu
+        Amount to shift the distribution
+    lamb
+        The rate
     """ 
 
-    return area * nb_poisson_pmf(x, lamb, mu)
+    return area * nb_poisson_pmf(x, mu, lamb)
 
 
 @nb.njit(**kwd)
-def nb_poisson_scaled_cdf(x: np.ndarray, lamb: float, mu: int, area: float) -> np.ndarray:
+def nb_poisson_scaled_cdf(x: np.ndarray, area: float, mu: int, lamb: float) -> np.ndarray:
     r"""
     Poisson cdf scaled by the number of signal counts for extended binned fits 
     As a Numba JIT function, it runs slightly faster than
@@ -115,37 +115,42 @@ def nb_poisson_scaled_cdf(x: np.ndarray, lamb: float, mu: int, area: float) -> n
     ----------
     x : integer array-like
         The input data
-    lamb
-        The rate
-    mu
-        Amount to shift the distribution
     area
         The number of counts in the signal
+    mu
+        Amount to shift the distribution
+    lamb
+        The rate
     """ 
     
-    return area * nb_poisson_cdf(x, lamb, mu)
+    return area * nb_poisson_cdf(x, mu, lamb)
 
     
 class poisson_gen(rv_discrete):
 
-    def _pmf(self, x, lamb):
-        x.flags.writeable = True
-        return nb_poisson_pmf(x, lamb[0], 0)
-    def _cdf(self, x, lamb):
-        x.flags.writeable = True
-        return nb_poisson_cdf(x, lamb[0], 0)
+    def __init__(self, *args, **kwargs):
+        self.x_lo = 0
+        self.x_hi = np.inf
+        super().__init__()
 
-    def get_pmf(self, x, lamb, mu):
-        return nb_poisson_pmf(x, lamb, mu)
-    def get_cdf(self, x, lamb, mu):
-        return nb_poisson_cdf(x, lamb, mu)
+    def _pmf(self, x: np.array, mu: int, lamb: float) -> np.array:
+        x.flags.writeable = True
+        return nb_poisson_pmf(x, mu[0], lamb[0])
+    def _cdf(self, x: np.array,  mu: int, lamb: float) -> np.array:
+        x.flags.writeable = True
+        return nb_poisson_cdf(x, mu[0], lamb[0])
 
-    def pmf_ext(self, x, area, x_lo, x_hi, lamb, mu):
-        return nb_poisson_scaled_cdf(np.array([x_hi]), lamb, mu, area)[0]-nb_poisson_scaled_cdf(np.array([x_lo]), lamb, mu, area)[0], nb_poisson_scaled_pmf(x, lamb, mu, area)
-    def cdf_ext(self, x, area, lamb, mu):
-        return nb_poisson_scaled_cdf(x, lamb, mu, area)
+    def get_pmf(self, x: np.array, mu: int, lamb: float) -> np.array:
+        return nb_poisson_pmf(x, mu, lamb)
+    def get_cdf(self, x: np.array, mu: int, lamb: float) -> np.array:
+        return nb_poisson_cdf(x, mu, lamb)
+
+    def pmf_ext(self, x: np.array, x_lo: float, x_hi: float, area: float, mu: int, lamb: float) -> np.array:
+        return np.diff(nb_poisson_scaled_cdf(np.array([x_lo, x_hi]), area, mu, lamb)), nb_poisson_scaled_pmf(x, area, mu, lamb)
+    def cdf_ext(self, x: np.array, area: float, mu: int, lamb: float) -> np.array:
+        return nb_poisson_scaled_cdf(x, area, mu, lamb)
 
     def required_args(self) -> tuple[str, str]:
-        return "lamb", "mu"
+        return "mu", "lamb"
 
 poisson = poisson_gen(name='poisson')

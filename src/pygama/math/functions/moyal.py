@@ -81,7 +81,7 @@ def nb_moyal_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
 
 
 @nb.njit(**kwd)
-def nb_moyal_scaled_pdf(x: np.ndarray, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_moyal_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     r"""
     Scaled Moyal probability density function, w/ args: mu, sigma, area.
     As a Numba JIT function, it runs slightly faster than
@@ -91,19 +91,19 @@ def nb_moyal_scaled_pdf(x: np.ndarray, mu: float, sigma: float, area: float) -> 
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the signal
     """ 
 
     return area * nb_moyal_pdf(x, mu, sigma)
 
 
 @nb.njit(**kwd)
-def nb_moyal_scaled_cdf(x: np.ndarray, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_moyal_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     r"""
     Moyal cdf scaled by the area, used for extended binned fits 
     As a Numba JIT function, it runs slightly faster than
@@ -114,18 +114,23 @@ def nb_moyal_scaled_cdf(x: np.ndarray, mu: float, sigma: float, area: float) -> 
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     mu
         The amount to shift the distribution
     sigma
         The amount to scale the distribution
-    area
-        The number of counts in the signal
     """ 
     
     return area * nb_moyal_cdf(x, mu, sigma)
 
 
 class moyal_gen(pygama_continuous):
+
+    def __init__(self, *args, **kwargs):
+        self.x_lo = -1*np.inf
+        self.x_hi = np.inf
+        super().__init__(self)
 
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True
@@ -139,15 +144,15 @@ class moyal_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_cdf(x, mu, sigma)
 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_pdf(x, x_lower, x_upper, mu, sigma)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray:
-        return self._norm_cdf(x, x_lower, x_upper, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
+        return self._pdf_norm(x, x_lo, x_hi, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
+        return self._cdf_norm(x, x_lo, x_hi, mu, sigma)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_moyal_scaled_cdf(np.array([x_hi]), mu, sigma, area)[0]-nb_moyal_scaled_cdf(np.array([x_lo]), mu, sigma, area)[0], nb_moyal_scaled_pdf(x, mu, sigma, area)
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float) -> np.ndarray:
+        return np.diff(nb_moyal_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma)), nb_moyal_scaled_pdf(x, area, mu, sigma)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_moyal_scaled_cdf(x, mu, sigma, area)
+        return nb_moyal_scaled_cdf(x, area, mu, sigma)
 
     def required_args(self) -> tuple[str, str]:
         return "mu", "sigma"

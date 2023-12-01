@@ -124,7 +124,7 @@ def nb_gauss_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
 
 
 @nb.njit(**kwd)
-def nb_gauss_scaled_pdf(x: np.ndarray, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_gauss_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     """
     Gaussian with height as a parameter for fwhm etc.
     As a Numba JIT function, it runs slightly faster than
@@ -134,19 +134,19 @@ def nb_gauss_scaled_pdf(x: np.ndarray, mu: float, sigma: float, area: float) -> 
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     mu
         The centroid of the Gaussian
     sigma
         The standard deviation of the Gaussian
-    area
-        The number of counts in the signal
     """ 
 
     return area * nb_gauss_pdf(x, mu, sigma)
 
 
 @nb.njit(**kwd)
-def nb_gauss_scaled_cdf(x: np.ndarray, mu: float, sigma: float, area: float) -> np.ndarray:
+def nb_gauss_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     """
     Gaussian CDF scaled by the number of signal counts for extended binned fits 
     As a Numba JIT function, it runs slightly faster than
@@ -156,18 +156,23 @@ def nb_gauss_scaled_cdf(x: np.ndarray, mu: float, sigma: float, area: float) -> 
     ----------
     x
         Input data
+    area
+        The number of counts in the signal
     mu
         The centroid of the Gaussian
     sigma
         The standard deviation of the Gaussian
-    area
-        The number of counts in the signal
     """ 
     
     return area * nb_gauss_cdf(x, mu, sigma)
 
 
 class gaussian_gen(pygama_continuous):
+
+    def __init__(self, *args, **kwargs):
+        self.x_lo = -1*np.inf
+        self.x_hi = np.inf
+        super().__init__(self)
 
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True
@@ -180,15 +185,15 @@ class gaussian_gen(pygama_continuous):
     def get_cdf(self, x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         return nb_gauss_cdf(x, mu, sigma)
 
-    def norm_pdf(self, x: np.ndarray, x_lower: float, x_upper: float,  mu: float, sigma: float) -> np.ndarray: 
-        return self._norm_pdf(x, x_lower, x_upper, mu, sigma)
-    def norm_cdf(self, x: np.ndarray, x_lower: float, x_upper: float, mu: float, sigma: float) -> np.ndarray: 
-        return self._norm_cdf(x, x_lower, x_upper, mu, sigma)
+    def pdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._pdf_norm(x, x_lo, x_hi, mu, sigma)
+    def cdf_norm(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray: 
+        return self._cdf_norm(x, x_lo, x_hi, mu, sigma)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_gauss_scaled_cdf(np.array([x_hi]), mu, sigma, area)[0]-nb_gauss_scaled_cdf(np.array([x_lo]), mu, sigma, area)[0], nb_gauss_scaled_pdf(x, mu, sigma, area)
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float) -> np.ndarray:
+        return np.diff(nb_gauss_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma)), nb_gauss_scaled_pdf(x, area, mu, sigma)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
-        return nb_gauss_scaled_cdf(x, mu, sigma, area)
+        return nb_gauss_scaled_cdf(x, area, mu, sigma)
 
     def required_args(self) -> tuple[str, str]:
         return "mu", "sigma"

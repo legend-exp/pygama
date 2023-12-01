@@ -1,0 +1,25 @@
+{
+  "nest1": {
+    "nest2": {
+      "filedb": "$_/filedb-config.json",
+      "levels": {
+        "hit": {
+          "tiers": ["raw", "dsp", "hit"]
+        },
+        "tcm": {
+          "tiers": ["tcm"],
+          "parent": "hit",
+          "child": "evt",
+          "tcm_cols": {
+            "child_idx": "coin_idx",
+            "parent_tb": "array_id",
+            "parent_idx": "array_idx"
+          }
+        },
+        "evt": {
+          "tiers": ["evt"]
+        }
+      }
+    }
+  }
+}

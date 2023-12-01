@@ -56,7 +56,7 @@ class numba_frozen(rv_frozen):
 
         return self.dist.get_cdf(np.array(x), *self.args, **self.kwds)
 
-    def pdf_ext(self, x: np.ndarray, area: float, x_lo: float, x_hi: float) -> tuple[float, np.ndarray]:
+    def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float) -> tuple[float, np.ndarray]:
         r"""
         Direct access to numba-fied extended pdfs, a fast function
 
@@ -65,7 +65,7 @@ class numba_frozen(rv_frozen):
         integral, scaled support normalized pdf
         """
 
-        return self.dist.pdf_ext(np.array(x), area, x_lo, x_hi, *self.args, **self.kwds)
+        return self.dist.pdf_ext(np.array(x), x_lo, x_hi, area, *self.args, **self.kwds)
 
     def cdf_ext(self, x: np.ndarray, area: float) -> np.ndarray:
         r"""
@@ -78,7 +78,7 @@ class numba_frozen(rv_frozen):
 
         return self.dist.cdf_ext(np.array(x), area, *self.args, **self.kwds)
     
-    def norm_pdf(self, x, x_lower, x_upper):
+    def pdf_norm(self, x, x_lo: float, x_hi: float):
         r"""
         Direct access to numba-fied pdfs, a fast function. Normalized on a fit range
 
@@ -86,9 +86,9 @@ class numba_frozen(rv_frozen):
         -------
         fit-range normalized pdf
         """
-        return self.dist.norm_pdf(x, x_lower, x_upper, *self.args, **self.kwds)
+        return self.dist.pdf_norm(x, x_lo, x_hi, *self.args, **self.kwds)
     
-    def norm_cdf(self, x, x_lower, x_upper):
+    def cdf_norm(self, x, x_lo: float, x_hi: float):
         r"""
         Direct access to numba-fied cdfs, a fast function. Normalized on a fit range
 
@@ -96,7 +96,7 @@ class numba_frozen(rv_frozen):
         -------
         fit-range normalized cdf
         """
-        return self.dist.norm_cdf(x, x_lower, x_upper, *self.args, **self.kwds)
+        return self.dist.cdf_norm(x, x_lo, x_hi, *self.args, **self.kwds)
     
     def required_args(self) -> tuple:
         r"""
@@ -116,7 +116,7 @@ class pygama_continuous(rv_continuous):
     version of rv_continuous_frozen that has direct access to pygama numbafied functions
     """
 
-    def _norm_pdf(self, x, x_lower, x_upper, *args, **kwds):
+    def _pdf_norm(self, x, x_lo, x_hi, *args, **kwds):
         r"""
         Normalize a pdf on a subset of its support, typically over a fit-range. 
 
@@ -124,36 +124,34 @@ class pygama_continuous(rv_continuous):
         ---------- 
         x 
             The data
-        x_lower 
+        x_lo 
             The lower range to normalize on 
-        x_upper 
+        x_hi 
             The upper range to normalize on 
         args 
             The shape and location and scale parameters of a specific distribution 
 
         Returns 
         -------
-        norm_pdf 
+        pdf_norm 
             The pdf that is normalized on a smaller range 
 
         Notes 
         ----- 
-        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
+        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lo =:func:`np.amin(x)`, x_hi=:func:`np.amax(x)`
         We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names
         For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
         """
 
-        if (x_lower == np.inf) and (x_upper == np.inf):
-            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), *args))
-        else: 
-            norm = np.diff(self.get_cdf(np.array([x_lower, x_upper]), *args))
+
+        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *args))
 
         if norm == 0:
             return np.full_like(x, np.inf)
         else:
             return self.get_pdf(x,*args)/norm
     
-    def _norm_cdf(self, x, x_lower, x_upper, *args, **kwds):
+    def _cdf_norm(self, x, x_lo, x_hi, *args, **kwds):
         r"""
         Derive a cdf from a pdf that is normalized on a subset of its support, typically over a fit-range. 
 
@@ -161,28 +159,26 @@ class pygama_continuous(rv_continuous):
         ---------- 
         x 
             The data
-        x_lower 
+        x_lo 
             The lower range to normalize on 
-        x_upper 
+        x_hi 
             The upper range to normalize on 
         args 
             The shape and location and scale parameters of a specific distribution 
 
         Returns 
         -------
-        norm_pdf 
+        pdf_norm 
             The pdf that is normalized on a smaller range 
 
         Notes 
         ----- 
-        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lower =:func:`np.amin(x)`, x_upper=:func:`np.amax(x)`
+        If upper_range and lower_range are both :func:`np.inf`, then the function automatically takes x_lo =:func:`np.amin(x)`, x_hi=:func:`np.amax(x)`
         We also need to overload this in every subclass because we want functions to be able to introspect the shape and location/scale names. 
         For distributions that are only defined on a limited range, like with lower_range, upper_range, we don't need to call these, instead just call the normal pdf.
         """
-        if (x_lower == np.inf) and (x_upper == np.inf):
-            norm = np.diff(self.get_cdf(np.array([np.amin(x), np.amax(x)]), *args))
-        else: 
-            norm = np.diff(self.get_cdf(np.array([x_lower, x_upper]), *args))
+
+        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *args))
         
         if norm == 0:
             return np.full_like(x, np.inf)

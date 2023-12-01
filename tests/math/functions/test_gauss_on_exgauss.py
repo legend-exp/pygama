@@ -6,7 +6,6 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_gauss_on_exgauss_pdf():
-
     x = np.arange(-10, 10)
     mu = 1
     sigma = 1
@@ -17,7 +16,7 @@ def test_gauss_on_exgauss_pdf():
 
     assert isinstance(gauss_on_exgauss, sum_dists)
 
-    y_direct = gauss_on_exgauss.get_pdf(x, pars)
+    y_direct = gauss_on_exgauss.get_pdf(x, *pars)
     scipy_exgauss = h_tail * exponnorm.pdf(
         -1 * x, tau / sigma, -1 * mu, sigma
     )  # to be equivalent to the scipy version, x -> -x, mu -> -mu, k -> k/sigma
@@ -29,14 +28,14 @@ def test_gauss_on_exgauss_pdf():
 
     x_lo = -100
     x_hi = 100
-    pars = np.insert(pars, 0, [x_lo, x_hi])
-    y_sig, y_ext = gauss_on_exgauss.pdf_ext(x, pars)
+    pars = np.array([x_lo, x_hi, mu, sigma, h_tail, tau], dtype=float)
+
+    y_sig, y_ext = gauss_on_exgauss.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, 1, rtol=1e-8)
 
 
 def test_gauss_on_exgauss_cdf():
-
     x = np.arange(-10, 10)
     mu = 1
     sigma = 1
@@ -48,7 +47,7 @@ def test_gauss_on_exgauss_cdf():
 
     assert isinstance(gauss_on_exgauss, sum_dists)
 
-    y_direct = gauss_on_exgauss.get_cdf(x, pars)
+    y_direct = gauss_on_exgauss.get_cdf(x, *pars)
 
     scipy_exgauss = h_tail * (
         1 - exponnorm.cdf(-1 * x, tau / sigma, -1 * mu, sigma)
@@ -59,5 +58,13 @@ def test_gauss_on_exgauss_cdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    y_ext = gauss_on_exgauss.cdf_ext(x, pars)
+    y_ext = gauss_on_exgauss.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
+
+
+def test_required_args():
+    names = gauss_on_exgauss.required_args()
+    assert names[0] == "mu"
+    assert names[1] == "sigma"
+    assert names[2] == "htail"
+    assert names[3] == "tau"

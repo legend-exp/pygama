@@ -6,7 +6,6 @@ from pygama.math.functions.sum_dists import sum_dists
 
 
 def test_hpge_peak_pdf():
-
     x = np.arange(-10, 10)
 
     sigma = 0.2
@@ -14,19 +13,19 @@ def test_hpge_peak_pdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.inf
-    upper_range = np.inf
+    x_lo = np.amin(x)
+    x_hi = np.max(x)
     n_sig = 10
     n_bkg = 20
 
     pars = np.array(
-        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
+        [x_lo, x_hi, n_sig, mu, sigma, htail, tau, n_bkg, hstep],
         dtype=float,
     )
 
     assert isinstance(hpge_peak, sum_dists)
 
-    y_direct = hpge_peak.get_pdf(x, pars)
+    y_direct = hpge_peak.get_pdf(x, *pars)
     scipy_exgauss = htail * exponnorm.pdf(
         -1 * x, tau / sigma, -1 * mu, sigma
     )  # to be equivalent to the scipy version, x -> -x, mu -> -mu, k -> k/sigma
@@ -54,21 +53,12 @@ def test_hpge_peak_pdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
-    x = np.arange(-100, 100)
-    y_sig, y_ext = hpge_peak.pdf_ext(x, pars)
-    assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
-
-    x = np.arange(-10, 10)
-    x_lo = -100
-    x_hi = 100
-    pars = np.insert(pars, 0, [x_lo, x_hi])
-    y_sig, y_ext = hpge_peak.pdf_ext(x, pars)
+    y_sig, y_ext = hpge_peak.pdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-8)
     assert np.allclose(y_sig, n_sig + n_bkg, rtol=1e-8)
 
 
 def test_hpge_peak_cdf():
-
     x = np.arange(-10, 10)
 
     sigma = 0.2
@@ -76,19 +66,19 @@ def test_hpge_peak_cdf():
     tau = 0.1
     htail = 0.75
     hstep = 0.5
-    lower_range = np.inf
-    upper_range = np.inf
+    x_lo = np.amin(x)
+    x_hi = np.max(x)
     n_sig = 10
     n_bkg = 20
 
     pars = np.array(
-        [n_sig, mu, sigma, htail, tau, n_bkg, hstep, lower_range, upper_range],
+        [x_lo, x_hi, n_sig, mu, sigma, htail, tau, n_bkg, hstep],
         dtype=float,
     )
 
     assert isinstance(hpge_peak, sum_dists)
 
-    y_direct = hpge_peak.get_cdf(x, pars)
+    y_direct = hpge_peak.get_cdf(x, *pars)
 
     scipy_exgauss = htail * (
         1 - exponnorm.cdf(-1 * x, tau / sigma, -1 * mu, sigma)
@@ -123,5 +113,18 @@ def test_hpge_peak_cdf():
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-1)
 
-    y_ext = hpge_peak.cdf_ext(x, pars)
+    y_ext = hpge_peak.cdf_ext(x, *pars)
     assert np.allclose(y_ext, scipy_y, rtol=1e-1)
+
+
+def test_required_args():
+    names = hpge_peak.required_args()
+    assert names[0] == "x_lo"
+    assert names[1] == "x_hi"
+    assert names[2] == "n_sig"
+    assert names[3] == "mu"
+    assert names[4] == "sigma"
+    assert names[5] == "htail"
+    assert names[6] == "tau"
+    assert names[7] == "n_bkg"
+    assert names[8] == "hstep"

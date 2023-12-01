@@ -29,4 +29,4 @@ from pygama.math.functions.moyal import moyal
 from pygama.math.functions.uniform import uniform
 from pygama.math.functions.linear import linear
 from pygama.math.functions.exponential import exponential
-
+from pygama.math.functions.error_function import nb_erf, nb_erfc
