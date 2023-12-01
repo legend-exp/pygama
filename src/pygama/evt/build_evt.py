@@ -49,6 +49,7 @@ def evaluate_expression(
     para: dict = None,
     qry: str = None,
     defv=np.nan,
+    sorter: str = None,
 ) -> dict:
     """
     Evaluates the expression defined by the user across all channels according to the mode
@@ -86,6 +87,8 @@ def evaluate_expression(
        Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
     defv
        default value of evaluation
+    sorter
+       can be used to sort vector outputs according to sorter expression (see :func:`evaluate_to_vector`)
     """
 
     # find parameters in evt file or in parameters
@@ -247,6 +250,7 @@ def evaluate_expression(
                 nrows,
                 var_ph,
                 defv,
+                sorter,
             )
         elif "any" == mode:
             return evaluate_to_any(
@@ -410,7 +414,10 @@ def get_data_at_channel(
     elif "tcm.array_id" == expr:
         res = np.full(outsize, int(ch[2:]), dtype=int)
     else:
-        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl) | var_ph
+        var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl)
+
+        if var_ph is not None:
+            var = var | var_ph
 
         # evaluate expression
         # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
@@ -1031,6 +1038,89 @@ def evaluate_at_channel_vov(
     return {"values": out, "channels": ch_comp}
 
 
+def evaluate_to_aoesa(
+    idx: np.ndarray,
+    ids: np.ndarray,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    chns_rm: list,
+    expr: str,
+    exprl: list,
+    qry: str | np.ndarray,
+    nrows: int,
+    var_ph: dict = None,
+    defv=np.nan,
+    missv=np.nan,
+) -> np.ndarray:
+    """
+    Aggregates by returning a ArrayOfEqualSizedArrays of evaluated expressions of channels that fulfill a query expression.
+
+    Parameters
+    ----------
+    idx
+       tcm index array
+    ids
+       tcm id array
+    f_hit
+       Path to hit tier file
+    f_dsp
+       Path to dsp tier file
+    chns
+       list of channels to be aggregated
+    chns_rm
+       list of channels to be skipped from evaluation and set to default value
+    expr
+       expression string to be evaluated
+    exprl
+       list of dsp/hit/evt parameter tuples in expression (tier,field)
+    qry
+       query expression to mask aggregation
+    nrows
+       length of output VectorOfVectors
+    ch_comp
+       array of rawids at which the expression is evaluated
+    var_ph
+       dictionary of evt and additional parameters and their values
+    defv
+       default value
+    missv
+       missing value
+    sorter
+       sorts the entries in the vector according to sorter expression
+    """
+    # define dimension of output array
+    out = np.full((nrows, len(chns)), missv)
+
+    i = 0
+    for ch in chns:
+        # get index list for this channel to be loaded
+        idx_ch = idx[ids == int(ch[2:])]
+
+        res = get_data_at_channel(
+            ch,
+            idx_ch,
+            expr,
+            exprl,
+            var_ph,
+            ch not in chns_rm,
+            f_hit,
+            f_dsp,
+            len(out),
+            defv,
+        )
+
+        # get mask from query
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
+
+        # append to out according to mode == vov
+        out[:, i][limarr] = res[limarr]
+
+        i += 1
+
+    return out
+
+
 def evaluate_to_vector(
     idx: np.ndarray,
     ids: np.ndarray,
@@ -1044,6 +1134,7 @@ def evaluate_to_vector(
     nrows: int,
     var_ph: dict = None,
     defv=np.nan,
+    sorter: str = None,
 ) -> dict:
     """
     Aggregates by returning a VectorOfVector of evaluated expressions of channels that fulfill a query expression.
@@ -1076,38 +1167,49 @@ def evaluate_to_vector(
        dictionary of evt and additional parameters and their values
     defv
        default value
+    sorter
+       sorts the entries in the vector according to sorter expression. acend_by:<hit|dsp.field> results in an vector ordered ascending, decend_by:<hit|dsp.field> sorts descending
     """
+    out = evaluate_to_aoesa(
+        idx,
+        ids,
+        f_hit,
+        f_dsp,
+        chns,
+        chns_rm,
+        expr,
+        exprl,
+        qry,
+        nrows,
+        var_ph,
+        defv,
+        np.nan,
+    )
 
-    # define dimension of output array
-    out = np.full((nrows, len(chns)), np.nan)
-    out_chs = np.full((nrows, len(chns)), np.nan)
-
-    i = 0
-    for ch in chns:
-        # get index list for this channel to be loaded
-        idx_ch = idx[ids == int(ch[2:])]
-
-        res = get_data_at_channel(
-            ch,
-            idx_ch,
-            expr,
-            exprl,
-            var_ph,
-            ch not in chns_rm,
+    # if a sorter is given sort accordingly
+    if sorter is not None:
+        md, fld = sorter.split(":")
+        s_val = evaluate_to_aoesa(
+            idx,
+            ids,
             f_hit,
             f_dsp,
-            len(out),
-            defv,
+            chns,
+            chns_rm,
+            fld,
+            [tuple(fld.split("."))],
+            None,
+            nrows,
         )
+        if "ascend_by" == md:
+            out[np.arange(len(out))[:, None], np.argsort(s_val)]
 
-        # get mask from query
-        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
-
-        # append to out according to mode == vov
-        out[:, i][limarr] = res[limarr]
-        out_chs[:, i][limarr] = int(ch[2:])
-
-        i += 1
+        elif "descend_by" == md:
+            out[np.arange(len(out))[:, None], np.argsort(-s_val)]
+        else:
+            raise ValueError(
+                "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
+            )
 
     # This can be smarter
     # shorten to vov (FUTURE: replace with awkward)
@@ -1115,12 +1217,8 @@ def evaluate_to_vector(
         flattened_data=out.flatten()[~np.isnan(out.flatten())],
         cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
     )
-    out_chs = VectorOfVectors(
-        flattened_data=out_chs.flatten()[~np.isnan(out_chs.flatten())].astype(int),
-        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out_chs), axis=1)),
-    )
 
-    return {"values": out, "channels": out_chs}
+    return {"values": out}
 
 
 def build_evt(
@@ -1320,13 +1418,15 @@ def build_evt(
                         )
                     )
 
-            pars, qry, defaultv = None, None, np.nan
+            pars, qry, defaultv, srter = None, None, np.nan, None
             if "parameters" in v.keys():
                 pars = v["parameters"]
             if "query" in v.keys():
                 qry = v["query"]
             if "initial" in v.keys() and not v["initial"] == "np.nan":
                 defaultv = v["initial"]
+            if "sort" in v.keys():
+                srter = v["sort"]
 
             result = evaluate_expression(
                 f_tcm,
@@ -1341,6 +1441,7 @@ def build_evt(
                 pars,
                 qry,
                 defaultv,
+                srter,
             )
 
             obj = result["values"]

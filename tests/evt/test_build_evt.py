@@ -193,6 +193,55 @@ def test_query(lgnd_test_data, tmptestdir):
     assert len(ls(outfile, "/evt/")) == 12
 
 
+def test_vector_sort(lgnd_test_data, tmptestdir):
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    f_tcm = lgnd_test_data.get_path(tcm_path)
+    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
+    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
+
+    conf = {
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "operations": {
+            "acend_id": {
+                "channels": "geds_on",
+                "aggregation_mode": "vectorize",
+                "query": "hit.cuspEmax_ctc_cal>25",
+                "expression": "tcm.array_id",
+                "sort": "ascend_by:dsp.tp_0_est",
+            },
+            "t0_acend": {
+                "aggregation_mode": "keep_at:evt.acend_id",
+                "expression": "dsp.tp_0_est",
+            },
+            "decend_id": {
+                "channels": "geds_on",
+                "aggregation_mode": "vectorize",
+                "query": "hit.cuspEmax_ctc_cal>25",
+                "expression": "tcm.array_id",
+                "sort": "descend_by:dsp.tp_0_est",
+            },
+            "t0_decend": {
+                "aggregation_mode": "keep_at:evt.acend_id",
+                "expression": "dsp.tp_0_est",
+            },
+        },
+    }
+    build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
+
+    assert os.path.exists(outfile)
+    assert len(ls(outfile, "/evt/")) == 4
+    lstore = store.LH5Store()
+    vov_t0, _ = lstore.read_object("/evt/t0_acend", outfile)
+    nda_t0 = vov_t0.to_aoesa().nda
+    assert ((np.diff(nda_t0) >= 0) | (np.isnan(np.diff(nda_t0)))).all()
+    vov_t0, _ = lstore.read_object("/evt/t0_decend", outfile)
+    nda_t0 = vov_t0.to_aoesa().nda
+    assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
+
+
 def test_skimming(lgnd_test_data, tmptestdir):
     outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
