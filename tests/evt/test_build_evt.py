@@ -207,7 +207,7 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
         "operations": {
             "acend_id": {
                 "channels": "geds_on",
-                "aggregation_mode": "vectorize",
+                "aggregation_mode": "gather",
                 "query": "hit.cuspEmax_ctc_cal>25",
                 "expression": "tcm.array_id",
                 "sort": "ascend_by:dsp.tp_0_est",
@@ -218,7 +218,7 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
             },
             "decend_id": {
                 "channels": "geds_on",
-                "aggregation_mode": "vectorize",
+                "aggregation_mode": "gather",
                 "query": "hit.cuspEmax_ctc_cal>25",
                 "expression": "tcm.array_id",
                 "sort": "descend_by:dsp.tp_0_est",

@@ -73,14 +73,14 @@
     },
     "test_vov": {
       "channels": "geds_on",
-      "aggregation_mode": "vectorize",
+      "aggregation_mode": "gather",
       "query": "evt.multiplicity == 1",
       "expression": "True",
       "initial": false
     },
     "test_vov2": {
       "channels": "geds_on",
-      "aggregation_mode": "vectorize",
+      "aggregation_mode": "gather",
       "expression": "True",
       "initial": false
     }

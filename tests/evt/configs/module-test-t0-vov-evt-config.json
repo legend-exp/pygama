@@ -6,13 +6,13 @@
   "operations": {
     "energy": {
       "channels": "geds_on",
-      "aggregation_mode": "vectorize",
+      "aggregation_mode": "gather",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal"
     },
     "energy_id": {
       "channels": "geds_on",
-      "aggregation_mode": "vectorize",
+      "aggregation_mode": "gather",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "tcm.array_id"
     },

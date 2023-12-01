@@ -76,7 +76,7 @@ def evaluate_expression(
        - "any": aggregates by logical or.
        - "all": aggregates by logical and.
        - "keep_at:ch_field": aggregates according to passed ch_field
-       - "vectorize": Channels are not combined, but result saved as VectorOfVectors.
+       - "gather": Channels are not combined, but result saved as VectorOfVectors.
     qry
        A query that can mask the aggregation.
     expr
@@ -236,7 +236,7 @@ def evaluate_expression(
                 var_ph,
                 defv,
             )
-        elif "vectorize" == mode:
+        elif "gather" == mode:
             return evaluate_to_vector(
                 idx,
                 ids,
@@ -1260,18 +1260,17 @@ def build_evt(
                     "muon": "ch1027202",
                 },
                 "operations": {
-                    "energy":{
-                        "channels": "geds_on",
-                        "aggregation_mode": "vectorize",
-                        "query": "hit.cuspEmax_ctc_cal>25",
-                        "expression": "hit.cuspEmax_ctc_cal"
-                    },
                     "energy_id":{
                         "channels": "geds_on",
-                        "aggregation_mode": "vectorize",
+                        "aggregation_mode": "gather",
                         "query": "hit.cuspEmax_ctc_cal>25",
-                        "expression": "tcm.array_id"
+                        "expression": "tcm.array_id",
+                        "sort": "ascend_by:dsp.tp_0_est"
                     },
+                    "energy":{
+                        "aggregation_mode": "keep_at:evt.energy_id",
+                        "expression": "hit.cuspEmax_ctc_cal>25"
+                    }
                     "is_muon_rejected":{
                         "channels": "muon",
                         "aggregation_mode": "any",
