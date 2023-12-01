@@ -1,5 +1,5 @@
 """
-Module for importing channel lists from LEGEND meta data
+Module provides LEGEND internal functions
 """
 from importlib import import_module
 
