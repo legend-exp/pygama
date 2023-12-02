@@ -115,7 +115,7 @@ def test_vov(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 7
+    assert len(ls(outfile, "/evt/")) == 9
     lstore = store.LH5Store()
     vov_ene, _ = lstore.read_object("/evt/energy", outfile)
     vov_aoe, _ = lstore.read_object("/evt/aoe", outfile)
