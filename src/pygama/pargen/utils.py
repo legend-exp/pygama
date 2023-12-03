@@ -76,14 +76,14 @@ def load_data(
             file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
             params.append("run_timestamp")
             for param in params:
-                if param not in df:
+                if param not in file_df:
                     file_df[param] = lh5.load_nda(tfiles, [param], lh5_path)[param]
             if threshold is not None:
                 mask = file_df[cal_energy_param] > threshold
-                file_df.drop(np.where(mask)[0], inplace=True)
+                file_df.drop(np.where(~mask)[0], inplace=True)
             else:
-                mask = np.zeros(len(file_df), dtype=bool)
-            masks = np.append(masks, ~mask)
+                mask = np.ones(len(file_df), dtype=bool)
+            masks = np.append(masks, mask)
             df.append(file_df)
             all_files += tfiles
 
