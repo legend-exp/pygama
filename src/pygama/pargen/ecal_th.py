@@ -1254,14 +1254,18 @@ def bin_stability(ecal_class, data, time_slice=180, energy_range=[2585, 2660]):
 
 
 def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
-    pk_pars = ecal_class.results["pk_pars"]
+    valid_fits = ecal_class.results["pk_validities"]
+    pk_pars = ecal_class.results["pk_pars"][valid_fits]
+    pk_errs = ecal_class.results["pk_errors"][valid_fits]
     fitted_peaks = ecal_class.results["got_peaks_keV"]
-    pk_errs = ecal_class.results["pk_errors"]
 
     fitted_gof_funcs = []
     for i, peak in enumerate(ecal_class.glines):
         if peak in fitted_peaks:
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
+    
+    fitted_gof_funcs=np.array(fitted_gof_funcs)[valid_fits]
+    fitted_peaks = np.array(fitted_peaks)[valid_fits]
 
     mus = [
         pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
@@ -1339,118 +1343,121 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     fit_fwhms = np.delete(fwhms, [indexes])
     fit_dfwhms = np.delete(dfwhms, [indexes])
 
+    
+
     fig, (ax1, ax2) = plt.subplots(
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
-    ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black")
+    if len(np.where((~np.isnan(fit_fwhms))& (~np.isnan(fit_dfwhms)))[0])>0:
+        ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black")
 
-    fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
+        fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
 
-    qbb_line_vx = [2039.0, 2039.0]
-    qbb_line_vy = [
-        0.9
-        * np.nanmin(
-            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"])
-        ),
-        np.nanmax(
+        qbb_line_vx = [2039.0, 2039.0]
+        qbb_line_vy = [
+            0.9
+            * np.nanmin(
+                fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"])
+            ),
+            np.nanmax(
+                [
+                    ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
+                    ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
+                ]
+            ),
+        ]
+        qbb_line_hx = [erange[0], 2039.0]
+
+        ax1.plot(
+            fwhm_slope_bins,
+            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
+            lw=1,
+            c="g",
+            label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err_in_keV"]:1.2f} keV',
+        )
+        ax1.plot(
+            fwhm_slope_bins,
+            fwhm_quadratic.func(
+                fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["parameters"]
+            ),
+            lw=1,
+            c="b",
+            label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err_in_keV"]:1.2f} keV',
+        )
+        ax1.plot(
+            qbb_line_hx,
             [
                 ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-            ]
-        ),
-    ]
-    qbb_line_hx = [erange[0], 2039.0]
-
-    ax1.plot(
-        fwhm_slope_bins,
-        fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
-        lw=1,
-        c="g",
-        label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err_in_keV"]:1.2f} keV',
-    )
-    ax1.plot(
-        fwhm_slope_bins,
-        fwhm_quadratic.func(
-            fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["parameters"]
-        ),
-        lw=1,
-        c="b",
-        label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err_in_keV"]:1.2f} keV',
-    )
-    ax1.plot(
-        qbb_line_hx,
-        [
-            ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-            ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-        ],
-        lw=1,
-        c="r",
-        ls="--",
-    )
-    ax1.plot(
-        qbb_line_hx,
-        [
-            ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-            ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-        ],
-        lw=1,
-        c="r",
-        ls="--",
-    )
-    ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
-
-    ax1.legend(loc="upper left", frameon=False)
-    if np.isnan(ecal_class.fwhm_fit_linear["parameters"]).all():
-        [
-            0.9 * np.nanmin(fit_fwhms),
-            1.1 * np.nanmax(fit_fwhms),
-        ]
-    else:
-        ax1.set_ylim(
+                ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
+            ],
+            lw=1,
+            c="r",
+            ls="--",
+        )
+        ax1.plot(
+            qbb_line_hx,
             [
-                0.9
-                * np.nanmin(
-                    fwhm_linear.func(
-                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
-                    )
-                ),
-                1.1
-                * np.nanmax(
-                    fwhm_linear.func(
-                        fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
-                    )
-                ),
+                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
+                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
+            ],
+            lw=1,
+            c="r",
+            ls="--",
+        )
+        ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
+
+        ax1.legend(loc="upper left", frameon=False)
+        if np.isnan(ecal_class.fwhm_fit_linear["parameters"]).all():
+            [
+                0.9 * np.nanmin(fit_fwhms),
+                1.1 * np.nanmax(fit_fwhms),
             ]
-        )
-    ax1.set_xlim(erange)
-    ax1.set_ylabel("FWHM energy resolution (keV)")
-    ax2.plot(
-        fwhm_peaks,
-        (
-            fit_fwhms
-            - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"])
-        )
-        / fit_dfwhms,
-        lw=0,
-        marker="x",
-        c="g",
-    )
-    ax2.plot(
-        fwhm_peaks,
-        (
-            fit_fwhms
-            - fwhm_quadratic.func(
-                fwhm_peaks, *ecal_class.fwhm_fit_quadratic["parameters"]
+        else:
+            ax1.set_ylim(
+                [
+                    0.9
+                    * np.nanmin(
+                        fwhm_linear.func(
+                            fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
+                        )
+                    ),
+                    1.1
+                    * np.nanmax(
+                        fwhm_linear.func(
+                            fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
+                        )
+                    ),
+                ]
             )
+        ax1.set_xlim(erange)
+        ax1.set_ylabel("FWHM energy resolution (keV)")
+        ax2.plot(
+            fwhm_peaks,
+            (
+                fit_fwhms
+                - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"])
+            )
+            / fit_dfwhms,
+            lw=0,
+            marker="x",
+            c="g",
         )
-        / fit_dfwhms,
-        lw=0,
-        marker="x",
-        c="b",
-    )
-    ax2.plot(erange, [0, 0], color="black", lw=0.5)
-    ax2.set_xlabel("Energy (keV)")
-    ax2.set_ylabel("Normalised Residuals")
+        ax2.plot(
+            fwhm_peaks,
+            (
+                fit_fwhms
+                - fwhm_quadratic.func(
+                    fwhm_peaks, *ecal_class.fwhm_fit_quadratic["parameters"]
+                )
+            )
+            / fit_dfwhms,
+            lw=0,
+            marker="x",
+            c="b",
+        )
+        ax2.plot(erange, [0, 0], color="black", lw=0.5)
+        ax2.set_xlabel("Energy (keV)")
+        ax2.set_ylabel("Normalised Residuals")
     plt.tight_layout()
     plt.close()
     return fig
