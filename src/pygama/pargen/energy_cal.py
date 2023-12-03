@@ -858,7 +858,7 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
     fixed : dict
-        dict where keys are index of polyfit pars to fix and vals are the value 
+        dict where keys are index of polyfit pars to fix and vals are the value
         to fix at, can be None to fix at guess value
     Returns
     -------
@@ -884,7 +884,7 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
-                m.fixed[idx]=True
+                m.fixed[idx] = True
         m.simplex()
         m.migrad()
         m.hesse()
@@ -915,7 +915,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
     fixed : dict
-        dict where keys are index of polyfit pars to fix and vals are the value 
+        dict where keys are index of polyfit pars to fix and vals are the value
         to fix at, can be None to fix at guess value
 
     Returns
@@ -947,7 +947,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
-                m.fixed[idx]=True
+                m.fixed[idx] = True
         m.simplex()
         m.migrad()
         m.hesse()

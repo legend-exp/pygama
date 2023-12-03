@@ -555,7 +555,7 @@ class calibrate_parameter:
             log.info(f"Calibration pars are {self.pars}")
         if ~np.isnan(self.pars).all():
             self.fit_energy_res()
-        self.hit_dict = {self.cal_energy_param:self.gen_pars_dict()}
+        self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
         data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
 
     def fill_plot_dict(self, data, plot_dict={}):
@@ -673,9 +673,9 @@ class high_stats_fitting(calibrate_parameter):
         plot_options={},
         simplex=False,
         tail_weight=20,
-        cal_energy_param = None,
+        cal_energy_param=None,
         deg=2,
-        fixed = None,
+        fixed=None,
     ):
         self.energy_param = energy_param
         if cal_energy_param is None:
@@ -694,7 +694,7 @@ class high_stats_fitting(calibrate_parameter):
         self.pars = [1, 0]
         self.tail_weight = tail_weight
         self.fixed = fixed
-        self.deg=deg
+        self.deg = deg
 
     def get_results_dict(self, data):
         if self.results:
@@ -738,27 +738,23 @@ class high_stats_fitting(calibrate_parameter):
             return {}
 
     def run_fit(self, data):
-        hist, bins, var = pgh.get_hist(data.query(self.selection_string)[self.energy_param], 
-                                   range=(np.amin(self.glines)*0.8,np.amax(self.glines)*1.1), dx=0.5 )
-        (got_peak_locations, 
-         got_peak_energies, 
-         roughpars) = cal.hpge_get_E_peaks(
-            hist, 
-            bins, 
-            var, 
-            np.array([1,0]),
-            n_sigma=3, 
-            peaks_keV=self.glines)
-        
-        found_mask = np.in1d(self.glines,got_peak_energies)
+        hist, bins, var = pgh.get_hist(
+            data.query(self.selection_string)[self.energy_param],
+            range=(np.amin(self.glines) * 0.8, np.amax(self.glines) * 1.1),
+            dx=0.5,
+        )
+        (got_peak_locations, got_peak_energies, roughpars) = cal.hpge_get_E_peaks(
+            hist, bins, var, np.array([1, 0]), n_sigma=3, peaks_keV=self.glines
+        )
+
+        found_mask = np.in1d(self.glines, got_peak_energies)
         self.results["got_peaks_locs"] = got_peak_locations
         self.results["got_peaks_keV"] = got_peak_energies
-        
+
         log.info(f"{len(got_peak_energies)} peaks obtained:")
         log.info(f"\t   Energy   | Position  ")
         for i, (Li, Ei) in enumerate(zip(got_peak_locations, got_peak_energies)):
             log.info(f"\t{i}".ljust(4) + str(Ei).ljust(9) + f"| {Li:g}".ljust(5))
-
 
         self.glines = np.array(self.glines)[found_mask].tolist()
         self.range_keV = np.array(self.range_keV)[found_mask].tolist()
@@ -821,23 +817,21 @@ class high_stats_fitting(calibrate_parameter):
         self.results["pk_validities"] = valid_pks
 
         # Drop failed fits
-        self.results["fitted_keV"] = np.asarray(self.glines)[
-            valid_pks
-        ]
-        
+        self.results["fitted_keV"] = np.asarray(self.glines)[valid_pks]
 
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
             self.run_fit(data)
-            
+
             valid_pks = self.results["pk_validities"]
             fitted_peaks_keV = self.results["fitted_keV"]
-            pk_pars = np.asarray(self.results["pk_pars"], dtype=object)[valid_pks]  # ragged
+            pk_pars = np.asarray(self.results["pk_pars"], dtype=object)[
+                valid_pks
+            ]  # ragged
             pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
             pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
             pk_funcs = np.asarray(self.funcs)[valid_pks]
-            
 
             log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
             for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
@@ -847,13 +841,11 @@ class high_stats_fitting(calibrate_parameter):
                 parsi = np.asarray(parsi, dtype=float)
                 errorsi = np.asarray(errorsi, dtype=float)
                 covsi = np.asarray(covsi, dtype=float)
-                
+
                 log.info(f"\tEnergy: {str(Ei)}")
                 log.info(f"\t\tParameter  |    Value +/- Sigma  ")
                 for vari, pari, errorsi in zip(varnames, parsi, errorsi):
-                    log.info(
-                    f'\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}'
-                )
+                    log.info(f"\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}")
 
             cal_fwhms = [
                 pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
@@ -880,18 +872,17 @@ class high_stats_fitting(calibrate_parameter):
         except:
             self.results = {}
             log.debug(f"high stats fitting failed")
-    
+
     def update_calibration(self, data):
         log.debug(f"Calibrating {self.energy_param}")
         self.run_fit(data)
-        
+
         valid_pks = self.results["pk_validities"]
         fitted_peaks_keV = self.results["fitted_keV"]
         pk_pars = np.asarray(self.results["pk_pars"], dtype=object)[valid_pks]  # ragged
         pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
         pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
         pk_funcs = np.asarray(self.funcs)[valid_pks]
-        
 
         log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
         for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
@@ -905,9 +896,7 @@ class high_stats_fitting(calibrate_parameter):
             log.info(f"\tEnergy: {str(Ei)}")
             log.info(f"\t\tParameter    |    Value +/- Sigma  ")
             for vari, pari, errorsi in zip(varnames, parsi, errorsi):
-                log.info(
-                    f'\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}'
-                )
+                log.info(f"\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}")
         # Drop failed fits
 
         mus = [
@@ -920,16 +909,18 @@ class high_stats_fitting(calibrate_parameter):
         mu_vars = np.asarray(mu_vars) ** 2
 
         try:
-            pars, errs, cov = cal.hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=self.deg,
-                                              fixed = self.fixed)
+            pars, errs, cov = cal.hpge_fit_E_scale(
+                mus, mu_vars, fitted_peaks_keV, deg=self.deg, fixed=self.fixed
+            )
         except ValueError:
             log.error("Failed to fit enough peaks to get accurate calibration")
             return None, None, None, results
 
         # Invert the E scale fit to get a calibration function
-        self.pars, self.errs, self.cov = cal.hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=self.deg,
-                                             fixed = self.fixed)
-        
+        self.pars, self.errs, self.cov = cal.hpge_fit_E_cal_func(
+            mus, mu_vars, fitted_peaks_keV, pars, deg=self.deg, fixed=self.fixed
+        )
+
         uncal_fwhms = [
             pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
             for func_i, pars_i, covs_i in zip(pk_funcs, pk_pars, pk_covs)
@@ -951,12 +942,12 @@ class high_stats_fitting(calibrate_parameter):
         for i, (Ei, fwhm, fwhme) in enumerate(
             zip(fitted_peaks_keV, cal_fwhms, cal_fwhms_errs)
         ):
-            log.info(
-                f"\t{str(i):<4}{str(Ei):<9}| {f'{fwhm:.2f}+-{fwhme:.2f}':<10} keV"
-            )
+            log.info(f"\t{str(i):<4}{str(Ei):<9}| {f'{fwhm:.2f}+-{fwhme:.2f}':<10} keV")
         self.fit_energy_res()
         if self.cal_energy_param == self.energy_param:
-            log.info("Warning dataframe energy will be overwritten as cal energy and input energy have same name")
+            log.info(
+                "Warning dataframe energy will be overwritten as cal energy and input energy have same name"
+            )
         self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
         data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
         log.debug(f"high stats calibration successful")
@@ -1263,8 +1254,8 @@ def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 27
     for i, peak in enumerate(ecal_class.glines):
         if peak in fitted_peaks:
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
-    
-    fitted_gof_funcs=np.array(fitted_gof_funcs)[valid_fits]
+
+    fitted_gof_funcs = np.array(fitted_gof_funcs)[valid_fits]
     fitted_peaks = np.array(fitted_peaks)[valid_fits]
 
     mus = [
@@ -1343,13 +1334,13 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
     fit_fwhms = np.delete(fwhms, [indexes])
     fit_dfwhms = np.delete(dfwhms, [indexes])
 
-    
-
     fig, (ax1, ax2) = plt.subplots(
         2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
-    if len(np.where((~np.isnan(fit_fwhms))& (~np.isnan(fit_dfwhms)))[0])>0:
-        ax1.errorbar(fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black")
+    if len(np.where((~np.isnan(fit_fwhms)) & (~np.isnan(fit_dfwhms)))[0]) > 0:
+        ax1.errorbar(
+            fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black"
+        )
 
         fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
 
@@ -1357,7 +1348,9 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
         qbb_line_vy = [
             0.9
             * np.nanmin(
-                fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"])
+                fwhm_linear.func(
+                    fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
+                )
             ),
             np.nanmax(
                 [
@@ -1370,7 +1363,9 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
 
         ax1.plot(
             fwhm_slope_bins,
-            fwhm_linear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
+            fwhm_linear.func(
+                fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
+            ),
             lw=1,
             c="g",
             label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err_in_keV"]:1.2f} keV',
@@ -1435,7 +1430,9 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
             fwhm_peaks,
             (
                 fit_fwhms
-                - fwhm_linear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"])
+                - fwhm_linear.func(
+                    fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"]
+                )
             )
             / fit_dfwhms,
             lw=0,
