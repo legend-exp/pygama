@@ -1320,7 +1320,6 @@ class cal_aoe:
         self.dt_cut = dt_cut
         self.dep_acc = dep_acc
         if self.dt_cut is not None:
-            self.update_cal_dicts(dt_cut["cut"])
             self.dt_cut_param = dt_cut["out_param"]
             self.fit_selection = f"{self.selection_string} & {self.dt_cut_param}"
             self.dt_cut_hard = dt_cut["hard"]
