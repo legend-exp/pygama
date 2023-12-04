@@ -15,6 +15,8 @@ from collections import namedtuple
 
 import lgdo
 import matplotlib as mpl
+
+mpl.use("agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -63,16 +65,6 @@ def noise_optimization(
     """
 
     t0 = time.time()
-    log.info(f"Select baselines {len(tb_data)}")
-    if verbose:
-        print(f"Select baselines {len(tb_data)}")
-    dsp_data = run_one_dsp(tb_data, dsp_proc_chain)
-    cut_dict = generate_cuts(dsp_data, parameters=opt_dict["cut_pars"])
-    idxs = get_cut_indexes(dsp_data, cut_dict)
-    tb_data = index_data(tb_data, idxs)
-    log.info(f"... {len(tb_data)} baselines after cuts")
-    if verbose:
-        print(f"... {len(tb_data)} baselines after cuts")
 
     samples = np.arange(opt_dict["start"], opt_dict["stop"], opt_dict["step"])
     samples_val = np.arange(opt_dict["start"], opt_dict["stop"], opt_dict["step_val"])
@@ -81,7 +73,7 @@ def noise_optimization(
 
     res_dict = {}
     if display > 0:
-        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
+        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
         psd = np.mean(dsp_data["wf_psd"].values.nda, axis=0)
         sample_us = float(dsp_data["wf_presum"].dt.nda[0]) / 1000
         freq = np.linspace(0, (1 / sample_us) / 2, len(psd))
@@ -93,11 +85,8 @@ def noise_optimization(
         ax.set_ylabel(f"power spectral density")
 
         plot_dict = {}
-        plot_dict["nopt"] = {}
-        plot_dict["nopt"]["fft"] = {}
-        plot_dict["nopt"]["fft"]["frequency"] = freq
-        plot_dict["nopt"]["fft"]["psd"] = psd
-        plot_dict["nopt"]["fft"]["fig"] = fig
+        plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
+        plt.close()
 
     result_dict = {}
     ene_pars = [par for par in opt_dict_par.keys()]
@@ -112,10 +101,13 @@ def noise_optimization(
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
             filter_par = opt_dict_par[ene_par]["filter_par"]
-            par_dsp[lh5_path][dict_str][filter_par] = f"{x}*us"
+            if dict_str in par_dsp:
+                par_dsp[dict_str].update({filter_par: f"{x}*us"})
+            else:
+                par_dsp[dict_str] = {filter_par: f"{x}*us"}
 
         t1 = time.time()
-        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp[lh5_path])
+        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
         log.info(f"Time to process dsp data {time.time()-t1:.2f} s")
         if verbose:
             print(f"Time to process dsp data {time.time()-t1:.2f} s")
@@ -158,9 +150,6 @@ def noise_optimization(
             [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str].keys()]
         )
 
-        print(ene_par, sample_list)
-        print(ene_par, fom_list)
-
         guess_par = sample_list[np.nanargmin(fom_list)]
         if verbose:
             print(f"guess par: {guess_par:.2f} us")
@@ -199,6 +188,7 @@ def noise_optimization(
         par_dict_res["best_par_err"] = best_par_err
         par_dict_res["best_val"] = best_val
 
+        filter_par = opt_dict_par[ene_par]["filter_par"]
         res_dict[dict_str] = {
             filter_par: f"{best_par:.2f}*us",
             f"{filter_par}_err": f"{best_par_err:.2f}*us",
