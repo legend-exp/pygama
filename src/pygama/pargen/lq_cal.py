@@ -711,7 +711,7 @@ def plot_lq_cut_fit(lq_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    fig, (ax1, ax2) = plt.subplots(2, 1, height_ratios=(2, 1))
+    fig, (ax1, ax2) = plt.subplots(2, 1)
 
     try:
         hist, bins = lq_class.fit_hist
