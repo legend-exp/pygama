@@ -504,8 +504,13 @@ def gauss_pdf(x, mu, sigma, n_sig):
     """
     Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
     """
-
     return n_sig * gauss_norm(x,mu,sigma)
+
+def extended_gauss_pdf(x, mu, sigma, n_sig):
+    """
+    Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
+    """
+    return n_sig, gauss_norm(x,mu,sigma)
 
 
 def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):

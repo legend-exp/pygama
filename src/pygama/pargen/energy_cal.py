@@ -701,7 +701,7 @@ def hpge_fit_E_peaks(
                         mode_guess,
                         tail_weight=tail_weight,
                     )
-                    if pars_i["n_sig"] < 20:
+                    if pars_i["n_sig"] < 100:
                         valid_fit = False
                 else:
                     par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
@@ -842,7 +842,7 @@ def poly_wrapper(x, *pars):
     return pgf.poly(x, pars)
 
 
-def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
+def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
     """Find best fit of poly(E) = mus +/- sqrt(mu_vars)
     Compare to hpge_fit_E_cal_func which fits for E = poly(mu)
 
@@ -857,7 +857,9 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
-
+    fixed : dict
+        dict where keys are index of polyfit pars to fix and vals are the value
+        to fix at, can be None to fix at guess value
     Returns
     -------
     pars : array
@@ -873,7 +875,16 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     else:
         poly_pars = np.polyfit(Es_keV, mus, deg=deg, w=1 / np.sqrt(mu_vars))
         c = cost.LeastSquares(Es_keV, mus, np.sqrt(mu_vars), poly_wrapper)
+        if fixed is not None:
+            for idx, val in fixed.items():
+                if val is True or val is None:
+                    pass
+                else:
+                    poly_pars[idx] = val
         m = Minuit(c, *poly_pars)
+        if fixed is not None:
+            for idx in list(fixed):
+                m.fixed[idx] = True
         m.simplex()
         m.migrad()
         m.hesse()
@@ -883,7 +894,7 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0):
     return pars, errs, cov
 
 
-def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
+def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
     """Find best fit of E = poly(mus +/- sqrt(mu_vars))
     This is an inversion of hpge_fit_E_scale.
     E uncertainties are computed from mu_vars / dmu/dE where mu = poly(E) is the
@@ -903,6 +914,9 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
+    fixed : dict
+        dict where keys are index of polyfit pars to fix and vals are the value
+        to fix at, can be None to fix at guess value
 
     Returns
     -------
@@ -923,8 +937,17 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0):
             dmudEs += E_scale_pars[n] * mus ** (len(E_scale_pars) - 2 - n)
         E_weights = dmudEs * mu_vars
         poly_pars = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights)
+        if fixed is not None:
+            for idx, val in fixed.items():
+                if val is True or val is None:
+                    pass
+                else:
+                    poly_pars[idx] = val
         c = cost.LeastSquares(mus, Es_keV, E_weights, poly_wrapper)
         m = Minuit(c, *poly_pars)
+        if fixed is not None:
+            for idx in list(fixed):
+                m.fixed[idx] = True
         m.simplex()
         m.migrad()
         m.hesse()

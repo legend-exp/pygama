@@ -52,7 +52,19 @@ def load_data(
 
     sto = lh5.LH5Store()
 
+    out_df = pd.DataFrame(columns=params)
+
     if isinstance(files, dict):
+        keys = lh5.ls(
+            files[list(files)[0]][0],
+            lh5_path if lh5_path[-1] == "/" else lh5_path + "/",
+        )
+        keys = [key.split("/")[-1] for key in keys]
+        if list(files)[0] in cal_dict:
+            params = get_params(keys + list(cal_dict[list(files)[0]].keys()), params)
+        else:
+            params = get_params(keys + list(cal_dict.keys()), params)
+
         df = []
         all_files = []
         masks = np.array([], dtype=bool)
@@ -64,21 +76,30 @@ def load_data(
                 file_df = table.eval(cal_dict).get_dataframe()
             file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
             params.append("run_timestamp")
+            for param in params:
+                if param not in file_df:
+                    file_df[param] = lh5.load_nda(tfiles, [param], lh5_path)[param]
             if threshold is not None:
-                mask = file_df[cal_energy_param] < threshold
-
-                file_df.drop(np.where(mask)[0], inplace=True)
+                mask = file_df[cal_energy_param] > threshold
+                file_df.drop(np.where(~mask)[0], inplace=True)
             else:
-                mask = np.zeros(len(file_df), dtype=bool)
-            masks = np.append(masks, ~mask)
+                mask = np.ones(len(file_df), dtype=bool)
+            masks = np.append(masks, mask)
             df.append(file_df)
             all_files += tfiles
 
         df = pd.concat(df)
 
     elif isinstance(files, list):
+        keys = lh5.ls(files[0], lh5_path if lh5_path[-1] == "/" else lh5_path + "/")
+        keys = [key.split("/")[-1] for key in keys]
+        params = get_params(keys + list(cal_dict.keys()), params)
+
         table = sto.read_object(lh5_path, files)[0]
         df = table.eval(cal_dict).get_dataframe()
+        for param in params:
+            if param not in df:
+                df[param] = lh5.load_nda(files, [param], lh5_path)[param]
         if threshold is not None:
             masks = df[cal_energy_param] > threshold
             df.drop(np.where(~masks)[0], inplace=True)
@@ -86,20 +107,10 @@ def load_data(
             masks = np.ones(len(df), dtype=bool)
         all_files = files
 
-    if lh5_path[-1] != "/":
-        lh5_path += "/"
-    keys = lh5.ls(all_files[0], lh5_path)
-    keys = [key.split("/")[-1] for key in keys]
-    params = get_params(keys + list(df.keys()), params)
-
     for col in list(df.keys()):
         if col not in params:
             df.drop(col, inplace=True, axis=1)
 
-    param_dict = {}
-    for param in params:
-        if param not in df:
-            df[param] = lh5.load_nda(all_files, [param], lh5_path)[param][masks]
     log.debug(f"data loaded")
     if return_selection_mask:
         return df, masks
