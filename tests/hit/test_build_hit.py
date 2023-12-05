@@ -98,6 +98,53 @@ def test_outputs_specification(dsp_test_file, tmptestdir):
     assert list(obj.keys()) == ["calE", "AoE", "A_max"]
 
 
+def test_aggregation_outputs(dsp_test_file, tmptestdir):
+    outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+
+    build_hit(
+        dsp_test_file,
+        outfile=outfile,
+        hit_config=f"{config_dir}/aggregations-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    sto = LH5Store()
+    obj, _ = sto.read_object("/geds/hit", outfile)
+    assert list(obj.keys()) == [
+        "is_valid_rt",
+        "is_valid_t0",
+        "is_valid_tmax",
+        "aggr1",
+        "aggr2",
+    ]
+
+    df = store.load_dfs(
+        outfile,
+        ["is_valid_rt", "is_valid_t0", "is_valid_tmax", "aggr1", "aggr2"],
+        "geds/hit/",
+    )
+
+    # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
+    assert not (df["aggr1"] > 7).any()
+    assert not (df["aggr2"] > 3).any()
+
+    def get_bit(x, n):
+        """bit numbering from right to left, starting with bit 0"""
+        return x & (1 << n) != 0
+
+    df["bit0_check"] = df.apply(lambda row: get_bit(row["aggr1"], 0), axis=1)
+    are_identical = df["bit0_check"].equals(df.is_valid_rt)
+    assert are_identical
+
+    df["bit1_check"] = df.apply(lambda row: get_bit(row["aggr1"], 1), axis=1)
+    are_identical = df["bit1_check"].equals(df.is_valid_t0)
+    assert are_identical
+
+    df["bit2_check"] = df.apply(lambda row: get_bit(row["aggr1"], 2), axis=1)
+    are_identical = df["bit2_check"].equals(df.is_valid_tmax)
+    assert are_identical
+
+
 def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
     out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
     build_hit(
