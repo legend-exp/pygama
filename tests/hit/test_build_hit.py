@@ -118,11 +118,31 @@ def test_aggregation_outputs(dsp_test_file, tmptestdir):
         "aggr2",
     ]
 
-    df = store.load_dfs(outfile, ["aggr1", "aggr2"], "geds/hit/")
+    df = store.load_dfs(
+        outfile,
+        ["is_valid_rt", "is_valid_t0", "is_valid_tmax", "aggr1", "aggr2"],
+        "geds/hit/",
+    )
 
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
     assert not (df["aggr1"] > 7).any()
     assert not (df["aggr2"] > 3).any()
+
+    def get_bit(x, n):
+        """bit numbering from right to left, starting with bit 0"""
+        return x & (1 << n) != 0
+
+    df["bit0_check"] = df.apply(lambda row: get_bit(row["aggr1"], 0), axis=1)
+    are_identical = df["bit0_check"].equals(df.is_valid_rt)
+    assert are_identical
+
+    df["bit1_check"] = df.apply(lambda row: get_bit(row["aggr1"], 1), axis=1)
+    are_identical = df["bit1_check"].equals(df.is_valid_t0)
+    assert are_identical
+
+    df["bit2_check"] = df.apply(lambda row: get_bit(row["aggr1"], 2), axis=1)
+    are_identical = df["bit2_check"].equals(df.is_valid_tmax)
+    assert are_identical
 
 
 def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
