@@ -272,23 +272,23 @@ class cal_lq:
     def lq_timecorr(self, df, lq_param, output_name="LQ_Timecorr", display=0):
         """
         Calculates the average LQ value for DEP events for each specified run
-        timestamp. Applies a time normalization based on the average LQ value
-        in the DEP across all timestamps.
+        run_timestamp. Applies a time normalization based on the average LQ value
+        in the DEP across all run_timestamps.
         """
 
         log.info("Starting LQ time correction")
         self.timecorr_df = pd.DataFrame(
-            columns=["timestamp", "mean", "mean_err", "res", "res_err"]
+            columns=["run_timestamp", "mean", "mean_err", "res", "res_err"]
         )
         try:
-            if "timestamp" in df:
-                tstamps = sorted(np.unique(df["timestamp"]))
+            if "run_timestamp" in df:
+                tstamps = sorted(np.unique(df["run_timestamp"]))
                 means = []
                 errors = []
                 reses = []
                 res_errs = []
                 final_tstamps = []
-                for tstamp, time_df in df.groupby("timestamp", sort=True):
+                for tstamp, time_df in df.groupby("run_timestamp", sort=True):
                     try:
                         pars, errs, _, _ = binned_lq_fit(
                             time_df.query(f"{self.selection_string}"),
@@ -304,7 +304,7 @@ class cal_lq:
                                 pd.DataFrame(
                                     [
                                         {
-                                            "timestamp": tstamp,
+                                            "run_timestamp": tstamp,
                                             "mean": pars["mu"],
                                             "mean_err": errs["mu"],
                                             "res": pars["sigma"] / pars["mu"],
@@ -325,7 +325,7 @@ class cal_lq:
                                 pd.DataFrame(
                                     [
                                         {
-                                            "timestamp": tstamp,
+                                            "run_timestamp": tstamp,
                                             "mean": np.nan,
                                             "mean_err": np.nan,
                                             "res": np.nan,
@@ -335,7 +335,7 @@ class cal_lq:
                                 ),
                             ]
                         )
-                self.timecorr_df.set_index("timestamp", inplace=True)
+                self.timecorr_df.set_index("run_timestamp", inplace=True)
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
                     np.array(self.timecorr_df["mean"]),
@@ -343,7 +343,7 @@ class cal_lq:
                 )
 
                 df[output_name] = df[lq_param] / np.array(
-                    [time_dict[tstamp] for tstamp in df["timestamp"]]
+                    [time_dict[tstamp] for tstamp in df["run_timestamp"]]
                 )
                 self.update_cal_dicts(
                     {
