@@ -11,22 +11,23 @@ def legend_meta(params: dict) -> list:
     lm = import_module("legendmeta")
     lmeta = lm.LegendMetadata(path=params["meta_path"])
     chmap = lmeta.channelmap(params["time_key"])
+
     tmp = [
         f"ch{e}"
         for e in chmap.map("daq.rawid")
         if chmap.map("daq.rawid")[e]["system"] == params["system"]
     ]
-    if "usability" in params.keys():
-        tmp = [
-            e
-            for e in tmp
-            if chmap.map("daq.rawid")[int(e[2:])]["analysis"]["usability"]
-            == params["usability"]
-        ]
-    if "geds" == params["system"] and "type" in params.keys():
-        tmp = [
-            e
-            for e in tmp
-            if chmap.map("daq.rawid")[int(e[2:])]["type"] == params["type"]
-        ]
+
+    if "selectors" in params.keys():
+        for k in params["selectors"].keys():
+            s = ""
+            for e in k.split("."):
+                s += f"['{e}']"
+
+            tmp = [
+                e
+                for e in tmp
+                if eval("dotter" + s, {"dotter": chmap.map("daq.rawid")[int(e[2:])]})
+                == params["selectors"][k]
+            ]
     return tmp
