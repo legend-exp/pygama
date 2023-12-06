@@ -152,7 +152,6 @@ def evaluate_expression(
                     ids,
                     f_hit,
                     f_dsp,
-                    chns,
                     chns_rm,
                     expr,
                     exprl,
@@ -902,7 +901,6 @@ def evaluate_at_channel(
     ids: np.ndarray,
     f_hit: str,
     f_dsp: str,
-    chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
@@ -923,8 +921,6 @@ def evaluate_at_channel(
        Path to hit tier file
     f_dsp
        Path to dsp tier file
-    chns
-       list of channels to be aggregated
     chns_rm
        list of channels to be skipped from evaluation and set to default value
     expr
@@ -939,26 +935,29 @@ def evaluate_at_channel(
        default value
     """
 
-    out = np.full(len(ch_comp), defv, dtype=type(defv))
+    out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
 
-    for ch in chns:
+    for ch in np.unique(ch_comp.nda.astype(int)):
+        # skip default value
+        if f"ch{ch}" not in store.ls(f_hit):
+            continue
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == ch]
 
         res = get_data_at_channel(
-            ch,
+            f"ch{ch}",
             idx_ch,
             expr,
             exprl,
             var_ph,
-            ch not in chns_rm,
+            f"ch{ch}" not in chns_rm,
             f_hit,
             f_dsp,
             len(out),
             defv,
         )
 
-        out[idx_ch] = np.where(int(ch[2:]) == ch_comp.nda, res, out[idx_ch])
+        out = np.where(ch == ch_comp.nda, res, out)
 
     return {"values": out}
 

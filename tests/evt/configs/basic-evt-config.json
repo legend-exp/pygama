@@ -51,19 +51,16 @@
       "initial": 0.0
     },
     "is_usable_aoe": {
-      "channels": "geds_on",
       "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "True",
       "initial": false
     },
     "aoe": {
-      "channels": "geds_on",
       "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "hit.AoE_Classifier",
       "initial": "np.nan"
     },
     "is_aoe_rejected": {
-      "channels": "geds_on",
       "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "~(hit.AoE_Double_Sided_Cut)",
       "initial": false

@@ -17,7 +17,6 @@
       "expression": "tcm.array_id"
     },
     "t0": {
-      "channels": "geds_on",
       "aggregation_mode": "keep_at:evt.energy_id",
       "expression": "dsp.tp_0_est",
       "initial": 0.0
