@@ -3,6 +3,17 @@
     "geds_on": ["ch1084803", "ch1084804", "ch1121600"],
     "ts_master": "ch1084803"
   },
+  "outputs": [
+    "timestamp",
+    "energy",
+    "energy_id",
+    "aoe",
+    "multiplicity",
+    "is_saturated",
+    "energy_times_aoe",
+    "energy_times_multiplicity",
+    "multiplicity_squared"
+  ],
   "operations": {
     "timestamp": {
       "channels": "ts_master",

@@ -161,6 +161,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "outputs": ["foo"],
         "operations": {
             "foo": {
                 "channels": "geds_on",
@@ -204,6 +205,7 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "outputs": ["acend_id", "t0_acend", "decend_id", "t0_decend"],
         "operations": {
             "acend_id": {
                 "channels": "geds_on",

@@ -2,6 +2,20 @@
   "channels": {
     "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
   },
+  "outputs": [
+    "multiplicity",
+    "test_sum",
+    "test_first",
+    "test_first2",
+    "test_last",
+    "test_last2",
+    "test_any",
+    "test_any2",
+    "test_all",
+    "test_all2",
+    "test_vov",
+    "test_vov2"
+  ],
   "operations": {
     "multiplicity": {
       "channels": "geds_on",

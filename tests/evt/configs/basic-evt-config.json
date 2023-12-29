@@ -2,6 +2,18 @@
   "channels": {
     "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
   },
+  "outputs": [
+    "multiplicity",
+    "energy",
+    "energy_id",
+    "energy_any_above1MeV",
+    "energy_all_above1MeV",
+    "energy_aux",
+    "energy_sum",
+    "is_usable_aoe",
+    "aoe",
+    "is_aoe_rejected"
+  ],
   "operations": {
     "multiplicity": {
       "channels": "geds_on",

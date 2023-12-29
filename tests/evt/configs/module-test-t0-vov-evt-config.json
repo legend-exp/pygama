@@ -3,6 +3,18 @@
     "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
     "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
   },
+  "outputs": [
+    "energy",
+    "energy_id",
+    "t0",
+    "lar_energy",
+    "lar_multiplicity",
+    "is_lar_rejected",
+    "lar_classifier",
+    "lar_energy_dplms",
+    "lar_multiplicity_dplms",
+    "lar_time_shift"
+  ],
   "operations": {
     "energy": {
       "channels": "geds_on",

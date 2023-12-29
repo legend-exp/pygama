@@ -8,6 +8,7 @@ import itertools
 import json
 import logging
 import os
+import random
 import re
 from importlib import import_module
 
@@ -1359,6 +1360,10 @@ def build_evt(
     log.info(
         f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
     )
+
+    # Define temporary file
+    f_evt_tmp = f"{os.path.dirname(f_evt)}/{os.path.basename(f_evt).split('.')[0]}_tmp{random.randrange(9999):04d}.lh5"
+
     for k, v in tbl_cfg["operations"].items():
         log.debug("Processing field" + k)
 
@@ -1366,8 +1371,8 @@ def build_evt(
         if "aggregation_mode" not in v.keys():
             exprl = re.findall(r"(evt).([a-zA-Z_$][\w$]*)", v["expression"])
             var = {}
-            if os.path.exists(f_evt):
-                var = load_vars_to_nda(f_evt, "", exprl)
+            if os.path.exists(f_evt_tmp):
+                var = load_vars_to_nda(f_evt_tmp, "", exprl)
 
             if "parameters" in v.keys():
                 var = var | v["parameters"]
@@ -1391,7 +1396,7 @@ def build_evt(
             lstore.write_object(
                 obj=res,
                 name=group + k,
-                lh5_file=f_evt,
+                lh5_file=f_evt_tmp,
                 wo_mode=wo_mode,
             )
 
@@ -1428,7 +1433,7 @@ def build_evt(
 
             result = evaluate_expression(
                 f_tcm,
-                f_evt,
+                f_evt_tmp,
                 f_hit,
                 f_dsp,
                 chns_e,
@@ -1448,9 +1453,26 @@ def build_evt(
             lstore.write_object(
                 obj=obj,
                 name=group + k,
+                lh5_file=f_evt_tmp,
+                wo_mode=wo_mode,
+            )
+
+    # write output fields into f_evt and delete temporary file
+    if "outputs" in tbl_cfg.keys():
+        if len(tbl_cfg["outputs"]) < 1:
+            log.warning("No output fields specified, no file will be written.")
+        for fld in tbl_cfg["outputs"]:
+            obj, _ = lstore.read_object(group + fld, f_evt_tmp)
+            lstore.write_object(
+                obj=obj,
+                name=group + fld,
                 lh5_file=f_evt,
                 wo_mode=wo_mode,
             )
+    else:
+        log.warning("No output fields specified, no file will be written.")
+
+    os.remove(f_evt_tmp)
 
     log.info("Done")
 
