@@ -504,8 +504,13 @@ def gauss_pdf(x, mu, sigma, n_sig):
     """
     Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
     """
-
     return n_sig * gauss_norm(x,mu,sigma)
+
+def extended_gauss_pdf(x, mu, sigma, n_sig):
+    """
+    Basic Gaussian pdf args; mu, sigma, n_sig (number of signal events)
+    """
+    return n_sig, gauss_norm(x,mu,sigma)
 
 
 def gauss_uniform(x, n_sig, mu, sigma, n_bkg, components = False):
@@ -918,6 +923,8 @@ def get_mu_func(func, pars, cov = None, errors=None):
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
             n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==8:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range, components = pars
         if errors is not None:
             return mu, errors[1]
         elif cov is not None:
@@ -930,6 +937,8 @@ def get_mu_func(func, pars, cov = None, errors=None):
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==10:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range, components = pars
         if errors is not None:
             return mu, errors[1]
         elif cov is not None:
@@ -948,6 +957,8 @@ def get_fwhm_func(func, pars, cov = None):
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
             n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==8:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range, components = pars
         if cov is None:
             return sigma*2*np.sqrt(2*np.log(2))
         else:
@@ -958,6 +969,12 @@ def get_fwhm_func(func, pars, cov = None):
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
+            if cov is not None:
+                cov = cov[:7,:][:,:7]
+        elif len(pars) ==10:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range, components = pars
+            if cov is not None:
+                cov = cov[:7,:][:,:7]
 
         return radford_fwhm(sigma, htail, tau, cov)
     else:
@@ -971,6 +988,8 @@ def get_total_events_func(func, pars, cov = None, errors=None):
             n_sig, mu, sigma, n_bkg, hstep = pars
         elif len(pars) ==7:
             n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==8:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range, components = pars
         if errors is not None:
             return n_sig+n_bkg, np.sqrt(errors[0]**2 + errors[3]**2)
         elif cov is not None:
@@ -983,6 +1002,8 @@ def get_total_events_func(func, pars, cov = None, errors=None):
             n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
         elif len(pars) ==9:
             n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==10:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range, components = pars
         if errors is not None:
             return n_sig+n_bkg, np.sqrt(errors[0]**2 + errors[5]**2)
         elif cov is not None:

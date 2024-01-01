@@ -894,15 +894,15 @@ def get_wf_indexes(sorted_indexs, n_events):
     return out_list
 
 
-def index_data(data, indexes):
+def index_data(data, indexes, wf_field="waveform"):
     new_baselines = lh5.Array(data["baseline"].nda[indexes])
-    new_waveform_values = data["waveform"]["values"].nda[indexes]
-    new_waveform_dts = data["waveform"]["dt"].nda[indexes]
-    new_waveform_t0 = data["waveform"]["t0"].nda[indexes]
+    new_waveform_values = data[wf_field]["values"].nda[indexes]
+    new_waveform_dts = data[wf_field]["dt"].nda[indexes]
+    new_waveform_t0 = data[wf_field]["t0"].nda[indexes]
     new_waveform = lh5.WaveformTable(
         None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
     )
-    new_data = lh5.Table(col_dict={"waveform": new_waveform, "baseline": new_baselines})
+    new_data = lh5.Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
     return new_data
 
 
@@ -915,6 +915,7 @@ def event_selection(
     peak_idxs,
     kev_widths,
     cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    pulser_mask=None,
     energy_parameter="trapTmax",
     wf_field: str = "waveform",
     n_events=10000,
@@ -928,37 +929,42 @@ def event_selection(
     sto = lh5.LH5Store()
     df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
 
-    pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
-    if len(pulser_props) > 0:
-        final_mask = None
-        for entry in pulser_props:
-            e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
-                df.daqenergy.values > entry[0] - entry[1]
-            )
-            if final_mask is None:
-                final_mask = e_cut
-            else:
-                final_mask = final_mask | e_cut
-        ids = final_mask
-        log.debug(f"pulser found: {pulser_props}")
+    if pulser_mask is None:
+        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+        if len(pulser_props) > 0:
+            final_mask = None
+            for entry in pulser_props:
+                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
+                    df.daqenergy.values > entry[0] - entry[1]
+                )
+                if final_mask is None:
+                    final_mask = e_cut
+                else:
+                    final_mask = final_mask | e_cut
+            ids = final_mask
+            log.debug(f"pulser found: {pulser_props}")
+        else:
+            log.debug("no_pulser")
+            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+        # Get events around peak using raw file values
     else:
-        log.debug("no_pulser")
-        ids = np.zeros(len(df.daqenergy.values), dtype=bool)
-    # Get events around peak using raw file values
+        ids = pulser_mask
     initial_mask = (df.daqenergy.values > threshold) & (~ids)
     rough_energy = df.daqenergy.values[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
 
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-    Euc_min = threshold / guess_keV * 0.6
+    Euc_min = threshold / guess_keV
     Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 1  # / guess_keV
+    dEuc = 5 / guess_keV
     hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
     detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
         hist,
         bins,
         var,
-        np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2103.53, 2614.553]),
+        np.array(
+            [238.632, 583.191, 727.330, 860.564, 1592.5, 1620.5, 2103.53, 2614.553]
+        ),
     )
     log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
 
@@ -993,13 +999,9 @@ def event_selection(
     idx_list = get_wf_indexes(sort_index, idx_list_lens)
     idxs = np.array(sorted(np.concatenate(masks)))
 
-    waveforms = sto.read_object(
-        f"{lh5_path}/{wf_field}", raw_files, idx=idxs, n_rows=len(idxs)
-    )[0]
-    baseline = sto.read_object(
-        f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
-    )[0]
-    input_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
+    input_data = sto.read_object(f"{lh5_path}", raw_files, idx=idxs, n_rows=len(idxs))[
+        0
+    ]
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:
@@ -1018,6 +1020,7 @@ def event_selection(
     ct_mask = cts.get_cut_indexes(tb_data, cut_dict)
 
     final_events = []
+    out_events = []
     for peak_idx in peak_idxs:
         peak = peaks_keV[peak_idx]
         kev_width = kev_widths[peak_idx]
@@ -1038,13 +1041,23 @@ def event_selection(
         e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
 
         e_ranges = (int(peak_loc - e_lower_lim), int(e_upper_lim - peak_loc))
-        params, errors, covs, bins, ranges, p_val, valid_pks = pgc.hpge_fit_E_peaks(
+        (
+            params,
+            errors,
+            covs,
+            bins,
+            ranges,
+            p_val,
+            valid_pks,
+            pk_funcs,
+        ) = pgc.hpge_fit_E_peaks(
             energy,
             [peak_loc],
             [e_ranges],
             n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
+            uncal_is_int=True,
         )
-        if params[0] is None:
+        if params[0] is None or np.isnan(params[0]).any():
             log.debug("Fit failed, using max guess")
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
@@ -1056,18 +1069,16 @@ def event_selection(
         log.info(f"lower lim is :{e_lower_lim}, upper lim is {e_upper_lim}")
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
+        out_events.append(idxs[final_events[-1]])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
         if len(peak_ids[final_mask]) < 0.5 * n_events:
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
-
+    out_events = np.unique(np.array(out_events).flatten())
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
-    idxs = np.array(sorted(np.concatenate(final_events)))
-
-    final_data = index_data(input_data, idxs)
-    return final_data, idx_list
+    return out_events, idx_list
 
 
 def fwhm_slope(x, m0, m1, m2):
