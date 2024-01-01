@@ -69,7 +69,7 @@ def load_data(
         all_files = []
         masks = np.array([], dtype=bool)
         for tstamp, tfiles in files.items():
-            table = sto.read_object(lh5_path, tfiles)[0]
+            table = sto.read(lh5_path, tfiles)[0]
             if tstamp in cal_dict:
                 file_df = table.eval(cal_dict[tstamp]).get_dataframe()
             else:
@@ -95,7 +95,7 @@ def load_data(
         keys = [key.split("/")[-1] for key in keys]
         params = get_params(keys + list(cal_dict.keys()), params)
 
-        table = sto.read_object(lh5_path, files)[0]
+        table = sto.read(lh5_path, files)[0]
         df = table.eval(cal_dict).get_dataframe()
         for param in params:
             if param not in df:

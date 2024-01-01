@@ -94,7 +94,7 @@ def test_outputs_specification(dsp_test_file, tmptestdir):
     )
 
     store = LH5Store()
-    obj, _ = store.read_object("/geds/hit", outfile)
+    obj, _ = store.read("/geds/hit", outfile)
     assert list(obj.keys()) == ["calE", "AoE", "A_max"]
 
 
@@ -109,7 +109,7 @@ def test_aggregation_outputs(dsp_test_file, tmptestdir):
     )
 
     sto = LH5Store()
-    obj, _ = sto.read_object("/geds/hit", outfile)
+    obj, _ = sto.read("/geds/hit", outfile)
     assert list(obj.keys()) == [
         "is_valid_rt",
         "is_valid_t0",

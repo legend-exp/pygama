@@ -476,7 +476,7 @@ class FileDB:
                 flattened_data=flattened, cumulative_length=length
             )
             sto = LH5Store()
-            sto.write_object(columns_vov, "unique_columns", to_file)
+            sto.write(columns_vov, "unique_columns", to_file)
 
         return self.columns
 
@@ -526,7 +526,7 @@ class FileDB:
 
         # loop over the files
         for p in paths:
-            cfg, _ = sto.read_object("config", p)
+            cfg, _ = sto.read("config", p)
             cfg = json.loads(cfg.value.decode())
 
             # make sure configurations are all the same
@@ -538,7 +538,7 @@ class FileDB:
                 )
 
             # read in unique columns
-            vov, _ = sto.read_object("columns", p)
+            vov, _ = sto.read("columns", p)
             # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
             columns = [[v.decode("utf-8") for v in ov] for ov in list(vov)]
 
@@ -597,14 +597,12 @@ class FileDB:
         filename
             output LH5 file name.
         wo_mode
-            passed to :meth:`~.lgdo.lh5.write_object`.
+            passed to :meth:`~.lgdo.lh5.write`.
         """
         log.debug(f"writing database to {filename}")
 
         sto = LH5Store()
-        sto.write_object(
-            Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
-        )
+        sto.write(Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode)
 
         if wo_mode in ["write_safe", "w", "overwrite_file", "of"]:
             wo_mode = "a"
@@ -621,7 +619,7 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
+            sto.write(col_vov, "columns", filename, wo_mode=wo_mode)
 
         # FIXME: to_hdf() throws this:
         #
