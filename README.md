@@ -25,3 +25,8 @@
 - generating and selecting high-level event data for further analysis
 
 Check out the [online documentation](https://pygama.readthedocs.io).
+
+## Related repositories
+- [legend-exp/legend-pydataobj](https://github.com/legend-exp/legend-pydataobj) → LEGEND Python Data Objects
+- [legend-exp/legend-daq2lh5](https://github.com/legend-exp/legend-daq2lh5) → Convert digitizer data to LEGEND HDF5
+- [legend-exp/dspeed](https://github.com/legend-exp/dspeed) → Fast Digital Signal Processing for particle detector signals in Python
