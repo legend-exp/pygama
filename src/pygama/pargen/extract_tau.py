@@ -15,7 +15,7 @@ import matplotlib as mpl
 
 mpl.use("agg")
 import lgdo
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -61,12 +61,10 @@ def load_data(
 
     cuts = np.where((df.daqenergy.values > threshold) & (~ids))[0]
 
-    waveforms = sto.read_object(
-        f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events
-    )[0]
-    baseline = sto.read_object(
-        f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
-    )[0]
+    waveforms = sto.read(f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events)[
+        0
+    ]
+    baseline = sto.read(f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events)[0]
     tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return tb_data
 

@@ -14,7 +14,9 @@ from typing import Iterator
 import numpy as np
 import pandas as pd
 from dspeed.vis import WaveformBrowser
-from lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
+from lgdo.lh5 import LH5Iterator, LH5Store
+from lgdo.lh5.utils import expand_vars
+from lgdo.types import Array, Struct, Table
 from lgdo.types.vectorofvectors import build_cl, explode_arrays, explode_cl
 from tqdm.auto import tqdm
 
@@ -193,9 +195,7 @@ class DataLoader:
         # look for info in configuration if FileDB is not set
         if self.filedb is None:
             # expand $_ variables
-            value = lgdo_utils.expand_vars(
-                config["filedb"], substitute={"_": config_dir}
-            )
+            value = expand_vars(config["filedb"], substitute={"_": config_dir})
             self.filedb = FileDB(value)
 
         if not os.path.isdir(self.filedb.data_dir):
@@ -584,7 +584,7 @@ class DataLoader:
 
             tcm_table_name = self.filedb.get_table_name(tcm_tier, tcm_tb)
             try:
-                tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
+                tcm_lgdo, _ = sto.read(tcm_table_name, tcm_path)
             except KeyError:
                 log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
                 continue
@@ -649,7 +649,7 @@ class DataLoader:
                             if tb in col_tiers[file]["tables"][tier]:
                                 table_name = self.filedb.get_table_name(tier, tb)
                                 try:
-                                    tier_table, _ = sto.read_object(
+                                    tier_table, _ = sto.read(
                                         table_name,
                                         tier_path,
                                         field_mask=cut_cols[level],
@@ -708,11 +708,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                    sto.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(
-                        f_struct, f"entries/{file}", output_file, wo_mode="a"
-                    )
+                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -862,7 +860,7 @@ class DataLoader:
                             # load the data from the tier file, just the columns needed for the cut
                             table_name = self.filedb.get_table_name(tier, tb)
                             try:
-                                tier_tb, _ = sto.read_object(
+                                tier_tb, _ = sto.read(
                                     table_name, tier_path, field_mask=cut_cols
                                 )
                             except KeyError:
@@ -902,11 +900,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                    sto.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(
-                        f_struct, f"entries/{file}", output_file, wo_mode="a"
-                    )
+                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -1117,7 +1113,7 @@ class DataLoader:
                         for file in files
                     ]
 
-                    tier_table, _ = sto.read_object(
+                    tier_table, _ = sto.read(
                         name=tb_name,
                         lh5_file=tier_paths,
                         idx=idx_mask,
@@ -1143,7 +1139,7 @@ class DataLoader:
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
-                sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
+                sto.write(f_table, "merged_data", output_file, wo_mode="o")
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return f_table
@@ -1220,7 +1216,7 @@ class DataLoader:
                             raise FileNotFoundError(tier_path)
 
                         table_name = self.filedb.get_table_name(tier, tb)
-                        tier_table, _ = sto.read_object(
+                        tier_table, _ = sto.read(
                             table_name,
                             tier_path,
                             idx=idx_mask,
@@ -1246,7 +1242,7 @@ class DataLoader:
                 if in_memory:
                     load_out.add_field(name=file, obj=f_table)
                 if output_file:
-                    sto.write_object(f_table, f"{file}", output_file, wo_mode="o")
+                    sto.write(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
@@ -1318,7 +1314,7 @@ class DataLoader:
                                 )
                                 if os.path.exists(tier_path):
                                     table_name = self.filedb.get_table_name(tier, tb)
-                                    tier_table, _ = sto.read_object(
+                                    tier_table, _ = sto.read(
                                         table_name,
                                         tier_path,
                                         idx=idx_mask,
@@ -1332,7 +1328,7 @@ class DataLoader:
                 if in_memory:
                     load_out[file] = f_table
                 if output_file:
-                    sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
+                    sto.write(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
 
             if in_memory:

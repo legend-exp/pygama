@@ -69,7 +69,7 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`~.lgdo.lh5_store.write_object`.
+        forwarded to :meth:`~.lgdo.lh5.write`.
     """
     store = LH5Store()
 
@@ -168,7 +168,7 @@ def build_hit(
                         if col not in cfg["outputs"]:
                             outtbl_obj.remove_column(col, delete=True)
 
-            store.write_object(
+            store.write(
                 obj=outtbl_obj,
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,

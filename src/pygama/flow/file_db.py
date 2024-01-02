@@ -9,11 +9,11 @@ import string
 import warnings
 
 import h5py
-import lgdo
 import numpy as np
 import pandas as pd
-from lgdo import Array, Scalar, VectorOfVectors
-from lgdo import lh5_store as lh5
+from lgdo.lh5.store import LH5Store, ls
+from lgdo.lh5.utils import expand_path, expand_vars
+from lgdo.types import Array, Scalar, VectorOfVectors
 from parse import parse
 
 from . import utils
@@ -185,14 +185,12 @@ class FileDB:
         if config_path is not None:
             subst_vars["_"] = os.path.dirname(str(config_path))
 
-        data_dir = lgdo.lgdo_utils.expand_path(
-            self.config["data_dir"], substitute=subst_vars
-        )
+        data_dir = expand_path(self.config["data_dir"], substitute=subst_vars)
         self.data_dir = data_dir
 
         tier_dirs = self.config["tier_dirs"]
         for k, val in tier_dirs.items():
-            tier_dirs[k] = lgdo.lgdo_utils.expand_vars(val, substitute=subst_vars)
+            tier_dirs[k] = expand_vars(val, substitute=subst_vars)
         self.tier_dirs = tier_dirs
 
     def scan_files(self, dirs: list[str] = None) -> None:
@@ -407,7 +405,7 @@ class FileDB:
                 )
 
                 # TODO this call here is really expensive!
-                groups = lh5.ls(f, wildcard)
+                groups = ls(f, wildcard)
                 if len(groups) > 0 and parse(template, groups[0]) is None:
                     log.warning(f"groups in {fpath} don't match template")
                 else:
@@ -431,7 +429,7 @@ class FileDB:
                     table_name = template
 
                 try:
-                    col = lh5.ls(f[table_name])
+                    col = ls(f[table_name])
                 except KeyError:
                     log.warning(f"cannot find '{table_name}' in {fpath}")
                     continue
@@ -477,8 +475,8 @@ class FileDB:
             columns_vov = VectorOfVectors(
                 flattened_data=flattened, cumulative_length=length
             )
-            sto = lh5.LH5Store()
-            sto.write_object(columns_vov, "unique_columns", to_file)
+            sto = LH5Store()
+            sto.write(columns_vov, "unique_columns", to_file)
 
         return self.columns
 
@@ -501,12 +499,12 @@ class FileDB:
         # expand wildcards
         paths = []
         for p in path:
-            paths += lgdo.lgdo_utils.expand_path(p, list=True)
+            paths += expand_path(p, list=True)
 
         if not paths:
             raise FileNotFoundError(path)
 
-        sto = lh5.LH5Store()
+        sto = LH5Store()
         # objects/accumulators that will be used to configure the FileDB at the end
         _cfg = None
         _df = None
@@ -528,7 +526,7 @@ class FileDB:
 
         # loop over the files
         for p in paths:
-            cfg, _ = sto.read_object("config", p)
+            cfg, _ = sto.read("config", p)
             cfg = json.loads(cfg.value.decode())
 
             # make sure configurations are all the same
@@ -540,7 +538,7 @@ class FileDB:
                 )
 
             # read in unique columns
-            vov, _ = sto.read_object("columns", p)
+            vov, _ = sto.read("columns", p)
             # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
             columns = [[v.decode("utf-8") for v in ov] for ov in list(vov)]
 
@@ -599,14 +597,12 @@ class FileDB:
         filename
             output LH5 file name.
         wo_mode
-            passed to :meth:`~.lgdo.lh5_store.write_object`.
+            passed to :meth:`~.lgdo.lh5.write`.
         """
         log.debug(f"writing database to {filename}")
 
-        sto = lh5.LH5Store()
-        sto.write_object(
-            Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode
-        )
+        sto = LH5Store()
+        sto.write(Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode)
 
         if wo_mode in ["write_safe", "w", "overwrite_file", "of"]:
             wo_mode = "a"
@@ -623,7 +619,7 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto.write_object(col_vov, "columns", filename, wo_mode=wo_mode)
+            sto.write(col_vov, "columns", filename, wo_mode=wo_mode)
 
         # FIXME: to_hdf() throws this:
         #
