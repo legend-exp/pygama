@@ -11,6 +11,7 @@ import os
 import awkward as ak
 import h5py
 import lgdo.lh5_store as store
+import numpy as np
 import pandas as pd
 from lgdo import VectorOfVectors
 
@@ -165,7 +166,7 @@ def build_skm(
             mv = tbl_cfg["skimmed_fields"][fld[0]]["missing_value"]
             if mv in ["np.inf", "-np.inf", "np.nan"]:
                 mv = eval(mv)
-            out = vls.vov_to_aoesa(max_len=multi, fill_val=mv).nda
+            out = vls.to_aoesa(max_len=multi, fill_val=mv).nda
             nms = [fld[0] + f"_{e}" for e in range(multi)]
             df = df.join(pd.DataFrame(data=out, columns=nms), how="outer")
 
@@ -214,8 +215,10 @@ def build_skm(
                         f"global {k} {mode} operation needs a missing value assigned"
                     )
                 mv = tbl_cfg["global_fields"][k]["missing_value"]
-                if mv in ["np.inf", "-np.inf"]:
-                    mv = eval(mv)
+                if mv == "np.inf":
+                    mv = np.inf
+                elif mv == "-np.inf":
+                    mv = -1 * np.inf
                 val = ak.fill_none(val, mv)
                 df = df.join(
                     pd.DataFrame(data=val.to_numpy(allow_missing=False), columns=[k])
