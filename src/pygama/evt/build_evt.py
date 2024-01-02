@@ -146,7 +146,7 @@ def evaluate_expression(
             in [e.split("/")[-1] for e in store.ls(f_evt, "/evt/")]
         ):
             lstore = store.LH5Store()
-            ch_comp, _ = lstore.read_object(mode[8:].replace(".", "/"), f_evt)
+            ch_comp, _ = lstore.read(mode[8:].replace(".", "/"), f_evt)
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
                     idx,
@@ -336,7 +336,7 @@ def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) ->
 
     lstore = store.LH5Store()
     var = {
-        f"{e[0]}_{e[1]}": lstore.read_object(
+        f"{e[0]}_{e[1]}": lstore.read(
             f"{group.replace('/','')}/{e[0]}/{e[1]}",
             f,
             idx=idx,
@@ -1393,7 +1393,7 @@ def build_evt(
                     f"Currently only 2d formats are supported, the evaluated array has the dimension {res.shape}"
                 )
 
-            lstore.write_object(
+            lstore.write(
                 obj=res,
                 name=group + k,
                 lh5_file=f_evt_tmp,
@@ -1450,7 +1450,7 @@ def build_evt(
             obj = result["values"]
             if isinstance(obj, np.ndarray):
                 obj = Array(result["values"])
-            lstore.write_object(
+            lstore.write(
                 obj=obj,
                 name=group + k,
                 lh5_file=f_evt_tmp,
@@ -1462,8 +1462,8 @@ def build_evt(
         if len(tbl_cfg["outputs"]) < 1:
             log.warning("No output fields specified, no file will be written.")
         for fld in tbl_cfg["outputs"]:
-            obj, _ = lstore.read_object(group + fld, f_evt_tmp)
-            lstore.write_object(
+            obj, _ = lstore.read(group + fld, f_evt_tmp)
+            lstore.write(
                 obj=obj,
                 name=group + fld,
                 lh5_file=f_evt,
@@ -1493,7 +1493,7 @@ def skim_evt(
     f_evt
         input LH5 file of the evt level
     expression
-        skimming expression. Can contain variabels from event file or from the params dictionary.
+        skimming expression. Can contain variables from event file or from the params dictionary.
     f_out
         output LH5 file. Can be None if wo_mode is set to overwrite f_evt.
     wo_mode
@@ -1519,7 +1519,7 @@ def skim_evt(
         for e in store.ls(f_evt, evt_group)
         if e.split("/")[-1] in exprl
     ]
-    var = {e: lstore.read_object(evt_group + e, f_evt)[0] for e in flds}
+    var = {e: lstore.read(evt_group + e, f_evt)[0] for e in flds}
 
     # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
     arr_keys = []
@@ -1554,8 +1554,8 @@ def skim_evt(
     of_tmp = of.replace(of.split("/")[-1], ".tmp_" + of.split("/")[-1])
 
     for fld in fields:
-        ob, _ = lstore.read_object(fld, f_evt, idx=idx_list)
-        lstore.write_object(
+        ob, _ = lstore.read(fld, f_evt, idx=idx_list)
+        lstore.write(
             obj=ob,
             name=fld,
             lh5_file=of_tmp,

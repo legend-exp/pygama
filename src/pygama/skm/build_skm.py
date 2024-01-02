@@ -11,65 +11,10 @@ import os
 import awkward as ak
 import h5py
 import lgdo.lh5_store as store
-import numpy as np
 import pandas as pd
-from lgdo import Array, ArrayOfEqualSizedArrays, VectorOfVectors
+from lgdo import VectorOfVectors
 
 log = logging.getLogger(__name__)
-
-
-def vov_to_ak(vov: VectorOfVectors) -> ak.Array:
-    """
-    Temporary function to convert VectorOfVectors to awkward arrays. This function will be removed soon.
-
-    Parameters
-    ----------
-    vov
-       VectorOfVectors to be converted.
-    """
-    flattened_data = vov.flattened_data
-    cumulative_length = vov.cumulative_length
-    if isinstance(flattened_data, Array):
-        flattened_data = flattened_data.nda
-    if isinstance(cumulative_length, Array):
-        cumulative_length = cumulative_length.nda
-
-    offsets = np.empty(len(cumulative_length) + 1, dtype=cumulative_length.dtype)
-    offsets[1:] = cumulative_length
-    offsets[0] = 0
-
-    layout = ak.contents.ListOffsetArray(
-        offsets=ak.index.Index(offsets), content=ak.contents.NumpyArray(flattened_data)
-    )
-    return ak.Array(layout)
-
-
-def vov_to_aoesa(
-    vov: VectorOfVectors, missing_value=np.nan, length: int = None
-) -> ArrayOfEqualSizedArrays:
-    """
-    Temporary function to convert VectorOfVectors to ArrayOfEqualSizedArrays. This function will be removed soon.
-
-    Parameters
-    ----------
-    vov
-       VectorOfVectors to be converted.
-    missing_value
-       missing value to be inserted. Determines the datatype of the output ArrayOfEqualSizedArrays
-    length
-       length of each row in the ArrayOfEqualSizedArrays. If the row in VectorOfVectors is shorter than length, the row gets padded with missing_value. If the row in VectorOfVectors is longer than length, the row gets clipped.
-    """
-    arr = vov_to_ak(vov)
-    if length is not None:
-        max_len = length
-    else:
-        max_len = int(ak.max(ak.count(arr, axis=-1)))
-    return ArrayOfEqualSizedArrays(
-        nda=ak.fill_none(ak.pad_none(arr, max_len, clip=True), missing_value)
-        .to_numpy(allow_missing=False)
-        .astype(type(missing_value)),
-        attrs=vov.getattrs(),
-    )
 
 
 def build_skm(
@@ -131,7 +76,7 @@ def build_skm(
 
     wo_mode
         writing mode.
-        - ``write_safe`` or ``w``: only proceed with writing if the file does not already exis.
+        - ``write_safe`` or ``w``: only proceed with writing if the file does not already exists.
         - ``append`` or ``a``: append  to file.
         - ``overwrite`` or ``o``: replaces existing file.
     group
@@ -216,11 +161,11 @@ def build_skm(
                 raise ValueError(
                     f"({fld[0]}) is a VectorOfVector field and no missing_value is specified"
                 )
-            vls, _ = lstore.read_object(group + fld[1], f_evt)
+            vls, _ = lstore.read(group + fld[1], f_evt)
             mv = tbl_cfg["skimmed_fields"][fld[0]]["missing_value"]
             if mv in ["np.inf", "-np.inf", "np.nan"]:
                 mv = eval(mv)
-            out = vov_to_aoesa(vls, missing_value=mv, length=multi).nda
+            out = vls.vov_to_aoesa(max_len=multi, fill_val=mv).nda
             nms = [fld[0] + f"_{e}" for e in range(multi)]
             df = df.join(pd.DataFrame(data=out, columns=nms), how="outer")
 
@@ -235,13 +180,13 @@ def build_skm(
             mode = tbl_cfg["global_fields"][k]["aggregation_mode"]
             fld = tbl_cfg["global_fields"][k]["evt_field"]
 
-            obj, _ = lstore.read_object(group + fld, f_evt)
+            obj, _ = lstore.read(group + fld, f_evt)
             if not isinstance(obj, VectorOfVectors):
                 raise ValueError(
                     f"global {k} operation not possible, since {fld} is not an VectorOfVectors"
                 )
 
-            obj_ak = vov_to_ak(obj)
+            obj_ak = obj.view_as("ak")
             if mode in [
                 "sum",
                 "prod",

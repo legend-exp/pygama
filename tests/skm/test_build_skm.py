@@ -29,10 +29,10 @@ def test_basics(lgnd_test_data, tmptestdir):
 
     skm_conf = f"{config_dir}/basic-skm-config.json"
     skm_out = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.parquet"
-    build_skm(outfile, skm_out, skm_conf, wo_mode="o")
+    build_skm(outfile, skm_out, skm_conf, wo_mode="o", skim_format="hdf")
 
     assert os.path.exists(skm_out)
-    df = pd.read_parquet(skm_out)
+    df = pd.read_hdf(skm_out)
     assert df.index.name == "timestamp"
     assert "energy_0" in df.keys()
     assert "energy_1" in df.keys()

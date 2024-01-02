@@ -117,12 +117,12 @@ def test_vov(lgnd_test_data, tmptestdir):
     assert os.path.exists(outfile)
     assert len(ls(outfile, "/evt/")) == 9
     lstore = store.LH5Store()
-    vov_ene, _ = lstore.read_object("/evt/energy", outfile)
-    vov_aoe, _ = lstore.read_object("/evt/aoe", outfile)
-    arr_ac, _ = lstore.read_object("/evt/multiplicity", outfile)
-    vov_aoeene, _ = lstore.read_object("/evt/energy_times_aoe", outfile)
-    vov_eneac, _ = lstore.read_object("/evt/energy_times_multiplicity", outfile)
-    arr_ac2, _ = lstore.read_object("/evt/multiplicity_squared", outfile)
+    vov_ene, _ = lstore.read("/evt/energy", outfile)
+    vov_aoe, _ = lstore.read("/evt/aoe", outfile)
+    arr_ac, _ = lstore.read("/evt/multiplicity", outfile)
+    vov_aoeene, _ = lstore.read("/evt/energy_times_aoe", outfile)
+    vov_eneac, _ = lstore.read("/evt/energy_times_multiplicity", outfile)
+    arr_ac2, _ = lstore.read("/evt/multiplicity_squared", outfile)
     assert isinstance(vov_ene, VectorOfVectors)
     assert isinstance(vov_aoe, VectorOfVectors)
     assert isinstance(arr_ac, Array)
@@ -236,10 +236,10 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
     assert os.path.exists(outfile)
     assert len(ls(outfile, "/evt/")) == 4
     lstore = store.LH5Store()
-    vov_t0, _ = lstore.read_object("/evt/t0_acend", outfile)
+    vov_t0, _ = lstore.read("/evt/t0_acend", outfile)
     nda_t0 = vov_t0.to_aoesa().nda
     assert ((np.diff(nda_t0) >= 0) | (np.isnan(np.diff(nda_t0)))).all()
-    vov_t0, _ = lstore.read_object("/evt/t0_decend", outfile)
+    vov_t0, _ = lstore.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().nda
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
 
@@ -256,16 +256,16 @@ def test_skimming(lgnd_test_data, tmptestdir):
     build_evt(f_tcm, f_dsp, f_hit, outfile, f_config)
 
     lstore = store.LH5Store()
-    ac = lstore.read_object("/evt/multiplicity", outfile)[0].nda
+    ac = lstore.read("/evt/multiplicity", outfile)[0].nda
     ac = len(ac[ac == 3])
 
     outfile_skm = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
 
     skim_evt(outfile, "multiplicity == 3", None, outfile_skm, "n")
-    assert ac == len(lstore.read_object("/evt/energy", outfile_skm)[0].to_aoesa().nda)
+    assert ac == len(lstore.read("/evt/energy", outfile_skm)[0].to_aoesa().nda)
 
     skim_evt(outfile, "multiplicity == 3", None, None, "o")
-    assert ac == len(lstore.read_object("/evt/energy", outfile)[0].to_aoesa().nda)
+    assert ac == len(lstore.read("/evt/energy", outfile)[0].to_aoesa().nda)
 
     with pytest.raises(ValueError):
         skim_evt(outfile, "multiplicity == 3", None, None, "bla")
