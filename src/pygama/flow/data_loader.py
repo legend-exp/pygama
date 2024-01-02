@@ -868,7 +868,7 @@ class DataLoader:
                                     f"Cannot find {table_name} in file {tier_path}"
                                 )
                                 continue
-                            # join eveything in one table
+                            # join everything in one table
                             if tb_table is None:
                                 tb_table = tier_tb
                             else:
