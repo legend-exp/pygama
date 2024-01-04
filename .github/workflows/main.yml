@@ -12,6 +12,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TQDM_MININTERVAL: 10
+
 jobs:
 
   build-and-test:
