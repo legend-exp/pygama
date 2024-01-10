@@ -9,6 +9,9 @@
       "parameters": {
         "a": 1.23,
         "b": 42.69
+      },
+      "lgdo_attrs": {
+        "units": "keV"
       }
     },
     "AoE": {

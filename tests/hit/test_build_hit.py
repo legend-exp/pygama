@@ -24,6 +24,10 @@ def test_basics(dsp_test_file, tmptestdir):
     assert os.path.exists(outfile)
     assert ls(outfile, "/geds/") == ["geds/hit"]
 
+    store = LH5Store()
+    tbl, _ = store.read("geds/hit", outfile)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
 
 def test_illegal_arguments(dsp_test_file):
     with pytest.raises(ValueError):
@@ -95,7 +99,7 @@ def test_outputs_specification(dsp_test_file, tmptestdir):
 
     store = LH5Store()
     obj, _ = store.read("/geds/hit", outfile)
-    assert list(obj.keys()) == ["calE", "AoE", "A_max"]
+    assert sorted(obj.keys()) == ["A_max", "AoE", "calE"]
 
 
 def test_aggregation_outputs(dsp_test_file, tmptestdir):
