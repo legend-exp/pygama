@@ -60,6 +60,9 @@ intersphinx_mapping = {
     "iminuit": ("https://iminuit.readthedocs.io/en/stable", None),
     "h5py": ("https://docs.h5py.org/en/stable", None),
     "pint": ("https://pint.readthedocs.io/en/stable", None),
+    "lgdo": ("https://legend-pydataobj.readthedocs.io/en/stable", None),
+    "dspeed": ("https://dspeed.readthedocs.io/en/stable", None),
+    "daq2lh5": ("https://legend-daq2lh5.readthedocs.io/en/stable", None),
 }
 
 suppress_warnings = [
