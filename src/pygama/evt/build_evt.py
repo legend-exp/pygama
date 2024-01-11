@@ -15,6 +15,7 @@ from importlib import import_module
 import numpy as np
 from lgdo import Array, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
+from numpy.typing import NDArray
 
 log = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ def evaluate_expression(
     nrows: int,
     para: dict = None,
     qry: str = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
     sorter: str = None,
 ) -> dict:
     """Evaluates the expression defined by the user across all channels
@@ -305,7 +306,7 @@ def find_parameters(
     f_hit: str,
     f_dsp: str,
     ch: str,
-    idx_ch: np.ndarray,
+    idx_ch: NDArray,
     exprl: list,
 ) -> dict:
     """Wraps :func:`load_vars_to_nda` to return parameters from `hit` and `dsp`
@@ -332,7 +333,7 @@ def find_parameters(
     return dsp_dic | var
 
 
-def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) -> dict:
+def load_vars_to_nda(f: str, group: str, exprl: list, idx: NDArray = None) -> dict:
     """Maps parameter expressions to parameters if found in `f`.
     Blows up :class:`.VectorOfVectors` to :class:`.ArrayOfEqualSizedArrays`.
 
@@ -386,7 +387,7 @@ def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) ->
 
 def get_data_at_channel(
     ch: str,
-    idx_ch: np.ndarray,
+    idx_ch: NDArray,
     expr: str,
     exprl: list,
     var_ph: dict,
@@ -451,10 +452,10 @@ def get_data_at_channel(
 
 
 def get_mask_from_query(
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     length: int,
     ch: str,
-    idx_ch: np.ndarray,
+    idx_ch: NDArray,
     f_hit: str,
     f_dsp: str,
 ) -> np.ndarray:
@@ -497,19 +498,19 @@ def get_mask_from_query(
 
 
 def evaluate_to_first(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     sorter: tuple,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates across channels by returning the expression of the channel
     with smallest value of `sorter`.
@@ -591,19 +592,19 @@ def evaluate_to_first(
 
 
 def evaluate_to_last(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     sorter: tuple,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates across channels by returning the expression of the channel
     with largest value of `sorter`.
@@ -682,18 +683,18 @@ def evaluate_to_last(
 
 
 def evaluate_to_tot(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates by summation across channels.
 
@@ -758,18 +759,18 @@ def evaluate_to_tot(
 
 
 def evaluate_to_any(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates by logical or operation across channels. If the expression
     evaluates to a non boolean value it is casted to boolean.
@@ -835,18 +836,18 @@ def evaluate_to_any(
 
 
 def evaluate_to_all(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates by logical and operation across channels. If the expression
     evaluates to a non boolean value it is casted to boolean.
@@ -912,8 +913,8 @@ def evaluate_to_all(
 
 
 def evaluate_at_channel(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns_rm: list,
@@ -921,7 +922,7 @@ def evaluate_at_channel(
     exprl: list,
     ch_comp: Array,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Aggregates by evaluating the expression at a given channel.
 
@@ -977,8 +978,8 @@ def evaluate_at_channel(
 
 
 def evaluate_at_channel_vov(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     expr: str,
@@ -986,7 +987,7 @@ def evaluate_at_channel_vov(
     ch_comp: VectorOfVectors,
     chns_rm: list,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
 ) -> dict:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
@@ -1052,18 +1053,18 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
     missv=np.nan,
 ) -> np.ndarray:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
@@ -1135,18 +1136,18 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
-    idx: np.ndarray,
-    ids: np.ndarray,
+    idx: NDArray,
+    ids: NDArray,
     f_hit: str,
     f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
     exprl: list,
-    qry: str | np.ndarray,
+    qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv=np.nan,
+    defv: bool | int | float = np.nan,
     sorter: str = None,
 ) -> dict:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
@@ -1287,13 +1288,13 @@ def build_evt(
                 "energy_id":{
                   "channels": "geds_on",
                   "aggregation_mode": "gather",
-                  "query": "hit.cuspEmax_ctc_cal>25",
+                  "query": "hit.cuspEmax_ctc_cal > 25",
                   "expression": "tcm.array_id",
                   "sort": "ascend_by:dsp.tp_0_est"
                 },
                 "energy":{
                   "aggregation_mode": "keep_at:evt.energy_id",
-                  "expression": "hit.cuspEmax_ctc_cal>25"
+                  "expression": "hit.cuspEmax_ctc_cal > 25"
                 }
                 "is_muon_rejected":{
                   "channels": "muon",
@@ -1303,7 +1304,7 @@ def build_evt(
                   "initial": false
                 },
                 "multiplicity":{
-                  "channels":  ["geds_on","geds_no_psd","geds_ac"],
+                  "channels":  ["geds_on", "geds_no_psd", "geds_ac"],
                   "aggregation_mode": "sum",
                   "expression": "hit.cuspEmax_ctc_cal > a",
                   "parameters": {"a":25},
@@ -1316,7 +1317,7 @@ def build_evt(
                 "lar_energy":{
                   "channels": "spms_on",
                   "aggregation_mode": "function",
-                  "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
+                  "expression": ".modules.spm.get_energy(0.5, evt.t0, 48000, 1000, 5000)"
                 },
               }
             }
