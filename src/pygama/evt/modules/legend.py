@@ -4,7 +4,7 @@ Module provides LEGEND internal functions
 from importlib import import_module
 
 
-def legend_meta(params: dict) -> list:
+def metadata(params: dict) -> list:
     # only import legend meta data when needed.
     # LEGEND collaborators can use the meta keyword
     # While for users w/o access to the LEGEND meta data this is still working
