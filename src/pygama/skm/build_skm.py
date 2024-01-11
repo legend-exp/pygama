@@ -10,10 +10,10 @@ import os
 
 import awkward as ak
 import h5py
-import lgdo.lh5_store as store
 import numpy as np
 import pandas as pd
-from lgdo import VectorOfVectors
+from lgdo import VectorOfVectors, lh5
+from lgdo.lh5 import LH5Store
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +107,7 @@ def build_skm(
             if x[1]
             in [
                 e.split("/")[-1]
-                for e in store.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
+                for e in lh5.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
                 if "array<1>{array<1>{" in f[e].attrs.get("datatype")
             ]
         ]
@@ -118,7 +118,7 @@ def build_skm(
             and x[1]
             in [
                 e.split("/")[-1]
-                for e in store.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
+                for e in lh5.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
             ]
         ]
 
@@ -142,27 +142,32 @@ def build_skm(
 
     # init pandas df
     df = pd.DataFrame()
+    store = LH5Store()
 
     # add array like fields
     if isinstance(flds_arr, list):
         log.debug("Crunching array-like fields")
-        df = df.join(
-            store.load_dfs(f_evt, [x[1] for x in flds_arr], group).rename(
-                columns={y: x for x, y in flds_arr}
-            ),
-            how="outer",
-        )
+
+        _df = store.read(
+            group,
+            f_evt,
+            field_mask=[x[1] for x in flds_arr],
+        )[
+            0
+        ].view_as("pd")
+
+        _df = _df.rename(columns={y: x for x, y in flds_arr})
+        df = df.join(_df, how="outer")
 
     # take care of vector like fields
     if isinstance(flds_vov, list):
         log.debug("Processing VoV-like fields")
-        lstore = store.LH5Store()
         for fld in flds_vov:
             if "missing_value" not in tbl_cfg["skimmed_fields"][fld[0]].keys():
                 raise ValueError(
                     f"({fld[0]}) is a VectorOfVector field and no missing_value is specified"
                 )
-            vls, _ = lstore.read(group + fld[1], f_evt)
+            vls, _ = store.read(group + fld[1], f_evt)
             mv = tbl_cfg["skimmed_fields"][fld[0]]["missing_value"]
             if mv in ["np.inf", "-np.inf", "np.nan"]:
                 mv = eval(mv)
@@ -181,7 +186,7 @@ def build_skm(
             mode = tbl_cfg["global_fields"][k]["aggregation_mode"]
             fld = tbl_cfg["global_fields"][k]["evt_field"]
 
-            obj, _ = lstore.read(group + fld, f_evt)
+            obj, _ = store.read(group + fld, f_evt)
             if not isinstance(obj, VectorOfVectors):
                 raise ValueError(
                     f"global {k} operation not possible, since {fld} is not an VectorOfVectors"

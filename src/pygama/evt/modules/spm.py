@@ -11,9 +11,9 @@ additional parameters are free to the user and need to be defined in the JSON
 
 import warnings
 
-import lgdo.lh5_store as store
 import numpy as np
 from lgdo import Array, VectorOfVectors
+from lgdo.lh5 import LH5Store
 
 
 # get LAr energy per event over all channels
@@ -35,21 +35,25 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     sum = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
-        df = store.load_nda(
-            f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/", idx_ch
+        energy_in_pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
+        trigger_pos = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
+            "np"
         )
         mask = (
-            (df["trigger_pos"] < tma[:, None] / 16)
-            & (df["trigger_pos"] > tmi[:, None] / 16)
-            & (df["energy_in_pe"] > lim)
+            (trigger_pos < tma[:, None] / 16)
+            & (trigger_pos > tmi[:, None] / 16)
+            & (energy_in_pe > lim)
         )
-        pes = df["energy_in_pe"]
+        pes = energy_in_pe
         pes = np.where(np.isnan(pes), 0, pes)
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
@@ -76,21 +80,24 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     maj = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
-        df = store.load_nda(
-            f_hit, ["energy_in_pe", "trigger_pos"], ch + "/hit/", idx_ch
+        energy_in_pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
+        trigger_pos = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
+            "np"
         )
         mask = (
-            (df["trigger_pos"] < tma[:, None] / 16)
-            & (df["trigger_pos"] > tmi[:, None] / 16)
-            & (df["energy_in_pe"] > lim)
+            (trigger_pos < tma[:, None] / 16)
+            & (trigger_pos > tmi[:, None] / 16)
+            & (energy_in_pe > lim)
         )
-        pes = df["energy_in_pe"]
+        pes = energy_in_pe
         pes = np.where(np.isnan(pes), 0, pes)
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
@@ -118,21 +125,24 @@ def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = trig + tmax
     sum = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
-        df = store.load_nda(
-            f_hit, ["energy_in_pe_dplms", "trigger_pos_dplms"], ch + "/hit/", idx_ch
-        )
+        energy_in_pe_dplms = store.read(
+            f"{ch}/hit/energy_in_pe_dplms", f_hit, idx=idx_ch
+        )[0].view_as("np")
+        trigger_pos_dplms = store.read(
+            f"{ch}/hit/trigger_pos_dplms", f_hit, idx=idx_ch
+        )[0].view_as("np")
         mask = (
-            (df["trigger_pos_dplms"] < tma[:, None] / 16)
-            & (df["trigger_pos_dplms"] > tmi[:, None] / 16)
-            & (df["energy_in_pe_dplms"] > lim)
+            (trigger_pos_dplms < tma[:, None] / 16)
+            & (trigger_pos_dplms > tmi[:, None] / 16)
+            & (energy_in_pe_dplms > lim)
         )
-        pes = df["energy_in_pe_dplms"]
+        pes = energy_in_pe_dplms
         pes = np.where(np.isnan(pes), 0, pes)
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
@@ -159,21 +169,24 @@ def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
     tma = trig + tmax
     maj = np.zeros(len(trig))
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
-        df = store.load_nda(
-            f_hit, ["energy_in_pe_dplms", "trigger_pos_dplms"], ch + "/hit/", idx_ch
-        )
+        energy_in_pe_dplms = store.read(
+            f"{ch}/hit/energy_in_pe_dplms", f_hit, idx=idx_ch
+        )[0].view_as("np")
+        trigger_pos_dplms = store.read(
+            f"{ch}/hit/trigger_pos_dplms", f_hit, idx=idx_ch
+        )[0].view_as("np")
         mask = (
-            (df["trigger_pos_dplms"] < tma[:, None] / 16)
-            & (df["trigger_pos_dplms"] > tmi[:, None] / 16)
-            & (df["energy_in_pe_dplms"] > lim)
+            (trigger_pos_dplms < tma[:, None] / 16)
+            & (trigger_pos_dplms > tmi[:, None] / 16)
+            & (energy_in_pe_dplms > lim)
         )
-        pes = df["energy_in_pe_dplms"]
+        pes = energy_in_pe_dplms
         pes = np.where(np.isnan(pes), 0, pes)
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
@@ -188,9 +201,10 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
     warnings.filterwarnings("ignore", r"invalid value encountered in true_divide")
     warnings.filterwarnings("ignore", r"invalid value encountered in divide")
 
-    predf = store.load_nda(f_hit, ["energy_in_pe", "timestamp"], chs[0] + "/hit/")
+    store = LH5Store()
+    energy_in_pe, _ = store.read(f"{chs[0]}/hit/energy_in_pe", f_hit)
 
-    peshape = (predf["energy_in_pe"]).shape
+    peshape = energy_in_pe.view_as("np").shape
     # 1D = channel, 2D = event num, 3D = array per event
     pes = np.zeros([len(chs), peshape[0], peshape[1]])
     times = np.zeros([len(chs), peshape[0], peshape[1]])
@@ -213,25 +227,25 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
     tma = tge + tmax
 
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     for i in range(len(chs)):
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(chs[i][2:])]
-        df = store.load_nda(
-            f_hit,
-            ["energy_in_pe", "trigger_pos", "timestamp"],
-            chs[i] + "/hit/",
-            idx_ch,
-        )
+        energy_in_pe = store.read(f"{chs[i]}/hit/energy_in_pe", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
+        trigger_pos = store.read(f"{chs[i]}/hit/trigger_pos", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
         mask = (
-            (df["trigger_pos"] < tma[:, None] / 16)
-            & (df["trigger_pos"] > tmi[:, None] / 16)
-            & (df["energy_in_pe"] > lim)
+            (trigger_pos < tma[:, None] / 16)
+            & (trigger_pos > tmi[:, None] / 16)
+            & (energy_in_pe > lim)
         )
-        pe = df["energy_in_pe"]
-        time = df["trigger_pos"] * 16
+        pe = energy_in_pe
+        time = trigger_pos * 16
 
         pe = np.where(mask, pe, np.nan)
         time = np.where(mask, time, np.nan)
@@ -271,8 +285,12 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
 
 
 def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
-    predf = store.load_nda(f_hit, ["energy_in_pe"], chs[0] + "/hit/")
-    peshape = (predf["energy_in_pe"]).shape
+    store = LH5Store()
+    energy_in_pe, _ = store.read(
+        f"{chs[0]}/hit/energy_in_pe",
+        f_hit,
+    )
+    peshape = energy_in_pe.view_as("np").shape
     times = np.zeros([len(chs), peshape[0], peshape[1]])
 
     tge = trgr
@@ -293,22 +311,24 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
     tma = tge + tmax
 
     # load TCM data to define an event
-    nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-    ids = nda["array_id"]
-    idx = nda["array_idx"]
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     for i in range(len(chs)):
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(chs[i][2:])]
-        df = store.load_nda(
-            f_hit, ["energy_in_pe", "trigger_pos"], chs[i] + "/hit/", idx_ch
-        )
+        energy_in_pe = store.read(f"{chs[i]}/hit/energy_in_pe", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
+        trigger_pos = store.read(f"{chs[i]}/hit/trigger_pos", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
         mask = (
-            (df["trigger_pos"] < tma[:, None] / 16)
-            & (df["trigger_pos"] > tmi[:, None] / 16)
-            & (df["energy_in_pe"] > lim)
+            (trigger_pos < tma[:, None] / 16)
+            & (trigger_pos > tmi[:, None] / 16)
+            & (energy_in_pe > lim)
         )
 
-        time = df["trigger_pos"] * 16
+        time = trigger_pos * 16
         time = np.where(mask, time, np.nan)
         times[i][idx_ch] = time
 

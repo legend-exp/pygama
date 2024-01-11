@@ -12,9 +12,9 @@ import random
 import re
 from importlib import import_module
 
-import lgdo.lh5_store as store
 import numpy as np
-from lgdo import Array, VectorOfVectors
+from lgdo import Array, VectorOfVectors, lh5
+from lgdo.lh5 import LH5Store
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +92,8 @@ def evaluate_expression(
        can be used to sort vector outputs according to sorter expression (see :func:`evaluate_to_vector`)
     """
 
+    store = LH5Store()
+
     # find parameters in evt file or in parameters
     exprl = re.findall(r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", expr)
     var_ph = {}
@@ -133,9 +135,8 @@ def evaluate_expression(
                 qry_mask = eval(qry.replace("evt.", "evt_"), var_qry)
 
         # load TCM data to define an event
-        nda = store.load_nda(f_tcm, ["array_id", "array_idx"], "hardware_tcm_1/")
-        ids = nda["array_id"]
-        idx = nda["array_idx"]
+        ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+        idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
 
         # switch through modes
         if (
@@ -143,10 +144,9 @@ def evaluate_expression(
             and "keep_at:" == mode[:8]
             and "evt." == mode[8:][:4]
             and mode[8:].split(".")[-1]
-            in [e.split("/")[-1] for e in store.ls(f_evt, "/evt/")]
+            in [e.split("/")[-1] for e in lh5.ls(f_evt, "/evt/")]
         ):
-            lstore = store.LH5Store()
-            ch_comp, _ = lstore.read(mode[8:].replace(".", "/"), f_evt)
+            ch_comp, _ = store.read(mode[8:].replace(".", "/"), f_evt)
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
                     idx,
@@ -334,16 +334,16 @@ def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) ->
        list of parameter-tuples (root_group, field) to be found in f
     """
 
-    lstore = store.LH5Store()
+    store = LH5Store()
     var = {
-        f"{e[0]}_{e[1]}": lstore.read(
+        f"{e[0]}_{e[1]}": store.read(
             f"{group.replace('/','')}/{e[0]}/{e[1]}",
             f,
             idx=idx,
         )[0]
         for e in exprl
         if e[1]
-        in [x.split("/")[-1] for x in store.ls(f, f"{group.replace('/','')}/{e[0]}/")]
+        in [x.split("/")[-1] for x in lh5.ls(f, f"{group.replace('/','')}/{e[0]}/")]
     }
 
     # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
@@ -536,6 +536,8 @@ def evaluate_to_first(
     out_chs = np.zeros(len(out), dtype=int)
     outt = np.zeros(len(out))
 
+    store = LH5Store()
+
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -562,12 +564,11 @@ def evaluate_to_first(
             outt[:] = np.inf
 
         # find if sorter is in hit or dsp
-        t0 = store.load_nda(
+        t0 = store.read(
+            f"{ch}/{sorter[0]}/{sorter[1]}",
             f_hit if "hit" == sorter[0] else f_dsp,
-            [sorter[1]],
-            f"{ch}/{sorter[0]}/",
-            idx_ch,
-        )[sorter[1]]
+            idx=idx_ch,
+        )[0].view_as("np")
 
         out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
         out_chs[idx_ch] = np.where((t0 < outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
@@ -629,6 +630,8 @@ def evaluate_to_last(
     out_chs = np.zeros(len(out), dtype=int)
     outt = np.zeros(len(out))
 
+    store = LH5Store()
+
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -652,12 +655,11 @@ def evaluate_to_last(
 
         # append to out according to mode == last
         # find if sorter is in hit or dsp
-        t0 = store.load_nda(
+        t0 = store.read(
+            f"{ch}/{sorter[0]}/{sorter[1]}",
             f_hit if "hit" == sorter[0] else f_dsp,
-            [sorter[1]],
-            f"{ch}/{sorter[0]}/",
-            idx_ch,
-        )[sorter[1]]
+            idx=idx_ch,
+        )[0].view_as("np")
 
         out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
         out_chs[idx_ch] = np.where((t0 > outt) & (limarr), int(ch[2:]), out_chs[idx_ch])
@@ -940,7 +942,7 @@ def evaluate_at_channel(
 
     for ch in np.unique(ch_comp.nda.astype(int)):
         # skip default value
-        if f"ch{ch}" not in store.ls(f_hit):
+        if f"ch{ch}" not in lh5.ls(f_hit):
             continue
         # get index list for this channel to be loaded
         idx_ch = idx[ids == ch]
@@ -1305,7 +1307,7 @@ def build_evt(
         lh5 root group in tcm file
     """
 
-    lstore = store.LH5Store()
+    store = LH5Store()
     tbl_cfg = evt_config
     if not isinstance(tbl_cfg, (str, dict)):
         raise TypeError()
@@ -1355,8 +1357,9 @@ def build_evt(
             chns[k] = [e for e in v]
 
     nrows = len(
-        store.load_nda(f_tcm, ["cumulative_length"], tcm_group)["cumulative_length"]
+        lh5.load_nda(f_tcm, ["cumulative_length"], tcm_group)["cumulative_length"]
     )
+    # nrows = store.read_n_rows(f"{tcm_group}/cumulative_length", f_tcm)
     log.info(
         f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
     )
@@ -1393,7 +1396,7 @@ def build_evt(
                     f"Currently only 2d formats are supported, the evaluated array has the dimension {res.shape}"
                 )
 
-            lstore.write(
+            store.write(
                 obj=res,
                 name=group + k,
                 lh5_file=f_evt_tmp,
@@ -1450,7 +1453,7 @@ def build_evt(
             obj = result["values"]
             if isinstance(obj, np.ndarray):
                 obj = Array(result["values"])
-            lstore.write(
+            store.write(
                 obj=obj,
                 name=group + k,
                 lh5_file=f_evt_tmp,
@@ -1462,8 +1465,8 @@ def build_evt(
         if len(tbl_cfg["outputs"]) < 1:
             log.warning("No output fields specified, no file will be written.")
         for fld in tbl_cfg["outputs"]:
-            obj, _ = lstore.read(group + fld, f_evt_tmp)
-            lstore.write(
+            obj, _ = store.read(group + fld, f_evt_tmp)
+            store.write(
                 obj=obj,
                 name=group + fld,
                 lh5_file=f_evt,
@@ -1507,19 +1510,17 @@ def skim_evt(
             wo_mode
             + " is a invalid writing mode. Valid options are: 'o', 'overwrite','n','new'"
         )
-    lstore = store.LH5Store()
-    fields = store.ls(f_evt, evt_group)
-    nrows = lstore.read_n_rows(fields[0], f_evt)
+    store = LH5Store()
+    fields = lh5.ls(f_evt, evt_group)
+    nrows = store.read_n_rows(fields[0], f_evt)
     # load fields in expression
     exprl = re.findall(r"[a-zA-Z_$][\w$]*", expression)
     var = {}
 
     flds = [
-        e.split("/")[-1]
-        for e in store.ls(f_evt, evt_group)
-        if e.split("/")[-1] in exprl
+        e.split("/")[-1] for e in lh5.ls(f_evt, evt_group) if e.split("/")[-1] in exprl
     ]
-    var = {e: lstore.read(evt_group + e, f_evt)[0] for e in flds}
+    var = {e: store.read(evt_group + e, f_evt)[0] for e in flds}
 
     # to make any operations to VoVs we have to blow it up to a table (future change to more intelligant way)
     arr_keys = []
@@ -1554,8 +1555,8 @@ def skim_evt(
     of_tmp = of.replace(of.split("/")[-1], ".tmp_" + of.split("/")[-1])
 
     for fld in fields:
-        ob, _ = lstore.read(fld, f_evt, idx=idx_list)
-        lstore.write(
+        ob, _ = store.read(fld, f_evt, idx=idx_list)
+        store.write(
             obj=ob,
             name=fld,
             lh5_file=of_tmp,
