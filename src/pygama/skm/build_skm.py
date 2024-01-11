@@ -1,5 +1,6 @@
 """
-This module implements routines to build the evt tier.
+This module implements routines to build the `skm` tier, consisting of skimmed
+data from the `evt` tier.
 """
 
 from __future__ import annotations
@@ -25,67 +26,77 @@ def build_skm(
     wo_mode="w",
     group: str = "/evt/",
     skim_format: str = "parquet",
-):
-    """
-    Builds a skimmed file from a (set) of evt tier file(s).
+) -> None:
+    """Builds a skimmed file from a (set) of evt tier file(s).
 
     Parameters
     ----------
     f_evt
-        list/path of evt file(s)
+        list/path of `evt` file(s).
     f_skm
-        name of the skm output file
+        name of the `skm` output file.
     skm_conf
-        name of JSON file or dict defining skm fields. multiplicity defines upto which row length VectorOfVector fields should be kept. Skimmed fields are forwarded from the evt tier and clipped/padded according to missing_value if needed. Global fields define an operation to reduce the dimension of VectorOfVector event fields.
+        name of configuration file or dictionary defining `skm` fields.
+
+        - ``multiplicity`` defines up to which row length
+          :class:`.VectorOfVector` fields should be kept.
+        - ``index_field``
+        - ``skimmed_fields`` are forwarded from the evt tier and clipped/padded
+          according to ``missing_value`` if needed.
+        - ``global_fields`` defines an operation to reduce the dimension of
+          :class:`.VectorOfVector` event fields.
+
         For example:
 
-        .. code-block::json
+        .. code-block:: json
 
             {
-                "multiplicity": 2,
-                "index_field": "timestamp",
-                "skimmed_fields": {
-                    "timestamp":{
-                        "evt_field": "timestamp"
-                    },
-                    "is_muon_rejected":{
-                        "evt_field": "is_muon_rejected"
-                    },
-                    "multiplicity":{
-                        "evt_field": "multiplicity"
-                    },
-                    "energy":{
-                        "evt_field": "energy",
-                        "missing_value": "np.nan"
-                    },
-                    "energy_id":{
-                        "evt_field": "energy_id",
-                        "missing_value": 0
-                    },
-                    "global_fields":{
-                        "energy_sum":{
-                            "aggregation_mode": "sum",
-                            "evt_field": "energy"
-                        },
-                        "is_all_physical":{
-                            "aggregation_mode": "all",
-                            "evt_field": "is_physical"
-                        },
-                    }
+              "multiplicity": 2,
+              "index_field": "timestamp",
+              "skimmed_fields": {
+                "timestamp":{
+                  "evt_field": "timestamp"
+                },
+                "is_muon_rejected":{
+                  "evt_field": "is_muon_rejected"
+                },
+                "multiplicity":{
+                  "evt_field": "multiplicity"
+                },
+                "energy":{
+                  "evt_field": "energy",
+                  "missing_value": "np.nan"
+                },
+                "energy_id":{
+                  "evt_field": "energy_id",
+                  "missing_value": 0
+                },
+                "global_fields":{
+                  "energy_sum":{
+                    "aggregation_mode": "sum",
+                    "evt_field": "energy"
+                  },
+                  "is_all_physical":{
+                    "aggregation_mode": "all",
+                    "evt_field": "is_physical"
+                  },
                 }
+              }
             }
 
     wo_mode
         writing mode.
-        - ``write_safe`` or ``w``: only proceed with writing if the file does not already exists.
+
+        - ``write_safe`` or ``w``: only proceed with writing if the file does
+          not already exists.
         - ``append`` or ``a``: append  to file.
         - ``overwrite`` or ``o``: replaces existing file.
-    group
-        lh5 root group name of the evt tier
-    skim_format
-        data format of the skimmed output (hdf or parquet)
-    """
 
+    group
+        LH5 root group name of the evt tier.
+    skim_format
+        data format of the skimmed output (``hdf`` or ``parquet``).
+    """
     log = logging.getLogger(__name__)
     log.info("Starting skimming")
     log.debug(f"I am skimning {len(f_evt) if isinstance(f_evt,list) else 1} files")

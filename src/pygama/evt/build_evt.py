@@ -1,5 +1,5 @@
 """
-This module implements routines to build the evt tier.
+This module implements routines to build the `evt` tier.
 """
 
 from __future__ import annotations
@@ -52,44 +52,59 @@ def evaluate_expression(
     defv=np.nan,
     sorter: str = None,
 ) -> dict:
-    """
-    Evaluates the expression defined by the user across all channels according to the mode
+    """Evaluates the expression defined by the user across all channels
+    according to the mode.
 
     Parameters
     ----------
     f_tcm
-       Path to tcm tier file
+       path to `tcm` tier file.
     f_evt
-       Path to event tier file
+       path to `evt` tier file.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       List of channel names across which expression gets evaluated (form: "ch<rawid>")
+       list of channel names across which expression gets evaluated (form:
+       ``ch<rawid>``).
     chns_rm
-       List of channels which get set to default value during evaluation. In function mode they are removed entirely (form: "ch<rawid>")
+       list of channels which get set to default value during evaluation. In
+       function mode they are removed entirely (form: ``ch<rawid>``)
     mode
-       The mode determines how the event entry is calculated across channels. Options are:
-       - "first_at:sorter": aggregates across channels by returning the expression of the channel with smallest value of sorter.
-       - "last_at": aggregates across channels by returning the expression of the channel with largest value of sorter.
-       - "sum": aggregates by summation.
-       - "any": aggregates by logical or.
-       - "all": aggregates by logical and.
-       - "keep_at:ch_field": aggregates according to passed ch_field
-       - "gather": Channels are not combined, but result saved as VectorOfVectors.
+       The mode determines how the event entry is calculated across channels.
+       Options are:
+
+       - ``first_at:sorter``: aggregates across channels by returning the
+         expression of the channel with smallest value of sorter.
+       - ``last_at``: aggregates across channels by returning the expression of
+         the channel with largest value of sorter.
+       - ``sum``: aggregates by summation.
+       - ``any``: aggregates by logical or.
+       - ``all``: aggregates by logical and.
+       - ``keep_at:ch_field``: aggregates according to passed ch_field
+       - ``gather``: Channels are not combined, but result saved as
+         :class:`.VectorOfVectors`.
+
     qry
-       A query that can mask the aggregation.
+       a query that can mask the aggregation.
     expr
-       The expression. That can be any mathematical equation/comparison. If mode == function, the expression needs to be a special processing function defined in modules (e.g. "modules.spm.get_energy). In the expression parameters from either hit, dsp, evt tier (from operations performed before this one! --> JSON operations order matters), or from the "parameters" field can be used.
+       the expression. That can be any mathematical equation/comparison. If
+       `mode` is ``function``, the expression needs to be a special processing
+       function defined in modules (e.g. :func:`.modules.spm.get_energy`). In
+       the expression parameters from either hit, dsp, evt tier (from
+       operations performed before this one! Dictionary operations order
+       matters), or from the ``parameters`` field can be used.
     nrows
-       Number of rows to be processed.
+       number of rows to be processed.
     para
-       Dictionary of parameters defined in the "parameters" field in the configuration JSON file.
+       dictionary of parameters defined in the ``parameters`` field in the
+       configuration dictionary.
     defv
-       default value of evaluation
+       default value of evaluation.
     sorter
-       can be used to sort vector outputs according to sorter expression (see :func:`evaluate_to_vector`)
+       can be used to sort vector outputs according to sorter expression (see
+       :func:`evaluate_to_vector`).
     """
 
     store = LH5Store()
@@ -293,21 +308,21 @@ def find_parameters(
     idx_ch: np.ndarray,
     exprl: list,
 ) -> dict:
-    """
-    Wraps :func:`load_vars_to_nda` to return parameters from hit and dsp tiers.
+    """Wraps :func:`load_vars_to_nda` to return parameters from `hit` and `dsp`
+    tiers.
 
     Parameters
     ----------
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     ch
-       rawid in the tiers
+       "rawid" in the tiers.
     idx_ch
-       index array of entries to be read from files
+       index array of entries to be read from files.
     exprl
-       list of tuples (tier, field) to be found in the hit/dsp tiers
+       list of tuples ``(tier, field)`` to be found in the `hit/dsp` tiers.
     """
 
     # find fields in either dsp, hit
@@ -318,20 +333,19 @@ def find_parameters(
 
 
 def load_vars_to_nda(f: str, group: str, exprl: list, idx: np.ndarray = None) -> dict:
-    """
-    Maps parameter expressions to parameters if found in f.
-    Blows up VectorOfVectors to ArrayOfEqualSizedArrays.
+    """Maps parameter expressions to parameters if found in `f`.
+    Blows up :class:`.VectorOfVectors` to :class:`.ArrayOfEqualSizedArrays`.
 
     Parameters
     ----------
     f
-       Path to a LGDO file
+       path to a LGDO file.
     group
-       additional group in f
+       additional group in `f`.
     idx
-       index array of entries to be read from files
+       index array of entries to be read from files.
     exprl
-       list of parameter-tuples (root_group, field) to be found in f
+       list of parameter-tuples ``(root_group, field)`` to be found in `f`.
     """
 
     store = LH5Store()
@@ -382,31 +396,31 @@ def get_data_at_channel(
     outsize: int,
     defv,
 ) -> np.ndarray:
-    """
-    Evaluates an expression and returns the result
+    """Evaluates an expression and returns the result.
 
     Parameters
     ----------
     ch
-       rawid of channel to be evaluated
+       "rawid" of channel to be evaluated.
     idx_ch
-       array of indices to be evaluated
+       array of indices to be evaluated.
     expr
-       expression to be evaluated
+       expression to be evaluated.
     exprl
-       list of parameter-tuples (root_group, field) found in the expression
+       list of parameter-tuples ``(root_group, field)`` found in the expression.
     var_ph
-       dict of additional parameters that are not channel dependent
+       dict of additional parameters that are not channel dependent.
     is_evaluated
-       if false, the expression does not get evaluated but an array of default values is returned
+       if false, the expression does not get evaluated but an array of default
+       values is returned.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     outsize
-       size of the return array
+       size of the return array.
     defv
-       default value
+       default value.
     """
 
     if not is_evaluated:
@@ -444,23 +458,22 @@ def get_mask_from_query(
     f_hit: str,
     f_dsp: str,
 ) -> np.ndarray:
-    """
-    Evaluates an query expression and returns a mask accordingly
+    """Evaluates a query expression and returns a mask accordingly.
 
     Parameters
     ----------
     qry
-       query expression
+       query expression.
     length
-       length of the return mask
+       length of the return mask.
     ch
-       rawid of channel to be evaluated
+       "rawid" of channel to be evaluated.
     idx_ch
-       array of indices to be evaluated
+       array of indices to be evaluated.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     """
 
     # get sub evt based query condition if needed
@@ -498,37 +511,37 @@ def evaluate_to_first(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates across channels by returning the expression of the channel with smallest value of sorter.
+    """Aggregates across channels by returning the expression of the channel
+    with smallest value of `sorter`.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output array
+       length of output array.
     sorter
-       tuple of field in hit/dsp/evt tier to evaluate (tier,field)
+       tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # define dimension of output array
@@ -592,37 +605,37 @@ def evaluate_to_last(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates across channels by returning the expression of the channel with largest value of sorter.
+    """Aggregates across channels by returning the expression of the channel
+    with largest value of `sorter`.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of dsp/hit/evt parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output array
+       length of output array.
     sorter
-       tuple of field in hit/dsp/evt tier to evaluate (tier,field)
+       tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # define dimension of output array
@@ -682,35 +695,34 @@ def evaluate_to_tot(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates by summation across channels.
+    """Aggregates by summation across channels.
 
     Parameters
     ----------
     idx
-       tcm index array
+       tcm index array.
     ids
-       tcm id array
+       tcm id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of dsp/hit/evt parameter tuples in expression (tier, field).
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
        length of output array
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of evt and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # define dimension of output array
@@ -759,35 +771,35 @@ def evaluate_to_any(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates by logical or operation across channels. If the expression evaluates to a non boolean value it is casted to bool.
+    """Aggregates by logical or operation across channels. If the expression
+    evaluates to a non boolean value it is casted to boolean.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output array
+       length of output array.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # define dimension of output array
@@ -836,35 +848,35 @@ def evaluate_to_all(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates by logical and operation across channels. If the expression evaluates to a non boolean value it is casted to bool.
+    """Aggregates by logical and operation across channels. If the expression
+    evaluates to a non boolean value it is casted to boolean.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output array
+       length of output array.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of evt and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # define dimension of output array
@@ -911,31 +923,30 @@ def evaluate_at_channel(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    aggregates by evaluating the expression at a given channel
+    """Aggregates by evaluating the expression at a given channel.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
-       array of rawids at which the expression is evaluated
+       array of rawids at which the expression is evaluated.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
@@ -977,31 +988,31 @@ def evaluate_at_channel_vov(
     var_ph: dict = None,
     defv=np.nan,
 ) -> dict:
-    """
-    same as :func:`evaluate_at_channel` but evaluates expression at non flat channels VectorOfVectors.
+    """Same as :func:`evaluate_at_channel` but evaluates expression at non
+    flat channels :class:`.VectorOfVectors`.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
-       array of rawids at which the expression is evaluated
+       array of "rawid"s at which the expression is evaluated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     """
 
     # blow up vov to aoesa
@@ -1055,41 +1066,41 @@ def evaluate_to_aoesa(
     defv=np.nan,
     missv=np.nan,
 ) -> np.ndarray:
-    """
-    Aggregates by returning a ArrayOfEqualSizedArrays of evaluated expressions of channels that fulfill a query expression.
+    """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
+    expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output VectorOfVectors
+       length of output :class:`.VectorOfVectors`.
     ch_comp
-       array of rawids at which the expression is evaluated
+       array of "rawid"s at which the expression is evaluated.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     missv
-       missing value
+       missing value.
     sorter
-       sorts the entries in the vector according to sorter expression
+       sorts the entries in the vector according to sorter expression.
     """
     # define dimension of output array
     out = np.full((nrows, len(chns)), missv)
@@ -1138,39 +1149,41 @@ def evaluate_to_vector(
     defv=np.nan,
     sorter: str = None,
 ) -> dict:
-    """
-    Aggregates by returning a VectorOfVector of evaluated expressions of channels that fulfill a query expression.
+    """Aggregates by returning a :class:`.VectorOfVector` of evaluated
+    expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
     idx
-       tcm index array
+       `tcm` index array.
     ids
-       tcm id array
+       `tcm` id array.
     f_hit
-       Path to hit tier file
+       path to `hit` tier file.
     f_dsp
-       Path to dsp tier file
+       path to `dsp` tier file.
     chns
-       list of channels to be aggregated
+       list of channels to be aggregated.
     chns_rm
-       list of channels to be skipped from evaluation and set to default value
+       list of channels to be skipped from evaluation and set to default value.
     expr
-       expression string to be evaluated
+       expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier,field)
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
-       query expression to mask aggregation
+       query expression to mask aggregation.
     nrows
-       length of output VectorOfVectors
+       length of output :class:`.VectorOfVectors`.
     ch_comp
-       array of rawids at which the expression is evaluated
+       array of "rawids" at which the expression is evaluated.
     var_ph
-       dictionary of evt and additional parameters and their values
+       dictionary of `evt` and additional parameters and their values.
     defv
-       default value
+       default value.
     sorter
-       sorts the entries in the vector according to sorter expression. acend_by:<hit|dsp.field> results in an vector ordered ascending, decend_by:<hit|dsp.field> sorts descending
+       sorts the entries in the vector according to sorter expression.
+       ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
+       ``decend_by:<hit|dsp.field>`` sorts descending.
     """
     out = evaluate_to_aoesa(
         idx,
@@ -1233,80 +1246,88 @@ def build_evt(
     group: str = "/evt/",
     tcm_group: str = "/hardware_tcm_1/",
 ) -> None:
-    """
-    Transform data from the hit and dsp levels which a channel sorted
-    to a event sorted data format
+    """Transform data from the `hit` and `dsp` levels which a channel sorted to a
+    event sorted data format.
 
     Parameters
     ----------
     f_tcm
-        input LH5 file of the tcm level
+        input LH5 file of the tcm level.
     f_dsp
-        input LH5 file of the dsp level
+        input LH5 file of the dsp level.
     f_hit
-        input LH5 file of the hit level
-
+        input LH5 file of the hit level.
     f_evt
-        name of the output file
+        name of the output file.
     evt_config
-        name of JSON file or dict defining evt fields. Channel lists can be defined by importing a meta module. The "operations" dictionary defines the fields (name=key), where "channels" specifies the channels used to for this field (either a string or a list of strings), "aggregation_mode" defines how the channels should be combined (see evaluate_expression). "expression" defnies the mathematical/special function to apply (see evaluate_expression),
-        "query" defines an expression to mask the aggregation.
-        "parameters" defines any other parameter used in expression. For example:
+        name of configuration file or dictionary defining event fields. Channel
+        lists can be defined by importing a metadata module.
 
-        .. code-block::json
+        - ``operations`` defines the fields ``name=key``, where ``channels``
+          specifies the channels used to for this field (either a string or a
+          list of strings),
+        - ``aggregation_mode`` defines how the channels should be combined (see
+          :func:`evaluate_expression`).
+        - ``expression`` defnies the mathematical/special function to apply
+          (see :func:`evaluate_expression`),
+        - ``query`` defines an expression to mask the aggregation.
+        - ``parameters`` defines any other parameter used in expression.
+
+        For example:
+
+        .. code-block:: json
 
             {
-                "channels": {
-                    "geds_on": ["ch1084803", "ch1084804", "ch1121600"],
-                    "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
-                    "muon": "ch1027202",
+              "channels": {
+                "geds_on": ["ch1084803", "ch1084804", "ch1121600"],
+                "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
+                "muon": "ch1027202",
+              },
+              "operations": {
+                "energy_id":{
+                  "channels": "geds_on",
+                  "aggregation_mode": "gather",
+                  "query": "hit.cuspEmax_ctc_cal>25",
+                  "expression": "tcm.array_id",
+                  "sort": "ascend_by:dsp.tp_0_est"
                 },
-                "operations": {
-                    "energy_id":{
-                        "channels": "geds_on",
-                        "aggregation_mode": "gather",
-                        "query": "hit.cuspEmax_ctc_cal>25",
-                        "expression": "tcm.array_id",
-                        "sort": "ascend_by:dsp.tp_0_est"
-                    },
-                    "energy":{
-                        "aggregation_mode": "keep_at:evt.energy_id",
-                        "expression": "hit.cuspEmax_ctc_cal>25"
-                    }
-                    "is_muon_rejected":{
-                        "channels": "muon",
-                        "aggregation_mode": "any",
-                        "expression": "dsp.wf_max>a",
-                        "parameters": {"a":15100},
-                        "initial": false
-                    },
-                    "multiplicity":{
-                        "channels":  ["geds_on","geds_no_psd","geds_ac"],
-                        "aggregation_mode": "sum",
-                        "expression": "hit.cuspEmax_ctc_cal > a",
-                        "parameters": {"a":25},
-                        "initial": 0
-                    },
-                    "t0":{
-                        "aggregation_mode": "keep_at:evt.energy_id",
-                        "expression": "dsp.tp_0_est"
-                    },
-                    "lar_energy":{
-                        "channels": "spms_on",
-                        "aggregation_mode": "function",
-                        "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
-                    },
+                "energy":{
+                  "aggregation_mode": "keep_at:evt.energy_id",
+                  "expression": "hit.cuspEmax_ctc_cal>25"
                 }
+                "is_muon_rejected":{
+                  "channels": "muon",
+                  "aggregation_mode": "any",
+                  "expression": "dsp.wf_max>a",
+                  "parameters": {"a":15100},
+                  "initial": false
+                },
+                "multiplicity":{
+                  "channels":  ["geds_on","geds_no_psd","geds_ac"],
+                  "aggregation_mode": "sum",
+                  "expression": "hit.cuspEmax_ctc_cal > a",
+                  "parameters": {"a":25},
+                  "initial": 0
+                },
+                "t0":{
+                  "aggregation_mode": "keep_at:evt.energy_id",
+                  "expression": "dsp.tp_0_est"
+                },
+                "lar_energy":{
+                  "channels": "spms_on",
+                  "aggregation_mode": "function",
+                  "expression": ".modules.spm.get_energy(0.5,evt.t0,48000,1000,5000)"
+                },
+              }
             }
 
     wo_mode
-        writing mode
+        writing mode.
     group
-        lh5 root group name
+        LH5 root group name.
     tcm_group
-        lh5 root group in tcm file
+        LH5 root group in tcm file.
     """
-
     store = LH5Store()
     tbl_cfg = evt_config
     if not isinstance(tbl_cfg, (str, dict)):
@@ -1488,21 +1509,23 @@ def skim_evt(
     wo_mode="n",
     evt_group="/evt/",
 ) -> None:
-    """
-    Skimms events from a evt file which are fullfling the expression, discards all other events.
+    """Skims events from an `evt` file which are fulfilling the expression,
+    discards all other events.
 
     Parameters
     ----------
     f_evt
-        input LH5 file of the evt level
+        input LH5 file of the `evt` level.
     expression
-        skimming expression. Can contain variables from event file or from the params dictionary.
+        skimming expression. Can contain variables from event file or from the
+        `params` dictionary.
     f_out
-        output LH5 file. Can be None if wo_mode is set to overwrite f_evt.
+        output LH5 file. Can be ``None`` if `wo_mode` is set to overwrite `f_evt`.
     wo_mode
-        Write mode: "o"/"overwrite" overwrites f_evt. "n"/"new" writes to a new file specified in f_out.
+        Write mode: ``o``/``overwrite`` overwrites f_evt. ``n``/``new`` writes
+        to a new file specified in `f_out`.
     evt_group
-        lh5 root group of the evt file
+        LH5 root group of the `evt` file.
     """
 
     if wo_mode not in ["o", "overwrite", "n", "new"]:
@@ -1543,7 +1566,8 @@ def skim_evt(
 
     if res.shape != (nrows,):
         raise ValueError(
-            f"The expression must result to 1D with length = event number. Current shape is {res.shape}"
+            "The expression must result to 1D with length = event number. "
+            f"Current shape is {res.shape}"
         )
 
     res = res.astype(bool)
