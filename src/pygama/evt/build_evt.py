@@ -1397,9 +1397,9 @@ def build_evt(
                 )
 
             store.write(
-                obj=res,
-                name=group + k,
-                lh5_file=f_evt_tmp,
+                res,
+                group + k,
+                f_evt_tmp,
                 wo_mode=wo_mode,
             )
 
@@ -1454,9 +1454,9 @@ def build_evt(
             if isinstance(obj, np.ndarray):
                 obj = Array(result["values"])
             store.write(
-                obj=obj,
-                name=group + k,
-                lh5_file=f_evt_tmp,
+                obj,
+                group + k,
+                f_evt_tmp,
                 wo_mode=wo_mode,
             )
 
@@ -1467,9 +1467,9 @@ def build_evt(
         for fld in tbl_cfg["outputs"]:
             obj, _ = store.read(group + fld, f_evt_tmp)
             store.write(
-                obj=obj,
-                name=group + fld,
-                lh5_file=f_evt,
+                obj,
+                group + fld,
+                f_evt,
                 wo_mode=wo_mode,
             )
     else:
@@ -1557,9 +1557,9 @@ def skim_evt(
     for fld in fields:
         ob, _ = store.read(fld, f_evt, idx=idx_list)
         store.write(
-            obj=ob,
-            name=fld,
-            lh5_file=of_tmp,
+            ob,
+            fld,
+            of_tmp,
             wo_mode="o",
         )
 

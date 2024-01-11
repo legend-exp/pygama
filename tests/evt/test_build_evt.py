@@ -145,7 +145,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     with pytest.raises(RuntimeError):
         build_evt(f_dsp, f_tcm, f_hit, outfile, f_config)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(KeyError):
         build_evt(f_tcm, f_hit, f_dsp, outfile, f_config)
 
     with pytest.raises(TypeError):
