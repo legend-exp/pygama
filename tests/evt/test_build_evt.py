@@ -142,7 +142,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
     f_config = f"{config_dir}/basic-evt-config.json"
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(KeyError):
         build_evt(f_dsp, f_tcm, f_hit, outfile, f_config)
 
     with pytest.raises(KeyError):

@@ -1378,13 +1378,7 @@ def build_evt(
         elif isinstance(v, list):
             chns[k] = [e for e in v]
 
-    nrows = len(
-        lh5.load_nda(f_tcm, ["cumulative_length"], tcm_group)["cumulative_length"]
-    )
-    # nrows = store.read_n_rows(f"{tcm_group}/cumulative_length", f_tcm)
-    log.info(
-        f"Applying {len(tbl_cfg['operations'].keys())} operations to key {f_tcm.split('-')[-2]}"
-    )
+    nrows = store.read_n_rows(f"{tcm_group}/cumulative_length", f_tcm)
 
     # Define temporary file
     f_evt_tmp = f"{os.path.dirname(f_evt)}/{os.path.basename(f_evt).split('.')[0]}_tmp{random.randrange(9999):04d}.lh5"
@@ -1498,8 +1492,6 @@ def build_evt(
         log.warning("No output fields specified, no file will be written.")
 
     os.remove(f_evt_tmp)
-
-    log.info("Done")
 
 
 def skim_evt(

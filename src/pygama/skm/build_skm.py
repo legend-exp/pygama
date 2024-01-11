@@ -98,8 +98,8 @@ def build_skm(
         data format of the skimmed output (``hdf`` or ``parquet``).
     """
     log = logging.getLogger(__name__)
-    log.info("Starting skimming")
     log.debug(f"I am skimning {len(f_evt) if isinstance(f_evt,list) else 1} files")
+
     tbl_cfg = skm_conf
     if not isinstance(tbl_cfg, (str, dict)):
         raise TypeError()
@@ -276,5 +276,3 @@ def build_skm(
             df.to_parquet(f_skm, append=True)
     else:
         raise ValueError(f"wo_mode {wo_mode} not valid.")
-
-    log.info("done")
