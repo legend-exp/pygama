@@ -1,3 +1,5 @@
+<img src=".github/logo.png" alt="pygama logo" align="left" height="410">
+
 # pygama
 
 [![PyPI](https://img.shields.io/pypi/v/pygama?logo=pypi)](https://pypi.org/project/pygama/)
