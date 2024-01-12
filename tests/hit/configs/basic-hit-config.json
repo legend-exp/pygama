@@ -1,8 +1,8 @@
 {
   "outputs": ["calE", "AoE", "A_max"],
   "operations": {
-    "twice_trap_e_max": {
-      "expression": "2 * trapEmax"
+    "AoE": {
+      "expression": "A_max/calE"
     },
     "calE": {
       "expression": "sqrt(a + b * twice_trap_e_max**2)",
@@ -18,8 +18,8 @@
         }
       }
     },
-    "AoE": {
-      "expression": "A_max/calE"
+    "twice_trap_e_max": {
+      "expression": "2 * trapEmax"
     }
   }
 }
