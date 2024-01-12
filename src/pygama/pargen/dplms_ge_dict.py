@@ -13,11 +13,9 @@ import pickle
 import time
 from collections import OrderedDict
 
-import lgdo
-import lgdo.lh5_store as lh5
 import matplotlib.pyplot as plt
 import numpy as np
-from lgdo import Array
+from lgdo import Array, Table, lh5
 from scipy.signal import convolve, convolve2d
 
 from pygama.math.histogram import get_hist
@@ -42,8 +40,8 @@ sto = lh5.LH5Store()
 
 def dplms_ge_dict(
     lh5_path: str,
-    raw_fft: lgdo.Table,
-    raw_cal: lgdo.Table,
+    raw_fft: Table,
+    raw_cal: Table,
     dsp_config: dict,
     par_dsp: dict,
     par_dsp_lh5: str,
@@ -57,19 +55,19 @@ def dplms_ge_dict(
 
     Parameters
     ----------
-    lh5_path: str
+    lh5_path
         Name of channel to process, should be name of lh5 group in raw files
-    fft_files : lgdo.Table
+    fft_files
         table with fft data
-    raw_cal : lgdo.Table
+    raw_cal
         table with cal data
-    dsp_config: dict
+    dsp_config
         dsp config file
-    par_dsp: dict
+    par_dsp
         Dictionary with db parameters for dsp processing
-    par_dsp_lh5: str
+    par_dsp_lh5
         Path for saving dplms coefficients
-    dplms_dict: dict
+    dplms_dict
         Dictionary with various parameters
 
     Returns
@@ -275,7 +273,7 @@ def dplms_ge_dict(
         wsize,
     )
 
-    sto.write_object(
+    sto.write(
         Array(x),
         name="dplms",
         lh5_file=par_dsp_lh5,
