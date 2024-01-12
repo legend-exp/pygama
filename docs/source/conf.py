@@ -39,6 +39,7 @@ html_theme_options = {
     "source_directory": "docs/source",
 }
 html_title = f"{project} {version}"
+html_logo = "../../.github/logo.png"
 
 # sphinx-napoleon
 # enforce consistent usage of NumPy-style docstrings
