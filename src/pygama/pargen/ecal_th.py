@@ -15,7 +15,7 @@ import matplotlib as mpl
 from scipy.stats import binned_statistic
 
 mpl.use("agg")
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -212,7 +212,7 @@ class calibrate_parameter:
                 indexes.append(i)
                 continue
             elif peak == 511.0:
-                log.info(f"e annhilation found at index {i}")
+                log.info(f"e annihilation found at index {i}")
                 indexes.append(i)
                 continue
             elif np.isnan(dfwhms[i]):
@@ -1326,7 +1326,7 @@ def plot_eres_fit(ecal_class, data, erange=[200, 2700], figsize=[12, 8], fontsiz
             indexes.append(i)
             continue
         elif peak == 511.0:
-            log.info(f"e annhilation found at index {i}")
+            log.info(f"e annihilation found at index {i}")
             indexes.append(i)
             continue
         else:

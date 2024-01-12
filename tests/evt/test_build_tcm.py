@@ -15,7 +15,7 @@ def test_generate_tcm_cols(lgnd_test_data):
     store = LH5Store()
     coin_data = []
     for tbl in tables:
-        ts, _ = store.read_object(f"{tbl}/raw/timestamp", f_raw)
+        ts, _ = store.read(f"{tbl}/raw/timestamp", f_raw)
         coin_data.append(ts)
 
     tcm_cols = evt.generate_tcm_cols(
@@ -67,6 +67,6 @@ def test_build_tcm(lgnd_test_data, tmptestdir):
     )
     assert os.path.exists(out_file)
     store = LH5Store()
-    obj, n_rows = store.read_object("hardware_tcm", out_file)
+    obj, n_rows = store.read("hardware_tcm", out_file)
     assert isinstance(obj, lgdo.Struct)
     assert list(obj.keys()) == ["cumulative_length", "array_id", "array_idx"]

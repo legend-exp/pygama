@@ -49,7 +49,7 @@ def build_tcm(
     out_name
         name for the TCM table in the output file.
     wo_mode
-        mode to send to :meth:`~.lgdo.lh5_store.LH5Store.write_object`.
+        mode to send to :meth:`~.lgdo.lh5.LH5Store.write`.
 
     See Also
     --------
@@ -79,7 +79,7 @@ def build_tcm(
                 else:
                     array_id = len(all_tables) - 1
                 table = table + "/" + coin_col
-                coin_data.append(store.read_object(table, filename)[0].nda)
+                coin_data.append(store.read(table, filename)[0].nda)
                 array_ids.append(array_id)
 
     tcm_cols = ptcm.generate_tcm_cols(
@@ -94,6 +94,6 @@ def build_tcm(
     )
 
     if out_file is not None:
-        store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
+        store.write(tcm, out_name, out_file, wo_mode=wo_mode)
 
     return tcm

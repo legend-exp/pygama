@@ -8,6 +8,7 @@ import logging
 import os
 from collections import OrderedDict
 
+import lgdo
 import numpy as np
 from lgdo import LH5Iterator, LH5Store, ls
 
@@ -25,10 +26,12 @@ def build_hit(
     buffer_len: int = 3200,
 ) -> None:
     """
-    Transform a :class:`~.lgdo.Table` into a new :class:`~.lgdo.Table` by
-    evaluating strings describing column operations.
+    Transform a :class:`~lgdo.types.table.Table` into a new
+    :class:`~lgdo.types.table.Table` by evaluating strings describing column
+    operations.
 
-    Operates on columns only, not specific rows or elements.
+    Operates on columns only, not specific rows or elements. Relies on
+    :meth:`~lgdo.types.table.Table.eval`.
 
     Parameters
     ----------
@@ -47,7 +50,7 @@ def build_hit(
                 "outputs": ["calE", "AoE"],
                 "operations": {
                     "calE": {
-                        "expression": "sqrt(@a + @b * trapEmax**2)",
+                        "expression": "sqrt(a + b * trapEmax**2)",
                         "parameters": {"a": "1.23", "b": "42.69"},
                     },
                     "AoE": {"expression": "A_max/calE"},
@@ -69,7 +72,11 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`~.lgdo.lh5_store.write_object`.
+        forwarded to :meth:`lgdo.lh5.store.LH5Store.write`.
+
+    See Also
+    --------
+    lgdo.types.table.Table.eval
     """
     store = LH5Store()
 
@@ -129,7 +136,40 @@ def build_hit(
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
-            outtbl_obj = tbl_obj.eval(cfg["operations"])
+            # create a new table object that links all the columns in the
+            # current table (i.e. no copy)
+            outtbl_obj = lgdo.Table(col_dict=tbl_obj)
+
+            for outname, info in cfg["operations"].items():
+                outcol = outtbl_obj.eval(
+                    info["expression"], info.get("parameters", None)
+                )
+                if "lgdo_attrs" in info:
+                    outcol.attrs |= info["lgdo_attrs"]
+
+                outtbl_obj.add_column(outname, outcol)
+
+            # make high level flags
+            if "aggregations" in cfg:
+                for high_lvl_flag, flags in cfg["aggregations"].items():
+                    flags_list = list(flags.values())
+                    n_flags = len(flags_list)
+                    if n_flags <= 8:
+                        flag_dtype = np.uint8
+                    elif n_flags <= 16:
+                        flag_dtype = np.uint16
+                    elif n_flags <= 32:
+                        flag_dtype = np.uint32
+                    else:
+                        flag_dtype = np.uint64
+
+                    df_flags = outtbl_obj.get_dataframe(flags_list)
+                    flag_values = df_flags.values.astype(flag_dtype)
+
+                    multiplier = 2 ** np.arange(n_flags, dtype=flag_values.dtype)
+                    flag_out = np.dot(flag_values, multiplier)
+
+                    outtbl_obj.add_field(high_lvl_flag, lgdo.Array(flag_out))
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary
@@ -146,7 +186,7 @@ def build_hit(
                         if col not in cfg["outputs"]:
                             outtbl_obj.remove_column(col, delete=True)
 
-            store.write_object(
+            store.write(
                 obj=outtbl_obj,
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,

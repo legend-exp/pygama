@@ -80,7 +80,7 @@ def pygama_cli():
 
 
 def add_lh5ls_parser(subparsers):
-    """Configure :func:`.lgdo.lh5_store.show` command line interface."""
+    """Configure :func:`.lgdo.lh5.show` command line interface."""
 
     parser_lh5ls = subparsers.add_parser(
         "lh5ls", description="""Inspect LEGEND HDF5 (LH5) file contents"""
@@ -99,7 +99,7 @@ def add_lh5ls_parser(subparsers):
 
 
 def lh5_show_cli(args):
-    """Passes command line arguments to :func:`.lgdo.lh5_store.show`."""
+    """Passes command line arguments to :func:`.lgdo.lh5.show`."""
 
     show(args.lh5_file, args.lh5_group, attrs=args.attributes)
 

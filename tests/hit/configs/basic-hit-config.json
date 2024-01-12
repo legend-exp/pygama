@@ -9,6 +9,13 @@
       "parameters": {
         "a": 1.23,
         "b": 42.69
+      },
+      "lgdo_attrs": {
+        "units": "keV",
+        "hdf5_settings": {
+          "compression": "gzip",
+          "shuffle": true
+        }
       }
     },
     "AoE": {
