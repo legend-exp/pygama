@@ -1,4 +1,4 @@
-<img src=".github/logo.png" alt="pygama logo" align="left" height="410">
+<img src=".github/logo.png" alt="pygama logo" align="left" height="150">
 
 # pygama
 
