@@ -7,8 +7,26 @@ import pytest
 from lgdo import LH5Store, ls
 
 from pygama.hit import build_hit
+from pygama.hit.build_hit import _reorder_table_operations
 
 config_dir = Path(__file__).parent / "configs"
+
+
+def test_ops_reorder():
+    assert list(_reorder_table_operations({}).keys()) == []
+
+    ops = {
+        "out1": {"expression": "out2 + out3 * outy"},
+        "out2": {"expression": "log(out4)"},
+        "out3": {"expression": "outx + 2"},
+        "out4": {"expression": "outz + out3"},
+    }
+    assert list(_reorder_table_operations(ops).keys()) == [
+        "out3",
+        "out4",
+        "out2",
+        "out1",
+    ]
 
 
 def test_basics(dsp_test_file, tmptestdir):
