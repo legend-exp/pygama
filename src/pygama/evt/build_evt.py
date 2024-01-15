@@ -8,12 +8,11 @@ import itertools
 import json
 import logging
 import os
-import random
 import re
 from importlib import import_module
 
 import numpy as np
-from lgdo import Array, VectorOfVectors, lh5
+from lgdo import Array, Table, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
 from numpy.typing import NDArray
 
@@ -40,7 +39,6 @@ def num_and_pars(value: str, par_dic: dict):
 
 def evaluate_expression(
     f_tcm: str,
-    f_evt: str,
     f_hit: str,
     f_dsp: str,
     chns: list,
@@ -48,6 +46,7 @@ def evaluate_expression(
     mode: str,
     expr: str,
     nrows: int,
+    table: Table = None,
     para: dict = None,
     qry: str = None,
     defv: bool | int | float = np.nan,
@@ -60,8 +59,6 @@ def evaluate_expression(
     ----------
     f_tcm
        path to `tcm` tier file.
-    f_evt
-       path to `evt` tier file.
     f_hit
        path to `hit` tier file.
     f_dsp
@@ -98,6 +95,8 @@ def evaluate_expression(
        matters), or from the ``parameters`` field can be used.
     nrows
        number of rows to be processed.
+    table
+       table of 'evt' tier data.
     para
        dictionary of parameters defined in the ``parameters`` field in the
        configuration dictionary.
@@ -113,8 +112,8 @@ def evaluate_expression(
     # find parameters in evt file or in parameters
     exprl = re.findall(r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", expr)
     var_ph = {}
-    if os.path.exists(f_evt):
-        var_ph = load_vars_to_nda(f_evt, "", exprl)
+    if table:
+        var_ph = var_ph | table
     if para:
         var_ph = var_ph | para
 
@@ -122,9 +121,7 @@ def evaluate_expression(
         # evaluate expression
         func, params = expr.split("(")
         params = (
-            params.replace("dsp.", "dsp_")
-            .replace("hit.", "hit_")
-            .replace("evt.", "evt_")
+            params.replace("dsp.", "dsp_").replace("hit.", "hit_").replace("evt.", "")
         )
         params = [f_hit, f_dsp, f_tcm, [x for x in chns if x not in chns_rm]] + [
             num_and_pars(e, var_ph) for e in params[:-1].split(",")
@@ -144,11 +141,8 @@ def evaluate_expression(
                 raise ValueError("Query can't be a mix of evt tier and lower tiers.")
 
             # if it is an evt query we can evaluate it directly here
-            if os.path.exists(f_evt) and "evt." in qry:
-                var_qry = load_vars_to_nda(
-                    f_evt, "", re.findall(r"(evt).([a-zA-Z_$][\w$]*)", qry)
-                )
-                qry_mask = eval(qry.replace("evt.", "evt_"), var_qry)
+            if table and "evt." in qry:
+                qry_mask = eval(qry.replace("evt.", ""), table)
 
         # load TCM data to define an event
         ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
@@ -156,13 +150,12 @@ def evaluate_expression(
 
         # switch through modes
         if (
-            os.path.exists(f_evt)
+            table
             and "keep_at:" == mode[:8]
             and "evt." == mode[8:][:4]
-            and mode[8:].split(".")[-1]
-            in [e.split("/")[-1] for e in lh5.ls(f_evt, "/evt/")]
+            and mode[8:].split(".")[-1] in table.keys()
         ):
-            ch_comp, _ = store.read(mode[8:].replace(".", "/"), f_evt)
+            ch_comp = table[mode[8:].replace("evt.", "")]
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
                     idx,
@@ -1380,44 +1373,18 @@ def build_evt(
 
     nrows = store.read_n_rows(f"{tcm_group}/cumulative_length", f_tcm)
 
-    # Define temporary file
-    f_evt_tmp = f"{os.path.dirname(f_evt)}/{os.path.basename(f_evt).split('.')[0]}_tmp{random.randrange(9999):04d}.lh5"
+    table = Table(size=nrows)
 
     for k, v in tbl_cfg["operations"].items():
         log.debug("Processing field" + k)
 
         # if mode not defined in operation, it can only be an operation on the evt level.
         if "aggregation_mode" not in v.keys():
-            exprl = re.findall(r"(evt).([a-zA-Z_$][\w$]*)", v["expression"])
             var = {}
-            if os.path.exists(f_evt_tmp):
-                var = load_vars_to_nda(f_evt_tmp, "", exprl)
-
             if "parameters" in v.keys():
                 var = var | v["parameters"]
-            res = eval(v["expression"].replace("evt.", "evt_"), var)
-
-            # now check what dimension we have after the evaluation
-            if len(res.shape) == 1:
-                res = Array(res)
-            elif len(res.shape) == 2:
-                res = VectorOfVectors(
-                    flattened_data=res.flatten()[~np.isnan(res.flatten())],
-                    cumulative_length=np.cumsum(
-                        np.count_nonzero(~np.isnan(res), axis=1)
-                    ),
-                )
-            else:
-                raise NotImplementedError(
-                    f"Currently only 2d formats are supported, the evaluated array has the dimension {res.shape}"
-                )
-
-            store.write(
-                res,
-                group + k,
-                f_evt_tmp,
-                wo_mode=wo_mode,
-            )
+            res = table.eval(v["expression"].replace("evt.", ""), var)
+            table.add_field(k, res)
 
         # Else we build the event entry
         else:
@@ -1452,7 +1419,6 @@ def build_evt(
 
             result = evaluate_expression(
                 f_tcm,
-                f_evt_tmp,
                 f_hit,
                 f_dsp,
                 chns_e,
@@ -1460,6 +1426,7 @@ def build_evt(
                 v["aggregation_mode"],
                 v["expression"],
                 nrows,
+                table,
                 pars,
                 qry,
                 defaultv,
@@ -1469,29 +1436,20 @@ def build_evt(
             obj = result["values"]
             if isinstance(obj, np.ndarray):
                 obj = Array(result["values"])
-            store.write(
-                obj,
-                group + k,
-                f_evt_tmp,
-                wo_mode=wo_mode,
-            )
 
-    # write output fields into f_evt and delete temporary file
+            table.add_field(k, obj)
+
+    # write output fields into f_evt
     if "outputs" in tbl_cfg.keys():
         if len(tbl_cfg["outputs"]) < 1:
             log.warning("No output fields specified, no file will be written.")
-        for fld in tbl_cfg["outputs"]:
-            obj, _ = store.read(group + fld, f_evt_tmp)
-            store.write(
-                obj,
-                group + fld,
-                f_evt,
-                wo_mode=wo_mode,
-            )
+        else:
+            clms_to_remove = [e for e in table.keys() if e not in tbl_cfg["outputs"]]
+            for fld in clms_to_remove:
+                table.remove_field(fld, True)
+            store.write(obj=table, name=group, lh5_file=f_evt, wo_mode=wo_mode)
     else:
         log.warning("No output fields specified, no file will be written.")
-
-    os.remove(f_evt_tmp)
 
 
 def skim_evt(
