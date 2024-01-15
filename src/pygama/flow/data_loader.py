@@ -588,13 +588,13 @@ class DataLoader:
             except KeyError:
                 log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
                 continue
-            # Have to do some hacky stuff until I get a get_dataframe() method
+            # Have to do some hacky stuff until I get a view_as("pd") method
             tcm_lgdo[self.tcms[tcm_level]["tcm_cols"]["child_idx"]] = Array(
                 nda=explode_cl(tcm_lgdo["cumulative_length"].nda)
             )
             tcm_lgdo.pop("cumulative_length")
             tcm_tb = Table(col_dict=tcm_lgdo)
-            f_entries = tcm_tb.get_dataframe()
+            f_entries = tcm_tb.view_as("pd")
             renaming = {
                 self.tcms[tcm_level]["tcm_cols"]["child_idx"]: f"{child}_idx",
                 self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
@@ -666,7 +666,7 @@ class DataLoader:
                                     tb_table.join(tier_table)
                     if tb_table is None:
                         continue
-                    tb_df = tb_table.get_dataframe()
+                    tb_df = tb_table.view_as("pd")
                     tb_df.query(cut, inplace=True)
                     idx_match = f_entries.query(f"{level}_idx in {list(tb_df.index)}")
                     if level == parent:
@@ -878,7 +878,7 @@ class DataLoader:
                         continue
 
                     # convert to DataFrame and apply cuts
-                    tb_df = tb_table.get_dataframe()
+                    tb_df = tb_table.view_as("pd")
                     tb_df.query(cut, inplace=True)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
@@ -1144,7 +1144,7 @@ class DataLoader:
                 if self.output_format == "lgdo.Table":
                     return f_table
                 elif self.output_format == "pd.DataFrame":
-                    return f_table.get_dataframe()
+                    return f_table.view_as("pd")
                 else:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"
@@ -1255,7 +1255,7 @@ class DataLoader:
                     return load_out
                 elif self.output_format == "pd.DataFrame":
                     for file in load_out.keys():
-                        load_out[file] = load_out[file].get_dataframe()
+                        load_out[file] = load_out[file].view_as("pd")
                     return load_out
                 else:
                     raise ValueError(
@@ -1336,7 +1336,7 @@ class DataLoader:
                     return load_out
                 elif self.output_format == "pd.DataFrame":
                     for file in load_out.keys():
-                        load_out[file] = load_out[file].get_dataframe()
+                        load_out[file] = load_out[file].view_as("pd")
                     return load_out
                 else:
                     raise ValueError(

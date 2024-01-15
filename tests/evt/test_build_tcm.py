@@ -2,7 +2,7 @@ import os
 
 import lgdo
 import numpy as np
-from lgdo import LH5Store
+from lgdo import lh5
 
 from pygama import evt
 
@@ -11,8 +11,8 @@ def test_generate_tcm_cols(lgnd_test_data):
     f_raw = lgnd_test_data.get_path(
         "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
     )
-    tables = lgdo.ls(f_raw)
-    store = LH5Store()
+    tables = lh5.ls(f_raw)
+    store = lh5.LH5Store()
     coin_data = []
     for tbl in tables:
         ts, _ = store.read(f"{tbl}/raw/timestamp", f_raw)
@@ -66,7 +66,7 @@ def test_build_tcm(lgnd_test_data, tmptestdir):
         wo_mode="of",
     )
     assert os.path.exists(out_file)
-    store = LH5Store()
+    store = lh5.LH5Store()
     obj, n_rows = store.read("hardware_tcm", out_file)
     assert isinstance(obj, lgdo.Struct)
     assert list(obj.keys()) == ["cumulative_length", "array_id", "array_idx"]
