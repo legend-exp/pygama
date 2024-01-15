@@ -11,7 +11,7 @@ from typing import Iterable, Mapping
 
 import lgdo
 import numpy as np
-from lgdo import LH5Iterator, LH5Store, ls
+from lgdo.lh5 import LH5Iterator, LH5Store, ls
 
 log = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ def build_hit(
                     else:
                         flag_dtype = np.uint64
 
-                    df_flags = outtbl_obj.get_dataframe(flags_list)
+                    df_flags = outtbl_obj.view_as("pd", cols=flags_list)
                     flag_values = df_flags.values.astype(flag_dtype)
 
                     multiplier = 2 ** np.arange(n_flags, dtype=flag_values.dtype)
