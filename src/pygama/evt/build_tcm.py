@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-import lgdo as lgdo
+import lgdo
+from lgdo import lh5
 
 from . import tcm as ptcm
 
@@ -57,7 +58,7 @@ def build_tcm(
     """
     # hash_func: later can add list or dict or a function(str) --> int.
 
-    store = lgdo.LH5Store()
+    store = lh5.LH5Store()
     coin_data = []
     array_ids = []
     all_tables = []
@@ -65,7 +66,7 @@ def build_tcm(
         if isinstance(patterns, str):
             patterns = [patterns]
         for pattern in patterns:
-            tables = lgdo.ls(filename, lh5_group=pattern)
+            tables = lh5.ls(filename, lh5_group=pattern)
             for table in tables:
                 all_tables.append(table)
                 array_id = len(array_ids)
