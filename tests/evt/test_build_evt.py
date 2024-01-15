@@ -1,14 +1,15 @@
 import os
 from pathlib import Path
 
-import lgdo.lh5_store as store
 import numpy as np
 import pytest
-from lgdo import Array, VectorOfVectors, load_nda, ls
+from lgdo import Array, VectorOfVectors, lh5
+from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt, skim_evt
 
 config_dir = Path(__file__).parent / "configs"
+store = LH5Store()
 
 
 def test_basics(lgnd_test_data, tmptestdir):
@@ -28,10 +29,11 @@ def test_basics(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 10
-    nda = load_nda(
-        outfile, ["energy", "energy_aux", "energy_sum", "multiplicity"], "/evt/"
-    )
+    assert len(lh5.ls(outfile, "/evt/")) == 10
+    nda = {
+        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
+        for e in ["energy", "energy_aux", "energy_sum", "multiplicity"]
+    }
     assert (
         nda["energy"][nda["multiplicity"] == 1]
         == nda["energy_aux"][nda["multiplicity"] == 1]
@@ -62,12 +64,11 @@ def test_lar_module(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 10
-    nda = load_nda(
-        outfile,
-        ["lar_multiplicity", "lar_multiplicity_dplms", "t0", "lar_time_shift"],
-        "/evt/",
-    )
+    assert len(lh5.ls(outfile, "/evt/")) == 10
+    nda = {
+        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
+        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "t0", "lar_time_shift"]
+    }
     assert np.max(nda["lar_multiplicity"]) <= 3
     assert np.max(nda["lar_multiplicity_dplms"]) <= 3
     assert ((nda["lar_time_shift"] + nda["t0"]) >= 0).all()
@@ -89,12 +90,11 @@ def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 10
-    nda = load_nda(
-        outfile,
-        ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"],
-        "/evt/",
-    )
+    assert len(lh5.ls(outfile, "/evt/")) == 10
+    nda = {
+        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
+        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"]
+    }
     assert np.max(nda["lar_multiplicity"]) <= 3
     assert np.max(nda["lar_multiplicity_dplms"]) <= 3
 
@@ -115,14 +115,13 @@ def test_vov(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 9
-    lstore = store.LH5Store()
-    vov_ene, _ = lstore.read("/evt/energy", outfile)
-    vov_aoe, _ = lstore.read("/evt/aoe", outfile)
-    arr_ac, _ = lstore.read("/evt/multiplicity", outfile)
-    vov_aoeene, _ = lstore.read("/evt/energy_times_aoe", outfile)
-    vov_eneac, _ = lstore.read("/evt/energy_times_multiplicity", outfile)
-    arr_ac2, _ = lstore.read("/evt/multiplicity_squared", outfile)
+    assert len(lh5.ls(outfile, "/evt/")) == 9
+    vov_ene, _ = store.read("/evt/energy", outfile)
+    vov_aoe, _ = store.read("/evt/aoe", outfile)
+    arr_ac, _ = store.read("/evt/multiplicity", outfile)
+    vov_aoeene, _ = store.read("/evt/energy_times_aoe", outfile)
+    vov_eneac, _ = store.read("/evt/energy_times_multiplicity", outfile)
+    arr_ac2, _ = store.read("/evt/multiplicity_squared", outfile)
     assert isinstance(vov_ene, VectorOfVectors)
     assert isinstance(vov_aoe, VectorOfVectors)
     assert isinstance(arr_ac, Array)
@@ -191,7 +190,7 @@ def test_query(lgnd_test_data, tmptestdir):
         group="/evt/",
         tcm_group="hardware_tcm_1",
     )
-    assert len(ls(outfile, "/evt/")) == 12
+    assert len(lh5.ls(outfile, "/evt/")) == 12
 
 
 def test_vector_sort(lgnd_test_data, tmptestdir):
@@ -234,13 +233,12 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
     build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
 
     assert os.path.exists(outfile)
-    assert len(ls(outfile, "/evt/")) == 4
-    lstore = store.LH5Store()
-    vov_t0, _ = lstore.read("/evt/t0_acend", outfile)
-    nda_t0 = vov_t0.to_aoesa().nda
+    assert len(lh5.ls(outfile, "/evt/")) == 4
+    vov_t0, _ = store.read("/evt/t0_acend", outfile)
+    nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) >= 0) | (np.isnan(np.diff(nda_t0)))).all()
-    vov_t0, _ = lstore.read("/evt/t0_decend", outfile)
-    nda_t0 = vov_t0.to_aoesa().nda
+    vov_t0, _ = store.read("/evt/t0_decend", outfile)
+    nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
 
 
@@ -255,17 +253,16 @@ def test_skimming(lgnd_test_data, tmptestdir):
     f_config = f"{config_dir}/vov-test-evt-config.json"
     build_evt(f_tcm, f_dsp, f_hit, outfile, f_config)
 
-    lstore = store.LH5Store()
-    ac = lstore.read("/evt/multiplicity", outfile)[0].nda
+    ac = store.read("/evt/multiplicity", outfile)[0].view_as("np")
     ac = len(ac[ac == 3])
 
     outfile_skm = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
 
     skim_evt(outfile, "multiplicity == 3", None, outfile_skm, "n")
-    assert ac == len(lstore.read("/evt/energy", outfile_skm)[0].to_aoesa().nda)
+    assert ac == len(store.read("/evt/energy", outfile_skm)[0].to_aoesa().view_as("np"))
 
     skim_evt(outfile, "multiplicity == 3", None, None, "o")
-    assert ac == len(lstore.read("/evt/energy", outfile)[0].to_aoesa().nda)
+    assert ac == len(store.read("/evt/energy", outfile)[0].to_aoesa().view_as("np"))
 
     with pytest.raises(ValueError):
         skim_evt(outfile, "multiplicity == 3", None, None, "bla")
