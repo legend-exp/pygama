@@ -17,7 +17,7 @@ from lgdo.lh5 import LH5Store
 
 
 # get LAr energy per event over all channels
-def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
+def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
     trig = trgr
     if isinstance(trgr, VectorOfVectors):
         trig = trig.to_aoesa().nda
@@ -58,11 +58,11 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
         sum[idx_ch] = sum[idx_ch] + chsum
-    return sum
+    return Array(nda=sum)
 
 
 # get LAr majority per event over all channels
-def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
+def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
     trig = trgr
     if isinstance(trgr, VectorOfVectors):
         trig = trig.to_aoesa().nda
@@ -103,11 +103,13 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
         chsum = np.nansum(pes, axis=1)
         chmaj = np.where(chsum > lim, 1, 0)
         maj[idx_ch] = maj[idx_ch] + chmaj
-    return maj
+    return Array(nda=maj)
 
 
 # get LAr energy per event over all channels
-def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
+def get_energy_dplms(
+    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
+) -> Array:
     trig = trgr
     if isinstance(trgr, VectorOfVectors):
         trig = trig.to_aoesa().nda
@@ -147,11 +149,13 @@ def get_energy_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
         pes = np.where(mask, pes, 0)
         chsum = np.nansum(pes, axis=1)
         sum[idx_ch] = sum[idx_ch] + chsum
-    return sum
+    return Array(nda=sum)
 
 
 # get LAr majority per event over all channels
-def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
+def get_majority_dplms(
+    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
+) -> Array:
     trig = trgr
     if isinstance(trgr, VectorOfVectors):
         trig = trig.to_aoesa().nda
@@ -192,10 +196,12 @@ def get_majority_dplms(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
         chsum = np.nansum(pes, axis=1)
         chmaj = np.where(chsum > lim, 1, 0)
         maj[idx_ch] = maj[idx_ch] + chmaj
-    return maj
+    return Array(nda=maj)
 
 
-def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, trail):
+def get_etc(
+    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, trail
+) -> Array:
     # ignore stupid numpy warnings
     warnings.filterwarnings("ignore", r"All-NaN slice encountered")
     warnings.filterwarnings("ignore", r"invalid value encountered in true_divide")
@@ -267,7 +273,7 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
             / np.nansum(np.where((times >= tt), pes, 0), axis=(0, 2)),
             np.nansum(np.where((times >= tt), pes, 0), axis=(0, 2)),
         )
-        return outi
+        return Array(nda=outi)
 
     else:
         outi = np.where(
@@ -281,10 +287,10 @@ def get_etc(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, swin, tra
             / np.nansum(np.where((times >= tge[:, None]), pes, 0), axis=(0, 2)),
             np.nansum(pes, axis=(0, 2)),
         )
-        return outi
+        return Array(nda=outi)
 
 
-def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
+def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
     store = LH5Store()
     energy_in_pe, _ = store.read(
         f"{chs[0]}/hit/energy_in_pe",
@@ -334,4 +340,4 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax):
 
         t1d = np.nanmin(times, axis=(0, 2))
 
-        return t1d - tge
+        return Array(t1d - tge)
