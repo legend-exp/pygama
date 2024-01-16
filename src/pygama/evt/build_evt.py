@@ -114,7 +114,11 @@ def evaluate_expression(
     exprl = re.findall(r"(evt|hit|dsp).([a-zA-Z_$][\w$]*)", expr)
     var_ph = {}
     if table:
-        var_ph = var_ph | table
+        var_ph = var_ph | {
+            e: table[e].view_as("ak")
+            for e in table.keys()
+            if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
+        }
     if para:
         var_ph = var_ph | para
 
@@ -349,9 +353,7 @@ def get_data_at_channel(
         # evaluate expression
         # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
         res = eval(
-            expr.replace("dsp.", "dsp_")
-            .replace("hit.", "hit_")
-            .replace("evt.", "evt_"),
+            expr.replace("dsp.", "dsp_").replace("hit.", "hit_").replace("evt.", ""),
             var,
         )
 

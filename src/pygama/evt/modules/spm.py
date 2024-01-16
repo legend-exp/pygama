@@ -24,6 +24,17 @@ def get_spm_mask(lim, trgr, tdefault, tmin, tmax, pe, times) -> np.ndarray:
         trig = trig.to_aoesa().view_as("np")
     elif isinstance(trgr, Array):
         trig = trig.view_as("np")
+    elif isinstance(trgr, ak.Array):
+        if trgr.ndim == 1:
+            trig = ak.to_numpy(trig)
+        else:
+            trig = ak.to_numpy(
+                ak.fill_none(
+                    ak.pad_none(trig, target=ak.max(ak.count(trig, axis=-1)), axis=-1),
+                    np.nan,
+                ),
+                allow_missing=False,
+            )
     if isinstance(trig, np.ndarray) and trig.ndim == 2:
         trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
         trig = np.nanmin(trig, axis=1)
@@ -281,7 +292,7 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) ->
     # load TCM data to define an event
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
-    spm_tmin = np.full(np.max(idx), np.inf)
+    spm_tmin = np.full(np.max(idx) + 1, np.inf)
     for i in range(len(chs)):
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(chs[i][2:])]
