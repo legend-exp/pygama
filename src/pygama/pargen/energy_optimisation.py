@@ -13,12 +13,12 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
+import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost, util
-from lgdo import Array, Table, WaveformTable, lh5
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit, minimize
@@ -857,7 +857,6 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
         csqr,
         n_sig,
         n_sig_err,
-        _,
     ) = get_peak_fwhm_with_dt_corr(
         Energies, alpha, dt, func, gof_func, peak=peak, kev_width=kev_width, kev=True
     )
@@ -892,14 +891,14 @@ def get_wf_indexes(sorted_indexs, n_events):
 
 
 def index_data(data, indexes, wf_field="waveform"):
-    new_baselines = Array(data["baseline"].nda[indexes])
+    new_baselines = lh5.Array(data["baseline"].nda[indexes])
     new_waveform_values = data[wf_field]["values"].nda[indexes]
     new_waveform_dts = data[wf_field]["dt"].nda[indexes]
     new_waveform_t0 = data[wf_field]["t0"].nda[indexes]
-    new_waveform = WaveformTable(
+    new_waveform = lh5.WaveformTable(
         None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
     )
-    new_data = Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
+    new_data = lh5.Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
     return new_data
 
 
@@ -1068,20 +1067,17 @@ def event_selection(
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
-    out_events = np.unique(np.concatenate(out_events))
+    out_events = np.unique(np.array(out_events).flatten())
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
     return out_events, idx_list
 
 
-def fwhm_slope(x, m0, m1, m2=None):
+def fwhm_slope(x, m0, m1, m2):
     """
     Fit the energy resolution curve
     """
-    if m2 is None:
-        return np.sqrt(m0 + m1 * x)
-    else:
-        return np.sqrt(m0 + m1 * x + m2 * (x**2))
+    return np.sqrt(m0 + m1 * x + m2 * (x**2))
 
 
 def interpolate_energy(peak_energies, points, err_points, energy):
@@ -1089,7 +1085,7 @@ def interpolate_energy(peak_energies, points, err_points, energy):
     if len(points[~nan_mask]) < 3:
         return np.nan, np.nan, np.nan
     else:
-        param_guess = [2, 0.001]
+        param_guess = [2, 0.001, 0.000001]  #
         # param_bounds = (0, [10., 1. ])#
         try:
             fit_pars, fit_covs = curve_fit(
@@ -1139,11 +1135,6 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
-
-    if idxs is not None:
-        Energies = Energies[idxs]
-        dt = dt[idxs]
-
     if np.isnan(Energies).any() or np.isnan(dt).any():
         if np.isnan(Energies).any():
             log.debug(f"nan energy values for peak {peak}")
@@ -1157,6 +1148,10 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
+
+    if idxs is not None:
+        Energies = Energies[idxs]
+        dt = dt[idxs]
 
     # Return fwhm of optimal alpha in kev with error
     try:
@@ -1210,37 +1205,39 @@ def single_peak_fom(data, kwarg_dict):
     return out_dict
 
 
-def new_fom(data, kwarg_dict, alpha=None):
+def new_fom(data, kwarg_dict):
     peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
 
     peak_dicts = kwarg_dict["peak_dicts"]
 
-    if alpha is None:
-        out_dict = fom_FWHM_with_dt_corr_fit(
-            data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], display=0
-        )
-        alpha = out_dict["alpha"]
-
+    out_dict = fom_FWHM_with_dt_corr_fit(
+        data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], display=0
+    )
+    alpha = out_dict["alpha"]
     log.info(alpha)
     fwhms = []
     fwhm_errs = []
     n_sig = []
     n_sig_err = []
-    chisquares = []
-    for i, peak in enumerate(peaks):
+    for i, peak in enumerate(peaks[:-1]):
         out_peak_dict = fom_FWHM(
             data, peak_dicts[i], ctc_param, alpha, idxs=idx_list[i], display=0
         )
+        # n_sig_minimum = peak_dicts[i]["n_sig_minimum"]
+        # if peak_dict["n_sig"]<n_sig_minimum:
+        #    out_peak_dict['fwhm'] = np.nan
+        #   out_peak_dict['fwhm_err'] = np.nan
         fwhms.append(out_peak_dict["fwhm"])
         fwhm_errs.append(out_peak_dict["fwhm_err"])
         n_sig.append(out_peak_dict["n_sig"])
         n_sig_err.append(out_peak_dict["n_sig_err"])
-        chisquares.append(out_peak_dict["chisquare"])
-
+    fwhms.append(out_dict["fwhm"])
+    fwhm_errs.append(out_dict["fwhm_err"])
+    n_sig.append(out_dict["n_sig"])
+    n_sig_err.append(out_dict["n_sig_err"])
     log.info(f"fwhms are {fwhms}keV +- {fwhm_errs}")
-
     qbb, qbb_err, fit_pars = interpolate_energy(
         np.array(peaks), np.array(fwhms), np.array(fwhm_errs), 2039
     )
@@ -1258,8 +1255,6 @@ def new_fom(data, kwarg_dict, alpha=None):
         "fwhm_errs": fwhm_errs,
         "n_events": n_sig,
         "n_sig_err": n_sig_err,
-        "fit_pars": fit_pars,
-        "chisquares": chisquares,
     }
 
 
