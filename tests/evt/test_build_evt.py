@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+import awkward as ak
 import numpy as np
 import pytest
 from lgdo import Array, VectorOfVectors, lh5
@@ -90,13 +91,18 @@ def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 10
+    assert len(lh5.ls(outfile, "/evt/")) == 12
     nda = {
         e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
         for e in ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"]
     }
     assert np.max(nda["lar_multiplicity"]) <= 3
     assert np.max(nda["lar_multiplicity_dplms"]) <= 3
+
+    ch_idx = store.read("/evt/lar_tcm_index", outfile)[0].view_as("ak")
+    pls_idx = store.read("/evt/lar_pulse_index", outfile)[0].view_as("ak")
+    assert ak.count(ch_idx) == ak.count(pls_idx)
+    assert ak.all(ak.count(ch_idx, axis=-1) == ak.count(pls_idx, axis=-1))
 
 
 def test_vov(lgnd_test_data, tmptestdir):

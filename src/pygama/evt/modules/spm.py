@@ -11,18 +11,19 @@ additional parameters are free to the user and need to be defined in the JSON
 
 import warnings
 
+import awkward as ak
 import numpy as np
 from lgdo import Array, VectorOfVectors
 from lgdo.lh5 import LH5Store
 
 
-# get LAr energy per event over all channels
-def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
+# get SiPM coincidence window mask
+def get_spm_mask(lim, trgr, tdefault, tmin, tmax, pe, times) -> np.ndarray:
     trig = trgr
     if isinstance(trgr, VectorOfVectors):
-        trig = trig.to_aoesa().nda
+        trig = trig.to_aoesa().view_as("np")
     elif isinstance(trgr, Array):
-        trig = trig.nda
+        trig = trig.view_as("np")
     if isinstance(trig, np.ndarray) and trig.ndim == 2:
         trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
         trig = np.nanmin(trig, axis=1)
@@ -31,14 +32,70 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Arr
         trig = np.where(np.isnan(trig), tdefault, trig)
     else:
         raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
+
     tmi = trig - tmin
     tma = trig + tmax
-    sum = np.zeros(len(trig))
+
+    mask = (times < tma[:, None] / 16) & (times > tmi[:, None] / 16) & (pe > lim)
+    return mask, trig
+
+
+# get LAr indices according to mask per event over all channels
+def get_masked_tcm_idx(
+    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, get_pls_idx=False
+) -> VectorOfVectors:
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
 
+    arr_lst = []
+    for ch in chs:
+        idx_ch = idx[ids == int(ch[2:])]
+        energy_in_pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
+        trigger_pos = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
+            "np"
+        )
+        mask, _ = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
+        )
+
+        if get_pls_idx:
+            out_idx = np.repeat(
+                np.arange(len(mask[0]))[:, None], repeats=len(mask), axis=1
+            ).T
+            out_idx = np.where(mask, out_idx, np.nan)
+            out_idx = VectorOfVectors(
+                flattened_data=out_idx.flatten()[~np.isnan(out_idx.flatten())],
+                cumulative_length=np.cumsum(
+                    np.count_nonzero(~np.isnan(out_idx), axis=1)
+                ),
+                dtype=int,
+            ).view_as("ak")
+        else:
+            out_idx = np.where(mask, np.where(ids == int(ch[2:]))[0][:, None], np.nan)
+            out_idx = VectorOfVectors(
+                flattened_data=out_idx.flatten()[~np.isnan(out_idx.flatten())],
+                cumulative_length=np.cumsum(
+                    np.count_nonzero(~np.isnan(out_idx), axis=1)
+                ),
+                dtype=int,
+            ).view_as("ak")
+
+        arr_lst.append(out_idx)
+
+    return VectorOfVectors(array=ak.concatenate(arr_lst, axis=-1))
+
+
+# get LAr energy per event over all channels
+def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
+    # load TCM data to define an event
+    store = LH5Store()
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    sum = np.zeros(np.max(idx) + 1)
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -48,10 +105,8 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Arr
         trigger_pos = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
             "np"
         )
-        mask = (
-            (trigger_pos < tma[:, None] / 16)
-            & (trigger_pos > tmi[:, None] / 16)
-            & (energy_in_pe > lim)
+        mask, _ = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
         )
         pes = energy_in_pe
         pes = np.where(np.isnan(pes), 0, pes)
@@ -63,26 +118,11 @@ def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Arr
 
 # get LAr majority per event over all channels
 def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
-    trig = trgr
-    if isinstance(trgr, VectorOfVectors):
-        trig = trig.to_aoesa().nda
-    elif isinstance(trgr, Array):
-        trig = trig.nda
-    if isinstance(trig, np.ndarray) and trig.ndim == 2:
-        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
-        trig = np.nanmin(trig, axis=1)
-
-    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
-        trig = np.where(np.isnan(trig), tdefault, trig)
-    else:
-        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
-    tmi = trig - tmin
-    tma = trig + tmax
-    maj = np.zeros(len(trig))
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    maj = np.zeros(np.max(idx) + 1)
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -92,11 +132,10 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> A
         trigger_pos = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
             "np"
         )
-        mask = (
-            (trigger_pos < tma[:, None] / 16)
-            & (trigger_pos > tmi[:, None] / 16)
-            & (energy_in_pe > lim)
+        mask, _ = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
         )
+
         pes = energy_in_pe
         pes = np.where(np.isnan(pes), 0, pes)
         pes = np.where(mask, pes, 0)
@@ -110,26 +149,11 @@ def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> A
 def get_energy_dplms(
     f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
 ) -> Array:
-    trig = trgr
-    if isinstance(trgr, VectorOfVectors):
-        trig = trig.to_aoesa().nda
-    elif isinstance(trgr, Array):
-        trig = trig.nda
-    if isinstance(trig, np.ndarray) and trig.ndim == 2:
-        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
-        trig = np.nanmin(trig, axis=1)
-
-    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
-        trig = np.where(np.isnan(trig), tdefault, trig)
-    else:
-        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
-    tmi = trig - tmin
-    tma = trig + tmax
-    sum = np.zeros(len(trig))
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    sum = np.zeros(np.max(idx) + 1)
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -139,10 +163,8 @@ def get_energy_dplms(
         trigger_pos_dplms = store.read(
             f"{ch}/hit/trigger_pos_dplms", f_hit, idx=idx_ch
         )[0].view_as("np")
-        mask = (
-            (trigger_pos_dplms < tma[:, None] / 16)
-            & (trigger_pos_dplms > tmi[:, None] / 16)
-            & (energy_in_pe_dplms > lim)
+        mask, _ = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe_dplms, trigger_pos_dplms
         )
         pes = energy_in_pe_dplms
         pes = np.where(np.isnan(pes), 0, pes)
@@ -156,26 +178,11 @@ def get_energy_dplms(
 def get_majority_dplms(
     f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
 ) -> Array:
-    trig = trgr
-    if isinstance(trgr, VectorOfVectors):
-        trig = trig.to_aoesa().nda
-    elif isinstance(trgr, Array):
-        trig = trig.nda
-    if isinstance(trig, np.ndarray) and trig.ndim == 2:
-        trig = np.where(np.isnan(trig).all(axis=1)[:, None], tdefault, trig)
-        trig = np.nanmin(trig, axis=1)
-
-    elif isinstance(trig, np.ndarray) and trig.ndim == 1:
-        trig = np.where(np.isnan(trig), tdefault, trig)
-    else:
-        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
-    tmi = trig - tmin
-    tma = trig + tmax
-    maj = np.zeros(len(trig))
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    maj = np.zeros(np.max(idx) + 1)
     for ch in chs:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(ch[2:])]
@@ -185,10 +192,8 @@ def get_majority_dplms(
         trigger_pos_dplms = store.read(
             f"{ch}/hit/trigger_pos_dplms", f_hit, idx=idx_ch
         )[0].view_as("np")
-        mask = (
-            (trigger_pos_dplms < tma[:, None] / 16)
-            & (trigger_pos_dplms > tmi[:, None] / 16)
-            & (energy_in_pe_dplms > lim)
+        mask, _ = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe_dplms, trigger_pos_dplms
         )
         pes = energy_in_pe_dplms
         pes = np.where(np.isnan(pes), 0, pes)
@@ -215,23 +220,6 @@ def get_etc(
     pes = np.zeros([len(chs), peshape[0], peshape[1]])
     times = np.zeros([len(chs), peshape[0], peshape[1]])
 
-    tge = trgr
-    if isinstance(trgr, VectorOfVectors):
-        tge = tge.to_aoesa().nda
-    elif isinstance(trgr, Array):
-        tge = tge.nda
-    if isinstance(tge, np.ndarray) and tge.ndim == 2:
-        tge = np.where(np.isnan(tge).all(axis=1)[:, None], tdefault, tge)
-        tge = np.nanmin(tge, axis=1)
-
-    elif isinstance(tge, np.ndarray) and tge.ndim == 1:
-        tge = np.where(np.isnan(tge), tdefault, tge)
-    else:
-        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
-
-    tmi = tge - tmin
-    tma = tge + tmax
-
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
@@ -245,10 +233,8 @@ def get_etc(
         trigger_pos = store.read(f"{chs[i]}/hit/trigger_pos", f_hit, idx=idx_ch)[
             0
         ].view_as("np")
-        mask = (
-            (trigger_pos < tma[:, None] / 16)
-            & (trigger_pos > tmi[:, None] / 16)
-            & (energy_in_pe > lim)
+        mask, tge = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
         )
         pe = energy_in_pe
         time = trigger_pos * 16
@@ -292,52 +278,30 @@ def get_etc(
 
 def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
     store = LH5Store()
-    energy_in_pe, _ = store.read(
-        f"{chs[0]}/hit/energy_in_pe",
-        f_hit,
-    )
-    peshape = energy_in_pe.view_as("np").shape
-    times = np.zeros([len(chs), peshape[0], peshape[1]])
-
-    tge = trgr
-    if isinstance(trgr, VectorOfVectors):
-        tge = tge.to_aoesa().nda
-    elif isinstance(trgr, Array):
-        tge = tge.nda
-    if isinstance(tge, np.ndarray) and tge.ndim == 2:
-        tge = np.where(np.isnan(tge).all(axis=1)[:, None], tdefault, tge)
-        tge = np.nanmin(tge, axis=1)
-
-    elif isinstance(tge, np.ndarray) and tge.ndim == 1:
-        tge = np.where(np.isnan(tge), tdefault, tge)
-    else:
-        raise ValueError(f"Can't deal with t0 of type {type(trgr)}")
-
-    tmi = tge - tmin
-    tma = tge + tmax
-
     # load TCM data to define an event
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    spm_tmin = np.full(np.max(idx), np.inf)
     for i in range(len(chs)):
         # get index list for this channel to be loaded
         idx_ch = idx[ids == int(chs[i][2:])]
         energy_in_pe = store.read(f"{chs[i]}/hit/energy_in_pe", f_hit, idx=idx_ch)[
             0
-        ].view_as("np")
+        ].view_as("ak")
         trigger_pos = store.read(f"{chs[i]}/hit/trigger_pos", f_hit, idx=idx_ch)[
             0
-        ].view_as("np")
-        mask = (
-            (trigger_pos < tma[:, None] / 16)
-            & (trigger_pos > tmi[:, None] / 16)
-            & (energy_in_pe > lim)
+        ].view_as("ak")
+        mask, tge = get_spm_mask(
+            lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
         )
 
         time = trigger_pos * 16
-        time = np.where(mask, time, np.nan)
-        times[i][idx_ch] = time
+        time = ak.min(ak.nan_to_none(time[mask]), axis=-1)
+        if not time:
+            return Array(nda=np.zeros(len(spm_tmin)))
+        time = ak.fill_none(time, tdefault)
+        if not time:
+            time = ak.to_numpy(time, allow_missing=False)
+            spm_tmin = np.where(time < spm_tmin, time, spm_tmin)
 
-        t1d = np.nanmin(times, axis=(0, 2))
-
-        return Array(t1d - tge)
+    return Array(spm_tmin - tge)
