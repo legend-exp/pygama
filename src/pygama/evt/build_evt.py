@@ -1165,6 +1165,11 @@ def build_evt(
     else:
         log.warning("No output fields specified, no file will be written.")
 
+    key = re.search(r"\d{8}T\d{6}Z", f_hit).group(0)
+    log.info(
+        f"Applied {len(tbl_cfg['operations'])} operations to key {key} and saved {len(tbl_cfg['outputs'])} evt fields across {len(chns)} channel groups"
+    )
+
 
 def skim_evt(
     f_evt: str,
