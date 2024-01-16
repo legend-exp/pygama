@@ -3,10 +3,10 @@ from __future__ import annotations
 import logging
 from types import FunctionType
 
-import lgdo.lh5_store as lh5
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost, util
+from lgdo import Table, lh5
 
 log = logging.getLogger(__name__)
 
@@ -70,15 +70,20 @@ def load_data(
         masks = np.array([], dtype=bool)
         for tstamp, tfiles in files.items():
             table = sto.read(lh5_path, tfiles)[0]
+            file_df = pd.DataFrame(columns=params)
             if tstamp in cal_dict:
-                file_df = table.eval(cal_dict[tstamp]).get_dataframe()
+                cal_dict_ts = cal_dict[tstamp]
             else:
-                file_df = table.eval(cal_dict).get_dataframe()
+                cal_dict_ts = cal_dict
+            for param in params:
+                if param in cal_dict_ts:
+                    expression = cal_dict_ts[param]["expression"]
+                    parameters = cal_dict_ts[param].get("parameters", None)
+                    file_df[param] = table.eval(expression, parameters)
+                else:
+                    file_df[param] = table[param]
             file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
             params.append("run_timestamp")
-            for param in params:
-                if param not in file_df:
-                    file_df[param] = lh5.load_nda(tfiles, [param], lh5_path)[param]
             if threshold is not None:
                 mask = file_df[cal_energy_param] > threshold
                 file_df.drop(np.where(~mask)[0], inplace=True)
@@ -96,10 +101,14 @@ def load_data(
         params = get_params(keys + list(cal_dict.keys()), params)
 
         table = sto.read(lh5_path, files)[0]
-        df = table.eval(cal_dict).get_dataframe()
+        df = pd.DataFrame(columns=params)
         for param in params:
-            if param not in df:
-                df[param] = lh5.load_nda(files, [param], lh5_path)[param]
+            if param in cal_dict:
+                expression = cal_dict[param]["expression"]
+                parameters = cal_dict[param].get("parameters", None)
+                df[param] = table.eval(expression, parameters)
+            else:
+                df[param] = table[param]
         if threshold is not None:
             masks = df[cal_energy_param] > threshold
             df.drop(np.where(~masks)[0], inplace=True)
