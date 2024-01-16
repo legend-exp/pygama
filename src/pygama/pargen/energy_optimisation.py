@@ -13,12 +13,12 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
-import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost, util
+from lgdo import Array, Table, WaveformTable, lh5
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit, minimize
@@ -892,14 +892,14 @@ def get_wf_indexes(sorted_indexs, n_events):
 
 
 def index_data(data, indexes, wf_field="waveform"):
-    new_baselines = lh5.Array(data["baseline"].nda[indexes])
+    new_baselines = Array(data["baseline"].nda[indexes])
     new_waveform_values = data[wf_field]["values"].nda[indexes]
     new_waveform_dts = data[wf_field]["dt"].nda[indexes]
     new_waveform_t0 = data[wf_field]["t0"].nda[indexes]
-    new_waveform = lh5.WaveformTable(
+    new_waveform = WaveformTable(
         None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
     )
-    new_data = lh5.Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
+    new_data = Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
     return new_data
 
 
@@ -1070,7 +1070,7 @@ def event_selection(
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
-    out_events = np.unique(np.array(out_events).flatten())
+    out_events = np.unique(np.concatenate(out_events))
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
     return out_events, idx_list

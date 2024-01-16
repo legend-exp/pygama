@@ -8,10 +8,7 @@ import itertools
 import json
 import logging
 import os
-import pathlib
-import pickle
 import time
-from collections import OrderedDict
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,14 +22,9 @@ from pygama.math.peak_fitting import (
     gauss_step_pdf,
     radford_pdf,
 )
-from pygama.pargen.cuts import find_pulser_properties, generate_cuts, get_cut_indexes
+from pygama.pargen.cuts import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
-from pygama.pargen.energy_cal import hpge_find_E_peaks
-from pygama.pargen.energy_optimisation import (
-    event_selection,
-    fom_FWHM,
-    fom_FWHM_with_dt_corr_fit,
-)
+from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -72,11 +64,12 @@ def dplms_ge_dict(
 
     Returns
     -------
-    out_dict : dict
+    out_dict
     """
 
     t0 = time.time()
     log.info(f"\nSelecting baselines")
+
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp[lh5_path])
     cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
     idxs = get_cut_indexes(dsp_fft, cut_dict)
@@ -133,11 +126,7 @@ def dplms_ge_dict(
 
     # penalized coefficients
     dp_coeffs = dplms_dict["dp_coeffs"]
-    if lh5_path in dplms_dict["noisy_bl"]:
-        log.info("Setting explicit zero area condition")
-        za_coeff = dp_coeffs["za"]
-    else:
-        za_coeff = dplms_dict["dp_def"]["za"]
+    za_coeff = dplms_dict["dp_def"]["za"]
     dp_coeffs.pop("za")
     coeff_keys = [key for key in dp_coeffs.keys()]
     lists = [dp_coeffs[key] for key in dp_coeffs.keys()]
@@ -177,9 +166,7 @@ def dplms_ge_dict(
             dplms_dict["length"],
             wsize,
         )
-        par_dsp[lh5_path]["dplms"] = {}
-        par_dsp[lh5_path]["dplms"]["length"] = dplms_dict["length"]
-        par_dsp[lh5_path]["dplms"]["coefficients"] = x.tolist()
+        par_dsp[lh5_path]["dplms"] = {"length": dplms_dict["length"], "coefficients": x}
         log.info(
             f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area", np.sum(x)
         )
@@ -402,11 +389,11 @@ def dplms_ge_dict(
         plot_dict["dplms"]["wf_sel"] = fig
 
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
-        ax.plot(np.flip(x), "r-", label=f"filter")
+        ax.plot(x, "r-", label=f"filter")
         ax.axhline(0, color="black", linestyle=":")
         ax.legend(loc="upper right", title=f"{lh5_path}")
         axin = ax.inset_axes([0.6, 0.1, 0.35, 0.33])
-        axin.plot(np.flip(x), "r-")
+        axin.plot(x, "r-")
         axin.set_xlim(
             dplms_dict["length"] / 2 - dplms_dict["zoom"],
             dplms_dict["length"] / 2 + dplms_dict["zoom"],
@@ -560,14 +547,18 @@ def filter_synthesis(
     fmat: np.array,
     length: int,
     size: int,
+    flip: bool = True,
 ) -> np.array:
     mat = nmat + rmat + za * np.ones([length, length]) + pmat + fmat
     flo = (size // 2) - (length // 2)
     fhi = (size // 2) + (length // 2)
-    x = np.linalg.solve(mat, ref[flo:fhi])
+    x = np.linalg.solve(mat, ref[flo:fhi]).astype(np.float32)
     y = convolve(ref, np.flip(x), mode="valid")
     maxy = np.max(y)
     x /= maxy
     y /= maxy
     refy = ref[(size // 2) - (len(y) // 2) : (size // 2) + (len(y) // 2)]
-    return x, y, refy
+    if flip:
+        return np.flip(x), y, refy
+    else:
+        return x, y, refy
