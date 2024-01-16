@@ -52,8 +52,12 @@ def get_spm_mask(lim, trgr, tdefault, tmin, tmax, pe, times) -> np.ndarray:
 
 
 # get LAr indices according to mask per event over all channels
+# mode 0 -> return pulse indices
+# mode 1 -> return tcm indices
+# mode 2 -> return rawids
+# mode 3 -> return tcm_idx
 def get_masked_tcm_idx(
-    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, get_pls_idx=False
+    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode=0
 ) -> VectorOfVectors:
     # load TCM data to define an event
     store = LH5Store()
@@ -73,7 +77,7 @@ def get_masked_tcm_idx(
             lim, trgr, tdefault, tmin, tmax, energy_in_pe, trigger_pos
         )
 
-        if get_pls_idx:
+        if mode == 0:
             out_idx = np.repeat(
                 np.arange(len(mask[0]))[:, None], repeats=len(mask), axis=1
             ).T
@@ -84,8 +88,8 @@ def get_masked_tcm_idx(
                     np.count_nonzero(~np.isnan(out_idx), axis=1)
                 ),
                 dtype=int,
-            ).view_as("ak")
-        else:
+            ).view_as("ak", preserve_dtype=True)
+        elif mode == 1:
             out_idx = np.where(mask, np.where(ids == int(ch[2:]))[0][:, None], np.nan)
             out_idx = VectorOfVectors(
                 flattened_data=out_idx.flatten()[~np.isnan(out_idx.flatten())],
@@ -93,7 +97,27 @@ def get_masked_tcm_idx(
                     np.count_nonzero(~np.isnan(out_idx), axis=1)
                 ),
                 dtype=int,
-            ).view_as("ak")
+            ).view_as("ak", preserve_dtype=True)
+        elif mode == 2:
+            out_idx = np.where(mask, int(ch[2:]), np.nan)
+            out_idx = VectorOfVectors(
+                flattened_data=out_idx.flatten()[~np.isnan(out_idx.flatten())],
+                cumulative_length=np.cumsum(
+                    np.count_nonzero(~np.isnan(out_idx), axis=1)
+                ),
+                dtype=int,
+            ).view_as("ak", preserve_dtype=True)
+        elif mode == 3:
+            out_idx = np.where(mask, idx_ch[:, None], np.nan)
+            out_idx = VectorOfVectors(
+                flattened_data=out_idx.flatten()[~np.isnan(out_idx.flatten())],
+                cumulative_length=np.cumsum(
+                    np.count_nonzero(~np.isnan(out_idx), axis=1)
+                ),
+                dtype=int,
+            ).view_as("ak", preserve_dtype=True)
+        else:
+            raise ValueError("Unknown mode")
 
         arr_lst.append(out_idx)
 

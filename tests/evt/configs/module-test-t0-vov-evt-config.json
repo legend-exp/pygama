@@ -71,12 +71,12 @@
     "lar_tcm_index": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": ".modules.spm.get_masked_tcm_idx(0.5,evt.t0,48000,1000,5000,False)"
+      "expression": ".modules.spm.get_masked_tcm_idx(0.5,evt.t0,48000,1000,5000,1)"
     },
     "lar_pulse_index": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": ".modules.spm.get_masked_tcm_idx(0.5,evt.t0,48000,1000,5000,True)"
+      "expression": ".modules.spm.get_masked_tcm_idx(0.5,evt.t0,48000,1000,5000,0)"
     }
   }
 }
