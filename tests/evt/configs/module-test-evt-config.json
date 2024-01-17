@@ -31,7 +31,7 @@
       "initial": 0
     },
     "t0": {
-      "aggregation_mode": "keep_at:evt.energy_first_id",
+      "aggregation_mode": "keep_at_ch:evt.energy_first_id",
       "expression": "dsp.tp_0_est",
       "initial": 0.0
     },

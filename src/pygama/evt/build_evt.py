@@ -80,7 +80,9 @@ def evaluate_expression(
        - ``sum``: aggregates by summation.
        - ``any``: aggregates by logical or.
        - ``all``: aggregates by logical and.
-       - ``keep_at:ch_field``: aggregates according to passed ch_field
+       - ``keep_at_ch:ch_field``: aggregates according to passed ch_field.
+       - ``keep_at_idx:tcm_idx_field``: aggregates according to passed tcm
+         index field.
        - ``gather``: Channels are not combined, but result saved as
          :class:`.VectorOfVectors`.
 
@@ -152,13 +154,26 @@ def evaluate_expression(
         idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
 
         # switch through modes
-        if (
-            table
-            and "keep_at:" == mode[:8]
-            and "evt." == mode[8:][:4]
-            and mode[8:].split(".")[-1] in table.keys()
-        ):
-            ch_comp = table[mode[8:].replace("evt.", "")]
+        if table and (("keep_at_ch:" == mode[:11]) or ("keep_at_idx:" == mode[:12])):
+            if "keep_at_ch:" == mode[:11]:
+                ch_comp = table[mode[11:].replace("evt.", "")]
+            else:
+                ch_comp = table[mode[12:].replace("evt.", "")]
+                if isinstance(ch_comp, Array):
+                    ch_comp = Array(nda=ids[ch_comp.view_as("np")])
+                elif isinstance(ch_comp, VectorOfVectors):
+                    ch_comp = ch_comp.view_as("ak")
+                    ch_comp = VectorOfVectors(
+                        array=ak.unflatten(
+                            ids[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
+                        )
+                    )
+                else:
+                    raise NotImplementedError(
+                        type(ch_comp)
+                        + " not supported (only Array and VectorOfVectors are supported)"
+                    )
+
             if isinstance(ch_comp, Array):
                 return evaluate_at_channel(
                     idx,
@@ -1003,7 +1018,7 @@ def build_evt(
                   "sort": "ascend_by:dsp.tp_0_est"
                 },
                 "energy":{
-                  "aggregation_mode": "keep_at:evt.energy_id",
+                  "aggregation_mode": "keep_at_ch:evt.energy_id",
                   "expression": "hit.cuspEmax_ctc_cal > 25"
                 }
                 "is_muon_rejected":{
@@ -1021,7 +1036,7 @@ def build_evt(
                   "initial": 0
                 },
                 "t0":{
-                  "aggregation_mode": "keep_at:evt.energy_id",
+                  "aggregation_mode": "keep_at_ch:evt.energy_id",
                   "expression": "dsp.tp_0_est"
                 },
                 "lar_energy":{

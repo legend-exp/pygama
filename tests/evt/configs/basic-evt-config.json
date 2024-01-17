@@ -6,6 +6,7 @@
     "multiplicity",
     "energy",
     "energy_id",
+    "energy_idx",
     "energy_any_above1MeV",
     "energy_all_above1MeV",
     "energy_aux",
@@ -36,6 +37,13 @@
       "expression": "tcm.array_id",
       "initial": 0
     },
+    "energy_idx": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.index",
+      "initial": 999999999999
+    },
     "energy_any_above1MeV": {
       "channels": "geds_on",
       "aggregation_mode": "any",
@@ -63,17 +71,17 @@
       "initial": 0.0
     },
     "is_usable_aoe": {
-      "aggregation_mode": "keep_at:evt.energy_id",
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
       "expression": "True",
       "initial": false
     },
     "aoe": {
-      "aggregation_mode": "keep_at:evt.energy_id",
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
       "expression": "hit.AoE_Classifier",
       "initial": "np.nan"
     },
     "is_aoe_rejected": {
-      "aggregation_mode": "keep_at:evt.energy_id",
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
       "expression": "~(hit.AoE_Double_Sided_Cut)",
       "initial": false
     }
