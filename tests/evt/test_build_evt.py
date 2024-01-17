@@ -7,7 +7,7 @@ import pytest
 from lgdo import Array, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
 
-from pygama.evt import build_evt, skim_evt
+from pygama.evt import build_evt
 
 config_dir = Path(__file__).parent / "configs"
 store = LH5Store()
@@ -121,7 +121,7 @@ def test_vov(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 9
+    assert len(lh5.ls(outfile, "/evt/")) == 11
     vov_ene, _ = store.read("/evt/energy", outfile)
     vov_aoe, _ = store.read("/evt/aoe", outfile)
     arr_ac, _ = store.read("/evt/multiplicity", outfile)
@@ -135,6 +135,18 @@ def test_vov(lgnd_test_data, tmptestdir):
     assert isinstance(vov_eneac, VectorOfVectors)
     assert isinstance(arr_ac2, Array)
     assert (np.diff(vov_ene.cumulative_length.nda, prepend=[0]) == arr_ac.nda).all()
+
+    vov_eid = store.read("/evt/energy_id", outfile)[0].view_as("ak")
+    vov_eidx = store.read("/evt/energy_idx", outfile)[0].view_as("ak")
+
+    ids = store.read("hardware_tcm_1/array_id", lgnd_test_data.get_path(tcm_path))[
+        0
+    ].view_as("ak")
+    ids = ak.unflatten(ids[ak.flatten(vov_eidx)], ak.count(vov_eidx, axis=-1))
+    assert ak.all(ids == vov_eid)
+
+    arr_ene = store.read("/evt/energy_sum", outfile)[0].view_as("ak")
+    assert ak.all(arr_ene == ak.nansum(vov_ene.view_as("ak"), axis=-1))
 
 
 def test_graceful_crashing(lgnd_test_data, tmptestdir):
@@ -246,29 +258,3 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
     vov_t0, _ = store.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
-
-
-def test_skimming(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    f_tcm = lgnd_test_data.get_path(tcm_path)
-    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
-    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    f_config = f"{config_dir}/vov-test-evt-config.json"
-    build_evt(f_tcm, f_dsp, f_hit, outfile, f_config)
-
-    ac = store.read("/evt/multiplicity", outfile)[0].view_as("np")
-    ac = len(ac[ac == 3])
-
-    outfile_skm = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
-
-    skim_evt(outfile, "multiplicity == 3", None, outfile_skm, "n")
-    assert ac == len(store.read("/evt/energy", outfile_skm)[0].to_aoesa().view_as("np"))
-
-    skim_evt(outfile, "multiplicity == 3", None, None, "o")
-    assert ac == len(store.read("/evt/energy", outfile)[0].to_aoesa().view_as("np"))
-
-    with pytest.raises(ValueError):
-        skim_evt(outfile, "multiplicity == 3", None, None, "bla")

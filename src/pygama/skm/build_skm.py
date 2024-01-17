@@ -1,6 +1,6 @@
 """
 This module implements routines to build the `skm` tier, consisting of skimmed
-data from the `evt` tier.
+data from lower tiers.
 """
 
 from __future__ import annotations
@@ -10,29 +10,36 @@ import logging
 import os
 
 import awkward as ak
-import h5py
 import numpy as np
 import pandas as pd
-from lgdo import VectorOfVectors, lh5
+from lgdo import Array
 from lgdo.lh5 import LH5Store
 
 log = logging.getLogger(__name__)
 
 
 def build_skm(
-    f_evt: str | list,
+    f_evt: str,
+    f_hit: str,
+    f_dsp: str,
+    f_tcm: str,
     f_skm: str,
     skm_conf: dict | str,
     wo_mode="w",
-    group: str = "/evt/",
     skim_format: str = "parquet",
 ) -> None:
-    """Builds a skimmed file from a (set) of evt tier file(s).
+    """Builds a skimmed file from a (set) of evt/hit/dsp tier file(s).
 
     Parameters
     ----------
     f_evt
-        list/path of `evt` file(s).
+        path of `evt` file.
+    f_hit
+        path of `hit` file.
+    f_dsp
+        path of `dsp` file.
+    f_tcm
+        path of `tcm` file.
     f_skm
         name of the `skm` output file.
     skm_conf
@@ -40,11 +47,12 @@ def build_skm(
 
         - ``multiplicity`` defines up to which row length
           :class:`.VectorOfVector` fields should be kept.
-        - ``index_field``
-        - ``skimmed_fields`` are forwarded from the evt tier and clipped/padded
-          according to ``missing_value`` if needed.
-        - ``global_fields`` defines an operation to reduce the dimension of
-          :class:`.VectorOfVector` event fields.
+        - ``index_field`` sets the index of the output table. If not given
+          the index are set es increasing integers.
+        - ``operations`` are forwarded from lower tiers and clipped/padded
+          according to ``missing_value`` if needed. If the forwarded field
+          is not an evt tier, ``tcm_idx`` must be passed that specifies the
+          value to pick across channels.
 
         For example:
 
@@ -53,35 +61,24 @@ def build_skm(
             {
               "multiplicity": 2,
               "index_field": "timestamp",
-              "skimmed_fields": {
-                "timestamp":{
-                  "evt_field": "timestamp"
-                },
-                "is_muon_rejected":{
-                  "evt_field": "is_muon_rejected"
-                },
-                "multiplicity":{
-                  "evt_field": "multiplicity"
-                },
-                "energy":{
-                  "evt_field": "energy",
-                  "missing_value": "np.nan"
-                },
-                "energy_id":{
-                  "evt_field": "energy_id",
-                  "missing_value": 0
-                },
-                "global_fields":{
-                  "energy_sum":{
-                    "aggregation_mode": "sum",
-                    "evt_field": "energy"
-                  },
-                  "is_all_physical":{
-                    "aggregation_mode": "all",
-                    "evt_field": "is_physical"
-                  },
+              "operations": {
+                    "timestamp":{
+                    "forward_field": "evt.timestamp"
+                    },
+                    "multiplicity":{
+                    "forward_field": "evt.multiplicity"
+                    },
+                    "energy":{
+                    "forward_field": "hit.cuspEmax_ctc_cal",
+                    "missing_value": "np.nan",
+                    "tcm_idx": "evt.energy_idx"
+                    },
+                    "energy_id":{
+                    "forward_field": "tcm.array_id",
+                    "missing_value": 0,
+                    "tcm_idx": "evt.energy_idx"
+                    }
                 }
-              }
             }
 
     wo_mode
@@ -92,11 +89,10 @@ def build_skm(
         - ``append`` or ``a``: append  to file.
         - ``overwrite`` or ``o``: replaces existing file.
 
-    group
-        LH5 root group name of the evt tier.
     skim_format
         data format of the skimmed output (``hdf`` or ``parquet``).
     """
+    f_dict = {"evt": f_evt, "hit": f_hit, "dsp": f_dsp, "tcm": f_tcm}
     log = logging.getLogger(__name__)
     log.debug(f"I am skimning {len(f_evt) if isinstance(f_evt,list) else 1} files")
 
@@ -107,140 +103,92 @@ def build_skm(
         with open(tbl_cfg) as f:
             tbl_cfg = json.load(f)
 
-    flds, flds_vov, flds_arr, multi = None, None, None, None
-    if "skimmed_fields" in tbl_cfg.keys():
-        flds = tbl_cfg["skimmed_fields"].keys()
-        evt_flds = [(e, tbl_cfg["skimmed_fields"][e]["evt_field"]) for e in flds]
-        f = h5py.File(f_evt[0] if isinstance(f_evt, list) else f_evt, "r")
-        flds_vov = [
-            x
-            for x in evt_flds
-            if x[1]
-            in [
-                e.split("/")[-1]
-                for e in lh5.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
-                if "array<1>{array<1>{" in f[e].attrs.get("datatype")
-            ]
-        ]
-        flds_arr = [
-            x
-            for x in evt_flds
-            if x not in flds_vov
-            and x[1]
-            in [
-                e.split("/")[-1]
-                for e in lh5.ls(f_evt[0] if isinstance(f_evt, list) else f_evt, group)
-            ]
-        ]
+    # Check if multiplicity is given
+    if "multiplicity" not in tbl_cfg.keys():
+        raise ValueError("multiplicity field missing")
 
-    gflds = None
-    if "global_fields" in tbl_cfg.keys():
-        gflds = list(tbl_cfg["global_fields"].keys())
-
-    if flds is None and gflds is None:
-        return
-
-    # Check if multiplicity is given, if vector like fields are skimmed
-    if (
-        isinstance(flds_vov, list)
-        and len(flds_vov) > 0
-        and "multiplicity" not in tbl_cfg.keys()
-    ):
-        raise ValueError("If skiime fields are passed, multiplicity must be given")
-
-    elif "multiplicity" in tbl_cfg.keys():
-        multi = tbl_cfg["multiplicity"]
-
-    # init pandas df
-    df = pd.DataFrame()
+    multi = int(tbl_cfg["multiplicity"])
     store = LH5Store()
+    df = pd.DataFrame()
 
-    # add array like fields
-    if isinstance(flds_arr, list):
-        log.debug("Crunching array-like fields")
+    if "operations" in tbl_cfg.keys():
+        for op in tbl_cfg["operations"].keys():
+            miss_val = np.nan
+            if "missing_value" in tbl_cfg["operations"][op].keys():
+                miss_val = tbl_cfg["operations"][op]["missing_value"]
+                if isinstance(miss_val, str) and (
+                    miss_val in ["np.nan", "np.inf", "-np.inf"]
+                ):
+                    miss_val = eval(miss_val)
 
-        _df = store.read(
-            group,
-            f_evt,
-            field_mask=[x[1] for x in flds_arr],
-        )[
-            0
-        ].view_as("pd")
+            fw_fld = tbl_cfg["operations"][op]["forward_field"].split(".")
+            if fw_fld[0] not in ["evt", "hit", "dsp", "tcm"]:
+                raise ValueError(f"{fw_fld[0]} is not a valid tier")
 
-        _df = _df.rename(columns={y: x for x, y in flds_arr})
-        df = df.join(_df, how="outer")
+            # load object if from evt tier
+            if fw_fld[0] == "evt":
+                obj = store.read(f"/{fw_fld[0]}/{fw_fld[1]}", f_dict[fw_fld[0]])[
+                    0
+                ].view_as("ak")
 
-    # take care of vector like fields
-    if isinstance(flds_vov, list):
-        log.debug("Processing VoV-like fields")
-        for fld in flds_vov:
-            if "missing_value" not in tbl_cfg["skimmed_fields"][fld[0]].keys():
-                raise ValueError(
-                    f"({fld[0]}) is a VectorOfVector field and no missing_value is specified"
-                )
-            vls, _ = store.read(group + fld[1], f_evt)
-            mv = tbl_cfg["skimmed_fields"][fld[0]]["missing_value"]
-            if mv in ["np.inf", "-np.inf", "np.nan"]:
-                mv = eval(mv)
-            out = vls.to_aoesa(max_len=multi, fill_val=mv).nda
-            nms = [fld[0] + f"_{e}" for e in range(multi)]
-            df = df.join(pd.DataFrame(data=out, columns=nms), how="outer")
-
-    # ok now build global fields if requested
-    if isinstance(gflds, list):
-        log.debug("Defining global fields")
-        for k in gflds:
-            if "aggregation_mode" not in tbl_cfg["global_fields"][k].keys():
-                raise ValueError(f"global {k} operation needs aggregation mode")
-            if "evt_field" not in tbl_cfg["global_fields"][k].keys():
-                raise ValueError(f"global {k} operation needs evt_field")
-            mode = tbl_cfg["global_fields"][k]["aggregation_mode"]
-            fld = tbl_cfg["global_fields"][k]["evt_field"]
-
-            obj, _ = store.read(group + fld, f_evt)
-            if not isinstance(obj, VectorOfVectors):
-                raise ValueError(
-                    f"global {k} operation not possible, since {fld} is not an VectorOfVectors"
-                )
-
-            obj_ak = obj.view_as("ak")
-            if mode in [
-                "sum",
-                "prod",
-                "nansum",
-                "nanprod",
-                "any",
-                "all",
-                "mean",
-                "std",
-                "var",
-            ]:
-                df = df.join(
-                    pd.DataFrame(
-                        data=getattr(ak, mode)(obj_ak, axis=-1).to_numpy(
-                            allow_missing=False
-                        ),
-                        columns=[k],
-                    )
-                )
-
-            elif mode in ["min", "max"]:
-                val = getattr(ak, mode)(obj_ak, axis=-1, mask_identity=True)
-                if "missing_value" not in tbl_cfg["global_fields"][k].keys():
-                    raise ValueError(
-                        f"global {k} {mode} operation needs a missing value assigned"
-                    )
-                mv = tbl_cfg["global_fields"][k]["missing_value"]
-                if mv == "np.inf":
-                    mv = np.inf
-                elif mv == "-np.inf":
-                    mv = -1 * np.inf
-                val = ak.fill_none(val, mv)
-                df = df.join(
-                    pd.DataFrame(data=val.to_numpy(allow_missing=False), columns=[k])
-                )
+            # else collect data from lower tier via tcm_idx
             else:
-                raise ValueError("aggregation mode not supported")
+                if "tcm_idx" not in tbl_cfg["operations"][op].keys():
+                    raise ValueError(
+                        f"{op} is an sub evt level operation. tcm_idx field must be specified"
+                    )
+                tcm_idx_fld = tbl_cfg["operations"][op]["tcm_idx"].split(".")
+                tcm_idx = store.read(
+                    f"/{tcm_idx_fld[0]}/{tcm_idx_fld[1]}", f_dict[tcm_idx_fld[0]]
+                )[0].view_as("ak")[:, :multi]
+
+                obj = ak.Array([[] for x in range(len(tcm_idx))])
+
+                # load TCM data to define an event
+                ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("ak")
+                ids = ak.unflatten(ids[ak.flatten(tcm_idx)], ak.count(tcm_idx, axis=-1))
+
+                idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("ak")
+                idx = ak.unflatten(idx[ak.flatten(tcm_idx)], ak.count(tcm_idx, axis=-1))
+
+                if "tcm.array_id" == tbl_cfg["operations"][op]["forward_field"]:
+                    obj = ids
+                elif "tcm.array_idx" == tbl_cfg["operations"][op]["forward_field"]:
+                    obj = idx
+
+                else:
+                    chns = np.unique(
+                        ak.to_numpy(ak.flatten(ids), allow_missing=False)
+                    ).astype(int)
+
+                    # Get the data
+                    for ch in chns:
+                        ch_idx = idx[ids == ch]
+                        ct_idx = ak.count(ch_idx, axis=-1)
+                        fl_idx = ak.to_numpy(ak.flatten(ch_idx), allow_missing=False)
+                        och, _ = store.read(
+                            f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}",
+                            f_dict[fw_fld[0]],
+                            idx=fl_idx,
+                        )
+                        if not isinstance(och, Array):
+                            raise ValueError(
+                                f"{type(och)} not supported. Forward only Array fields"
+                            )
+                        och = och.view_as("ak")
+                        och = ak.unflatten(och, ct_idx)
+                        obj = ak.concatenate((obj, och), axis=-1)
+
+            # Pad, clip and numpyfy
+            if obj.ndim > 1:
+                obj = ak.pad_none(obj, multi, clip=True)
+            obj = ak.to_numpy(ak.fill_none(obj, miss_val))
+
+            nms = [op]
+            if obj.ndim > 1:
+                nms = [f"{op}_{x}" for x in range(multi)]
+
+            df = df.join(pd.DataFrame(data=obj, columns=nms), how="outer")
 
     # Set an index column if specified
     if "index_field" in tbl_cfg.keys():

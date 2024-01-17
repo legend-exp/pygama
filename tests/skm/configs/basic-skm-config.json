@@ -1,35 +1,25 @@
 {
   "multiplicity": 3,
   "index_field": "timestamp",
-  "skimmed_fields": {
+  "operations": {
     "timestamp": {
-      "evt_field": "timestamp"
+      "forward_field": "evt.timestamp"
+    },
+    "energy_sum": {
+      "forward_field": "evt.energy_sum"
     },
     "multiplicity": {
-      "evt_field": "multiplicity"
+      "forward_field": "evt.multiplicity"
     },
     "energy": {
-      "evt_field": "energy",
-      "missing_value": "np.nan"
+      "forward_field": "hit.cuspEmax_ctc_cal",
+      "missing_value": "np.nan",
+      "tcm_idx": "evt.energy_idx"
     },
     "energy_id": {
-      "evt_field": "energy_id",
-      "missing_value": 0
-    }
-  },
-  "global_fields": {
-    "energy_sum": {
-      "aggregation_mode": "nansum",
-      "evt_field": "energy"
-    },
-    "is_any_saturated": {
-      "aggregation_mode": "any",
-      "evt_field": "is_saturated"
-    },
-    "max_energy": {
-      "aggregation_mode": "max",
-      "evt_field": "energy",
-      "missing_value": "np.inf"
+      "forward_field": "tcm.array_id",
+      "missing_value": 0,
+      "tcm_idx": "evt.energy_idx"
     }
   }
 }

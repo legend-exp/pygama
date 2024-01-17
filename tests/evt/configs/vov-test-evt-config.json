@@ -6,7 +6,9 @@
   "outputs": [
     "timestamp",
     "energy",
+    "energy_sum",
     "energy_id",
+    "energy_idx",
     "aoe",
     "multiplicity",
     "is_saturated",
@@ -27,11 +29,28 @@
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal"
     },
+    "energy_sum": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal",
+      "initial": 0.0
+    },
+    "energy_idx": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.index",
+      "sort": "ascend_by:dsp.tp_0_est",
+      "initial": 0
+    },
     "energy_id": {
       "channels": "geds_on",
       "aggregation_mode": "gather",
       "query": "hit.cuspEmax_ctc_cal>25",
-      "expression": "tcm.array_id"
+      "expression": "tcm.array_id",
+      "sort": "ascend_by:dsp.tp_0_est",
+      "initial": 0
     },
     "aoe": {
       "aggregation_mode": "keep_at:evt.energy_id",

@@ -1,14 +1,17 @@
 import os
 from pathlib import Path
 
+import awkward as ak
 import numpy as np
 import pandas as pd
+from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt
 from pygama.skm import build_skm
 
 config_dir = Path(__file__).parent / "configs"
 evt_config_dir = Path(__file__).parent.parent / "evt" / "configs"
+store = LH5Store()
 
 
 def test_basics(lgnd_test_data, tmptestdir):
@@ -29,7 +32,16 @@ def test_basics(lgnd_test_data, tmptestdir):
 
     skm_conf = f"{config_dir}/basic-skm-config.json"
     skm_out = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.parquet"
-    build_skm(outfile, skm_out, skm_conf, wo_mode="o", skim_format="hdf")
+    build_skm(
+        outfile,
+        lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+        lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
+        lgnd_test_data.get_path(tcm_path),
+        skm_out,
+        skm_conf,
+        wo_mode="o",
+        skim_format="hdf",
+    )
 
     assert os.path.exists(skm_out)
     df = pd.read_hdf(skm_out)
@@ -37,7 +49,11 @@ def test_basics(lgnd_test_data, tmptestdir):
     assert "energy_0" in df.keys()
     assert "energy_1" in df.keys()
     assert "energy_2" in df.keys()
+    assert "energy_id_0" in df.keys()
+    assert "energy_id_1" in df.keys()
+    assert "energy_id_2" in df.keys()
     assert "multiplicity" in df.keys()
+    assert "energy_sum" in df.keys()
     assert (df.multiplicity.to_numpy() <= 3).all()
     assert (
         np.nan_to_num(df.energy_0.to_numpy())
@@ -45,6 +61,16 @@ def test_basics(lgnd_test_data, tmptestdir):
         + np.nan_to_num(df.energy_2.to_numpy())
         == df.energy_sum.to_numpy()
     ).all()
-    assert (np.nan_to_num(df.energy_0.to_numpy()) <= df.max_energy.to_numpy()).all()
-    assert (np.nan_to_num(df.energy_1.to_numpy()) <= df.max_energy.to_numpy()).all()
-    assert (np.nan_to_num(df.energy_2.to_numpy()) <= df.max_energy.to_numpy()).all()
+
+    vov_eid = ak.to_numpy(
+        ak.fill_none(
+            ak.pad_none(
+                store.read("/evt/energy_id", outfile)[0].view_as("ak"), 3, clip=True
+            ),
+            0,
+        ),
+        allow_missing=False,
+    )
+    assert (vov_eid[:, 0] == df.energy_id_0.to_numpy()).all()
+    assert (vov_eid[:, 1] == df.energy_id_1.to_numpy()).all()
+    assert (vov_eid[:, 2] == df.energy_id_2.to_numpy()).all()
