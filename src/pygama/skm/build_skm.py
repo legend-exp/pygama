@@ -12,7 +12,7 @@ import os
 import awkward as ak
 import numpy as np
 import pandas as pd
-from lgdo import Array
+from lgdo import Array, lh5
 from lgdo.lh5 import LH5Store
 
 log = logging.getLogger(__name__)
@@ -47,6 +47,9 @@ def build_skm(
 
         - ``multiplicity`` defines up to which row length
           :class:`.VectorOfVector` fields should be kept.
+        - ``postfixes`` list of postfixes must be list of
+          ``len(multiplicity)``. If not given, numbers from 0 to
+          ``multiplicity -1`` are used
         - ``index_field`` sets the index of the output table. If not given
           the index are set es increasing integers.
         - ``operations`` are forwarded from lower tiers and clipped/padded
@@ -60,6 +63,7 @@ def build_skm(
 
             {
               "multiplicity": 2,
+              "postfixes":["","aux"],
               "index_field": "timestamp",
               "operations": {
                     "timestamp":{
@@ -166,11 +170,17 @@ def build_skm(
                         ch_idx = idx[ids == ch]
                         ct_idx = ak.count(ch_idx, axis=-1)
                         fl_idx = ak.to_numpy(ak.flatten(ch_idx), allow_missing=False)
-                        och, _ = store.read(
-                            f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}",
-                            f_dict[fw_fld[0]],
-                            idx=fl_idx,
-                        )
+
+                        if f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}" not in lh5.ls(
+                            f_dict[fw_fld[0]], f"ch{ch}/{fw_fld[0]}/"
+                        ):
+                            och = Array(nda=np.full(len(fl_idx), miss_val))
+                        else:
+                            och, _ = store.read(
+                                f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}",
+                                f_dict[fw_fld[0]],
+                                idx=fl_idx,
+                            )
                         if not isinstance(och, Array):
                             raise ValueError(
                                 f"{type(och)} not supported. Forward only Array fields"
@@ -186,7 +196,10 @@ def build_skm(
 
             nms = [op]
             if obj.ndim > 1:
-                nms = [f"{op}_{x}" for x in range(multi)]
+                if "postfixes" in tbl_cfg.keys():
+                    nms = [f"{op}{x}" for x in tbl_cfg["postfixes"]]
+                else:
+                    nms = [f"{op}_{x}" for x in range(multi)]
 
             df = df.join(pd.DataFrame(data=obj, columns=nms), how="outer")
 
