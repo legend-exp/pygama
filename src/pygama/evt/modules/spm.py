@@ -20,7 +20,7 @@ from lgdo.lh5 import LH5Store
 # get an 1D akward array from 0 to 2D array
 # casted by minimum of a 2D array
 def cast_trigger(
-    trgr: int | float | Array | VectorOfVectors | ak.Array,
+    trgr,
     tdefault: float,
     length: int = None,
 ) -> ak.Array:
@@ -80,7 +80,7 @@ def get_masked_tcm_idx(
 
     arr_lst = []
 
-    if isinstance(trgr, (float | int)):
+    if isinstance(trgr, (float, int)):
         tge = cast_trigger(trgr, tdefault, length=np.max(idx) + 1)
     else:
         tge = cast_trigger(trgr, tdefault, length=None)
@@ -136,7 +136,7 @@ def get_spm_ene_or_maj(f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode)
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     out = np.zeros(np.max(idx) + 1)
 
-    if isinstance(trgr, (float | int)):
+    if isinstance(trgr, (float, int)):
         tge = cast_trigger(trgr, tdefault, length=np.max(idx) + 1)
     else:
         tge = cast_trigger(trgr, tdefault, length=None)
@@ -257,7 +257,7 @@ def get_etc(
     pe_lst = []
     time_lst = []
 
-    if isinstance(trgr, (float | int)):
+    if isinstance(trgr, (float, int)):
         tge = cast_trigger(trgr, tdefault, length=np.max(idx) + 1)
     else:
         tge = cast_trigger(trgr, tdefault, length=None)
@@ -317,7 +317,7 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) ->
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
     time_lst = []
 
-    if isinstance(trgr, (float | int)):
+    if isinstance(trgr, (float, int)):
         tge = cast_trigger(trgr, tdefault, length=np.max(idx) + 1)
     else:
         tge = cast_trigger(trgr, tdefault, length=None)
