@@ -21,7 +21,8 @@
       "aggregation_mode": "sum",
       "expression": "hit.cuspEmax_ctc_cal > a",
       "parameters": { "a": 25 },
-      "initial": 0
+      "initial": 0,
+      "lgdo_attrs": { "statement": "0bb decay is real" }
     },
     "energy": {
       "channels": "geds_on",

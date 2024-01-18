@@ -1116,6 +1116,11 @@ def build_evt(
             if "parameters" in v.keys():
                 var = var | v["parameters"]
             res = table.eval(v["expression"].replace("evt.", ""), var)
+
+            # add attribute if present
+            if "lgdo_attrs" in v.keys():
+                res.attrs |= v["lgdo_attrs"]
+
             table.add_field(k, res)
 
         # Else we build the event entry
@@ -1168,6 +1173,10 @@ def build_evt(
                 defaultv,
                 srter,
             )
+
+            # add attribute if present
+            if "lgdo_attrs" in v.keys():
+                obj.attrs |= v["lgdo_attrs"]
 
             table.add_field(k, obj)
 

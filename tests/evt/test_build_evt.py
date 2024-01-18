@@ -28,7 +28,11 @@ def test_basics(lgnd_test_data, tmptestdir):
         group="/evt/",
         tcm_group="hardware_tcm_1",
     )
-
+    assert "statement" in store.read("/evt/multiplicity", outfile)[0].getattrs().keys()
+    assert (
+        store.read("/evt/multiplicity", outfile)[0].getattrs()["statement"]
+        == "0bb decay is real"
+    )
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 11
     nda = {
