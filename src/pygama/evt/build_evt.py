@@ -935,10 +935,10 @@ def evaluate_to_vector(
             nrows,
         ).view_as("np")
         if "ascend_by" == md:
-            out[np.arange(len(out))[:, None], np.argsort(s_val)]
+            out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
 
         elif "descend_by" == md:
-            out[np.arange(len(out))[:, None], np.argsort(-s_val)]
+            out = out[np.arange(len(out))[:, None], np.argsort(-s_val)]
         else:
             raise ValueError(
                 "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
