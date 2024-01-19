@@ -317,7 +317,6 @@ def get_data_at_channel(
     is_evaluated: bool,
     f_hit: str,
     f_dsp: str,
-    outsize: int,
     defv,
 ) -> np.ndarray:
     """Evaluates an expression and returns the result.
@@ -343,14 +342,13 @@ def get_data_at_channel(
        path to `hit` tier file.
     f_dsp
        path to `dsp` tier file.
-    outsize
-       size of the return array.
     defv
        default value.
     """
 
     # get index list for this channel to be loaded
     idx_ch = idx[ids == int(ch[2:])]
+    outsize = len(idx_ch)
 
     if not is_evaluated:
         res = np.full(outsize, defv, dtype=type(defv))
@@ -393,8 +391,7 @@ def get_mask_from_query(
     qry: str | NDArray,
     length: int,
     ch: str,
-    ids: NDArray,
-    idx: NDArray,
+    idx_ch: NDArray,
     f_hit: str,
     f_dsp: str,
 ) -> np.ndarray:
@@ -408,17 +405,13 @@ def get_mask_from_query(
        length of the return mask.
     ch
        "rawid" of channel to be evaluated.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    idx_ch
+       channel indices to be read.
     f_hit
        path to `hit` tier file.
     f_dsp
        path to `dsp` tier file.
     """
-    # get index list for this channel to be loaded
-    idx_ch = idx[ids == int(ch[2:])]
 
     # get sub evt based query condition if needed
     if isinstance(qry, str):
@@ -523,12 +516,11 @@ def evaluate_to_first_or_last(
             ch not in chns_rm,
             f_hit,
             f_dsp,
-            len(out),
             defv,
         )
 
         # get mask from query
-        limarr = get_mask_from_query(qry, len(res), ch, ids, idx, f_hit, f_dsp)
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # find if sorter is in hit or dsp
         t0 = store.read(
@@ -618,12 +610,11 @@ def evaluate_to_scalar(
             ch not in chns_rm,
             f_hit,
             f_dsp,
-            len(out),
             defv,
         )
 
         # get mask from query
-        limarr = get_mask_from_query(qry, len(res), ch, ids, idx, f_hit, f_dsp)
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
         # switch through modes
         if "sum" == mode:
@@ -686,7 +677,7 @@ def evaluate_at_channel(
         # skip default value
         if f"ch{ch}" not in lh5.ls(f_hit):
             continue
-
+        idx_ch = idx[ids == ch]
         res = get_data_at_channel(
             f"ch{ch}",
             ids,
@@ -697,11 +688,10 @@ def evaluate_at_channel(
             f"ch{ch}" not in chns_rm,
             f_hit,
             f_dsp,
-            len(out),
             defv,
         )
 
-        out = np.where(ch == ch_comp.nda, res, out)
+        out[idx_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[idx_ch])
 
     return Array(nda=out)
 
@@ -746,12 +736,14 @@ def evaluate_at_channel_vov(
     """
 
     # blow up vov to aoesa
-    out = ch_comp.to_aoesa().view_as("np")
+    out = ak.Array([[] for x in range(len(ch_comp))])
 
-    chns = np.unique(out[~np.isnan(out)]).astype(int)
+    chns = np.unique(ch_comp.flattened_data.nda).astype(int)
+    ch_comp = ch_comp.view_as("ak")
 
     type_name = None
     for ch in chns:
+        idx_ch = idx[ids == ch]
         res = get_data_at_channel(
             f"ch{ch}",
             ids,
@@ -762,23 +754,22 @@ def evaluate_at_channel_vov(
             f"ch{ch}" not in chns_rm,
             f_hit,
             f_dsp,
-            len(out),
             defv,
         )
 
         # see in which events the current channel is present
-        mask = (out == ch).any(axis=1)
-        out[out == ch] = res[mask]
+        mask = ak.to_numpy(ak.any(ch_comp == ch, axis=-1), allow_missing=False)
+        cv = np.full(len(ch_comp), np.nan)
+        cv[idx_ch] = res
+        cv[~mask] = np.nan
+        cv = ak.drop_none(ak.nan_to_none(ak.Array(cv)[:, None]))
+
+        out = ak.concatenate((out, cv), axis=-1)
 
         if ch == chns[0]:
             type_name = res.dtype
 
-    # ok now implode the table again
-    out = VectorOfVectors(
-        flattened_data=out.flatten()[~np.isnan(out.flatten())].astype(type_name),
-        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
-    )
-    return out
+    return VectorOfVectors(ak.values_astype(out, type_name))
 
 
 def evaluate_to_aoesa(
@@ -837,6 +828,7 @@ def evaluate_to_aoesa(
 
     i = 0
     for ch in chns:
+        idx_ch = idx[ids == int(ch[2:])]
         res = get_data_at_channel(
             ch,
             ids,
@@ -847,15 +839,13 @@ def evaluate_to_aoesa(
             ch not in chns_rm,
             f_hit,
             f_dsp,
-            len(out),
             defv,
         )
 
         # get mask from query
-        limarr = get_mask_from_query(qry, len(res), ch, ids, idx, f_hit, f_dsp)
+        limarr = get_mask_from_query(qry, len(res), ch, idx_ch, f_hit, f_dsp)
 
-        # append to out according to mode == vov
-        out[:, i][limarr] = res[limarr]
+        out[idx_ch, i] = np.where(limarr, res, out[idx_ch, i])
 
         i += 1
 
@@ -954,12 +944,9 @@ def evaluate_to_vector(
                 "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
             )
 
-    out = VectorOfVectors(
-        flattened_data=out.flatten()[~np.isnan(out.flatten())].astype(type(defv)),
-        cumulative_length=np.cumsum(np.count_nonzero(~np.isnan(out), axis=1)),
+    return VectorOfVectors(
+        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv))
     )
-
-    return out
 
 
 def build_evt(
@@ -1108,7 +1095,7 @@ def build_evt(
     table = Table(size=nrows)
 
     for k, v in tbl_cfg["operations"].items():
-        log.debug("Processing field" + k)
+        log.debug("Processing field " + k)
 
         # if mode not defined in operation, it can only be an operation on the evt level.
         if "aggregation_mode" not in v.keys():

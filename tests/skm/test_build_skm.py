@@ -75,6 +75,7 @@ def test_basics(lgnd_test_data, tmptestdir):
     assert (vov_eid[:, 1] == df.energy_id_1.to_numpy()).all()
     assert (vov_eid[:, 2] == df.energy_id_2.to_numpy()).all()
 
+
 def test_df_to_table_conversion(lgnd_test_data, tmptestdir):
     outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
@@ -118,9 +119,10 @@ def test_df_to_table_conversion(lgnd_test_data, tmptestdir):
     assert os.path.exists(skm_out)
     assert os.path.exists(skm_out2)
     df = pd.read_hdf(skm_out)
-    tbl = store.read("/skm/",skm_out2)[0].view_as("pd")
-    assert isinstance(tbl,pd.DataFrame)
+    tbl = store.read("/skm/", skm_out2)[0].view_as("pd")
+    assert isinstance(tbl, pd.DataFrame)
     assert df.reset_index().equals(tbl)
+
 
 def test_attribute_passing(lgnd_test_data, tmptestdir):
     outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
@@ -141,7 +143,7 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
     skm_conf = f"{config_dir}/basic-skm-config.json"
 
     skm_out = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
-    
+
     build_skm(
         outfile,
         lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
@@ -155,9 +157,4 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
 
     assert os.path.exists(skm_out)
     assert "info" in store.read("/skm/timestamp", skm_out)[0].getattrs().keys()
-    assert (
-        store.read("/skm/timestamp", skm_out)[0].getattrs()["info"]
-        == "pk was here"
-    )
-
-
+    assert store.read("/skm/timestamp", skm_out)[0].getattrs()["info"] == "pk was here"

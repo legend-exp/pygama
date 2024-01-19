@@ -88,18 +88,16 @@ def get_masked_tcm_idx(
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
+        tmp[idx_ch] = pe
+        pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
+        tmp[idx_ch] = times
+        times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         mask = get_spm_mask(lim, tge, tmin, tmax, pe, times)
 
@@ -107,16 +105,20 @@ def get_masked_tcm_idx(
             out_idx = ak.local_index(mask)[mask]
 
         elif mode == 1:
-            out_idx = ak.Array(np.where(ids == int(ch[2:]))[0])
-            out_idx = out_idx[:, None][mask[mask] - 1]
+            out_idx = np.full((np.max(idx) + 1), np.nan)
+            out_idx[idx_ch] = np.where(ids == int(ch[2:]))[0]
+            out_idx = ak.drop_none(ak.nan_to_none(ak.Array(out_idx)[:, None]))
+            out_idx = out_idx[mask[mask] - 1]
 
         elif mode == 2:
             out_idx = ak.Array([int(ch[2:])] * len(mask))
             out_idx = out_idx[:, None][mask[mask] - 1]
 
         elif mode == 3:
-            out_idx = ak.Array(idx_ch)
-            out_idx = out_idx[:, None][mask[mask] - 1]
+            out_idx = np.full((np.max(idx) + 1), np.nan)
+            out_idx[idx_ch] = idx_ch
+            out_idx = ak.drop_none(ak.nan_to_none(ak.Array(out_idx)[:, None]))
+            out_idx = out_idx[mask[mask] - 1]
 
         else:
             raise ValueError("Unknown mode")
@@ -180,7 +182,7 @@ def get_spm_ene_or_maj(f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode)
                 )
             )
 
-        mask = get_spm_mask(lim, tge, tmin, tmax, pe, times)
+        mask = get_spm_mask(lim, tge[idx_ch], tmin, tmax, pe, times)
         pe = pe[mask]
 
         if mode in ["energy_hc", "energy_dplms"]:
@@ -265,18 +267,16 @@ def get_etc(
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
+        tmp[idx_ch] = pe
+        pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
+        tmp[idx_ch] = times
+        times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         mask = get_spm_mask(lim, tge, tmin, tmax, pe, times)
 
@@ -315,7 +315,7 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) ->
     # load TCM data to define an event
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
-    time_lst = []
+    time_all = ak.Array([[] for x in range(np.max(idx) + 1)])
 
     if isinstance(trgr, (float, int)):
         tge = cast_trigger(trgr, tdefault, length=np.max(idx) + 1)
@@ -325,25 +325,24 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) ->
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
+        tmp[idx_ch] = pe
+        pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = ak.drop_none(
-            ak.nan_to_none(
-                store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("ak")
-            )
-        )
+        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
+        tmp[idx_ch] = times
+        times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         mask = get_spm_mask(lim, tge, tmin, tmax, pe, times)
 
         # apply mask and convert sample units to ns
-        time_lst.append(times[mask] * 16)
+        times = times[mask] * 16
 
-    time_all = ak.concatenate(time_lst, axis=-1)
+        time_all = ak.concatenate((time_all, times), axis=-1)
+
     out = ak.min(time_all, axis=-1)
 
     # Convert to 1D numpy array
