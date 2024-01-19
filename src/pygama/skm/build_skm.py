@@ -12,11 +12,10 @@ import os
 import awkward as ak
 import numpy as np
 import pandas as pd
-from lgdo import Array, lh5
+from lgdo import Array, lh5, Table
 from lgdo.lh5 import LH5Store
 
 log = logging.getLogger(__name__)
-
 
 def build_skm(
     f_evt: str,
@@ -27,6 +26,7 @@ def build_skm(
     skm_conf: dict | str,
     wo_mode="w",
     skim_format: str = "parquet",
+    group: str = "/skm/",
 ) -> None:
     """Builds a skimmed file from a (set) of evt/hit/dsp tier file(s).
 
@@ -94,7 +94,9 @@ def build_skm(
         - ``overwrite`` or ``o``: replaces existing file.
 
     skim_format
-        data format of the skimmed output (``hdf`` or ``parquet``).
+        data format of the skimmed output (``hdf``, ``lh5`` or ``parquet``).
+    group
+        LH5 root group name (only used if ``skim_format`` is ``lh5``).
     """
     f_dict = {"evt": f_evt, "hit": f_hit, "dsp": f_dsp, "tcm": f_tcm}
     log = logging.getLogger(__name__)
@@ -113,8 +115,8 @@ def build_skm(
 
     multi = int(tbl_cfg["multiplicity"])
     store = LH5Store()
-    df = pd.DataFrame()
-
+    # df = pd.DataFrame()
+    table = Table()
     if "operations" in tbl_cfg.keys():
         for op in tbl_cfg["operations"].keys():
             miss_val = np.nan
@@ -194,46 +196,59 @@ def build_skm(
                 obj = ak.pad_none(obj, multi, clip=True)
             obj = ak.to_numpy(ak.fill_none(obj, miss_val))
 
-            nms = [op]
             if obj.ndim > 1:
                 if "postfixes" in tbl_cfg.keys():
                     nms = [f"{op}{x}" for x in tbl_cfg["postfixes"]]
                 else:
                     nms = [f"{op}_{x}" for x in range(multi)]
-
-            df = df.join(pd.DataFrame(data=obj, columns=nms), how="outer")
-
-    # Set an index column if specified
-    if "index_field" in tbl_cfg.keys():
-        log.debug("Setting index")
-        if tbl_cfg["index_field"] in df.keys():
-            df = df.set_index(tbl_cfg["index_field"])
-        else:
-            raise ValueError(
-                "index field not found. Needs to be a previously defined skm field"
-            )
+            
+                for i in range(len(nms)):
+                    # add attribute if present
+                    ob = Array(nda=obj[:,i])
+                    if "lgdo_attrs" in tbl_cfg["operations"][op].keys():
+                        ob.attrs |= tbl_cfg["operations"][op]["lgdo_attrs"]
+                    table.add_field(nms[i], ob,True)
+            else:
+                obj = Array(nda=obj)
+                if "lgdo_attrs" in tbl_cfg["operations"][op].keys():
+                    obj.attrs |= tbl_cfg["operations"][op]["lgdo_attrs"]
+                table.add_field(op, obj,True)
 
     # last thing missing is writing it out
     log.debug("saving skm file")
-    if skim_format not in ["parquet", "hdf"]:
-        raise ValueError("Not supported skim data format. Operations are hdf, parquet")
-    if wo_mode in ["w", "write_safe"]:
-        if os.path.exists(f_skm):
-            raise FileExistsError(f"Write_safe mode: {f_skm} exists.")
-        else:
-            if "hdf" == skim_format:
+    if skim_format not in ["parquet", "hdf","lh5"]:
+        raise ValueError("Not supported skim data format. Operations are hdf, lh5, parquet")
+    
+    if (wo_mode in ["w", "write_safe"]) and os.path.exists(f_skm):
+        raise FileExistsError(f"Write_safe mode: {f_skm} exists.")
+    
+    if skim_format in ["hdf","parquet"]:
+        df = table.view_as("pd")
+        # Set an index column if specified
+        if "index_field" in tbl_cfg.keys():
+            log.debug("Setting index")
+            if tbl_cfg["index_field"] in df.keys():
+                df = df.set_index(tbl_cfg["index_field"])
+            else:
+                raise ValueError(
+                    "index field not found. Needs to be a previously defined skm field"
+                )
+        
+        if "hdf" == skim_format:
+            if wo_mode in ["w", "write_safe","o", "overwrite"]:
                 df.to_hdf(f_skm, key="df", mode="w")
-            elif "parquet" == skim_format:
+            elif wo_mode in ["a", "append"]:
+                df.to_hdf(f_skm, key="df", mode="a")
+
+        elif "parquet" == skim_format:
+            if wo_mode in ["w", "write_safe","o", "overwrite"]:
                 df.to_parquet(f_skm)
-    elif wo_mode in ["o", "overwrite"]:
-        if "hdf" == skim_format:
-            df.to_hdf(f_skm, key="df", mode="w")
-        elif "parquet" == skim_format:
-            df.to_parquet(f_skm)
-    elif wo_mode in ["a", "append"]:
-        if "hdf" == skim_format:
-            df.to_hdf(f_skm, key="df", mode="a")
-        elif "parquet" == skim_format:
-            df.to_parquet(f_skm, append=True)
+            elif wo_mode in ["a", "append"]:
+                df.to_parquet(f_skm, append=True)
+    
+    elif "lh5" == skim_format:
+        wo = wo_mode if wo_mode not in ["o", "overwrite"] else "of"
+        store.write(obj=table, name=group, lh5_file=f_skm, wo_mode=wo)
+    
     else:
         raise ValueError(f"wo_mode {wo_mode} not valid.")

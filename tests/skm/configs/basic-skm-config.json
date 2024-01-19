@@ -3,7 +3,8 @@
   "index_field": "timestamp",
   "operations": {
     "timestamp": {
-      "forward_field": "evt.timestamp"
+      "forward_field": "evt.timestamp",
+      "lgdo_attrs": {"info":"pk was here"}
     },
     "energy_sum": {
       "forward_field": "evt.energy_sum"
