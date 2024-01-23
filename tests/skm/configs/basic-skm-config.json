@@ -1,6 +1,5 @@
 {
   "multiplicity": 3,
-  "index_field": "timestamp",
   "operations": {
     "timestamp": {
       "forward_field": "evt.timestamp",
