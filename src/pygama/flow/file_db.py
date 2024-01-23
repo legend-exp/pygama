@@ -272,7 +272,10 @@ class FileDB:
 
         # convert cols to numeric dtypes where possible
         for col in self.df.columns:
-            self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
+            try:
+                self.df[col] = pd.to_numeric(self.df[col])
+            except ValueError:
+                continue
 
         # sort rows according to timestamps
         utils.inplace_sort(self.df, self.sortby)
@@ -669,7 +672,10 @@ class FileDB:
 
         # convert cols to numeric dtypes where possible
         for col in self.df.columns:
-            self.df[col] = pd.to_numeric(self.df[col], errors="ignore")
+            try:
+                self.df[col] = pd.to_numeric(self.df[col])
+            except ValueError:
+                continue
 
     def get_table_name(self, tier: str, tb: str) -> str:
         """Get the table name for a tier given its table identifier.
