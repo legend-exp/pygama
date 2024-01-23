@@ -274,3 +274,27 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
     vov_t0, _ = store.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
+
+
+def test_tcm_id_table_pattern(lgnd_test_data, tmptestdir):
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    f_tcm = lgnd_test_data.get_path(tcm_path)
+    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
+    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
+    f_config = f"{config_dir}/basic-evt-config.json"
+
+    with pytest.raises(ValueError):
+        build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{{}}")
+    with pytest.raises(ValueError):
+        build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{}{}")
+    with pytest.raises(NotImplementedError):
+        build_evt(
+            f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{tcm_id}"
+        )
+    with pytest.raises(ValueError):
+        build_evt(
+            f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="apple{}banana"
+        )

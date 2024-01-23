@@ -19,6 +19,23 @@ from numpy.typing import NDArray
 log = logging.getLogger(__name__)
 
 
+def get_tcm_id_by_pattern(tcm_id_table_pattern: str, ch: str) -> int:
+    pre = tcm_id_table_pattern.split("{")[0]
+    post = tcm_id_table_pattern.split("}")[1]
+    return int(ch.strip(pre).strip(post))
+
+
+def get_table_name_by_pattern(tcm_id_table_pattern: str, ch_id: int) -> str:
+    # check tcm_id_table_pattern validity
+    pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)[0]
+    if pattern_check == "" or ":" == pattern_check[0]:
+        return tcm_id_table_pattern.format(ch_id)
+    else:
+        raise NotImplementedError(
+            "Only empty placeholders with format specifications are currently implemented"
+        )
+
+
 def num_and_pars(value: str, par_dic: dict):
     # function tries to convert a string to a int, float, bool
     # or returns the value if value is a key in par_dic
@@ -51,6 +68,7 @@ def evaluate_expression(
     qry: str = None,
     defv: bool | int | float = np.nan,
     sorter: str = None,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
     """Evaluates the expression defined by the user across all channels
     according to the mode.
@@ -107,6 +125,9 @@ def evaluate_expression(
     sorter
        can be used to sort vector outputs according to sorter expression (see
        :func:`evaluate_to_vector`).
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     store = LH5Store()
@@ -186,6 +207,7 @@ def evaluate_expression(
                     ch_comp,
                     var_ph,
                     defv,
+                    tcm_id_table_pattern,
                 )
             elif isinstance(ch_comp, VectorOfVectors):
                 return evaluate_at_channel_vov(
@@ -199,6 +221,7 @@ def evaluate_expression(
                     chns_rm,
                     var_ph,
                     defv,
+                    tcm_id_table_pattern,
                 )
             else:
                 raise NotImplementedError(
@@ -226,6 +249,7 @@ def evaluate_expression(
                 var_ph,
                 defv,
                 is_first=True if "first_at:" in mode else False,
+                tcm_id_table_pattern=tcm_id_table_pattern,
             )
         elif mode in ["sum", "any", "all"]:
             return evaluate_to_scalar(
@@ -242,6 +266,7 @@ def evaluate_expression(
                 nrows,
                 var_ph,
                 defv,
+                tcm_id_table_pattern,
             )
         elif "gather" == mode:
             return evaluate_to_vector(
@@ -258,6 +283,7 @@ def evaluate_expression(
                 var_ph,
                 defv,
                 sorter,
+                tcm_id_table_pattern,
             )
         else:
             raise ValueError(mode + " not a valid mode")
@@ -318,6 +344,7 @@ def get_data_at_channel(
     f_hit: str,
     f_dsp: str,
     defv,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> np.ndarray:
     """Evaluates an expression and returns the result.
 
@@ -344,18 +371,23 @@ def get_data_at_channel(
        path to `dsp` tier file.
     defv
        default value.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     # get index list for this channel to be loaded
-    idx_ch = idx[ids == int(ch[2:])]
+    idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
     outsize = len(idx_ch)
 
     if not is_evaluated:
         res = np.full(outsize, defv, dtype=type(defv))
     elif "tcm.array_id" == expr:
-        res = np.full(outsize, int(ch[2:]), dtype=int)
+        res = np.full(
+            outsize, get_tcm_id_by_pattern(tcm_id_table_pattern, ch), dtype=int
+        )
     elif "tcm.index" == expr:
-        res = np.where(ids == int(ch[2:]))[0]
+        res = np.where(ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0]
     else:
         var = find_parameters(f_hit, f_dsp, ch, idx_ch, exprl)
 
@@ -459,6 +491,7 @@ def evaluate_to_first_or_last(
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
     is_first: bool = True,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
@@ -493,6 +526,9 @@ def evaluate_to_first_or_last(
        default value.
     is_first
        defines if sorted by smallest or largest value of `sorter`
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     # define dimension of output array
@@ -503,7 +539,7 @@ def evaluate_to_first_or_last(
 
     for ch in chns:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         # evaluate at channel
         res = get_data_at_channel(
@@ -517,6 +553,7 @@ def evaluate_to_first_or_last(
             f_hit,
             f_dsp,
             defv,
+            tcm_id_table_pattern,
         )
 
         # get mask from query
@@ -560,6 +597,7 @@ def evaluate_to_scalar(
     nrows: int,
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> Array:
     """Aggregates by summation across channels.
 
@@ -591,6 +629,9 @@ def evaluate_to_scalar(
        dictionary of evt and additional parameters and their values.
     defv
        default value.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     # define dimension of output array
@@ -598,7 +639,7 @@ def evaluate_to_scalar(
 
     for ch in chns:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         res = get_data_at_channel(
             ch,
@@ -611,6 +652,7 @@ def evaluate_to_scalar(
             f_hit,
             f_dsp,
             defv,
+            tcm_id_table_pattern,
         )
 
         # get mask from query
@@ -644,6 +686,7 @@ def evaluate_at_channel(
     ch_comp: Array,
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> Array:
     """Aggregates by evaluating the expression at a given channel.
 
@@ -669,26 +712,30 @@ def evaluate_at_channel(
        dictionary of `evt` and additional parameters and their values.
     defv
        default value.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
 
     for ch in np.unique(ch_comp.nda.astype(int)):
         # skip default value
-        if f"ch{ch}" not in lh5.ls(f_hit):
+        if get_table_name_by_pattern(tcm_id_table_pattern, ch) not in lh5.ls(f_hit):
             continue
         idx_ch = idx[ids == ch]
         res = get_data_at_channel(
-            f"ch{ch}",
+            get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids,
             idx,
             expr,
             exprl,
             var_ph,
-            f"ch{ch}" not in chns_rm,
+            get_table_name_by_pattern(tcm_id_table_pattern, ch) not in chns_rm,
             f_hit,
             f_dsp,
             defv,
+            tcm_id_table_pattern,
         )
 
         out[idx_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[idx_ch])
@@ -707,6 +754,7 @@ def evaluate_at_channel_vov(
     chns_rm: list,
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
@@ -733,6 +781,9 @@ def evaluate_at_channel_vov(
        dictionary of `evt` and additional parameters and their values.
     defv
        default value.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
 
     # blow up vov to aoesa
@@ -745,16 +796,17 @@ def evaluate_at_channel_vov(
     for ch in chns:
         idx_ch = idx[ids == ch]
         res = get_data_at_channel(
-            f"ch{ch}",
+            get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids,
             idx,
             expr,
             exprl,
             var_ph,
-            f"ch{ch}" not in chns_rm,
+            get_table_name_by_pattern(tcm_id_table_pattern, ch) not in chns_rm,
             f_hit,
             f_dsp,
             defv,
+            tcm_id_table_pattern,
         )
 
         # see in which events the current channel is present
@@ -786,6 +838,7 @@ def evaluate_to_aoesa(
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
     missv=np.nan,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
@@ -822,13 +875,16 @@ def evaluate_to_aoesa(
        missing value.
     sorter
        sorts the entries in the vector according to sorter expression.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
     # define dimension of output array
     out = np.full((nrows, len(chns)), missv)
 
     i = 0
     for ch in chns:
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
         res = get_data_at_channel(
             ch,
             ids,
@@ -840,6 +896,7 @@ def evaluate_to_aoesa(
             f_hit,
             f_dsp,
             defv,
+            tcm_id_table_pattern,
         )
 
         # get mask from query
@@ -866,6 +923,7 @@ def evaluate_to_vector(
     var_ph: dict = None,
     defv: bool | int | float = np.nan,
     sorter: str = None,
+    tcm_id_table_pattern: str = "ch{}",
 ) -> VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
@@ -902,6 +960,9 @@ def evaluate_to_vector(
        sorts the entries in the vector according to sorter expression.
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
     out = evaluate_to_aoesa(
         idx,
@@ -917,6 +978,7 @@ def evaluate_to_vector(
         var_ph,
         defv,
         np.nan,
+        tcm_id_table_pattern,
     ).view_as("np")
 
     # if a sorter is given sort accordingly
@@ -933,6 +995,7 @@ def evaluate_to_vector(
             [tuple(fld.split("."))],
             None,
             nrows,
+            tcm_id_table_pattern=tcm_id_table_pattern,
         ).view_as("np")
         if "ascend_by" == md:
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
@@ -958,6 +1021,7 @@ def build_evt(
     wo_mode: str = "write_safe",
     group: str = "/evt/",
     tcm_group: str = "/hardware_tcm_1/",
+    tcm_id_table_pattern: str = "ch{}",
 ) -> None:
     """Transform data from the `hit` and `dsp` levels which a channel sorted to a
     event sorted data format.
@@ -1040,6 +1104,9 @@ def build_evt(
         LH5 root group name.
     tcm_group
         LH5 root group in tcm file.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
     store = LH5Store()
     tbl_cfg = evt_config
@@ -1053,6 +1120,28 @@ def build_evt(
         raise ValueError("channel field needs to be specified in the config")
     if "operations" not in tbl_cfg.keys():
         raise ValueError("operations field needs to be specified in the config")
+
+    # check tcm_id_table_pattern validity
+    pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)
+    if len(pattern_check) != 1:
+        raise ValueError(
+            f"tcm_id_table_pattern must have exactly one placeholder. {tcm_id_table_pattern} is invalid."
+        )
+    elif "{" in pattern_check[0] or "}" in pattern_check[0]:
+        raise ValueError(
+            f"tcm_id_table_pattern {tcm_id_table_pattern} has an invalid placeholder."
+        )
+
+    if (
+        get_table_name_by_pattern(
+            tcm_id_table_pattern,
+            get_tcm_id_by_pattern(tcm_id_table_pattern, lh5.ls(f_hit)[0]),
+        )
+        != lh5.ls(f_hit)[0]
+    ):
+        raise ValueError(
+            f"tcm_id_table_pattern {tcm_id_table_pattern} does not match keys in data!"
+        )
 
     # create channel list according to config
     # This can be either read from the meta data
