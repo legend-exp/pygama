@@ -9,7 +9,6 @@ functions must take as the first 4 args in order:
 additional parameters are free to the user and need to be defined in the JSON
 """
 
-import warnings
 
 import awkward as ak
 import numpy as np
@@ -247,11 +246,6 @@ def get_etc(
     trail,
     min_first_pls_ene,
 ) -> Array:
-    # ignore stupid numpy warnings
-    warnings.filterwarnings("ignore", r"All-NaN slice encountered")
-    warnings.filterwarnings("ignore", r"invalid value encountered in true_divide")
-    warnings.filterwarnings("ignore", r"invalid value encountered in divide")
-
     # load TCM data to define an event
     store = LH5Store()
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
