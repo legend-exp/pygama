@@ -25,7 +25,9 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
         tcm_group="hardware_tcm_1",
     )
 
@@ -86,7 +88,9 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
         tcm_group="hardware_tcm_1",
     )
 

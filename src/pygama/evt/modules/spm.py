@@ -5,6 +5,9 @@ functions must take as the first 4 args in order:
 - path to the hit file
 - path to the dsp file
 - path to the tcm file
+- hit LH5 root group
+- dsp LH5 root group
+- tcm LH5 root group
 - list of channels processed
 additional parameters are free to the user and need to be defined in the JSON
 """
@@ -70,12 +73,24 @@ def get_spm_mask(
 # mode 2 -> return rawids
 # mode 3 -> return tcm_idx
 def get_masked_tcm_idx(
-    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode=0
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
+    mode=0,
 ) -> VectorOfVectors:
     # load TCM data to define an event
     store = LH5Store()
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
-    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
+    idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
 
     arr_lst = []
 
@@ -87,13 +102,17 @@ def get_masked_tcm_idx(
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
+            "np"
+        )
         tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
         tmp[idx_ch] = pe
         pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        times = store.read(f"{ch}/{hit_group}/trigger_pos", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
         tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
         tmp[idx_ch] = times
         times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
@@ -127,14 +146,16 @@ def get_masked_tcm_idx(
     return VectorOfVectors(array=ak.concatenate(arr_lst, axis=-1))
 
 
-def get_spm_ene_or_maj(f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode):
+def get_spm_ene_or_maj(
+    f_hit, f_tcm, hit_group, tcm_group, chs, lim, trgr, tdefault, tmin, tmax, mode
+):
     if mode not in ["energy_hc", "energy_dplms", "majority_hc", "majority_dplms"]:
         raise ValueError("Unknown mode")
 
     # load TCM data to define an event
     store = LH5Store()
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
-    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
+    idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
     out = np.zeros(np.max(idx) + 1)
 
     if isinstance(trgr, (float, int)):
@@ -148,36 +169,36 @@ def get_spm_ene_or_maj(f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode)
         if mode in ["energy_dplms", "majority_dplms"]:
             pe = ak.drop_none(
                 ak.nan_to_none(
-                    store.read(f"{ch}/hit/energy_in_pe_dplms", f_hit, idx=idx_ch)[
-                        0
-                    ].view_as("ak")
+                    store.read(
+                        f"{ch}/{hit_group}/energy_in_pe_dplms", f_hit, idx=idx_ch
+                    )[0].view_as("ak")
                 )
             )
 
             # times are in sample units
             times = ak.drop_none(
                 ak.nan_to_none(
-                    store.read(f"{ch}/hit/trigger_pos_dplms", f_hit, idx=idx_ch)[
-                        0
-                    ].view_as("ak")
+                    store.read(
+                        f"{ch}/{hit_group}/trigger_pos_dplms", f_hit, idx=idx_ch
+                    )[0].view_as("ak")
                 )
             )
 
         else:
             pe = ak.drop_none(
                 ak.nan_to_none(
-                    store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
-                        "ak"
-                    )
+                    store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[
+                        0
+                    ].view_as("ak")
                 )
             )
 
             # times are in sample units
             times = ak.drop_none(
                 ak.nan_to_none(
-                    store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as(
-                        "ak"
-                    )
+                    store.read(f"{ch}/{hit_group}/trigger_pos", f_hit, idx=idx_ch)[
+                        0
+                    ].view_as("ak")
                 )
             )
 
@@ -196,34 +217,122 @@ def get_spm_ene_or_maj(f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, mode)
 
 
 # get LAr energy per event over all channels
-def get_energy(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
+def get_energy(
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
+) -> Array:
     return get_spm_ene_or_maj(
-        f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, "energy_hc"
+        f_hit,
+        f_tcm,
+        hit_group,
+        tcm_group,
+        chs,
+        lim,
+        trgr,
+        tdefault,
+        tmin,
+        tmax,
+        "energy_hc",
     )
 
 
 # get LAr majority per event over all channels
-def get_majority(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
+def get_majority(
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
+) -> Array:
     return get_spm_ene_or_maj(
-        f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, "majority_hc"
+        f_hit,
+        f_tcm,
+        hit_group,
+        tcm_group,
+        chs,
+        lim,
+        trgr,
+        tdefault,
+        tmin,
+        tmax,
+        "majority_hc",
     )
 
 
 # get LAr energy per event over all channels
 def get_energy_dplms(
-    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
 ) -> Array:
     return get_spm_ene_or_maj(
-        f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, "energy_dplms"
+        f_hit,
+        f_tcm,
+        hit_group,
+        tcm_group,
+        chs,
+        lim,
+        trgr,
+        tdefault,
+        tmin,
+        tmax,
+        "energy_dplms",
     )
 
 
 # get LAr majority per event over all channels
 def get_majority_dplms(
-    f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
 ) -> Array:
     return get_spm_ene_or_maj(
-        f_hit, f_tcm, chs, lim, trgr, tdefault, tmin, tmax, "majority_dplms"
+        f_hit,
+        f_tcm,
+        hit_group,
+        tcm_group,
+        chs,
+        lim,
+        trgr,
+        tdefault,
+        tmin,
+        tmax,
+        "majority_dplms",
     )
 
 
@@ -236,6 +345,9 @@ def get_etc(
     f_hit,
     f_dsp,
     f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
     chs,
     lim,
     trgr,
@@ -248,8 +360,8 @@ def get_etc(
 ) -> Array:
     # load TCM data to define an event
     store = LH5Store()
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
-    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
+    idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
     pe_lst = []
     time_lst = []
 
@@ -261,13 +373,17 @@ def get_etc(
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
+            "np"
+        )
         tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
         tmp[idx_ch] = pe
         pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        times = store.read(f"{ch}/{hit_group}/trigger_pos", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
         tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
         tmp[idx_ch] = times
         times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
@@ -310,11 +426,24 @@ def get_etc(
 
 
 # returns relative time shift of the first LAr pulse relative to the Ge trigger
-def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) -> Array:
+def get_time_shift(
+    f_hit,
+    f_dsp,
+    f_tcm,
+    hit_group,
+    dsp_group,
+    tcm_group,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
+) -> Array:
     store = LH5Store()
     # load TCM data to define an event
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
-    idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
+    idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
     time_all = ak.Array([[] for x in range(np.max(idx) + 1)])
 
     if isinstance(trgr, (float, int)):
@@ -325,13 +454,17 @@ def get_time_shift(f_hit, f_dsp, f_tcm, chs, lim, trgr, tdefault, tmin, tmax) ->
     for ch in chs:
         idx_ch = idx[ids == int(ch[2:])]
 
-        pe = store.read(f"{ch}/hit/energy_in_pe", f_hit, idx=idx_ch)[0].view_as("np")
+        pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
+            "np"
+        )
         tmp = np.full((np.max(idx) + 1, len(pe[0])), np.nan)
         tmp[idx_ch] = pe
         pe = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))
 
         # times are in sample units
-        times = store.read(f"{ch}/hit/trigger_pos", f_hit, idx=idx_ch)[0].view_as("np")
+        times = store.read(f"{ch}/{hit_group}/trigger_pos", f_hit, idx=idx_ch)[
+            0
+        ].view_as("np")
         tmp = np.full((np.max(idx) + 1, len(times[0])), np.nan)
         tmp[idx_ch] = times
         times = ak.drop_none(ak.nan_to_none(ak.Array(tmp)))

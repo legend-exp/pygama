@@ -25,7 +25,9 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{config_dir}/basic-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
         tcm_group="hardware_tcm_1",
     )
     assert "statement" in store.read("/evt/multiplicity", outfile)[0].getattrs().keys()
@@ -75,7 +77,10 @@ def test_lar_module(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{config_dir}/module-test-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
+        tcm_group="hardware_tcm_1",
     )
 
     assert os.path.exists(outfile)
@@ -101,7 +106,10 @@ def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{config_dir}/module-test-t0-vov-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
+        tcm_group="hardware_tcm_1",
     )
 
     assert os.path.exists(outfile)
@@ -131,7 +139,10 @@ def test_vov(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{config_dir}/vov-test-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
+        tcm_group="hardware_tcm_1",
     )
 
     assert os.path.exists(outfile)
@@ -221,7 +232,9 @@ def test_query(lgnd_test_data, tmptestdir):
         f_evt=outfile,
         evt_config=f"{config_dir}/query-test-evt-config.json",
         wo_mode="o",
-        group="/evt/",
+        evt_group="evt",
+        hit_group="hit",
+        dsp_group="dsp",
         tcm_group="hardware_tcm_1",
     )
     assert len(lh5.ls(outfile, "/evt/")) == 12
