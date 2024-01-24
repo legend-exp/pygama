@@ -1,13 +1,14 @@
 """
 Module for special event level routines for SiPMs
 
-functions must take as the first 4 args in order:
+functions must take as the first 8 args in order:
 - path to the hit file
-- path to the dsp file
+- path to the dsp <file
 - path to the tcm file
 - hit LH5 root group
 - dsp LH5 root group
 - tcm LH5 root group
+- pattern to cast table names to tcm channel ids
 - list of channels processed
 additional parameters are free to the user and need to be defined in the JSON
 """
@@ -17,6 +18,8 @@ import awkward as ak
 import numpy as np
 from lgdo import Array, VectorOfVectors
 from lgdo.lh5 import LH5Store
+
+from pygama.evt import utils
 
 
 # get an 1D akward array from 0 to 2D array
@@ -79,6 +82,7 @@ def get_masked_tcm_idx(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -100,7 +104,7 @@ def get_masked_tcm_idx(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"
@@ -124,12 +128,16 @@ def get_masked_tcm_idx(
 
         elif mode == 1:
             out_idx = np.full((np.max(idx) + 1), np.nan)
-            out_idx[idx_ch] = np.where(ids == int(ch[2:]))[0]
+            out_idx[idx_ch] = np.where(
+                ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)
+            )[0]
             out_idx = ak.drop_none(ak.nan_to_none(ak.Array(out_idx)[:, None]))
             out_idx = out_idx[mask[mask] - 1]
 
         elif mode == 2:
-            out_idx = ak.Array([int(ch[2:])] * len(mask))
+            out_idx = ak.Array(
+                [utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)] * len(mask)
+            )
             out_idx = out_idx[:, None][mask[mask] - 1]
 
         elif mode == 3:
@@ -147,7 +155,18 @@ def get_masked_tcm_idx(
 
 
 def get_spm_ene_or_maj(
-    f_hit, f_tcm, hit_group, tcm_group, chs, lim, trgr, tdefault, tmin, tmax, mode
+    f_hit,
+    f_tcm,
+    hit_group,
+    tcm_group,
+    tcm_id_table_pattern,
+    chs,
+    lim,
+    trgr,
+    tdefault,
+    tmin,
+    tmax,
+    mode,
 ):
     if mode not in ["energy_hc", "energy_dplms", "majority_hc", "majority_dplms"]:
         raise ValueError("Unknown mode")
@@ -164,7 +183,7 @@ def get_spm_ene_or_maj(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         if mode in ["energy_dplms", "majority_dplms"]:
             pe = ak.drop_none(
@@ -224,6 +243,7 @@ def get_energy(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -236,6 +256,7 @@ def get_energy(
         f_tcm,
         hit_group,
         tcm_group,
+        tcm_id_table_pattern,
         chs,
         lim,
         trgr,
@@ -254,6 +275,7 @@ def get_majority(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -266,6 +288,7 @@ def get_majority(
         f_tcm,
         hit_group,
         tcm_group,
+        tcm_id_table_pattern,
         chs,
         lim,
         trgr,
@@ -284,6 +307,7 @@ def get_energy_dplms(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -296,6 +320,7 @@ def get_energy_dplms(
         f_tcm,
         hit_group,
         tcm_group,
+        tcm_id_table_pattern,
         chs,
         lim,
         trgr,
@@ -314,6 +339,7 @@ def get_majority_dplms(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -326,6 +352,7 @@ def get_majority_dplms(
         f_tcm,
         hit_group,
         tcm_group,
+        tcm_id_table_pattern,
         chs,
         lim,
         trgr,
@@ -348,6 +375,7 @@ def get_etc(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -371,7 +399,7 @@ def get_etc(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"
@@ -433,6 +461,7 @@ def get_time_shift(
     hit_group,
     dsp_group,
     tcm_group,
+    tcm_id_table_pattern,
     chs,
     lim,
     trgr,
@@ -452,7 +481,7 @@ def get_time_shift(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == int(ch[2:])]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"

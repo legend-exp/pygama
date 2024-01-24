@@ -14,1197 +14,10 @@ import awkward as ak
 import numpy as np
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
-from numpy.typing import NDArray
+
+from . import aggregators, utils
 
 log = logging.getLogger(__name__)
-
-
-def get_tcm_id_by_pattern(tcm_id_table_pattern: str, ch: str) -> int:
-    pre = tcm_id_table_pattern.split("{")[0]
-    post = tcm_id_table_pattern.split("}")[1]
-    return int(ch.strip(pre).strip(post))
-
-
-def get_table_name_by_pattern(tcm_id_table_pattern: str, ch_id: int) -> str:
-    # check tcm_id_table_pattern validity
-    pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)[0]
-    if pattern_check == "" or ":" == pattern_check[0]:
-        return tcm_id_table_pattern.format(ch_id)
-    else:
-        raise NotImplementedError(
-            "Only empty placeholders with format specifications are currently implemented"
-        )
-
-
-def num_and_pars(value: str, par_dic: dict):
-    # function tries to convert a string to a int, float, bool
-    # or returns the value if value is a key in par_dic
-    if value in par_dic.keys():
-        return par_dic[value]
-    try:
-        value = int(value)
-    except ValueError:
-        try:
-            value = float(value)
-        except ValueError:
-            try:
-                value = bool(value)
-            except ValueError:
-                pass
-    return value
-
-
-def evaluate_expression(
-    f_tcm: str,
-    f_hit: str,
-    f_dsp: str,
-    chns: list,
-    chns_rm: list,
-    mode: str,
-    expr: str,
-    nrows: int,
-    table: Table = None,
-    para: dict = None,
-    qry: str = None,
-    defv: bool | int | float = np.nan,
-    sorter: str = None,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-    tcm_group: str = "tcm",
-) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
-    """Evaluates the expression defined by the user across all channels
-    according to the mode.
-
-    Parameters
-    ----------
-    f_tcm
-       path to `tcm` tier file.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns
-       list of channel names across which expression gets evaluated (form:
-       ``ch<rawid>``).
-    chns_rm
-       list of channels which get set to default value during evaluation. In
-       function mode they are removed entirely (form: ``ch<rawid>``)
-    mode
-       The mode determines how the event entry is calculated across channels.
-       Options are:
-
-       - ``first_at:sorter``: aggregates across channels by returning the
-         expression of the channel with smallest value of sorter.
-       - ``last_at``: aggregates across channels by returning the expression of
-         the channel with largest value of sorter.
-       - ``sum``: aggregates by summation.
-       - ``any``: aggregates by logical or.
-       - ``all``: aggregates by logical and.
-       - ``keep_at_ch:ch_field``: aggregates according to passed ch_field.
-       - ``keep_at_idx:tcm_idx_field``: aggregates according to passed tcm
-         index field.
-       - ``gather``: Channels are not combined, but result saved as
-         :class:`.VectorOfVectors`.
-
-    qry
-       a query that can mask the aggregation.
-    expr
-       the expression. That can be any mathematical equation/comparison. If
-       `mode` is ``function``, the expression needs to be a special processing
-       function defined in modules (e.g. :func:`.modules.spm.get_energy`). In
-       the expression parameters from either hit, dsp, evt tier (from
-       operations performed before this one! Dictionary operations order
-       matters), or from the ``parameters`` field can be used.
-    nrows
-       number of rows to be processed.
-    table
-       table of 'evt' tier data.
-    para
-       dictionary of parameters defined in the ``parameters`` field in the
-       configuration dictionary.
-    defv
-       default value of evaluation.
-    sorter
-       can be used to sort vector outputs according to sorter expression (see
-       :func:`evaluate_to_vector`).
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    evt group
-        LH5 root group name of evt tier.
-    tcm_group
-        LH5 root group in tcm file.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    """
-
-    store = LH5Store()
-
-    # find parameters in evt file or in parameters
-    exprl = re.findall(
-        rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)", expr
-    )
-    var_ph = {}
-    if table:
-        var_ph = var_ph | {
-            e: table[e].view_as("ak")
-            for e in table.keys()
-            if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
-        }
-    if para:
-        var_ph = var_ph | para
-
-    if mode == "function":
-        # evaluate expression
-        func, params = expr.split("(")
-        params = (
-            params.replace(f"{dsp_group}.", f"{dsp_group}_")
-            .replace(f"{hit_group}.", f"{hit_group}_")
-            .replace(f"{evt_group}.", "")
-        )
-        params = [
-            f_hit,
-            f_dsp,
-            f_tcm,
-            hit_group,
-            dsp_group,
-            tcm_group,
-            [x for x in chns if x not in chns_rm],
-        ] + [num_and_pars(e, var_ph) for e in params[:-1].split(",")]
-
-        # load function dynamically
-        p, m = func.rsplit(".", 1)
-        met = getattr(import_module(p, package=__package__), m)
-        return met(*params)
-
-    else:
-        # check if query is either on channel basis or evt basis (and not a mix)
-        qry_mask = qry
-        if qry is not None:
-            if f"{evt_group}." in qry and (
-                f"{hit_group}." in qry or f"{dsp_group}." in qry
-            ):
-                raise ValueError(
-                    f"Query can't be a mix of {evt_group} tier and lower tiers."
-                )
-
-            # if it is an evt query we can evaluate it directly here
-            if table and f"{evt_group}." in qry:
-                qry_mask = eval(qry.replace(f"{evt_group}.", ""), table)
-
-        # load TCM data to define an event
-        ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
-        idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
-
-        # switch through modes
-        if table and (("keep_at_ch:" == mode[:11]) or ("keep_at_idx:" == mode[:12])):
-            if "keep_at_ch:" == mode[:11]:
-                ch_comp = table[mode[11:].replace(f"{evt_group}.", "")]
-            else:
-                ch_comp = table[mode[12:].replace(f"{evt_group}.", "")]
-                if isinstance(ch_comp, Array):
-                    ch_comp = Array(nda=ids[ch_comp.view_as("np")])
-                elif isinstance(ch_comp, VectorOfVectors):
-                    ch_comp = ch_comp.view_as("ak")
-                    ch_comp = VectorOfVectors(
-                        array=ak.unflatten(
-                            ids[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
-                        )
-                    )
-                else:
-                    raise NotImplementedError(
-                        type(ch_comp)
-                        + " not supported (only Array and VectorOfVectors are supported)"
-                    )
-
-            if isinstance(ch_comp, Array):
-                return evaluate_at_channel(
-                    idx=idx,
-                    ids=ids,
-                    f_hit=f_hit,
-                    f_dsp=f_dsp,
-                    chns_rm=chns_rm,
-                    expr=expr,
-                    exprl=exprl,
-                    ch_comp=ch_comp,
-                    var_ph=var_ph,
-                    defv=defv,
-                    tcm_id_table_pattern=tcm_id_table_pattern,
-                    evt_group=evt_group,
-                    hit_group=hit_group,
-                    dsp_group=dsp_group,
-                )
-            elif isinstance(ch_comp, VectorOfVectors):
-                return evaluate_at_channel_vov(
-                    idx=idx,
-                    ids=ids,
-                    f_hit=f_hit,
-                    f_dsp=f_dsp,
-                    expr=expr,
-                    exprl=exprl,
-                    ch_comp=ch_comp,
-                    chns_rm=chns_rm,
-                    var_ph=var_ph,
-                    defv=defv,
-                    tcm_id_table_pattern=tcm_id_table_pattern,
-                    evt_group=evt_group,
-                    hit_group=hit_group,
-                    dsp_group=dsp_group,
-                )
-            else:
-                raise NotImplementedError(
-                    type(ch_comp)
-                    + " not supported (only Array and VectorOfVectors are supported)"
-                )
-        elif "first_at:" in mode or "last_at:" in mode:
-            sorter = tuple(
-                re.findall(
-                    rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)",
-                    mode.split("first_at:")[-1],
-                )[0]
-            )
-            return evaluate_to_first_or_last(
-                idx=idx,
-                ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
-                chns=chns,
-                chns_rm=chns_rm,
-                expr=expr,
-                exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
-                sorter=sorter,
-                var_ph=var_ph,
-                defv=defv,
-                is_first=True if "first_at:" in mode else False,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
-            )
-        elif mode in ["sum", "any", "all"]:
-            return evaluate_to_scalar(
-                mode=mode,
-                idx=idx,
-                ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
-                chns=chns,
-                chns_rm=chns_rm,
-                expr=expr,
-                exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
-                var_ph=var_ph,
-                defv=defv,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
-            )
-        elif "gather" == mode:
-            return evaluate_to_vector(
-                idx=idx,
-                ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
-                chns=chns,
-                chns_rm=chns_rm,
-                expr=expr,
-                exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
-                var_ph=var_ph,
-                defv=defv,
-                sorter=sorter,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
-            )
-        else:
-            raise ValueError(mode + " not a valid mode")
-
-
-def find_parameters(
-    f_hit: str,
-    f_dsp: str,
-    ch: str,
-    idx_ch: NDArray,
-    exprl: list,
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> dict:
-    """Wraps :func:`load_vars_to_nda` to return parameters from `hit` and `dsp`
-    tiers.
-
-    Parameters
-    ----------
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    ch
-       "rawid" in the tiers.
-    idx_ch
-       index array of entries to be read from files.
-    exprl
-       list of tuples ``(tier, field)`` to be found in the `hit/dsp` tiers.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    """
-
-    # find fields in either dsp, hit
-    dsp_flds = [e[1] for e in exprl if e[0] == dsp_group]
-    hit_flds = [e[1] for e in exprl if e[0] == hit_group]
-
-    store = LH5Store()
-    hit_dict, dsp_dict = {}, {}
-    if len(hit_flds) > 0:
-        hit_ak = store.read(
-            f"{ch.replace('/','')}/{hit_group}/", f_hit, field_mask=hit_flds, idx=idx_ch
-        )[0].view_as("ak")
-        hit_dict = dict(
-            zip([f"{hit_group}_" + e for e in ak.fields(hit_ak)], ak.unzip(hit_ak))
-        )
-    if len(dsp_flds) > 0:
-        dsp_ak = store.read(
-            f"{ch.replace('/','')}/{dsp_group}/", f_dsp, field_mask=dsp_flds, idx=idx_ch
-        )[0].view_as("ak")
-        dsp_dict = dict(
-            zip([f"{dsp_group}_" + e for e in ak.fields(dsp_ak)], ak.unzip(dsp_ak))
-        )
-
-    return hit_dict | dsp_dict
-
-
-def get_data_at_channel(
-    ch: str,
-    ids: NDArray,
-    idx: NDArray,
-    expr: str,
-    exprl: list,
-    var_ph: dict,
-    is_evaluated: bool,
-    f_hit: str,
-    f_dsp: str,
-    defv,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> np.ndarray:
-    """Evaluates an expression and returns the result.
-
-    Parameters
-    ----------
-    ch
-       "rawid" of channel to be evaluated.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    expr
-       expression to be evaluated.
-    exprl
-       list of parameter-tuples ``(root_group, field)`` found in the expression.
-    var_ph
-       dict of additional parameters that are not channel dependent.
-    is_evaluated
-       if false, the expression does not get evaluated but an array of default
-       values is returned.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    defv
-       default value.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-
-    # get index list for this channel to be loaded
-    idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
-    outsize = len(idx_ch)
-
-    if not is_evaluated:
-        res = np.full(outsize, defv, dtype=type(defv))
-    elif "tcm.array_id" == expr:
-        res = np.full(
-            outsize, get_tcm_id_by_pattern(tcm_id_table_pattern, ch), dtype=int
-        )
-    elif "tcm.index" == expr:
-        res = np.where(ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0]
-    else:
-        var = find_parameters(
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            ch=ch,
-            idx_ch=idx_ch,
-            exprl=exprl,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        if var_ph is not None:
-            var = var | var_ph
-
-        # evaluate expression
-        # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
-        res = eval(
-            expr.replace(f"{dsp_group}.", f"{dsp_group}_")
-            .replace(f"{hit_group}.", f"{hit_group}_")
-            .replace(f"{evt_group}.", ""),
-            var,
-        )
-
-        # in case the expression evaluates to a single value blow it up
-        if (not hasattr(res, "__len__")) or (isinstance(res, str)):
-            return np.full(outsize, res)
-
-        # the resulting arrays need to be 1D from the operation,
-        # this can only change once we support larger than two dimensional LGDOs
-        # ak.to_numpy() raises error if array not regular
-        res = ak.to_numpy(res, allow_missing=False)
-
-        # in this method only 1D values are allowed
-        if res.ndim > 1:
-            raise ValueError(
-                f"expression '{expr}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
-            )
-
-    return res
-
-
-def get_mask_from_query(
-    qry: str | NDArray,
-    length: int,
-    ch: str,
-    idx_ch: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> np.ndarray:
-    """Evaluates a query expression and returns a mask accordingly.
-
-    Parameters
-    ----------
-    qry
-       query expression.
-    length
-       length of the return mask.
-    ch
-       "rawid" of channel to be evaluated.
-    idx_ch
-       channel indices to be read.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    hit_group
-        LH5 root group in hit file.
-    dsp_group
-        LH5 root group in dsp file.
-    """
-
-    # get sub evt based query condition if needed
-    if isinstance(qry, str):
-        qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-        qry_var = find_parameters(
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            ch=ch,
-            idx_ch=idx_ch,
-            exprl=qry_lst,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-        limarr = eval(
-            qry.replace(f"{dsp_group}.", f"{dsp_group}_").replace(
-                f"{hit_group}.", f"{hit_group}_"
-            ),
-            qry_var,
-        )
-
-        # in case the expression evaluates to a single value blow it up
-        if (not hasattr(limarr, "__len__")) or (isinstance(limarr, str)):
-            return np.full(len(idx_ch), limarr)
-
-        limarr = ak.to_numpy(limarr, allow_missing=False)
-        if limarr.ndim > 1:
-            raise ValueError(
-                f"query '{qry}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
-            )
-
-    # or forward the array
-    elif isinstance(qry, np.ndarray):
-        limarr = qry
-
-    # if no condition, it must be true
-    else:
-        limarr = np.ones(length).astype(bool)
-
-    # explicit cast to bool
-    if limarr.dtype != bool:
-        limarr = limarr.astype(bool)
-
-    return limarr
-
-
-def evaluate_to_first_or_last(
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    chns: list,
-    chns_rm: list,
-    expr: str,
-    exprl: list,
-    qry: str | NDArray,
-    nrows: int,
-    sorter: tuple,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    is_first: bool = True,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> Array:
-    """Aggregates across channels by returning the expression of the channel
-    with value of `sorter`.
-
-    Parameters
-    ----------
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns
-       list of channels to be aggregated.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
-       query expression to mask aggregation.
-    nrows
-       length of output array.
-    sorter
-       tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
-    var_ph
-       dictionary of `evt` and additional parameters and their values.
-    defv
-       default value.
-    is_first
-       defines if sorted by smallest or largest value of `sorter`
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-
-    # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
-    outt = np.zeros(len(out))
-
-    store = LH5Store()
-
-    for ch in chns:
-        # get index list for this channel to be loaded
-        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
-
-        # evaluate at channel
-        res = get_data_at_channel(
-            ch=ch,
-            ids=ids,
-            idx=idx,
-            expr=expr,
-            exprl=exprl,
-            var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # get mask from query
-        limarr = get_mask_from_query(
-            qry=qry,
-            length=len(res),
-            ch=ch,
-            idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # find if sorter is in hit or dsp
-        t0 = store.read(
-            f"{ch}/{sorter[0]}/{sorter[1]}",
-            f_hit if f"{hit_group}" == sorter[0] else f_dsp,
-            idx=idx_ch,
-        )[0].view_as("np")
-
-        if t0.ndim > 1:
-            raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
-
-        if is_first:
-            if ch == chns[0]:
-                outt[:] = np.inf
-
-            out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
-            outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
-
-        else:
-            out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
-            outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
-
-    return Array(nda=out)
-
-
-def evaluate_to_scalar(
-    mode: str,
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    chns: list,
-    chns_rm: list,
-    expr: str,
-    exprl: list,
-    qry: str | NDArray,
-    nrows: int,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> Array:
-    """Aggregates by summation across channels.
-
-    Parameters
-    ----------
-    mode
-       aggregation mode.
-    idx
-       tcm index array.
-    ids
-       tcm id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns
-       list of channels to be aggregated.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of dsp/hit/evt parameter tuples in expression (tier, field).
-    qry
-       query expression to mask aggregation.
-    nrows
-       length of output array
-    var_ph
-       dictionary of evt and additional parameters and their values.
-    defv
-       default value.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-
-    # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
-
-    for ch in chns:
-        # get index list for this channel to be loaded
-        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
-
-        res = get_data_at_channel(
-            ch=ch,
-            ids=ids,
-            idx=idx,
-            expr=expr,
-            exprl=exprl,
-            var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # get mask from query
-        limarr = get_mask_from_query(
-            qry=qry,
-            length=len(res),
-            ch=ch,
-            idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # switch through modes
-        if "sum" == mode:
-            if res.dtype == bool:
-                res = res.astype(int)
-            out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
-        if "any" == mode:
-            if res.dtype != bool:
-                res = res.astype(bool)
-            out[idx_ch] = out[idx_ch] | (res & limarr)
-        if "all" == mode:
-            if res.dtype != bool:
-                res = res.astype(bool)
-            out[idx_ch] = out[idx_ch] & res & limarr
-
-    return Array(nda=out)
-
-
-def evaluate_at_channel(
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    chns_rm: list,
-    expr: str,
-    exprl: list,
-    ch_comp: Array,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> Array:
-    """Aggregates by evaluating the expression at a given channel.
-
-    Parameters
-    ----------
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    ch_comp
-       array of rawids at which the expression is evaluated.
-    var_ph
-       dictionary of `evt` and additional parameters and their values.
-    defv
-       default value.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-
-    out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
-
-    for ch in np.unique(ch_comp.nda.astype(int)):
-        # skip default value
-        if get_table_name_by_pattern(tcm_id_table_pattern, ch) not in lh5.ls(f_hit):
-            continue
-        idx_ch = idx[ids == ch]
-        res = get_data_at_channel(
-            ch=get_table_name_by_pattern(tcm_id_table_pattern, ch),
-            ids=ids,
-            idx=idx,
-            expr=expr,
-            exprl=exprl,
-            var_ph=var_ph,
-            is_evaluated=get_table_name_by_pattern(tcm_id_table_pattern, ch)
-            not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        out[idx_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[idx_ch])
-
-    return Array(nda=out)
-
-
-def evaluate_at_channel_vov(
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    expr: str,
-    exprl: list,
-    ch_comp: VectorOfVectors,
-    chns_rm: list,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> VectorOfVectors:
-    """Same as :func:`evaluate_at_channel` but evaluates expression at non
-    flat channels :class:`.VectorOfVectors`.
-
-    Parameters
-    ----------
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    ch_comp
-       array of "rawid"s at which the expression is evaluated.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    var_ph
-       dictionary of `evt` and additional parameters and their values.
-    defv
-       default value.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-     dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-
-    # blow up vov to aoesa
-    out = ak.Array([[] for _ in range(len(ch_comp))])
-
-    chns = np.unique(ch_comp.flattened_data.nda).astype(int)
-    ch_comp = ch_comp.view_as("ak")
-
-    type_name = None
-    for ch in chns:
-        idx_ch = idx[ids == ch]
-        res = get_data_at_channel(
-            ch=get_table_name_by_pattern(tcm_id_table_pattern, ch),
-            ids=ids,
-            idx=idx,
-            expr=expr,
-            exprl=exprl,
-            var_ph=var_ph,
-            is_evaluated=get_table_name_by_pattern(tcm_id_table_pattern, ch)
-            not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # see in which events the current channel is present
-        mask = ak.to_numpy(ak.any(ch_comp == ch, axis=-1), allow_missing=False)
-        cv = np.full(len(ch_comp), np.nan)
-        cv[idx_ch] = res
-        cv[~mask] = np.nan
-        cv = ak.drop_none(ak.nan_to_none(ak.Array(cv)[:, None]))
-
-        out = ak.concatenate((out, cv), axis=-1)
-
-        if ch == chns[0]:
-            type_name = res.dtype
-
-    return VectorOfVectors(ak.values_astype(out, type_name))
-
-
-def evaluate_to_aoesa(
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    chns: list,
-    chns_rm: list,
-    expr: str,
-    exprl: list,
-    qry: str | NDArray,
-    nrows: int,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    missv=np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> ArrayOfEqualSizedArrays:
-    """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
-    expressions of channels that fulfill a query expression.
-
-    Parameters
-    ----------
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns
-       list of channels to be aggregated.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
-       query expression to mask aggregation.
-    nrows
-       length of output :class:`.VectorOfVectors`.
-    ch_comp
-       array of "rawid"s at which the expression is evaluated.
-    var_ph
-       dictionary of `evt` and additional parameters and their values.
-    defv
-       default value.
-    missv
-       missing value.
-    sorter
-       sorts the entries in the vector according to sorter expression.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-    # define dimension of output array
-    out = np.full((nrows, len(chns)), missv)
-
-    i = 0
-    for ch in chns:
-        idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
-        res = get_data_at_channel(
-            ch=ch,
-            ids=ids,
-            idx=idx,
-            expr=expr,
-            exprl=exprl,
-            var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        # get mask from query
-        limarr = get_mask_from_query(
-            qry=qry,
-            length=len(res),
-            ch=ch,
-            idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        )
-
-        out[idx_ch, i] = np.where(limarr, res, out[idx_ch, i])
-
-        i += 1
-
-    return ArrayOfEqualSizedArrays(nda=out)
-
-
-def evaluate_to_vector(
-    idx: NDArray,
-    ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    chns: list,
-    chns_rm: list,
-    expr: str,
-    exprl: list,
-    qry: str | NDArray,
-    nrows: int,
-    var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    sorter: str = None,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> VectorOfVectors:
-    """Aggregates by returning a :class:`.VectorOfVector` of evaluated
-    expressions of channels that fulfill a query expression.
-
-    Parameters
-    ----------
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    chns
-       list of channels to be aggregated.
-    chns_rm
-       list of channels to be skipped from evaluation and set to default value.
-    expr
-       expression string to be evaluated.
-    exprl
-       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
-       query expression to mask aggregation.
-    nrows
-       length of output :class:`.VectorOfVectors`.
-    ch_comp
-       array of "rawids" at which the expression is evaluated.
-    var_ph
-       dictionary of `evt` and additional parameters and their values.
-    defv
-       default value.
-    sorter
-       sorts the entries in the vector according to sorter expression.
-       ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
-       ``decend_by:<hit|dsp.field>`` sorts descending.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-     dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
-    """
-    out = evaluate_to_aoesa(
-        idx=idx,
-        ids=ids,
-        f_hit=f_hit,
-        f_dsp=f_dsp,
-        chns=chns,
-        chns_rm=chns_rm,
-        expr=expr,
-        exprl=exprl,
-        qry=qry,
-        nrows=nrows,
-        var_ph=var_ph,
-        defv=defv,
-        missv=np.nan,
-        tcm_id_table_pattern=tcm_id_table_pattern,
-        evt_group=evt_group,
-        hit_group=hit_group,
-        dsp_group=dsp_group,
-    ).view_as("np")
-
-    # if a sorter is given sort accordingly
-    if sorter is not None:
-        md, fld = sorter.split(":")
-        s_val = evaluate_to_aoesa(
-            idx=idx,
-            ids=ids,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            chns=chns,
-            chns_rm=chns_rm,
-            expr=fld,
-            exprl=[tuple(fld.split("."))],
-            qry=None,
-            nrows=nrows,
-            missv=np.nan,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
-        ).view_as("np")
-        if "ascend_by" == md:
-            out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
-
-        elif "descend_by" == md:
-            out = out[np.arange(len(out))[:, None], np.argsort(-s_val)]
-        else:
-            raise ValueError(
-                "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
-            )
-
-    return VectorOfVectors(
-        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv))
-    )
 
 
 def build_evt(
@@ -1335,9 +148,9 @@ def build_evt(
         )
 
     if (
-        get_table_name_by_pattern(
+        utils.get_table_name_by_pattern(
             tcm_id_table_pattern,
-            get_tcm_id_by_pattern(tcm_id_table_pattern, lh5.ls(f_hit)[0]),
+            utils.get_tcm_id_by_pattern(tcm_id_table_pattern, lh5.ls(f_hit)[0]),
         )
         != lh5.ls(f_hit)[0]
     ):
@@ -1481,3 +294,281 @@ def build_evt(
     log.info(
         f"Applied {len(tbl_cfg['operations'])} operations to key {key} and saved {len(tbl_cfg['outputs'])} evt fields across {len(chns)} channel groups"
     )
+
+
+def evaluate_expression(
+    f_tcm: str,
+    f_hit: str,
+    f_dsp: str,
+    chns: list,
+    chns_rm: list,
+    mode: str,
+    expr: str,
+    nrows: int,
+    table: Table = None,
+    para: dict = None,
+    qry: str = None,
+    defv: bool | int | float = np.nan,
+    sorter: str = None,
+    tcm_id_table_pattern: str = "ch{}",
+    evt_group: str = "evt",
+    hit_group: str = "hit",
+    dsp_group: str = "dsp",
+    tcm_group: str = "tcm",
+) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
+    """Evaluates the expression defined by the user across all channels
+    according to the mode.
+
+    Parameters
+    ----------
+    f_tcm
+       path to `tcm` tier file.
+    f_hit
+       path to `hit` tier file.
+    f_dsp
+       path to `dsp` tier file.
+    chns
+       list of channel names across which expression gets evaluated (form:
+       ``ch<rawid>``).
+    chns_rm
+       list of channels which get set to default value during evaluation. In
+       function mode they are removed entirely (form: ``ch<rawid>``)
+    mode
+       The mode determines how the event entry is calculated across channels.
+       Options are:
+
+       - ``first_at:sorter``: aggregates across channels by returning the
+         expression of the channel with smallest value of sorter.
+       - ``last_at``: aggregates across channels by returning the expression of
+         the channel with largest value of sorter.
+       - ``sum``: aggregates by summation.
+       - ``any``: aggregates by logical or.
+       - ``all``: aggregates by logical and.
+       - ``keep_at_ch:ch_field``: aggregates according to passed ch_field.
+       - ``keep_at_idx:tcm_idx_field``: aggregates according to passed tcm
+         index field.
+       - ``gather``: Channels are not combined, but result saved as
+         :class:`.VectorOfVectors`.
+
+    qry
+       a query that can mask the aggregation.
+    expr
+       the expression. That can be any mathematical equation/comparison. If
+       `mode` is ``function``, the expression needs to be a special processing
+       function defined in modules (e.g. :func:`.modules.spm.get_energy`). In
+       the expression parameters from either hit, dsp, evt tier (from
+       operations performed before this one! Dictionary operations order
+       matters), or from the ``parameters`` field can be used.
+    nrows
+       number of rows to be processed.
+    table
+       table of 'evt' tier data.
+    para
+       dictionary of parameters defined in the ``parameters`` field in the
+       configuration dictionary.
+    defv
+       default value of evaluation.
+    sorter
+       can be used to sort vector outputs according to sorter expression (see
+       :func:`evaluate_to_vector`).
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
+    evt group
+        LH5 root group name of evt tier.
+    tcm_group
+        LH5 root group in tcm file.
+    dsp_group
+        LH5 root group in dsp file.
+    hit_group
+        LH5 root group in hit file.
+    """
+
+    store = LH5Store()
+
+    # find parameters in evt file or in parameters
+    exprl = re.findall(
+        rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)", expr
+    )
+    var_ph = {}
+    if table:
+        var_ph = var_ph | {
+            e: table[e].view_as("ak")
+            for e in table.keys()
+            if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
+        }
+    if para:
+        var_ph = var_ph | para
+
+    if mode == "function":
+        # evaluate expression
+        func, params = expr.split("(")
+        params = (
+            params.replace(f"{dsp_group}.", f"{dsp_group}_")
+            .replace(f"{hit_group}.", f"{hit_group}_")
+            .replace(f"{evt_group}.", "")
+        )
+        params = [
+            f_hit,
+            f_dsp,
+            f_tcm,
+            hit_group,
+            dsp_group,
+            tcm_group,
+            tcm_id_table_pattern,
+            [x for x in chns if x not in chns_rm],
+        ] + [utils.num_and_pars(e, var_ph) for e in params[:-1].split(",")]
+
+        # load function dynamically
+        p, m = func.rsplit(".", 1)
+        met = getattr(import_module(p, package=__package__), m)
+        return met(*params)
+
+    else:
+        # check if query is either on channel basis or evt basis (and not a mix)
+        qry_mask = qry
+        if qry is not None:
+            if f"{evt_group}." in qry and (
+                f"{hit_group}." in qry or f"{dsp_group}." in qry
+            ):
+                raise ValueError(
+                    f"Query can't be a mix of {evt_group} tier and lower tiers."
+                )
+
+            # if it is an evt query we can evaluate it directly here
+            if table and f"{evt_group}." in qry:
+                qry_mask = eval(qry.replace(f"{evt_group}.", ""), table)
+
+        # load TCM data to define an event
+        ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
+        idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
+
+        # switch through modes
+        if table and (("keep_at_ch:" == mode[:11]) or ("keep_at_idx:" == mode[:12])):
+            if "keep_at_ch:" == mode[:11]:
+                ch_comp = table[mode[11:].replace(f"{evt_group}.", "")]
+            else:
+                ch_comp = table[mode[12:].replace(f"{evt_group}.", "")]
+                if isinstance(ch_comp, Array):
+                    ch_comp = Array(nda=ids[ch_comp.view_as("np")])
+                elif isinstance(ch_comp, VectorOfVectors):
+                    ch_comp = ch_comp.view_as("ak")
+                    ch_comp = VectorOfVectors(
+                        array=ak.unflatten(
+                            ids[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
+                        )
+                    )
+                else:
+                    raise NotImplementedError(
+                        type(ch_comp)
+                        + " not supported (only Array and VectorOfVectors are supported)"
+                    )
+
+            if isinstance(ch_comp, Array):
+                return aggregators.evaluate_at_channel(
+                    idx=idx,
+                    ids=ids,
+                    f_hit=f_hit,
+                    f_dsp=f_dsp,
+                    chns_rm=chns_rm,
+                    expr=expr,
+                    exprl=exprl,
+                    ch_comp=ch_comp,
+                    var_ph=var_ph,
+                    defv=defv,
+                    tcm_id_table_pattern=tcm_id_table_pattern,
+                    evt_group=evt_group,
+                    hit_group=hit_group,
+                    dsp_group=dsp_group,
+                )
+            elif isinstance(ch_comp, VectorOfVectors):
+                return aggregators.evaluate_at_channel_vov(
+                    idx=idx,
+                    ids=ids,
+                    f_hit=f_hit,
+                    f_dsp=f_dsp,
+                    expr=expr,
+                    exprl=exprl,
+                    ch_comp=ch_comp,
+                    chns_rm=chns_rm,
+                    var_ph=var_ph,
+                    defv=defv,
+                    tcm_id_table_pattern=tcm_id_table_pattern,
+                    evt_group=evt_group,
+                    hit_group=hit_group,
+                    dsp_group=dsp_group,
+                )
+            else:
+                raise NotImplementedError(
+                    type(ch_comp)
+                    + " not supported (only Array and VectorOfVectors are supported)"
+                )
+        elif "first_at:" in mode or "last_at:" in mode:
+            sorter = tuple(
+                re.findall(
+                    rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)",
+                    mode.split("first_at:")[-1],
+                )[0]
+            )
+            return aggregators.evaluate_to_first_or_last(
+                idx=idx,
+                ids=ids,
+                f_hit=f_hit,
+                f_dsp=f_dsp,
+                chns=chns,
+                chns_rm=chns_rm,
+                expr=expr,
+                exprl=exprl,
+                qry=qry_mask,
+                nrows=nrows,
+                sorter=sorter,
+                var_ph=var_ph,
+                defv=defv,
+                is_first=True if "first_at:" in mode else False,
+                tcm_id_table_pattern=tcm_id_table_pattern,
+                evt_group=evt_group,
+                hit_group=hit_group,
+                dsp_group=dsp_group,
+            )
+        elif mode in ["sum", "any", "all"]:
+            return aggregators.evaluate_to_scalar(
+                mode=mode,
+                idx=idx,
+                ids=ids,
+                f_hit=f_hit,
+                f_dsp=f_dsp,
+                chns=chns,
+                chns_rm=chns_rm,
+                expr=expr,
+                exprl=exprl,
+                qry=qry_mask,
+                nrows=nrows,
+                var_ph=var_ph,
+                defv=defv,
+                tcm_id_table_pattern=tcm_id_table_pattern,
+                evt_group=evt_group,
+                hit_group=hit_group,
+                dsp_group=dsp_group,
+            )
+        elif "gather" == mode:
+            return aggregators.evaluate_to_vector(
+                idx=idx,
+                ids=ids,
+                f_hit=f_hit,
+                f_dsp=f_dsp,
+                chns=chns,
+                chns_rm=chns_rm,
+                expr=expr,
+                exprl=exprl,
+                qry=qry_mask,
+                nrows=nrows,
+                var_ph=var_ph,
+                defv=defv,
+                sorter=sorter,
+                tcm_id_table_pattern=tcm_id_table_pattern,
+                evt_group=evt_group,
+                hit_group=hit_group,
+                dsp_group=dsp_group,
+            )
+        else:
+            raise ValueError(mode + " not a valid mode")
