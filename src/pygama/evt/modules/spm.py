@@ -296,11 +296,17 @@ def get_etc(
         mask_total = time_all > tge
         mask_singlet = (time_all > tge) & (time_all < tge + swin)
 
-    pe_singlet = ak.nansum(pe_all[mask_singlet], axis=-1)
-    pe_total = ak.nansum(pe_all[mask_total], axis=-1)
-    etc = ak.where(pe_total > 0, pe_singlet / pe_total, np.nan)
+    pe_singlet = ak.to_numpy(
+        ak.fill_none(ak.nansum(pe_all[mask_singlet], axis=-1), 0), allow_missing=False
+    )
+    pe_total = ak.to_numpy(
+        ak.fill_none(ak.nansum(pe_all[mask_total], axis=-1), 0), allow_missing=False
+    )
+    etc = np.divide(
+        pe_singlet, pe_total, out=np.full_like(pe_total, np.nan), where=pe_total != 0
+    )
 
-    return Array(nda=ak.to_numpy(ak.fill_none(etc, np.nan), allow_missing=False))
+    return Array(nda=etc)
 
 
 # returns relative time shift of the first LAr pulse relative to the Ge trigger
