@@ -3,14 +3,15 @@ This module provides aggregators to build the `evt` tier.
 """
 
 from __future__ import annotations
-import re
-import numpy as np
-from numpy.typing import NDArray
+
 import awkward as ak
+import numpy as np
+from lgdo import Array, ArrayOfEqualSizedArrays, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
-from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
+from numpy.typing import NDArray
 
 from . import utils
+
 
 def evaluate_to_first_or_last(
     idx: NDArray,
@@ -308,7 +309,9 @@ def evaluate_at_channel(
 
     for ch in np.unique(ch_comp.nda.astype(int)):
         # skip default value
-        if utils.get_table_name_by_pattern(tcm_id_table_pattern, ch) not in lh5.ls(f_hit):
+        if utils.get_table_name_by_pattern(tcm_id_table_pattern, ch) not in lh5.ls(
+            f_hit
+        ):
             continue
         idx_ch = idx[ids == ch]
         res = utils.get_data_at_channel(

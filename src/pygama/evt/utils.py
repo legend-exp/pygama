@@ -3,11 +3,14 @@ This module provides utilities to build the `evt` tier.
 """
 
 from __future__ import annotations
+
 import re
-import numpy as np
-from numpy.typing import NDArray
+
 import awkward as ak
+import numpy as np
 from lgdo.lh5 import LH5Store
+from numpy.typing import NDArray
+
 
 def get_tcm_id_by_pattern(tcm_id_table_pattern: str, ch: str) -> int:
     pre = tcm_id_table_pattern.split("{")[0]
@@ -42,6 +45,7 @@ def num_and_pars(value: str, par_dic: dict):
             except ValueError:
                 pass
     return value
+
 
 def find_parameters(
     f_hit: str,

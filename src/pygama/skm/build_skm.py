@@ -14,6 +14,8 @@ import numpy as np
 from lgdo import Array, Table, lh5
 from lgdo.lh5 import LH5Store
 
+from pygama.evt import utils
+
 log = logging.getLogger(__name__)
 
 
@@ -25,7 +27,12 @@ def build_skm(
     f_skm: str,
     skm_conf: dict | str,
     wo_mode="w",
-    group: str = "/skm/",
+    skm_group: str = "skm",
+    evt_group: str = "evt",
+    tcm_group: str = "hardware_tcm_1",
+    dsp_group: str = "dsp",
+    hit_group: str = "hit",
+    tcm_id_table_pattern: str = "ch{}",
 ) -> None:
     """Builds a skimmed file from a (set) of evt/hit/dsp tier file(s).
 
@@ -89,10 +96,21 @@ def build_skm(
         - ``append`` or ``a``: append  to file.
         - ``overwrite`` or ``o``: replaces existing file.
 
-    group
-        LH5 root group name (only used if ``skim_format`` is ``lh5``).
+    skm_group
+        skm LH5 root group name.
+    evt_group
+        evt LH5 root group name.
+    hit_group
+        hit LH5 root group name.
+    dsp_group
+        dsp LH5 root group name.
+    tcm_group
+        tcm LH5 root group name.
+    tcm_id_table_pattern
+        Pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the tcm id.
     """
-    f_dict = {"evt": f_evt, "hit": f_hit, "dsp": f_dsp, "tcm": f_tcm}
+    f_dict = {evt_group: f_evt, hit_group: f_hit, dsp_group: f_dsp, tcm_group: f_tcm}
     log = logging.getLogger(__name__)
     log.debug(f"I am skimming {len(f_evt) if isinstance(f_evt,list) else 1} files")
 
@@ -122,11 +140,9 @@ def build_skm(
                     miss_val = eval(miss_val)
 
             fw_fld = tbl_cfg["operations"][op]["forward_field"].split(".")
-            if fw_fld[0] not in ["evt", "hit", "dsp", "tcm"]:
-                raise ValueError(f"{fw_fld[0]} is not a valid tier")
 
             # load object if from evt tier
-            if fw_fld[0] == "evt":
+            if fw_fld[0] == evt_group:
                 obj = store.read(f"/{fw_fld[0]}/{fw_fld[1]}", f_dict[fw_fld[0]])[
                     0
                 ].view_as("ak")
@@ -145,10 +161,10 @@ def build_skm(
                 obj = ak.Array([[] for x in range(len(tcm_idx))])
 
                 # load TCM data to define an event
-                ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("ak")
+                ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("ak")
                 ids = ak.unflatten(ids[ak.flatten(tcm_idx)], ak.count(tcm_idx, axis=-1))
 
-                idx = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("ak")
+                idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("ak")
                 idx = ak.unflatten(idx[ak.flatten(tcm_idx)], ak.count(tcm_idx, axis=-1))
 
                 if "tcm.array_id" == tbl_cfg["operations"][op]["forward_field"]:
@@ -167,13 +183,14 @@ def build_skm(
                         ct_idx = ak.count(ch_idx, axis=-1)
                         fl_idx = ak.to_numpy(ak.flatten(ch_idx), allow_missing=False)
 
-                        if f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}" not in lh5.ls(
-                            f_dict[fw_fld[0]], f"ch{ch}/{fw_fld[0]}/"
+                        if (
+                            f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld[0]}/{fw_fld[1]}"
+                            not in lh5.ls(f_dict[fw_fld[0]], f"ch{ch}/{fw_fld[0]}/")
                         ):
                             och = Array(nda=np.full(len(fl_idx), miss_val))
                         else:
                             och, _ = store.read(
-                                f"ch{ch}/{fw_fld[0]}/{fw_fld[1]}",
+                                f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld[0]}/{fw_fld[1]}",
                                 f_dict[fw_fld[0]],
                                 idx=fl_idx,
                             )
@@ -216,4 +233,4 @@ def build_skm(
         raise FileExistsError(f"Write_safe mode: {f_skm} exists.")
 
     wo = wo_mode if wo_mode not in ["o", "overwrite"] else "of"
-    store.write(obj=table, name=group, lh5_file=f_skm, wo_mode=wo)
+    store.write(obj=table, name=f"/{skm_group}/", lh5_file=f_skm, wo_mode=wo)
