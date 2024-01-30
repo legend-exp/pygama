@@ -48,14 +48,14 @@ def build_hit(
         .. code-block:: json
 
             {
-                "outputs": ["calE", "AoE"],
-                "operations": {
-                    "calE": {
-                        "expression": "sqrt(a + b * trapEmax**2)",
-                        "parameters": {"a": "1.23", "b": "42.69"},
-                    },
-                    "AoE": {"expression": "A_max/calE"},
-                }
+              "outputs": ["calE", "AoE"],
+              "operations": {
+                "calE": {
+                  "expression": "sqrt(a + b * trapEmax**2)",
+                  "parameters": {"a": "1.23", "b": "42.69"},
+                },
+                "AoE": {"expression": "A_max/calE"},
+              }
             }
 
         The ``outputs`` array lists columns that will be effectively written in

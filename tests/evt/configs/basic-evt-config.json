@@ -1,0 +1,90 @@
+{
+  "channels": {
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  },
+  "outputs": [
+    "multiplicity",
+    "energy",
+    "energy_id",
+    "energy_idx",
+    "energy_any_above1MeV",
+    "energy_all_above1MeV",
+    "energy_aux",
+    "energy_sum",
+    "is_usable_aoe",
+    "aoe",
+    "is_aoe_rejected"
+  ],
+  "operations": {
+    "multiplicity": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "expression": "hit.cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0,
+      "lgdo_attrs": { "statement": "0bb decay is real" }
+    },
+    "energy": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal",
+      "initial": "np.nan"
+    },
+    "energy_id": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.array_id",
+      "initial": 0
+    },
+    "energy_idx": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.index",
+      "initial": 999999999999
+    },
+    "energy_any_above1MeV": {
+      "channels": "geds_on",
+      "aggregation_mode": "any",
+      "expression": "hit.cuspEmax_ctc_cal>1000",
+      "initial": false
+    },
+    "energy_all_above1MeV": {
+      "channels": "geds_on",
+      "aggregation_mode": "all",
+      "expression": "hit.cuspEmax_ctc_cal>1000",
+      "initial": false
+    },
+    "energy_aux": {
+      "channels": "geds_on",
+      "aggregation_mode": "last_at:dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal",
+      "initial": "np.nan"
+    },
+    "energy_sum": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal",
+      "initial": 0.0
+    },
+    "is_usable_aoe": {
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
+      "expression": "True",
+      "initial": false
+    },
+    "aoe": {
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
+      "expression": "hit.AoE_Classifier",
+      "initial": "np.nan"
+    },
+    "is_aoe_rejected": {
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
+      "expression": "~(hit.AoE_Double_Sided_Cut)",
+      "initial": false
+    }
+  }
+}
