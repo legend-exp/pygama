@@ -14,6 +14,7 @@ from . import utils
 
 
 def evaluate_to_first_or_last(
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -86,6 +87,10 @@ def evaluate_to_first_or_last(
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        evt_ids_ch = np.searchsorted(
+            cumulengths,
+            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+        )
 
         # evaluate at channel
         res = utils.get_data_at_channel(
@@ -131,12 +136,20 @@ def evaluate_to_first_or_last(
             if ch == chns[0]:
                 outt[:] = np.inf
 
-            out[idx_ch] = np.where((t0 < outt) & (limarr), res, out[idx_ch])
-            outt[idx_ch] = np.where((t0 < outt) & (limarr), t0, outt[idx_ch])
+            out[evt_ids_ch] = np.where(
+                (t0 < outt[evt_ids_ch]) & (limarr), res, out[evt_ids_ch]
+            )
+            outt[evt_ids_ch] = np.where(
+                (t0 < outt[evt_ids_ch]) & (limarr), t0, outt[evt_ids_ch]
+            )
 
         else:
-            out[idx_ch] = np.where((t0 > outt) & (limarr), res, out[idx_ch])
-            outt[idx_ch] = np.where((t0 > outt) & (limarr), t0, outt[idx_ch])
+            out[evt_ids_ch] = np.where(
+                (t0 > outt[evt_ids_ch]) & (limarr), res, out[evt_ids_ch]
+            )
+            outt[evt_ids_ch] = np.where(
+                (t0 > outt[evt_ids_ch]) & (limarr), t0, outt[evt_ids_ch]
+            )
 
     return Array(nda=out)
 
