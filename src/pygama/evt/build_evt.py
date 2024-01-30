@@ -39,11 +39,11 @@ def build_evt(
     Parameters
     ----------
     f_tcm
-        input LH5 file of the tcm level.
+        input LH5 file of the `tcm` level.
     f_dsp
-        input LH5 file of the dsp level.
+        input LH5 file of the `dsp` level.
     f_hit
-        input LH5 file of the hit level.
+        input LH5 file of the `hit` level.
     f_evt
         name of the output file.
     evt_config
@@ -111,16 +111,16 @@ def build_evt(
     wo_mode
         writing mode.
     evt group
-        LH5 root group name of evt tier.
+        LH5 root group name of `evt` tier.
     tcm_group
-        LH5 root group in tcm file.
+        LH5 root group in `tcm` file.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must
+        have one placeholder which is the `tcm` id.
     """
 
     store = LH5Store()
@@ -362,7 +362,7 @@ def evaluate_expression(
     nrows
        number of rows to be processed.
     table
-       table of 'evt' tier data.
+       table of `evt` tier data.
     para
        dictionary of parameters defined in the ``parameters`` field in the
        configuration dictionary.
@@ -372,16 +372,16 @@ def evaluate_expression(
        can be used to sort vector outputs according to sorter expression (see
        :func:`evaluate_to_vector`).
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format tcm id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     evt group
-        LH5 root group name of evt tier.
+        LH5 root group name of `evt` tier.
     tcm_group
-        LH5 root group in tcm file.
+        LH5 root group in `tcm` file.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     """
 
     store = LH5Store()

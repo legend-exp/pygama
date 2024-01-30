@@ -34,7 +34,7 @@ def build_skm(
     hit_group: str = "hit",
     tcm_id_table_pattern: str = "ch{}",
 ) -> None:
-    """Builds a skimmed file from a (set) of evt/hit/dsp tier file(s).
+    """Builds a skimmed file from a (set) of `evt/hit/dsp` tier file(s).
 
     Parameters
     ----------
@@ -65,28 +65,28 @@ def build_skm(
 
         .. code-block:: json
 
-            {
-              "multiplicity": 2,
-              "postfixes":["","aux"],
-              "operations": {
-                    "timestamp":{
-                    "forward_field": "evt.timestamp"
-                    },
-                    "multiplicity":{
-                    "forward_field": "evt.multiplicity"
-                    },
-                    "energy":{
-                    "forward_field": "hit.cuspEmax_ctc_cal",
-                    "missing_value": "np.nan",
-                    "tcm_idx": "evt.energy_idx"
-                    },
-                    "energy_id":{
-                    "forward_field": "tcm.array_id",
-                    "missing_value": 0,
-                    "tcm_idx": "evt.energy_idx"
-                    }
-                }
-            }
+           {
+             "multiplicity": 2,
+             "postfixes":["", "aux"],
+             "operations": {
+               "timestamp":{
+                 "forward_field": "evt.timestamp"
+               },
+               "multiplicity":{
+                 "forward_field": "evt.multiplicity"
+               },
+               "energy":{
+                 "forward_field": "hit.cuspEmax_ctc_cal",
+                 "missing_value": "np.nan",
+                 "tcm_idx": "evt.energy_idx"
+               },
+               "energy_id":{
+                 "forward_field": "tcm.array_id",
+                 "missing_value": 0,
+                 "tcm_idx": "evt.energy_idx"
+               }
+             }
+           }
 
     wo_mode
         writing mode.
@@ -97,18 +97,18 @@ def build_skm(
         - ``overwrite`` or ``o``: replaces existing file.
 
     skm_group
-        skm LH5 root group name.
+        `skm` LH5 root group name.
     evt_group
-        evt LH5 root group name.
+        `evt` LH5 root group name.
     hit_group
-        hit LH5 root group name.
+        `hit` LH5 root group name.
     dsp_group
-        dsp LH5 root group name.
+        `dsp` LH5 root group name.
     tcm_group
-        tcm LH5 root group name.
+        `tcm` LH5 root group name.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     """
     f_dict = {evt_group: f_evt, hit_group: f_hit, dsp_group: f_dsp, tcm_group: f_tcm}
     log = logging.getLogger(__name__)

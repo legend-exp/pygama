@@ -67,14 +67,14 @@ def evaluate_to_first_or_last(
     is_first
        defines if sorted by smallest or largest value of `sorter`
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
 
     # define dimension of output array
@@ -167,9 +167,9 @@ def evaluate_to_scalar(
     mode
        aggregation mode.
     idx
-       tcm index array.
+       `tcm` index array.
     ids
-       tcm id array.
+       `tcm` id array.
     f_hit
        path to `hit` tier file.
     f_dsp
@@ -181,24 +181,24 @@ def evaluate_to_scalar(
     expr
        expression string to be evaluated.
     exprl
-       list of dsp/hit/evt parameter tuples in expression (tier, field).
+       list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     qry
        query expression to mask aggregation.
     nrows
        length of output array
     var_ph
-       dictionary of evt and additional parameters and their values.
+       dictionary of `evt` and additional parameters and their values.
     defv
        default value.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
 
     # define dimension of output array
@@ -295,14 +295,14 @@ def evaluate_at_channel(
     defv
        default value.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
 
     out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
@@ -379,14 +379,14 @@ def evaluate_at_channel_vov(
     defv
        default value.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
      dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
 
     # blow up vov to aoesa
@@ -486,14 +486,14 @@ def evaluate_to_aoesa(
     sorter
        sorts the entries in the vector according to sorter expression.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
     dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
     # define dimension of output array
     out = np.full((nrows, len(chns)), missv)
@@ -592,14 +592,14 @@ def evaluate_to_vector(
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
     tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
+        pattern to format `tcm` id values to table name in higher tiers. Must have one
+        placeholder which is the `tcm` id.
      dsp_group
-        LH5 root group in dsp file.
+        LH5 root group in `dsp` file.
     hit_group
-        LH5 root group in hit file.
+        LH5 root group in `hit` file.
     evt_group
-        LH5 root group in evt file.
+        LH5 root group in `evt` file.
     """
     out = evaluate_to_aoesa(
         idx=idx,
