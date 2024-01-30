@@ -487,7 +487,6 @@ def evaluate_expression(
                 )
             elif isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
-                    cumulength=cumulength,
                     idx=idx,
                     ids=ids,
                     f_hit=f_hit,

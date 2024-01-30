@@ -14,7 +14,7 @@ from . import utils
 
 
 def evaluate_to_first_or_last(
-    cumulengths: NDArray,
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -88,7 +88,7 @@ def evaluate_to_first_or_last(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulengths,
+            cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
         )
 
@@ -156,7 +156,7 @@ def evaluate_to_first_or_last(
 
 def evaluate_to_scalar(
     mode: str,
-    cumulengths: NDArray,
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -222,7 +222,7 @@ def evaluate_to_scalar(
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulengths,
+            cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
         )
 
@@ -273,7 +273,7 @@ def evaluate_to_scalar(
 
 
 def evaluate_at_channel(
-    cumulengths: NDArray,
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -332,10 +332,10 @@ def evaluate_at_channel(
             f_hit
         ):
             continue
-        idx_ch = idx[ids == utils.get_table_name_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == ch]
         evt_ids_ch = np.searchsorted(
-            cumulengths,
-            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            cumulength,
+            np.where(ids == ch)[0],
         )
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
@@ -361,7 +361,6 @@ def evaluate_at_channel(
 
 
 def evaluate_at_channel_vov(
-    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -421,11 +420,8 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in chns:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
-        evt_ids_ch = np.searchsorted(
-            cumulengths,
-            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
-        )
+        idx_ch = idx[ids == ch]
+
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids=ids,
@@ -460,7 +456,7 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
-    cumulengths: NDArray,
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -531,7 +527,7 @@ def evaluate_to_aoesa(
     for ch in chns:
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulengths,
+            cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
         )
         res = utils.get_data_at_channel(
@@ -571,7 +567,7 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
-    cumulengths: NDArray,
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -636,6 +632,7 @@ def evaluate_to_vector(
         LH5 root group in `evt` file.
     """
     out = evaluate_to_aoesa(
+        cumulength=cumulength,
         idx=idx,
         ids=ids,
         f_hit=f_hit,
@@ -659,6 +656,7 @@ def evaluate_to_vector(
     if sorter is not None:
         md, fld = sorter.split(":")
         s_val = evaluate_to_aoesa(
+            cumulength=cumulength,
             idx=idx,
             ids=ids,
             f_hit=f_hit,
