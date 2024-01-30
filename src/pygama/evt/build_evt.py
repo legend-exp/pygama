@@ -469,6 +469,7 @@ def evaluate_expression(
 
             if isinstance(ch_comp, Array):
                 return aggregators.evaluate_at_channel(
+                    cumulength=cumulength,
                     idx=idx,
                     ids=ids,
                     f_hit=f_hit,
@@ -486,6 +487,7 @@ def evaluate_expression(
                 )
             elif isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
+                    cumulength=cumulength,
                     idx=idx,
                     ids=ids,
                     f_hit=f_hit,
@@ -537,6 +539,7 @@ def evaluate_expression(
         elif mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
                 mode=mode,
+                cumulength=cumulength,
                 idx=idx,
                 ids=ids,
                 f_hit=f_hit,
@@ -556,6 +559,7 @@ def evaluate_expression(
             )
         elif "gather" == mode:
             return aggregators.evaluate_to_vector(
+                cumulength=cumulength,
                 idx=idx,
                 ids=ids,
                 f_hit=f_hit,

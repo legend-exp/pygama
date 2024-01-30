@@ -156,6 +156,7 @@ def evaluate_to_first_or_last(
 
 def evaluate_to_scalar(
     mode: str,
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -220,6 +221,10 @@ def evaluate_to_scalar(
     for ch in chns:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        evt_ids_ch = np.searchsorted(
+            cumulengths,
+            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+        )
 
         res = utils.get_data_at_channel(
             ch=ch,
@@ -254,20 +259,21 @@ def evaluate_to_scalar(
         if "sum" == mode:
             if res.dtype == bool:
                 res = res.astype(int)
-            out[idx_ch] = np.where(limarr, res + out[idx_ch], out[idx_ch])
+            out[evt_ids_ch] = np.where(limarr, res + out[evt_ids_ch], out[evt_ids_ch])
         if "any" == mode:
             if res.dtype != bool:
                 res = res.astype(bool)
-            out[idx_ch] = out[idx_ch] | (res & limarr)
+            out[evt_ids_ch] = out[evt_ids_ch] | (res & limarr)
         if "all" == mode:
             if res.dtype != bool:
                 res = res.astype(bool)
-            out[idx_ch] = out[idx_ch] & res & limarr
+            out[evt_ids_ch] = out[evt_ids_ch] & res & limarr
 
     return Array(nda=out)
 
 
 def evaluate_at_channel(
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -326,7 +332,11 @@ def evaluate_at_channel(
             f_hit
         ):
             continue
-        idx_ch = idx[ids == ch]
+        idx_ch = idx[ids == utils.get_table_name_by_pattern(tcm_id_table_pattern, ch)]
+        evt_ids_ch = np.searchsorted(
+            cumulengths,
+            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+        )
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids=ids,
@@ -345,12 +355,13 @@ def evaluate_at_channel(
             dsp_group=dsp_group,
         )
 
-        out[idx_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[idx_ch])
+        out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
 
     return Array(nda=out)
 
 
 def evaluate_at_channel_vov(
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -410,7 +421,11 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in chns:
-        idx_ch = idx[ids == ch]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        evt_ids_ch = np.searchsorted(
+            cumulengths,
+            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+        )
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids=ids,
@@ -445,6 +460,7 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -514,6 +530,10 @@ def evaluate_to_aoesa(
     i = 0
     for ch in chns:
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        evt_ids_ch = np.searchsorted(
+            cumulengths,
+            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+        )
         res = utils.get_data_at_channel(
             ch=ch,
             ids=ids,
@@ -543,7 +563,7 @@ def evaluate_to_aoesa(
             dsp_group=dsp_group,
         )
 
-        out[idx_ch, i] = np.where(limarr, res, out[idx_ch, i])
+        out[evt_ids_ch, i] = np.where(limarr, res, out[evt_ids_ch, i])
 
         i += 1
 
@@ -551,6 +571,7 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
+    cumulengths: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
