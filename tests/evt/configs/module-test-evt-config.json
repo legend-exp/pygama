@@ -51,7 +51,7 @@
     "lar_classifier": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": ".modules.spm.get_etc(0.5,evt.t0,48000,100,6000,80,1,0)"
+      "expression": ".modules.spm.get_etc(0.5,evt.t0,48000,100,6000,80,1,0,50)"
     },
     "lar_energy_dplms": {
       "channels": "spms_on",

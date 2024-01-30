@@ -368,6 +368,7 @@ def get_majority_dplms(
 # trail = 1: Singlet window = [t_first_lar_pulse, t_first_lar_pulse+ swin]
 # trail = 2: Like trail = 1, but t_first_lar_pulse <= tge is ensured
 # min_first_pls_ene sets the minimum energy of the first pulse (only used in trail > 0)
+# max_per_channel, maximum number of pes a channel is allowed to have, if above it gets excluded
 def get_etc(
     f_hit,
     f_dsp,
@@ -385,6 +386,7 @@ def get_etc(
     swin,
     trail,
     min_first_pls_ene,
+    max_per_channel,
 ) -> Array:
     # load TCM data to define an event
     store = LH5Store()
@@ -419,9 +421,18 @@ def get_etc(
         mask = get_spm_mask(lim, tge, tmin, tmax, pe, times)
 
         pe = pe[mask]
+
+        # max pe mask
+        max_pe_mask = ak.nansum(pe, axis=-1) < max_per_channel
+        pe = ak.drop_none(
+            ak.nan_to_none(ak.where(max_pe_mask, pe, ak.Array([[np.nan]])))
+        )
         pe_lst.append(pe)
 
         times = times[mask] * 16
+        times = ak.drop_none(
+            ak.nan_to_none(ak.where(max_pe_mask, times, ak.Array([[np.nan]])))
+        )
         time_lst.append(times)
 
     pe_all = ak.concatenate(pe_lst, axis=-1)
