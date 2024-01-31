@@ -442,6 +442,9 @@ def evaluate_expression(
         # load TCM data to define an event
         ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
         idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
+        cumulength = store.read(f"/{tcm_group}/cumulative_length", f_tcm)[0].view_as(
+            "np"
+        )
 
         # switch through modes
         if table and (("keep_at_ch:" == mode[:11]) or ("keep_at_idx:" == mode[:12])):
@@ -466,6 +469,7 @@ def evaluate_expression(
 
             if isinstance(ch_comp, Array):
                 return aggregators.evaluate_at_channel(
+                    cumulength=cumulength,
                     idx=idx,
                     ids=ids,
                     f_hit=f_hit,
@@ -483,6 +487,7 @@ def evaluate_expression(
                 )
             elif isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
+                    cumulength=cumulength,
                     idx=idx,
                     ids=ids,
                     f_hit=f_hit,
@@ -511,6 +516,7 @@ def evaluate_expression(
                 )[0]
             )
             return aggregators.evaluate_to_first_or_last(
+                cumulength=cumulength,
                 idx=idx,
                 ids=ids,
                 f_hit=f_hit,
@@ -533,6 +539,7 @@ def evaluate_expression(
         elif mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
                 mode=mode,
+                cumulength=cumulength,
                 idx=idx,
                 ids=ids,
                 f_hit=f_hit,
@@ -552,6 +559,7 @@ def evaluate_expression(
             )
         elif "gather" == mode:
             return aggregators.evaluate_to_vector(
+                cumulength=cumulength,
                 idx=idx,
                 ids=ids,
                 f_hit=f_hit,

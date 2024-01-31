@@ -11,7 +11,8 @@ import warnings
 import h5py
 import numpy as np
 import pandas as pd
-from lgdo.lh5.store import LH5Store, ls
+from lgdo.lh5 import ls
+from lgdo.lh5.store import LH5Store
 from lgdo.lh5.utils import expand_path, expand_vars
 from lgdo.types import Array, Scalar, VectorOfVectors
 from parse import parse
