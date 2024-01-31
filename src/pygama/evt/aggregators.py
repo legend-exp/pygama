@@ -90,6 +90,7 @@ def evaluate_to_first_or_last(
         evt_ids_ch = np.searchsorted(
             cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            "right",
         )
 
         # evaluate at channel
@@ -224,6 +225,7 @@ def evaluate_to_scalar(
         evt_ids_ch = np.searchsorted(
             cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            "right",
         )
 
         res = utils.get_data_at_channel(
@@ -333,10 +335,7 @@ def evaluate_at_channel(
         ):
             continue
         idx_ch = idx[ids == ch]
-        evt_ids_ch = np.searchsorted(
-            cumulength,
-            np.where(ids == ch)[0],
-        )
+        evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids=ids,
@@ -361,6 +360,7 @@ def evaluate_at_channel(
 
 
 def evaluate_at_channel_vov(
+    cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
     f_hit: str,
@@ -420,8 +420,7 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in chns:
-        idx_ch = idx[ids == ch]
-
+        evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
         res = utils.get_data_at_channel(
             ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
             ids=ids,
@@ -443,7 +442,7 @@ def evaluate_at_channel_vov(
         # see in which events the current channel is present
         mask = ak.to_numpy(ak.any(ch_comp == ch, axis=-1), allow_missing=False)
         cv = np.full(len(ch_comp), np.nan)
-        cv[idx_ch] = res
+        cv[evt_ids_ch] = res
         cv[~mask] = np.nan
         cv = ak.drop_none(ak.nan_to_none(ak.Array(cv)[:, None]))
 
@@ -529,6 +528,7 @@ def evaluate_to_aoesa(
         evt_ids_ch = np.searchsorted(
             cumulength,
             np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            "right",
         )
         res = utils.get_data_at_channel(
             ch=ch,
