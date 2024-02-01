@@ -318,7 +318,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         # interpolate between the two bins that cross the [fraction] line
         # works well for high stats
         if bin_lo < 1 or bin_hi >= len(hist)-1:
-            print(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
+            log.debug(f"get_fwhm: can't interpolate ({bin_lo}, {bin_hi})")
             return 0, 0
 
         val_f = bl + fraction*(mx-bl)
@@ -403,7 +403,7 @@ def get_fwfm(fraction, hist, bins, var=None, mx=None, dmx=0, bl=0, dbl=0, method
         return x_hi - x_lo, np.sqrt(dxl2 + dxh2)
 
     else:
-        print(f"get_fwhm: unrecognized method {method}")
+        log.debug(f"get_fwhm: unrecognized method {method}")
         return 0, 0
 
 
