@@ -9,7 +9,7 @@ from iminuit import Minuit, cost, util
 from lgdo import Table, lh5
 
 log = logging.getLogger(__name__)
-sto=lh5.LH5Store()
+sto = lh5.LH5Store()
 
 
 def return_nans(input):
@@ -141,9 +141,19 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
             mask = np.append(mask, file_mask)
         ids = np.where(mask)[0]
     else:
-        data = pd.DataFrame({"array_id":sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as('np'), 
-            "array_idx":sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as('np')})
-        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as('np')
+        data = pd.DataFrame(
+            {
+                "array_id": sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as(
+                    "np"
+                ),
+                "array_idx": sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as(
+                    "np"
+                ),
+            }
+        )
+        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as(
+            "np"
+        )
         cumulength = np.append(np.array([0]), cumulength)
         n_channels = np.diff(cumulength)
         evt_numbers = np.repeat(np.arange(0, len(cumulength) - 1), np.diff(cumulength))

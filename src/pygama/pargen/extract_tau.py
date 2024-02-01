@@ -28,6 +28,7 @@ import pygama.pargen.energy_optimisation as om
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
+
 def load_data(
     raw_file: list[str],
     lh5_path: str,
@@ -36,7 +37,9 @@ def load_data(
     threshold: int = 5000,
     wf_field: str = "waveform",
 ) -> lgdo.Table:
-    df = sto.read(lh5_path, raw_file, field_mask=["daqenergy", "timestamp"])[0].view_as('pd')
+    df = sto.read(lh5_path, raw_file, field_mask=["daqenergy", "timestamp"])[0].view_as(
+        "pd"
+    )
 
     if pulser_mask is None:
         pulser_props = cts.find_pulser_properties(df, energy="daqenergy")

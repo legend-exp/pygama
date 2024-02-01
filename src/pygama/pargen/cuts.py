@@ -10,9 +10,9 @@ import logging
 import os
 
 import lgdo.lh5 as lh5
-from lgdo.types import Table
 import numpy as np
 import pandas as pd
+from lgdo.types import Table
 from scipy import stats
 
 import pygama.math.histogram as pgh

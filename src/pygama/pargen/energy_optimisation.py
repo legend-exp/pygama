@@ -23,9 +23,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit, minimize
 from scipy.stats import chisquare, norm
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
-from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils._testing import ignore_warnings
 
 import pygama.math.histogram as pgh
@@ -924,7 +924,9 @@ def event_selection(
     if not isinstance(kev_widths, list):
         kev_widths = [kev_widths]
 
-    df = sto.read(lh5_path, raw_files, field_mask=["daqenergy", "timestamp"])[0].view_as('pd')
+    df = sto.read(lh5_path, raw_files, field_mask=["daqenergy", "timestamp"])[
+        0
+    ].view_as("pd")
 
     if pulser_mask is None:
         pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
