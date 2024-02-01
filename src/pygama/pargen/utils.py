@@ -9,6 +9,7 @@ from iminuit import Minuit, cost, util
 from lgdo import Table, lh5
 
 log = logging.getLogger(__name__)
+sto=lh5.LH5Store()
 
 
 def return_nans(input):
@@ -49,8 +50,6 @@ def load_data(
     """
     Loads in the A/E parameters needed and applies calibration constants to energy
     """
-
-    sto = lh5.LH5Store()
 
     out_df = pd.DataFrame(columns=params)
 
@@ -142,14 +141,13 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
             mask = np.append(mask, file_mask)
         ids = np.where(mask)[0]
     else:
-        data = lh5.load_dfs(tcm_file, ["array_id", "array_idx"], "hardware_tcm_1")
-        cum_length = lh5.load_nda(tcm_file, ["cumulative_length"], "hardware_tcm_1")[
-            "cumulative_length"
-        ]
-        cum_length = np.append(np.array([0]), cum_length)
-        n_channels = np.diff(cum_length)
-        evt_numbers = np.repeat(np.arange(0, len(cum_length) - 1), np.diff(cum_length))
-        evt_mult = np.repeat(np.diff(cum_length), np.diff(cum_length))
+        data = pd.DataFrame({"array_id":sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as('np'), 
+            "array_idx":sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as('np')})
+        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as('np')
+        cumulength = np.append(np.array([0]), cumulength)
+        n_channels = np.diff(cumulength)
+        evt_numbers = np.repeat(np.arange(0, len(cumulength) - 1), np.diff(cumulength))
+        evt_mult = np.repeat(np.diff(cumulength), np.diff(cumulength))
         data["evt_number"] = evt_numbers
         data["evt_mult"] = evt_mult
         high_mult_events = np.where(n_channels > multiplicity_threshold)[0]
