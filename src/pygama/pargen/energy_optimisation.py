@@ -25,6 +25,8 @@ from scipy.optimize import curve_fit, minimize
 from scipy.stats import chisquare, norm
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils._testing import ignore_warnings
 
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
@@ -922,8 +924,7 @@ def event_selection(
     if not isinstance(kev_widths, list):
         kev_widths = [kev_widths]
 
-    sto = lh5.LH5Store()
-    df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
+    df = sto.read(lh5_path, raw_files, field_mask=["daqenergy", "timestamp"])[0].view_as('pd')
 
     if pulser_mask is None:
         pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
@@ -1067,7 +1068,7 @@ def event_selection(
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
-    out_events = np.unique(np.array(out_events).flatten())
+    out_events = np.unique(np.concatenate(out_events))
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
     return out_events, idx_list
@@ -1381,6 +1382,7 @@ class BayesianOptimizer:
         self.optimal_ei = None
         return self.optimal_x, self.optimal_ei
 
+    @ignore_warnings(category=ConvergenceWarning)
     def iterate_values(self):
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
@@ -1451,6 +1453,7 @@ class BayesianOptimizer:
                 out_dict[name][parameter] = value_str
         return out_dict
 
+    @ignore_warnings(category=ConvergenceWarning)
     def plot(self, init_samples=None):
         nan_idxs = np.isnan(self.y_init)
         fail_idxs = np.isnan(self.yerr_init)
@@ -1557,6 +1560,7 @@ class BayesianOptimizer:
         plt.close()
         return fig
 
+    @ignore_warnings(category=ConvergenceWarning)
     def plot_acq(self, init_samples=None):
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
