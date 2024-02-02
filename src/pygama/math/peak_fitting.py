@@ -6,8 +6,11 @@ import numpy as np
 from iminuit import Minuit, cost
 from scipy.optimize import brentq, minimize_scalar
 from scipy.stats import crystalball
+import logging
 
 import pygama.math.histogram as pgh
+
+log = logging.getLogger(__name__)
 
 limit = np.log(sys.float_info.max)/10
 kwd = {"parallel": False, "fastmath": True}
