@@ -152,7 +152,7 @@ def evaluate_to_first_or_last(
                 (t0 > outt[evt_ids_ch]) & (limarr), t0, outt[evt_ids_ch]
             )
 
-    return Array(nda=out)
+    return Array(nda=out, dtype=type(defv))
 
 
 def evaluate_to_scalar(
@@ -271,7 +271,7 @@ def evaluate_to_scalar(
                 res = res.astype(bool)
             out[evt_ids_ch] = out[evt_ids_ch] & res & limarr
 
-    return Array(nda=out)
+    return Array(nda=out, dtype=type(defv))
 
 
 def evaluate_at_channel(
@@ -356,7 +356,7 @@ def evaluate_at_channel(
 
         out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
 
-    return Array(nda=out)
+    return Array(nda=out, dtype=type(defv))
 
 
 def evaluate_at_channel_vov(
@@ -451,7 +451,7 @@ def evaluate_at_channel_vov(
         if ch == chns[0]:
             type_name = res.dtype
 
-    return VectorOfVectors(ak.values_astype(out, type_name))
+    return VectorOfVectors(ak.values_astype(out, type_name), dtype=type_name)
 
 
 def evaluate_to_aoesa(
@@ -684,5 +684,5 @@ def evaluate_to_vector(
             )
 
     return VectorOfVectors(
-        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv))
+        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv)),dtype=type(defv)
     )
