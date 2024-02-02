@@ -69,18 +69,19 @@ def load_data(
         masks = np.array([], dtype=bool)
         for tstamp, tfiles in files.items():
             table = sto.read(lh5_path, tfiles)[0]
+
             file_df = pd.DataFrame(columns=params)
             if tstamp in cal_dict:
                 cal_dict_ts = cal_dict[tstamp]
             else:
                 cal_dict_ts = cal_dict
+
+            for outname, info in cal_dict_ts.items():
+                outcol = table.eval(info["expression"], info.get("parameters", None))
+                table.add_column(outname, outcol)
+
             for param in params:
-                if param in cal_dict_ts:
-                    expression = cal_dict_ts[param]["expression"]
-                    parameters = cal_dict_ts[param].get("parameters", None)
-                    file_df[param] = table.eval(expression, parameters)
-                else:
-                    file_df[param] = table[param]
+                file_df[param] = table[param]
             file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
             params.append("run_timestamp")
             if threshold is not None:
@@ -101,13 +102,11 @@ def load_data(
 
         table = sto.read(lh5_path, files)[0]
         df = pd.DataFrame(columns=params)
+        for outname, info in cal_dict.items():
+            outcol = table.eval(info["expression"], info.get("parameters", None))
+            table.add_column(outname, outcol)
         for param in params:
-            if param in cal_dict:
-                expression = cal_dict[param]["expression"]
-                parameters = cal_dict[param].get("parameters", None)
-                df[param] = table.eval(expression, parameters)
-            else:
-                df[param] = table[param]
+            df[param] = table[param]
         if threshold is not None:
             masks = df[cal_energy_param] > threshold
             df.drop(np.where(~masks)[0], inplace=True)

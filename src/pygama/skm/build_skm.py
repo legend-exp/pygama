@@ -139,13 +139,13 @@ def build_skm(
                 ):
                     miss_val = eval(miss_val)
 
-            fw_fld = tbl_cfg["operations"][op]["forward_field"].split(".")
+            fw_fld = tbl_cfg["operations"][op]["forward_field"]
 
             # load object if from evt tier
-            if fw_fld[0] == evt_group:
-                obj = store.read(f"/{fw_fld[0]}/{fw_fld[1]}", f_dict[fw_fld[0]])[
-                    0
-                ].view_as("ak")
+            if evt_group in fw_fld.replace(".", "/"):
+                obj = store.read(
+                    f"/{fw_fld.replace('.','/')}", f_dict[fw_fld.split(".", 1)[0]]
+                )[0].view_as("ak")
 
             # else collect data from lower tier via tcm_idx
             else:
@@ -153,9 +153,10 @@ def build_skm(
                     raise ValueError(
                         f"{op} is an sub evt level operation. tcm_idx field must be specified"
                     )
-                tcm_idx_fld = tbl_cfg["operations"][op]["tcm_idx"].split(".")
+                tcm_idx_fld = tbl_cfg["operations"][op]["tcm_idx"]
                 tcm_idx = store.read(
-                    f"/{tcm_idx_fld[0]}/{tcm_idx_fld[1]}", f_dict[tcm_idx_fld[0]]
+                    f"/{tcm_idx_fld.replace('.','/')}",
+                    f_dict[tcm_idx_fld.split(".")[0]],
                 )[0].view_as("ak")[:, :multi]
 
                 obj = ak.Array([[] for x in range(len(tcm_idx))])
@@ -184,14 +185,17 @@ def build_skm(
                         fl_idx = ak.to_numpy(ak.flatten(ch_idx), allow_missing=False)
 
                         if (
-                            f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld[0]}/{fw_fld[1]}"
-                            not in lh5.ls(f_dict[fw_fld[0]], f"ch{ch}/{fw_fld[0]}/")
+                            f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld.replace('.','/')}"
+                            not in lh5.ls(
+                                f_dict[[key for key in f_dict if key in fw_fld][0]],
+                                f"ch{ch}/{fw_fld.rsplit('.',1)[0]}/",
+                            )
                         ):
                             och = Array(nda=np.full(len(fl_idx), miss_val))
                         else:
                             och, _ = store.read(
-                                f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld[0]}/{fw_fld[1]}",
-                                f_dict[fw_fld[0]],
+                                f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld.replace('.','/')}",
+                                f_dict[[key for key in f_dict if key in fw_fld][0]],
                                 idx=fl_idx,
                             )
                         if not isinstance(och, Array):
