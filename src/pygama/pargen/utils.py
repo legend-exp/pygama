@@ -69,7 +69,7 @@ def load_data(
         masks = np.array([], dtype=bool)
         for tstamp, tfiles in files.items():
             table = sto.read(lh5_path, tfiles)[0]
-            
+
             file_df = pd.DataFrame(columns=params)
             if tstamp in cal_dict:
                 cal_dict_ts = cal_dict[tstamp]
@@ -77,9 +77,7 @@ def load_data(
                 cal_dict_ts = cal_dict
 
             for outname, info in cal_dict_ts.items():
-                outcol = table.eval(
-                    info["expression"], info.get("parameters", None)
-                )
+                outcol = table.eval(info["expression"], info.get("parameters", None))
                 table.add_column(outname, outcol)
 
             for param in params:
@@ -105,9 +103,7 @@ def load_data(
         table = sto.read(lh5_path, files)[0]
         df = pd.DataFrame(columns=params)
         for outname, info in cal_dict.items():
-            outcol = table.eval(
-                info["expression"], info.get("parameters", None)
-            )
+            outcol = table.eval(info["expression"], info.get("parameters", None))
             table.add_column(outname, outcol)
         for param in params:
             df[param] = table[param]

@@ -142,10 +142,10 @@ def build_skm(
             fw_fld = tbl_cfg["operations"][op]["forward_field"]
 
             # load object if from evt tier
-            if evt_group in fw_fld.replace('.','/'):
-                obj = store.read(f"/{fw_fld.replace('.','/')}", f_dict[fw_fld.split(".",1)[0]])[
-                    0
-                ].view_as("ak")
+            if evt_group in fw_fld.replace(".", "/"):
+                obj = store.read(
+                    f"/{fw_fld.replace('.','/')}", f_dict[fw_fld.split(".", 1)[0]]
+                )[0].view_as("ak")
 
             # else collect data from lower tier via tcm_idx
             else:
@@ -155,7 +155,8 @@ def build_skm(
                     )
                 tcm_idx_fld = tbl_cfg["operations"][op]["tcm_idx"]
                 tcm_idx = store.read(
-                    f"/{tcm_idx_fld.replace('.','/')}", f_dict[tcm_idx_fld.split(".")[0]]
+                    f"/{tcm_idx_fld.replace('.','/')}",
+                    f_dict[tcm_idx_fld.split(".")[0]],
                 )[0].view_as("ak")[:, :multi]
 
                 obj = ak.Array([[] for x in range(len(tcm_idx))])
@@ -182,10 +183,13 @@ def build_skm(
                         ch_idx = idx[ids == ch]
                         ct_idx = ak.count(ch_idx, axis=-1)
                         fl_idx = ak.to_numpy(ak.flatten(ch_idx), allow_missing=False)
-                        
+
                         if (
                             f"{utils.get_table_name_by_pattern(tcm_id_table_pattern,ch)}/{fw_fld.replace('.','/')}"
-                            not in lh5.ls(f_dict[[key for key in f_dict if key in fw_fld][0]], f"ch{ch}/{fw_fld.rsplit('.',1)[0]}/")
+                            not in lh5.ls(
+                                f_dict[[key for key in f_dict if key in fw_fld][0]],
+                                f"ch{ch}/{fw_fld.rsplit('.',1)[0]}/",
+                            )
                         ):
                             och = Array(nda=np.full(len(fl_idx), miss_val))
                         else:

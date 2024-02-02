@@ -684,5 +684,6 @@ def evaluate_to_vector(
             )
 
     return VectorOfVectors(
-        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv)),dtype=type(defv)
+        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv)),
+        dtype=type(defv),
     )
