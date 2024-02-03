@@ -82,8 +82,9 @@ def load_data(
 
             for param in params:
                 file_df[param] = table[param]
+
             file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
-            params.append("run_timestamp")
+
             if threshold is not None:
                 mask = file_df[cal_energy_param] > threshold
                 file_df.drop(np.where(~mask)[0], inplace=True)
@@ -93,6 +94,7 @@ def load_data(
             df.append(file_df)
             all_files += tfiles
 
+        params.append("run_timestamp")
         df = pd.concat(df)
 
     elif isinstance(files, list):
