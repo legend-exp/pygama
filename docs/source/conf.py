@@ -58,7 +58,6 @@ intersphinx_mapping = {
     "scipy": ("https://docs.scipy.org/doc/scipy", None),
     "pandas": ("https://pandas.pydata.org/docs", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
-    "iminuit": ("https://iminuit.readthedocs.io/en/stable", None),
     "h5py": ("https://docs.h5py.org/en/stable", None),
     "pint": ("https://pint.readthedocs.io/en/stable", None),
     "lgdo": ("https://legend-pydataobj.readthedocs.io/en/stable", None),
