@@ -919,6 +919,66 @@ def radford_parameter_gradient(E, pars, step_norm):
     gradient = g_n_sig, g_mu, g_sigma,g_ht, g_tau, g_n_bkg, g_hs
     return np.array(gradient)
 
+def radford_full_width_at_frac_max(sigma, htail, tau, frac_max = 0.5, cov = None):
+    """
+    Return the FWHM of the radford_peak function, ignoring background and step
+    components. If calculating error also need the normalisation for the step
+    function.
+    """
+    # optimize this to find max value
+    def neg_radford_peak_bgfree(E, sigma, htail, tau):
+        return -gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0]
+
+    if htail<0 or htail>1:
+        raise ValueError("htail outside allowed limits of 0 and 1")
+
+    res = minimize_scalar( neg_radford_peak_bgfree,
+                           args=(sigma, htail, tau),
+                           bounds=(-sigma-htail, sigma+htail) )
+    Emax = res.x
+    val_frac_max = -neg_radford_peak_bgfree(Emax, sigma, htail, tau)*frac_max
+
+    # root find this to find the half-max energies
+    def radford_peak_bgfree_fracmax(E, sigma, htail, tau, val_frac_max):
+        return gauss_with_tail_pdf(np.array([E]), 0, sigma, htail, tau)[0] - val_frac_max
+
+    try:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+                       -(2.5*sigma/2 + htail*tau), Emax,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+               -(5*sigma + htail*tau), Emax,
+               args = (sigma, htail, tau, val_frac_max) )
+    try:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                       Emax, 2.5*sigma/2,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                   Emax, 5*sigma,
+                   args = (sigma, htail, tau, val_frac_max) )
+
+    if cov is None: return upper_hm - lower_hm
+
+    #calculate uncertainty
+    #amp set to 1, mu to 0, hstep+bg set to 0
+    pars = [1,0, sigma, htail, tau,0,0]
+    step_norm = 1
+    gradmax = radford_parameter_gradient(Emax, pars, step_norm)
+    gradmax *= 0.5
+    grad1 = radford_parameter_gradient(lower_hm, pars,step_norm)
+    grad1 -= gradmax
+    grad1 /= radford_peakshape_derivative(lower_hm, pars,step_norm)
+    grad2 = radford_parameter_gradient(upper_hm, pars,step_norm)
+    grad2 -= gradmax
+    grad2 /= radford_peakshape_derivative(upper_hm, pars,step_norm)
+    grad2 -= grad1
+
+    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
+
+    return upper_hm - lower_hm, fwfm_unc
+
 def get_mu_func(func, pars, cov = None, errors=None):
 
     if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
@@ -980,6 +1040,39 @@ def get_fwhm_func(func, pars, cov = None):
                 cov = cov[:7,:][:,:7]
 
         return radford_fwhm(sigma, htail, tau, cov)
+    else:
+        print(f'get_fwhm_func not implemented for {func.__name__}')
+        return None
+
+def get_full_width_at_frac_max_func(func, pars, frac_max=0.5,cov = None):
+    if frac_max >1 or frac_max <0:
+        raise ValueError("Invalid frac max must be fraction between 0 and 1")
+
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+        if len(pars) ==5:
+            n_sig, mu, sigma, n_bkg, hstep = pars
+        elif len(pars) ==7:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==8:
+            n_sig, mu, sigma, n_bkg, hstep, low_range, high_range, components = pars
+        if cov is None:
+            return sigma*2*np.sqrt(-2*np.log(frac_max))
+        else:
+            return sigma*2*np.sqrt(-2*np.log(frac_max)), np.sqrt(cov[2][2])*2*np.sqrt(-2*np.log(frac_max))
+
+    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+        if len(pars) ==7:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+        elif len(pars) ==9:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
+            if cov is not None:
+                cov = cov[:7,:][:,:7]
+        elif len(pars) ==10:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range, components = pars
+            if cov is not None:
+                cov = cov[:7,:][:,:7]
+
+        return radford_full_width_at_frac_max(sigma, htail, tau, frac_max, cov)
     else:
         print(f'get_fwhm_func not implemented for {func.__name__}')
         return None
