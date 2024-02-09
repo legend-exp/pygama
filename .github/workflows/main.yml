@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  TQDM_MININTERVAL: 10
+  TQDM_MININTERVAL: 100
 
 jobs:
 
