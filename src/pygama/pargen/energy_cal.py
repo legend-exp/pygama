@@ -592,7 +592,7 @@ def unbinned_staged_energy_fit(
     if debug_level>0:
         print(x0)
      
-    if func == pgf.extended_radford_pdf or func == pgf.radford_pdf:
+    if (func == pgf.extended_radford_pdf or func == pgf.radford_pdf) and  allow_tail_drop==True:
         fit_no_tail = unbinned_staged_energy_fit(energy, 
                                 func=pgf.extended_gauss_step_pdf,
                                 gof_func=pgf.gauss_step_pdf,
@@ -760,10 +760,10 @@ def unbinned_staged_energy_fit(
     else:
         raise RuntimeError
         
-    if func == pgf.extended_radford_pdf or func == pgf.radford_pdf:
+    if (func == pgf.extended_radford_pdf or func == pgf.radford_pdf) and allow_tail_drop==True:
         p_val = chi2.sf(fit[3][0], fit[3][1])
         p_val_no_tail = chi2.sf(fit_no_tail[3][0], fit_no_tail[3][1])
-        if (pars["htail"]<errs["htail"] or p_val_no_tail>p_val) and allow_tail_drop is True:
+        if (pars["htail"]<errs["htail"] or p_val_no_tail>p_val):
             if debug_level>0:
                 print(p_val, p_val_no_tail)
             fit = fit_no_tail
