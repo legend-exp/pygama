@@ -18,6 +18,7 @@ def test_basics(lgnd_test_data, tmptestdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
     if os.path.exists(outfile):
         os.remove(outfile)
+
     build_evt(
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
@@ -30,6 +31,7 @@ def test_basics(lgnd_test_data, tmptestdir):
         dsp_group="dsp",
         tcm_group="hardware_tcm_1",
     )
+
     assert "statement" in store.read("/evt/multiplicity", outfile)[0].getattrs().keys()
     assert (
         store.read("/evt/multiplicity", outfile)[0].getattrs()["statement"]

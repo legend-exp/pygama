@@ -25,7 +25,6 @@ def build_evt(
     f_dsp: str,
     f_hit: str,
     evt_config: str | dict,
-    *,
     f_evt: str | None = None,
     wo_mode: str = "write_safe",
     evt_group: str = "evt",

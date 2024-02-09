@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import awkward as ak
-import numpy as np
+import lgdo
 from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt
@@ -18,6 +18,7 @@ def test_basics(lgnd_test_data, tmptestdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
     if os.path.exists(outfile):
         os.remove(outfile)
+
     build_evt(
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
@@ -33,6 +34,17 @@ def test_basics(lgnd_test_data, tmptestdir):
 
     skm_conf = f"{config_dir}/basic-skm-config.json"
     skm_out = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
+
+    result = build_skm(
+        outfile,
+        lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+        lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
+        lgnd_test_data.get_path(tcm_path),
+        skm_conf,
+    )
+
+    assert isinstance(result, lgdo.Table)
+
     build_skm(
         outfile,
         lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
@@ -44,7 +56,11 @@ def test_basics(lgnd_test_data, tmptestdir):
     )
 
     assert os.path.exists(skm_out)
-    df = store.read("/skm/", skm_out)[0].view_as("pd")
+    obj, _ = store.read("/skm/", skm_out)
+
+    assert obj == result
+
+    df = obj.view_as("pd")
     assert "timestamp" in df.keys()
     assert "energy_0" in df.keys()
     assert "energy_1" in df.keys()
@@ -56,9 +72,7 @@ def test_basics(lgnd_test_data, tmptestdir):
     assert "energy_sum" in df.keys()
     assert (df.multiplicity.to_numpy() <= 3).all()
     assert (
-        np.nan_to_num(df.energy_0.to_numpy())
-        + np.nan_to_num(df.energy_1.to_numpy())
-        + np.nan_to_num(df.energy_2.to_numpy())
+        df.energy_0.to_numpy() + df.energy_1.to_numpy() + df.energy_2.to_numpy()
         == df.energy_sum.to_numpy()
     ).all()
 
@@ -81,12 +95,13 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
     if os.path.exists(outfile):
         os.remove(outfile)
+
     build_evt(
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -104,7 +119,7 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
         lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         lgnd_test_data.get_path(tcm_path),
         skm_conf,
-        skm_out,
+        f_skm=skm_out,
         wo_mode="o",
     )
 

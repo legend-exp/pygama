@@ -13,7 +13,7 @@
     },
     "energy": {
       "forward_field": "hit.cuspEmax_ctc_cal",
-      "missing_value": "np.nan",
+      "missing_value": 0.0,
       "tcm_idx": "evt.energy_idx"
     },
     "energy_id": {

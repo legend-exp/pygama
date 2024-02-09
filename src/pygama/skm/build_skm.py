@@ -25,7 +25,6 @@ def build_skm(
     f_dsp: str,
     f_tcm: str,
     skm_conf: dict | str,
-    *,
     f_skm: str | None = None,
     wo_mode: str = "w",
     skm_group: str = "skm",
@@ -237,6 +236,7 @@ def build_skm(
     # last thing missing is writing it out
     if wo_mode not in ["w", "write_safe", "o", "overwrite", "a", "append"]:
         raise ValueError(f"wo_mode {wo_mode} not valid.")
+
     log.debug("saving skm file")
     if (wo_mode in ["w", "write_safe"]) and os.path.exists(f_skm):
         raise FileExistsError(f"Write_safe mode: {f_skm} exists.")
