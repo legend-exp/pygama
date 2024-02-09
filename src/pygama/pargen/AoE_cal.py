@@ -30,7 +30,7 @@ from scipy.stats import chi2
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
 from pygama.math.peak_fitting import nb_erfc
-from pygama.pargen.energy_cal import get_i_local_maxima
+import pygama.pargen.energy_cal as pgc
 from pygama.pargen.utils import *
 
 log = logging.getLogger(__name__)
@@ -599,11 +599,11 @@ class drift_time_distribution(PDF):
         Guess for fitting dt spectrum
         """
         bcs = pgh.get_bin_centers(bins)
-        mus = get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 5)
+        mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 5)
         if len(mus) > 2:
-            mus = get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 8)
+            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 8)
         elif len(mus) < 2:
-            mus = get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 3)
+            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 3)
         mu1 = bcs[mus[0]]
         mu2 = bcs[mus[-1]]
 
@@ -905,15 +905,29 @@ def fit_time_means(tstamps, means, reses):
     return out_dict
 
 
-def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
+def energy_guess(energy, func_i, fit_range=None, bin_width=0.5, peak=None, eres=None):
     """
     Simple guess for peak fitting
     """
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+    hist, bins, var = pgh.get_hist(
+                    energy, dx=bin_width, range=fit_range
+                )
     if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
-        sigma = eres / 2.355
         i_0 = np.nanargmax(hist)
-        mu = peak
+        
+        if peak is not None:
+            mu = peak
+        else:
+            mu = bin_cs[np.nanmax(hist)]
+        
+        if eres is not None:
+            sigma = eres / 2.355
+        else:
+            _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+        
         height = hist[i_0]
         bg0 = np.mean(hist[-10:])
         step = np.mean(hist[:10]) - bg0
@@ -949,8 +963,16 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
         return parguess
 
     elif func_i == pgf.extended_gauss_step_pdf:
-        mu = peak
-        sigma = eres / 2.355
+        if peak is not None:
+            mu = peak
+        else:
+            mu = bin_cs[np.nanmax(hist)]
+
+        if eres is not None:
+            sigma = eres / 2.355
+        else:
+            _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
         step = bg - np.mean(hist[:10])
@@ -979,134 +1001,78 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
                 parguess[i] = 0
         return parguess
 
+def fix_all_but_nevents(func):
+    """
+    Returns: Sequence list of fixed indexes for fitting and mask for parameters
+    """
 
-def unbinned_energy_fit(
-    energy: np.array,
-    peak: float,
-    eres: list,
-    simplex=False,
-    guess=None,
-    display=0,
-    verbose: bool = False,
-) -> tuple(np.array, np.array):
-    """
-    Fitting function for energy peaks used to calculate survival fractions
-    """
-    try:
-        hist, bins, var = pgh.get_hist(
-            energy, dx=0.5, range=(np.nanmin(energy), np.nanmax(energy))
+    if (
+        func == pgf.gauss_step_cdf
+        or func == pgf.gauss_step_pdf
+        or func == pgf.extended_gauss_step_pdf
+    ):
+        # pars are: n_sig, mu, sigma, n_bkg, hstep, lower, upper, components
+        return [1, 2, 4, 5, 6, 7], np.array(
+            [True, False, False, True, False, False, False, False]
         )
-    except ValueError:
-        pars, errs, cov = return_nans(pgf.radford_pdf)
-        return pars, errs
-    sigma = eres / 2.355
-    if guess is None:
-        x0 = energy_guess(
-            hist,
-            bins,
-            var,
-            pgf.extended_gauss_step_pdf,
-            peak,
-            eres,
-            (np.nanmin(energy), np.nanmax(energy)),
+
+    if (
+        func == pgf.radford_cdf
+        or func == pgf.radford_pdf
+        or func == pgf.extended_radford_pdf
+    ):
+        # pars are: n_sig, mu, sigma, htail,tau, n_bkg, hstep, components
+        return [1, 2, 3, 4, 6, 7, 8, 9], np.array(
+            [True, False, False, False, False, True, False, False, False, False]
         )
-        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
-        m = Minuit(c, *x0)
-        m.limits = [
-            (0, 2 * np.sum(hist)),
-            (peak - 1, peak + 1),
+
+    else:
+        log.error(f"get_hpge_E_fixed not implemented for {func.__name__}")
+        return None
+    return None
+
+
+def get_bounds(func, parguess):
+    if (
+        func == pgf.radford_cdf
+        or func == pgf.radford_pdf
+        or func == pgf.extended_radford_pdf
+    ):
+
+        bounds = [
+            (0, 2 * (parguess[0]+parguess[5])),
+            (parguess[1] - 1, parguess[1] + 1),
             (0, None),
-            (0, 2 * np.sum(hist)),
+            (0, 0.5),
+            (0, None),
+            (0, 2 * (parguess[0]+parguess[5])),
             (-1, 1),
             (None, None),
             (None, None),
             (None, None),
         ]
-        m.fixed[-3:] = True
-        m.simplex().migrad()
-        m.hesse()
-        x0 = m.values[:3]
-        x0 += [0.2, 0.2 * m.values[2]]
-        x0 += m.values[3:]
-        if verbose:
-            print(m)
+        return bounds
+
+    elif (
+        func == pgf.gauss_step_cdf
+        or func == pgf.gauss_step_pdf
+        or func == pgf.extended_gauss_step_pdf
+    ):
         bounds = [
-            (0, 2 * np.sum(hist)),
-            (peak - 1, peak + 1),
+            (0, 2 * (parguess[0]+parguess[5])),
+            (parguess[1] - 1, parguess[1] + 1),
             (0, None),
-            (0, 1),
-            (0, None),
-            (0, 2 * np.sum(hist)),
+            (0, 2 * (parguess[0]+parguess[5])),
             (-1, 1),
             (None, None),
             (None, None),
             (None, None),
         ]
-        fixed = [7, 8, 9]
-    else:
-        x0 = guess
-        x1 = energy_guess(
-            hist,
-            bins,
-            var,
-            pgf.extended_radford_pdf,
-            peak,
-            eres,
-            (np.nanmin(energy), np.nanmax(energy)),
-        )
-        x0[0] = x1[0]
-        x0[5] = x1[5]
-        bounds = [
-            (0, 2 * np.sum(hist)),
-            (guess[1] - 0.5, guess[1] + 0.5),
-            sorted((0.8 * guess[2], 1.2 * guess[2])),
-            sorted((0.8 * guess[3], 1.2 * guess[3])),
-            sorted((0.8 * guess[4], 1.2 * guess[4])),
-            (0, 2 * np.sum(hist)),
-            sorted((0.8 * guess[6], 1.2 * guess[6])),
-            (None, None),
-            (None, None),
-            (None, None),
-        ]
-        fixed = [1, 2, 3, 4, 6, 7, 8, 9]
-    if len(x0) == 0:
-        pars, errs, cov = return_nans(pgf.extended_radford_pdf)
-        return pars, errs
+        return bounds
 
-    if verbose:
-        print(x0)
-    c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
-    m = Minuit(c, *x0)
-    m.limits = bounds
-    for fix in fixed:
-        m.fixed[fix] = True
-    if simplex == True:
-        m.simplex().migrad()
     else:
-        m.migrad()
-
-    m.hesse()
-    if verbose:
-        print(m)
-    if display > 1:
-        plt.figure()
-        bcs = (bins[1:] + bins[:-1]) / 2
-        plt.step(bcs, hist, where="mid")
-        plt.plot(bcs, pgf.radford_pdf(bcs, *x0) * np.diff(bcs)[0])
-        plt.plot(bcs, pgf.radford_pdf(bcs, *m.values) * np.diff(bcs)[0])
-        plt.show()
-
-    if not np.isnan(m.errors[:-3]).all():
-        return m.values, m.errors
-    else:
-        try:
-            m.simplex().migrad()
-            m.minos()
-            if not np.isnan(m.errors[:-3]).all():
-                return m.values, m.errors
-        except:
-            pars, errs, cov = return_nans(pgf.extended_radford_pdf)
-            return pars, errs
+        log.error(f"get_bounds not implemented for {func.__name__}")
+        return []
 
 
 def get_peak_label(peak: float) -> str:
@@ -1149,29 +1115,47 @@ def get_survival_fraction(
         else:
             raise ValueError("mode not recognised")
 
+    func = pgf.extended_radford_pdf
+    gof_func=pgf.radford_pdf
+
     if guess_pars_cut is None or guess_pars_surv is None:
-        pars, errs = unbinned_energy_fit(energy, peak, eres_pars, simplex=True)
+        (pars,errs, cov, _,func, gof_func, _,_) =  pgf.unbinned_staged_energy_fit(energy, 
+                                    func,
+                                    gof_func,
+                                    guess_func=energy_guess,
+                                    bounds_func=get_bounds,
+                                    guess_kwargs={"peak":peak,
+                                                "eres":eres_pars}
+                                    )
         guess_pars_cut = pars
         guess_pars_surv = pars
 
-    cut_pars, ct_errs = unbinned_energy_fit(
-        energy[(~nan_idxs) & (~idxs)],
-        peak,
-        eres_pars,
-        guess=guess_pars_cut,
-        simplex=False,
-        display=display,
-        verbose=False,
-    )
+    (cut_pars,cut_errs, cut_cov, _,_, _, _,_) = pgf.unbinned_staged_energy_fit(
+                                    energy[(~nan_idxs) & (~idxs)],
+                                    func,
+                                    gof_func,
+                                    guess=guess_pars_cut,
+                                    guess_func=energy_guess,
+                                    bounds_func=get_bounds,
+                                    fixed_func=fix_all_but_nevents,
+                                    guess_kwargs={"peak":peak,
+                                                "eres":eres_pars},
+                                    allow_tail_drop=False
+                                    )
 
-    surv_pars, surv_errs = unbinned_energy_fit(
-        energy[(~nan_idxs) & (idxs)],
-        peak,
-        eres_pars,
-        guess=guess_pars_surv,
-        simplex=False,
-        display=display,
-    )
+    (surv_pars,surv_errs, cut_cov, _,_, _, _,_) = pgf.unbinned_staged_energy_fit(
+                                energy[(~nan_idxs) & (idxs)],
+                                func,
+                                gof_func,
+                                guess=guess_pars_surv,
+                                guess_func=energy_guess,
+                                bounds_func=get_bounds,
+                                fixed_func=fix_all_but_nevents,
+                                guess_kwargs={"peak":peak,
+                                            "eres":eres_pars},
+                                allow_tail_drop=False
+                                )
+                                
 
     ct_n = cut_pars["n_sig"]
     ct_err = ct_errs["n_sig"]
