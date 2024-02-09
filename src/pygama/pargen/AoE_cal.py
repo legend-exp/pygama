@@ -914,7 +914,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=0.5, peak=None, eres=
     hist, bins, var = pgh.get_hist(
                     energy, dx=bin_width, range=fit_range
                 )
-    if func_i == pgf.extended_radford_pdf:
+    if (func_i == pgf.extended_radford_pdf) or (func_i == pgf.radford_pdf):
         bin_cs = (bins[1:] + bins[:-1]) / 2
         i_0 = np.nanargmax(hist)
         
@@ -962,7 +962,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=0.5, peak=None, eres=
                 parguess[i] = 0
         return parguess
 
-    elif func_i == pgf.extended_gauss_step_pdf:
+    elif (func_i == pgf.extended_gauss_step_pdf) or (func_i==pgf.gauss_step_pdf):
         if peak is not None:
             mu = peak
         else:
