@@ -78,8 +78,8 @@ def generate_cuts(
         )
         par_array = all_par_array[idxs]
         bin_width = (
-            np.nanpercentile(par_array, 70) - np.nanpercentile(par_array, 50)
-        ) / 5
+            np.nanpercentile(par_array, 55) - np.nanpercentile(par_array, 50)
+        )
 
         counts, start_bins, var = pgh.get_hist(
             par_array, range=(np.nanmin(par_array), np.nanmax(par_array)), dx=bin_width
@@ -95,20 +95,8 @@ def generate_cuts(
             upper_bound = mu + 10 * guess_sig
 
         except:
-            bin_range = 1000
-
-            if max_idx < bin_range:
-                lower_bound_idx = 0
-            else:
-                lower_bound_idx = max_idx - bin_range
-            lower_bound = start_bins[lower_bound_idx]
-
-            if max_idx > len(start_bins) - bin_range:
-                upper_bound_idx = -1
-            else:
-                upper_bound_idx = max_idx + bin_range
-
-            upper_bound = start_bins[upper_bound_idx]
+            lower_bound = np.nanpercentile(par_array, 5) 
+            upper_bound = np.nanpercentile(par_array, 95) 
 
         if (lower_bound < np.nanmin(par_array)) or (lower_bound > np.nanmax(par_array)):
             lower_bound = np.nanmin(par_array)
@@ -117,7 +105,9 @@ def generate_cuts(
 
         try:
             counts, bins, var = pgh.get_hist(
-                par_array, bins=200, range=(lower_bound, upper_bound)
+                par_array, 
+                dx=(np.nanpercentile(par_array,52)-np.nanpercentile(par_array,50)),
+                range=(lower_bound, upper_bound)
             )
 
             bin_centres = pgh.get_bin_centers(bins)
@@ -136,24 +126,18 @@ def generate_cuts(
             mean = pars[0]
             std = fwhm / 2.355
 
-            if mean < np.nanmin(bins) or mean > np.nanmax(bins):
+            if (mean < np.nanmin(bins) or mean > np.nanmax(bins) 
+                or (mean+std) < mu
+                or (mean-std) > mu):
                 raise IndexError
         except IndexError:
-            bin_range = 5000
+            lower_bound = np.nanpercentile(par_array, 5) 
+            upper_bound = np.nanpercentile(par_array, 95) 
 
-            if max_idx < bin_range:
-                lower_bound_idx = 0
-            else:
-                lower_bound_idx = max_idx - bin_range
-            lower_bound = start_bins[lower_bound_idx]
-
-            if max_idx > len(start_bins) - bin_range:
-                upper_bound_idx = -1
-            else:
-                upper_bound_idx = max_idx + bin_range
-            upper_bound = start_bins[upper_bound_idx]
             counts, bins, var = pgh.get_hist(
-                par_array, bins=200, range=(lower_bound, upper_bound)
+                par_array, 
+                dx=np.nanpercentile(par_array,51)-np.nanpercentile(par_array,50),
+                range=(lower_bound, upper_bound)
             )
 
             bin_centres = pgh.get_bin_centers(bins)
