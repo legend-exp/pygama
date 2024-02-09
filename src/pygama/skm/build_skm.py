@@ -24,16 +24,17 @@ def build_skm(
     f_hit: str,
     f_dsp: str,
     f_tcm: str,
-    f_skm: str,
     skm_conf: dict | str,
-    wo_mode="w",
+    *,
+    f_skm: str | None = None,
+    wo_mode: str = "w",
     skm_group: str = "skm",
     evt_group: str = "evt",
     tcm_group: str = "hardware_tcm_1",
     dsp_group: str = "dsp",
     hit_group: str = "hit",
     tcm_id_table_pattern: str = "ch{}",
-) -> None:
+) -> None | Table:
     """Builds a skimmed file from a (set) of `evt/hit/dsp` tier file(s).
 
     Parameters
@@ -46,8 +47,6 @@ def build_skm(
         path of `dsp` file.
     f_tcm
         path of `tcm` file.
-    f_skm
-        name of the `skm` output file.
     skm_conf
         name of configuration file or dictionary defining `skm` fields.
 
@@ -87,6 +86,9 @@ def build_skm(
                }
              }
            }
+    f_skm
+        name of the `skm` output file. If ``None``, return the output
+        class:`.Table` instead of writing to disk.
 
     wo_mode
         writing mode.
@@ -228,6 +230,9 @@ def build_skm(
                 if "lgdo_attrs" in tbl_cfg["operations"][op].keys():
                     obj.attrs |= tbl_cfg["operations"][op]["lgdo_attrs"]
                 table.add_field(op, obj, True)
+
+    if not f_skm:
+        return table
 
     # last thing missing is writing it out
     if wo_mode not in ["w", "write_safe", "o", "overwrite", "a", "append"]:

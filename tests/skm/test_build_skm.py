@@ -22,8 +22,8 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -38,8 +38,8 @@ def test_basics(lgnd_test_data, tmptestdir):
         lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         lgnd_test_data.get_path(tcm_path),
-        skm_out,
         skm_conf,
+        skm_out,
         wo_mode="o",
     )
 
@@ -103,8 +103,8 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
         lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
         lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         lgnd_test_data.get_path(tcm_path),
-        skm_out,
         skm_conf,
+        skm_out,
         wo_mode="o",
     )
 

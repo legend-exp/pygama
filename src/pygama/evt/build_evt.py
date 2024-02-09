@@ -24,15 +24,16 @@ def build_evt(
     f_tcm: str,
     f_dsp: str,
     f_hit: str,
-    f_evt: str,
     evt_config: str | dict,
+    *,
+    f_evt: str | None = None,
     wo_mode: str = "write_safe",
     evt_group: str = "evt",
     tcm_group: str = "hardware_tcm_1",
     dsp_group: str = "dsp",
     hit_group: str = "hit",
     tcm_id_table_pattern: str = "ch{}",
-) -> None:
+) -> None | Table:
     """Transform data from the `hit` and `dsp` levels which a channel sorted to a
     event sorted data format.
 
@@ -44,8 +45,6 @@ def build_evt(
         input LH5 file of the `dsp` level.
     f_hit
         input LH5 file of the `hit` level.
-    f_evt
-        name of the output file.
     evt_config
         name of configuration file or dictionary defining event fields. Channel
         lists can be defined by importing a metadata module.
@@ -108,6 +107,9 @@ def build_evt(
               }
             }
 
+    f_evt
+        name of the output file. If ``None``, return the output :class:`.Table`
+        instead of writing to disk.
     wo_mode
         writing mode.
     evt group
@@ -280,19 +282,25 @@ def build_evt(
     if "outputs" in tbl_cfg.keys():
         if len(tbl_cfg["outputs"]) < 1:
             log.warning("No output fields specified, no file will be written.")
+            return table
         else:
             clms_to_remove = [e for e in table.keys() if e not in tbl_cfg["outputs"]]
             for fld in clms_to_remove:
                 table.remove_field(fld, True)
-            store.write(
-                obj=table, name=f"/{evt_group}/", lh5_file=f_evt, wo_mode=wo_mode
-            )
+
+            if f_evt:
+                store.write(
+                    obj=table, name=f"/{evt_group}/", lh5_file=f_evt, wo_mode=wo_mode
+                )
+            else:
+                return table
     else:
         log.warning("No output fields specified, no file will be written.")
 
     key = re.search(r"\d{8}T\d{6}Z", f_hit).group(0)
     log.info(
-        f"Applied {len(tbl_cfg['operations'])} operations to key {key} and saved {len(tbl_cfg['outputs'])} evt fields across {len(chns)} channel groups"
+        f"Applied {len(tbl_cfg['operations'])} operations to key {key} and saved "
+        f"{len(tbl_cfg['outputs'])} evt fields across {len(chns)} channel groups"
     )
 
 

@@ -22,8 +22,8 @@ def test_basics(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{config_dir}/basic-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -74,8 +74,8 @@ def test_lar_module(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{config_dir}/module-test-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -103,8 +103,8 @@ def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{config_dir}/module-test-t0-vov-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -136,8 +136,8 @@ def test_vov(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{config_dir}/vov-test-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -187,21 +187,21 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
     f_config = f"{config_dir}/basic-evt-config.json"
 
     with pytest.raises(KeyError):
-        build_evt(f_dsp, f_tcm, f_hit, outfile, f_config)
+        build_evt(f_dsp, f_tcm, f_hit, f_config, outfile)
 
     with pytest.raises(KeyError):
-        build_evt(f_tcm, f_hit, f_dsp, outfile, f_config)
+        build_evt(f_tcm, f_hit, f_dsp, f_config, outfile)
 
     with pytest.raises(TypeError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, None)
+        build_evt(f_tcm, f_dsp, f_hit, None, outfile)
 
     conf = {"operations": {}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
+        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
 
     conf = {"channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
+        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
@@ -217,7 +217,7 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         },
     }
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
+        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
 
 
 def test_query(lgnd_test_data, tmptestdir):
@@ -229,8 +229,8 @@ def test_query(lgnd_test_data, tmptestdir):
         f_tcm=lgnd_test_data.get_path(tcm_path),
         f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
         f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        f_evt=outfile,
         evt_config=f"{config_dir}/query-test-evt-config.json",
+        f_evt=outfile,
         wo_mode="o",
         evt_group="evt",
         hit_group="hit",
@@ -277,7 +277,7 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
             },
         },
     }
-    build_evt(f_tcm, f_dsp, f_hit, outfile, conf)
+    build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 4
@@ -300,14 +300,14 @@ def test_tcm_id_table_pattern(lgnd_test_data, tmptestdir):
     f_config = f"{config_dir}/basic-evt-config.json"
 
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{{}}")
+        build_evt(f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{{}}")
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{}{}")
+        build_evt(f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{}{}")
     with pytest.raises(NotImplementedError):
         build_evt(
-            f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="ch{tcm_id}"
+            f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{tcm_id}"
         )
     with pytest.raises(ValueError):
         build_evt(
-            f_tcm, f_dsp, f_hit, outfile, f_config, tcm_id_table_pattern="apple{}banana"
+            f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="apple{}banana"
         )
