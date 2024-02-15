@@ -134,10 +134,13 @@ def get_dpz_decay_constants(
 ) -> tuple[dict, dict]:
     """
     Gets values for the DPZ time constants in 3 stages:
-        1. Perform a linear fit to the start and end of the decaying tail of a superpulse
-        2. Use those initial guesses to seed a LSQ fit to a DPZ model of the sum of two decaying exponentials
-        3. Use the results of the model fit as initial guesses in a DSP routine that optimizes the flatness of the decaying tail
+
+    1. Perform a linear fit to the start and end of the decaying tail of a superpulse
+    2. Use those initial guesses to seed a LSQ fit to a DPZ model of the sum of two decaying exponentials
+    3. Use the results of the model fit as initial guesses in a DSP routine that optimizes the flatness of the decaying tail
+
     The first step in this process is to generate a superpulse from high-energy waveforms.
+
 
     Parameters
     ----------
@@ -162,6 +165,7 @@ def get_dpz_decay_constants(
     display
         An integer. If greater than 1, plots and shows the attempts to fit the long and short time constants. If greater than 0, saves the plot to a dictionary.
 
+
     Returns
     -------
     tau_dict
@@ -169,9 +173,10 @@ def get_dpz_decay_constants(
     out_plot_dict
         A dictionary containing monitoring plots
 
+
     Notes
     -----
-    tau1 is the shorter time constant, tau2 is the longer, and frac is the amount of the larger time constant present in the sum of the two exponentials.
+    tau1 is the shorter time constant, tau2 is the longer, and frac is the amount of the larger time constant present in the sum of the two exponentials
     """
     n_events = 10000
     tau_dict = {}
