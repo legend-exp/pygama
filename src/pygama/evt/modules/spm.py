@@ -37,7 +37,7 @@ def cast_trigger(
             ak.min(ak.fill_none(trgr.view_as("ak"), tdefault), axis=-1), tdefault
         )
 
-        elif isinstance(trgr, (Array, ak.highlevel.Array)):
+    elif isinstance(trgr, (ak.Array, ak.highlevel.Array)):
         if trgr.ndim == 1:
             return ak.fill_none(ak.nan_to_none(trgr), tdefault)
         elif trgr.ndim == 2:
