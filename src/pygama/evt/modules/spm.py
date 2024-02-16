@@ -41,7 +41,9 @@ def cast_trigger(
         if trgr.ndim == 1:
             return ak.fill_none(ak.nan_to_none(trgr), tdefault)
         elif trgr.ndim == 2:
-            return ak.fill_none(ak.min(ak.fill_none(ak.nan_to_none(trgr), tdefault), axis=-1), tdefault)
+            return ak.fill_none(
+                ak.min(ak.fill_none(ak.nan_to_none(trgr), tdefault), axis=-1), tdefault
+            )
         else:
             raise ValueError(f"Too many dimensions: {trgr.ndim}")
     elif isinstance(trgr, (float, int)) and isinstance(length, int):
