@@ -203,15 +203,15 @@ class calibrate_parameter:
         indexes = []
         for i, peak in enumerate(fitted_peaks):
             all_peaks = np.append(all_peaks, peak)
-            if peak == 2103.53:
+            if np.abs(peak- 2103.5) <1:
                 log.info(f"Tl SEP found at index {i}")
                 indexes.append(i)
                 continue
-            elif peak == 1592.53:
+            elif np.abs(peak-1592.53)<1:
                 log.info(f"Tl DEP found at index {i}")
                 indexes.append(i)
                 continue
-            elif peak == 511.0:
+            elif np.abs(peak-511.0)<1:
                 log.info(f"e annihilation found at index {i}")
                 indexes.append(i)
                 continue
