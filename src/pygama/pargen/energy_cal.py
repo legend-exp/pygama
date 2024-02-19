@@ -12,6 +12,7 @@ import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
+from scipy.stats import chisquare, norm
 from iminuit import Minuit, cost
 from scipy.signal import find_peaks_cwt, medfilt
 
@@ -247,7 +248,7 @@ def hpge_fit_E_peak_tops(
     return np.array(pars_list, dtype=object), np.array(cov_list, dtype=object)
 
 
-def get_hpge_E_peak_par_guess(hist, bins, var, func, mode_guess):
+def get_hpge_E_peak_par_guess(energy, func, fit_range=None, bin_width=1, mode_guess=None):
     """Get parameter guesses for func fit to peak in hist
 
     Parameters
@@ -258,6 +259,11 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func, mode_guess):
     func : function
         The function to be fit to the peak in the (windowed) hist
     """
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+    hist, bins, var = pgh.get_hist(
+                    energy, dx=bin_width, range=fit_range
+                )
     if (
         func == pgf.gauss_step_cdf
         or func == pgf.gauss_step_pdf
@@ -334,7 +340,7 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func, mode_guess):
     ):
         # guess mu, height
         pars, cov = pgf.gauss_mode_width_max(
-            hist, bins, var, mode_guess=mode_guess, n_bins=10
+            hist, bins, var, n_bins=10
         )
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
@@ -447,8 +453,8 @@ def get_hpge_E_bounds(func, parguess):
             (0, None),
             (parguess[-3], parguess[-2]),
             (0, None),
-            (0, 1),
-            (None, None),
+            (0, 0.5),
+            (0.1*parguess[2], 10*parguess[2]),
             (0, None),
             (-1, 1),
             (None, None),
@@ -509,88 +515,268 @@ class tail_prior:
         return self.tail_weight * np.log(htail + 0.1)  # len(self.data)/
 
 
-def staged_fit(
-    energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess, tail_weight=100
+def unbinned_staged_energy_fit(
+    energy,
+    func,
+    gof_func=None,
+    gof_range=None,
+    fit_range=None,
+    guess=None,
+    guess_func = get_hpge_E_peak_par_guess,
+    bounds_func = get_hpge_E_bounds,
+    fixed_func = get_hpge_E_fixed,
+    guess_kwargs = {},
+    bounds_kwargs={},
+    fixed_kwargs={},
+    tol=None,
+    tail_weight=10,
+    allow_tail_drop=True,
+    bin_width = 1,
+    debug_level=0,
+    display=0,
 ):
-    par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i, mode_guess)
-    bounds = get_hpge_E_bounds(func_i, par_guesses)
-    fixed, mask = get_hpge_E_fixed(func_i)
+    """
+    Unbinned fit to energy. This is different to the default fitting as
+    it will try different fitting methods and choose the best. This is necessary for the lower statistics.
+    """
+    if gof_func is None:
+        gof_func=func
 
-    if func_i == pgf.extended_radford_pdf or func_i == pgf.radford_pdf:
-        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i) + tail_prior(
-            energies, func_i, tail_weight=tail_weight
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+
+    if gof_range is None:
+        gof_range = fit_range
+    
+    hist, bins, var = pgh.get_hist(energy, range= fit_range, dx = bin_width)
+    bin_cs = (bins[:-1] + bins[1:]) / 2
+    
+    gof_hist, gof_bins, gof_var = pgh.get_hist(energy, dx=bin_width, range=gof_range)
+    gof_bin_cs = (gof_bins[:-1] + gof_bins[1:]) / 2
+    
+    if guess is not None:     
+        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
+        x1 = guess_func(func, fit_range, bin_width = bin_width, **guess_kwargs)
+        if len(x0) == len(x1):
+            cs, _ = pgf.goodness_of_fit(
+            gof_hist, gof_bins, None, gof_func, x0[:-3], method="Pearson"
         )
-        m = Minuit(cost_func, *par_guesses)
-        m.limits = bounds
+            cs2, _ = pgf.goodness_of_fit(
+            gof_hist, gof_bins, None, gof_func, x1[:-3], method="Pearson"
+        )
+            if cs>=cs2:
+                x0=x1
+        else:
+            x0=x1
+    else:
+        if func == pgf.extended_radford_pdf:
+            x0 = guess_func(hist, bins, var, pgf.extended_gauss_step_pdf, fit_range)
+            if verbose:
+                print(x0)
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
+            m = Minuit(c, *x0)
+            m.fixed[-3:] = True
+            m.simplex().migrad()
+            m.hesse()
+            if guess is not None:
+                x0_rad = [*guess[:-2], fit_range[0], fit_range[1], False]
+            else:
+                x0_rad = guess_func(hist, bins, var, func, fit_range)
+            x0 = m.values[:3]
+            x0 += x0_rad[3:5]
+            x0 += m.values[3:]
+            
+        else:
+            x0 = guess_func(hist, bins, var, func, fit_range)
+
+    if debug_level>0:
+        print(x0)
+     
+    if (func == pgf.extended_radford_pdf or func == pgf.radford_pdf) and  allow_tail_drop==True:
+        fit_no_tail = unbinned_staged_energy_fit(energy, 
+                                func=pgf.extended_gauss_step_pdf,
+                                gof_func=pgf.gauss_step_pdf,
+                                gof_range=gof_range,
+                                fit_range=fit_range,
+                                guess=None,
+                                tol=tol)
+    
+        c = cost.ExtendedUnbinnedNLL(energy, func) + tail_prior(
+                energy, func, tail_weight=tail_weight
+            )
+    else:
+        c = cost.ExtendedUnbinnedNLL(energy, func)
+    
+    fixed, mask = fixed_func(func, **fixed_kwargs)
+    bounds = bounds_func(func, x0, **bounds_kwargs)
+    if debug_level>1:
+        print(fixed, mask)
+        print(bounds)
+
+    #try without simplex
+    m = Minuit(c, *x0)
+    if tol is not None:
+        m.tol = tol
+    for fix in fixed:
+        m.fixed[fix] = True
+    m.limits = bounds
+    m.migrad()
+    m.hesse()
+
+    m_fit = func(bin_cs, *m.values)[1]
+
+    valid1 = (
+        m.valid
+        & (~np.isnan(np.array(m.errors)[mask]).any())
+        & (~(np.array(m.errors)[mask] == 0).all())
+    )
+
+    cs = pgf.goodness_of_fit(
+        gof_hist, gof_bins, None, gof_func, np.array(m.values)[mask], method="Pearson"
+    )
+
+    fit1 = (
+        m.values,
+        m.errors,
+        m.covariance,
+        cs,
+        func, 
+        gof_func,
+        mask,
+        valid1,
+    )
+    
+    #Now try with simplex
+    m2 = Minuit(c, *x0)
+    if tol is not None:
+        m2.tol = tol
+    for fix in fixed:
+        m2.fixed[fix] = True
+    m2.limits = bounds
+    m2.simplex().migrad()
+    m2.hesse()
+    m2_fit = func(bin_cs, *m2.values)[1]
+    
+    valid2 = (
+        m2.valid
+        & (~np.isnan(np.array(m2.errors)[mask]).any())
+        & (~(np.array(m2.errors)[mask] == 0).all())
+    )
+
+    cs2 = pgf.goodness_of_fit(
+        gof_hist, gof_bins, None, gof_func, np.array(m2.values)[mask], method="Pearson"
+    )
+
+    fit2 = (
+        m.values2,
+        m.errors2,
+        m.covariance2,
+        cs2,
+        func, 
+        gof_func,
+        mask,
+        valid2,
+    )
+
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[mask] / np.array(m.values)[mask]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
+
+    if debug_level>0:
+        print(m)
+        print(m2)
+        print(valid1, valid2)
+
+    if display > 1:
+        m_fit = gof_func(bin_cs, *m.values)
+        m2_fit = gof_func(bin_cs, *m2.values)
+        plt.figure()
+        plt.step(bin_cs, hist, label=f"hist")
+        plt.plot(bin_cs, func(bin_cs, *x0)[1],label=f"Guess")
+        plt.plot(bin_cs, m_fit, label=f"Fit 1: {cs}")
+        plt.plot(bin_cs, m2_fit, label=f"Fit 2: {cs2}")
+        plt.legend()
+        plt.show()
+
+    if valid1 == False and valid2 == False:
+        log.debug("Extra simplex needed")
+        m = Minuit(c, *x0)
+        if tol is not None:
+            m.tol = tol
         for fix in fixed:
             m.fixed[fix] = True
-
-        m.values["htail"] = 0
-        m.values["tau"] = 0
-        m.fixed["htail"] = True
-        m.fixed["tau"] = True
-        if simplex == True:
-            m.simplex().migrad()
-        else:
-            m.migrad()
-        try:
-            # set htail to guess
-            m.values["htail"] = par_guesses[3]
-            m.values["tau"] = par_guesses[4]
-            m.fixed = False
-            for fix in fixed:
-                m.fixed[fix] = True
-
-            if simplex == True:
-                m.simplex().migrad()
-            else:
-                m.migrad()
-            m.hesse()
-            pars_i = m.values
-            errs_i = m.errors
-            cov_i = m.covariance
-            valid_fit = m.valid
-            if valid_fit == False:
+        m.limits = bounds
+        m.simplex().simplex().migrad()
+        m.hesse()
+        if verbose:
+            print(m)
+        cs = pgf.goodness_of_fit(
+            gof_hist, gof_bins, None, gof_func, np.array(m.values)[mask], method="Pearson"
+        )
+        valid3 = (
+            m.valid
+            & (~np.isnan(np.array(m.errors)[mask]).any())
+            & (~(np.array(m.errors)[mask] == 0).all())
+        )
+        if valid3 is False:
+            try:
+                m.minos()
+                valid3 = (
+                    m.valid
+                    & (~np.isnan(np.array(m.errors)[mask]).any())
+                    & (~(np.array(m.errors)[mask] == 0).all())
+                )
+            except:
                 raise RuntimeError
-        except:
-            func_i = pgf.extended_gauss_step_pdf
-            gof_func_i = pgf.gauss_step_pdf
-            pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(
-                energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess
-            )
 
-        # check htail
-        if (
-            m.values["htail"] < 0.01
-            or m.values["htail"] < 2 * m.errors["htail"]
-            or np.isnan(m.values).any()
-        ):  # switch to stat test
-            func_i = pgf.extended_gauss_step_pdf
-            gof_func_i = pgf.gauss_step_pdf
-            pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(
-                energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess
-            )
+        fit = (
+            m.values,
+            m.errors,
+            m.covariance,
+            cs,
+            func, 
+            gof_func,
+            mask,
+            valid3,
+        )
+
+    elif valid2 == False:
+        fit = fit1
+
+    elif valid1 == False:
+        fit = fit2
+        
+    elif cs[0] * 1.05 < cs2[0]:
+        fit = fit1
+
+    elif cs2[0] * 1.05 < cs[0]:
+        fit = fit2
+
+    elif frac_errors1 < frac_errors2:
+        fit = fit1
+
+    elif frac_errors1 > frac_errors2:
+        fit = fit2
 
     else:
-        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i)
-        m = Minuit(cost_func, *par_guesses)
-        m.limits = bounds
-        for fix in fixed:
-            m.fixed[fix] = True
-        if simplex == True:
-            m.simplex().migrad()
-        else:
-            m.migrad()
-
-        m.hesse()
-
-        pars_i = m.values
-        errs_i = m.errors
-        cov_i = m.covariance
-
-        valid_fit = m.valid
-
-    return pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit
+        raise RuntimeError
+        
+    if (func == pgf.extended_radford_pdf or func == pgf.radford_pdf) and allow_tail_drop==True:
+        p_val = chi2.sf(fit[3][0], fit[3][1])
+        p_val_no_tail = chi2.sf(fit_no_tail[3][0], fit_no_tail[3][1])
+        if (pars["htail"]<errs["htail"] or p_val_no_tail>p_val):
+            if debug_level>0:
+                print(p_val, p_val_no_tail)
+            fit = fit_no_tail
+            if display > 0:
+                m_fit = pgf.gauss_step_pdf(bin_cs, *fit[0])
+                plt.figure()
+                plt.step(bin_cs, hist, where="mid", label=f"hist")
+                plt.plot(bin_cs, m_fit, label=f"Drop tail: {p_val_no_tail}")
+                plt.legend()
+                plt.show()
+    if debug_level>0:
+        print(fit[0], fit[1], fit[2])
+    return fit
 
 
 def hpge_fit_E_peaks(
@@ -686,20 +872,24 @@ def hpge_fit_E_peaks(
                         pars_i,
                         errs_i,
                         cov_i,
+                        csqr_i
                         func_i,
                         gof_func_i,
                         mask,
                         valid_fit,
-                    ) = staged_fit(
-                        energies,
-                        hist,
-                        bins,
-                        var,
-                        func_i,
-                        gof_func_i,
-                        simplex,
-                        mode_guess,
+                    ) = unbinned_staged_energy_fit(
+                        energy,
+                        func=func_i,
+                        gof_func=gof_func_i,
+                        fit_range=(Euc_min, Euc_max),
+                        guess_func = get_hpge_E_peak_par_guess,
+                        bounds_func = get_hpge_E_bounds,
+                        fixed_func = get_hpge_E_fixed,
+                        tail_weight=10,
+                        allow_tail_drop=True,
+                        bin_width = np.diff(bins)[0],
                         tail_weight=tail_weight,
+                        guess_kwargs={"mode_guess": mode_guesses[i_peak]}
                     )
                     if pars_i["n_sig"] < 100:
                         valid_fit = False

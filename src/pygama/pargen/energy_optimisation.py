@@ -12,6 +12,8 @@ import pathlib
 import pickle as pkl
 import sys
 from collections import namedtuple
+import pint
+from dspeed.units import unit_registry as ureg
 
 import lgdo.lh5 as lh5
 import matplotlib as mpl
@@ -181,10 +183,14 @@ def set_values(par_values):
     return string_values
 
 
-def simple_guess(hist, bins, var, func_i, fit_range):
+def simple_guess(energy, func_i, fit_range=None, bin_width = 1):
     """
     Simple guess for peak fitting
     """
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+    hist, bins, var = pgh.get_hist(energy, range= fit_range, dx = bin_width)
+
     if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         _, sigma, amp = pgh.get_gaussian_guess(hist, bins)
@@ -228,180 +234,6 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         return [nsig_guess, mu, sigma, nbkg_guess, hstep, fit_range[0], fit_range[1], 0]
 
 
-def unbinned_energy_fit(
-    energy,
-    func,
-    gof_func,
-    gof_range,
-    fit_range=(np.inf, np.inf),
-    guess=None,
-    tol=None,
-    verbose=False,
-    display=0,
-):
-    """
-    Unbinned fit to energy. This is different to the default fitting as
-    it will try different fitting methods and choose the best. This is necessary for the lower statistics.
-    """
-
-    bin_width = 1
-    lower_bound = (np.nanmin(energy) // bin_width) * bin_width
-    upper_bound = ((np.nanmax(energy) // bin_width) + 1) * bin_width
-    hist1, bins, var = pgh.get_hist(
-        energy, dx=bin_width, range=(lower_bound, upper_bound)
-    )
-    bin_cs1 = (bins[:-1] + bins[1:]) / 2
-    if guess is not None:
-        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
-    else:
-        if func == pgf.extended_radford_pdf:
-            x0 = simple_guess(hist1, bins, var, pgf.extended_gauss_step_pdf, fit_range)
-            if verbose:
-                print(x0)
-            c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
-            m = Minuit(c, *x0)
-            m.fixed[-3:] = True
-            m.simplex().migrad()
-            m.hesse()
-            if guess is not None:
-                x0_rad = [*guess[:-2], fit_range[0], fit_range[1], False]
-            else:
-                x0_rad = simple_guess(hist1, bins, var, func, fit_range)
-            x0 = m.values[:3]
-            x0 += x0_rad[3:5]
-            x0 += m.values[3:]
-        else:
-            x0 = simple_guess(hist1, bins, var, func, fit_range)
-    if verbose:
-        print(x0)
-    c = cost.ExtendedUnbinnedNLL(energy, func)
-    m = Minuit(c, *x0)
-    if tol is not None:
-        m.tol = tol
-    m.fixed[-3:] = True
-    m.migrad()
-    m.hesse()
-
-    hist, bins, var = pgh.get_hist(energy, dx=1, range=gof_range)
-    bin_cs = (bins[:-1] + bins[1:]) / 2
-    m_fit = func(bin_cs1, *m.values)[1]
-
-    valid1 = (
-        m.valid
-        # & m.accurate
-        & (~np.isnan(m.errors).any())
-        & (~(np.array(m.errors[:-3]) == 0).all())
-    )
-
-    cs = pgf.goodness_of_fit(
-        hist, bins, None, gof_func, m.values[:-3], method="Pearson"
-    )
-    cs = cs[0] / cs[1]
-    m2 = Minuit(c, *x0)
-    if tol is not None:
-        m2.tol = tol
-    m2.fixed[-3:] = True
-    m2.simplex().migrad()
-    m2.hesse()
-    m2_fit = func(bin_cs1, *m2.values)[1]
-    valid2 = (
-        m2.valid
-        # & m2.accurate
-        & (~np.isnan(m.errors).any())
-        & (~(np.array(m2.errors[:-3]) == 0).all())
-    )
-
-    cs2 = pgf.goodness_of_fit(
-        hist, bins, None, gof_func, m2.values[:-3], method="Pearson"
-    )
-    cs2 = cs2[0] / cs2[1]
-
-    frac_errors1 = np.sum(np.abs(np.array(m.errors)[:-3] / np.array(m.values)[:-3]))
-    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[:-3] / np.array(m2.values)[:-3]))
-
-    if verbose:
-        print(m)
-        print(m2)
-        print(frac_errors1, frac_errors2)
-
-    if display > 1:
-        m_fit = gof_func(bin_cs1, *m.values)
-        m2_fit = gof_func(bin_cs1, *m2.values)
-        plt.figure()
-        plt.plot(bin_cs1, hist1, label=f"hist")
-        plt.plot(bin_cs1, func(bin_cs1, *x0)[1], label=f"Guess")
-        plt.plot(bin_cs1, m_fit, label=f"Fit 1: {cs}")
-        plt.plot(bin_cs1, m2_fit, label=f"Fit 2: {cs2}")
-        plt.legend()
-        plt.show()
-
-    if valid1 == False and valid2 == False:
-        log.debug("Extra simplex needed")
-        m = Minuit(c, *x0)
-        if tol is not None:
-            m.tol = tol
-        m.fixed[-3:] = True
-        m.limits = pgc.get_hpge_E_bounds(func)
-        m.simplex().simplex().migrad()
-        m.hesse()
-        if verbose:
-            print(m)
-        cs = pgf.goodness_of_fit(
-            hist, bins, None, gof_func, m.values[:-3], method="Pearson"
-        )
-        cs = cs[0] / cs[1]
-        valid3 = (
-            m.valid
-            # & m.accurate
-            & (~np.isnan(m.errors).any())
-            & (~(np.array(m.errors[:-3]) == 0).all())
-        )
-        if valid3 is False:
-            try:
-                m.minos()
-                valid3 = (
-                    m.valid
-                    & (~np.isnan(m.errors).any())
-                    & (~(np.array(m.errors[:-3]) == 0).all())
-                )
-            except:
-                raise RuntimeError
-
-        pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-1]
-        cov = np.array(m.covariance)[:-1, :-1]
-        csqr = cs
-
-    elif valid2 == False or cs * 1.05 < cs2:
-        pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-3]
-        cov = np.array(m.covariance)[:-1, :-1]
-        csqr = cs
-
-    elif valid1 == False or cs2 * 1.05 < cs:
-        pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-3]
-        cov = np.array(m2.covariance)[:-1, :-1]
-        csqr = cs2
-
-    elif frac_errors1 < frac_errors2:
-        pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-3]
-        cov = np.array(m.covariance)[:-1, :-1]
-        csqr = cs
-
-    elif frac_errors1 > frac_errors2:
-        pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-3]
-        cov = np.array(m2.covariance)[:-1, :-1]
-        csqr = cs2
-
-    else:
-        raise RuntimeError
-
-    return pars, errs, cov, csqr
-
-
 def get_peak_fwhm_with_dt_corr(
     Energies,
     alpha,
@@ -412,6 +244,7 @@ def get_peak_fwhm_with_dt_corr(
     kev_width,
     guess=None,
     kev=False,
+    frac_max=0.5,
     display=0,
 ):
     """
@@ -447,14 +280,16 @@ def get_peak_fwhm_with_dt_corr(
     tol = None
     try:
         if display > 0:
-            energy_pars, energy_err, cov, chisqr = unbinned_energy_fit(
+            energy_pars, energy_err, cov, chisqr, func, gof_func, _, _ = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
-                func,
-                gof_func,
-                gof_range,
-                fit_range,
+                func=func,
+                gof_func=gof_func,
+                gof_range=gof_range,
+                fit_range=fit_range,
+                guess_func = simple_guess,
                 tol=tol,
                 guess=guess,
+                allow_tail_drop=False,
                 verbose=True,
                 display=display,
             )
@@ -466,29 +301,30 @@ def get_peak_fwhm_with_dt_corr(
             hist, bins, var = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
-            plt.plot((bins[1:] + bins[:-1]) / 2, hist)
+            plt.step((bins[1:] + bins[:-1]) / 2, hist)
             plt.plot(xs, gof_func(xs, *energy_pars))
             plt.show()
         else:
-            energy_pars, energy_err, cov, chisqr = unbinned_energy_fit(
+            energy_pars, energy_err, cov, chisqr, func, gof_func, _,_ = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
-                func,
-                gof_func,
-                gof_range,
-                fit_range,
+                func=func,
+                gof_func=gof_func,
+                gof_range=gof_range,
+                fit_range=fit_range,
                 guess=guess,
+                allow_tail_drop=False,
                 tol=tol,
             )
         if func == pgf.extended_radford_pdf:
             if energy_pars[3] < 1e-6 and energy_err[3] < 1e-6:
-                fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
-                fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
+                fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1/frac_max))
+                fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1/frac_max))
             else:
-                fwhm = pgf.radford_fwhm(energy_pars[2], energy_pars[3], energy_pars[4])
+                fwhm = pgf.radford_full_width_at_frac_max(energy_pars[2], energy_pars[3], energy_pars[4],frac_max)
 
         elif func == pgf.extended_gauss_step_pdf:
-            fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
-            fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
+            fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1/frac_max))
+            fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1/frac_max))
 
         xs = np.arange(lower_bound, upper_bound, 0.1)
         y = func(xs, *energy_pars)[1]
@@ -510,15 +346,16 @@ def get_peak_fwhm_with_dt_corr(
             y_b = np.zeros(len(par_b))
             for i, p in enumerate(par_b):
                 try:
-                    y_b[i] = pgf.radford_fwhm(p[2], p[3], p[4])  #
+                    y_b[i] = pgf.radford_full_width_at_frac_max(p[2], p[3], p[4],frac_max)  #
                 except:
                     y_b[i] = np.nan
             fwhm_err = np.nanstd(y_b, axis=0)
             if fwhm_err == 0:
-                fwhm, fwhm_err = pgf.radford_fwhm(
+                fwhm, fwhm_err = pgf.radford_full_width_at_frac_max(
                     energy_pars[2],
                     energy_pars[3],
                     energy_pars[4],
+                    frac_max,
                     cov=cov[:, :-2][:-2, :],
                 )
             fwhm_o_max_err = np.nanstd(y_b / maxs, axis=0)
@@ -531,7 +368,7 @@ def get_peak_fwhm_with_dt_corr(
 
         if display > 1:
             plt.figure()
-            plt.plot((bins[1:] + bins[:-1]) / 2, hist)
+            plt.step((bins[1:] + bins[:-1]) / 2, hist)
             for i in range(100):
                 plt.plot(xs, y_max[i, :])
             plt.show()
@@ -541,8 +378,8 @@ def get_peak_fwhm_with_dt_corr(
             hist, bins, var = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
-            plt.plot((bins[1:] + bins[:-1]) / 2, hist)
-            plt.plot(xs, gof_func(xs, *energy_pars))
+            plt.step((bins[1:] + bins[:-1]) / 2, hist)
+            plt.plot(xs, y, color="orange")
             plt.fill_between(
                 xs, y - yerr_boot, y + yerr_boot, facecolor="C1", alpha=0.5
             )
@@ -567,7 +404,7 @@ def get_peak_fwhm_with_dt_corr(
     )
 
 
-def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, display=0):
+def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=None, frac_max =0.2, display=0):
     """
     FOM for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
     the corresponding alpha value and the number of events in the fitted peak, also the reduced chisquare of the
@@ -581,7 +418,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
     kev_width = kwarg_dict["kev_width"]
     min_alpha = 0
     max_alpha = 3.50e-06
-    astep = 1.250e-07
+    alphas = np.linspace(0, 3.5*10**-6, nsteps, dtype="float64") 
     if ctc_parameter == "QDrift":
         dt = tb_in["dt_eff"].nda
     elif ctc_parameter == "dt":
@@ -613,41 +450,6 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
-
-    alphas = np.array(
-        [
-            0.000e00,
-            1.250e-07,
-            2.500e-07,
-            3.750e-07,
-            5.000e-07,
-            6.250e-07,
-            7.500e-07,
-            8.750e-07,
-            1.000e-06,
-            1.125e-06,
-            1.250e-06,
-            1.375e-06,
-            1.500e-06,
-            1.625e-06,
-            1.750e-06,
-            1.875e-06,
-            2.000e-06,
-            2.125e-06,
-            2.250e-06,
-            2.375e-06,
-            2.500e-06,
-            2.625e-06,
-            2.750e-06,
-            2.875e-06,
-            3.000e-06,
-            3.125e-06,
-            3.250e-06,
-            3.375e-06,
-            3.500e-06,
-        ],
-        dtype="float64",
-    )
     fwhms = np.array([])
     final_alphas = np.array([])
     fwhm_errs = np.array([])
@@ -664,7 +466,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             _,
             fit_pars,
         ) = get_peak_fwhm_with_dt_corr(
-            Energies, alpha, dt, func, gof_func, peak, kev_width, guess=guess
+            Energies, alpha, dt, func, gof_func, peak, kev_width, guess=None, frac_max = 0.5
         )
         if not np.isnan(fwhm_o_max):
             fwhms = np.append(fwhms, fwhm_o_max)
@@ -674,11 +476,11 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             if fwhms[-1] < best_fwhm:
                 best_fwhm = fwhms[-1]
                 best_fit = fit_pars
-        log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max}+-{fwhm_o_max_err}")
+        log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
 
     # Make sure fit isn't based on only a few points
-    if len(fwhms) < 10:
-        log.debug("less than 10 fits successful")
+    if len(fwhms) < nsteps*0.2:
+        log.debug("less than 20% fits successful")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
@@ -689,12 +491,12 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             "n_sig_err": np.nan,
         }
 
-    ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (fwhm_errs > 0)
+    ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50))  & (fwhm_errs > 1e-10)
     # Fit alpha curve to get best alpha
 
     try:
-        alphas = np.arange(
-            final_alphas[ids][0], final_alphas[ids][-1], astep / 20, dtype="float64"
+        alphas = np.linspace(
+            final_alphas[ids][0], final_alphas[ids][-1], nsteps*20, dtype="float64"
         )
         alpha_fit, cov = np.polyfit(
             final_alphas[ids], fwhms[ids], w=1 / fwhm_errs[ids], deg=4, cov=True
@@ -769,31 +571,11 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             gof_func,
             peak,
             kev_width,
-            guess=best_fit,
+            guess=None,
             kev=True,
+            frac_max=frac_max,
             display=display,
         )
-        if np.isnan(final_fwhm) or np.isnan(final_err):
-            (
-                final_fwhm,
-                _,
-                final_err,
-                _,
-                csqr,
-                n_sig,
-                n_sig_err,
-                _,
-            ) = get_peak_fwhm_with_dt_corr(
-                Energies,
-                alpha,
-                dt,
-                func,
-                gof_func,
-                peak,
-                kev_width,
-                kev=True,
-                display=display,
-            )
         if np.isnan(final_fwhm) or np.isnan(final_err):
             log.debug(f"final fit failed, alpha was {alpha}")
         return {
@@ -805,18 +587,6 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, idxs=None, displ
             "n_sig": n_sig,
             "n_sig_err": n_sig_err,
         }
-
-
-def fom_all_fit(tb_in, kwarg_dict):
-    """
-    FOM to run over different ctc parameters
-    """
-    ctc_parameters = ["QDrift"]  #'dt',
-    output_dict = {}
-    for param in ctc_parameters:
-        out = fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, param)
-        output_dict[param] = out
-    return output_dict
 
 
 def fom_FWHM_fit(tb_in, kwarg_dict):
@@ -918,23 +688,41 @@ def event_selection(
     wf_field: str = "waveform",
     n_events=10000,
     threshold=1000,
+    initial_energy="daqenergy",
+    check_pulser=True,
 ):
+
+    """
+    Function for selecting events in peaks using raw files, 
+    to do this it uses the daqenergy to get a first rough selection
+    then runs 1 dsp to get a more accurate energy estimate and apply cuts
+    returns the indexes of the final events and the peak to which each index corresponds
+    """
+
     if not isinstance(peak_idxs, list):
         peak_idxs = [peak_idxs]
     if not isinstance(kev_widths, list):
         kev_widths = [kev_widths]
 
-    df = sto.read(lh5_path, raw_files, field_mask=["daqenergy", "timestamp"])[
-        0
-    ].view_as("pd")
+    if lh5_path[-1] != "/":
+        lh5_path +="/"
+    
+    raw_fields = [field.replace(lh5_path, "") for field in lh5.ls(raw_files[0], lh5_path)]
+    initial_fields = cts.get_keys(
+        raw_fields, [initial_energy]
+    )
+    initial_fields += ["timestamp"]
 
-    if pulser_mask is None:
-        pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
+    df = lh5.read_as(lh5_path, raw_files, "pd", field_mask=initial_fields)
+    df["initial_energy"] = df.eval(initial_energy)
+
+    if pulser_mask is None and check_pulser is True:
+        pulser_props = cts.find_pulser_properties(df, energy="initial_energy")
         if len(pulser_props) > 0:
             final_mask = None
             for entry in pulser_props:
-                e_cut = (df.daqenergy.values < entry[0] + entry[1]) & (
-                    df.daqenergy.values > entry[0] - entry[1]
+                e_cut = (df.initial_energy.values < entry[0] + entry[1]) & (
+                    df.initial_energy.values > entry[0] - entry[1]
                 )
                 if final_mask is None:
                     final_mask = e_cut
@@ -944,12 +732,15 @@ def event_selection(
             log.debug(f"pulser found: {pulser_props}")
         else:
             log.debug("no_pulser")
-            ids = np.zeros(len(df.daqenergy.values), dtype=bool)
+            ids = np.zeros(len(df.initial_energy.values), dtype=bool)
         # Get events around peak using raw file values
-    else:
+    elif pulser_mask is not None:
         ids = pulser_mask
-    initial_mask = (df.daqenergy.values > threshold) & (~ids)
-    rough_energy = df.daqenergy.values[initial_mask]
+    else:
+        ids = np.zeros(len(df.initial_energy.values), dtype=bool)
+
+    initial_mask = (df["initial_energy"] > threshold) & (~ids)
+    rough_energy = np.array(df["initial_energy"])[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
 
     guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
@@ -1027,49 +818,44 @@ def event_selection(
         energy = tb_data[energy_parameter].nda[peak_ids]
 
         hist, bins, var = pgh.get_hist(
-            energy, range=(int(threshold), int(np.nanmax(energy))), dx=1
+            energy, range=(np.floor(np.nanmin(energy)), np.ceil(np.nanmax(energy))), dx=peak/(np.nanpercentile(energy,50))
         )
         peak_loc = pgh.get_bin_centers(bins)[np.nanargmax(hist)]
-        rough_adc_to_kev = peak / peak_loc
 
-        e_lower_lim = peak_loc - (1.5 * kev_width[0]) / rough_adc_to_kev
-        e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
-
-        e_ranges = (int(peak_loc - e_lower_lim), int(e_upper_lim - peak_loc))
-        (
-            params,
-            errors,
-            covs,
-            bins,
-            ranges,
-            p_val,
-            valid_pks,
-            pk_funcs,
-        ) = pgc.hpge_fit_E_peaks(
-            energy,
-            [peak_loc],
-            [e_ranges],
-            n_bins=(np.nanmax(energy) - np.nanmin(energy)) // 1,
-            uncal_is_int=True,
-        )
-        if params[0] is None or np.isnan(params[0]).any():
+        mu, sigma, height = pgc.hpge_fit_E_peak_tops(
+                hist,
+                bins,
+                var,
+                [peak_loc],
+                n_to_fit=7,
+            )[0][0]
+        
+        if mu is None or np.isnan(mu):
+            raise RuntimeError
             log.debug("Fit failed, using max guess")
+            rough_adc_to_kev = peak / peak_loc
+            e_lower_lim = peak_loc - (1.5 * kev_width[0]) / rough_adc_to_kev
+            e_upper_lim = peak_loc + (1.5 * kev_width[1]) / rough_adc_to_kev
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
             )
-            params = [[0, pgh.get_bin_centers(bins)[np.nanargmax(hist)], 0, 0, 0, 0]]
-        updated_adc_to_kev = peak / params[0][1]
-        e_lower_lim = params[0][1] - (kev_width[0]) / updated_adc_to_kev
-        e_upper_lim = params[0][1] + (kev_width[1]) / updated_adc_to_kev
+            params = [pgh.get_bin_centers(bins)[np.nanargmax(hist)], 0, 0]
+
+        updated_adc_to_kev = peak / mu
+        e_lower_lim = mu - (kev_width[0]) / updated_adc_to_kev
+        e_upper_lim = mu + (kev_width[1]) / updated_adc_to_kev
         log.info(f"lower lim is :{e_lower_lim}, upper lim is {e_upper_lim}")
+
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
         out_events.append(idxs[final_events[-1]])
+
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
         if len(peak_ids[final_mask]) < 0.5 * n_events:
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
+
     out_events = np.unique(np.concatenate(out_events))
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
@@ -1193,16 +979,19 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         "n_sig_err": n_sig_err,
     }
 
-
 def single_peak_fom(data, kwarg_dict):
     peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
-
+    if "frac_max" in kwarg_dict:
+        frac_max = kwarg_dict["frac_max"]
+    else:
+        frac_max = 0.2
     out_dict = fom_FWHM_with_dt_corr_fit(
-        data, peak_dicts[0], ctc_param, idxs=idx_list[0], display=0
+        data, peak_dicts[0], ctc_param, idxs=idx_list[0], frac_max = frac_max, display=0
     )
+    
     out_dict["y_val"] = out_dict["fwhm"]
     out_dict["y_err"] = out_dict["fwhm_err"]
     return out_dict
@@ -1215,8 +1004,13 @@ def new_fom(data, kwarg_dict):
 
     peak_dicts = kwarg_dict["peak_dicts"]
 
+    if "frac_max" in kwarg_dict:
+        frac_max = kwarg_dict["frac_max"]
+    else:
+        frac_max = 0.2
+
     out_dict = fom_FWHM_with_dt_corr_fit(
-        data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], display=0
+        data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], frac_max = frac_max, display=0
     )
     alpha = out_dict["alpha"]
     log.info(alpha)
@@ -1226,12 +1020,8 @@ def new_fom(data, kwarg_dict):
     n_sig_err = []
     for i, peak in enumerate(peaks[:-1]):
         out_peak_dict = fom_FWHM(
-            data, peak_dicts[i], ctc_param, alpha, idxs=idx_list[i], display=0
+            data, peak_dicts[i], ctc_param, alpha, idxs=idx_list[i], frac_max = frac_max, display=0
         )
-        # n_sig_minimum = peak_dicts[i]["n_sig_minimum"]
-        # if peak_dict["n_sig"]<n_sig_minimum:
-        #    out_peak_dict['fwhm'] = np.nan
-        #   out_peak_dict['fwhm_err'] = np.nan
         fwhms.append(out_peak_dict["fwhm"])
         fwhm_errs.append(out_peak_dict["fwhm_err"])
         n_sig.append(out_peak_dict["n_sig"])
@@ -1262,23 +1052,37 @@ def new_fom(data, kwarg_dict):
 
 
 OptimiserDimension = namedtuple(
-    "OptimiserDimension", "name parameter min_val max_val rounding unit"
+    "OptimiserDimension", "name parameter min_val max_val round unit"
 )
 
 
 class BayesianOptimizer:
+
+    """
+    Bayesian optimiser uses Gaussian Process Regressor from sklearn to fit kernel
+    to data, takes in a series of init samples for this fit and then calculates
+    the next point using the acquisition function specified.
+    """
+
+
     np.random.seed(55)
     lambda_param = 0.01
     eta_param = 0
-    # FIXME: the following throws a TypeError
-    # kernel=ConstantKernel(1.0, constant_value_bounds="fixed") * RBF(1, length_scale_bounds="fixed") #+ WhiteKernel(noise_level=0.0111)
 
-    def __init__(self, acq_func, batch_size, kernel=None):
+    def __init__(self, acq_func, batch_size, kernel=None, sampling_rate=None):
         self.dims = []
         self.current_iter = 0
 
         self.batch_size = batch_size
         self.iters = 0
+        
+        if isinstance(sampling_rate, str):
+            self.sampling_rate = ureg.Quantity(sampling_rate)
+        elif isinstance(sampling_rate, pint.Quantity):
+            self.sampling_rate = sampling_rate
+        else:
+            if sampling_rate is not None:
+                raise TypeError("Unknown type for sampling rate")
 
         self.gauss_pr = GaussianProcessRegressor(kernel=kernel)
         self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
@@ -1291,9 +1095,13 @@ class BayesianOptimizer:
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
 
-    def add_dimension(self, name, parameter, min_val, max_val, rounding=2, unit=None):
+    def add_dimension(self, name, parameter, min_val, max_val, round_to_samples=False, unit=None):
+        if round_to_samples is True and self.sampling_rate is None:
+            raise ValueError("Must provide sampling rate to round to samples")
+        if unit is not None:
+            unit = ureg.Quantity(unit)
         self.dims.append(
-            OptimiserDimension(name, parameter, min_val, max_val, rounding, unit)
+            OptimiserDimension(name, parameter, min_val, max_val, round_to_samples, unit)
         )
 
     def get_n_dimensions(self):
@@ -1347,29 +1155,38 @@ class BayesianOptimizer:
             )
             if response.fun < min_ei:
                 min_ei = response.fun
-                x_optimal = [
-                    y.round(dim.rounding) for y, dim in zip(response.x, self.dims)
-                ]
-        if x_optimal in self.x_init and self.iters < 5:
-            if self.iters < 5:
-                self.iters += 1
-                x_optimal, min_ei = self._get_next_probable_point()
-            else:
-                perturb = np.random.uniform(
-                    np.array([(dim.max_val - dim.min_val) / 100 for dim in self.dims]),
-                    np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
-                    (1, len(self.dims)),
-                )
-                x_optimal += perturb
-                x_optimal = [
-                    y.round(dim.rounding) for y, dim in zip(x_optimal[0], self.dims)
-                ]
-                for i, y in enumerate(x_optimal):
-                    if y > self.dims[i].max_val:
-                        x_optimal[i] = self.dims[i].max_val
-                    elif y < self.dims[i].min_val:
-                        x_optimal[i] = self.dims[i].min_val
-
+                x_optimal = []
+                for y, dim in zip(response.x, self.dims):
+                    if dim.round is True and dim.unit is not None:
+                        # round so samples is integer
+                        
+                        x_optimal.append(
+                        float(round((y*(dim.unit / self.sampling_rate)).to("dimensionless"),0)*(self.sampling_rate/dim.unit))
+                    )
+                    else:
+                        x_optimal.append(y)
+        if x_optimal in self.x_init:
+            perturb = np.random.uniform(
+                -np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                (1, len(self.dims)),
+            )
+            x_optimal += perturb
+            new_x_optimal = []
+            for y, dim in zip(x_optimal[0], self.dims):
+                if dim.round is True and dim.unit is not None:
+                    # round so samples is integer
+                    new_x_optimal.append(
+                    float(round((y*(dim.unit / self.sampling_rate)).to("dimensionless"),0)*(self.sampling_rate/dim.unit))
+                    )
+                else:
+                    new_x_optimal.append(y)
+            x_optimal = new_x_optimal
+            for i, y in enumerate(x_optimal):
+                if y > self.dims[i].max_val:
+                    x_optimal[i] = self.dims[i].max_val
+                elif y < self.dims[i].min_val:
+                    x_optimal[i] = self.dims[i].min_val
         return x_optimal, min_ei
 
     def _extend_prior_with_posterior_data(self, x, y, yerr):
@@ -1400,7 +1217,9 @@ class BayesianOptimizer:
         for i, val in enumerate(x_new):
             name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             if unit is not None:
-                value_str = f"{val}*{unit}"
+                value_str = f"{val}*{unit.units:~}"
+                if "µ" in value_str:
+                    value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
             if name not in db_dict.keys():
@@ -1448,7 +1267,12 @@ class BayesianOptimizer:
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
             name, parameter, min_val, max_val, rounding, unit = self.dims[i]
-            value_str = f"{val}*{unit}"
+            if unit is not None:
+                value_str = f"{val}*{unit.units:~}"
+                if "µ" in value_str:
+                    value_str.replace("µ", "u")
+            else:
+                value_str = f"{val}"
             if name not in out_dict.keys():
                 out_dict[name] = {parameter: value_str}
             else:
