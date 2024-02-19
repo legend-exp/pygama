@@ -732,6 +732,19 @@ def unbinned_aoe_fit(
     """
     Fitting function for A/E, first fits just a gaussian before using the full pdf to fit
     if fails will return NaN values
+
+    Args:
+    aoe: np.array
+        A/E values
+    pdf: PDF
+        PDF to fit to
+    display: int
+        Level of display
+    verbose: bool
+        Verbose output
+    
+    Returns: tuple(np.array, np.array)
+        Tuple of fit values and errors
     """
     hist, bins, var = pgh.get_hist(aoe, bins=500)
 
@@ -857,6 +870,21 @@ def unbinned_aoe_fit(
 
 
 def fit_time_means(tstamps, means, reses):
+    """
+    Fit the time dependence of the means of the A/E distribution
+
+    Args:
+
+    tstamps: np.array
+        Timestamps of the data
+    means: np.array
+        Means of the A/E distribution
+    reses: np.array
+        Resolutions of the A/E distribution
+
+    Returns: dict
+        Dictionary of the time dependence of the means        
+    """
     out_dict = {}
     current_tstamps = []
     current_means = []
