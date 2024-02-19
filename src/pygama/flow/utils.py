@@ -124,10 +124,8 @@ def fill_col_dict(
                     )
                 try:
                     col_dict[col][tcm_idx] = tier_table[col].nda
-                except BaseException:
-                    raise ValueError(
-                        f"self.aoesa_to_vov is False but {col} is a jagged array"
-                    )
+                except BaseException as e:
+                    raise e(f"self.aoesa_to_vov is False but {col} is a jagged array")
         elif isinstance(tier_table[col], VectorOfVectors):
             # Allocate memory for column for all channels
             if col not in col_dict.keys():
