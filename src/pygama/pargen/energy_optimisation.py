@@ -245,6 +245,7 @@ def get_peak_fwhm_with_dt_corr(
     guess=None,
     kev=False,
     frac_max=0.5,
+    allow_tail_drop=False,
     display=0,
 ):
     """
@@ -280,7 +281,7 @@ def get_peak_fwhm_with_dt_corr(
     tol = None
     try:
         if display > 0:
-            energy_pars, energy_err, cov, chisqr, func, gof_func, _, _ = pgc.unbinned_staged_energy_fit(
+            energy_pars, energy_err, cov, chisqr, func, gof_func, _, _,_ = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
                 func=func,
                 gof_func=gof_func,
@@ -289,7 +290,7 @@ def get_peak_fwhm_with_dt_corr(
                 guess_func = simple_guess,
                 tol=tol,
                 guess=guess,
-                allow_tail_drop=False,
+                allow_tail_drop=allow_tail_drop,
                 verbose=True,
                 display=display,
             )
@@ -305,15 +306,16 @@ def get_peak_fwhm_with_dt_corr(
             plt.plot(xs, gof_func(xs, *energy_pars))
             plt.show()
         else:
-            energy_pars, energy_err, cov, chisqr, func, gof_func, _,_ = pgc.unbinned_staged_energy_fit(
+            energy_pars, energy_err, cov, chisqr, func, gof_func, _,_,_ = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
                 func=func,
                 gof_func=gof_func,
                 gof_range=gof_range,
                 fit_range=fit_range,
-                guess=guess,
-                allow_tail_drop=False,
+                guess_func = simple_guess,
                 tol=tol,
+                guess=guess,
+                allow_tail_drop=allow_tail_drop,
             )
         if func == pgf.extended_radford_pdf:
             if energy_pars[3] < 1e-6 and energy_err[3] < 1e-6:
@@ -386,7 +388,7 @@ def get_peak_fwhm_with_dt_corr(
             plt.show()
 
     except:
-        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, None
+        return np.nan, np.nan, np.nan, np.nan, (np.nan,np.nan), np.nan, np.nan, None
 
     if kev == True:
         fwhm *= peak / energy_pars[1]
@@ -434,9 +436,9 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
-            "alpha": np.nan,
+            "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": np.nan,
+            "chisquare": (np.nan,np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -444,9 +446,9 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
-            "alpha": np.nan,
+            "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": np.nan,
+            "chisquare": (np.nan,np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -466,7 +468,10 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             _,
             fit_pars,
         ) = get_peak_fwhm_with_dt_corr(
-            Energies, alpha, dt, func, gof_func, peak, kev_width, guess=None, frac_max = 0.5
+            Energies, alpha, dt, func, gof_func, peak, kev_width, 
+            guess=None, 
+            frac_max = 0.5,
+            allow_tail_drop=False
         )
         if not np.isnan(fwhm_o_max):
             fwhms = np.append(fwhms, fwhm_o_max)
@@ -484,9 +489,9 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
-            "alpha": np.nan,
+            "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": np.nan,
+            "chisquare": (np.nan,np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -533,9 +538,9 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
-            "alpha": np.nan,
+            "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": np.nan,
+            "chisquare": (np.nan,np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -545,9 +550,9 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
-            "alpha": np.nan,
+            "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": np.nan,
+            "chisquare": (np.nan,np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -574,6 +579,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             guess=None,
             kev=True,
             frac_max=frac_max,
+            allow_tail_drop=True,
             display=display,
         )
         if np.isnan(final_fwhm) or np.isnan(final_err):
@@ -786,6 +792,9 @@ def event_selection(
     sort_index = np.argsort(np.concatenate(masks))
     idx_list = get_wf_indexes(sort_index, idx_list_lens)
     idxs = np.array(sorted(np.concatenate(masks)))
+
+    if len(idxs) == 0:
+        raise ValueError("No events found in energy range")
 
     input_data = sto.read(f"{lh5_path}", raw_files, idx=idxs, n_rows=len(idxs))[0]
 
@@ -1219,7 +1228,7 @@ class BayesianOptimizer:
             if unit is not None:
                 value_str = f"{val}*{unit.units:~}"
                 if "µ" in value_str:
-                    value_str.replace("µ", "u")
+                    value_str = value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
             if name not in db_dict.keys():
@@ -1270,7 +1279,7 @@ class BayesianOptimizer:
             if unit is not None:
                 value_str = f"{val}*{unit.units:~}"
                 if "µ" in value_str:
-                    value_str.replace("µ", "u")
+                    value_str = value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
             if name not in out_dict.keys():
