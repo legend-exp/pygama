@@ -146,9 +146,9 @@ class calibrate_parameter:
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
     ]
     gof_funcs = [
@@ -156,9 +156,9 @@ class calibrate_parameter:
         pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
         pgf.radford_pdf,
     ]
 
@@ -174,7 +174,8 @@ class calibrate_parameter:
         simplex: bool = True,
         deg: int = 1,
         cal_energy_param: str = None,
-        tail_weight=100,
+        tail_weight=0,
+        peak_param = "mode",
     ):
         self.energy_param = energy_param
         if cal_energy_param is None:
@@ -190,6 +191,7 @@ class calibrate_parameter:
         self.plot_options = plot_options
         self.simplex = simplex
         self.tail_weight = tail_weight
+        self.peak_param = peak_param
 
     def fit_energy_res(self):
         fitted_peaks = self.results["fitted_keV"]
@@ -410,14 +412,17 @@ class calibrate_parameter:
                     "uncertainties_in_ADC": errorsi.to_dict(),
                     "p_val": pvali,
                     "fwhm_in_keV": list(fwhmi),
+                    "pk_position":(posi, posuni),
                 }
-                for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
+                for i, (Ei, parsi, errorsi, pvali, fwhmi, posi, posuni, func_i) in enumerate(
                     zip(
                         self.results["fitted_keV"],
                         self.results["pk_pars"][self.results["pk_validities"]],
                         self.results["pk_errors"][self.results["pk_validities"]],
                         self.results["pk_pvals"][self.results["pk_validities"]],
                         self.results["pk_fwhms"],
+                        self.results["pk_pos"],
+                        self.results["pk_pos_uncertainties"],
                         self.funcs,
                     )
                 )
@@ -448,6 +453,7 @@ class calibrate_parameter:
                 "eres_quadratic": fwhm_quad,
                 "fitted_peaks": self.results["fitted_keV"].tolist(),
                 "pk_fits": pk_dict,
+                "mode":self.results["mode"],
             }
 
     def calibrate_parameter(self, data):
@@ -476,12 +482,15 @@ class calibrate_parameter:
                 allowed_p_val=self.p_val,
                 simplex=self.simplex,
                 tail_weight=self.tail_weight,
+                peak_param = self.peak_param,
                 verbose=False,
             )
             pk_pars = self.results["pk_pars"]
             found_peaks = self.results["got_peaks_locs"]
             fitted_peaks = self.results["fitted_keV"]
             fitted_funcs = self.results["pk_funcs"]
+            
+            #self.pars = np.array([float(2614.5/self.results["pk_pos"][np.where(fitted_peaks==2614.5)[0]][0]),0.], dtype="float")
             if self.pars is None:
                 raise ValueError
 
@@ -527,10 +536,13 @@ class calibrate_parameter:
                     allowed_p_val=self.p_val,
                     simplex=self.simplex,
                     tail_weight=self.tail_weight,
+                    peak_param = self.peak_param,
                     verbose=False,
                 )
+    
                 fitted_peaks = self.results["fitted_keV"]
                 fitted_funcs = self.results["pk_funcs"]
+                #self.pars = np.array([float(2614.5/self.results["pk_pos"][np.where(fitted_peaks==2614.5)[0]][0]),0.], dtype="float")
 
                 log.debug("Calibrated found")
                 log.info(f"Calibration pars are {self.pars}")
@@ -551,6 +563,8 @@ class calibrate_parameter:
 
                 log.error(f"Calibration failed completely for {self.energy_param}")
         else:
+            
+
             log.debug("Calibrated found")
             log.info(f"Calibration pars are {self.pars}")
         if ~np.isnan(self.pars).all():
@@ -626,16 +640,16 @@ class high_stats_fitting(calibrate_parameter):
         0.2,
     ]
     funcs = [
-        pgf.extended_gauss_step_pdf,  # probably should be gauss on exp
-        pgf.extended_gauss_step_pdf,
+        pgf.extended_radford_pdf,  # probably should be gauss on exp
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
         pgf.extended_radford_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
         pgf.extended_radford_pdf,
@@ -645,16 +659,16 @@ class high_stats_fitting(calibrate_parameter):
         pgf.extended_gauss_step_pdf,
     ]
     gof_funcs = [
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
         pgf.radford_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
         pgf.radford_pdf,
@@ -672,10 +686,11 @@ class high_stats_fitting(calibrate_parameter):
         p_val,
         plot_options={},
         simplex=False,
-        tail_weight=20,
+        tail_weight=0,
         cal_energy_param=None,
         deg=2,
         fixed=None,
+        peak_param = "mode",
     ):
         self.energy_param = energy_param
         if cal_energy_param is None:
@@ -695,6 +710,7 @@ class high_stats_fitting(calibrate_parameter):
         self.tail_weight = tail_weight
         self.fixed = fixed
         self.deg = deg
+        self.peak_param = peak_param
 
     def get_results_dict(self, data):
         if self.results:
@@ -715,14 +731,17 @@ class high_stats_fitting(calibrate_parameter):
                     "uncertainties_in_keV": errorsi.to_dict(),
                     "p_val": pvali,
                     "fwhm_in_keV": list(fwhmi),
+                    "pk_position":(posi, posuni),
                 }
-                for i, (Ei, parsi, errorsi, pvali, fwhmi, func_i) in enumerate(
+                for i, (Ei, parsi, errorsi, pvali, fwhmi,  posi, posuni, func_i) in enumerate(
                     zip(
                         self.results["fitted_keV"],
                         self.results["pk_pars"][self.results["pk_validities"]],
                         self.results["pk_errors"][self.results["pk_validities"]],
                         self.results["pk_pvals"][self.results["pk_validities"]],
                         self.results["pk_fwhms"],
+                        self.results["pk_pos"],
+                        self.results["pk_pos_uncertainties"],
                         self.funcs,
                     )
                 )
@@ -813,11 +832,57 @@ class high_stats_fitting(calibrate_parameter):
                     valid_pks[i] = False
             except:
                 pass
-
+        
         self.results["pk_validities"] = valid_pks
 
         # Drop failed fits
-        self.results["fitted_keV"] = np.asarray(self.glines)[valid_pks]
+        fitted_peaks_keV = self.results["fitted_keV"] = np.asarray(self.glines)[valid_pks]
+        pk_pars = np.asarray(self.results["pk_pars"], dtype=object)[
+                valid_pks
+            ]  # ragged
+        pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
+        pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
+        pk_funcs = np.asarray(self.funcs)[valid_pks]
+
+        log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
+        for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
+            zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs, pk_funcs)
+        ):
+            varnames = func_i.__code__.co_varnames[1 : len(pk_pars[-1]) + 1]
+            parsi = np.asarray(parsi, dtype=float)
+            errorsi = np.asarray(errorsi, dtype=float)
+            covsi = np.asarray(covsi, dtype=float)
+
+            log.info(f"\tEnergy: {str(Ei)}")
+            log.info(f"\t\tParameter  |    Value +/- Sigma  ")
+            for vari, pari, errorsi in zip(varnames, parsi, errorsi):
+                log.info(f"\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}")
+
+        if self.peak_param == "mu":
+            mus = [
+                pgf.get_mu_func(func_i, pars_i, errors=errors_i)
+                for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
+            ]
+            mus, mu_vars = zip(*mus)
+            mus = np.asarray(mus)
+            mu_vars = np.asarray(mu_vars) ** 2
+        elif self.peak_param == "mode":
+            mus = [
+                pgf.get_mode_func(func_i, pars_i, cov=cov_i)
+                for func_i, pars_i, cov_i in zip(pk_funcs, pk_pars, pk_covs)
+            ]
+            mus, mu_vars = zip(*mus)
+            mus = np.asarray(mus)
+            mu_vars = np.asarray(mu_vars) ** 2
+        else:
+            log.error(f"hpge_E_calibration: mode {mode} not recognized")
+            return None, None, results
+            
+        self.results["mode"] = self.peak_param
+        self.results["pk_pos"] = mus
+        self.results["pk_pos_uncertainties"] = np.sqrt(mu_vars)
+
+        
 
     def fit_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
@@ -832,20 +897,6 @@ class high_stats_fitting(calibrate_parameter):
             pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
             pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
             pk_funcs = np.asarray(self.funcs)[valid_pks]
-
-            log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
-            for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
-                zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs, pk_funcs)
-            ):
-                varnames = func_i.__code__.co_varnames[1 : len(pk_pars[-1]) + 1]
-                parsi = np.asarray(parsi, dtype=float)
-                errorsi = np.asarray(errorsi, dtype=float)
-                covsi = np.asarray(covsi, dtype=float)
-
-                log.info(f"\tEnergy: {str(Ei)}")
-                log.info(f"\t\tParameter  |    Value +/- Sigma  ")
-                for vari, pari, errorsi in zip(varnames, parsi, errorsi):
-                    log.info(f"\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}")
 
             cal_fwhms = [
                 pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
@@ -883,30 +934,9 @@ class high_stats_fitting(calibrate_parameter):
         pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
         pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
         pk_funcs = np.asarray(self.funcs)[valid_pks]
+        mus = self.results["pk_pos"]
+        mu_vars = self.results["pk_pos_uncertainties"]
 
-        log.info(f"{len(np.where(valid_pks)[0])} peaks fitted:")
-        for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
-            zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs, pk_funcs)
-        ):
-            varnames = func_i.__code__.co_varnames[1 : len(pk_pars[-1]) + 1]
-            parsi = np.asarray(parsi, dtype=float)
-            errorsi = np.asarray(errorsi, dtype=float)
-            covsi = np.asarray(covsi, dtype=float)
-            # parsigsi = np.sqrt(covsi.diagonal())
-            log.info(f"\tEnergy: {str(Ei)}")
-            log.info(f"\t\tParameter    |    Value +/- Sigma  ")
-            for vari, pari, errorsi in zip(varnames, parsi, errorsi):
-                log.info(f"\t\t{str(vari):<12} | {pari: 8.2f} +/- {errorsi:.2f}")
-        # Drop failed fits
-
-        mus = [
-            pgf.get_mu_func(func_i, pars_i, errors=errors_i)
-            for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
-        ]
-        mus, mu_vars = zip(*mus)
-        mus = np.asarray(mus)
-        mu_errs = np.asarray(mu_vars)
-        mu_vars = np.asarray(mu_vars) ** 2
 
         try:
             pars, errs, cov = cal.hpge_fit_E_scale(
@@ -1246,8 +1276,8 @@ def bin_stability(ecal_class, data, time_slice=180, energy_range=[2585, 2660]):
 
 def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 2700]):
     valid_fits = ecal_class.results["pk_validities"]
-    pk_pars = ecal_class.results["pk_pars"][valid_fits]
-    pk_errs = ecal_class.results["pk_errors"][valid_fits]
+    mus = ecal_class.results["pk_pos"]
+    mu_errs = ecal_class.results["pk_pos_uncertainties"]
     fitted_peaks = ecal_class.results["got_peaks_keV"]
 
     fitted_gof_funcs = []
@@ -1257,16 +1287,6 @@ def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 27
 
     fitted_gof_funcs = np.array(fitted_gof_funcs)[valid_fits]
     fitted_peaks = np.array(fitted_peaks)[valid_fits]
-
-    mus = [
-        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
-    ]
-
-    mu_errs = [
-        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_errs)
-    ]
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
