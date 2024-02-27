@@ -1115,6 +1115,31 @@ def get_peak_label(peak: float) -> str:
     elif peak == 2614.5:
         return "Tl FEP @"
 
+def update_guess(func, parguess, energies):
+    if (
+        func == pgf.gauss_step_cdf
+        or func == pgf.gauss_step_pdf
+        or func == pgf.extended_gauss_step_pdf
+    ):
+        total_events = len(energies)
+        parguess[0] = len(energies[(energies > parguess[1]- 2*parguess[2])&(energies < parguess[1]+ 2*parguess[2])])
+        parguess[3] = total_events - parguess[0]
+        return parguess
+
+    if (
+        func == pgf.radford_cdf
+        or func == pgf.radford_pdf
+        or func == pgf.extended_radford_pdf
+    ):
+        total_events = len(energies)
+        parguess[0] = len(energies[(energies > parguess[1]- 2*parguess[2])&(energies < parguess[1]+ 2*parguess[2])])
+        parguess[5] = total_events - parguess[0]
+        return parguess
+
+    else:
+        log.error(f"update_guess not implemented for {func.__name__}")
+        return parguess
+
 
 def get_survival_fraction(
     energy,
@@ -1127,6 +1152,8 @@ def get_survival_fraction(
     guess_pars_surv=None,
     dt_mask=None,
     mode="greater",
+    func = pgf.extended_radford_pdf, 
+    gof_func = pgf.radford_pdf,
     display=0,
 ):
     if dt_mask is None:
@@ -1143,11 +1170,10 @@ def get_survival_fraction(
         else:
             raise ValueError("mode not recognised")
 
-    func = pgf.extended_radford_pdf
-    gof_func=pgf.radford_pdf
+    
 
     if guess_pars_cut is None or guess_pars_surv is None:
-        (pars,errs, cov, _,func, gof_func, _,_) =  pgf.unbinned_staged_energy_fit(energy, 
+        (pars, errs, cov, _,func, gof_func, _,_,_) =  pgc.unbinned_staged_energy_fit(energy, 
                                     func,
                                     gof_func,
                                     guess_func=energy_guess,
@@ -1155,10 +1181,12 @@ def get_survival_fraction(
                                     guess_kwargs={"peak":peak,
                                                 "eres":eres_pars}
                                     )
+        
         guess_pars_cut = pars
         guess_pars_surv = pars
-
-    (cut_pars,cut_errs, cut_cov, _,_, _, _,_) = pgf.unbinned_staged_energy_fit(
+    # add update guess here for n_sig and n_bkg
+    guess_pars_cut = update_guess(func, guess_pars_cut, energy[(~nan_idxs) & (~idxs)])
+    (cut_pars,cut_errs, cut_cov, _,_, _, _,_,_) = pgc.unbinned_staged_energy_fit(
                                     energy[(~nan_idxs) & (~idxs)],
                                     func,
                                     gof_func,
@@ -1168,10 +1196,11 @@ def get_survival_fraction(
                                     fixed_func=fix_all_but_nevents,
                                     guess_kwargs={"peak":peak,
                                                 "eres":eres_pars},
+                                    lock_guess= True,
                                     allow_tail_drop=False
                                     )
-
-    (surv_pars,surv_errs, cut_cov, _,_, _, _,_) = pgf.unbinned_staged_energy_fit(
+    guess_pars_surv = update_guess(func, guess_pars_cut, energy[(~nan_idxs) & (idxs)])
+    (surv_pars,surv_errs, surv_cov, _,_, _, _,_,_) = pgc.unbinned_staged_energy_fit(
                                 energy[(~nan_idxs) & (idxs)],
                                 func,
                                 gof_func,
@@ -1181,12 +1210,13 @@ def get_survival_fraction(
                                 fixed_func=fix_all_but_nevents,
                                 guess_kwargs={"peak":peak,
                                             "eres":eres_pars},
+                                lock_guess= True,
                                 allow_tail_drop=False
                                 )
                                 
 
     ct_n = cut_pars["n_sig"]
-    ct_err = ct_errs["n_sig"]
+    ct_err = cut_errs["n_sig"]
     surv_n = surv_pars["n_sig"]
     surv_err = surv_errs["n_sig"]
 
@@ -1201,12 +1231,12 @@ def get_survival_fraction(
 def get_sf_sweep(
     energy: np.array,
     cut_param: np.array,
-    final_cut_value: float,
-    peak: float,
-    eres_pars: list,
+    final_cut_value: float=None,
+    peak: float=1592.5,
+    eres_pars: list=[1,0],
     dt_mask=None,
     cut_range=(-5, 5),
-    n_samples=51,
+    n_samples=26,
     mode="greater",
 ) -> tuple(pd.DataFrame, float, float):
     """
@@ -1218,10 +1248,25 @@ def get_sf_sweep(
 
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
     out_df = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
+
+
+    (pars,errs, cov, _,func, gof_func, _,_,_) =  pgc.unbinned_staged_energy_fit(energy, 
+                                    pgf.extended_radford_pdf,
+                                    pgf.radford_pdf,
+                                    guess_func=energy_guess,
+                                    bounds_func=get_bounds,
+                                    guess_kwargs={"peak":peak,
+                                                "eres":eres_pars}
+                                    )
+    guess_pars_cut = pars
+    guess_pars_surv = pars
+
     for cut_val in cut_vals:
         try:
             sf, err, cut_pars, surv_pars = get_survival_fraction(
-                energy, cut_param, cut_val, peak, eres_pars, dt_mask=dt_mask, mode=mode
+                energy, cut_param, cut_val, peak, eres_pars, dt_mask=dt_mask, mode=mode,
+                guess_pars_cut=guess_pars_cut, guess_pars_surv=guess_pars_surv,
+                func = func, gof_func = gof_func
             )
             out_df = pd.concat(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
@@ -1229,13 +1274,17 @@ def get_sf_sweep(
         except:
             pass
     out_df.set_index("cut_val", inplace=True)
-    sf, sf_err, cut_pars, surv_pars = get_survival_fraction(
-        energy, cut_param, final_cut_value, peak, eres_pars, dt_mask=dt_mask, mode=mode
-    )
+    if final_cut_value is not None:
+        sf, sf_err, cut_pars, surv_pars = get_survival_fraction(
+            energy, cut_param, final_cut_value, peak, eres_pars, dt_mask=dt_mask, mode=mode,
+            guess_pars_cut=guess_pars_cut, guess_pars_surv=guess_pars_surv,
+            func = func, gof_func = gof_func
+        )
+    else:
+        sf= None
+        sf_err = None
     return (
-        out_df.query(
-            f'sf_err<5*{np.nanpercentile(out_df["sf_err"], 50)}& sf_err==sf_err & sf<=100'
-        ),
+        out_df,
         sf,
         sf_err,
     )
@@ -1505,6 +1554,7 @@ class cal_aoe:
         self,
         data: pd.DataFrame,
         aoe_param,
+        out_param = "AoE_DTcorr",
         display: int = 0,
     ):
         """
@@ -1590,7 +1640,7 @@ class cal_aoe:
                 self.alpha = 0
             self.dt_res_dict["alpha"] = self.alpha
             log.info(f"dtcorr successful alpha:{self.alpha}")
-            data["AoE_DTcorr"] = data[aoe_param] * (
+            data[out_param] = data[aoe_param] * (
                 1 + self.alpha * data[self.dt_param]
             )
         except:
@@ -1599,14 +1649,16 @@ class cal_aoe:
 
         self.update_cal_dicts(
             {
-                "AoE_DTcorr": {
+                out_param : {
                     "expression": f"{aoe_param}*(1+a*{self.dt_param})",
                     "parameters": {"a": self.alpha},
                 }
             }
         )
 
-    def AoEcorrection(self, data: pd.DataFrame, aoe_param: str, display: int = 0):
+    def AoEcorrection(self, data: pd.DataFrame, aoe_param: str, 
+        corrected_param="AoE_Corrected",
+        classifier_param="AoE_Classifier", display: int = 0):
         """
         Calculates the corrections needed for the energy dependence of the A/E.
         Does this by fitting the compton continuum in slices and then applies fits to the centroid and variance.
@@ -1791,10 +1843,10 @@ class cal_aoe:
             except:
                 dep_pars, dep_err, _ = return_nans(self.pdf)
 
-            data["AoE_Corrected"] = data[aoe_param] / self.mean_func.func(
+            data[corrected_param] = data[aoe_param] / self.mean_func.func(
                 data[self.cal_energy_param], *mu_pars
             )
-            data["AoE_Classifier"] = (data["AoE_Corrected"] - 1) / self.sigma_func.func(
+            data[classifier_param] = (data[corrected_param] - 1) / self.sigma_func.func(
                 data[self.cal_energy_param], *sig_pars
             )
             log.info("Finished A/E energy successful")
@@ -1837,12 +1889,12 @@ class cal_aoe:
 
         self.update_cal_dicts(
             {
-                "AoE_Corrected": {
+                corrected_param: {
                     "expression": f"{aoe_param}/({self.mean_func.string_func(self.cal_energy_param)})",
                     "parameters": mu_pars.to_dict(),
                 },
-                "AoE_Classifier": {
-                    "expression": f"(AoE_Corrected-1)/({self.sigma_func.string_func(self.cal_energy_param)})",
+                classifier_param: {
+                    "expression": f"({corrected_param}-1)/({self.sigma_func.string_func(self.cal_energy_param)})",
                     "parameters": sig_pars.to_dict(),
                 },
             }
@@ -1855,6 +1907,7 @@ class cal_aoe:
         peak: float,
         ranges: tuple,
         dep_acc: float,
+        output_cut_param:str="AoE_Low_Cut",
         display: int = 1,
     ):
         """
@@ -1877,34 +1930,18 @@ class cal_aoe:
             #     peak_aoe = (select_df[aoe_param] / dep_mu(select_df[self.cal_energy_param])) - 1
             #     peak_aoe = select_df[aoe_param] / sig_func(select_df[self.cal_energy_param])
 
-            cut_vals = np.arange(-8, 0, 0.2)
-            sfs = []
-            sf_errs = []
-            for cut_val in cut_vals:
-                sf, err, cut_pars, surv_pars = get_survival_fraction(
-                    select_df[self.cal_energy_param].to_numpy(),
-                    select_df[aoe_param].to_numpy(),
-                    cut_val,
-                    peak,
-                    self.eres_func(peak),
-                    guess_pars_cut=None,
-                    guess_pars_surv=None,
-                )
-                self.cut_fits = pd.concat(
-                    [
-                        self.cut_fits,
-                        pd.DataFrame(
-                            [
-                                {
-                                    "cut_val": cut_val,
-                                    "sf": sf,
-                                    "sf_err": err,
-                                }
-                            ]
-                        ),
-                    ]
-                )
-            self.cut_fits.set_index("cut_val", inplace=True)
+            self.cut_fits, _,_ = get_sf_sweep(
+                select_df[self.cal_energy_param],
+                select_df[aoe_param],
+                None,
+                peak,
+                self.eres_func(peak),
+                dt_mask=None,
+                cut_range=(-8, 0),
+                n_samples=40,
+                mode="greater",
+            )
+
             valid_fits = self.cut_fits.query(
                 f'sf_err<{(1.5 * np.nanpercentile(self.cut_fits["sf_err"],85))}&sf_err==sf_err'
             )
@@ -1935,19 +1972,16 @@ class cal_aoe:
             self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * self.dep_acc)))], 3)
             log.info(f"Cut found at {self.low_cut_val}")
 
-            data["AoE_Low_Cut"] = data[aoe_param] > self.low_cut_val
+            data[output_cut_param] = data[aoe_param] > self.low_cut_val
             if self.dt_cut_param is not None:
-                data["AoE_Low_Cut"] = data["AoE_Low_Cut"] & (data[self.dt_cut_param])
-            data["AoE_Double_Sided_Cut"] = data["AoE_Low_Cut"] & (
-                data[aoe_param] < self.high_cut_val
-            )
+                data[output_cut_param] = data[output_cut_param] & (data[self.dt_cut_param])
         except:
             log.error("A/E cut determination failed")
             self.low_cut_val = np.nan
         if self.dt_cut_param is not None and self.dt_cut_hard == True:
             self.update_cal_dicts(
                 {
-                    "AoE_Low_Cut": {
+                    output_cut_param : {
                         "expression": f"({aoe_param}>a) & ({self.dt_cut_param})",
                         "parameters": {"a": self.low_cut_val},
                     }
@@ -1956,20 +1990,160 @@ class cal_aoe:
         else:
             self.update_cal_dicts(
                 {
-                    "AoE_Low_Cut": {
+                    output_cut_param: {
                         "expression": f"({aoe_param}>a)",
                         "parameters": {"a": self.low_cut_val},
                     }
                 }
             )
-        self.update_cal_dicts(
-            {
-                "AoE_Double_Sided_Cut": {
-                    "expression": f"(a>{aoe_param}) & (AoE_Low_Cut)",
-                    "parameters": {"a": self.high_cut_val},
-                }
-            }
-        )
+    
+    def calculate_survival_fractions_sweep(self, data, aoe_param, peaks, fit_widths, nsamples=26, cut_range=(-5, 5), mode="greater"):
+        sfs = pd.DataFrame(columns=["peak", "sf", "sf_err"])
+        peak_dfs = {}
+
+        for i, peak in enumerate(peaks_of_interest):
+            try:
+                select_df = data.query(
+                    f"{self.selection_string}&{aoe_param}=={aoe_param}"
+                )
+                fwhm = self.eres_func(peak)
+                if peak == 2039:
+                    emin = 2 * fwhm
+                    emax = 2 * fwhm
+                    peak_df = select_df.query(
+                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                    )
+
+                    cut_df, sf, sf_err = compton_sf_sweep(
+                        peak_df[self.cal_energy_param].to_numpy(),
+                        peak_df[aoe_param].to_numpy(),
+                        self.low_cut_val,
+                        peak,
+                        fwhm,
+                        cut_range=cut_range,
+                        nsamples=nsamples,
+                        mode=mode,
+                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
+                        if self.dt_cut_param is not None
+                        else None,
+                    )
+                    sfs = pd.concat(
+                        [
+                            sfs,
+                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                        ]
+                    )
+                    peak_dfs[peak] = cut_df
+                else:
+                    emin, emax = fit_widths[i]
+                    peak_df = select_df.query(
+                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                    )
+                    cut_df, sf, sf_err = get_sf_sweep(
+                        peak_df[self.cal_energy_param].to_numpy(),
+                        peak_df[aoe_param].to_numpy(),
+                        self.low_cut_val,
+                        peak,
+                        fwhm,
+                        cut_range=cut_range,
+                        nsamples=nsamples,
+                        mode=mode,
+                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
+                        if self.dt_cut_param is not None
+                        else None,
+                    )
+
+                    cut_df = cut_df.query(
+                        f'sf_err<5*{np.nanpercentile(cut_df["sf_err"], 50)}& sf_err==sf_err & sf<=100'
+                    )
+
+                    sfs = pd.concat(
+                        [
+                            sfs,
+                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                        ]
+                    )
+                    peak_dfs[peak] = cut_df
+                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
+            except:
+                sfs = pd.concat(
+                    [
+                        sfs,
+                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
+                    ]
+                )
+                log.error(
+                    f"A/E Survival fraction sweep determination failed for {peak} peak"
+                )
+        sfs.set_index("peak", inplace=True)
+        return sfs, peak_dfs
+
+    def calculate_survival_fractions(self, data, aoe_param, peaks, fit_widths, mode="greater"):
+        sfs = pd.DataFrame(columns=["peak", "sf", "sf_err"])
+        for i, peak in enumerate(peaks_of_interest):
+            fwhm = self.eres_func(peak)
+            try:
+                if peak == 2039:
+                    emin = 2 * fwhm
+                    emax = 2 * fwhm
+                    peak_df = data.query(
+                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                    )
+
+                    sf_dict = compton_sf(
+                        peak_df[aoe_param].to_numpy(),
+                        self.low_cut_val,
+                        self.high_cut_val,
+                        mode=mode,
+                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
+                        if self.dt_cut_param is not None
+                        else None,
+                    )
+                    sf = sf_dict["sf"]
+                    sf_err = sf_dict["sf_err"]
+                    sfs = pd.concat(
+                        [
+                            sfs,
+                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                        ]
+                    )
+                else:
+                    emin, emax = fit_widths[i]
+                    peak_df = data.query(
+                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                    )
+                    sf, sf_err, _, _ = get_survival_fraction(
+                        peak_df[self.cal_energy_param].to_numpy(),
+                        peak_df[aoe_param].to_numpy(),
+                        self.low_cut_val,
+                        peak,
+                        fwhm,
+                        mode=mode,
+                        high_cut=self.high_cut_val,
+                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
+                        if self.dt_cut_param is not None
+                        else None,
+                    )
+                    sfs = pd.concat(
+                        [
+                            sfs,
+                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                        ]
+                    )
+                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
+
+            except:
+                sfs = pd.concat(
+                    [
+                        sfs,
+                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
+                    ]
+                )
+                log.error(
+                    f"A/E survival fraction determination failed for {peak} peak"
+                )
+        sfs.set_index("peak", inplace=True)
+        return sfs
 
     def get_results_dict(self):
         return {
@@ -1993,155 +2167,72 @@ class cal_aoe:
                 plot_dict[key] = item["function"](self, data)
         return plot_dict
 
-    def calibrate(self, df, initial_aoe_param):
-        self.aoe_timecorr(df, initial_aoe_param)
+    def calibrate(
+        self, 
+        df, 
+        initial_aoe_param, 
+        peaks_of_interest= [1592.5, 1620.5, 2039, 2103.53, 2614.50], 
+        fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)], 
+        cut_peak_idx=0, 
+        dep_acc=0.9,
+        sf_nsamples=26,
+        sf_cut_range=(-5, 5),   
+        ):
+        self.aoe_timecorr(df, initial_aoe_param, output_name="AoE_Timecorr")
         log.info("Finished A/E time correction")
 
         if self.dt_corr == True:
             aoe_param = "AoE_DTcorr"
-            self.drift_time_correction(df, "AoE_Timecorr")
+            self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
         else:
             aoe_param = "AoE_Timecorr"
 
-        self.AoEcorrection(df, aoe_param)
+        self.AoEcorrection(df, aoe_param, corrected_param="AoE_Corrected", classifier_param="AoE_Classifier")
 
-        self.get_aoe_cut_fit(df, "AoE_Classifier", 1592, (40, 20), 0.9)
+        self.get_aoe_cut_fit(df, "AoE_Classifier", peaks_of_interest[cut_peak_idx], 
+        fit_widths[cut_peak_idx], dep_acc,  output_cut_param="AoE_Low_Cut" )
 
-        aoe_param = "AoE_Classifier"
-        log.info("  Compute low side survival fractions: ")
-        self.low_side_sf = pd.DataFrame(columns=["peak", "sf", "sf_err"])
-        peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
-        fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
-        self.low_side_peak_dfs = {}
+        df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
+                df["AoE_Classifier"] < self.high_cut_val
+            )
 
-        for i, peak in enumerate(peaks_of_interest):
-            try:
-                select_df = df.query(
-                    f"{self.selection_string}&{aoe_param}=={aoe_param}"
-                )
-                fwhm = self.eres_func(peak)
-                if peak == 2039:
-                    emin = 2 * fwhm
-                    emax = 2 * fwhm
-                    peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
-                    )
+        if self.dt_cut_param is not None and self.dt_cut_hard == True:
+            self.update_cal_dicts(
+                {
+                    "AoE_High_Side_Cut": {
+                        "expression": f"(a<AoE_Classifier)& ({self.dt_cut_param}",
+                        "parameters": {"a": self.high_cut_val},
+                    }
+                }
+            )
+        else:
+            self.update_cal_dicts(
+                {
+                    "AoE_High_Side_Cut": {
+                        "expression": f"(a<AoE_Classifier)",
+                        "parameters": {"a": self.high_cut_val},
+                    }
+                }
+            )
+        
+        self.update_cal_dicts(
+            {
+                "AoE_Double_Sided_Cut": {
+                    "expression": f"(a>AoE_Classifier) & (AoE_Low_Cut)",
+                    "parameters": {"a": self.high_cut_val},
+                }
+            }
+        )
 
-                    cut_df, sf, sf_err = compton_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        peak,
-                        fwhm,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
-                    )
-                    self.low_side_sf = pd.concat(
-                        [
-                            self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
-                        ]
-                    )
-                    self.low_side_peak_dfs[peak] = cut_df
-                else:
-                    emin, emax = fit_widths[i]
-                    peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
-                    )
-                    cut_df, sf, sf_err = get_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        peak,
-                        fwhm,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
-                    )
-                    self.low_side_sf = pd.concat(
-                        [
-                            self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
-                        ]
-                    )
-                    self.low_side_peak_dfs[peak] = cut_df
-                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
-            except:
-                self.low_side_sf = pd.concat(
-                    [
-                        self.low_side_sf,
-                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
-                    ]
-                )
-                log.error(
-                    f"A/E Low side Survival fraction determination failed for {peak} peak"
-                )
-        self.low_side_sf.set_index("peak", inplace=True)
+        log.info("Compute low side survival fractions: ")
+        self.low_side_sfs, self.low_side_peak_dfs = self.calculate_survival_fractions_sweep(
+            df, "AoE_Classifier", peaks_of_interest, fit_widths, 
+            nsamples=sf_nsamples, cut_range=sf_cut_range, mode="greater")
 
-        self.two_side_sf = pd.DataFrame(columns=["peak", "sf", "sf_err"])
-        log.info("Calculating 2 sided cut sfs")
-        for i, peak in enumerate(peaks_of_interest):
-            fwhm = self.eres_func(peak)
-            try:
-                if peak == 2039:
-                    emin = 2 * fwhm
-                    emax = 2 * fwhm
-                    peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
-                    )
-
-                    sf_dict = compton_sf(
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        self.high_cut_val,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
-                    )
-                    sf = sf_dict["sf"]
-                    sf_err = sf_dict["sf_err"]
-                    self.two_side_sf = pd.concat(
-                        [
-                            self.two_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
-                        ]
-                    )
-                else:
-                    emin, emax = fit_widths[i]
-                    peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
-                    )
-                    sf, sf_err, _, _ = get_survival_fraction(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        peak,
-                        fwhm,
-                        high_cut=self.high_cut_val,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
-                    )
-                    self.two_side_sf = pd.concat(
-                        [
-                            self.two_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
-                        ]
-                    )
-                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
-
-            except:
-                self.two_side_sf = pd.concat(
-                    [
-                        self.two_side_sf,
-                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
-                    ]
-                )
-                log.error(
-                    f"A/E two side Survival fraction determination failed for {peak} peak"
-                )
-        self.two_side_sf.set_index("peak", inplace=True)
+        log.info("Compute 2 side survival fractions: ")
+        self.two_side_sf = self.calculate_survival_fractions(
+            df, "AoE_Classifier", peaks_of_interest, fit_widths, mode="greater"
+            )
 
 
 def plot_aoe_mean_time(
