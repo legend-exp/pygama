@@ -1013,6 +1013,40 @@ def get_mu_func(func, pars, cov = None, errors=None):
         print(f'get_mu_func not implemented for {func.__name__}')
         return None
 
+
+def get_mode_func(func, pars, cov = None):
+
+    if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
+        return get_mu_func(func, pars, cov=cov)
+
+    elif  func == radford_cdf or func == radford_pdf or func == extended_radford_pdf:
+        
+        if len(pars) ==7:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep = pars
+            low_range = high_range  = None
+        elif len(pars) ==9:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range = pars
+        elif len(pars) ==10:
+            n_sig, mu, sigma, htail, tau, n_bkg, hstep, low_range, high_range, components = pars
+
+        mode = brentq(radford_peakshape_derivative,
+                       mu-sigma, mu+sigma,
+                       args = ([1,mu,sigma,htail,tau,0,0],1 ))
+
+        if cov is not None:
+            rng = np.random.default_rng(1)
+            par_b = rng.multivariate_normal(pars, cov, size=100)
+            modes = np.array([get_mode_func(func, p, cov = None) for p in par_b])
+            mode_err_boot = np.nanstd(modes, axis=0)
+
+            return mode, mode_err_boot
+        else:
+            return mode
+
+    else:
+        print(f'get_mode_func not implemented for {func.__name__}')
+        return None
+
 def get_fwhm_func(func, pars, cov = None):
 
     if  func == gauss_step_cdf or func == gauss_step_pdf or func == extended_gauss_step_pdf:
