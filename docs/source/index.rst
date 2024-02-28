@@ -65,5 +65,6 @@ Next steps
 
    Source Code <https://github.com/legend-exp/pygama>
    License <https://github.com/legend-exp/pygama/blob/main/LICENSE>
+   Citation <https://zenodo.org/doi/10.5281/zenodo.10614246>
    Changelog <https://github.com/legend-exp/pygama/releases>
    developer

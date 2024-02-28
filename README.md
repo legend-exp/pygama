@@ -12,6 +12,7 @@
 [![GitHub pull requests](https://img.shields.io/github/issues-pr/legend-exp/pygama?logo=github)](https://github.com/legend-exp/pygama/pulls)
 [![License](https://img.shields.io/github/license/legend-exp/pygama)](https://github.com/legend-exp/pygama/blob/main/LICENSE)
 [![Read the Docs](https://img.shields.io/readthedocs/pygama?logo=readthedocs)](https://pygama.readthedocs.io)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10614246.svg)](https://zenodo.org/doi/10.5281/zenodo.10614246)
 
 *pygama* is a Python package for:
 
@@ -28,7 +29,14 @@
 
 Check out the [online documentation](https://pygama.readthedocs.io).
 
+If you are using this software, consider
+[citing](https://zenodo.org/doi/10.5281/zenodo.10614246)!
+
 ## Related repositories
-- [legend-exp/legend-pydataobj](https://github.com/legend-exp/legend-pydataobj) → LEGEND Python Data Objects
-- [legend-exp/legend-daq2lh5](https://github.com/legend-exp/legend-daq2lh5) → Convert digitizer data to LEGEND HDF5
-- [legend-exp/dspeed](https://github.com/legend-exp/dspeed) → Fast Digital Signal Processing for particle detector signals in Python
+
+- [legend-exp/legend-pydataobj](https://github.com/legend-exp/legend-pydataobj)
+  → LEGEND Python Data Objects
+- [legend-exp/legend-daq2lh5](https://github.com/legend-exp/legend-daq2lh5)
+  → Convert digitizer data to LEGEND HDF5
+- [legend-exp/dspeed](https://github.com/legend-exp/dspeed)
+  → Fast Digital Signal Processing for particle detector signals in Python
