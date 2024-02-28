@@ -1,18 +1,19 @@
 name: pygama
 
 on:
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
       - main
-      - 'releases/**'
-  pull_request:
-  release:
+      - "releases/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
+  FORCE_COLOR: 3
   TQDM_MININTERVAL: 100
 
 jobs:
