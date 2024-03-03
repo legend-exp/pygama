@@ -26,13 +26,15 @@ log = logging.getLogger(__name__)
 
 
 def hpge_find_E_peaks(
-    hist,
-    bins,
-    var,
+    E_uncal,
+    cal_pars,
     peaks_keV,
     n_sigma=5,
     deg=0,
     Etol_keV=None,
+    uncal_is_int=False,
+    bin_width_keV=1,
+    erange=None,
     var_zero=1,
     verbose=False,
 ):
@@ -70,6 +72,23 @@ def hpge_find_E_peaks(
     pars : list of floats
         the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
     """
+
+    derco = np.polyder(np.poly1d(cal_pars)).coefficients
+    der = [pgf.poly(Ei, derco) for Ei in peaks_keV]
+    
+     # bin the histogram in ~1 keV bins for the initial rough peak search
+    if erange is None:
+        Euc_min = np.nanmin(der)  * 0.6
+        Euc_max = np.nanmax(der) * 1.1
+    else:
+        Euc_min, Euc_max = erange
+    dEuc = bin_width_keV/cal_pars[-2]
+    if uncal_is_int:
+        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
+            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
+        )
+    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
+
     # clean up var if necessary
     if np.any(var == 0):
         log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
@@ -119,14 +138,14 @@ def hpge_find_E_peaks(
 
 
 def hpge_get_E_peaks(
-    hist,
-    bins,
-    var,
+    E_uncal,
     cal_pars,
     peaks_keV,
     n_sigma=3,
     Etol_keV=5,
     var_zero=1,
+    bin_width_keV=0.2,
+    erange = None,
     verbose=False,
 ):
     """Get uncalibrated E peaks at the energies of peaks_keV
@@ -160,6 +179,28 @@ def hpge_get_E_peaks(
     pars : list of floats
         the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
     """
+
+    # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
+    if erange is None:
+        Euc_min, Euc_max = (
+            (np.poly1d(cal_pars) - i).roots
+            for i in (peaks_keV[0] * 0.9, peaks_keV[-1] * 1.1)
+        )
+        Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
+        Euc_max = Euc_max[
+            np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal) * 1.1)
+        ][0]
+    else:
+        Euc_min, Euc_max = erange
+    
+    dEuc = bin_width_keV / cal_pars[-2]
+
+    if uncal_is_int:
+        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
+            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
+        )
+    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
+
     # clean up var if necessary
     if np.any(var == 0):
         log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
@@ -1290,41 +1331,14 @@ def hpge_E_calibration(
         log.error(f"hpge_E_cal warning: invalid deg = {deg}")
         return None, None, results
 
-    # bin the histogram in ~1 keV bins for the initial rough peak search
-    Euc_min = peaks_keV[0] / guess_keV * 0.6
-    Euc_max = peaks_keV[-1] / guess_keV * 1.1
-    dEuc = 1 / guess_keV
-    if uncal_is_int:
-        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
-            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
-        )
-    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
-
     # Run the initial rough peak search
     detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(
-        hist, bins, var, peaks_keV, n_sigma=5, deg=deg
+        E_uncal, [guess_keV,0], peaks_keV, uncal_is_int=uncal_is_int, n_sigma=5, deg=deg
     )
-
-    # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
-    Euc_min, Euc_max = (
-        (np.poly1d(roughpars) - i).roots
-        for i in (peaks_keV[0] * 0.9, peaks_keV[-1] * 1.1)
-    )
-    Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
-    Euc_max = Euc_max[
-        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal) * 1.1)
-    ][0]
-    dEuc = 0.2 / roughpars[-2]
-
-    if uncal_is_int:
-        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
-            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
-        )
-    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
 
     # run peak getter after rebinning
     got_peaks_locs, got_peaks_keV, roughpars = hpge_get_E_peaks(
-        hist, bins, var, roughpars, peaks_keV, n_sigma=3
+        E_uncal, roughpars, peaks_keV, n_sigma=3, uncal_is_int=uncal_is_int,
     )
     results["got_peaks_locs"] = got_peaks_locs
     results["got_peaks_keV"] = got_peaks_keV
@@ -1334,7 +1348,6 @@ def hpge_E_calibration(
     range_keV = range_keV[got_peaks_mask]
     funcs = funcs[got_peaks_mask]
     gof_funcs = gof_funcs[got_peaks_mask]
-
 
     # Drop peaks to not be fitted
     tmp = zip(
@@ -1693,300 +1706,3 @@ def get_i_local_maxima(data, delta):
 def get_i_local_minima(data, delta):
     return get_i_local_extrema(data, delta)[1]
 
-
-def get_most_prominent_peaks(
-    energySeries, xlo, xhi, xpb, max_num_peaks=np.inf, test=False
-):
-    """find the most prominent peaks in a spectrum by looking for spikes in
-    derivative of spectrum energySeries: array of measured energies
-    max_num_peaks = maximum number of most prominent peaks to find return a
-    histogram around the most prominent peak in a spectrum of a given
-    percentage of width
-    """
-    nb = int((xhi - xlo) / xpb)
-    hist, bin_edges = np.histogram(energySeries, range=(xlo, xhi), bins=nb)
-    bin_centers = pgh.get_bin_centers(bin_edges)
-
-    # median filter along the spectrum, do this as a "baseline subtraction"
-    hist_med = medfilt(hist, 21)
-    hist = hist - hist_med
-
-    # identify peaks with a scipy function (could be improved ...)
-    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=5)
-    peak_energies = bin_centers[peak_idxs]
-
-    # pick the num_peaks most prominent peaks
-    if max_num_peaks < len(peak_energies):
-        peak_vals = hist[peak_idxs]
-        sort_idxs = np.argsort(peak_vals)
-        peak_idxs_max = peak_idxs[sort_idxs[-max_num_peaks:]]
-        peak_energies = np.sort(bin_centers[peak_idxs_max])
-
-    if test:
-        plt.plot(bin_centers, hist, ls="steps", lw=1, c="b")
-        for e in peak_energies:
-            plt.axvline(e, color="r", lw=1, alpha=0.6)
-        plt.xlabel("Energy [uncal]", ha="right", x=1)
-        plt.ylabel("Filtered Spectrum", ha="right", y=1)
-        plt.tight_layout()
-        plt.show()
-        exit()
-
-    return peak_energies
-
-
-def match_peaks(data_pks, cal_pks):
-    """
-    Match uncalibrated peaks with literature energy values.
-    """
-    from itertools import combinations
-
-    from scipy.stats import linregress
-
-    n_pks = len(cal_pks) if len(cal_pks) < len(data_pks) else len(data_pks)
-
-    cal_sets = combinations(range(len(cal_pks)), n_pks)
-    data_sets = combinations(range(len(data_pks)), n_pks)
-
-    best_err, best_m, best_b = np.inf, None, None
-    for i, cal_set in enumerate(cal_sets):
-        cal = cal_pks[list(cal_set)]  # lit energies for this set
-
-        for data_set in data_sets:
-            data = data_pks[list(data_set)]  # uncal energies for this set
-
-            m, b, _, _, _ = linregress(data, y=cal)
-            err = np.sum((cal - (m * data + b)) ** 2)
-
-            if err < best_err:
-                best_err, best_m, best_b = err, m, b
-
-    print(i, best_err)
-    print("cal:", cal)
-    print("data:", data)
-    plt.scatter(data, cal, label=f"min.err:{err:.2e}")
-    xs = np.linspace(data[0], data[-1], 10)
-    plt.plot(
-        xs, best_m * xs + best_b, c="r", label=f"y = {best_m:.2f} x + {best_b:.2f}"
-    )
-    plt.xlabel("Energy (uncal)", ha="right", x=1)
-    plt.ylabel("Energy (keV)", ha="right", y=1)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-    exit()
-
-    return best_m, best_b
-
-
-def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
-    """
-    energy_series: array of energies we want to calibrate
-    cal_peaks: array of peaks to fit
-    1.) we find the 2614 peak by looking for the tallest peak at >0.1 the max adc value
-    2.) fit that peak to get a rough guess at a calibration to find other peaks with
-    3.) fit each peak in peak_energies
-    4.) do a linear fit to the peak centroids to find a calibration
-    """
-
-    if cal_peaks is None:
-        cal_peaks = np.array(
-            [238.632, 510.770, 583.191, 727.330, 860.564, 2614.553]
-        )  # get_calibration_energies(peak_energies)
-    else:
-        cal_peaks = np.array(cal_peaks)
-
-    if len(energy_series) < 100:
-        return 1, 0
-
-    # get 10 most prominent ~high e peaks
-    max_adc = np.amax(energy_series)
-    energy_hi = energy_series  # [ (energy_series > np.percentile(energy_series, 20)) & (energy_series < np.percentile(energy_series, 99.9))]
-
-    peak_energies, peak_e_err = get_most_prominent_peaks(
-        energy_hi,
-    )
-    rough_kev_per_adc, rough_kev_offset = match_peaks(peak_energies, cal_peaks)
-    e_cal_rough = rough_kev_per_adc * energy_series + rough_kev_offset
-
-    # return rough_kev_per_adc, rough_kev_offset
-    # print(energy_series)
-    # plt.ion()
-    # plt.figure()
-    # # for peak in cal_peaks:
-    # #     plt.axvline(peak, c="r", ls=":")
-    # # energy_series.hist()
-    # # for peak in peak_energies:
-    # #      plt.axvline(peak, c="r", ls=":")
-    # #
-    # plt.hist(energy_series)
-    # # plt.hist(e_cal_rough[e_cal_rough>100], bins=2700)
-    # val = input("do i exist?")
-    # exit()
-
-    ###############################################
-    # Do a real fit to every peak in peak_energies
-    ###############################################
-    max_adc = np.amax(energy_series)
-
-    peak_num = len(cal_peaks)
-    centers = np.zeros(peak_num)
-    fit_result_map = {}
-    bin_size = 0.2  # keV
-
-    if plotFigure is not None:
-        plot_map = {}
-
-    for i, energy in enumerate(cal_peaks):
-        window_width = 10  # keV
-        window_width_in_adc = (window_width) / rough_kev_per_adc
-        energy_in_adc = (energy - rough_kev_offset) / rough_kev_per_adc
-        bin_size_adc = (bin_size) / rough_kev_per_adc
-
-        peak_vals = energy_series[
-            (energy_series > energy_in_adc - window_width_in_adc)
-            & (energy_series < energy_in_adc + window_width_in_adc)
-        ]
-
-        peak_hist, bins = np.histogram(
-            peak_vals,
-            bins=np.arange(
-                energy_in_adc - window_width_in_adc,
-                energy_in_adc + window_width_in_adc + bin_size_adc,
-                bin_size_adc,
-            ),
-        )
-        bin_centers = pgh.get_bin_centers(bins)
-        # plt.ion()
-        # plt.figure()
-        # plt.plot(bin_centers,peak_hist,  color="k", ls="steps")
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        try:
-            guess_e, guess_sigma, guess_area = get_gaussian_guess(
-                peak_hist, bin_centers
-            )
-        except IndexError:
-            print(f"\n\nIt looks like there may not be a peak at {energy} keV")
-            print("Here is a plot of the area I'm searching for a peak...")
-            plt.ion()
-            plt.figure(figsize=(12, 6))
-            plt.subplot(121)
-            plt.plot(bin_centers, peak_hist, color="k", ls="steps")
-            plt.subplot(122)
-            plt.hist(e_cal_rough, bins=2700, histtype="step")
-            input("-->press any key to continue...")
-            sys.exit()
-
-        plt.plot(
-            bin_centers, gauss(bin_centers, guess_e, guess_sigma, guess_area), color="b"
-        )
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        bounds = (
-            [0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, 0],
-            [
-                1.1 * guess_e,
-                2 * guess_sigma,
-                0.1,
-                0.75,
-                window_width_in_adc,
-                10,
-                5 * guess_area,
-            ],
-        )
-        params = fit_binned(
-            radford_peak,
-            peak_hist,
-            bin_centers,
-            [guess_e, guess_sigma, 1e-3, 0.7, 5, 0, guess_area],
-        )  # bounds=bounds)
-
-        plt.plot(bin_centers, radford_peak(bin_centers, *params), color="r")
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        fit_result_map[energy] = params
-        centers[i] = params[0]
-
-        if plotFigure is not None:
-            plot_map[energy] = (bin_centers, peak_hist)
-
-    # Do a linear fit to find the calibration
-    linear_cal = np.polyfit(centers, cal_peaks, deg=1)
-
-    if plotFigure is not None:
-        plt.figure(plotFigure.number)
-        plt.clf()
-
-        grid = gs.GridSpec(peak_num, 3)
-        ax_line = plt.subplot(grid[:, 1])
-        ax_spec = plt.subplot(grid[:, 2])
-
-        for i, energy in enumerate(cal_peaks):
-            ax_peak = plt.subplot(grid[i, 0])
-            bin_centers, peak_hist = plot_map[energy]
-            params = fit_result_map[energy]
-            ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset,
-                peak_hist,
-                ls="steps-mid",
-                color="k",
-            )
-            fit = radford_peak(bin_centers, *params)
-            ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset, fit, color="b"
-            )
-
-        ax_peak.set_xlabel("Energy [keV]")
-
-        ax_line.scatter(
-            centers,
-            cal_peaks,
-        )
-
-        x = np.arange(0, max_adc, 1)
-        ax_line.plot(x, linear_cal[0] * x + linear_cal[1])
-        ax_line.set_xlabel("ADC")
-        ax_line.set_ylabel("Energy [keV]")
-
-        energies_cal = energy_series * linear_cal[0] + linear_cal[1]
-        peak_hist, bins = np.histogram(energies_cal, bins=np.arange(0, 2700))
-        ax_spec.semilogy(pgh.get_bin_centers(bins), peak_hist, ls="steps-mid")
-        ax_spec.set_xlabel("Energy [keV]")
-
-    return linear_cal
-
-
-def get_calibration_energies(cal_type):
-    if cal_type == "th228":
-        return np.array(
-            [
-                238,
-                277,
-                300,
-                452,
-                510.77,
-                583.191,
-                727,
-                763,
-                785,
-                860.564,
-                1620,
-                2614.533,
-            ],
-            dtype="double",
-        )
-
-    elif cal_type == "uwmjlab":
-        # return np.array([239, 295, 351, 510, 583, 609, 911, 969, 1120,
-        #                  1258, 1378, 1401, 1460, 1588, 1764, 2204, 2615],
-        #                 dtype="double")
-        return np.array([239, 911, 1460, 1764, 2615], dtype="double")
-    else:
-        raise ValueError
