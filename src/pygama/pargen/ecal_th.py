@@ -121,57 +121,20 @@ class fwhm_quadratic:
 
 
 class calibrate_parameter:
-    glines = [
-        # 238.632,
-        583.191,
-        727.330,
-        860.564,
-        1592.53,
-        1620.50,
-        2103.53,
-        2614.50,
-    ]  # gamma lines used for calibration
-    range_keV = [
-        # (8, 8),
-        (20, 20),
-        (30, 30),
-        (30, 30),
-        (40, 20),
-        (20, 40),
-        (40, 40),
-        (60, 60),
-    ]  # side bands width
-    funcs = [
-        # pgf.extended_gauss_step_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-    ]
-    gof_funcs = [
-        # pgf.gauss_step_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-    ]
 
     def __init__(
         self,
         energy_param,
+        glines, 
+        range_keV,
+        funcs, 
+        gof_funcs,
         selection_string="",
         plot_options: dict = None,
         guess_keV: float | None = None,
         threshold: int = 0,
         p_val: float = 0,
         n_events: int = None,
-        simplex: bool = True,
         deg: int = 1,
         cal_energy_param: str = None,
         tail_weight=0,
@@ -182,16 +145,143 @@ class calibrate_parameter:
             self.cal_energy_param = f"{self.energy_param}_cal"
         else:
             self.cal_energy_param = cal_energy_param
-        self.selection_string = selection_string
+        
+        self.glines = glines
         self.guess_keV = guess_keV
-        self.threshold = threshold
+
+        self.range_keV = range_keV
+        self.funcs = funcs
+        self.gof_funcs = gof_funcs
         self.p_val = p_val
         self.n_events = n_events
-        self.deg = deg
-        self.plot_options = plot_options
-        self.simplex = simplex
         self.tail_weight = tail_weight
         self.peak_param = peak_param
+        
+        self.selection_string = selection_string
+        self.threshold = threshold
+        
+        self.plot_options = plot_options
+
+        self.deg = deg
+        self.peaks_keV = glines
+        self.peak_locs = []
+        self.pars = np.zeros(deg,dtype=float)
+        self.pars[-2] = guess_keV
+        self.results = {}
+
+    def gen_pars_dict(self):
+        if self.deg == 1:
+            out_dict = {
+                "expression": f"a*{self.energy_param}+b",
+                "parameters": {"a": self.pars[0], "b": self.pars[1]},
+            }
+        elif self.deg == 0:
+            out_dict = {
+                "expression": f"a*{self.energy_param}",
+                "parameters": {"a": self.pars[0]},
+            }
+        elif self.deg == 2:
+            out_dict = {
+                "expression": f"a*{self.energy_param}**2 +b*{self.energy_param}+c",
+                "parameters": {"a": self.pars[0], "b": self.pars[1], "c": self.pars[2]},
+            }
+        else:
+            out_dict = {}
+            log.warning(f"hit_dict not implemented for deg = {self.deg}")
+
+        return out_dict
+
+    def fill_plot_dict(self, data, plot_dict={}):
+        for key, item in self.plot_options.items():
+            if item["options"] is not None:
+                plot_dict[key] = item["function"](self, data, **item["options"])
+            else:
+                plot_dict[key] = item["function"](self, data)
+        return plot_dict
+
+    def fit_energy_res_curve(self, fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_func):
+        log.info(f'Running FWHM fit for : {fwhm_func.__name__}')
+        try:
+            c_lin = cost.LeastSquares(
+                    fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_func.func
+            )
+            c_lin.loss = "soft_l1"
+            m_lin = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fit_fwhms, fit_dfwhms))
+            m_lin.limits = fwhm_func.bounds()
+            m_lin.simplex()
+            m_lin.migrad()
+            m_lin.hesse()
+
+            p_val = scipy.stats.chi2.sf(m_lin.fval, len(fwhm_peaks) - len(m_lin.values))
+
+            results = {
+                "function": fwhm_func.__name__,
+                "module": fwhm_func.__module__,
+                "expression": fwhm_func.string_func("x"),
+                "parameters": m_lin.values,
+                "uncertainties": m_lin.errors,
+                "cov": m_lin.covariance,
+                "csqr": (m_lin.fval, len(fwhm_peaks) - len(m_lin.values)),
+                "p_val": p_val,
+            }
+            
+            log.info(f'FWHM fit: {results["parameters"].to_dict()}')
+            log.info(f"FWHM fit values:")
+            log.info(f"\t   Energy   | FWHM (keV)  | Predicted (keV)")
+            for i, (peak, fwhm, fwhme) in enumerate(
+                zip(fwhm_peaks, fit_fwhms, fit_dfwhms)
+            ):
+                log.info(
+                    f"\t{i}".ljust(4)
+                    + str(peak).ljust(9)
+                    + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
+                    + f"| {fwhm_func.func(peak, *results['parameters']):.2f}".ljust(
+                        5
+                    )
+                )
+
+        except RuntimeError:
+            pars, errs, cov = return_nans(fwhm_linear.func)
+            reseults = {
+                "function": fwhm_func.__name__,
+                "module": fwhm_func.__module__,
+                "expression": fwhm_func.string_func("x"),
+                "parameters": pars,
+                "uncertainties": errs,
+                "cov": cov,
+                "csqr": (np.nan, np.nan),
+                "p_val": 0,
+            }
+            log.error("FWHM fit failed to converge")
+            return results
+
+    def interpolate_energy_res(self, fwhm_peaks, fwhm_func, fwhm_results,  interp_energy_keV={"Qbb":2039.0}):
+        for key, energy in interp_energy_keV.items():
+            try:
+                if energy>np.nanmax(fwhm_peaks) or energy < np.nanmin(fwhm_peaks):
+                    raise RuntimeError("Interpolating energy out of range of fitted peaks")
+                rng = np.random.default_rng(1)
+                pars_b = rng.multivariate_normal(fwhm_results["parameters"], 
+                fwhm_results["cov"], , size=1000)
+                fits = np.array([fwhm_func.func(fwhm_peaks, *par_b) for par_b in pars_b])
+                interp_vals = np.array([fwhm_func.func(energy, *par_b) for par_b in pars_b])
+                interp_err = np.nanstd(interp_vals)
+                predicted_fwhms = fwhm_func.func(fwhm_peaks, *fwhm_results["parameters"])
+                interp_fwhm = fwhm_func.func(energy, *fwhm_results["parameters"])
+            except:
+                interp_fwhm = np.nan
+                interp_err = np.nan
+            fwhm_results= fwhm_results.update(
+                {
+                f"{key}_fwhm_in_keV": interp_fwhm,
+                f"{key}_fwhm_err_in_keV": interp_err
+                }
+                )
+            log.info(
+                f"FWHM {key} energy resolution at {energy} : {interp_fwhm:1.2f} +- {interp_err:1.2f} keV"
+            )
+        return fwhm_results
+
 
     def fit_energy_res(self):
         fitted_peaks = self.results["fitted_keV"]
@@ -199,7 +289,7 @@ class calibrate_parameter:
         dfwhms = self.results["pk_fwhms"][:, 1]
 
         #####
-        # Remove the Tl SEP and DEP from calibration if found
+        # Remove the Doppler Broadened peaks from calibration if found
         fwhm_peaks = np.array([], dtype=np.float32)
         all_peaks = np.array([], dtype=np.float32)
         indexes = []
@@ -230,231 +320,11 @@ class calibrate_parameter:
             log.info(
                 f"FWHM of {peak} keV peak is: {fit_fwhms[i]:1.2f} +- {fit_dfwhms[i]:1.2f} keV"
             )
-        try:
-            if 2614.50 not in fwhm_peaks:
-                raise RuntimeError
 
-            c_lin = cost.LeastSquares(
-                fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_linear.func
-            )
-            c_lin.loss = "soft_l1"
-            m_lin = Minuit(c_lin, *fwhm_linear.guess(fwhm_peaks, fit_fwhms, fit_dfwhms))
-            m_lin.limits = fwhm_linear.bounds()
-            m_lin.simplex()
-            m_lin.migrad()
-            m_lin.hesse()
-
-            rng = np.random.default_rng(1)
-            pars_b = rng.multivariate_normal(m_lin.values, m_lin.covariance, size=1000)
-            fits = np.array([fwhm_linear.func(fwhm_peaks, *par_b) for par_b in pars_b])
-            qbb_vals = np.array([fwhm_linear.func(2039.0, *par_b) for par_b in pars_b])
-            qbb_err = np.nanstd(qbb_vals)
-            predicted_fwhms = fwhm_linear.func(fwhm_peaks, *m_lin.values)
-            fit_qbb = fwhm_linear.func(2039.0, *m_lin.values)
-
-            p_val = scipy.stats.chi2.sf(m_lin.fval, len(fwhm_peaks) - len(m_lin.values))
-
-            self.fwhm_fit_linear = {
-                "function": fwhm_linear.__name__,
-                "module": fwhm_linear.__module__,
-                "expression": fwhm_linear.string_func("x"),
-                "Qbb_fwhm_in_keV": fit_qbb,
-                "Qbb_fwhm_err_in_keV": qbb_err,
-                "parameters": m_lin.values,
-                "uncertainties": m_lin.errors,
-                "cov": m_lin.covariance,
-                "csqr": (m_lin.fval, len(fwhm_peaks) - len(m_lin.values)),
-                "p_val": p_val,
-            }
-
-            log.info(f'FWHM linear fit: {self.fwhm_fit_linear["parameters"].to_dict()}')
-            log.info(f"FWHM fit values:")
-            log.info(f"\t   Energy   | FWHM (keV)  | Predicted (keV)")
-            for i, (peak, fwhm, fwhme) in enumerate(
-                zip(fwhm_peaks, fit_fwhms, fit_dfwhms)
-            ):
-                log.info(
-                    f"\t{i}".ljust(4)
-                    + str(peak).ljust(9)
-                    + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
-                    + f"| {fwhm_linear.func(peak, *self.fwhm_fit_linear['parameters']):.2f}".ljust(
-                        5
-                    )
-                )
-
-            log.info(
-                f"FWHM energy resolution at Qbb (linear fit): {fit_qbb:1.2f} +- {qbb_err:1.2f} keV"
-            )
-        except RuntimeError:
-            log.error(f"FWHM linear fit failed for {self.energy_param}")
-            pars, errs, cov = return_nans(fwhm_linear.func)
-            self.fwhm_fit_linear = {
-                "function": fwhm_linear.__name__,
-                "module": fwhm_linear.__module__,
-                "expression": fwhm_linear.string_func("x"),
-                "Qbb_fwhm_in_keV": np.nan,
-                "Qbb_fwhm_err_in_keV": np.nan,
-                "parameters": pars,
-                "uncertainties": errs,
-                "cov": cov,
-                "csqr": (np.nan, np.nan),
-                "p_val": 0,
-            }
-            log.error("FWHM linear fit failed to converge")
-        try:
-            if 2614.50 not in fwhm_peaks:
-                raise RuntimeError
-            c_quad = cost.LeastSquares(
-                fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_quadratic.func
-            )
-            c_quad.loss = "soft_l1"
-            m_quad = Minuit(
-                c_quad, *fwhm_quadratic.guess(fwhm_peaks, fit_fwhms, fit_dfwhms)
-            )
-            m_quad.limits = fwhm_quadratic.bounds()
-            m_quad.simplex()
-            m_quad.migrad()
-            m_quad.hesse()
-
-            rng = np.random.default_rng(1)
-            pars_b = rng.multivariate_normal(
-                m_quad.values, m_quad.covariance, size=1000
-            )
-            fits = np.array(
-                [fwhm_quadratic.func(fwhm_peaks, *par_b) for par_b in pars_b]
-            )
-            qbb_vals = np.array(
-                [fwhm_quadratic.func(2039.0, *par_b) for par_b in pars_b]
-            )
-            qbb_err = np.nanstd(qbb_vals)
-            predicted_fwhms = fwhm_quadratic.func(fwhm_peaks, *m_quad.values)
-            fit_qbb = fwhm_quadratic.func(2039.0, *m_quad.values)
-
-            p_val = scipy.stats.chi2.sf(
-                m_quad.fval, len(fwhm_peaks) - len(m_quad.values)
-            )
-
-            self.fwhm_fit_quadratic = {
-                "function": fwhm_quadratic.__name__,
-                "module": fwhm_quadratic.__module__,
-                "expression": fwhm_quadratic.string_func("x"),
-                "Qbb_fwhm_in_keV": fit_qbb,
-                "Qbb_fwhm_err_in_keV": qbb_err,
-                "parameters": m_quad.values,
-                "uncertainties": m_quad.errors,
-                "cov": m_quad.covariance,
-                "csqr": (m_quad.fval, len(fwhm_peaks) - len(m_quad.values)),
-                "p_val": p_val,
-            }
-            log.info(
-                f'FWHM quadratic fit: {self.fwhm_fit_quadratic["parameters"].to_dict()}'
-            )
-            log.info(
-                f"FWHM energy resolution at Qbb (quadratic fit): {fit_qbb:1.2f} +- {qbb_err:1.2f} keV"
-            )
-        except RuntimeError:
-            log.error(f"FWHM quadratic fit failed for {self.energy_param}")
-            pars, errs, cov = return_nans(fwhm_quadratic.func)
-            self.fwhm_fit_quadratic = {
-                "function": fwhm_quadratic.__name__,
-                "module": fwhm_quadratic.__module__,
-                "expression": fwhm_quadratic.string_func("x"),
-                "Qbb_fwhm_in_keV": np.nan,
-                "Qbb_fwhm_err_in_keV": np.nan,
-                "parameters": pars,
-                "uncertainties": errs,
-                "cov": cov,
-                "csqr": (np.nan, np.nan),
-                "p_val": 0,
-            }
-            log.error("FWHM quadratic fit failed to converge")
-
-    def gen_pars_dict(self):
-        if self.deg == 1:
-            out_dict = {
-                "expression": f"a*{self.energy_param}+b",
-                "parameters": {"a": self.pars[0], "b": self.pars[1]},
-            }
-        elif self.deg == 0:
-            out_dict = {
-                "expression": f"a*{self.energy_param}",
-                "parameters": {"a": self.pars[0]},
-            }
-        elif self.deg == 2:
-            out_dict = {
-                "expression": f"a*{self.energy_param}**2 +b*{self.energy_param}+c",
-                "parameters": {"a": self.pars[0], "b": self.pars[1], "c": self.pars[2]},
-            }
-        else:
-            out_dict = {}
-            log.warning(f"hit_dict not implemented for deg = {self.deg}")
-
-        return out_dict
-
-    def get_results_dict(self, data):
-        if np.isnan(self.pars).all():
-            return {}
-        else:
-            fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
-            fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
-            fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
-            fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
-            fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
-            fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
-
-            pk_dict = {
-                Ei: {
-                    "function": func_i.__name__,
-                    "module": func_i.__module__,
-                    "parameters_in_ADC": parsi.to_dict(),
-                    "uncertainties_in_ADC": errorsi.to_dict(),
-                    "p_val": pvali,
-                    "fwhm_in_keV": list(fwhmi),
-                    "pk_position":(posi, posuni),
-                }
-                for i, (Ei, parsi, errorsi, pvali, fwhmi, posi, posuni, func_i) in enumerate(
-                    zip(
-                        self.results["fitted_keV"],
-                        self.results["pk_pars"][self.results["pk_validities"]],
-                        self.results["pk_errors"][self.results["pk_validities"]],
-                        self.results["pk_pvals"][self.results["pk_validities"]],
-                        self.results["pk_fwhms"],
-                        self.results["pk_pos"],
-                        self.results["pk_pos_uncertainties"],
-                        self.funcs,
-                    )
-                )
-            }
-
-            return {
-                "total_fep": len(
-                    data.query(
-                        f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624"
-                    )
-                ),
-                "total_dep": len(
-                    data.query(
-                        f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597"
-                    )
-                ),
-                "pass_fep": len(
-                    data.query(
-                        f"{self.cal_energy_param}>2604&{self.cal_energy_param}<2624&{self.selection_string}"
-                    )
-                ),
-                "pass_dep": len(
-                    data.query(
-                        f"{self.cal_energy_param}>1587&{self.cal_energy_param}<1597&{self.selection_string}"
-                    )
-                ),
-                "eres_linear": fwhm_linear,
-                "eres_quadratic": fwhm_quad,
-                "fitted_peaks": self.results["fitted_keV"].tolist(),
-                "pk_fits": pk_dict,
-                "mode":self.results["mode"],
-            }
+        self.fwhm_fit_linear = self.fit_energy_res_curve(fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_fit_linear, interp_energy_keV={"Qbb":2039.0})
+        self.fwhm_fit_linear = self.interpolate_energy_res(fwhm_peaks, fwhm_fit_linear, self.fwhm_fit_linear,  interp_energy_keV={"Qbb":2039.0})
+        self.fwhm_fit_quadratic = self.fit_energy_res_curve(fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_fit_quadratic, interp_energy_keV={"Qbb":2039.0})
+        self.fwhm_fit_quadratic = self.interpolate_energy_res(fwhm_peaks, fwhm_fit_quadratic, self.fwhm_fit_quadratic,  interp_energy_keV={"Qbb":2039.0})
 
     def calibrate_parameter(self, data):
         kev_ranges = self.range_keV.copy()
@@ -480,7 +350,6 @@ class calibrate_parameter:
                 gof_funcs=self.gof_funcs,
                 n_events=self.n_events,
                 allowed_p_val=self.p_val,
-                simplex=self.simplex,
                 tail_weight=self.tail_weight,
                 peak_param = self.peak_param,
                 verbose=False,
@@ -534,7 +403,6 @@ class calibrate_parameter:
                     gof_funcs=self.gof_funcs,
                     n_events=self.n_events,
                     allowed_p_val=self.p_val,
-                    simplex=self.simplex,
                     tail_weight=self.tail_weight,
                     peak_param = self.peak_param,
                     verbose=False,
@@ -572,198 +440,14 @@ class calibrate_parameter:
         self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
         data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
 
-    def fill_plot_dict(self, data, plot_dict={}):
-        for key, item in self.plot_options.items():
-            if item["options"] is not None:
-                plot_dict[key] = item["function"](self, data, **item["options"])
-            else:
-                plot_dict[key] = item["function"](self, data)
-        return plot_dict
-
-
-class high_stats_fitting(calibrate_parameter):
-    glines = [
-        238.632,
-        511,
-        583.191,
-        727.330,
-        763,
-        785,
-        860.564,
-        893,
-        1079,
-        1513,
-        1592.53,
-        1620.50,
-        2103.53,
-        2614.50,
-        3125,
-        3198,
-        3474,
-    ]  # gamma lines used for calibration
-    range_keV = [
-        (10, 10),
-        (30, 30),
-        (30, 30),
-        (30, 30),
-        (30, 15),
-        (15, 30),
-        (30, 25),
-        (25, 30),
-        (30, 30),
-        (30, 30),
-        (30, 20),
-        (20, 30),
-        (30, 30),
-        (30, 30),
-        (30, 30),
-        (30, 30),
-        (30, 30),
-    ]  # side bands width
-    binning = [
-        0.02,
-        0.02,
-        0.02,
-        0.02,
-        0.2,
-        0.2,
-        0.02,
-        0.2,
-        0.2,
-        0.2,
-        0.1,
-        0.1,
-        0.1,
-        0.02,
-        0.2,
-        0.2,
-        0.2,
-    ]
-    funcs = [
-        pgf.extended_radford_pdf,  # probably should be gauss on exp
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_radford_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
-        pgf.extended_gauss_step_pdf,
-    ]
-    gof_funcs = [
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.radford_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
-        pgf.gauss_step_pdf,
-    ]
-
-    def __init__(
-        self,
-        energy_param,
-        selection_string,
-        threshold,
-        p_val,
-        plot_options={},
-        simplex=False,
-        tail_weight=0,
-        cal_energy_param=None,
-        deg=2,
-        fixed=None,
-        peak_param = "mode",
-    ):
-        self.energy_param = energy_param
-        if cal_energy_param is None:
-            self.cal_energy_param = energy_param
-        else:
-            self.cal_energy_param = cal_energy_param
-        self.selection_string = selection_string
-        self.threshold = threshold
-        self.p_val = p_val
-        self.plot_options = plot_options
-        self.simplex = simplex
-        self.results = {}
-        self.plot_dict = {}
-        self.n_events = None
-        self.output_dict = {}
-        self.pars = [1, 0]
-        self.tail_weight = tail_weight
-        self.fixed = fixed
-        self.deg = deg
-        self.peak_param = peak_param
-
-    def get_results_dict(self, data):
-        if self.results:
-            fwhm_linear = self.fwhm_fit_linear.copy()
-            fwhm_linear["parameters"] = fwhm_linear["parameters"].to_dict()
-            fwhm_linear["uncertainties"] = fwhm_linear["uncertainties"].to_dict()
-            fwhm_linear["cov"] = fwhm_linear["cov"].tolist()
-            fwhm_quad = self.fwhm_fit_quadratic.copy()
-            fwhm_quad["parameters"] = fwhm_quad["parameters"].to_dict()
-            fwhm_quad["uncertainties"] = fwhm_quad["uncertainties"].to_dict()
-            fwhm_quad["cov"] = fwhm_quad["cov"].tolist()
-
-            pk_dict = {
-                Ei: {
-                    "function": func_i.__name__,
-                    "module": func_i.__module__,
-                    "parameters_in_keV": parsi.to_dict(),
-                    "uncertainties_in_keV": errorsi.to_dict(),
-                    "p_val": pvali,
-                    "fwhm_in_keV": list(fwhmi),
-                    "pk_position":(posi, posuni),
-                }
-                for i, (Ei, parsi, errorsi, pvali, fwhmi,  posi, posuni, func_i) in enumerate(
-                    zip(
-                        self.results["fitted_keV"],
-                        self.results["pk_pars"][self.results["pk_validities"]],
-                        self.results["pk_errors"][self.results["pk_validities"]],
-                        self.results["pk_pvals"][self.results["pk_validities"]],
-                        self.results["pk_fwhms"],
-                        self.results["pk_pos"],
-                        self.results["pk_pos_uncertainties"],
-                        self.funcs,
-                    )
-                )
-            }
-
-            return {
-                "eres_linear": fwhm_linear,
-                "eres_quadratic": fwhm_quad,
-                "fitted_peaks": self.results["fitted_keV"].tolist(),
-                "pk_fits": pk_dict,
-            }
-        else:
-            return {}
-
-    def run_fit(self, data):
+    def run_fit(self, data, roughpars= np.array([1, 0])):
         hist, bins, var = pgh.get_hist(
             data.query(self.selection_string)[self.energy_param],
             range=(np.amin(self.glines) * 0.8, np.amax(self.glines) * 1.1),
             dx=0.5,
         )
         (got_peak_locations, got_peak_energies, roughpars) = cal.hpge_get_E_peaks(
-            hist, bins, var, np.array([1, 0]), n_sigma=3, peaks_keV=self.glines
+            hist, bins, var, roughpars, n_sigma=3, peaks_keV=self.glines
         )
 
         found_mask = np.in1d(self.glines, got_peak_energies)
@@ -884,7 +568,7 @@ class high_stats_fitting(calibrate_parameter):
 
         
 
-    def fit_peaks(self, data):
+    def fit_calibrated_peaks(self, data):
         log.debug(f"Fitting {self.energy_param}")
         try:
             self.run_fit(data)
