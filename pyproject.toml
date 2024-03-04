@@ -1,13 +1,120 @@
 [build-system]
 requires = [
-    "setuptools>=42.0.0",
-    "setuptools_scm[toml]>=3.4",
+    "setuptools>=61.2",
+    "setuptools_scm[toml]>=7",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygama"
+description = "Python package for data processing and analysis"
+authors = [
+    { name = "The LEGEND collaboration" },
+]
+maintainers = [
+    { name = "The LEGEND collaboration" },
+]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX",
+    "Operating System :: Unix",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "colorlog",
+    "dspeed>=1.3",
+    "h5py>=3.2",
+    "iminuit",
+    "legend-daq2lh5>=1.2",
+    "legend-pydataobj>=1.5",
+    "matplotlib",
+    "numba!=0.53.*,!=0.54.*,!=0.57",
+    "numpy>=1.21",
+    "pandas>=1.4.4",
+    "pint",
+    "scikit-learn",
+    "scipy>=1.0.1",
+    "tables",
+    "tqdm>=4.27",
+]
+dynamic = [
+    "version",
 ]
 
-build-backend = "setuptools.build_meta"
+[project.urls]
+Homepage = "https://github.com/legend-exp/pygama"
+"Bug Tracker" = "https://github.com/legend-exp/pygama/issues"
+Discussions = "https://github.com/legend-exp/pygama/discussions"
+Changelog = "https://github.com/legend-exp/pygama/releases"
 
 [tool.setuptools_scm]
 write_to = "src/pygama/_version.py"
+
+[project.optional-dependencies]
+all = [
+    "pygama[docs,test]",
+]
+docs = [
+    "furo",
+    "jupyter",
+    "myst-parser",
+    "nbsphinx",
+    "sphinx",
+    "sphinx-copybutton",
+    "sphinx-inline-tabs",
+]
+test = [
+    "pre-commit",
+    "pylegendtestdata",
+    "pytest>=6.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+pygama = "pygama.cli:pygama_cli"
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+license-files = [
+    "LICENSE",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
+namespaces = false
+
+[tool.setuptools.package-data]
+"*" = [
+    "*.json",
+]
+
+[tool.coverage]
+run.source = ["pygama"]
+report.exclude_also = [
+  '\.\.\.',
+  'if typing.TYPE_CHECKING:',
+]
+
+[tool.flake8]
+extend-ignore = "E203, E501"
+
+[tool.codespell]
+ignore-words-list = "hist, gaus, nd, ans, crate, nin, puls, spms, fom"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
