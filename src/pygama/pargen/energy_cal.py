@@ -282,7 +282,7 @@ class HPGeCalibration:
 
             etol_kev = 5.0 * (med_sigma_ratio / 0.003)
         self.pars, ixtup, iytup = poly_match(
-            detected_max_locs, peaks_kev, deg=deg, atol=etol_kev
+            detected_max_locs, peaks_kev, deg=deg, atol=etol_kev, fixed=self.fixed
         )
 
         if len(ixtup) != len(peaks_kev):
@@ -398,9 +398,23 @@ class HPGeCalibration:
         self.peaks_kev = matched_energies
 
         # Calculate updated calibration curve
-        self.pars = np.polyfit(
-            got_peak_locations, matched_energies, len(self.pars)
-        )  # change so can fix parameters
+        poly_pars = np.polyfit(got_peak_locations, matched_energies, len(self.pars))
+        c = cost.LeastSquares(
+            matched_energies,
+            got_peak_locations,
+            np.full(len(self.pars), 1),
+            poly_wrapper,
+        )
+        if self.fixed is not None:
+            for idx, val in self.fixed.items():
+                if val is True or val is None:
+                    pass
+                else:
+                    poly_pars[idx] = val
+        m = Minuit(c, *poly_pars)
+        if self.fixed is not None:
+            for idx in list(self.fixed):
+                m.fixed[idx] = True
 
         log.info(f"{len(self.peak_locs)} peaks obtained:")
         log.info("\t   Energy   | Position  ")
@@ -1903,7 +1917,7 @@ def hpge_fit_energy_cal_func(
     return pars, errs, cov
 
 
-def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
+def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
     """Find the polynomial function best matching pol(xx) = yy
 
     Finds the poly fit of xx to yy that obtains the most matches between pol(xx)
@@ -1984,7 +1998,19 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 
         # generic poly of degree >= 1
         else:
-            pars_i = np.polyfit(xx_i, yy_i, deg)
+            poly_pars = np.polyfit(xx_i, yy_i, deg)
+            c = cost.LeastSquares(xx_i, yy_i, np.full(deg, 1), poly_wrapper)
+            if fixed is not None:
+                for idx, val in fixed.items():
+                    if val is True or val is None:
+                        pass
+                    else:
+                        poly_pars[idx] = val
+            m = Minuit(c, *poly_pars)
+            if fixed is not None:
+                for idx in list(fixed):
+                    m.fixed[idx] = True
+            pars_i = m.values
             polxx = np.zeros(len(yy_i))
             polxx = pgf.poly(xx_i, pars_i)
 
