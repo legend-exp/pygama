@@ -4,34 +4,19 @@ This happens with a grid search performed on ENC peak.
 """
 
 import inspect
-import json
 import logging
-import os
-import pathlib
-import pickle as pkl
-import sys
 import time
-from collections import namedtuple
 
 import lgdo
-import matplotlib as mpl
-
-mpl.use("agg")
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import scipy.stats
-from iminuit import Minuit, cost, util
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.colors import LogNorm
 from scipy.interpolate import splev, splrep
 from scipy.optimize import minimize
 
 import pygama.math.peak_fitting as pgf
 from pygama.math.histogram import get_hist
-from pygama.pargen.cuts import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
-from pygama.pargen.energy_optimisation import index_data
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +27,6 @@ def noise_optimization(
     par_dsp: dict,
     opt_dict: dict,
     lh5_path: str,
-    verbose: bool = False,
     display: int = 0,
 ) -> dict:
     """
@@ -82,7 +66,7 @@ def noise_optimization(
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("frequency (MHz)")
-        ax.set_ylabel(f"power spectral density")
+        ax.set_ylabel("power spectral density")
 
         plot_dict = {}
         plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
@@ -91,13 +75,9 @@ def noise_optimization(
     result_dict = {}
     ene_pars = [par for par in opt_dict_par.keys()]
     log.info(f"\nRunning optimization for {ene_pars}")
-    if verbose:
-        print(f"\nRunning optimization for {ene_pars}")
     for i, x in enumerate(samples):
         x = f"{x:.1f}"
         log.info(f"\nCase {i}, par = {x} us")
-        if verbose:
-            print(f"\nCase {i}, par = {x} us")
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
             filter_par = opt_dict_par[ene_par]["filter_par"]
@@ -109,8 +89,6 @@ def noise_optimization(
         t1 = time.time()
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
         log.info(f"Time to process dsp data {time.time()-t1:.2f} s")
-        if verbose:
-            print(f"Time to process dsp data {time.time()-t1:.2f} s")
 
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
@@ -138,8 +116,6 @@ def noise_optimization(
 
     for ene_par in ene_pars:
         log.info(f"\nOptimization for {ene_par}")
-        if verbose:
-            print(f"\nOptimization for {ene_par}")
         dict_str = opt_dict_par[ene_par]["dict_str"]
         par_dict_res = result_dict[dict_str]
         sample_list = np.array([float(x) for x in result_dict[dict_str].keys()])
@@ -151,27 +127,18 @@ def noise_optimization(
         )
 
         guess_par = sample_list[np.nanargmin(fom_list)]
-        if verbose:
-            print(f"guess par: {guess_par:.2f} us")
 
         tck = splrep(sample_list, fom_list, k=opt_dict["fit_deg"])
 
-        def spl_func(x_val):
-            return splev(x_val, tck)
-
-        result = minimize(spl_func, guess_par)
+        result = minimize(splev, guess_par, args=tck)
         best_par = result.x[0]
         if (best_par < np.min(sample_list)) or (best_par > np.max(sample_list)):
             log.info(
                 f"Par from minimization not accepted {best_par:.2f}, setting par to guess"
             )
-            if verbose:
-                print(
-                    f"Par from minimization not accepted {best_par:.2f}, setting par to guess"
-                )
             best_par = guess_par
 
-        best_val = spl_func(best_par)
+        best_val = splev(best_par, tck)
 
         b_best_pars = np.zeros(opt_dict["n_bootstrap_samples"])
         for i in range(opt_dict["n_bootstrap_samples"]):
@@ -181,8 +148,6 @@ def noise_optimization(
             b_best_pars[i] = b_sample_list[np.nanargmin(b_fom_list)]
         best_par_err = np.std(b_best_pars)
         log.info(f"best par: {best_par:.2f} ± {best_par_err:.2f} us")
-        if verbose:
-            print(f"best par: {best_par:.2f} ± {best_par_err:.2f} us")
 
         par_dict_res["best_par"] = best_par
         par_dict_res["best_par_err"] = best_par_err
@@ -210,8 +175,6 @@ def noise_optimization(
                 )
                 ax.plot(bc, hist, ds="steps", label=string_res)
                 log.info(string_res)
-                if verbose:
-                    print(string_res)
             ax.set_xlabel("energy (ADC)")
             ax.set_ylabel("counts")
             ax.legend(loc="upper right")
@@ -233,7 +196,7 @@ def noise_optimization(
                 capsize=4,
                 label="samples",
             )
-            ax.plot(samples_val, spl_func(samples_val), "k:", label="fit")
+            ax.plot(samples_val, splev(samples_val, tck), "k:", label="fit")
             ax.errorbar(
                 best_par,
                 best_val,
@@ -256,8 +219,6 @@ def noise_optimization(
             plot_dict["nopt"][dict_str] = par_dict_res
 
     log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
-    if verbose:
-        print(f"Time to complete the optimization {time.time()-t0:.2f} s")
     if display > 0:
         return res_dict, plot_dict
     else:
@@ -328,7 +289,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
         fit_failed = False
 
     if fit_failed:
-        log.debug(f"Returning values from guess")
+        log.debug("Returning values from guess")
         mu = guess[0]
         mu_err = 0
         fwhm = guess[1] * 2 * np.sqrt(2 * np.log(2))
@@ -379,7 +340,7 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
         (n_sig + n_sig * toll, n_sig + n_sig * toll),
     ]
 
-    for i, par in enumerate(inspect.getfullargspec(func)[0][1:]):
+    for par in inspect.getfullargspec(func)[0][1:]:
         if par == "lower_range" or par == "upper_range":
             guess.append(np.inf)
             bounds.append(None)

@@ -1,8 +1,6 @@
 import logging
 import multiprocessing as mp
 from collections import namedtuple
-from multiprocessing import get_context
-from pprint import pprint
 
 import numpy as np
 from dspeed import build_processing_chain
@@ -114,11 +112,11 @@ class ParGrid:
         the order appearin in dims (first dimension is first for loop, etc):
         Return False when the grid runs out of indices. Otherwise returns True.
         """
-        for iD in reversed(range(self.get_n_dimensions())):
-            indices[iD] += 1
-            if indices[iD] < self.get_n_points_of_dim(iD):
+        for dim in reversed(range(self.get_n_dimensions())):
+            indices[dim] += 1
+            if indices[dim] < self.get_n_points_of_dim(dim):
                 return True
-            indices[iD] = 0
+            indices[dim] = 0
         return False
 
     # def check_indices(self, indices):
@@ -198,7 +196,7 @@ def run_grid(
     while True:
         db_dict = grid.set_dsp_pars(db_dict, iii)
         if verbosity > 1:
-            pprint(dsp_config)
+            log.debug(dsp_config)
         log.debug(grid.print_data(iii))
         grid_values[tuple(iii)] = run_one_dsp(
             tb_data,

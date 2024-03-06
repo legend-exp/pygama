@@ -1,33 +1,21 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
-import pathlib
 import re
 from datetime import datetime
-from typing import Callable
 
-import matplotlib as mpl
-
-mpl.use("agg")
-
-import lgdo.lh5_store as lh5
-import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from iminuit import Minuit, cost, util
-from matplotlib.backends.backend_pdf import PdfPages
+from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import linregress
 
 import pygama.math.histogram as pgh
 import pygama.math.peak_fitting as pgf
-import pygama.pargen.AoE_cal as aoe
-from pygama.pargen.utils import *
+import pygama.pargen.AoE_cal as AoE
 
 log = logging.getLogger(__name__)
 
@@ -220,7 +208,7 @@ def fit_time_means(tstamps, means, reses):
     return out_dict
 
 
-class cal_lq:
+class LQCal:
 
     """A class for calibrating the LQ parameter and determining the LQ cut value"""
 
@@ -231,7 +219,7 @@ class cal_lq:
         eres_func: callable,
         cdf: callable = pgf.gauss_cdf,
         selection_string: str = "is_valid_cal&is_not_pulser",
-        plot_options: dict = {},
+        plot_options: dict = None,
     ):
         """
         Parameters
@@ -257,7 +245,7 @@ class cal_lq:
         self.eres_func = eres_func
         self.cdf = cdf
         self.selection_string = selection_string
-        self.plot_options = plot_options
+        self.plot_options = plot_options if plot_options is not None else {}
 
     def update_cal_dicts(self, update_dict):
         if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
@@ -282,12 +270,6 @@ class cal_lq:
         )
         try:
             if "run_timestamp" in df:
-                tstamps = sorted(np.unique(df["run_timestamp"]))
-                means = []
-                errors = []
-                reses = []
-                res_errs = []
-                final_tstamps = []
                 for tstamp, time_df in df.groupby("run_timestamp", sort=True):
                     try:
                         pars, errs, _, _ = binned_lq_fit(
@@ -318,7 +300,7 @@ class cal_lq:
                                 ),
                             ]
                         )
-                    except:
+                    except Exception:
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -386,7 +368,7 @@ class cal_lq:
                             ),
                         ]
                     )
-                except:
+                except Exception:
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -412,7 +394,7 @@ class cal_lq:
                     }
                 )
                 log.info("LQ time correction finished")
-        except:
+        except Exception:
             log.error("LQ time correction failed")
             self.update_cal_dicts(
                 {
@@ -434,7 +416,6 @@ class cal_lq:
 
         log.info("Starting LQ drift time correction")
         try:
-            dt_dict = {}
             pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[0]
             mean = pars[0]
             sigma = pars[1]
@@ -456,7 +437,7 @@ class cal_lq:
                 df[lq_param] - df["dt_eff"] * self.dt_fit_pars[0] - self.dt_fit_pars[1]
             )
 
-        except:
+        except Exception:
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
 
@@ -491,7 +472,7 @@ class cal_lq:
 
             df["LQ_Cut"] = df[lq_param] < self.cut_val
 
-        except:
+        except Exception:
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
 
@@ -514,12 +495,15 @@ class cal_lq:
             "sfs": self.low_side_sf.to_dict("index"),
         }
 
-    def fill_plot_dict(self, data, plot_dict={}):
-        for key, item in self.plot_options.items():
-            if item["options"] is not None:
-                plot_dict[key] = item["function"](self, data, **item["options"])
-            else:
-                plot_dict[key] = item["function"](self, data)
+    def fill_plot_dict(self, data, plot_dict=None):
+        if plot_dict is not None:
+            for key, item in self.plot_options.items():
+                if item["options"] is not None:
+                    plot_dict[key] = item["function"](self, data, **item["options"])
+                else:
+                    plot_dict[key] = item["function"](self, data)
+        else:
+            plot_dict = {}
         return plot_dict
 
     def calibrate(self, df, initial_lq_param):
@@ -556,7 +540,7 @@ class cal_lq:
                         f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
                     )
 
-                    cut_df, sf, sf_err = aoe.compton_sf_sweep(
+                    cut_df, sf, sf_err = AoE.compton_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
                         peak_df[final_lq_param].to_numpy(),
                         self.cut_val,
@@ -577,7 +561,7 @@ class cal_lq:
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
                     )
-                    cut_df, sf, sf_err = aoe.get_sf_sweep(
+                    cut_df, sf, sf_err = AoE.get_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
                         peak_df[final_lq_param].to_numpy(),
                         self.cut_val,
@@ -594,7 +578,7 @@ class cal_lq:
                     )
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
-            except:
+            except Exception:
                 self.low_side_sf = pd.concat(
                     [
                         self.low_side_sf,
@@ -606,7 +590,7 @@ class cal_lq:
 
 
 def plot_lq_mean_time(
-    lq_class, data, lq_param="LQ_Timecorr", figsize=[12, 8], fontsize=12
+    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12
 ) -> plt.figure:
     """Plots the mean LQ value calculated for each given timestamp"""
 
@@ -647,18 +631,18 @@ def plot_lq_mean_time(
         color="yellow",
         alpha=0.2,
     )
-    # except:
+    # except Exception:
     #     pass
     ax.set_xlabel("time")
     ax.set_ylabel("LQ mean")
-    myFmt = mdates.DateFormatter("%b %d")
-    ax.xaxis.set_major_formatter(myFmt)
+    myfmt = mdates.DateFormatter("%b %d")
+    ax.xaxis.set_major_formatter(myfmt)
     plt.close()
     return fig
 
 
 def plot_drift_time_correction(
-    lq_class, data, lq_param="LQ_Timecorr", figsize=[12, 8], fontsize=12
+    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12
 ) -> plt.figure:
     """Plots a 2D histogram of LQ versus effective drift time in a 6 keV
     window around the DEP. Additionally plots the fit results for the
@@ -696,7 +680,7 @@ def plot_drift_time_correction(
 
         plt.title("LQ versus Drift Time for DEP")
 
-    except:
+    except Exception:
         pass
 
     plt.tight_layout()
@@ -704,7 +688,7 @@ def plot_drift_time_correction(
     return fig
 
 
-def plot_lq_cut_fit(lq_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
+def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     """Plots the final histogram of LQ values for events in the
     DEP, and the fit results used for determining the cut
     value"""
@@ -739,7 +723,7 @@ def plot_lq_cut_fit(lq_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
         ax2.set_xlabel("LQ")
         ax2.set_ylabel("residuals")
 
-    except:
+    except Exception:
         pass
 
     plt.tight_layout()
@@ -748,7 +732,7 @@ def plot_lq_cut_fit(lq_class, data, figsize=[12, 8], fontsize=12) -> plt.figure:
 
 
 def plot_survival_fraction_curves(
-    lq_class, data, figsize=[12, 8], fontsize=12
+    lq_class, data, figsize=(12, 8), fontsize=12
 ) -> plt.figure:
     """Plots the survival fraction curves as a function of
     LQ cut values for every peak of interest"""
@@ -772,11 +756,11 @@ def plot_survival_fraction_curves(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
-                    label=f'{aoe.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]["sf"]:2.1f} +/- {lq_class.low_side_sf.loc[peak]["sf_err"]:2.1f} %',
+                    label=f'{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]["sf"]:2.1f} +/- {lq_class.low_side_sf.loc[peak]["sf_err"]:2.1f} %',
                 )
-            except:
+            except Exception:
                 pass
-    except:
+    except Exception:
         pass
     vals, labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
@@ -789,7 +773,7 @@ def plot_survival_fraction_curves(
 
 
 def plot_sf_vs_energy(
-    lq_class, data, xrange=(900, 3000), n_bins=701, figsize=[12, 8], fontsize=12
+    lq_class, data, xrange=(900, 3000), n_bins=701, figsize=(12, 8), fontsize=12
 ) -> plt.figure:
     """Plots the survival fraction as a function of energy"""
 
@@ -812,7 +796,7 @@ def plot_sf_vs_energy(
         survival_fracs = counts_pass / (counts + 10**-99)
 
         plt.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
-    except:
+    except Exception:
         pass
     plt.ylim([0, 100])
     vals, labels = plt.yticks()
@@ -830,7 +814,7 @@ def plot_spectra(
     n_bins=2101,
     xrange_inset=(1580, 1640),
     n_bins_inset=200,
-    figsize=[12, 8],
+    figsize=(12, 8),
     fontsize=12,
 ) -> plt.figure:
     """Plots a 2D histogram of the LQ classifier vs calibrated energy"""
@@ -903,7 +887,7 @@ def plot_spectra(
             bins=bins,
             histtype="step",
         )
-    except:
+    except Exception:
         pass
     ax.set_xlim(xrange)
     ax.set_yscale("log")
@@ -922,7 +906,7 @@ def plot_classifier(
     yrange=(-2, 8),
     xn_bins=700,
     yn_bins=500,
-    figsize=[12, 8],
+    figsize=(12, 8),
     fontsize=12,
 ) -> plt.figure:
     plt.rcParams["figure.figsize"] = figsize
@@ -939,7 +923,7 @@ def plot_classifier(
             ],
             norm=LogNorm(),
         )
-    except:
+    except Exception:
         pass
     plt.xlabel("energy (keV)")
     plt.ylabel(lq_param)

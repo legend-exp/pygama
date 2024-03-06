@@ -4,16 +4,8 @@ This module is for extracting a single pole zero constant from the decay tail
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import pathlib
-import pickle as pkl
-from collections import OrderedDict
 
-import matplotlib as mpl
-
-mpl.use("agg")
 import lgdo
 import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
@@ -93,13 +85,11 @@ def get_decay_constant(
     """
     tau_dict = {}
 
-    pz = tau_dict.get("pz")
-
     counts, bins, var = pgh.get_hist(slopes, bins=100000, range=(-0.01, 0))
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, _ = pgf.gauss_mode_width_max(
             counts,
             bins,
             n_bins=10,
@@ -110,7 +100,7 @@ def get_decay_constant(
         if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
             raise ValueError
         high_bin = pars[0]
-    except:
+    except Exception:
         pass
     tau = round(-1 / (high_bin), 1)
 
@@ -174,7 +164,7 @@ def fom_dpz(tb_data, verbosity=0, rand_arg=None):
 
         mu = pars[0]
 
-    except:
+    except Exception:
         mu = start_bins[max_idx]
 
     return {"y_val": np.abs(mu)}
@@ -185,7 +175,6 @@ def get_dpz_consts(grid_out, opt_dict):
     for i in range(grid_out.shape[0]):
         for j in range(grid_out.shape[1]):
             std_grid[i, j] = grid_out[i, j]["y_val"]
-    min_val = np.amin(std_grid)
     min_point = np.where(std_grid == np.amin(std_grid))
 
     opt_name = list(opt_dict.keys())[0]
@@ -209,12 +198,12 @@ def get_dpz_consts(grid_out, opt_dict):
                 db_dict[opt_name].update(
                     {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
                 )
-            except:
+            except Exception:
                 db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
         else:
             try:
                 db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
-            except:
+            except Exception:
                 db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
     return db_dict
 
@@ -228,7 +217,7 @@ def dsp_preprocess_decay_const(
     wf_field: str = "waveform",
     wf_plot: str = "wf_pz",
     norm_param: str = "pz_mean",
-    cut_parameters: dict = {"bl_mean": 4, "bl_std": 4, "bl_slope": 4},
+    cut_parameters: dict = None,
 ) -> dict:
     """
     This function calculates the pole zero constant for the input data
@@ -249,11 +238,15 @@ def dsp_preprocess_decay_const(
 
     tb_out = opt.run_one_dsp(tb_data, dsp_config)
     log.debug("Processed Data")
-    cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
-    log.debug("Generated Cuts:", cut_dict)
-    idxs = cts.get_cut_indexes(tb_out, cut_dict)
-    log.debug("Applied cuts")
-    log.debug(f"{len(idxs)} events passed cuts")
+    if cut_parameters is not None:
+        cut_dict = cts.generate_cuts(tb_out, parameters=cut_parameters)
+        log.debug("Generated Cuts:", cut_dict)
+        idxs = cts.get_cut_indexes(tb_out, cut_dict)
+        log.debug("Applied cuts")
+        log.debug(f"{len(idxs)} events passed cuts")
+    else:
+        idxs = np.full(len(tb_out), True, dtype=bool)
+
     slopes = tb_out["tail_slope"].nda
     log.debug("Calculating pz constant")
     if display > 0:
@@ -262,7 +255,7 @@ def dsp_preprocess_decay_const(
         )
     else:
         tau_dict = get_decay_constant(slopes[idxs], tb_data[wf_field])
-    if double_pz == True:
+    if double_pz is True:
         log.debug("Calculating double pz constants")
         pspace = om.set_par_space(opt_dict)
         grid_out = opt.run_grid(

@@ -5,27 +5,19 @@ This module is for creating dplms dictionary for ge processing
 from __future__ import annotations
 
 import itertools
-import json
 import logging
-import os
 import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from lgdo import Array, Table, lh5
+from lgdo import Table, lh5
 from scipy.signal import convolve, convolve2d
+from scipy.stats import chi2
 
-from pygama.math.histogram import get_hist
-from pygama.math.peak_fitting import (
-    extended_gauss_step_pdf,
-    extended_radford_pdf,
-    gauss_step_pdf,
-    radford_pdf,
-)
+from pygama.math.peak_fitting import extended_gauss_step_pdf, gauss_step_pdf
 from pygama.pargen.cuts import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
-from scipy.stats import chi2
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -64,7 +56,7 @@ def dplms_ge_dict(
     """
 
     t0 = time.time()
-    log.info(f"Selecting baselines")
+    log.info("Selecting baselines")
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
     cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
@@ -92,7 +84,7 @@ def dplms_ge_dict(
     log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
     wf_field = dplms_dict["wf_field"]
-    peaks_keV = np.array(dplms_dict["peaks_keV"])
+    peaks_kev = np.array(dplms_dict["peaks_kev"])
     kev_widths = [tuple(kev_width) for kev_width in dplms_dict["kev_widths"]]
 
     log.info(f"Produce dsp data for {len(raw_cal)} events")
@@ -104,7 +96,7 @@ def dplms_ge_dict(
 
     # dictionary for peak fitting
     peak_dict = {
-        "peak": peaks_keV[-1],
+        "peak": peaks_kev[-1],
         "kev_width": kev_widths[-1],
         "parameter": ene_par,
         "func": extended_gauss_step_pdf,
@@ -131,7 +123,7 @@ def dplms_ge_dict(
         coeff_values = dict(zip(coeff_keys, values))
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
-            log_msg +=f" {key} = {value}" 
+            log_msg += f" {key} = {value}"
 
         grid_dict[i] = coeff_values
 
@@ -169,7 +161,7 @@ def dplms_ge_dict(
                 "QDrift",
                 idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
             )
-        except:
+        except Exception:
             log.debug("FWHM not calculated")
             continue
 
@@ -275,7 +267,7 @@ def dplms_ge_dict(
     log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
 
     if display > 0:
-        plot_dict = {"ref":ref,"coefficients":x}
+        plot_dict = {"ref": ref, "coefficients": x}
 
         bl_idxs = np.random.choice(len(bls), dplms_dict["n_plot"])
         bls = bls[bl_idxs]
@@ -285,7 +277,7 @@ def dplms_ge_dict(
                 ax.plot(wf, label=f"mean = {wf.mean():.1f}")
             else:
                 ax.plot(wf)
-        ax.legend( loc="upper right")
+        ax.legend(loc="upper right")
         plot_dict["bls"] = fig
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
         for ii, par in enumerate(bls_cut_pars):
@@ -304,7 +296,6 @@ def dplms_ge_dict(
         wf_idxs = np.random.choice(len(wfs), dplms_dict["n_plot"])
         wfs = wfs[wf_idxs]
         peak_pos = dsp_cal["peak_pos"].nda
-        peak_pos_neg = dsp_cal["peak_pos_neg"].nda
         centroid = dsp_cal["centroid"].nda
         risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
         rt_low = dplms_dict["rt_low"]
@@ -371,7 +362,7 @@ def dplms_ge_dict(
         plot_dict["wf_sel"] = fig
 
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
-        ax.plot(x, "r-", label=f"filter")
+        ax.plot(x, "r-", label="filter")
         ax.axhline(0, color="black", linestyle=":")
         ax.legend(loc="upper right")
         axin = ax.inset_axes([0.6, 0.1, 0.35, 0.33])
@@ -438,7 +429,6 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
     risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
 
     rt_low = dplms_dict["rt_low"]
-    rt_high = dplms_dict["rt_high"]
     peak_lim = dplms_dict["peak_lim"]
     wsize = dplms_dict["wsize"]
     bsize = dplms_dict["bsize"]
