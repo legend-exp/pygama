@@ -1,8 +1,8 @@
 """routines for automatic calibration.
 
-- hpge_find_E_peaks (Find uncalibrated E peaks whose E spacing matches the pattern in peaks_kev)
-- hpge_get_E_peaks (Get uncalibrated E peaks at the energies of peaks_kev)
-- hpge_fit_E_peaks (fits the energy peals)
+- hpge_find_energy_peaks (Find uncalibrated E peaks whose E spacing matches the pattern in peaks_kev)
+- hpge_get_energy_peaks (Get uncalibrated E peaks at the energies of peaks_kev)
+- hpge_fit_energy_peaks (fits the energy peals)
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
 import inspect
@@ -25,7 +25,7 @@ from pygama.pargen.utils import convert_to_minuit, return_nans
 log = logging.getLogger(__name__)
 
 
-class HpgeCalibration:
+class HPGeCalibration:
 
     """Calibrate HPGe data to a set of known peaks
 
@@ -98,14 +98,9 @@ class HpgeCalibration:
         guess_kev: float,
         deg: int = 1,
         cal_energy_param: str = None,
-        selection_string="",
         range_kev=None,
         funcs=None,
-        threshold: int = 0,
-        p_val: float = 0,
-        n_events: int = None,
-        tail_weight=0,
-        peak_param="mode",
+        fixed=None,
         plot_options: dict = None,
     ):
         self.energy_param = energy_param
@@ -125,6 +120,7 @@ class HpgeCalibration:
             log.error(f"hpge_E_cal warning: invalid guess_kev = {guess_kev}")
         self.pars[-2] = guess_kev
         self.results = {}
+        self.fixed = fixed
 
         self.uncal_is_int = False
         self.plot_options = plot_options
@@ -255,7 +251,7 @@ class HpgeCalibration:
 
         # clean up var if necessary
         if np.any(var == 0):
-            log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
+            log.debug(f"hpge_find_energy_peaks: replacing var zeros with {var_zero}")
             var[np.where(var == 0)] = var_zero
         peaks_kev = np.asarray(self.peaks_kev)
 
@@ -277,7 +273,7 @@ class HpgeCalibration:
                 == 0
             ):
                 log.debug(
-                    "hpge_find_E_peaks: can safely ignore previous covariance warning, not used"
+                    "hpge_find_energy_peaks: can safely ignore previous covariance warning, not used"
                 )
             pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
             med_sigma_ratio = np.median(
@@ -291,7 +287,7 @@ class HpgeCalibration:
 
         if len(ixtup) != len(peaks_kev):
             log.info(
-                f"hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_kev)} expected peaks"
+                f"hpge_find_energy_peaks: only found {len(ixtup)} of {len(peaks_kev)} expected peaks"
             )
 
         self.peak_locs = detected_max_locs[ixtup]
@@ -364,7 +360,7 @@ class HpgeCalibration:
 
         # clean up var if necessary
         if np.any(var == 0):
-            log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
+            log.debug(f"hpge_find_energy_peaks: replacing var zeros with {var_zero}")
             var[np.where(var == 0)] = var_zero
 
         # Find all maxes with > n_sigma significance
@@ -402,7 +398,9 @@ class HpgeCalibration:
         self.peaks_kev = matched_energies
 
         # Calculate updated calibration curve
-        self.pars = np.polyfit(got_peak_locations, matched_energies, len(self.pars))
+        self.pars = np.polyfit(
+            got_peak_locations, matched_energies, len(self.pars)
+        )  # change so can fix parameters
 
         log.info(f"{len(self.peak_locs)} peaks obtained:")
         log.info("\t   Energy   | Position  ")
@@ -435,6 +433,7 @@ class HpgeCalibration:
         n_events=None,
         allowed_p_val=0.05,
         tail_weight=0,
+        update_cal_pars=True,
     ):
         """Fit the Energy peaks specified using the function given
 
@@ -460,17 +459,6 @@ class HpgeCalibration:
         simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
         n_events : int number of events to use for unbinned fit
         allowed_p_val : lower limit on p_val of fit
-
-        Returns
-        -------
-        pars : list of array
-            a list of best-fit parameters for each peak fit
-        covs : list of 2D arrays
-            a list of covariance matrices for each pars
-        binwidths : list
-            a list of bin widths used for each peak fit
-        ranges: list of array
-            a list of [euc_min, euc_max] used for each peak fit
         """
 
         results_dict = {}
@@ -623,7 +611,7 @@ class HpgeCalibration:
 
                 if np.isnan(pars_i).any():
                     log.debug(
-                        f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
                     )
                     raise RuntimeError
 
@@ -648,13 +636,13 @@ class HpgeCalibration:
                     )
                 ):
                     log.debug(
-                        f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
+                        f"hpge_fit_energy_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
                     )
                     valid_pk = False
 
                 elif valid_fit is False:
                     log.debug(
-                        f"hpge_fit_E_peaks: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
+                        f"hpge_fit_energy_peaks: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
                     )
                     valid_pk = False
 
@@ -664,19 +652,19 @@ class HpgeCalibration:
                     or np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
                 ).any() or np.isnan(np.array(errs_i)[mask]).any():
                     log.debug(
-                        f"hpge_fit_E_peaks: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
+                        f"hpge_fit_energy_peaks: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
                     )
                     valid_pk = False
 
                 elif np.abs(total_events[0] - len(energies)) / len(energies) > 0.1:
                     log.debug(
-                        f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, total_events is outside limit"
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, total_events is outside limit"
                     )
                     valid_pk = False
 
                 elif p_val < allowed_p_val or np.isnan(p_val):
                     log.debug(
-                        f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
                     )
                     valid_pk = False
                 else:
@@ -684,7 +672,7 @@ class HpgeCalibration:
 
             except Exception:
                 log.debug(
-                    f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, unknown error"
+                    f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
                 )
                 valid_pk = False
                 pars_i, errs_i, cov_i = return_nans(func_i)
@@ -701,7 +689,7 @@ class HpgeCalibration:
                 "p_value": p_val,
             }
 
-        results_dict["peak_fits"] = fit_dict
+        results_dict["peak_parameters"] = fit_dict
 
         fitted_peaks_kev = np.array(
             [peak for peak in fit_dict if fit_dict[peak]["validity"]]
@@ -752,6 +740,11 @@ class HpgeCalibration:
             ]
         )
 
+        if len(pk_pars) == 0:
+            log.error("hpge_fit_energy_peaks: no peaks fitted")
+            self.update_results_dict(results_dict)
+            return
+
         # Do a second calibration to the results of the full peak fits
         # First, calculate the peak positions
         if peak_param == "mu":
@@ -769,62 +762,97 @@ class HpgeCalibration:
             mus, mu_vars = zip(*mus)
         else:
             log.error(f"hpge_E_calibration: mode {self.peak_param} not recognized")
+            self.update_results_dict(results_dict)
             return
-
-        self.peaks_kev = np.asarray(fitted_peaks_kev)
-        self.peak_locs = np.asarray(mus)
 
         results_dict["peak_param"] = peak_param
         mus = results_dict["pk_pos"] = np.asarray(mus)
         mu_vars = results_dict["pk_pos_uncertainties"] = np.asarray(mu_vars) ** 2
 
+        self.peaks_kev = np.asarray(fitted_peaks_kev)
+        self.peak_locs = np.asarray(mus)
+
+        if update_cal_pars is False:
+            self.update_results_dict(results_dict)
+            return
+
         # Now fit the E scale
         try:
             pars, errs, cov = hpge_fit_energy_scale(
-                mus, mu_vars, fitted_peaks_kev, deg=len(self.pars)
+                mus, mu_vars, fitted_peaks_kev, deg=len(self.pars), fixed=self.fixed
             )
 
             results_dict["pk_cal_pars"] = pars
             results_dict["pk_cal_errs"] = errs
             results_dict["pk_cal_cov"] = cov
+
+            # Invert the E scale fit to get a calibration function
+            self.pars, errs, cov = hpge_fit_energy_cal_func(
+                mus,
+                mu_vars,
+                fitted_peaks_kev,
+                pars,
+                deg=len(self.pars),
+                fixed=self.fixed,
+            )
         except ValueError:
             log.error("Failed to fit enough peaks to get accurate calibration")
-            return
-
-        # Invert the E scale fit to get a calibration function
-        self.pars, errs, cov = hpge_fit_energy_cal_func(
-            mus, mu_vars, fitted_peaks_kev, pars, deg=len(self.pars)
-        )
 
         self.update_results_dict(results_dict)
 
-    def get_fwhms(self, fitted_peaks_kev, pk_funcs, pk_pars, pk_covs):
-        # need to think how to handle this where do we want to get pars etc from?
+    def get_fwhms(self):
+        """
+        Updates last results dictionary with fwhms in kev
+        """
 
-        # Finally, calculate fwhms in kev
-        # Calculate the uncalibrated fwhms
-        results = {}
-        uncal_fwhms = [
-            pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
-            for func_i, pars_i, covs_i in zip(pk_funcs, pk_pars, pk_covs)
-        ]
-        uncal_fwhms, uncal_fwhm_errs = zip(*uncal_fwhms)
-        uncal_fwhms = np.asarray(uncal_fwhms)
-        uncal_fwhm_errs = np.asarray(uncal_fwhm_errs)
+        peak_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
 
-        # Calculate the calibrated fwhms
-        derco = np.polyder(np.poly1d(self.pars)).coefficients
-        der = [pgf.poly(ei, derco) for ei in fitted_peaks_kev]
-        cal_fwhms = uncal_fwhms * der
-        cal_fwhms_errs = uncal_fwhm_errs * der
-        results["pk_fwhms"] = np.asarray(
-            [(u * d, e * d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)]
+        if peak_parameters is None:
+            log.error("No peak parameters found")
+            return
+
+        cal_fwhms = []
+        cal_fwhm_errs = []
+        for peak, peak_dict in peak_parameters.items():
+            # Calculate the uncalibrated fwhm
+            uncal_fwhm, uncal_fwhm_err = [
+                pgf.get_fwhm_func(
+                    peak_dict["function"],
+                    peak_dict["parameters"],
+                    cov=peak_dict["covariance"],
+                )
+            ]
+
+            # Apply calibration
+            derco = np.polyder(np.poly1d(self.pars)).coefficients
+            der = pgf.poly(peak, derco)
+            cal_fwhm = uncal_fwhm * der
+            cal_fwhm_err = uncal_fwhm_err * der
+
+            peak_dict[peak].update(
+                {"fwhm_in_kev": cal_fwhm, "fwhm_err_in_kev": cal_fwhm_err}
+            )
+
+            if peak_dict[peak]["validity"] is True:
+                cal_fwhms.append(cal_fwhm)
+                cal_fwhm_errs.append(cal_fwhm_err)
+
+        cal_fwhms = np.array(cal_fwhms)
+        cal_fwhm_errs = np.array(cal_fwhm_errs)
+        fitted_peaks_kev = np.array(
+            [
+                peak
+                for peak, peak_dict in peak_parameters.items()
+                if peak_dict["validity"]
+            ]
         )
 
         log.info(f"{len(cal_fwhms)} FWHMs found:")
         log.info("\t   Energy   | FWHM  ")
         for i, (ei, fwhm, fwhme) in enumerate(
-            zip(fitted_peaks_kev, cal_fwhms, cal_fwhms_errs)
+            zip(fitted_peaks_kev, cal_fwhms, cal_fwhm_errs)
         ):
             log.info(
                 f"\t{i}".ljust(4)
@@ -832,12 +860,59 @@ class HpgeCalibration:
                 + f"| {fwhm:.2f}+-{fwhme:.2f} kev".ljust(5)
             )
 
-    def fit_energy_res_curve(self, fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_func):
+    def fit_energy_res_curve(self, fwhm_func, interp_energy_kev=None):
+        peak_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+        if peak_parameters is None:
+            log.error("No peak parameters found")
+            return
+        fitted_peaks_kev = np.array(
+            [
+                peak
+                for peak, peak_dict in peak_parameters.items()
+                if peak_dict["validity"]
+            ]
+        )
+        if "fwhm_in_kev" not in peak_parameters[fitted_peaks_kev[0]]:
+            self.get_fwhms()
+            peak_parameters = self.results[list(self.results)[-1]].get(
+                "peak_parameters", None
+            )
+
+        fwhm_peaks = np.array([], dtype=np.float32)
+        fwhms = np.array([], dtype=np.float32)
+        dfwhms = np.array([], dtype=np.float32)
+        all_peaks = np.array([], dtype=np.float32)
+        #####
+        # Remove the Doppler Broadened peaks from calibration if found
+        for peak, peak_dict in peak_parameters.items():
+            all_peaks = np.append(all_peaks, peak)
+            if np.abs(peak - 2103.5) < 1:
+                log.info("Tl SEP removed from fwhm fitting")
+                pass
+            elif np.abs(peak - 1592.53) < 1:
+                log.info("Tl DEP removed from fwhm fitting")
+                pass
+            elif np.abs(peak - 511.0) < 1:
+                log.info("e annihilation removed from fwhm fitting")
+                pass
+            elif np.isnan(peak_dict["fwhm_in_kev"]) or np.isnan(
+                peak_dict["fwhm_err_in_kev"]
+            ):
+                log.info(f"{peak} failed, removed from fwhm fitting")
+                pass
+            else:
+                fwhm_peaks = np.append(fwhm_peaks, peak)
+                fwhms = np.append(fwhms, peak_dict["fwhm_in_kev"])
+                dfwhms = np.append(dfwhms, peak_dict["fwhm_err_in_kev"])
+
         log.info(f"Running FWHM fit for : {fwhm_func.__name__}")
+
         try:
-            c_lin = cost.LeastSquares(fwhm_peaks, fit_fwhms, fit_dfwhms, fwhm_func.func)
+            c_lin = cost.LeastSquares(fwhm_peaks, fwhms, dfwhms, fwhm_func.func)
             c_lin.loss = "soft_l1"
-            m_lin = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fit_fwhms, fit_dfwhms))
+            m_lin = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fwhms, dfwhms))
             m_lin.limits = fwhm_func.bounds()
             m_lin.simplex()
             m_lin.migrad()
@@ -859,16 +934,13 @@ class HpgeCalibration:
             log.info(f'FWHM fit: {results["parameters"].to_dict()}')
             log.info("FWHM fit values:")
             log.info("\t   Energy   | FWHM (kev)  | Predicted (kev)")
-            for i, (peak, fwhm, fwhme) in enumerate(
-                zip(fwhm_peaks, fit_fwhms, fit_dfwhms)
-            ):
+            for i, (peak, fwhm, fwhme) in enumerate(zip(fwhm_peaks, fwhms, dfwhms)):
                 log.info(
                     f"\t{i}".ljust(4)
                     + str(peak).ljust(9)
                     + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
                     + f"| {fwhm_func.func(peak, *results['parameters']):.2f}".ljust(5)
                 )
-
         except RuntimeError:
             pars, errs, cov = return_nans(fwhm_func.func)
             results = {
@@ -882,7 +954,11 @@ class HpgeCalibration:
                 "p_val": 0,
             }
             log.error("FWHM fit failed to converge")
-            return results
+        if interp_energy_kev is not None:
+            results = self.interpolate_energy_res(
+                fwhm_peaks, fwhm_func, results, interp_energy_kev
+            )
+        self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
 
     def interpolate_energy_res(
         self, fwhm_peaks, fwhm_func, fwhm_results, interp_energy_kev=None
@@ -917,71 +993,6 @@ class HpgeCalibration:
                 )
         return fwhm_results
 
-    def fit_energy_res(self):
-        fitted_peaks = self.results["fitted_kev"]
-        fwhms = self.results["pk_fwhms"][:, 0]
-        dfwhms = self.results["pk_fwhms"][:, 1]
-
-        #####
-        # Remove the Doppler Broadened peaks from calibration if found
-        fwhm_peaks = np.array([], dtype=np.float32)
-        all_peaks = np.array([], dtype=np.float32)
-        indexes = []
-        for i, peak in enumerate(fitted_peaks):
-            all_peaks = np.append(all_peaks, peak)
-            if np.abs(peak - 2103.5) < 1:
-                log.info(f"Tl SEP found at index {i}")
-                indexes.append(i)
-                continue
-            elif np.abs(peak - 1592.53) < 1:
-                log.info(f"Tl DEP found at index {i}")
-                indexes.append(i)
-                continue
-            elif np.abs(peak - 511.0) < 1:
-                log.info(f"e annihilation found at index {i}")
-                indexes.append(i)
-                continue
-            elif np.isnan(dfwhms[i]):
-                log.info(f"{peak} failed")
-                indexes.append(i)
-                continue
-            else:
-                fwhm_peaks = np.append(fwhm_peaks, peak)
-        fit_fwhms = np.delete(fwhms, [indexes])
-        fit_dfwhms = np.delete(dfwhms, [indexes])
-        #####
-        for i, peak in enumerate(fwhm_peaks):
-            log.info(
-                f"FWHM of {peak} kev peak is: {fit_fwhms[i]:1.2f} +- {fit_dfwhms[i]:1.2f} kev"
-            )
-
-        self.fwhm_fit_linear = self.fit_energy_res_curve(
-            fwhm_peaks,
-            fit_fwhms,
-            fit_dfwhms,
-            FWHMLinear,
-            interp_energy_kev={"Qbb": 2039.0},
-        )
-        self.fwhm_fit_linear = self.interpolate_energy_res(
-            fwhm_peaks,
-            FWHMLinear,
-            self.fwhm_fit_linear,
-            interp_energy_kev={"Qbb": 2039.0},
-        )
-        self.fwhm_fit_quadratic = self.fit_energy_res_curve(
-            fwhm_peaks,
-            fit_fwhms,
-            fit_dfwhms,
-            FWHMQuadratic,
-            interp_energy_kev={"Qbb": 2039.0},
-        )
-        self.fwhm_fit_quadratic = self.interpolate_energy_res(
-            fwhm_peaks,
-            FWHMQuadratic,
-            self.fwhm_fit_quadratic,
-            interp_energy_kev={"Qbb": 2039.0},
-        )
-
     def full_calibration(
         self,
         e_uncal,
@@ -993,12 +1004,12 @@ class HpgeCalibration:
     ):
         log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
         log.debug(f"Guess is {self.guess_kev:.3f}")
+        self.hpge_find_energy_peaks(e_uncal)
+        self.hpge_get_energy_peaks(e_uncal)
 
-        self.hpge_find_E_peaks(e_uncal)
-        self.hpge_get_E_peaks(e_uncal)
-        # got_peak_locs = self.peak_locs
-        # got_peaks_kev = self.peaks_kev
-        self.hpge_fit_E_peaks(
+        got_peak_locs = self.peak_locs
+        got_peaks_kev = self.peaks_kev
+        self.hpge_fit_energy_peaks(
             e_uncal,
             peak_pars=peak_pars,
             allowed_p_val=allowed_p_val,
@@ -1006,169 +1017,77 @@ class HpgeCalibration:
             peak_param=peak_param,
             n_events=n_events,
         )
+        if len(self.peaks_kev) != len(got_peaks_kev):
+            for i, peak in enumerate(got_peaks_kev):
+                if peak not in self.peaks_kev:
+                    for i, peak_par in enumerate(peak_pars):
+                        if peak_par[0] == peak:
+                            new_kev_ranges = (peak_par[1][0] - 5, peak_par[1][1] - 5)
+                            peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
+            for i, peak in enumerate(self.peaks_kev):
+                try:
+                    if (
+                        self.results["pk_fwhms"][:, 1][i]
+                        / self.results["pk_fwhms"][:, 0][i]
+                        > 0.05
+                    ):
+                        for i, peak_par in enumerate(peak_pars):
+                            if peak_par[0] == peak:
+                                new_kev_ranges = (
+                                    peak_par[1][0] - 5,
+                                    peak_par[1][1] - 5,
+                                )
+                                peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
+                except Exception:
+                    pass
+            self.peak_locs = got_peak_locs
+            self.peaks_keV = got_peaks_kev
 
-        #     pk_pars = self.results["pk_pars"]
-        #     found_peaks = self.results["got_peaks_locs"]
-        #     fitted_peaks = self.results["fitted_kev"]
-        #     fitted_funcs = self.results["pk_funcs"]
+            self.hpge_fit_energy_peaks(
+                e_uncal,
+                peak_pars=peak_pars,
+                allowed_p_val=allowed_p_val,
+                tail_weight=tail_weight,
+                peak_param=peak_param,
+                n_events=n_events,
+            )
 
-        #     #self.pars = np.array([float(2614.5/self.results["pk_pos"][np.where(fitted_peaks==2614.5)[0]][0]),0.], dtype="float")
-        #     if self.pars is None:
-        #         raise ValueError
+            if self.pars is None:
+                self.pars = np.full(self.deg + 1, np.nan)
 
-        #     for i, peak in enumerate(self.results["got_peaks_kev"]):
-        #         idx = np.where(peak == self.glines)[0][0]
-        #         self.funcs[idx] = fitted_funcs[i]
-        #         if fitted_funcs[i] == pgf.extended_radford_pdf:
-        #             self.gof_funcs[idx] = pgf.radford_pdf
-        #         else:
-        #             self.gof_funcs[idx] = pgf.gauss_step_pdf
-        # except Exception:
-        #     found_peaks = np.array([])
-        #     fitted_peaks = np.array([])
-        #     fitted_funcs = np.array([])
-        # if len(fitted_peaks) != len(self.glines):
-        #     for i, peak in enumerate(self.glines):
-        #         if peak not in fitted_peaks:
-        #             kev_ranges[i] = (kev_ranges[i][0] - 5, kev_ranges[i][1] - 5)
-        #     for i, peak in enumerate(fitted_peaks):
-        #         try:
-        #             if (
-        #                 self.results["pk_fwhms"][:, 1][i]
-        #                 / self.results["pk_fwhms"][:, 0][i]
-        #                 > 0.05
-        #             ):
-        #                 index = np.where(self.glines == peak)[0][0]
-        #                 kev_ranges[index] = (
-        #                     kev_ranges[index][0] - 5,
-        #                     kev_ranges[index][1] - 5,
-        #                 )
-        #         except Exception:
-        #             pass
-        #     try:
-        #         self.pars, self.cov, self.results = cal.hpge_E_calibration(
-        #             data.query(self.selection_string)[self.energy_param],
-        #             self.glines,
-        #             self.guess_kev,
-        #             deg=self.deg,
-        #             range_kev=kev_ranges,
-        #             funcs=self.funcs,
-        #             gof_funcs=self.gof_funcs,
-        #             n_events=self.n_events,
-        #             allowed_p_val=self.p_val,
-        #             tail_weight=self.tail_weight,
-        #             peak_param = self.peak_param,
-        #             verbose=False,
-        #         )
+                log.error(f"Calibration failed completely for {self.energy_param}")
+                return
 
-        #         fitted_peaks = self.results["fitted_kev"]
-        #         fitted_funcs = self.results["pk_funcs"]
-        #         #self.pars = np.array([float(2614.5/self.results["pk_pos"][np.where(fitted_peaks==2614.5)[0]][0]),0.], dtype="float")
+        log.debug("Calibrated found")
+        log.info(f"Calibration pars are {self.pars}")
 
-        #         log.debug("Calibrated found")
-        #         log.info(f"Calibration pars are {self.pars}")
+        self.fit_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.fit_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
 
-        #         for i, peak in enumerate(self.results["got_peaks_kev"]):
-        #             idx = np.where(peak == self.glines)[0][0]
-        #             self.funcs[idx] = fitted_funcs[i]
-        #             if fitted_funcs[i] == pgf.extended_radford_pdf:
-        #                 self.gof_funcs[idx] = pgf.radford_pdf
-        #             else:
-        #                 self.gof_funcs[idx] = pgf.gauss_step_pdf
-        #         if self.pars is None:
-        #             raise ValueError
-
-        #     except Exception:
-        #         self.pars = np.full(self.deg + 1, np.nan)
-        #         self.results = None
-
-        #         log.error(f"Calibration failed completely for {self.energy_param}")
-        # else:
-
-        #     log.debug("Calibrated found")
-        #     log.info(f"Calibration pars are {self.pars}")
-        # if ~np.isnan(self.pars).all():
-        #     self.fit_energy_res()
+        # these go in dataflow
         # self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
         # data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
 
     def fit_calibrated_peaks(self, e_uncal):
         log.debug(f"Fitting {self.energy_param}")
-        # try:
-        #     self.hpge_get_E_peaks(e_uncal)
-        #     self.hpge_fit_E_peaks(e_uncal)
-
-        #     valid_pks = self.results["pk_validities"]
-        #     fitted_peaks_kev = self.results["fitted_kev"]
-        #     pk_pars = np.asarray(self.results["pk_pars"], dtype=object)[
-        #         valid_pks
-        #     ]  # ragged
-        #     pk_errors = np.asarray(self.results["pk_errors"], dtype=object)[valid_pks]
-        #     pk_covs = np.asarray(self.results["pk_covs"], dtype=object)[valid_pks]
-        #     pk_funcs = np.asarray(self.funcs)[valid_pks]
-
-        #     cal_fwhms = [
-        #         pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
-        #         for func_i, pars_i, covs_i in zip(pk_funcs, pk_pars, pk_covs)
-        #     ]
-
-        #     cal_fwhms, cal_fwhms_errs = zip(*cal_fwhms)
-        #     cal_fwhms = np.asarray(cal_fwhms)
-        #     cal_fwhms_errs = np.asarray(cal_fwhms_errs)
-        #     self.results["pk_fwhms"] = np.asarray(
-        #         [(u, e) for u, e in zip(cal_fwhms, cal_fwhms_errs)]
-        #     )
-
-        #     log.info(f"{len(cal_fwhms)} FWHMs found:")
-        #     log.info(f"\t{'Energy':>10}{'| FWHM':>9}")
-        #     for i, (Ei, fwhm, fwhme) in enumerate(
-        #         zip(fitted_peaks_kev, cal_fwhms, cal_fwhms_errs)
-        #     ):
-        #         log.info(
-        #             f"\t{str(i):<4}{str(Ei):<9}| {f'{fwhm:.2f}+-{fwhme:.2f}':<10} kev"
-        #         )
-        #     self.fit_energy_res()
-        #     log.debug(f"high stats fitting successful")
-        # except Exception:
-        #     self.results = {}
-        #     log.debug(f"high stats fitting failed")
-
-    def update_calibration(self, e_uncal):
-        log.debug(f"Calibrating {self.energy_param}")
-
-        self.hpge_get_E_peaks(e_uncal)
-        self.hpge_fit_E_peaks(e_uncal)
-
-        # uncal_fwhms = [
-        #     pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
-        #     for func_i, pars_i, covs_i in zip(pk_funcs, pk_pars, pk_covs)
-        # ]
-        # uncal_fwhms, uncal_fwhm_errs = zip(*uncal_fwhms)
-        # uncal_fwhms = np.asarray(uncal_fwhms)
-        # uncal_fwhm_errs = np.asarray(uncal_fwhm_errs)
-        # derco = np.polyder(np.poly1d(pars)).coefficients
-        # der = [pgf.poly(ei, derco) for ei in fitted_peaks_kev]
-
-        # cal_fwhms = uncal_fwhms * der
-        # cal_fwhms_errs = uncal_fwhm_errs * der
-        # self.results["pk_fwhms"] = np.asarray(
-        #     [(u * d, e * d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)]
-        # )
-
-        # log.info(f"{len(cal_fwhms)} FWHMs found:")
-        # log.info(f"\t{'Energy':>10}{'| FWHM':>9}")
-        # for i, (ei, fwhm, fwhme) in enumerate(
-        #     zip(fitted_peaks_kev, cal_fwhms, cal_fwhms_errs)
-        # ):
-        #     log.info(f"\t{str(i):<4}{str(ei):<9}| {f'{fwhm:.2f}+-{fwhme:.2f}':<10} kev")
-        # self.fit_energy_res()
-        # if self.cal_energy_param == self.energy_param:
-        #     log.info(
-        #         "Warning dataframe energy will be overwritten as cal energy and input energy have same name"
-        #     )
-        # self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
-        # data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
-        # log.debug("high stats calibration successful")
+        self.hpge_get_energy_peaks(e_uncal)
+        self.hpge_fit_energy_peaks(e_uncal)
+        self.pars = np.zeros(len(self.pars))
+        self.pars[-2] = 1
+        self.fit_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.fit_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
 
 
 def fwhm_slope(x: np.array, m0: float, m1: float, m2: float = None) -> np.array:
@@ -1501,10 +1420,10 @@ def get_hpge_energy_bounds(func, parguess):
     ):
         return {
             "n_sig": (0, None),
-            "mu": (parguess[-3], parguess[-2]),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
             "sigma": (0, None),
             "htail": (0, 0.5),
-            "tau": (0.1 * parguess[2], 10 * parguess[2]),
+            "tau": (0.1 * parguess["sigma"], 10 * parguess["sigma"]),
             "n_bkg": (None, None),
             "hstep": (-1, 1),
             "x_lo": (None, None),
@@ -1518,7 +1437,7 @@ def get_hpge_energy_bounds(func, parguess):
     ):
         return {
             "n_sig": (0, None),
-            "mu": (parguess[-3], parguess[-2]),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
             "sigma": (0, None),
             "n_bkg": (None, None),
             "hstep": (-1, 1),
@@ -1604,7 +1523,7 @@ def unbinned_staged_energy_fit(
     if guess is not None:
         if not isinstance(guess, ValueView):
             x0 = convert_to_minuit(guess, func)
-        x0["x_lo"] = (fit_range[0],)
+        x0["x_lo"] = fit_range[0]
         x0["x_hi"] = fit_range[1]
         x1 = guess_func(
             energy,
