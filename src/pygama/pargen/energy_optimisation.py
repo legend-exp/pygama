@@ -9,25 +9,22 @@ import json
 import logging
 import os
 import pathlib
-import pickle as pkl
 import sys
 from collections import namedtuple
-import pint
-from dspeed.units import unit_registry as ureg
 
 import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from iminuit import Minuit, cost, util
+import pint
+from dspeed.units import unit_registry as ureg
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit, minimize
-from scipy.stats import chisquare, norm
+from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 from sklearn.utils._testing import ignore_warnings
 
 import pygama.math.histogram as pgh
@@ -40,7 +37,7 @@ log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
 
-def run_optimisation(
+def run_optimisation_grid(
     file,
     opt_config,
     dsp_config,
@@ -87,6 +84,7 @@ def run_optimisation_multiprocessed(
     fom=None,
     db_dict=None,
     processes=5,
+    wf_field="waveform",
     n_events=8000,
     **fom_kwargs,
 ):
@@ -117,7 +115,7 @@ def run_optimisation_multiprocessed(
     def form_dict(in_dict, length):
         keys = list(in_dict.keys())
         out_list = []
-        for i in range(length):
+        for _ in range(length):
             out_list.append({keys[0]: 0})
         for key in keys:
             if isinstance(in_dict[key], list):
@@ -135,7 +133,7 @@ def run_optimisation_multiprocessed(
     if not isinstance(opt_config, list):
         opt_config = [opt_config]
     grid = []
-    for i, opt_conf in enumerate(opt_config):
+    for opt_conf in opt_config:
         grid.append(set_par_space(opt_conf))
     if fom_kwargs:
         if "fom_kwargs" in fom_kwargs:
@@ -178,25 +176,24 @@ def set_values(par_values):
     )
     try:
         string_values = [f'{val:.4f}*{par_values["unit"]}' for val in string_values]
-    except:
+    except Exception:
         string_values = [f"{val:.4f}" for val in string_values]
     return string_values
 
 
-def simple_guess(energy, func_i, fit_range=None, bin_width = 1):
+def simple_guess(energy, func_i, fit_range=None, bin_width=1):
     """
     Simple guess for peak fitting
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
-    hist, bins, var = pgh.get_hist(energy, range= fit_range, dx = bin_width)
+    hist, bins, var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
 
     if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         _, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.nanargmax(hist)
         mu = bin_cs[i_0]
-        height = hist[i_0]
         bg0 = np.mean(hist[-10:])
         step = np.mean(hist[:10]) - bg0
         htail = 1.0 / 5
@@ -235,7 +232,7 @@ def simple_guess(energy, func_i, fit_range=None, bin_width = 1):
 
 
 def get_peak_fwhm_with_dt_corr(
-    Energies,
+    energies,
     alpha,
     dt,
     func,
@@ -254,9 +251,9 @@ def get_peak_fwhm_with_dt_corr(
     """
 
     correction = np.multiply(
-        np.multiply(alpha, dt, dtype="float64"), Energies, dtype="float64"
+        np.multiply(alpha, dt, dtype="float64"), energies, dtype="float64"
     )
-    ct_energy = np.add(correction, Energies)
+    ct_energy = np.add(correction, energies)
 
     bin_width = 1
     lower_bound = (np.nanmin(ct_energy) // bin_width) * bin_width
@@ -281,22 +278,29 @@ def get_peak_fwhm_with_dt_corr(
     tol = None
     try:
         if display > 0:
-            energy_pars, energy_err, cov, chisqr, func, gof_func, _, _,_ = pgc.unbinned_staged_energy_fit(
+            (
+                energy_pars,
+                energy_err,
+                cov,
+                chisqr,
+                func,
+                gof_func,
+                _,
+                _,
+                _,
+            ) = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
                 func=func,
                 gof_func=gof_func,
                 gof_range=gof_range,
                 fit_range=fit_range,
-                guess_func = simple_guess,
+                guess_func=simple_guess,
                 tol=tol,
                 guess=guess,
                 allow_tail_drop=allow_tail_drop,
                 verbose=True,
                 display=display,
             )
-            print(energy_pars)
-            print(energy_err)
-            print(cov)
             plt.figure()
             xs = np.arange(lower_bound, upper_bound, bin_width)
             hist, bins, var = pgh.get_hist(
@@ -306,27 +310,39 @@ def get_peak_fwhm_with_dt_corr(
             plt.plot(xs, gof_func(xs, *energy_pars))
             plt.show()
         else:
-            energy_pars, energy_err, cov, chisqr, func, gof_func, _,_,_ = pgc.unbinned_staged_energy_fit(
+            (
+                energy_pars,
+                energy_err,
+                cov,
+                chisqr,
+                func,
+                gof_func,
+                _,
+                _,
+                _,
+            ) = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
                 func=func,
                 gof_func=gof_func,
                 gof_range=gof_range,
                 fit_range=fit_range,
-                guess_func = simple_guess,
+                guess_func=simple_guess,
                 tol=tol,
                 guess=guess,
                 allow_tail_drop=allow_tail_drop,
             )
         if func == pgf.extended_radford_pdf:
             if energy_pars[3] < 1e-6 and energy_err[3] < 1e-6:
-                fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1/frac_max))
-                fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1/frac_max))
+                fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1 / frac_max))
+                fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1 / frac_max))
             else:
-                fwhm = pgf.radford_full_width_at_frac_max(energy_pars[2], energy_pars[3], energy_pars[4],frac_max)
+                fwhm = pgf.radford_full_width_at_frac_max(
+                    energy_pars[2], energy_pars[3], energy_pars[4], frac_max
+                )
 
         elif func == pgf.extended_gauss_step_pdf:
-            fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1/frac_max))
-            fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1/frac_max))
+            fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(1 / frac_max))
+            fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(1 / frac_max))
 
         xs = np.arange(lower_bound, upper_bound, 0.1)
         y = func(xs, *energy_pars)[1]
@@ -348,8 +364,10 @@ def get_peak_fwhm_with_dt_corr(
             y_b = np.zeros(len(par_b))
             for i, p in enumerate(par_b):
                 try:
-                    y_b[i] = pgf.radford_full_width_at_frac_max(p[2], p[3], p[4],frac_max)  #
-                except:
+                    y_b[i] = pgf.radford_full_width_at_frac_max(
+                        p[2], p[3], p[4], frac_max
+                    )  #
+                except Exception:
                     y_b[i] = np.nan
             fwhm_err = np.nanstd(y_b, axis=0)
             if fwhm_err == 0:
@@ -387,10 +405,10 @@ def get_peak_fwhm_with_dt_corr(
             )
             plt.show()
 
-    except:
-        return np.nan, np.nan, np.nan, np.nan, (np.nan,np.nan), np.nan, np.nan, None
+    except Exception:
+        return np.nan, np.nan, np.nan, np.nan, (np.nan, np.nan), np.nan, np.nan, None
 
-    if kev == True:
+    if kev is True:
         fwhm *= peak / energy_pars[1]
         fwhm_err *= peak / energy_pars[1]
 
@@ -406,7 +424,9 @@ def get_peak_fwhm_with_dt_corr(
     )
 
 
-def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=None, frac_max =0.2, display=0):
+def fom_fwhm_with_dt_corr_fit(
+    tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=None, frac_max=0.2, display=0
+):
     """
     FOM for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
     the corresponding alpha value and the number of events in the fitted peak, also the reduced chisquare of the
@@ -414,13 +434,13 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
     gof_func = kwarg_dict["gof_func"]
-    Energies = tb_in[parameter].nda
-    Energies = Energies.astype("float64")
+    energies = tb_in[parameter].nda
+    energies = energies.astype("float64")
     peak = kwarg_dict["peak"]
     kev_width = kwarg_dict["kev_width"]
     min_alpha = 0
     max_alpha = 3.50e-06
-    alphas = np.linspace(0, 3.5*10**-6, nsteps, dtype="float64") 
+    alphas = np.linspace(min_alpha, max_alpha, nsteps, dtype="float64")
     if ctc_parameter == "QDrift":
         dt = tb_in["dt_eff"].nda
     elif ctc_parameter == "dt":
@@ -429,16 +449,16 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
 
     if idxs is not None:
-        Energies = Energies[idxs]
+        energies = energies[idxs]
         dt = dt[idxs]
 
-    if np.isnan(Energies).any():
+    if np.isnan(energies).any():
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
             "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": (np.nan,np.nan),
+            "chisquare": (np.nan, np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -448,14 +468,13 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             "fwhm_err": np.nan,
             "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": (np.nan,np.nan),
+            "chisquare": (np.nan, np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
     fwhms = np.array([])
     final_alphas = np.array([])
     fwhm_errs = np.array([])
-    guess = None
     best_fwhm = np.inf
     for alpha in alphas:
         (
@@ -468,40 +487,44 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             _,
             fit_pars,
         ) = get_peak_fwhm_with_dt_corr(
-            Energies, alpha, dt, func, gof_func, peak, kev_width, 
-            guess=None, 
-            frac_max = 0.5,
-            allow_tail_drop=False
+            energies,
+            alpha,
+            dt,
+            func,
+            gof_func,
+            peak,
+            kev_width,
+            guess=None,
+            frac_max=0.5,
+            allow_tail_drop=False,
         )
         if not np.isnan(fwhm_o_max):
             fwhms = np.append(fwhms, fwhm_o_max)
             final_alphas = np.append(final_alphas, alpha)
             fwhm_errs = np.append(fwhm_errs, fwhm_o_max_err)
-            guess = fit_pars
             if fwhms[-1] < best_fwhm:
                 best_fwhm = fwhms[-1]
-                best_fit = fit_pars
         log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
 
     # Make sure fit isn't based on only a few points
-    if len(fwhms) < nsteps*0.2:
+    if len(fwhms) < nsteps * 0.2:
         log.debug("less than 20% fits successful")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
             "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": (np.nan,np.nan),
+            "chisquare": (np.nan, np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
 
-    ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50))  & (fwhm_errs > 1e-10)
+    ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (fwhm_errs > 1e-10)
     # Fit alpha curve to get best alpha
 
     try:
         alphas = np.linspace(
-            final_alphas[ids][0], final_alphas[ids][-1], nsteps*20, dtype="float64"
+            final_alphas[ids][0], final_alphas[ids][-1], nsteps * 20, dtype="float64"
         )
         alpha_fit, cov = np.polyfit(
             final_alphas[ids], fwhms[ids], w=1 / fwhm_errs[ids], deg=4, cov=True
@@ -533,14 +556,14 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             )
             plt.show()
 
-    except:
+    except Exception:
         log.debug("alpha fit failed")
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,
             "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": (np.nan,np.nan),
+            "chisquare": (np.nan, np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -552,7 +575,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             "fwhm_err": np.nan,
             "alpha": 0,
             "alpha_err": np.nan,
-            "chisquare": (np.nan,np.nan),
+            "chisquare": (np.nan, np.nan),
             "n_sig": np.nan,
             "n_sig_err": np.nan,
         }
@@ -569,7 +592,7 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
             n_sig_err,
             _,
         ) = get_peak_fwhm_with_dt_corr(
-            Energies,
+            energies,
             alpha,
             dt,
             func,
@@ -595,15 +618,15 @@ def fom_FWHM_with_dt_corr_fit(tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=
         }
 
 
-def fom_FWHM_fit(tb_in, kwarg_dict):
+def fom_fwhm_fit(tb_in, kwarg_dict):
     """
     FOM with no ctc sweep, used for optimising ftp.
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
     gof_func = kwarg_dict["gof_func"]
-    Energies = tb_in[parameter].nda
-    Energies = Energies.astype("float64")
+    energies = tb_in[parameter].nda
+    energies = energies.astype("float64")
     peak = kwarg_dict["peak"]
     kev_width = kwarg_dict["kev_width"]
     try:
@@ -618,7 +641,7 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
     except KeyError:
         dt = 0
 
-    if np.isnan(Energies).any():
+    if np.isnan(energies).any():
         return {
             "fwhm_o_max": np.nan,
             "max_o_fwhm": np.nan,
@@ -636,7 +659,7 @@ def fom_FWHM_fit(tb_in, kwarg_dict):
         n_sig,
         n_sig_err,
     ) = get_peak_fwhm_with_dt_corr(
-        Energies, alpha, dt, func, gof_func, peak=peak, kev_width=kev_width, kev=True
+        energies, alpha, dt, func, gof_func, peak=peak, kev_width=kev_width, kev=True
     )
     return {
         "fwhm_o_max": final_fwhm_o_max,
@@ -685,10 +708,10 @@ def event_selection(
     lh5_path,
     dsp_config,
     db_dict,
-    peaks_keV,
+    peaks_kev,
     peak_idxs,
     kev_widths,
-    cut_parameters={"bl_mean": 4, "bl_std": 4, "pz_std": 4},
+    cut_parameters=None,
     pulser_mask=None,
     energy_parameter="trapTmax",
     wf_field: str = "waveform",
@@ -697,9 +720,8 @@ def event_selection(
     initial_energy="daqenergy",
     check_pulser=True,
 ):
-
     """
-    Function for selecting events in peaks using raw files, 
+    Function for selecting events in peaks using raw files,
     to do this it uses the daqenergy to get a first rough selection
     then runs 1 dsp to get a more accurate energy estimate and apply cuts
     returns the indexes of the final events and the peak to which each index corresponds
@@ -711,12 +733,12 @@ def event_selection(
         kev_widths = [kev_widths]
 
     if lh5_path[-1] != "/":
-        lh5_path +="/"
-    
-    raw_fields = [field.replace(lh5_path, "") for field in lh5.ls(raw_files[0], lh5_path)]
-    initial_fields = cts.get_keys(
-        raw_fields, [initial_energy]
-    )
+        lh5_path += "/"
+
+    raw_fields = [
+        field.replace(lh5_path, "") for field in lh5.ls(raw_files[0], lh5_path)
+    ]
+    initial_fields = cts.get_keys(raw_fields, [initial_energy])
     initial_fields += ["timestamp"]
 
     df = lh5.read_as(lh5_path, raw_files, "pd", field_mask=initial_fields)
@@ -749,33 +771,33 @@ def event_selection(
     rough_energy = np.array(df["initial_energy"])[initial_mask]
     initial_idxs = np.where(initial_mask)[0]
 
-    guess_keV = 2620 / np.nanpercentile(rough_energy, 99)
-    Euc_min = threshold / guess_keV * 0.6
-    Euc_max = 2620 / guess_keV * 1.1
-    dEuc = 1  # / guess_keV
-    hist, bins, var = pgh.get_hist(rough_energy, range=(Euc_min, Euc_max), dx=dEuc)
-    detected_peaks_locs, detected_peaks_keV, roughpars = pgc.hpge_find_E_peaks(
+    guess_kev = 2620 / np.nanpercentile(rough_energy, 99)
+    euc_min = threshold / guess_kev * 0.6
+    euc_max = 2620 / guess_kev * 1.1
+    deuc = 1  # / guess_kev
+    hist, bins, var = pgh.get_hist(rough_energy, range=(euc_min, euc_max), dx=deuc)
+    detected_peaks_locs, detected_peaks_kev, roughpars = pgc.hpge_find_E_peaks(
         hist,
         bins,
         var,
         np.array([238.632, 583.191, 727.330, 860.564, 1620.5, 2103.53, 2614.553]),
     )
-    log.debug(f"detected {detected_peaks_keV} keV peaks at {detected_peaks_locs}")
+    log.debug(f"detected {detected_peaks_kev} keV peaks at {detected_peaks_locs}")
 
     masks = []
     for peak_idx in peak_idxs:
-        peak = peaks_keV[peak_idx]
+        peak = peaks_kev[peak_idx]
         kev_width = kev_widths[peak_idx]
         try:
-            if peak not in detected_peaks_keV:
+            if peak not in detected_peaks_kev:
                 raise ValueError
-            detected_peak_idx = np.where(detected_peaks_keV == peak)[0]
+            detected_peak_idx = np.where(detected_peaks_kev == peak)[0]
             peak_loc = detected_peaks_locs[detected_peak_idx]
             log.info(f"{peak} peak found at {peak_loc}")
             rough_adc_to_kev = roughpars[0]
             e_lower_lim = peak_loc - (1.1 * kev_width[0]) / rough_adc_to_kev
             e_upper_lim = peak_loc + (1.1 * kev_width[1]) / rough_adc_to_kev
-        except:
+        except Exception:
             log.debug(f"{peak} peak not found attempting to use rough parameters")
             peak_loc = (peak - roughpars[1]) / roughpars[0]
             rough_adc_to_kev = roughpars[0]
@@ -809,15 +831,18 @@ def event_selection(
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)
 
-    cut_dict = cts.generate_cuts(tb_data, cut_parameters)
-    log.debug(f"Cuts are: {cut_dict}")
-    log.debug("Loaded Cuts")
-    ct_mask = cts.get_cut_indexes(tb_data, cut_dict)
+    if cut_parameters is not None:
+        cut_dict = cts.generate_cuts(tb_data, cut_parameters)
+        log.debug(f"Cuts are: {cut_dict}")
+        log.debug("Loaded Cuts")
+        ct_mask = cts.get_cut_indexes(tb_data, cut_dict)
+    else:
+        ct_mask = np.full(len(tb_data), True, dtype=bool)
 
     final_events = []
     out_events = []
     for peak_idx in peak_idxs:
-        peak = peaks_keV[peak_idx]
+        peak = peaks_kev[peak_idx]
         kev_width = kev_widths[peak_idx]
 
         peak_ids = np.array(idx_list[peak_idx])
@@ -827,20 +852,23 @@ def event_selection(
         energy = tb_data[energy_parameter].nda[peak_ids]
 
         hist, bins, var = pgh.get_hist(
-            energy, range=(np.floor(np.nanmin(energy)), np.ceil(np.nanmax(energy))), dx=peak/(np.nanpercentile(energy,50))
+            energy,
+            range=(np.floor(np.nanmin(energy)), np.ceil(np.nanmax(energy))),
+            dx=peak / (np.nanpercentile(energy, 50)),
         )
         peak_loc = pgh.get_bin_centers(bins)[np.nanargmax(hist)]
 
-        mu, sigma, height = pgc.hpge_fit_E_peak_tops(
-                hist,
-                bins,
-                var,
-                [peak_loc],
-                n_to_fit=7,
-            )[0][0]
-        
+        mu, _, _ = pgc.hpge_fit_E_peak_tops(
+            hist,
+            bins,
+            var,
+            [peak_loc],
+            n_to_fit=7,
+        )[
+            0
+        ][0]
+
         if mu is None or np.isnan(mu):
-            raise RuntimeError
             log.debug("Fit failed, using max guess")
             rough_adc_to_kev = peak / peak_loc
             e_lower_lim = peak_loc - (1.5 * kev_width[0]) / rough_adc_to_kev
@@ -848,7 +876,7 @@ def event_selection(
             hist, bins, var = pgh.get_hist(
                 energy, range=(int(e_lower_lim), int(e_upper_lim)), dx=1
             )
-            params = [pgh.get_bin_centers(bins)[np.nanargmax(hist)], 0, 0]
+            mu = pgh.get_bin_centers(bins)[np.nanargmax(hist)]
 
         updated_adc_to_kev = peak / mu
         e_lower_lim = mu - (kev_width[0]) / updated_adc_to_kev
@@ -896,18 +924,16 @@ def interpolate_energy(peak_energies, points, err_points, energy):
             )  # bounds=param_bounds,
             fit_qbb = fwhm_slope(energy, *fit_pars)
 
-            xs = np.arange(peak_energies[0], peak_energies[-1], 0.1)
-
             rng = np.random.default_rng(1)
 
             # generate set of bootstrapped parameters
             par_b = rng.multivariate_normal(fit_pars, fit_covs, size=1000)
             qbb_vals = np.array([fwhm_slope(energy, *p) for p in par_b])
             qbb_err = np.nanstd(qbb_vals)
-        except:
+        except Exception:
             return np.nan, np.nan, np.nan
 
-        if nan_mask[-1] == True or nan_mask[-2] == True:
+        if nan_mask[-1] is True or nan_mask[-2] is True:
             qbb_err = np.nan
         if qbb_err / fit_qbb > 0.1:
             qbb_err = np.nan
@@ -915,15 +941,15 @@ def interpolate_energy(peak_energies, points, err_points, energy):
     return fit_qbb, qbb_err, fit_pars
 
 
-def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
+def fom_fwhm(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
     """
     FOM for sweeping over ctc values to find the best value, returns the best found fwhm
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
     cs_func = kwarg_dict["gof_func"]
-    Energies = tb_in[parameter].nda
-    Energies = Energies.astype("float64")
+    energies = tb_in[parameter].nda
+    energies = energies.astype("float64")
     peak = kwarg_dict["peak"]
     kev_width = kwarg_dict["kev_width"]
 
@@ -933,8 +959,8 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_0_est"].nda, dtype="float64")
     elif ctc_parameter == "rt":
         dt = np.subtract(tb_in["tp_99"].nda, tb_in["tp_01"].nda, dtype="float64")
-    if np.isnan(Energies).any() or np.isnan(dt).any():
-        if np.isnan(Energies).any():
+    if np.isnan(energies).any() or np.isnan(dt).any():
+        if np.isnan(energies).any():
             log.debug(f"nan energy values for peak {peak}")
         else:
             log.debug(f"nan dt values for peak {peak}")
@@ -948,7 +974,7 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         }
 
     if idxs is not None:
-        Energies = Energies[idxs]
+        energies = energies[idxs]
         dt = dt[idxs]
 
     # Return fwhm of optimal alpha in kev with error
@@ -963,7 +989,7 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
             n_sig_err,
             _,
         ) = get_peak_fwhm_with_dt_corr(
-            Energies,
+            energies,
             alpha,
             dt,
             func,
@@ -973,7 +999,7 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
             kev=True,
             display=display,
         )
-    except:
+    except Exception:
         final_fwhm = np.nan
         final_err = np.nan
         csqr = np.nan
@@ -988,8 +1014,8 @@ def fom_FWHM(tb_in, kwarg_dict, ctc_parameter, alpha, idxs=None, display=0):
         "n_sig_err": n_sig_err,
     }
 
+
 def single_peak_fom(data, kwarg_dict):
-    peaks = kwarg_dict["peaks_keV"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
@@ -997,17 +1023,17 @@ def single_peak_fom(data, kwarg_dict):
         frac_max = kwarg_dict["frac_max"]
     else:
         frac_max = 0.2
-    out_dict = fom_FWHM_with_dt_corr_fit(
-        data, peak_dicts[0], ctc_param, idxs=idx_list[0], frac_max = frac_max, display=0
+    out_dict = fom_fwhm_with_dt_corr_fit(
+        data, peak_dicts[0], ctc_param, idxs=idx_list[0], frac_max=frac_max, display=0
     )
-    
+
     out_dict["y_val"] = out_dict["fwhm"]
     out_dict["y_err"] = out_dict["fwhm_err"]
     return out_dict
 
 
 def new_fom(data, kwarg_dict):
-    peaks = kwarg_dict["peaks_keV"]
+    peaks = kwarg_dict["peaks_kev"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
 
@@ -1018,8 +1044,8 @@ def new_fom(data, kwarg_dict):
     else:
         frac_max = 0.2
 
-    out_dict = fom_FWHM_with_dt_corr_fit(
-        data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], frac_max = frac_max, display=0
+    out_dict = fom_fwhm_with_dt_corr_fit(
+        data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], frac_max=frac_max, display=0
     )
     alpha = out_dict["alpha"]
     log.info(alpha)
@@ -1027,9 +1053,15 @@ def new_fom(data, kwarg_dict):
     fwhm_errs = []
     n_sig = []
     n_sig_err = []
-    for i, peak in enumerate(peaks[:-1]):
-        out_peak_dict = fom_FWHM(
-            data, peak_dicts[i], ctc_param, alpha, idxs=idx_list[i], frac_max = frac_max, display=0
+    for i, _ in enumerate(peaks[:-1]):
+        out_peak_dict = fom_fwhm(
+            data,
+            peak_dicts[i],
+            ctc_param,
+            alpha,
+            idxs=idx_list[i],
+            frac_max=frac_max,
+            display=0,
         )
         fwhms.append(out_peak_dict["fwhm"])
         fwhm_errs.append(out_peak_dict["fwhm_err"])
@@ -1073,7 +1105,6 @@ class BayesianOptimizer:
     the next point using the acquisition function specified.
     """
 
-
     np.random.seed(55)
     lambda_param = 0.01
     eta_param = 0
@@ -1084,7 +1115,7 @@ class BayesianOptimizer:
 
         self.batch_size = batch_size
         self.iters = 0
-        
+
         if isinstance(sampling_rate, str):
             self.sampling_rate = ureg.Quantity(sampling_rate)
         elif isinstance(sampling_rate, pint.Quantity):
@@ -1104,13 +1135,17 @@ class BayesianOptimizer:
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
 
-    def add_dimension(self, name, parameter, min_val, max_val, round_to_samples=False, unit=None):
+    def add_dimension(
+        self, name, parameter, min_val, max_val, round_to_samples=False, unit=None
+    ):
         if round_to_samples is True and self.sampling_rate is None:
             raise ValueError("Must provide sampling rate to round to samples")
         if unit is not None:
             unit = ureg.Quantity(unit)
         self.dims.append(
-            OptimiserDimension(name, parameter, min_val, max_val, round_to_samples, unit)
+            OptimiserDimension(
+                name, parameter, min_val, max_val, round_to_samples, unit
+            )
         )
 
     def get_n_dimensions(self):
@@ -1168,10 +1203,18 @@ class BayesianOptimizer:
                 for y, dim in zip(response.x, self.dims):
                     if dim.round is True and dim.unit is not None:
                         # round so samples is integer
-                        
+
                         x_optimal.append(
-                        float(round((y*(dim.unit / self.sampling_rate)).to("dimensionless"),0)*(self.sampling_rate/dim.unit))
-                    )
+                            float(
+                                round(
+                                    (y * (dim.unit / self.sampling_rate)).to(
+                                        "dimensionless"
+                                    ),
+                                    0,
+                                )
+                                * (self.sampling_rate / dim.unit)
+                            )
+                        )
                     else:
                         x_optimal.append(y)
         if x_optimal in self.x_init:
@@ -1186,7 +1229,15 @@ class BayesianOptimizer:
                 if dim.round is True and dim.unit is not None:
                     # round so samples is integer
                     new_x_optimal.append(
-                    float(round((y*(dim.unit / self.sampling_rate)).to("dimensionless"),0)*(self.sampling_rate/dim.unit))
+                        float(
+                            round(
+                                (y * (dim.unit / self.sampling_rate)).to(
+                                    "dimensionless"
+                                ),
+                                0,
+                            )
+                            * (self.sampling_rate / dim.unit)
+                        )
                     )
                 else:
                     new_x_optimal.append(y)
@@ -1331,7 +1382,7 @@ class BayesianOptimizer:
             plt.xlabel(
                 f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
             )
-            plt.ylabel(f"Kernel Value")
+            plt.ylabel("Kernel Value")
             plt.legend()
         elif len(self.dims) == 2:
             x, y = np.mgrid[
@@ -1427,7 +1478,7 @@ class BayesianOptimizer:
             plt.xlabel(
                 f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
             )
-            plt.ylabel(f"Acquisition Function Value")
+            plt.ylabel("Acquisition Function Value")
             plt.legend()
 
         elif len(self.dims) == 2:
@@ -1491,7 +1542,7 @@ class BayesianOptimizer:
         return fig
 
 
-def run_optimisation(
+def run_multiple_optimisation(
     tb_data,
     dsp_config,
     fom_function,
@@ -1578,11 +1629,11 @@ def get_ctc_grid(grids, ctc_param):
                 nevents_grid[i, j] = grid[i, j][ctc_param]["n_sig"]
                 try:
                     alpha_grid[i, j] = grid[i, j][ctc_param]["alpha"]
-                except:
+                except Exception:
                     pass
                 try:
                     alpha_error_grid[i, j] = grid[i, j][ctc_param]["alpha_err"]
-                except:
+                except Exception:
                     pass
         dt_grids.append(dt_grid)
         alpha_grids.append(alpha_grid)
@@ -1597,14 +1648,13 @@ def interpolate_energy_old(peak_energies, grids, error_grids, energy, nevents_gr
     Interpolates fwhm vs energy for every grid point
     """
 
-    grid_no = len(grids)
     grid_shape = grids[0].shape
     out_grid = np.empty(grid_shape)
     out_grid_err = np.empty(grid_shape)
     n_event_lim = np.array(
         [0.98 * np.nanpercentile(nevents_grid, 50) for nevents_grid in nevents_grids]
     )
-    for index, x in np.ndenumerate(grids[0]):
+    for index, _ in np.ndenumerate(grids[0]):
         points = np.array([grids[i][index] for i in range(len(grids))])
         err_points = np.array([error_grids[i][index] for i in range(len(grids))])
         n_sigs = np.array([nevents_grids[i][index] for i in range(len(grids))])
@@ -1617,7 +1667,7 @@ def interpolate_energy_old(peak_energies, grids, error_grids, energy, nevents_gr
         try:
             if len(points[nan_mask]) > 2:
                 raise ValueError
-            elif nan_mask[-1] == True or nan_mask[-2] == True:
+            elif nan_mask[-1] is True or nan_mask[-2] is True:
                 raise ValueError
             param_guess = [0.2, 0.001, 0.000001]
             param_bounds = param_bounds = (0, [1, np.inf, np.inf])  # ,0.1
@@ -1637,7 +1687,7 @@ def interpolate_energy_old(peak_energies, grids, error_grids, energy, nevents_gr
             )
             out_grid[index] = fit_qbb
             out_grid_err[index] = qbb_err
-        except:
+        except Exception:
             out_grid[index] = np.nan
             out_grid_err[index] = np.nan
     return out_grid, out_grid_err
@@ -1648,7 +1698,6 @@ def find_lowest_grid_point_save(grid, err_grid, opt_dict):
     Finds the lowest grid point, if more than one with same value returns shortest filter.
     """
     opt_name = list(opt_dict.keys())[0]
-    print(opt_name)
     keys = list(opt_dict[opt_name].keys())
     param_list = []
     shape = []
@@ -1664,15 +1713,15 @@ def find_lowest_grid_point_save(grid, err_grid, opt_dict):
 
     total_lengths = np.zeros(shape)
 
-    for index, x in np.ndenumerate(total_lengths):
+    for index, _ in np.ndenumerate(total_lengths):
         for i, param in enumerate(param_list):
             total_lengths[index] += param[index[i]]
     min_val = np.nanmin(grid)
     lowest_ixs = np.where(grid == min_val)
     try:
         fwhm_dict = {"fwhm": min_val, "fwhm_err": err_grid[lowest_ixs][0]}
-    except:
-        print(lowest_ixs)
+    except Exception:
+        pass
     if len(lowest_ixs[0]) == 1:
         for i, key in enumerate(keys):
             if i == 0:
@@ -1688,8 +1737,6 @@ def find_lowest_grid_point_save(grid, err_grid, opt_dict):
                 else:
                     db_dict[opt_name][key] = f"{param_list[i][lowest_ixs[i]][0]}"
     else:
-        shortest_length = np.argmin(total_lengths[lowest_ixs])
-        final_idxs = [lowest_ix[shortest_length] for lowest_ix in lowest_ixs]
         for i, key in enumerate(keys):
             if unit is not None:
                 db_dict[opt_name] = {key: f"{param_list[i][lowest_ixs[i]][0]}*{unit}"}
@@ -1702,13 +1749,12 @@ def interpolate_grid(energies, grids, int_energy, deg, nevents_grids):
     """
     Interpolates energy vs parameter for every grid point using polynomial.
     """
-    grid_no = len(grids)
     grid_shape = grids[0].shape
     out_grid = np.empty(grid_shape)
     n_event_lim = np.array(
         [0.98 * np.nanpercentile(nevents_grid, 50) for nevents_grid in nevents_grids]
     )
-    for index, x in np.ndenumerate(grids[0]):
+    for index, _ in np.ndenumerate(grids[0]):
         points = np.array([grids[i][index] for i in range(len(grids))])
         n_sigs = np.array([nevents_grids[i][index] for i in range(len(grids))])
         nan_mask = np.isnan(points) | (points < 0) | (n_sigs < n_event_lim)
@@ -1719,7 +1765,7 @@ def interpolate_grid(energies, grids, int_energy, deg, nevents_grids):
                 energies[~nan_mask], points[~nan_mask], deg=deg
             )
             out_grid[index] = np.polynomial.polynomial.polyval(int_energy, fit_point)
-        except:
+        except Exception:
             out_grid[index] = np.nan
     return out_grid
 
@@ -1751,7 +1797,6 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
 
         with PdfPages(save_path) as pdf:
             keys = list(opt_dict.keys())
-            print(keys)
             x_dict = opt_dict[keys[1]]
             xvals = np.arange(x_dict["start"], x_dict["end"], x_dict["spacing"])
             xs = (
@@ -1768,7 +1813,6 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
                 xs[1][i] = round(x, 1)
             for i, y in enumerate(ys[1]):
                 ys[1][i] = round(y, 1)
-            print(ixs)
             points = np.array(
                 [dt_grids[i][ixs[0][0], ixs[1][0]] for i in range(len(dt_grids))]
             )
@@ -1840,7 +1884,7 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
             )
             plt.xlabel(f"{keys[1]} (us)")
             plt.ylabel(f"{keys[0]} (us)")
-            plt.title(f"Qbb")
+            plt.title("Qbb")
             plt.xticks(rotation=45)
             cbar = plt.colorbar()
             cbar.set_label("FWHM (keV)")
@@ -1906,12 +1950,12 @@ def get_best_vals(peak_grids, peak_energies, param, opt_dict, save_path=None):
                     fig.suptitle(f"{detector}-{param}")
                     pdf.savefig()
                     plt.close()
-            except:
+            except Exception:
                 alphas = np.nan
     else:
         try:
             alphas = qbb_alphas[ixs[0], ixs[1]][0]
-        except:
+        except Exception:
             alphas = np.nan
     return alphas, fwhm_dict, db_dict, out_grid
 
@@ -1947,7 +1991,7 @@ def get_filter_params(
                 )
             try:
                 full_grids[param][ctc_param] = output_grid
-            except:
+            except Exception:
                 full_grids[param] = {ctc_param: output_grid}
             fwhm.update({"alpha": alpha})
             ctc_dict[ctc_param] = fwhm
