@@ -87,6 +87,8 @@ repos:
   rev: "v2.2.6"
   hooks:
   - id: codespell
+    additional_dependencies:
+      - tomli
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
   rev: "v0.9.0.6"
