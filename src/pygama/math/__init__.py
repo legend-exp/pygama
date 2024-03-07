@@ -1,3 +1,3 @@
 """
-Subpackage description
+Statistical and mathematical utilities.
 """
