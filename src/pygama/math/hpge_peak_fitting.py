@@ -93,7 +93,7 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     return upper_hm - lower_hm, fwfm_unc
 
 
-def hpge_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
+def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
     """
     Return the FWHM of the radford_peak function, ignoring background and step
     components. If calculating error also need the normalisation for the step
@@ -153,7 +153,7 @@ def hpge_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
 
     return upper_hm - lower_hm, fwfm_unc
 
-def get_mode_func(mu, sigma, htail, tau, cov = None):
+def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
         
 
     mode = brentq(hpge_peak_peakshape_derivative,
