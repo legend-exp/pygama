@@ -13,7 +13,7 @@ sto = lh5.LH5Store()
 
 
 def convert_to_minuit(pars, func):
-    c = cost.UnbinnedNLL(np.array([0]), func.pdf)
+    c = cost.UnbinnedNLL(np.array([0]), func.get_pdf)
     if isinstance(pars, dict):
         m = Minuit(c, **pars)
     else:
@@ -27,7 +27,7 @@ def return_nans(input):
         m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
     else:
-        args = input.pdf.__code__.co_varnames[: input.pdf.__code__.co_argcount][1:]
+        args = input.required_args()
         m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
 
