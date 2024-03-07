@@ -93,6 +93,84 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     return upper_hm - lower_hm, fwfm_unc
 
 
+def hpge_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
+    """
+    Return the FWHM of the radford_peak function, ignoring background and step
+    components. If calculating error also need the normalisation for the step
+    function.
+    """
+    # optimize this to find max value
+    def neg_radford_peak_bgfree(E, sigma, htail, tau):
+        return -gauss_on_exgauss.get_pdf(np.array([E]), 0, sigma, htail, tau)[0]
+
+    if htail<0 or htail>1:
+        raise ValueError("htail outside allowed limits of 0 and 1")
+
+    res = minimize_scalar( neg_radford_peak_bgfree,
+                           args=(sigma, htail, tau),
+                           bounds=(-sigma-htail, sigma+htail) )
+    Emax = res.x
+    val_frac_max = -neg_radford_peak_bgfree(Emax, sigma, htail, tau)*frac_max
+
+    # root find this to find the half-max energies
+    def radford_peak_bgfree_fracmax(E, sigma, htail, tau, val_frac_max):
+        return gauss_on_exgauss.get_pdf(np.array([E]), 0, sigma, htail, tau)[0] - val_frac_max
+
+    try:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+                       -(2.5*sigma/2 + htail*tau), Emax,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+               -(5*sigma + htail*tau), Emax,
+               args = (sigma, htail, tau, val_frac_max) )
+    try:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                       Emax, 2.5*sigma/2,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                   Emax, 5*sigma,
+                   args = (sigma, htail, tau, val_frac_max) )
+
+    if cov is None: return upper_hm - lower_hm
+    # this needs fixing at some point
+    #calculate uncertainty
+    #amp set to 1, mu to 0, hstep+bg set to 0
+    pars = [1,0, sigma, htail, tau,0,0]
+    step_norm = 1
+    gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
+    gradmax *= 0.5
+    grad1 = hpge_peak_parameter_gradient(lower_hm, pars,step_norm)
+    grad1 -= gradmax
+    grad1 /= hpge_peak_peakshape_derivative(lower_hm, pars,step_norm)
+    grad2 = hpge_peak_parameter_gradient(upper_hm, pars,step_norm)
+    grad2 -= gradmax
+    grad2 /= hpge_peak_peakshape_derivative(upper_hm, pars,step_norm)
+    grad2 -= grad1
+
+    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
+
+    return upper_hm - lower_hm, fwfm_unc
+
+def get_mode_func(mu, sigma, htail, tau, cov = None):
+        
+
+    mode = brentq(hpge_peak_peakshape_derivative,
+                    mu-sigma, mu+sigma,
+                    args = ([1,mu,sigma,htail,tau,0,0],1 ))
+
+    if cov is not None:
+        rng = np.random.default_rng(1)
+        par_b = rng.multivariate_normal(pars, cov, size=100)
+        modes = np.array([get_mode_func(func, p, cov = None) for p in par_b])
+        mode_err_boot = np.nanstd(modes, axis=0)
+
+        return mode, mode_err_boot
+    else:
+        return mode
+
+
 def hpge_peak_peakshape_derivative(E: np.ndarray, pars: np.ndarray, step_norm: float) -> np.ndarray:
     """
     Computes the derivative of the hpge_peak peak shape
