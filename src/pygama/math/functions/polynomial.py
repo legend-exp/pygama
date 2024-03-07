@@ -35,8 +35,9 @@ def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     
     result = x*0 # do x*0 to keep shape of x (scalar or array)
     if len(pars) == 0: return result
-    result += pars[-1]
+    result += pars[0]
+    y=x
     for i in nb.prange(1, len(pars)):
-        result += pars[-i-1]*x
-        x = x*x
+        result += pars[i]*x
+        x = x*y
     return result
