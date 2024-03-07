@@ -10,10 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
-from pygama.math.binned_fitting import *
-from pygama.math.functions.crystal_ball import nb_crystal_ball_scaled_pdf
-from pygama.math.functions.gauss import nb_gauss
-from pygama.math.histogram import *
+from pygama.math.peak_fitting import *
 
 
 def gaussian_cut(data, cut_sigma=3, plotAxis=None):
@@ -32,11 +29,11 @@ def gaussian_cut(data, cut_sigma=3, plotAxis=None):
     bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
 
     # fit gaussians to that
-    # result = fit_unbinned(nb_gauss, hist, [median, width/2] )
+    # result = fit_unbinned(gauss, hist, [median, width/2] )
     # print("unbinned: {}".format(result))
 
     result = fit_binned(
-        nb_gauss,
+        gauss,
         hist,
         bin_centers,
         [median, width / 2, np.amax(hist) * (width / 2) * np.sqrt(2 * np.pi)],
@@ -47,7 +44,7 @@ def gaussian_cut(data, cut_sigma=3, plotAxis=None):
 
     if plotAxis is not None:
         plotAxis.plot(bin_centers, hist, ls="steps-mid", color="k", label="data")
-        fit = nb_gauss(bin_centers, *result)
+        fit = gauss(bin_centers, *result)
         plotAxis.plot(bin_centers, fit, label="gaussian fit")
         plotAxis.axvline(result[0], color="g", label="fit mean")
         plotAxis.axvline(cut_lo, color="r", label=f"+/- {cut_sigma} sigma")
@@ -74,19 +71,15 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     bin_centers = bins[:-1] + (bins[1] - bins[0]) / 2
 
     # fit gaussians to that
-    # result = fit_unbinned(nb_gauss, hist, [median, width/2] )
+    # result = fit_unbinned(gauss, hist, [median, width/2] )
     # print("unbinned: {}".format(result))
     p0 = get_gaussian_guess(hist, bin_centers)
     bounds = [
-        (p0[2] * 0.2, p0[0] * 0.5, p0[1] * 0.5, 0, 1),
-        (p0[2] * 5, p0[0] * 1.5, p0[1] * 1.5, np.inf, np.inf),
+        (p0[0] * 0.5, p0[1] * 0.5, p0[2] * 0.2, 0, 1),
+        (p0[0] * 1.5, p0[1] * 1.5, p0[2] * 5, np.inf, np.inf),
     ]
     result = fit_binned(
-        nb_crystal_ball_scaled_pdf,
-        hist,
-        bin_centers,
-        [p0[2], p0[0], p0[1], 10, 1],
-        bounds=bounds,
+        xtalball, hist, bin_centers, [p0[0], p0[1], p0[2], 10, 1], bounds=bounds
     )
     # print("binned: {}".format(result))
     cut_lo = result[0] - cut_sigma * result[1]
@@ -95,7 +88,7 @@ def xtalball_cut(data, cut_sigma=3, plotFigure=None):
     if plotFigure is not None:
         plt.figure(plotFigure.number)
         plt.plot(bin_centers, hist, ls="steps-mid", color="k", label="data")
-        fit = nb_crystal_ball_scaled_pdf(bin_centers, *result)
+        fit = xtalball(bin_centers, *result)
         plt.plot(bin_centers, fit, label="xtalball fit")
         plt.axvline(result[0], color="g", label="fit mean")
         plt.axvline(cut_lo, color="r", label=f"+/- {cut_sigma} sigma")

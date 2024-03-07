@@ -28,10 +28,8 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 from sklearn.utils._testing import ignore_warnings
 
-import pygama.math.binned_fitting as pgbf
-import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.hpge_peak_fitting as pghpf
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_cal as pgc
@@ -187,7 +185,7 @@ def simple_guess(hist, bins, var, func_i, fit_range):
     """
     Simple guess for peak fitting
     """
-    if func_i == pgd.hpge_peak.pdf_ext:
+    if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         _, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.nanargmax(hist)
@@ -204,8 +202,6 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
         parguess = [
-            fit_range[0],
-            fit_range[1],
             nsig_guess,
             mu,
             sigma,
@@ -213,10 +209,13 @@ def simple_guess(hist, bins, var, func_i, fit_range):
             tau,
             nbkg_guess,
             hstep,
-        ]
+            fit_range[0],
+            fit_range[1],
+            0,
+        ]  #
         return parguess
 
-    elif func_i == pgd.gauss_on_step.pdf_ext:
+    elif func_i == pgf.extended_gauss_step_pdf:
         mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
@@ -226,7 +225,7 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         n_bins_range = int((4 * sigma) // dx)
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
-        return [fit_range[0], fit_range[1], nsig_guess, mu, sigma, nbkg_guess, hstep]
+        return [nsig_guess, mu, sigma, nbkg_guess, hstep, fit_range[0], fit_range[1], 0]
 
 
 def unbinned_energy_fit(
@@ -253,24 +252,24 @@ def unbinned_energy_fit(
     )
     bin_cs1 = (bins[:-1] + bins[1:]) / 2
     if guess is not None:
-        x0 = [*guess[:-2], fit_range[0], fit_range[1]]
+        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
     else:
-        if func == pgd.hpge_peak.pdf_ext:
-            x0 = simple_guess(hist1, bins, var, pgd.gauss_on_step.pdf_ext, fit_range)
+        if func == pgf.extended_radford_pdf:
+            x0 = simple_guess(hist1, bins, var, pgf.extended_gauss_step_pdf, fit_range)
             if verbose:
                 print(x0)
-            c = cost.ExtendedUnbinnedNLL(energy, pgd.gauss_on_step.pdf_ext)
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
             m = Minuit(c, *x0)
-            m.fixed[:2] = True
+            m.fixed[-3:] = True
             m.simplex().migrad()
             m.hesse()
             if guess is not None:
-                x0_rad = [fit_range[0], fit_range[1], *guess[2:]]
+                x0_rad = [*guess[:-2], fit_range[0], fit_range[1], False]
             else:
                 x0_rad = simple_guess(hist1, bins, var, func, fit_range)
-            x0 = m.values[:5]
-            x0 += x0_rad[5:7]
-            x0 += m.values[5:]
+            x0 = m.values[:3]
+            x0 += x0_rad[3:5]
+            x0 += m.values[3:]
         else:
             x0 = simple_guess(hist1, bins, var, func, fit_range)
     if verbose:
@@ -279,7 +278,7 @@ def unbinned_energy_fit(
     m = Minuit(c, *x0)
     if tol is not None:
         m.tol = tol
-    m.fixed[:2] = True
+    m.fixed[-3:] = True
     m.migrad()
     m.hesse()
 
@@ -291,17 +290,17 @@ def unbinned_energy_fit(
         m.valid
         # & m.accurate
         & (~np.isnan(m.errors).any())
-        & (~(np.array(m.errors[2:]) == 0).all())
+        & (~(np.array(m.errors[:-3]) == 0).all())
     )
 
-    cs = pgbf.goodness_of_fit(
-        hist, bins, None, gof_func, m.values[2:], method="Pearson"
+    cs = pgf.goodness_of_fit(
+        hist, bins, None, gof_func, m.values[:-3], method="Pearson"
     )
     cs = cs[0] / cs[1]
     m2 = Minuit(c, *x0)
     if tol is not None:
         m2.tol = tol
-    m2.fixed[:2] = True
+    m2.fixed[-3:] = True
     m2.simplex().migrad()
     m2.hesse()
     m2_fit = func(bin_cs1, *m2.values)[1]
@@ -309,16 +308,16 @@ def unbinned_energy_fit(
         m2.valid
         # & m2.accurate
         & (~np.isnan(m.errors).any())
-        & (~(np.array(m2.errors[2:]) == 0).all())
+        & (~(np.array(m2.errors[:-3]) == 0).all())
     )
 
-    cs2 = pgbf.goodness_of_fit(
-        hist, bins, None, gof_func, m2.values[2:], method="Pearson"
+    cs2 = pgf.goodness_of_fit(
+        hist, bins, None, gof_func, m2.values[:-3], method="Pearson"
     )
     cs2 = cs2[0] / cs2[1]
 
-    frac_errors1 = np.sum(np.abs(np.array(m.errors)[2:] / np.array(m.values)[2:]))
-    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[2:] / np.array(m2.values)[2:]))
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[:-3] / np.array(m.values)[:-3]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[:-3] / np.array(m2.values)[:-3]))
 
     if verbose:
         print(m)
@@ -341,21 +340,21 @@ def unbinned_energy_fit(
         m = Minuit(c, *x0)
         if tol is not None:
             m.tol = tol
-        m.fixed[:2] = True
+        m.fixed[-3:] = True
         m.limits = pgc.get_hpge_E_bounds(func)
         m.simplex().simplex().migrad()
         m.hesse()
         if verbose:
             print(m)
-        cs = pgbf.goodness_of_fit(
-            hist, bins, None, gof_func, m.values[:-2], method="Pearson"
+        cs = pgf.goodness_of_fit(
+            hist, bins, None, gof_func, m.values[:-3], method="Pearson"
         )
         cs = cs[0] / cs[1]
         valid3 = (
             m.valid
             # & m.accurate
             & (~np.isnan(m.errors).any())
-            & (~(np.array(m.errors[2:]) == 0).all())
+            & (~(np.array(m.errors[:-3]) == 0).all())
         )
         if valid3 is False:
             try:
@@ -363,7 +362,7 @@ def unbinned_energy_fit(
                 valid3 = (
                     m.valid
                     & (~np.isnan(m.errors).any())
-                    & (~(np.array(m.errors[2:]) == 0).all())
+                    & (~(np.array(m.errors[:-3]) == 0).all())
                 )
             except:
                 raise RuntimeError
@@ -375,25 +374,25 @@ def unbinned_energy_fit(
 
     elif valid2 == False or cs * 1.05 < cs2:
         pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-2]
+        errs = np.array(m.errors)[:-3]
         cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif valid1 == False or cs2 * 1.05 < cs:
         pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-2]
+        errs = np.array(m2.errors)[:-3]
         cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
     elif frac_errors1 < frac_errors2:
         pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-2]
+        errs = np.array(m.errors)[:-3]
         cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif frac_errors1 > frac_errors2:
         pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-2]
+        errs = np.array(m2.errors)[:-3]
         cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
@@ -480,16 +479,14 @@ def get_peak_fwhm_with_dt_corr(
                 guess=guess,
                 tol=tol,
             )
-        if func == pgd.hpge_peak.pdf_ext:
+        if func == pgf.extended_radford_pdf:
             if energy_pars[3] < 1e-6 and energy_err[3] < 1e-6:
                 fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
                 fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
             else:
-                fwhm = pghpf.hpge_peak_fwhm(
-                    energy_pars[2], energy_pars[3], energy_pars[4]
-                )
+                fwhm = pgf.radford_fwhm(energy_pars[2], energy_pars[3], energy_pars[4])
 
-        elif func == pgd.gauss_on_step.pdf_ext:
+        elif func == pgf.extended_gauss_step_pdf:
             fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
             fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
 
@@ -507,18 +504,18 @@ def get_peak_fwhm_with_dt_corr(
 
         yerr_boot = np.nanstd(y_max, axis=0)
 
-        if func == pgd.hpge_peak.pdf_ext and not (
+        if func == pgf.extended_radford_pdf and not (
             energy_pars[3] < 1e-6 and energy_err[3] < 1e-6
         ):
             y_b = np.zeros(len(par_b))
             for i, p in enumerate(par_b):
                 try:
-                    y_b[i] = pghpf.hpge_peak_fwhm(p[2], p[3], p[4])  #
+                    y_b[i] = pgf.radford_fwhm(p[2], p[3], p[4])  #
                 except:
                     y_b[i] = np.nan
             fwhm_err = np.nanstd(y_b, axis=0)
             if fwhm_err == 0:
-                fwhm, fwhm_err = pghpf.hpge_peak_fwhm(
+                fwhm, fwhm_err = pgf.radford_fwhm(
                     energy_pars[2],
                     energy_pars[3],
                     energy_pars[4],

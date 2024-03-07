@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 
-from pygama.math.distributions import *
 from pygama.math.histogram import get_bin_centers
+from pygama.math.peak_fitting import *
 
 
 def get_avse_cut(e_cal, current, plotFigure=None):
@@ -59,17 +59,17 @@ def get_avse_cut(e_cal, current, plotFigure=None):
 
         p0 = get_gaussian_guess(h, a_bins_cent)
         fit_idxs = a_bins_cent > p0[0] - 5 * p0[1]
-        p = fit_binned(nb_gauss, h[fit_idxs], a_bins_cent[fit_idxs], p0)
+        p = fit_binned(gauss, h[fit_idxs], a_bins_cent[fit_idxs], p0)
         y_max[i] = p[0]
 
         # plt.plot(a_bins_cent,h,ls="steps")
         # plt.axvline(a_mode, c="r")
         # plt.title("Energy: {} keV".format(e_cent[i]))
         #
-        # fit = nb_gauss(a_bins_cent[fit_idxs], *p)
+        # fit = gauss(a_bins_cent[fit_idxs], *p)
         # plt.plot(a_bins_cent[fit_idxs], fit, c="g")
 
-        # guess = nb_gauss(a_bins_cent[fit_idxs], *p0)
+        # guess = gauss(a_bins_cent[fit_idxs], *p0)
         # plt.plot(a_bins_cent[fit_idxs], guess, c="r")
 
         # inp = input("q to quit")
@@ -99,8 +99,8 @@ def get_avse_cut(e_cal, current, plotFigure=None):
     h_bgs = h_dep - h_bg
     # fit AvsE peak to gaussian to get the 90% cut
     p0 = get_gaussian_guess(h_bgs, bin_centers)
-    p = fit_binned(nb_gauss, h_bgs, bin_centers, p0)
-    fit = nb_gauss(bin_centers, *p)
+    p = fit_binned(gauss, h_bgs, bin_centers, p0)
+    fit = gauss(bin_centers, *p)
 
     ae_mean, ae_std = p[0], p[1]
     ae_cut = p[0] - 1.28 * p[1]  # cuts at 10% of CDF
@@ -250,8 +250,8 @@ def get_ae_cut(e_cal, current, plotFigure=None):
     h_bgs = h_dep - h_bg
 
     p0 = get_gaussian_guess(h_bgs, bin_centers)
-    p = fit_binned(nb_gauss, h_bgs, bin_centers, p0)
-    fit = nb_gauss(bin_centers, *p)
+    p = fit_binned(gauss, h_bgs, bin_centers, p0)
+    fit = gauss(bin_centers, *p)
 
     ae_mean, ae_std = p[0], p[1]
     ae_cut = p[0] - 1.28 * p[1]  # cuts at 10% of CDF

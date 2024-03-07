@@ -16,8 +16,8 @@ from lgdo.types import Table
 from scipy import stats
 
 import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
-from pygama.math.binned_fitting import gauss_mode_width_max
 
 log = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def generate_cuts(
 
             fwhm = pgh.get_fwhm(counts, bins)[0]
             mean = float(bin_centres[np.argmax(counts)])
-            pars, cov = gauss_mode_width_max(
+            pars, cov = pgf.gauss_mode_width_max(
                 counts,
                 bins,
                 mode_guess=mean,

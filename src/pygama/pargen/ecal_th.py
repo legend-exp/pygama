@@ -25,9 +25,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit
 
-import pygama.math.binned_fitting as pgbf
-import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.energy_cal as cal
 from pygama.pargen.utils import load_data, return_nans
@@ -143,24 +142,24 @@ class calibrate_parameter:
         (60, 60),
     ]  # side bands width
     funcs = [
-        # pgd.gauss_on_step.pdf_ext,
-        pgd.hpge_peak.pdf_ext,
-        pgd.hpge_peak.pdf_ext,
-        pgd.hpge_peak.pdf_ext,
-        pgd.gauss_on_step.pdf_ext,
-        pgd.gauss_on_step.pdf_ext,
-        pgd.gauss_on_step.pdf_ext,
-        pgd.hpge_peak.pdf_ext,
+        # pgf.extended_gauss_step_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_radford_pdf,
+        pgf.extended_gauss_step_pdf,
+        pgf.extended_gauss_step_pdf,
+        pgf.extended_gauss_step_pdf,
+        pgf.extended_radford_pdf,
     ]
     gof_funcs = [
-        # pgd.gauss_on_step.get_pdf,
-        pgd.hpge_peak.get_pdf,
-        pgd.hpge_peak.get_pdf,
-        pgd.hpge_peak.get_pdf,
-        pgd.gauss_on_step.get_pdf,
-        pgd.gauss_on_step.get_pdf,
-        pgd.gauss_on_step.get_pdf,
-        pgd.gauss_on_step.get_pdf,
+        # pgf.gauss_step_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.radford_pdf,
+        pgf.gauss_step_pdf,
+        pgf.gauss_step_pdf,
+        pgf.gauss_step_pdf,
+        pgf.radford_pdf,
     ]
 
     def __init__(
@@ -963,7 +962,7 @@ def get_peak_labels(
         if i % 2 == 1:
             continue
         else:
-            out.append(f"{pgd.nb_poly(label, pars):.1f}")
+            out.append(f"{pgf.poly(label, pars):.1f}")
             out_labels.append(label)
     return out_labels, out
 
@@ -1004,13 +1003,13 @@ def plot_fits(
             fitted_gof_funcs.append(ecal_class.gof_funcs[i])
 
     mus = [
-        func_i.get_mu(pars_i) if pars_i is not None else np.nan
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
 
     fig = plt.figure()
     derco = np.polyder(np.poly1d(ecal_class.pars)).coefficients
-    der = [pgd.nb_poly(5, derco) for Ei in fitted_peaks]
+    der = [pgf.poly(5, derco) for Ei in fitted_peaks]
     for i, peak in enumerate(mus):
         range_adu = 5 / der[i]
         plt.subplot(nrows, ncols, i + 1)
@@ -1260,12 +1259,12 @@ def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 27
     fitted_peaks = np.array(fitted_peaks)[valid_fits]
 
     mus = [
-        func_i.get_mu(pars_i) if pars_i is not None else np.nan
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
     ]
 
     mu_errs = [
-        func_i.get_mu(pars_i) if pars_i is not None else np.nan
+        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
         for func_i, pars_i in zip(fitted_gof_funcs, pk_errs)
     ]
 
@@ -1280,16 +1279,16 @@ def plot_cal_fit(ecal_class, data, figsize=[12, 8], fontsize=12, erange=[200, 27
 
     ax1.scatter(fitted_peaks, mus, marker="x", c="b")
 
-    ax1.plot(pgd.nb_poly(cal_bins, ecal_class.pars), cal_bins, lw=1, c="g")
+    ax1.plot(pgf.poly(cal_bins, ecal_class.pars), cal_bins, lw=1, c="g")
 
     ax1.grid()
     ax1.set_xlim([erange[0], erange[1]])
     ax1.set_ylabel("Energy (ADC)")
     ax2.errorbar(
         fitted_peaks,
-        pgd.nb_poly(np.array(mus), ecal_class.pars) - fitted_peaks,
-        yerr=pgd.nb_poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
-        - pgd.nb_poly(np.array(mus), ecal_class.pars),
+        pgf.poly(np.array(mus), ecal_class.pars) - fitted_peaks,
+        yerr=pgf.poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
+        - pgf.poly(np.array(mus), ecal_class.pars),
         linestyle=" ",
         marker="x",
         c="b",

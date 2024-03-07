@@ -19,8 +19,8 @@ import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 
-import pygama.math.binned_fitting as pgbf
 import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
@@ -99,7 +99,7 @@ def get_decay_constant(
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
-        pars, cov = pgbf.gauss_mode_width_max(
+        pars, cov = pgf.gauss_mode_width_max(
             counts,
             bins,
             n_bins=10,
@@ -162,7 +162,7 @@ def fom_dpz(tb_data, verbosity=0, rand_arg=None):
     max_idx = np.argmax(counts)
     mu = start_bins[max_idx]
     try:
-        pars, cov = pgbf.gauss_mode_width_max(
+        pars, cov = pgf.gauss_mode_width_max(
             counts,
             start_bins,
             mode_guess=mu,
