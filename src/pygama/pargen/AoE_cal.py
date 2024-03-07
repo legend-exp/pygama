@@ -15,7 +15,7 @@ from typing import Callable
 import matplotlib as mpl
 
 mpl.use("agg")
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
@@ -29,8 +29,8 @@ from scipy.stats import chi2
 
 import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.hpge_peak_fitting as pghpf
-from pygama.math.functions.error_function import nb_erfc
+import pygama.math.peak_fitting as pgf
+from pygama.math.peak_fitting import nb_erfc
 from pygama.pargen.energy_cal import get_i_local_maxima
 from pygama.pargen.utils import *
 
@@ -352,7 +352,7 @@ class standard_aoe_with_high_tail(PDF):
         ]
 
     def width(pars, errs, cov):
-        fwhm, fwhm_err = pghpf.hpge_peak_fwhm(
+        fwhm, fwhm_err = pgf.radford_fwhm(
             pars[2], pars[3], np.abs(pars[4]), cov=cov[:7, :7]
         )
         return fwhm / 2.355, fwhm_err / 2.355
@@ -943,6 +943,9 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
             tau,
             nbkg_guess,
             hstep,
+            fit_range[0],
+            fit_range[1],
+            0,
         ]
         for i, guess in enumerate(parguess):
             if np.isnan(guess):
@@ -966,13 +969,14 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
             nsig_guess = 0
 
         parguess = [
-            fit_range[0],
-            fit_range[1],
             nsig_guess,
             mu,
             sigma,
             nbkg_guess,
             hstep,
+            fit_range[0],
+            fit_range[1],
+            0,
         ]
         for i, guess in enumerate(parguess):
             if np.isnan(guess):
@@ -1317,7 +1321,6 @@ class cal_aoe:
         self.dt_cut = dt_cut
         self.dep_acc = dep_acc
         if self.dt_cut is not None:
-            self.update_cal_dicts(dt_cut["cut"])
             self.dt_cut_param = dt_cut["out_param"]
             self.fit_selection = f"{self.selection_string} & {self.dt_cut_param}"
             self.dt_cut_hard = dt_cut["hard"]

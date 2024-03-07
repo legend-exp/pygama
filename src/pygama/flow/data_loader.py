@@ -14,7 +14,9 @@ from typing import Iterator
 import numpy as np
 import pandas as pd
 from dspeed.vis import WaveformBrowser
-from lgdo import Array, LH5Iterator, LH5Store, Struct, Table, lgdo_utils
+from lgdo.lh5 import LH5Iterator, LH5Store
+from lgdo.lh5.utils import expand_vars
+from lgdo.types import Array, Struct, Table
 from lgdo.types.vectorofvectors import build_cl, explode_arrays, explode_cl
 from tqdm.auto import tqdm
 
@@ -193,9 +195,7 @@ class DataLoader:
         # look for info in configuration if FileDB is not set
         if self.filedb is None:
             # expand $_ variables
-            value = lgdo_utils.expand_vars(
-                config["filedb"], substitute={"_": config_dir}
-            )
+            value = expand_vars(config["filedb"], substitute={"_": config_dir})
             self.filedb = FileDB(value)
 
         if not os.path.isdir(self.filedb.data_dir):
@@ -505,6 +505,8 @@ class DataLoader:
 
         # Find out which columns are needed for any cuts
         cut_cols = {}
+        # ... and pre-load which tiers need to be loaded to make the cuts
+        col_tiers_dict = {}
 
         for level in [child, parent]:
             cut_cols[level] = []
@@ -527,6 +529,9 @@ class DataLoader:
                             and save_output_columns
                         ):
                             for_output.append(term)
+            col_tiers_dict[level] = self.get_tiers_for_col(
+                cut_cols[level], merge_files=False
+            )
 
         if save_output_columns:
             entry_cols += for_output
@@ -579,17 +584,17 @@ class DataLoader:
 
             tcm_table_name = self.filedb.get_table_name(tcm_tier, tcm_tb)
             try:
-                tcm_lgdo, _ = sto.read_object(tcm_table_name, tcm_path)
+                tcm_lgdo, _ = sto.read(tcm_table_name, tcm_path)
             except KeyError:
                 log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
                 continue
-            # Have to do some hacky stuff until I get a get_dataframe() method
+            # Have to do some hacky stuff until I get a view_as("pd") method
             tcm_lgdo[self.tcms[tcm_level]["tcm_cols"]["child_idx"]] = Array(
                 nda=explode_cl(tcm_lgdo["cumulative_length"].nda)
             )
             tcm_lgdo.pop("cumulative_length")
             tcm_tb = Table(col_dict=tcm_lgdo)
-            f_entries = tcm_tb.get_dataframe()
+            f_entries = tcm_tb.view_as("pd")
             renaming = {
                 self.tcms[tcm_level]["tcm_cols"]["child_idx"]: f"{child}_idx",
                 self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
@@ -611,7 +616,7 @@ class DataLoader:
                     if level in self.cuts.keys():
                         cut = self.cuts[level]
 
-                col_tiers = self.get_tiers_for_col(cut_cols[level], merge_files=False)
+                col_tiers = col_tiers_dict[level]
 
                 # Tables in first tier of event should be the same for all tiers in one level
                 tables = self.filedb.df.loc[file, f"{self.tiers[level][0]}_tables"]
@@ -644,7 +649,7 @@ class DataLoader:
                             if tb in col_tiers[file]["tables"][tier]:
                                 table_name = self.filedb.get_table_name(tier, tb)
                                 try:
-                                    tier_table, _ = sto.read_object(
+                                    tier_table, _ = sto.read(
                                         table_name,
                                         tier_path,
                                         field_mask=cut_cols[level],
@@ -661,7 +666,7 @@ class DataLoader:
                                     tb_table.join(tier_table)
                     if tb_table is None:
                         continue
-                    tb_df = tb_table.get_dataframe()
+                    tb_df = tb_table.view_as("pd")
                     tb_df.query(cut, inplace=True)
                     idx_match = f_entries.query(f"{level}_idx in {list(tb_df.index)}")
                     if level == parent:
@@ -703,11 +708,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                    sto.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(
-                        f_struct, f"entries/{file}", output_file, wo_mode="a"
-                    )
+                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -857,7 +860,7 @@ class DataLoader:
                             # load the data from the tier file, just the columns needed for the cut
                             table_name = self.filedb.get_table_name(tier, tb)
                             try:
-                                tier_tb, _ = sto.read_object(
+                                tier_tb, _ = sto.read(
                                     table_name, tier_path, field_mask=cut_cols
                                 )
                             except KeyError:
@@ -865,7 +868,7 @@ class DataLoader:
                                     f"Cannot find {table_name} in file {tier_path}"
                                 )
                                 continue
-                            # join eveything in one table
+                            # join everything in one table
                             if tb_table is None:
                                 tb_table = tier_tb
                             else:
@@ -875,7 +878,7 @@ class DataLoader:
                         continue
 
                     # convert to DataFrame and apply cuts
-                    tb_df = tb_table.get_dataframe()
+                    tb_df = tb_table.view_as("pd")
                     tb_df.query(cut, inplace=True)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
@@ -897,11 +900,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write_object(f_struct, "entries", output_file, wo_mode="a")
+                    sto.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write_object(
-                        f_struct, f"entries/{file}", output_file, wo_mode="a"
-                    )
+                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -1112,7 +1113,7 @@ class DataLoader:
                         for file in files
                     ]
 
-                    tier_table, _ = sto.read_object(
+                    tier_table, _ = sto.read(
                         name=tb_name,
                         lh5_file=tier_paths,
                         idx=idx_mask,
@@ -1138,12 +1139,12 @@ class DataLoader:
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
-                sto.write_object(f_table, "merged_data", output_file, wo_mode="o")
+                sto.write(f_table, "merged_data", output_file, wo_mode="o")
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return f_table
                 elif self.output_format == "pd.DataFrame":
-                    return f_table.get_dataframe()
+                    return f_table.view_as("pd")
                 else:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"
@@ -1215,7 +1216,7 @@ class DataLoader:
                             raise FileNotFoundError(tier_path)
 
                         table_name = self.filedb.get_table_name(tier, tb)
-                        tier_table, _ = sto.read_object(
+                        tier_table, _ = sto.read(
                             table_name,
                             tier_path,
                             idx=idx_mask,
@@ -1241,7 +1242,7 @@ class DataLoader:
                 if in_memory:
                     load_out.add_field(name=file, obj=f_table)
                 if output_file:
-                    sto.write_object(f_table, f"{file}", output_file, wo_mode="o")
+                    sto.write(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
@@ -1254,7 +1255,7 @@ class DataLoader:
                     return load_out
                 elif self.output_format == "pd.DataFrame":
                     for file in load_out.keys():
-                        load_out[file] = load_out[file].get_dataframe()
+                        load_out[file] = load_out[file].view_as("pd")
                     return load_out
                 else:
                     raise ValueError(
@@ -1313,7 +1314,7 @@ class DataLoader:
                                 )
                                 if os.path.exists(tier_path):
                                     table_name = self.filedb.get_table_name(tier, tb)
-                                    tier_table, _ = sto.read_object(
+                                    tier_table, _ = sto.read(
                                         table_name,
                                         tier_path,
                                         idx=idx_mask,
@@ -1327,7 +1328,7 @@ class DataLoader:
                 if in_memory:
                     load_out[file] = f_table
                 if output_file:
-                    sto.write_object(f_table, f"file{file}", output_file, wo_mode="o")
+                    sto.write(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
 
             if in_memory:
@@ -1335,7 +1336,7 @@ class DataLoader:
                     return load_out
                 elif self.output_format == "pd.DataFrame":
                     for file in load_out.keys():
-                        load_out[file] = load_out[file].get_dataframe()
+                        load_out[file] = load_out[file].view_as("pd")
                     return load_out
                 else:
                     raise ValueError(

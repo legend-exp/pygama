@@ -1,0 +1,85 @@
+{
+  "channels": {
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"],
+    "ts_master": "ch1084803"
+  },
+  "outputs": [
+    "timestamp",
+    "energy",
+    "energy_sum",
+    "energy_id",
+    "energy_idx",
+    "aoe",
+    "aoe_idx",
+    "multiplicity",
+    "is_saturated",
+    "energy_times_aoe",
+    "energy_times_multiplicity",
+    "multiplicity_squared"
+  ],
+  "operations": {
+    "timestamp": {
+      "channels": "ts_master",
+      "aggregation_mode": "sum",
+      "expression": "dsp.timestamp",
+      "initial": 0.0
+    },
+    "energy": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal"
+    },
+    "energy_sum": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "hit.cuspEmax_ctc_cal",
+      "initial": 0.0
+    },
+    "energy_idx": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.index",
+      "sort": "ascend_by:dsp.tp_0_est",
+      "initial": 0
+    },
+    "energy_id": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "query": "hit.cuspEmax_ctc_cal>25",
+      "expression": "tcm.array_id",
+      "sort": "ascend_by:dsp.tp_0_est",
+      "initial": 0
+    },
+    "aoe": {
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
+      "expression": "hit.AoE_Classifier"
+    },
+    "aoe_idx": {
+      "aggregation_mode": "keep_at_idx:evt.energy_idx",
+      "expression": "hit.AoE_Classifier"
+    },
+    "multiplicity": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "expression": "hit.cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0
+    },
+    "is_saturated": {
+      "aggregation_mode": "keep_at_ch:evt.energy_id",
+      "expression": "hit.is_saturated"
+    },
+    "energy_times_aoe": {
+      "expression": "evt.energy*evt.aoe"
+    },
+    "energy_times_multiplicity": {
+      "expression": "evt.energy*evt.multiplicity"
+    },
+    "multiplicity_squared": {
+      "expression": "evt.multiplicity*evt.multiplicity"
+    }
+  }
+}

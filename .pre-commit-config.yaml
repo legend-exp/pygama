@@ -6,7 +6,7 @@ ci:
 exclude: ^(attic|tutorials|src/pygama/math|src/pygama/flow/datagroup.py)
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: "v4.4.0"
+  rev: "v4.5.0"
   hooks:
   - id: check-added-large-files
   - id: check-case-conflict
@@ -26,35 +26,35 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/asottile/setup-cfg-fmt
-  rev: "v2.4.0"
+  rev: "v2.5.0"
   hooks:
   - id: setup-cfg-fmt
 
 - repo: https://github.com/PyCQA/isort
-  rev: "5.12.0"
+  rev: "5.13.2"
   hooks:
   - id: isort
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: "v3.13.0"
+  rev: "v3.15.0"
   hooks:
   - id: pyupgrade
     args: ["--py38-plus"]
 
 - repo: https://github.com/psf/black
-  rev: "23.9.1"
+  rev: "23.12.1"
   hooks:
   - id: black-jupyter
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: "v1.5.1"
+  rev: "v1.8.0"
   hooks:
   - id: mypy
     files: src
     stages: [manual]
 
 - repo: https://github.com/hadialqattan/pycln
-  rev: "v2.2.2"
+  rev: "v2.4.0"
   hooks:
   - id: pycln
     exclude: ^src/pygama/pargen
@@ -70,6 +70,7 @@ repos:
       flake8-print,
       pep8-naming
     ]
+    args: ["--extend-ignore", "E203,E501"]
 
 - repo: https://github.com/kynan/nbstripout
   rev: "0.6.1"
@@ -85,9 +86,11 @@ repos:
     stages: [manual]
 
 - repo: https://github.com/codespell-project/codespell
-  rev: "v2.2.5"
+  rev: "v2.2.6"
   hooks:
   - id: codespell
+    additional_dependencies:
+      - tomli
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
   rev: "v0.9.0.6"
@@ -103,7 +106,7 @@ repos:
   - id: rst-inline-touching-normal
 
 - repo: https://github.com/pre-commit/mirrors-prettier
-  rev: "v3.0.3"
+  rev: "v4.0.0-alpha.8"
   hooks:
     - id: prettier
       types_or: [json]

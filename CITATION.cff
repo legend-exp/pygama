@@ -1,0 +1,58 @@
+cff-version: 1.2.0
+title: pygama
+doi: https://doi.org/10.5281/zenodo.10614246
+date-released: 2024-02-03
+url: https://github.com/github-linguist/linguist
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Agostini
+    given-names: Matteo
+    orcid: https://orcid.org/0000-0003-1151-5301
+  - family-names: Detwiler
+    given-names: Jason
+    orcid: https://orcid.org/0000-0002-9050-4610
+  - family-names: Pertoldi
+    given-names: Luigi
+    orcid: https://orcid.org/0000-0002-0467-2571
+  - family-names: Guinn
+    given-names: Ian
+    orcid: https://orcid.org/0000-0002-2424-3272
+  - family-names: Marshall
+    given-names: George
+    orcid: https://orcid.org/0000-0002-5470-5132
+  - family-names: D'Andrea
+    given-names: Valerio
+    orcid: https://orcid.org/0000-0003-2037-4133
+  - family-names: Krause
+    given-names: Patrick
+    orcid: https://orcid.org/0000-0002-9603-7865
+  - family-names: Song
+    given-names: Grace
+    email: grsong@uw.edu
+  - family-names: Engelhardt
+    given-names: Erin
+    email: erin717@live.unc.edu
+  - family-names: Borden
+    given-names: Sam
+    orcid: https://orcid.org/0009-0003-2539-4333
+  - family-names: Deckert
+    given-names: Rosanna
+    orcid: https://orcid.org/0009-0006-0431-341X
+  - family-names: Sweigart
+    given-names: David
+    email: dsweigar@uw.edu
+  - family-names: Zschocke
+    given-names: Andreas
+    email: Andreas.Zschocke@uni-tuebingen.de
+  - family-names: Wiseman
+    given-names: Clint
+    orcid: https://orcid.org/0000-0002-4232-1326
+  - family-names: Mathew
+    given-names: Tim
+    email: tmathew@uoregon.edu
+  - family-names: Kermaïdic
+    given-names: Yoann
+    orcid: https://orcid.org/0000-0001-8007-8016
+  - family-names: Shanks
+    given-names: Ben
+    email: benjamin.shanks@gmail.com

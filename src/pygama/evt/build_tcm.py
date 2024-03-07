@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-import lgdo as lgdo
+import lgdo
+from lgdo import lh5
 
 from . import tcm as ptcm
 
@@ -49,7 +50,7 @@ def build_tcm(
     out_name
         name for the TCM table in the output file.
     wo_mode
-        mode to send to :meth:`~.lgdo.lh5_store.LH5Store.write_object`.
+        mode to send to :meth:`~.lgdo.lh5.LH5Store.write`.
 
     See Also
     --------
@@ -57,7 +58,7 @@ def build_tcm(
     """
     # hash_func: later can add list or dict or a function(str) --> int.
 
-    store = lgdo.LH5Store()
+    store = lh5.LH5Store()
     coin_data = []
     array_ids = []
     all_tables = []
@@ -65,7 +66,7 @@ def build_tcm(
         if isinstance(patterns, str):
             patterns = [patterns]
         for pattern in patterns:
-            tables = lgdo.ls(filename, lh5_group=pattern)
+            tables = lh5.ls(filename, lh5_group=pattern)
             for table in tables:
                 all_tables.append(table)
                 array_id = len(array_ids)
@@ -79,7 +80,7 @@ def build_tcm(
                 else:
                     array_id = len(all_tables) - 1
                 table = table + "/" + coin_col
-                coin_data.append(store.read_object(table, filename)[0].nda)
+                coin_data.append(store.read(table, filename)[0].nda)
                 array_ids.append(array_id)
 
     tcm_cols = ptcm.generate_tcm_cols(
@@ -94,6 +95,6 @@ def build_tcm(
     )
 
     if out_file is not None:
-        store.write_object(tcm, out_name, out_file, wo_mode=wo_mode)
+        store.write(tcm, out_name, out_file, wo_mode=wo_mode)
 
     return tcm
