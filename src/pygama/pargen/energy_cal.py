@@ -18,7 +18,8 @@ from matplotlib.colors import LogNorm
 from scipy.stats import binned_statistic, chi2
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
+import pygama.math.distributions as pgf
+import pygama.math.binned_fitting as pgb
 import pygama.math.utils as pgu
 from pygama.pargen.utils import convert_to_minuit, return_nans
 
@@ -192,7 +193,7 @@ class HPGeCalibration:
             peaks_kev = self.peaks_kev
 
         derco = np.polyder(np.poly1d(self.pars)).coefficients
-        der = [pgf.poly(ei, derco) for ei in peaks_kev]
+        der = [pgf.nb_poly(ei, derco) for ei in peaks_kev]
 
         # bin the histogram in ~1 kev bins for the initial rough peak search
         if erange is None:
@@ -331,7 +332,7 @@ class HPGeCalibration:
         imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
 
         # Keep maxes if they coincide with expected peaks
-        test_peaks_kev = np.asarray([pgf.poly(i, self.pars) for i in bins[imaxes]])
+        test_peaks_kev = np.asarray([pgf.nb_poly(i, self.pars) for i in bins[imaxes]])
         imatch = [abs(peaks_kev - i).min() < etol_kev for i in test_peaks_kev]
 
         got_peak_locations = bins[imaxes[imatch]]
@@ -473,7 +474,7 @@ class HPGeCalibration:
             if peak in self.peaks_kev:
                 loc = self.peak_locs[np.where(peak == self.peaks_kev)][0]
             else:
-                loc = pgf.poly(peak, derco)
+                loc = pgf.nb_poly(peak, derco)
 
             if fit_range is None:
                 euc_min, euc_max = (
@@ -505,7 +506,7 @@ class HPGeCalibration:
                 else:
                     range_uncal = None
             elif isinstance(fit_range, tuple):
-                der = pgf.poly(peak, derco)
+                der = pgf.nb_poly(peak, derco)
                 range_uncal = (fit_range[0] / der, fit_range[1] / der)
                 n_bins = int(sum(fit_range) / 0.5 / der)
 
@@ -534,7 +535,6 @@ class HPGeCalibration:
                         cov_i,
                         csqr_i,
                         func_i,
-                        gof_func_i,
                         mask,
                         valid_fit,
                         _,
@@ -571,7 +571,7 @@ class HPGeCalibration:
                     fixed, mask = get_hpge_energy_fixed(func_i)
                     bounds = get_hpge_energy_bounds(func_i, x0)
 
-                    pars_i, errs_i, cov_i = pgf.fit_binned(
+                    pars_i, errs_i, cov_i = pgb.fit_binned(
                         func_i,
                         hist,
                         bins,
@@ -584,11 +584,11 @@ class HPGeCalibration:
                     )
                     valid_fit = True
 
-                    csqr = pgf.goodness_of_fit(
+                    csqr = pgb.goodness_of_fit(
                         hist,
                         bins,
                         None,
-                        gof_func_i,
+                        func_i.pdf,
                         pars_i,
                         method="Pearson",
                         scale_bins=False,
@@ -603,7 +603,7 @@ class HPGeCalibration:
 
                 p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
 
-                total_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
+                total_events = func_i.get_total_events_func(pars_i, errors=errs_i)
                 if (
                     cov_i is None
                     or sum(
@@ -735,14 +735,14 @@ class HPGeCalibration:
         # First, calculate the peak positions
         if peak_param == "mu":
             mus = [
-                pgf.get_mu_func(func_i, pars_i, errors=errors_i)
+                func_i.get_mu_func(pars_i, errors=errors_i)
                 for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
             ]
             mus, mu_vars = zip(*mus)
 
         elif peak_param == "mode":
             mus = [
-                pgf.get_mode_func(func_i, pars_i, cov=cov_i)
+                func_i.get_mode_func(func_i, pars_i, cov=cov_i)
                 for func_i, pars_i, cov_i in zip(pk_funcs, pk_pars, pk_covs)
             ]
             mus, mu_vars = zip(*mus)
@@ -804,8 +804,7 @@ class HPGeCalibration:
         for peak, peak_dict in peak_parameters.items():
             # Calculate the uncalibrated fwhm
             uncal_fwhm, uncal_fwhm_err = [
-                pgf.get_fwhm_func(
-                    peak_dict["function"],
+                peak_dict["function"].get_fwhm_func(
                     peak_dict["parameters"],
                     cov=peak_dict["covariance"],
                 )
@@ -813,7 +812,7 @@ class HPGeCalibration:
 
             # Apply calibration
             derco = np.polyder(np.poly1d(self.pars)).coefficients
-            der = pgf.poly(peak, derco)
+            der = pgf.nb_poly(peak, derco)
             cal_fwhm = uncal_fwhm * der
             cal_fwhm_err = uncal_fwhm_err * der
 
@@ -1056,7 +1055,7 @@ class HPGeCalibration:
 
         # these go in dataflow
         # self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
-        # data[self.cal_energy_param] = pgf.poly(data[self.energy_param], self.pars)
+        # data[self.cal_energy_param] = pgf.nb_poly(data[self.energy_param], self.pars)
 
     def fit_calibrated_peaks(self, e_uncal):
         log.debug(f"Fitting {self.energy_param}")
@@ -1203,7 +1202,7 @@ def hpge_fit_energy_peak_tops(
     cov_list = []
     for e_peak in peak_locs:
         try:
-            pars, cov = pgf.gauss_mode_width_max(
+            pars, cov = pgb.gauss_mode_width_max(
                 hist,
                 bins,
                 var,
@@ -1238,12 +1237,10 @@ def get_hpge_energy_peak_par_guess(
         fit_range = (np.nanmin(energy), np.nanmax(energy))
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
     if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
+        func == pgf.gauss_on_step
     ):
         # get mu and height from a gauss fit, also sigma as fallback
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, cov = pgb.gauss_mode_width_max(
             hist, bins, var, mode_guess=mode_guess, n_bins=10
         )
 
@@ -1320,12 +1317,10 @@ def get_hpge_energy_peak_par_guess(
                 parguess[name] = 0
 
     elif (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
+        func == pgf.hpge_peak
     ):
         # guess mu, height
-        pars, cov = pgf.gauss_mode_width_max(hist, bins, var, n_bins=10)
+        pars, cov = pgb.gauss_mode_width_max(hist, bins, var, n_bins=10)
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
             log.info("get_hpge_energy_peak_par_guess: gauss_mode_width_max failed")
@@ -1419,17 +1414,13 @@ def get_hpge_energy_fixed(func):
     """
 
     if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
+        func == pgf.gauss_on_step
     ):
         # pars are: n_sig, mu, sigma, n_bkg, hstep, components
         fixed = ["x_lo", "x_hi"]
 
     elif (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
+        func == pgf.hpge_peak
     ):
         # pars are: n_sig, mu, sigma, htail,tau, n_bkg, hstep, components
         fixed = ["x_lo", "x_hi"]
@@ -1443,9 +1434,20 @@ def get_hpge_energy_fixed(func):
 
 def get_hpge_energy_bounds(func, parguess):
     if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
+        func == pgf.gauss_on_step
+    ):
+        return {
+            "n_sig": (0, None),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
+            "sigma": (0, None),
+            "n_bkg": (None, None),
+            "hstep": (-1, 1),
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+        }
+
+    elif (
+        func == pgf.hpge_peak
     ):
         return {
             "n_sig": (0, None),
@@ -1458,22 +1460,6 @@ def get_hpge_energy_bounds(func, parguess):
             "x_lo": (None, None),
             "x_hi": (None, None),
         }
-
-    elif (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
-    ):
-        return {
-            "n_sig": (0, None),
-            "mu": (parguess["x_lo"], parguess["x_hi"]),
-            "sigma": (0, None),
-            "n_bkg": (None, None),
-            "hstep": (-1, 1),
-            "x_lo": (None, None),
-            "x_hi": (None, None),
-        }
-
     else:
         log.error(f"get_hpge_energy_bounds not implemented for {func.__name__}")
         return []
@@ -1514,7 +1500,6 @@ class TailPrior:
 def unbinned_staged_energy_fit(
     energy,
     func,
-    gof_func=None,
     gof_range=None,
     fit_range=None,
     guess=None,
@@ -1535,8 +1520,6 @@ def unbinned_staged_energy_fit(
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
     """
-    if gof_func is None:
-        gof_func = func
 
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
@@ -1566,34 +1549,34 @@ def unbinned_staged_energy_fit(
                 x0[arg] = val
         if lock_guess is False:
             if len(x0) == len(x1):
-                cs, _ = pgf.goodness_of_fit(
-                    gof_hist, gof_bins, None, gof_func, x0, method="Pearson"
+                cs, _ = pgb.goodness_of_fit(
+                    gof_hist, gof_bins, None, func.pdf, x0, method="Pearson"
                 )
-                cs2, _ = pgf.goodness_of_fit(
-                    gof_hist, gof_bins, None, gof_func, x1, method="Pearson"
+                cs2, _ = pgb.goodness_of_fit(
+                    gof_hist, gof_bins, None, func.pdf, x1, method="Pearson"
                 )
                 if cs >= cs2:
                     x0 = x1
             else:
                 x0 = x1
     else:
-        if func == pgf.extended_radford_pdf:
+        if func == pgf.hpge_peak:
             x0_notail = guess_func(
                 energy,
-                pgf.extended_gauss_step_pdf,
+                pgf.gauss_on_step,
                 fit_range,
                 bin_width=bin_width,
                 **guess_kwargs,
             )
-            c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.gauss_on_step.pdf_ext)
             m = Minuit(c, *x0_notail)
             m.limits = bounds_func(
-                pgf.extended_gauss_step_pdf,
+                pgf.gauss_on_step,
                 x0_notail,
                 **bounds_kwargs if bounds_kwargs is not None else {},
             )
             fixed, mask = fixed_func(
-                pgf.extended_gauss_step_pdf,
+                pgf.gauss_on_step,
                 **fixed_kwargs if fixed_kwargs is not None else {},
             )
             for fix in fixed:
@@ -1620,12 +1603,11 @@ def unbinned_staged_energy_fit(
             )
 
     if (
-        func == pgf.extended_radford_pdf or func == pgf.radford_pdf
+        func == pgf.hpge_peak
     ) and allow_tail_drop is True:
         fit_no_tail = unbinned_staged_energy_fit(
             energy,
-            func=pgf.extended_gauss_step_pdf,
-            gof_func=pgf.gauss_step_pdf,
+            func=pgf.gauss_on_step,
             gof_range=gof_range,
             fit_range=fit_range,
             guess=None,
@@ -1641,11 +1623,11 @@ def unbinned_staged_energy_fit(
             bin_width=bin_width,
         )
 
-        c = cost.ExtendedUnbinnedNLL(energy, func) + TailPrior(
+        c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext) + TailPrior(
             energy, func, tail_weight=tail_weight
         )
     else:
-        c = cost.ExtendedUnbinnedNLL(energy, func)
+        c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext)
 
     fixed, mask = fixed_func(func, **fixed_kwargs if fixed_kwargs is not None else {})
     bounds = bounds_func(func, x0, **bounds_kwargs if bounds_kwargs is not None else {})
@@ -1669,18 +1651,18 @@ def unbinned_staged_energy_fit(
         & (~(np.array(m.errors)[mask] == 0).all())
     )
 
-    cs = pgf.goodness_of_fit(
+    cs = pgb.goodness_of_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        gof_func,
+        func.pdf,
         m.values,
         method="Pearson",
         scale_bins=True,
     )
     cs = (cs[0], cs[1] + len(np.where(mask)[0]))
 
-    fit1 = (m.values, m.errors, m.covariance, cs, func, gof_func, mask, valid1, m)
+    fit1 = (m.values, m.errors, m.covariance, cs, func, mask, valid1, m)
 
     # Now try with simplex
     m2 = Minuit(c, *x0)
@@ -1700,25 +1682,25 @@ def unbinned_staged_energy_fit(
         & (~(np.array(m2.errors)[mask] == 0).all())
     )
 
-    cs2 = pgf.goodness_of_fit(
+    cs2 = pgb.goodness_of_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        gof_func,
+        func.pdf,
         m2.values,
         method="Pearson",
         scale_bins=True,
     )
     cs2 = (cs2[0], cs2[1] + len(np.where(mask)[0]))
 
-    fit2 = (m2.values, m2.errors, m2.covariance, cs2, func, gof_func, mask, valid2, m2)
+    fit2 = (m2.values, m2.errors, m2.covariance, cs2, func, mask, valid2, m2)
 
     frac_errors1 = np.sum(np.abs(np.array(m.errors)[mask] / np.array(m.values)[mask]))
     frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
 
     if display > 1:
-        m_fit = gof_func(bin_cs, *m.values) * np.diff(bin_cs)[0]
-        m2_fit = gof_func(bin_cs, *m2.values) * np.diff(bin_cs)[0]
+        m_fit = func.pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
+        m2_fit = func.pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
         plt.figure()
         plt.step(bin_cs, hist, label="hist")
         plt.plot(bin_cs, func(bin_cs, *x0)[1], label="Guess")
@@ -1738,11 +1720,11 @@ def unbinned_staged_energy_fit(
             m.limits[arg] = val
         m.simplex().simplex().migrad()
         m.hesse()
-        cs = pgf.goodness_of_fit(
+        cs = pgb.goodness_of_fit(
             gof_hist,
             gof_bins,
             gof_var,
-            gof_func,
+            func.pdf,
             m.values,
             method="Pearson",
             scale_bins=True,
@@ -1764,7 +1746,7 @@ def unbinned_staged_energy_fit(
             except Exception:
                 raise RuntimeError
 
-        fit = (m.values, m.errors, m.covariance, cs, func, gof_func, mask, valid3, m)
+        fit = (m.values, m.errors, m.covariance, cs, func, mask, valid3, m)
 
     elif valid2 is False:
         fit = fit1
@@ -1788,7 +1770,7 @@ def unbinned_staged_energy_fit(
         raise RuntimeError
 
     if (
-        func == pgf.extended_radford_pdf or func == pgf.radford_pdf
+        func == pgf.hpge_peak
     ) and allow_tail_drop is True:
         p_val = chi2.sf(fit[3][0], fit[3][1])
         p_val_no_tail = chi2.sf(fit_no_tail[3][0], fit_no_tail[3][1])
@@ -1798,7 +1780,7 @@ def unbinned_staged_energy_fit(
             log.debug(debug_string)
             fit = fit_no_tail
             if display > 0:
-                m_fit = pgf.gauss_step_pdf(bin_cs, *fit[0])
+                m_fit = pgf.gauss_on_step.pdf(bin_cs, *fit[0])
                 plt.figure()
                 plt.step(bin_cs, hist, where="mid", label="hist")
                 plt.plot(
@@ -1812,7 +1794,7 @@ def unbinned_staged_energy_fit(
 
 
 def poly_wrapper(x, *pars):
-    return pgf.poly(x, pars)
+    return pgf.nb_poly(x, pars)
 
 
 def hpge_fit_energy_scale(mus, mu_vars, energies_kev, deg=0, fixed=None):
@@ -2027,7 +2009,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
                     m.fixed[idx] = True
             pars_i = m.values
             polxx = np.zeros(len(yy_i))
-            polxx = pgf.poly(xx_i, pars_i)
+            polxx = pgf.nb_poly(xx_i, pars_i)
 
         # by here we have the best polxx. Search for matches and store pars_i if
         # its the best so far
@@ -2100,7 +2082,7 @@ def get_peak_labels(
         if i % 2 == 1:
             continue
         else:
-            out.append(f"{pgf.poly(label, pars):.1f}")
+            out.append(f"{pgf.nb_poly(label, pars):.1f}")
             out_labels.append(label)
     return out_labels, out
 
@@ -2147,7 +2129,7 @@ def plot_fits(
 
     fig = plt.figure()
     derco = np.polyder(np.poly1d(ecal_class.pars)).coefficients
-    der = [pgf.poly(5, derco) for _ in fitted_peaks]
+    der = [pgf.nb_poly(5, derco) for _ in fitted_peaks]
     for i, peak in enumerate(mus):
         range_adu = 5 / der[i]
         plt.subplot(nrows, ncols, i + 1)
@@ -2407,16 +2389,16 @@ def plot_cal_fit(ecal_class, data, figsize=(12, 8), fontsize=12, erange=(200, 27
 
     ax1.scatter(fitted_peaks, mus, marker="x", c="b")
 
-    ax1.plot(pgf.poly(cal_bins, ecal_class.pars), cal_bins, lw=1, c="g")
+    ax1.plot(pgf.nb_poly(cal_bins, ecal_class.pars), cal_bins, lw=1, c="g")
 
     ax1.grid()
     ax1.set_xlim([erange[0], erange[1]])
     ax1.set_ylabel("Energy (ADC)")
     ax2.errorbar(
         fitted_peaks,
-        pgf.poly(np.array(mus), ecal_class.pars) - fitted_peaks,
-        yerr=pgf.poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
-        - pgf.poly(np.array(mus), ecal_class.pars),
+        pgf.nb_poly(np.array(mus), ecal_class.pars) - fitted_peaks,
+        yerr=pgf.nb_poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
+        - pgf.nb_poly(np.array(mus), ecal_class.pars),
         linestyle=" ",
         marker="x",
         c="b",
