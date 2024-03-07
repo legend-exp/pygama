@@ -27,13 +27,16 @@ log = logging.getLogger(__name__)
 
 class HPGeCalibration:
 
-    """Calibrate HPGe data to a set of known peaks
+    """
+    Calibrate HPGe data to a set of known peaks. Class stores the calibration parameters
+    as well as the peaks locations and energies used. Each function called updates a results
+    dictionary with any additional information which is stored in the class.
 
     Parameters
     ----------
     e_uncal : array
-        unbinned energy data to be calibrated
-    peaks_kev : array
+        uncalibrated energy data
+    glines : array
         list of peak energies to be fit to. Each must be in the data
     guess_kev : float
         a rough initial guess at the conversion factor from e_uncal to kev. Must
@@ -45,50 +48,11 @@ class HPGeCalibration:
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         e_uncal
-    range_kev : float, tuple, array of floats, or array of tuples of floats
-        ranges around which the peak fitting is performed
-        if tuple(s) are supplied, they provide the left and right ranges
-    funcs : function or array of functions
-        functions to use for fitting
-    gof_funcs : function or array of functions
-        functions to use for calculation goodness of fit if unspecified will use same func as fit
-    method : str
-        default is unbinned fit can specify to use binned fit method instead
-    n_events : int
-        number of events to use for unbinned fit
-    allowed_p_val
-        lower limit on p_val of fit
-    tail_weight: float
-        weight to give to the tail in the fit
-    peak_param : str
-        parameter to use for the peak location. Can be "mode" or "mean"
-    verbose : bool
-        print debug statements
+    fixed : dict
+        dictionary of fixed parameters for the calibration function
+    plot_options : dict
+        dictionary of options for plotting the calibration results
 
-    Returns
-    -------
-    pars, cov : array, 2D array
-        array of calibration function parameters and their covariances. The form
-        of the function is E_kev = poly(e_uncal). Assumes poly() is
-        overwhelmingly dominated by the linear term. pars follows convention in
-        np.polyfit unless deg=0, in which case it is the (lone) scale factor
-    results : dict with the following elements
-        'detected_peaks_locs', 'detected_peaks_kev' : array, array
-            array of rough uncalibrated/calibrated energies at which the fit peaks were
-            found in the initial peak search
-        'pt_pars', 'pt_cov' : list of (array), list of (2D array)
-            arrays of gaussian parameters / covariances fit to the peak tops in
-            the first refinement
-        'pt_cal_pars', 'pt_cal_cov' : array, 2D array
-            array of calibration parameters e_uncal = poly(E_kev) for fit to
-            means of gausses fit to tops of each peak
-        'pk_pars', 'pk_cov', 'pk_binws', 'pk_ranges' : list of (array), list of (2D array), list, list of (array)
-            the best fit parameters, covariances, bin width and energy range for the local fit to each peak
-        'pk_cal_pars', 'pk_cal_cov' : array, 2D array
-            array of calibration parameters e_uncal = poly(E_kev) for fit to
-            means from full peak fits
-        'fwhms', 'dfwhms' : array, array
-            the numeric fwhms and their uncertainties for each peak.
     """
 
     def __init__(
@@ -97,18 +61,15 @@ class HPGeCalibration:
         glines,
         guess_kev: float,
         deg: int = 1,
-        cal_energy_param: str = None,
-        range_kev=None,
-        funcs=None,
+        uncal_is_int: bool = False,
         fixed=None,
         plot_options: dict = None,
     ):
         self.energy_param = energy_param
-        if cal_energy_param is None:
-            self.cal_energy_param = f"{self.energy_param}_cal"
-        else:
-            self.cal_energy_param = cal_energy_param
 
+        if deg < 0:
+            log.error(f"hpge_E_cal warning: invalid deg = {deg}")
+            return
         self.deg = int(deg)
 
         # could change these to tuples of (kev, adc)?
@@ -122,26 +83,20 @@ class HPGeCalibration:
         self.results = {}
         self.fixed = fixed
 
-        self.uncal_is_int = False
+        self.uncal_is_int = uncal_is_int
         self.plot_options = plot_options
 
-        # these should be bundled with peaks - tuple structure?
+        # if not isinstance(range_kev, list):
+        #     if np.isscalar(range_kev):
+        #         range_kev = (range_kev / 2, range_kev / 2)
+        #     range_kev = [range_kev for peak in glines]
 
-        if deg < 0:
-            log.error(f"hpge_E_cal warning: invalid deg = {deg}")
-            return
+        # if not hasattr(funcs, "__len__"):
+        #     funcs = [funcs for peak in glines]
 
-        if not isinstance(range_kev, list):
-            if np.isscalar(range_kev):
-                range_kev = (range_kev / 2, range_kev / 2)
-            range_kev = [range_kev for peak in glines]
-
-        if not hasattr(funcs, "__len__"):
-            funcs = [funcs for peak in glines]
-
-        self.peak_args = [
-            (peak, ranges, func) for peak, ranges, func in zip(glines, range_kev, funcs)
-        ]
+        # self.peak_args = [
+        #     (peak, ranges, func) for peak, ranges, func in zip(glines, range_kev, funcs)
+        # ]
 
     def gen_pars_dict(self):
         if len(self.pars) == 0:
@@ -201,13 +156,13 @@ class HPGeCalibration:
     def hpge_find_energy_peaks(
         self,
         e_uncal,
+        peaks_kev=None,
         n_sigma=5,
-        deg=0,
         etol_kev=None,
         bin_width_kev=1,
         erange=None,
         var_zero=1,
-        verbose=False,
+        update_cal_pars=True,
     ):
         """Find uncalibrated E peaks whose E spacing matches the pattern in peaks_kev
         Note: the specialization here to units "kev" in peaks and Etol is
@@ -233,8 +188,11 @@ class HPGeCalibration:
             hist = 0, and any value here is fine.
         """
 
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
         derco = np.polyder(np.poly1d(self.pars)).coefficients
-        der = [pgf.poly(ei, derco) for ei in self.peaks_kev]
+        der = [pgf.poly(ei, derco) for ei in peaks_kev]
 
         # bin the histogram in ~1 kev bins for the initial rough peak search
         if erange is None:
@@ -253,7 +211,7 @@ class HPGeCalibration:
         if np.any(var == 0):
             log.debug(f"hpge_find_energy_peaks: replacing var zeros with {var_zero}")
             var[np.where(var == 0)] = var_zero
-        peaks_kev = np.asarray(self.peaks_kev)
+        peaks_kev = np.asarray(peaks_kev)
 
         # Find all maxes with > n_sigma significance
         imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
@@ -281,22 +239,14 @@ class HPGeCalibration:
             )
 
             etol_kev = 5.0 * (med_sigma_ratio / 0.003)
-        self.pars, ixtup, iytup = poly_match(
-            detected_max_locs, peaks_kev, deg=deg, atol=etol_kev, fixed=self.fixed
+        pars, ixtup, iytup = poly_match(
+            detected_max_locs, peaks_kev, deg=self.deg, atol=etol_kev, fixed=self.fixed
         )
 
         if len(ixtup) != len(peaks_kev):
             log.info(
                 f"hpge_find_energy_peaks: only found {len(ixtup)} of {len(peaks_kev)} expected peaks"
             )
-
-        self.peak_locs = detected_max_locs[ixtup]
-        self.peaks_kev = peaks_kev[iytup]
-
-        log.info(f"{len(self.peak_locs)} peaks found:")
-        log.info("\t   Energy   | Position  ")
-        for i, (li, ei) in enumerate(zip(self.peak_locs, self.peaks_kev)):
-            log.info(f"\t{i}".ljust(4) + str(ei).ljust(9) + f"| {li:g}".ljust(5))
 
         self.update_results_dict(
             {
@@ -305,16 +255,28 @@ class HPGeCalibration:
                 "found_peaks_locs": detected_max_locs[iytup],
             }
         )
+        log.info(f"{len(self.peak_locs)} peaks found:")
+        log.info("\t   Energy   | Position  ")
+        for i, (li, ei) in enumerate(zip(detected_max_locs[ixtup], peaks_kev[iytup])):
+            log.info(f"\t{i}".ljust(4) + str(ei).ljust(9) + f"| {li:g}".ljust(5))
+
+        if update_cal_pars is False:
+            return
+
+        self.peak_locs = detected_max_locs[ixtup]
+        self.peaks_kev = peaks_kev[iytup]
+        self.pars = pars
 
     def hpge_get_energy_peaks(
         self,
         e_uncal,
+        peaks_kev=None,
         n_sigma=3,
         etol_kev=5,
         var_zero=1,
         bin_width_kev=0.2,
+        update_cal_pars=True,
         erange=None,
-        verbose=False,
     ):
         """Get uncalibrated E peaks at the energies of peaks_kev
 
@@ -336,12 +298,14 @@ class HPGeCalibration:
             hist/sqrt(var). Default value is 1. Usually when var = 0 its because
             hist = 0, and any value here is fine.
         """
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
 
         # re-bin the histogram in ~0.2 kev bins with updated E scale par for peak-top fits
         if erange is None:
             euc_min, euc_max = (
                 (np.poly1d(self.pars) - i).roots
-                for i in (self.peaks_kev[0] * 0.9, self.peaks_kev[-1] * 1.1)
+                for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
             )
             euc_min = euc_min[np.logical_and(euc_min >= 0, euc_min <= max(euc_max))][0]
             euc_max = euc_max[
@@ -368,14 +332,14 @@ class HPGeCalibration:
 
         # Keep maxes if they coincide with expected peaks
         test_peaks_kev = np.asarray([pgf.poly(i, self.pars) for i in bins[imaxes]])
-        imatch = [abs(self.peaks_kev - i).min() < etol_kev for i in test_peaks_kev]
+        imatch = [abs(peaks_kev - i).min() < etol_kev for i in test_peaks_kev]
 
         got_peak_locations = bins[imaxes[imatch]]
         got_peak_energies = test_peaks_kev[imatch]
 
         # Match calculated and true peak energies
-        matched_energies = self.peaks_kev[
-            [np.argmin(abs(self.peaks_kev - i)) for i in got_peak_energies]
+        matched_energies = peaks_kev[
+            [np.argmin(abs(peaks_kev - i)) for i in got_peak_energies]
         ]
         while not all([list(matched_energies).count(x) == 1 for x in matched_energies]):
             for i in range(len(matched_energies)):
@@ -393,7 +357,19 @@ class HPGeCalibration:
                     break
                 i += 1
 
-        input_peaks = self.peaks_kev.copy()
+        input_peaks = peaks_kev.copy()
+
+        self.update_results_dict(
+            {
+                "input_peaks_kev": input_peaks,
+                "got_peaks_kev": got_peak_locations,
+                "got_peaks_locs": matched_energies,
+            }
+        )
+
+        if update_cal_pars is False:
+            return
+
         self.peak_locs = got_peak_locations
         self.peaks_kev = matched_energies
 
@@ -421,14 +397,6 @@ class HPGeCalibration:
         for i, (li, ei) in enumerate(zip(self.peak_locs, self.peaks_kev)):
             log.info(f"\t{i}".ljust(4) + str(ei).ljust(9) + f"| {li:g}".ljust(5))
 
-        self.update_results_dict(
-            {
-                "input_peaks_kev": input_peaks,
-                "got_peaks_kev": got_peak_locations,
-                "got_peaks_locs": matched_energies,
-            }
-        )
-
     def hpge_fit_energy_peak_tops(
         self,
         e_uncal,
@@ -440,6 +408,7 @@ class HPGeCalibration:
     def hpge_fit_energy_peaks(
         self,
         e_uncal,
+        peaks_kev=None,
         peak_pars=None,
         default_n_bins=50,
         peak_param="mode",
@@ -478,34 +447,38 @@ class HPGeCalibration:
         results_dict = {}
         # check no peaks in self.peaks_kev missing from peak_pars
 
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
         peak_pars_lines = [i[0] for i in peak_pars]
         peaks_mask = np.array(
-            [True if peak in peak_pars_lines else False for peak in self.peaks_kev],
+            [True if peak in peak_pars_lines else False for peak in peaks_kev],
             dtype=bool,
         )
         peak_pars = peak_pars[peaks_mask]
-
-        got_peaks_mask = np.array(
-            [True for i in peak_pars if i[0] in self.peaks_kev], dtype=bool
-        )
-        peak_pars = peak_pars[got_peaks_mask]
 
         fit_peaks_mask = np.array(
             [True for i in peak_pars if i[1] is not None and i[2] is not None],
             dtype=bool,
         )
         peak_pars = peak_pars[fit_peaks_mask]
-        peak_locs = self.peak_locs[fit_peaks_mask]
 
         # First calculate range around peaks to fit
 
         uncal_peak_pars = []
-        for loc, pars in zip(peak_locs, peak_pars):
+        derco = np.polyder(np.poly1d(self.pars)).coefficients
+        for pars in peak_pars:
             peak, fit_range, func = pars
+
+            if peak in self.peaks_kev:
+                loc = self.peak_locs[np.where(peak == self.peaks_kev)][0]
+            else:
+                loc = pgf.poly(peak, derco)
+
             if fit_range is None:
                 euc_min, euc_max = (
                     (np.poly1d(self.pars) - i).roots
-                    for i in (self.peaks_kev[0] * 0.9, self.peaks_kev[-1] * 1.1)
+                    for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
                 )
                 euc_min = euc_min[
                     np.logical_and(euc_min >= 0, euc_min <= max(euc_max))
@@ -532,7 +505,6 @@ class HPGeCalibration:
                 else:
                     range_uncal = None
             elif isinstance(fit_range, tuple):
-                derco = np.polyder(np.poly1d(self.pars)).coefficients
                 der = pgf.poly(peak, derco)
                 range_uncal = (fit_range[0] / der, fit_range[1] / der)
                 n_bins = int(sum(fit_range) / 0.5 / der)
@@ -783,12 +755,12 @@ class HPGeCalibration:
         mus = results_dict["pk_pos"] = np.asarray(mus)
         mu_vars = results_dict["pk_pos_uncertainties"] = np.asarray(mu_vars) ** 2
 
-        self.peaks_kev = np.asarray(fitted_peaks_kev)
-        self.peak_locs = np.asarray(mus)
-
         if update_cal_pars is False:
             self.update_results_dict(results_dict)
             return
+
+        self.peaks_kev = np.asarray(fitted_peaks_kev)
+        self.peak_locs = np.asarray(mus)
 
         # Now fit the E scale
         try:
@@ -1021,8 +993,7 @@ class HPGeCalibration:
         self.hpge_find_energy_peaks(e_uncal)
         self.hpge_get_energy_peaks(e_uncal)
 
-        got_peak_locs = self.peak_locs
-        got_peaks_kev = self.peaks_kev
+        got_peaks_kev = self.peaks_kev.copy()
         self.hpge_fit_energy_peaks(
             e_uncal,
             peak_pars=peak_pars,
@@ -1054,11 +1025,10 @@ class HPGeCalibration:
                                 peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
                 except Exception:
                     pass
-            self.peak_locs = got_peak_locs
-            self.peaks_keV = got_peaks_kev
 
             self.hpge_fit_energy_peaks(
                 e_uncal,
+                peaks=got_peaks_kev,
                 peak_pars=peak_pars,
                 allowed_p_val=allowed_p_val,
                 tail_weight=tail_weight,
@@ -1090,10 +1060,55 @@ class HPGeCalibration:
 
     def fit_calibrated_peaks(self, e_uncal):
         log.debug(f"Fitting {self.energy_param}")
+        self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
+        self.hpge_fit_energy_peaks(e_uncal, update_cal_pars=False)
+        self.fit_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.fit_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+
+    def calibrate_prominent_peak(
+        self,
+        e_uncal,
+        peak,
+        peak_pars,
+        allowed_p_val=10**-20,
+        tail_weight=0,
+        peak_param="mode",
+        n_events=None,
+    ):
+        log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
+        log.debug(f"Guess is {self.guess_kev:.3f}")
+        if self.deg != 0:
+            log.error("deg must be 0 for calibrate_prominent_peak")
+            return
+        self.hpge_find_energy_peaks(e_uncal)
         self.hpge_get_energy_peaks(e_uncal)
-        self.hpge_fit_energy_peaks(e_uncal)
-        self.pars = np.zeros(len(self.pars))
-        self.pars[-2] = 1
+
+        got_peaks_kev = self.peaks_kev.copy()
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peaks_kev=[peak],
+            peak_pars=peak_pars,
+            allowed_p_val=allowed_p_val,
+            tail_weight=tail_weight,
+            peak_param=peak_param,
+            n_events=n_events,
+        )
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peaks_kev=got_peaks_kev,
+            peak_pars=peak_pars,
+            allowed_p_val=allowed_p_val,
+            tail_weight=tail_weight,
+            peak_param=peak_param,
+            n_events=n_events,
+            update_cal_pars=False,
+        )
         self.fit_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
