@@ -153,17 +153,23 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
 
     return upper_hm - lower_hm, fwfm_unc
 
-def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
+def hpge_peak_mode(nsig, mu, sigma, htail, tau, cov = None):
         
-
+    if htail<0 or htail>1:
+        if cov is not None:
+            return np.nan, np.nan
+        else:
+            return np.nan
     mode = brentq(hpge_peak_peakshape_derivative,
-                    mu-sigma, mu+sigma,
-                    args = ([1,mu,sigma,htail,tau,0,0],1 ))
+                    mu-sigma - htail*tau, mu+sigma + htail*tau,
+                    args = ([nsig,mu,sigma,htail,tau,0,0],1 ))
+
 
     if cov is not None:
+        pars = np.array([nsig, mu, sigma, htail, tau,0,0])
         rng = np.random.default_rng(1)
         par_b = rng.multivariate_normal(pars, cov, size=100)
-        modes = np.array([get_mode_func(func, p, cov = None) for p in par_b])
+        modes = np.array([hpge_peak_mode(p[0],p[1],p[2],p[3],p[4], cov = None) for p in par_b])
         mode_err_boot = np.nanstd(modes, axis=0)
 
         return mode, mode_err_boot
