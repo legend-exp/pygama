@@ -1,0 +1,28 @@
+{
+  "outputs": ["is_valid_rt", "is_valid_t0", "is_valid_tmax", "aggr1", "aggr2"],
+  "operations": {
+    "is_valid_rt": {
+      "expression": "((tp_90-tp_10)>96) & ((tp_50-tp_10)>=16)",
+      "parameters": {}
+    },
+    "is_valid_t0": {
+      "expression": "(tp_0_est>47000) & (tp_0_est<55000)",
+      "parameters": {}
+    },
+    "is_valid_tmax": {
+      "expression": "(tp_max>47000) & (tp_max<120000)",
+      "parameters": {}
+    }
+  },
+  "aggregations": {
+    "aggr1": {
+      "bit0": "is_valid_rt",
+      "bit1": "is_valid_t0",
+      "bit2": "is_valid_tmax"
+    },
+    "aggr2": {
+      "bit0": "is_valid_t0",
+      "bit1": "is_valid_tmax"
+    }
+  }
+}

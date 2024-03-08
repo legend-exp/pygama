@@ -1,0 +1,102 @@
+{
+  "channels": {
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  },
+  "outputs": [
+    "multiplicity",
+    "test_sum",
+    "test_first",
+    "test_first2",
+    "test_last",
+    "test_last2",
+    "test_any",
+    "test_any2",
+    "test_all",
+    "test_all2",
+    "test_vov",
+    "test_vov2"
+  ],
+  "operations": {
+    "multiplicity": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "expression": "hit.cuspEmax_ctc_cal > a",
+      "parameters": { "a": 25 },
+      "initial": 0
+    },
+    "test_sum": {
+      "channels": "geds_on",
+      "aggregation_mode": "sum",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_first": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_first2": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "expression": "True",
+      "initial": false
+    },
+    "test_last": {
+      "channels": "geds_on",
+      "aggregation_mode": "last_at:dsp.tp_0_est",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_last2": {
+      "channels": "geds_on",
+      "aggregation_mode": "last_at:dsp.tp_0_est",
+      "expression": "True",
+      "initial": false
+    },
+    "test_any": {
+      "channels": "geds_on",
+      "aggregation_mode": "any",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_any2": {
+      "channels": "geds_on",
+      "aggregation_mode": "any",
+      "query": "hit.cuspEmax_ctc_cal >25",
+      "expression": "True",
+      "initial": false
+    },
+    "test_all": {
+      "channels": "geds_on",
+      "aggregation_mode": "all",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_all2": {
+      "channels": "geds_on",
+      "aggregation_mode": "all",
+      "query": "hit.cuspEmax_ctc_cal >25",
+      "expression": "True",
+      "initial": false
+    },
+    "test_vov": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "query": "evt.multiplicity == 1",
+      "expression": "True",
+      "initial": false
+    },
+    "test_vov2": {
+      "channels": "geds_on",
+      "aggregation_mode": "gather",
+      "expression": "True",
+      "initial": false
+    }
+  }
+}

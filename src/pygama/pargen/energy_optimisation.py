@@ -13,7 +13,7 @@ import pickle as pkl
 import sys
 from collections import namedtuple
 
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,13 +23,13 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.optimize import curve_fit, minimize
 from scipy.stats import chisquare, norm
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
+from sklearn.utils._testing import ignore_warnings
 
-import pygama.math.binned_fitting as pgbf
-import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.hpge_peak_fitting as pghpf
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_cal as pgc
@@ -70,8 +70,8 @@ def run_optimisation(
         Number of events to run over
     """
     grid = set_par_space(opt_config)
-    waveforms = sto.read_object(f"/raw/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
-    baseline = sto.read_object("/raw/baseline", file, idx=cuts, n_rows=n_events)[0]
+    waveforms = sto.read(f"/raw/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
+    baseline = sto.read("/raw/baseline", file, idx=cuts, n_rows=n_events)[0]
     tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid(tb_data, dsp_config, grid, fom, db_dict, **fom_kwargs)
 
@@ -140,12 +140,8 @@ def run_optimisation_multiprocessed(
             fom_kwargs = fom_kwargs["fom_kwargs"]
         fom_kwargs = form_dict(fom_kwargs, len(grid))
     sto = lh5.LH5Store()
-    waveforms = sto.read_object(
-        f"{lh5_path}/{wf_field}", file, idx=cuts, n_rows=n_events
-    )[0]
-    baseline = sto.read_object(f"{lh5_path}/baseline", file, idx=cuts, n_rows=n_events)[
-        0
-    ]
+    waveforms = sto.read(f"{lh5_path}/{wf_field}", file, idx=cuts, n_rows=n_events)[0]
+    baseline = sto.read(f"{lh5_path}/baseline", file, idx=cuts, n_rows=n_events)[0]
     tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return opt.run_grid_multiprocess_parallel(
         tb_data,
@@ -189,7 +185,7 @@ def simple_guess(hist, bins, var, func_i, fit_range):
     """
     Simple guess for peak fitting
     """
-    if func_i == pgd.hpge_peak.pdf_ext:
+    if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         _, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.nanargmax(hist)
@@ -206,8 +202,6 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
         parguess = [
-            fit_range[0],
-            fit_range[1],
             nsig_guess,
             mu,
             sigma,
@@ -215,10 +209,13 @@ def simple_guess(hist, bins, var, func_i, fit_range):
             tau,
             nbkg_guess,
             hstep,
-        ]
+            fit_range[0],
+            fit_range[1],
+            0,
+        ]  #
         return parguess
 
-    elif func_i == pgd.gauss_on_step.pdf_ext:
+    elif func_i == pgf.extended_gauss_step_pdf:
         mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
@@ -228,7 +225,7 @@ def simple_guess(hist, bins, var, func_i, fit_range):
         n_bins_range = int((4 * sigma) // dx)
         nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg_guess = np.sum(hist) - nsig_guess
-        return [fit_range[0], fit_range[1], nsig_guess, mu, sigma, nbkg_guess, hstep]
+        return [nsig_guess, mu, sigma, nbkg_guess, hstep, fit_range[0], fit_range[1], 0]
 
 
 def unbinned_energy_fit(
@@ -255,24 +252,24 @@ def unbinned_energy_fit(
     )
     bin_cs1 = (bins[:-1] + bins[1:]) / 2
     if guess is not None:
-        x0 = [*guess[:-2], fit_range[0], fit_range[1]]
+        x0 = [*guess[:-2], fit_range[0], fit_range[1], False]
     else:
-        if func == pgd.hpge_peak.pdf_ext:
-            x0 = simple_guess(hist1, bins, var, pgd.gauss_on_step.pdf_ext, fit_range)
+        if func == pgf.extended_radford_pdf:
+            x0 = simple_guess(hist1, bins, var, pgf.extended_gauss_step_pdf, fit_range)
             if verbose:
                 print(x0)
-            c = cost.ExtendedUnbinnedNLL(energy, pgd.gauss_on_step.pdf_ext)
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
             m = Minuit(c, *x0)
-            m.fixed[:2] = True
+            m.fixed[-3:] = True
             m.simplex().migrad()
             m.hesse()
             if guess is not None:
-                x0_rad = [fit_range[0], fit_range[1], *guess[2:]]
+                x0_rad = [*guess[:-2], fit_range[0], fit_range[1], False]
             else:
                 x0_rad = simple_guess(hist1, bins, var, func, fit_range)
-            x0 = m.values[:5]
-            x0 += x0_rad[5:7]
-            x0 += m.values[5:]
+            x0 = m.values[:3]
+            x0 += x0_rad[3:5]
+            x0 += m.values[3:]
         else:
             x0 = simple_guess(hist1, bins, var, func, fit_range)
     if verbose:
@@ -281,7 +278,7 @@ def unbinned_energy_fit(
     m = Minuit(c, *x0)
     if tol is not None:
         m.tol = tol
-    m.fixed[:2] = True
+    m.fixed[-3:] = True
     m.migrad()
     m.hesse()
 
@@ -293,17 +290,17 @@ def unbinned_energy_fit(
         m.valid
         # & m.accurate
         & (~np.isnan(m.errors).any())
-        & (~(np.array(m.errors[2:]) == 0).all())
+        & (~(np.array(m.errors[:-3]) == 0).all())
     )
 
-    cs = pgbf.goodness_of_fit(
-        hist, bins, None, gof_func, m.values[2:], method="Pearson"
+    cs = pgf.goodness_of_fit(
+        hist, bins, None, gof_func, m.values[:-3], method="Pearson"
     )
     cs = cs[0] / cs[1]
     m2 = Minuit(c, *x0)
     if tol is not None:
         m2.tol = tol
-    m2.fixed[:2] = True
+    m2.fixed[-3:] = True
     m2.simplex().migrad()
     m2.hesse()
     m2_fit = func(bin_cs1, *m2.values)[1]
@@ -311,16 +308,16 @@ def unbinned_energy_fit(
         m2.valid
         # & m2.accurate
         & (~np.isnan(m.errors).any())
-        & (~(np.array(m2.errors[2:]) == 0).all())
+        & (~(np.array(m2.errors[:-3]) == 0).all())
     )
 
-    cs2 = pgbf.goodness_of_fit(
-        hist, bins, None, gof_func, m2.values[2:], method="Pearson"
+    cs2 = pgf.goodness_of_fit(
+        hist, bins, None, gof_func, m2.values[:-3], method="Pearson"
     )
     cs2 = cs2[0] / cs2[1]
 
-    frac_errors1 = np.sum(np.abs(np.array(m.errors)[2:] / np.array(m.values)[2:]))
-    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[2:] / np.array(m2.values)[2:]))
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[:-3] / np.array(m.values)[:-3]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[:-3] / np.array(m2.values)[:-3]))
 
     if verbose:
         print(m)
@@ -343,21 +340,21 @@ def unbinned_energy_fit(
         m = Minuit(c, *x0)
         if tol is not None:
             m.tol = tol
-        m.fixed[:2] = True
+        m.fixed[-3:] = True
         m.limits = pgc.get_hpge_E_bounds(func)
         m.simplex().simplex().migrad()
         m.hesse()
         if verbose:
             print(m)
-        cs = pgbf.goodness_of_fit(
-            hist, bins, None, gof_func, m.values[:-2], method="Pearson"
+        cs = pgf.goodness_of_fit(
+            hist, bins, None, gof_func, m.values[:-3], method="Pearson"
         )
         cs = cs[0] / cs[1]
         valid3 = (
             m.valid
             # & m.accurate
             & (~np.isnan(m.errors).any())
-            & (~(np.array(m.errors[2:]) == 0).all())
+            & (~(np.array(m.errors[:-3]) == 0).all())
         )
         if valid3 is False:
             try:
@@ -365,7 +362,7 @@ def unbinned_energy_fit(
                 valid3 = (
                     m.valid
                     & (~np.isnan(m.errors).any())
-                    & (~(np.array(m.errors[2:]) == 0).all())
+                    & (~(np.array(m.errors[:-3]) == 0).all())
                 )
             except:
                 raise RuntimeError
@@ -377,25 +374,25 @@ def unbinned_energy_fit(
 
     elif valid2 == False or cs * 1.05 < cs2:
         pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-2]
+        errs = np.array(m.errors)[:-3]
         cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif valid1 == False or cs2 * 1.05 < cs:
         pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-2]
+        errs = np.array(m2.errors)[:-3]
         cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
     elif frac_errors1 < frac_errors2:
         pars = np.array(m.values)[:-1]
-        errs = np.array(m.errors)[:-2]
+        errs = np.array(m.errors)[:-3]
         cov = np.array(m.covariance)[:-1, :-1]
         csqr = cs
 
     elif frac_errors1 > frac_errors2:
         pars = np.array(m2.values)[:-1]
-        errs = np.array(m2.errors)[:-2]
+        errs = np.array(m2.errors)[:-3]
         cov = np.array(m2.covariance)[:-1, :-1]
         csqr = cs2
 
@@ -482,16 +479,14 @@ def get_peak_fwhm_with_dt_corr(
                 guess=guess,
                 tol=tol,
             )
-        if func == pgd.hpge_peak.pdf_ext:
+        if func == pgf.extended_radford_pdf:
             if energy_pars[3] < 1e-6 and energy_err[3] < 1e-6:
                 fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
                 fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
             else:
-                fwhm = pghpf.hpge_peak_fwhm(
-                    energy_pars[2], energy_pars[3], energy_pars[4]
-                )
+                fwhm = pgf.radford_fwhm(energy_pars[2], energy_pars[3], energy_pars[4])
 
-        elif func == pgd.gauss_on_step.pdf_ext:
+        elif func == pgf.extended_gauss_step_pdf:
             fwhm = energy_pars[2] * 2 * np.sqrt(2 * np.log(2))
             fwhm_err = np.sqrt(cov[2][2]) * 2 * np.sqrt(2 * np.log(2))
 
@@ -509,18 +504,18 @@ def get_peak_fwhm_with_dt_corr(
 
         yerr_boot = np.nanstd(y_max, axis=0)
 
-        if func == pgd.hpge_peak.pdf_ext and not (
+        if func == pgf.extended_radford_pdf and not (
             energy_pars[3] < 1e-6 and energy_err[3] < 1e-6
         ):
             y_b = np.zeros(len(par_b))
             for i, p in enumerate(par_b):
                 try:
-                    y_b[i] = pghpf.hpge_peak_fwhm(p[2], p[3], p[4])  #
+                    y_b[i] = pgf.radford_fwhm(p[2], p[3], p[4])  #
                 except:
                     y_b[i] = np.nan
             fwhm_err = np.nanstd(y_b, axis=0)
             if fwhm_err == 0:
-                fwhm, fwhm_err = pghpf.hpge_peak_fwhm(
+                fwhm, fwhm_err = pgf.radford_fwhm(
                     energy_pars[2],
                     energy_pars[3],
                     energy_pars[4],
@@ -897,15 +892,15 @@ def get_wf_indexes(sorted_indexs, n_events):
     return out_list
 
 
-def index_data(data, indexes):
+def index_data(data, indexes, wf_field="waveform"):
     new_baselines = lh5.Array(data["baseline"].nda[indexes])
-    new_waveform_values = data["waveform"]["values"].nda[indexes]
-    new_waveform_dts = data["waveform"]["dt"].nda[indexes]
-    new_waveform_t0 = data["waveform"]["t0"].nda[indexes]
+    new_waveform_values = data[wf_field]["values"].nda[indexes]
+    new_waveform_dts = data[wf_field]["dt"].nda[indexes]
+    new_waveform_t0 = data[wf_field]["t0"].nda[indexes]
     new_waveform = lh5.WaveformTable(
         None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
     )
-    new_data = lh5.Table(col_dict={"waveform": new_waveform, "baseline": new_baselines})
+    new_data = lh5.Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
     return new_data
 
 
@@ -929,8 +924,9 @@ def event_selection(
     if not isinstance(kev_widths, list):
         kev_widths = [kev_widths]
 
-    sto = lh5.LH5Store()
-    df = lh5.load_dfs(raw_files, ["daqenergy", "timestamp"], lh5_path)
+    df = sto.read(lh5_path, raw_files, field_mask=["daqenergy", "timestamp"])[
+        0
+    ].view_as("pd")
 
     if pulser_mask is None:
         pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
@@ -1000,13 +996,7 @@ def event_selection(
     idx_list = get_wf_indexes(sort_index, idx_list_lens)
     idxs = np.array(sorted(np.concatenate(masks)))
 
-    waveforms = sto.read_object(
-        f"{lh5_path}/{wf_field}", raw_files, idx=idxs, n_rows=len(idxs)
-    )[0]
-    baseline = sto.read_object(
-        f"{lh5_path}/baseline", raw_files, idx=idxs, n_rows=len(idxs)
-    )[0]
-    input_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
+    input_data = sto.read(f"{lh5_path}", raw_files, idx=idxs, n_rows=len(idxs))[0]
 
     if isinstance(dsp_config, str):
         with open(dsp_config) as r:
@@ -1025,6 +1015,7 @@ def event_selection(
     ct_mask = cts.get_cut_indexes(tb_data, cut_dict)
 
     final_events = []
+    out_events = []
     for peak_idx in peak_idxs:
         peak = peaks_keV[peak_idx]
         kev_width = kev_widths[peak_idx]
@@ -1073,18 +1064,16 @@ def event_selection(
         log.info(f"lower lim is :{e_lower_lim}, upper lim is {e_upper_lim}")
         final_mask = (energy > e_lower_lim) & (energy < e_upper_lim)
         final_events.append(peak_ids[final_mask][:n_events])
+        out_events.append(idxs[final_events[-1]])
         log.info(f"{len(peak_ids[final_mask][:n_events])} passed selections for {peak}")
         if len(peak_ids[final_mask]) < 0.5 * n_events:
             log.warning("Less than half number of specified events found")
         elif len(peak_ids[final_mask]) < 0.1 * n_events:
             log.error("Less than 10% number of specified events found")
-
+    out_events = np.unique(np.concatenate(out_events))
     sort_index = np.argsort(np.concatenate(final_events))
     idx_list = get_wf_indexes(sort_index, [len(mask) for mask in final_events])
-    idxs = np.array(sorted(np.concatenate(final_events)))
-
-    final_data = index_data(input_data, idxs)
-    return final_data, idx_list
+    return out_events, idx_list
 
 
 def fwhm_slope(x, m0, m1, m2):
@@ -1395,6 +1384,7 @@ class BayesianOptimizer:
         self.optimal_ei = None
         return self.optimal_x, self.optimal_ei
 
+    @ignore_warnings(category=ConvergenceWarning)
     def iterate_values(self):
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
@@ -1465,6 +1455,7 @@ class BayesianOptimizer:
                 out_dict[name][parameter] = value_str
         return out_dict
 
+    @ignore_warnings(category=ConvergenceWarning)
     def plot(self, init_samples=None):
         nan_idxs = np.isnan(self.y_init)
         fail_idxs = np.isnan(self.yerr_init)
@@ -1571,6 +1562,7 @@ class BayesianOptimizer:
         plt.close()
         return fig
 
+    @ignore_warnings(category=ConvergenceWarning)
     def plot_acq(self, init_samples=None):
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])

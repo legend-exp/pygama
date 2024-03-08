@@ -1,16 +1,20 @@
 name: pygama
 
 on:
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
       - main
-      - 'releases/**'
-  pull_request:
-  release:
+      - "releases/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 3
+  TQDM_MININTERVAL: 100
 
 jobs:
 
@@ -24,9 +28,9 @@ jobs:
         os: [ubuntu-latest, macOS-latest]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Get dependencies and install the package
@@ -35,16 +39,16 @@ jobs:
         python -m pip install --upgrade .[test]
     - name: Run unit tests
       run: |
-        pytest
+        python -m pytest
 
   test-coverage:
     name: Calculate and upload test coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -54,7 +58,7 @@ jobs:
           python -m pip install --upgrade .[test]
           python -m pytest --cov=pygama --cov-report=xml
       - name: Upload Coverage to codecov.io
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
@@ -63,10 +67,10 @@ jobs:
     name: Build documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Setup build environment

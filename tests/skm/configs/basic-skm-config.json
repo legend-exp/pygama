@@ -1,0 +1,25 @@
+{
+  "multiplicity": 3,
+  "operations": {
+    "timestamp": {
+      "forward_field": "evt.timestamp",
+      "lgdo_attrs": { "info": "pk was here" }
+    },
+    "energy_sum": {
+      "forward_field": "evt.energy_sum"
+    },
+    "multiplicity": {
+      "forward_field": "evt.multiplicity"
+    },
+    "energy": {
+      "forward_field": "hit.cuspEmax_ctc_cal",
+      "missing_value": 0.0,
+      "tcm_idx": "evt.energy_idx"
+    },
+    "energy_id": {
+      "forward_field": "tcm.array_id",
+      "missing_value": 0,
+      "tcm_idx": "evt.energy_idx"
+    }
+  }
+}

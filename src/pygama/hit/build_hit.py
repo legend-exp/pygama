@@ -7,9 +7,11 @@ import json
 import logging
 import os
 from collections import OrderedDict
+from typing import Iterable, Mapping
 
+import lgdo
 import numpy as np
-from lgdo import LH5Iterator, LH5Store, ls
+from lgdo.lh5 import LH5Iterator, LH5Store, ls
 
 log = logging.getLogger(__name__)
 
@@ -17,18 +19,20 @@ log = logging.getLogger(__name__)
 def build_hit(
     infile: str,
     outfile: str = None,
-    hit_config: str | dict = None,
-    lh5_tables: list[str] = None,
-    lh5_tables_config: str | dict[str] = None,
+    hit_config: str | Mapping = None,
+    lh5_tables: Iterable[str] = None,
+    lh5_tables_config: str | Mapping[str, Mapping] = None,
     n_max: int = np.inf,
     wo_mode: str = "write_safe",
     buffer_len: int = 3200,
 ) -> None:
     """
-    Transform a :class:`~.lgdo.Table` into a new :class:`~.lgdo.Table` by
-    evaluating strings describing column operations.
+    Transform a :class:`~lgdo.types.table.Table` into a new
+    :class:`~lgdo.types.table.Table` by evaluating strings describing column
+    operations.
 
-    Operates on columns only, not specific rows or elements.
+    Operates on columns only, not specific rows or elements. Relies on
+    :meth:`~lgdo.types.table.Table.eval`.
 
     Parameters
     ----------
@@ -44,14 +48,14 @@ def build_hit(
         .. code-block:: json
 
             {
-                "outputs": ["calE", "AoE"],
-                "operations": {
-                    "calE": {
-                        "expression": "sqrt(@a + @b * trapEmax**2)",
-                        "parameters": {"a": "1.23", "b": "42.69"},
-                    },
-                    "AoE": {"expression": "A_max/calE"},
-                }
+              "outputs": ["calE", "AoE"],
+              "operations": {
+                "calE": {
+                  "expression": "sqrt(a + b * trapEmax**2)",
+                  "parameters": {"a": "1.23", "b": "42.69"},
+                },
+                "AoE": {"expression": "A_max/calE"},
+              }
             }
 
         The ``outputs`` array lists columns that will be effectively written in
@@ -69,7 +73,11 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`~.lgdo.lh5_store.write_object`.
+        forwarded to :meth:`lgdo.lh5.store.LH5Store.write`.
+
+    See Also
+    --------
+    lgdo.types.table.Table.eval
     """
     store = LH5Store()
 
@@ -93,16 +101,14 @@ def build_hit(
         for k, v in tbl_cfg.items():
             if isinstance(v, str):
                 with open(v) as f:
-                    # order in hit configs is important (dependencies)
-                    tbl_cfg[k] = json.load(f, object_pairs_hook=OrderedDict)
+                    tbl_cfg[k] = json.load(f)
         lh5_tables_config = tbl_cfg
 
     else:
         if isinstance(hit_config, str):
             # sanitize config
             with open(hit_config) as f:
-                # order in hit configs is important (dependencies)
-                hit_config = json.load(f, object_pairs_hook=OrderedDict)
+                hit_config = json.load(f)
 
         if lh5_tables is None:
             lh5_tables_config = {}
@@ -113,10 +119,18 @@ def build_hit(
                 if f"{el}/dsp" in ls(infile, f"{el}/"):
                     log.debug(f"found candidate table /{el}/dsp")
                     lh5_tables_config[f"{el}/dsp"] = hit_config
+        else:
+            for tbl in lh5_tables:
+                lh5_tables_config[tbl] = hit_config
 
     if outfile is None:
         outfile = os.path.splitext(os.path.basename(infile))[0]
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
+
+    # reorder blocks in "operations" based on dependency
+    log.debug("reordering operations based on mutual dependency")
+    for cfg in lh5_tables_config.values():
+        cfg["operations"] = _reorder_table_operations(cfg["operations"])
 
     first_done = False
     for tbl, cfg in lh5_tables_config.items():
@@ -129,7 +143,40 @@ def build_hit(
         for tbl_obj, start_row, n_rows in lh5_it:
             n_rows = min(tot_n_rows - start_row, n_rows)
 
-            outtbl_obj = tbl_obj.eval(cfg["operations"])
+            # create a new table object that links all the columns in the
+            # current table (i.e. no copy)
+            outtbl_obj = lgdo.Table(col_dict=tbl_obj)
+
+            for outname, info in cfg["operations"].items():
+                outcol = outtbl_obj.eval(
+                    info["expression"], info.get("parameters", None)
+                )
+                if "lgdo_attrs" in info:
+                    outcol.attrs |= info["lgdo_attrs"]
+
+                outtbl_obj.add_column(outname, outcol)
+
+            # make high level flags
+            if "aggregations" in cfg:
+                for high_lvl_flag, flags in cfg["aggregations"].items():
+                    flags_list = list(flags.values())
+                    n_flags = len(flags_list)
+                    if n_flags <= 8:
+                        flag_dtype = np.uint8
+                    elif n_flags <= 16:
+                        flag_dtype = np.uint16
+                    elif n_flags <= 32:
+                        flag_dtype = np.uint32
+                    else:
+                        flag_dtype = np.uint64
+
+                    df_flags = outtbl_obj.view_as("pd", cols=flags_list)
+                    flag_values = df_flags.values.astype(flag_dtype)
+
+                    multiplier = 2 ** np.arange(n_flags, dtype=flag_values.dtype)
+                    flag_out = np.dot(flag_values, multiplier)
+
+                    outtbl_obj.add_field(high_lvl_flag, lgdo.Array(flag_out))
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary
@@ -137,7 +184,7 @@ def build_hit(
                 if isinstance(cfg["outputs"], list):
                     # add missing columns (forwarding)
                     for out in cfg["outputs"]:
-                        if out not in outtbl_obj.keys():
+                        if out not in outtbl_obj:
                             outtbl_obj.add_column(out, tbl_obj[out])
 
                     # remove non-required columns
@@ -146,7 +193,7 @@ def build_hit(
                         if col not in cfg["outputs"]:
                             outtbl_obj.remove_column(col, delete=True)
 
-            store.write_object(
+            store.write(
                 obj=outtbl_obj,
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
@@ -156,3 +203,59 @@ def build_hit(
             )
 
             first_done = True
+
+
+def _reorder_table_operations(
+    config: Mapping[str, Mapping]
+) -> OrderedDict[str, Mapping]:
+    """Reorder operations in `config` according to mutual dependency."""
+
+    def _one_pass(config):
+        """Loop once over `config` and do a first round of reordering"""
+        # list to hold reordered config keys
+        ordered_keys = []
+
+        # start looping over config
+        for outname in config:
+            # initialization
+            if not ordered_keys:
+                ordered_keys.append(outname)
+                continue
+
+            if outname in ordered_keys:
+                raise RuntimeError(f"duplicated operation '{outname}' detected")
+
+            # loop over existing reordered keys and figure out where to place
+            # the new key
+            idx = 0
+            for k in ordered_keys:
+                # get valid names in the expression
+                c = compile(
+                    config[k]["expression"], "gcc -O3 -ffast-math build_hit.py", "eval"
+                )
+
+                # if we need "outname" for this expression, insert it before!
+                if outname in c.co_names:
+                    break
+                else:
+                    idx += 1
+
+            ordered_keys.insert(idx, outname)
+
+        # now replay the config dictionary based on sorted keys
+        opdict = OrderedDict()
+        for k in ordered_keys:
+            opdict[k] = config[k]
+
+        return opdict
+
+    # okay, now we need to repeat this until we've sorted everything
+    current = OrderedDict(config)
+
+    while True:
+        new = _one_pass(current)
+
+        if new == current:
+            return new
+        else:
+            current = new

@@ -15,17 +15,18 @@ import matplotlib as mpl
 
 mpl.use("agg")
 import lgdo
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
 
-import pygama.math.binned_fitting as pgbf
 import pygama.math.histogram as pgh
+import pygama.math.peak_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
 
 log = logging.getLogger(__name__)
+sto = lh5.LH5Store()
 
 
 def load_data(
@@ -36,8 +37,9 @@ def load_data(
     threshold: int = 5000,
     wf_field: str = "waveform",
 ) -> lgdo.Table:
-    sto = lh5.LH5Store()
-    df = lh5.load_dfs(raw_file, ["daqenergy", "timestamp"], lh5_path)
+    df = sto.read(lh5_path, raw_file, field_mask=["daqenergy", "timestamp"])[0].view_as(
+        "pd"
+    )
 
     if pulser_mask is None:
         pulser_props = cts.find_pulser_properties(df, energy="daqenergy")
@@ -61,12 +63,10 @@ def load_data(
 
     cuts = np.where((df.daqenergy.values > threshold) & (~ids))[0]
 
-    waveforms = sto.read_object(
-        f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events
-    )[0]
-    baseline = sto.read_object(
-        f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events
-    )[0]
+    waveforms = sto.read(f"{lh5_path}/{wf_field}", raw_file, idx=cuts, n_rows=n_events)[
+        0
+    ]
+    baseline = sto.read(f"{lh5_path}/baseline", raw_file, idx=cuts, n_rows=n_events)[0]
     tb_data = lh5.Table(col_dict={f"{wf_field}": waveforms, "baseline": baseline})
     return tb_data
 
@@ -99,7 +99,7 @@ def get_decay_constant(
     bin_centres = pgh.get_bin_centers(bins)
     high_bin = bin_centres[np.argmax(counts)]
     try:
-        pars, cov = pgbf.gauss_mode_width_max(
+        pars, cov = pgf.gauss_mode_width_max(
             counts,
             bins,
             n_bins=10,
@@ -144,8 +144,8 @@ def get_decay_constant(
         )
         axins.axvline(high_bin, color="red")
         axins.set_xlim(bins[in_min], bins[in_max])
-        labels = ax.get_xticklabels()
-        ax.set_xticklabels(labels=labels, rotation=45)
+        ax.set_xticks(ax.get_xticks())
+        ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45)
         out_plot_dict["slope"] = fig
         if display > 1:
             plt.show()
@@ -162,7 +162,7 @@ def fom_dpz(tb_data, verbosity=0, rand_arg=None):
     max_idx = np.argmax(counts)
     mu = start_bins[max_idx]
     try:
-        pars, cov = pgbf.gauss_mode_width_max(
+        pars, cov = pgf.gauss_mode_width_max(
             counts,
             start_bins,
             mode_guess=mu,

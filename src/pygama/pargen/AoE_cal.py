@@ -15,7 +15,7 @@ from typing import Callable
 import matplotlib as mpl
 
 mpl.use("agg")
-import lgdo.lh5_store as lh5
+import lgdo.lh5 as lh5
 import matplotlib.cm as cmx
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
@@ -27,10 +27,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
 
-import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
-import pygama.math.hpge_peak_fitting as pghpf
-from pygama.math.functions.error_function import nb_erfc
+import pygama.math.peak_fitting as pgf
+from pygama.math.peak_fitting import nb_erfc
 from pygama.pargen.energy_cal import get_i_local_maxima
 from pygama.pargen.utils import *
 
@@ -68,10 +67,10 @@ class standard_aoe(PDF):
         PDF for A/E consists of a gaussian signal with gaussian tail background
         """
         try:
-            sig = n_sig * pgd.gaussian.get_pdf(x, mu, sigma)
-            x_lo = np.nanmin(x) if lower_range == np.inf else lower_range
-            x_hi = np.nanmax(x) if upper_range == np.inf else upper_range
-            bkg = n_bkg * pgd.exgauss.pdf_norm(x, x_lo, x_hi, mu, sigma, tau_bkg)
+            sig = n_sig * pgf.gauss_norm(x, mu, sigma)
+            bkg = n_bkg * pgf.gauss_tail_norm(
+                x, mu, sigma, tau_bkg, lower_range, upper_range
+            )
         except:
             sig = np.full_like(x, np.nan)
             bkg = np.full_like(x, np.nan)
@@ -128,7 +127,7 @@ class standard_aoe(PDF):
         try:
             _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
         except:
-            pars, cov = pgbf.gauss_mode_width_max(
+            pars, cov = pgf.gauss_mode_width_max(
                 hist, bins, var, mode_guess=mu, n_bins=20
             )
             _, sigma, _ = pars
@@ -215,13 +214,14 @@ class standard_aoe_with_high_tail(PDF):
         PDF for A/E consists of a gaussian signal with tail with gaussian tail background
         """
         try:
-            x_lo = np.nanmin(x) if lower_range == np.inf else lower_range
-            x_hi = np.nanmax(x) if upper_range == np.inf else upper_range
             sig = n_sig * (
-                (1 - htail) * pgd.gaussian.get_pdf(x, mu, sigma)
-                + htail * pgd.exgauss.pdf_norm(x, x_lo, x_hi, mu, sigma, tau_sig)
+                (1 - htail) * pgf.gauss_norm(x, mu, sigma)
+                + htail
+                * pgf.gauss_tail_norm(x, mu, sigma, tau_sig, lower_range, upper_range)
             )
-            bkg = n_bkg * pgd.exgauss.pdf_norm(x, x_lo, x_hi, mu, sigma, tau_bkg)
+            bkg = n_bkg * pgf.gauss_tail_norm(
+                x, mu, sigma, tau_bkg, lower_range, upper_range
+            )
         except:
             sig = np.full_like(x, np.nan)
             bkg = np.full_like(x, np.nan)
@@ -283,7 +283,7 @@ class standard_aoe_with_high_tail(PDF):
         try:
             _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
         except:
-            pars, cov = pgbf.gauss_mode_width_max(
+            pars, cov = pgf.gauss_mode_width_max(
                 hist, bins, var, mode_guess=mu, n_bins=20
             )
             _, sigma, _ = pars
@@ -352,7 +352,7 @@ class standard_aoe_with_high_tail(PDF):
         ]
 
     def width(pars, errs, cov):
-        fwhm, fwhm_err = pghpf.hpge_peak_fwhm(
+        fwhm, fwhm_err = pgf.radford_fwhm(
             pars[2], pars[3], np.abs(pars[4]), cov=cov[:7, :7]
         )
         return fwhm / 2.355, fwhm_err / 2.355
@@ -375,9 +375,9 @@ class standard_aoe_bkg(PDF):
         PDF for A/E consists of a gaussian signal with tail with gaussian tail background
         """
         try:
-            x_lo = np.nanmin(x) if lower_range == np.inf else lower_range
-            x_hi = np.nanmax(x) if upper_range == np.inf else upper_range
-            sig = n_events * pgd.exgauss.pdf_norm(x, x_lo, x_hi, mu, sigma, tau_bkg)
+            sig = n_events * pgf.gauss_tail_norm(
+                x, mu, sigma, tau_bkg, lower_range, upper_range
+            )
         except:
             sig = np.full_like(x, np.nan)
 
@@ -406,7 +406,7 @@ class standard_aoe_bkg(PDF):
         try:
             _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
         except:
-            pars, cov = pgbf.gauss_mode_width_max(
+            pars, cov = pgf.gauss_mode_width_max(
                 hist, bins, var, mode_guess=mu, n_bins=20
             )
             _, sigma, _ = pars
@@ -469,7 +469,7 @@ class gaussian(PDF):
         PDF for A/E consists of a gaussian signal with tail with gaussian tail background
         """
         try:
-            sig = n_events * pgd.gaussian.get_pdf(x, mu, sigma)
+            sig = n_events * pgf.gauss_norm(x, mu, sigma)
         except:
             sig = np.full_like(x, np.nan)
 
@@ -489,7 +489,7 @@ class gaussian(PDF):
         try:
             _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
         except:
-            pars, cov = pgbf.gauss_mode_width_max(
+            pars, cov = pgf.gauss_mode_width_max(
                 hist, bins, var, mode_guess=mu, n_bins=20
             )
             _, sigma, _ = pars
@@ -540,10 +540,8 @@ class drift_time_distribution(PDF):
         tau2,
         components,
     ):
-        gauss1 = n_sig1 * pgd.gauss_on_exgauss.get_pdf(x, mu1, sigma1, htail1, tau1)
-        gauss2 = n_sig2 * pgd.gauss_on_exgauss.get_pdf(
-            x, mu2, sigma2, tau2, htail2
-        )  # NOTE: are tau2 and htail2 in the intended order?
+        gauss1 = n_sig1 * pgf.gauss_with_tail_pdf(x, mu1, sigma1, htail1, tau1)
+        gauss2 = n_sig2 * pgf.gauss_with_tail_pdf(x, mu2, sigma2, tau2, htail2)
         if components is True:
             return gauss1, gauss2
         else:
@@ -609,7 +607,7 @@ class drift_time_distribution(PDF):
         mu1 = bcs[mus[0]]
         mu2 = bcs[mus[-1]]
 
-        pars, cov = pgbf.gauss_mode_width_max(
+        pars, cov = pgf.gauss_mode_width_max(
             hist,
             bins,
             var=None,
@@ -622,7 +620,7 @@ class drift_time_distribution(PDF):
         mu1, sigma1, amp = pars
         ix = np.where(bcs < mu1 + 3 * sigma1)[0][-1]
         n_sig1 = np.sum(hist[:ix])
-        pars2, cov2 = pgbf.gauss_mode_width_max(
+        pars2, cov2 = pgf.gauss_mode_width_max(
             hist,
             bins,
             var=None,
@@ -911,7 +909,7 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
     """
     Simple guess for peak fitting
     """
-    if func_i == pgd.hpge_peak.pdf_ext:
+    if func_i == pgf.extended_radford_pdf:
         bin_cs = (bins[1:] + bins[:-1]) / 2
         sigma = eres / 2.355
         i_0 = np.nanargmax(hist)
@@ -934,8 +932,6 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
         if nsig_guess < 0:
             nsig_guess = 0
         parguess = [
-            fit_range[0],
-            fit_range[1],
             nsig_guess,
             mu,
             sigma,
@@ -943,13 +939,16 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
             tau,
             nbkg_guess,
             hstep,
+            fit_range[0],
+            fit_range[1],
+            0,
         ]
         for i, guess in enumerate(parguess):
             if np.isnan(guess):
                 parguess[i] = 0
         return parguess
 
-    elif func_i == pgd.gauss_on_step.pdf_ext:
+    elif func_i == pgf.extended_gauss_step_pdf:
         mu = peak
         sigma = eres / 2.355
         i_0 = np.argmax(hist)
@@ -966,13 +965,14 @@ def energy_guess(hist, bins, var, func_i, peak, eres, fit_range):
             nsig_guess = 0
 
         parguess = [
-            fit_range[0],
-            fit_range[1],
             nsig_guess,
             mu,
             sigma,
             nbkg_guess,
             hstep,
+            fit_range[0],
+            fit_range[1],
+            0,
         ]
         for i, guess in enumerate(parguess):
             if np.isnan(guess):
@@ -997,7 +997,7 @@ def unbinned_energy_fit(
             energy, dx=0.5, range=(np.nanmin(energy), np.nanmax(energy))
         )
     except ValueError:
-        pars, errs, cov = return_nans(pgd.hpge_peak.get_pdf)
+        pars, errs, cov = return_nans(pgf.radford_pdf)
         return pars, errs
     sigma = eres / 2.355
     if guess is None:
@@ -1005,33 +1005,32 @@ def unbinned_energy_fit(
             hist,
             bins,
             var,
-            pgd.gauss_on_step.pdf_ext,
+            pgf.extended_gauss_step_pdf,
             peak,
             eres,
             (np.nanmin(energy), np.nanmax(energy)),
         )
-        c = cost.ExtendedUnbinnedNLL(energy, pgd.gauss_on_step.pdf_ext)
+        c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_gauss_step_pdf)
         m = Minuit(c, *x0)
         m.limits = [
-            (None, None),
-            (None, None),
             (0, 2 * np.sum(hist)),
             (peak - 1, peak + 1),
             (0, None),
             (0, 2 * np.sum(hist)),
             (-1, 1),
+            (None, None),
+            (None, None),
+            (None, None),
         ]
-        m.fixed[:2] = True
+        m.fixed[-3:] = True
         m.simplex().migrad()
         m.hesse()
-        x0 = m.values[:5]
-        x0 += [0.2, 0.2 * m.values[4]]
-        x0 += m.values[5:]
+        x0 = m.values[:3]
+        x0 += [0.2, 0.2 * m.values[2]]
+        x0 += m.values[3:]
         if verbose:
             print(m)
         bounds = [
-            (None, None),
-            (None, None),
             (0, 2 * np.sum(hist)),
             (peak - 1, peak + 1),
             (0, None),
@@ -1039,40 +1038,44 @@ def unbinned_energy_fit(
             (0, None),
             (0, 2 * np.sum(hist)),
             (-1, 1),
+            (None, None),
+            (None, None),
+            (None, None),
         ]
-        fixed = [0, 1]
+        fixed = [7, 8, 9]
     else:
         x0 = guess
         x1 = energy_guess(
             hist,
             bins,
             var,
-            pgd.hpge_peak.pdf_ext,
+            pgf.extended_radford_pdf,
             peak,
             eres,
             (np.nanmin(energy), np.nanmax(energy)),
         )
-        x0[2] = x1[2]
-        x0[7] = x1[7]
+        x0[0] = x1[0]
+        x0[5] = x1[5]
         bounds = [
-            (None, None),
-            (None, None),
             (0, 2 * np.sum(hist)),
-            (guess[3] - 0.5, guess[3] + 0.5),
+            (guess[1] - 0.5, guess[1] + 0.5),
+            sorted((0.8 * guess[2], 1.2 * guess[2])),
+            sorted((0.8 * guess[3], 1.2 * guess[3])),
             sorted((0.8 * guess[4], 1.2 * guess[4])),
-            sorted((0.8 * guess[5], 1.2 * guess[5])),
-            sorted((0.8 * guess[6], 1.2 * guess[6])),
             (0, 2 * np.sum(hist)),
-            sorted((0.8 * guess[8], 1.2 * guess[8])),
+            sorted((0.8 * guess[6], 1.2 * guess[6])),
+            (None, None),
+            (None, None),
+            (None, None),
         ]
-        fixed = [0, 1, 3, 4, 5, 6, 8]
+        fixed = [1, 2, 3, 4, 6, 7, 8, 9]
     if len(x0) == 0:
-        pars, errs, cov = return_nans(pgd.hpge_peak.pdf_ext)
+        pars, errs, cov = return_nans(pgf.extended_radford_pdf)
         return pars, errs
 
     if verbose:
         print(x0)
-    c = cost.ExtendedUnbinnedNLL(energy, pgd.hpge_peak.pdf_ext)
+    c = cost.ExtendedUnbinnedNLL(energy, pgf.extended_radford_pdf)
     m = Minuit(c, *x0)
     m.limits = bounds
     for fix in fixed:
@@ -1089,20 +1092,20 @@ def unbinned_energy_fit(
         plt.figure()
         bcs = (bins[1:] + bins[:-1]) / 2
         plt.step(bcs, hist, where="mid")
-        plt.plot(bcs, pgd.hpge_peak.get_pdf(bcs, *x0) * np.diff(bcs)[0])
-        plt.plot(bcs, pgd.hpge_peak.get_pdf(bcs, *m.values) * np.diff(bcs)[0])
+        plt.plot(bcs, pgf.radford_pdf(bcs, *x0) * np.diff(bcs)[0])
+        plt.plot(bcs, pgf.radford_pdf(bcs, *m.values) * np.diff(bcs)[0])
         plt.show()
 
-    if not np.isnan(m.errors[2:]).all():
+    if not np.isnan(m.errors[:-3]).all():
         return m.values, m.errors
     else:
         try:
             m.simplex().migrad()
             m.minos()
-            if not np.isnan(m.errors[2:]).all():
+            if not np.isnan(m.errors[:-3]).all():
                 return m.values, m.errors
         except:
-            pars, errs, cov = return_nans(pgd.hpge_peak.pdf_ext)
+            pars, errs, cov = return_nans(pgf.extended_radford_pdf)
             return pars, errs
 
 
@@ -1317,7 +1320,6 @@ class cal_aoe:
         self.dt_cut = dt_cut
         self.dep_acc = dep_acc
         if self.dt_cut is not None:
-            self.update_cal_dicts(dt_cut["cut"])
             self.dt_cut_param = dt_cut["out_param"]
             self.fit_selection = f"{self.selection_string} & {self.dt_cut_param}"
             self.dt_cut_hard = dt_cut["hard"]
