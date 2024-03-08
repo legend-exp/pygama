@@ -14,7 +14,7 @@ from lgdo.types import Table
 from scipy import stats
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
+import pygama.math.binned_fitting as pgf
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
@@ -30,6 +30,8 @@ def get_keys(in_data, cut_dict):
     for _, entry in cut_dict.items():
         if "cut_parameter" in entry:
             parameters.append(entry["cut_parameter"])
+        else:
+            parameters.append(entry["expression"])
 
     out_params = []
     if isinstance(in_data, dict):
@@ -360,10 +362,10 @@ def find_pulser_properties(df, energy="daqenergy"):
             bcs = pgh.get_bin_centers(bins)
             hist, bins, var = pgh.get_hist(tsl, bins=bins)
 
-            maxs = pgc.get_i_local_maxima(hist, 45)
+            maxs = pgh.get_i_local_maxima(hist, 45)
             maxs = maxs[maxs > 20]
 
-            super_max = pgc.get_i_local_maxima(hist, 500)
+            super_max = pgh.get_i_local_maxima(hist, 500)
             super_max = super_max[super_max > 20]
             if len(maxs) < 2:
                 continue
