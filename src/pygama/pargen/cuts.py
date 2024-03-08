@@ -13,8 +13,8 @@ import pandas as pd
 from lgdo.types import Table
 from scipy import stats
 
-import pygama.math.histogram as pgh
 import pygama.math.binned_fitting as pgf
+import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)

@@ -23,8 +23,7 @@ from scipy.stats import binned_statistic, chi2
 import pygama.math.binned_fitting as pgb
 import pygama.math.distributions as pgf
 import pygama.math.histogram as pgh
-from pygama.math.histogram import get_i_local_extrema, get_i_local_maxima
-import pygama.math.utils as pgu
+from pygama.math.histogram import get_i_local_maxima
 from pygama.math.least_squares import fit_simple_scaling
 from pygama.pargen.utils import convert_to_minuit, return_nans
 
@@ -84,20 +83,19 @@ class HPGeCalibration:
 
         if guess_kev <= 0:
             log.error(f"hpge_E_cal warning: invalid guess_kev = {guess_kev}")
-        if deg ==-1:
+        if deg == -1:
             self.pars = np.zeros(2, dtype=float)
             self.pars[0] = guess_kev
-            self.fixed = {1:1}
+            self.fixed = {1: 1}
         elif deg == 0:
             self.pars = np.zeros(2, dtype=float)
             self.pars[1] = guess_kev
-            self.fixed = {0:0}
+            self.fixed = {0: 0}
         else:
             self.pars = np.zeros(self.deg + 1, dtype=float)
             self.pars[1] = guess_kev
             self.fixed = fixed
         self.results = {}
-        
 
         self.uncal_is_int = uncal_is_int
         self.plot_options = plot_options
@@ -862,18 +860,14 @@ class HPGeCalibration:
             all_peaks = np.append(all_peaks, peak)
             if np.abs(peak - 2103.5) < 1:
                 log.info("Tl SEP removed from fwhm fitting")
-                pass
             elif np.abs(peak - 1592.53) < 1:
                 log.info("Tl DEP removed from fwhm fitting")
-                pass
             elif np.abs(peak - 511.0) < 1:
                 log.info("e annihilation removed from fwhm fitting")
-                pass
             elif np.isnan(peak_dict["fwhm_in_kev"]) or np.isnan(
                 peak_dict["fwhm_err_in_kev"]
             ):
                 log.info(f"{peak} failed, removed from fwhm fitting")
-                pass
             else:
                 fwhm_peaks = np.append(fwhm_peaks, peak)
                 fwhms = np.append(fwhms, peak_dict["fwhm_in_kev"])
@@ -1025,10 +1019,10 @@ class HPGeCalibration:
             )
 
             if self.pars is None:
-                if self.deg <1:
+                if self.deg < 1:
                     self.pars = np.full(2, np.nan)
                 else:
-                    self.pars = np.full(self.deg+1, np.nan)
+                    self.pars = np.full(self.deg + 1, np.nan)
 
                 log.error(f"Calibration failed completely for {self.energy_param}")
                 return
@@ -1752,8 +1746,8 @@ def unbinned_staged_energy_fit(
             debug_string = f'dropping tail tail val : {fit[0]["htail"]} tail err : {fit[1]["htail"]} '
             debug_string += f"p_val no tail: : {p_val_no_tail} p_val with tail: {p_val}"
             log.debug(debug_string)
-            
-            #if display > 0:
+
+            # if display > 0:
             m_fit = pgf.gauss_on_step.get_pdf(bin_cs, *fit_no_tail[0])
             m_fit_tail = pgf.hpge_peak.get_pdf(bin_cs, *fit[0])
             plt.figure()
@@ -1810,7 +1804,7 @@ def hpge_fit_energy_scale(mus, mu_vars, energies_kev, deg=0, fixed=None):
     """
     if deg == 0:
         scale, scale_cov = fit_simple_scaling(energies_kev, mus, var=mu_vars)
-        pars = np.array([0,scale])
+        pars = np.array([0, scale])
         cov = np.array([[0, 0], [0, scale_cov]])
         errs = np.diag(np.sqrt(cov))
     else:
@@ -1875,7 +1869,7 @@ def hpge_fit_energy_cal_func(
     if deg == 0:
         e_vars = mu_vars / energy_scale_pars[1] ** 2
         scale, scale_cov = fit_simple_scaling(mus, energies_kev, var=e_vars)
-        pars = np.array([0,scale])
+        pars = np.array([0, scale])
         cov = np.array([[0, 0], [0, scale_cov]])
         errs = np.diag(np.sqrt(cov))
     else:
@@ -2063,6 +2057,7 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
         gof = np.inf
 
     return pars, best_ixtup, best_iytup
+
 
 # move these to dataflow
 def get_peak_labels(
@@ -2605,4 +2600,3 @@ def bin_survival_fraction(
     )
     sf = 100 * (counts_pass + 10 ** (-6)) / (counts_pass + counts_fail + 10 ** (-6))
     return {"bins": pgh.get_bin_centers(bins_pass), "sf": sf}
-
