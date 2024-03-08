@@ -628,3 +628,72 @@ def get_bin_estimates(pars: np.ndarray, func: Callable, bins: np.ndarray, is_int
     else:
         # func can be an integral functions
         return func(bins[1:], *pars, **kwargs) - func(bins[:-1], *pars, **kwargs)
+
+def get_i_local_extrema(data, delta):
+    """Get lists of indices of the local maxima and minima of data
+
+    The "local" extrema are those maxima / minima that have heights / depths of
+    at least delta.
+    Converted from MATLAB script at: http://billauer.co.il/peakdet.html
+
+    Parameters
+    ----------
+    data : array-like
+        the array of data within which extrema will be found
+    delta : scalar
+        the absolute level by which data must vary (in one direction) about an
+        extremum in order for it to be tagged
+
+    Returns
+    -------
+    imaxes, imins : 2-tuple ( array, array )
+        A 2-tuple containing arrays of variable length that hold the indices of
+        the identified local maxima (first tuple element) and minima (second
+        tuple element)
+    """
+
+    # prepare output
+    imaxes, imins = [], []
+
+    # sanity checks
+    data = np.asarray(data)
+    if not np.isscalar(delta):
+        log.error("get_i_local_extrema: Input argument delta must be a scalar")
+        return np.array(imaxes), np.array(imins)
+    if delta <= 0:
+        log.error(f"get_i_local_extrema: delta ({delta}) must be positive")
+        return np.array(imaxes), np.array(imins)
+
+    # now loop over data
+    imax, imin = 0, 0
+    find_max = True
+    for i in range(len(data)):
+        if data[i] > data[imax]:
+            imax = i
+        if data[i] < data[imin]:
+            imin = i
+
+        if find_max:
+            # if the sample is less than the current max by more than delta,
+            # declare the previous one a maximum, then set this as the new "min"
+            if data[i] < data[imax] - delta:
+                imaxes.append(imax)
+                imin = i
+                find_max = False
+        else:
+            # if the sample is more than the current min by more than delta,
+            # declare the previous one a minimum, then set this as the new "max"
+            if data[i] > data[imin] + delta:
+                imins.append(imin)
+                imax = i
+                find_max = True
+
+    return np.array(imaxes), np.array(imins)
+
+
+def get_i_local_maxima(data, delta):
+    return get_i_local_extrema(data, delta)[0]
+
+
+def get_i_local_minima(data, delta):
+    return get_i_local_extrema(data, delta)[1]
