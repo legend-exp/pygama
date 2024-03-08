@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
+import pygama.math.binned_fitting as pgf
 import pygama.pargen.cuts as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
