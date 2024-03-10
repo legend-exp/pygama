@@ -14,8 +14,7 @@ from lgdo import Table, lh5
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-from pygama.math.distributions import gauss_on_step
-from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
+from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
 

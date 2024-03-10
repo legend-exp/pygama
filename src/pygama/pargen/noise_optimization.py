@@ -3,7 +3,6 @@ This module contains the functions for performing the filter optimisation.
 This happens with a grid search performed on ENC peak.
 """
 
-import inspect
 import logging
 import time
 
@@ -16,8 +15,8 @@ from scipy.optimize import minimize
 
 from pygama.math.binned_fitting import goodness_of_fit
 from pygama.math.distributions import gauss
-from pygama.math.unbinned_fitting import fit_unbinned
 from pygama.math.histogram import get_hist
+from pygama.math.unbinned_fitting import fit_unbinned
 from pygama.pargen.dsp_optimize import run_one_dsp
 
 log = logging.getLogger(__name__)

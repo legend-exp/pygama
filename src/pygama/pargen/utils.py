@@ -47,6 +47,7 @@ def get_params(file_params, param_list):
 
 # do these all belong in dataflow?
 
+
 def load_data(
     files: list,
     lh5_path: str,
@@ -132,6 +133,7 @@ def load_data(
         return df, masks
     else:
         return df
+
 
 def get_wf_indexes(sorted_indexs, n_events):
     out_list = []
@@ -287,9 +289,9 @@ def event_selection(
         with open(dsp_config) as r:
             dsp_config = json.load(r)
 
-    dsp_config["outputs"] = cts.get_keys(
-        dsp_config["outputs"], cut_parameters
-    ) + [energy_parameter]
+    dsp_config["outputs"] = cts.get_keys(dsp_config["outputs"], cut_parameters) + [
+        energy_parameter
+    ]
 
     log.debug("Processing data")
     tb_data = opt.run_one_dsp(input_data, dsp_config, db_dict=db_dict)

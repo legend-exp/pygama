@@ -285,6 +285,7 @@ def generate_cuts(
     else:
         return output_dict
 
+
 def get_cut_indexes(data, cut_parameters):
     """
     Get the indexes of the data that pass the cuts in
@@ -302,7 +303,7 @@ def get_cut_indexes(data, cut_parameters):
         outcol = tb_data.eval(info["expression"], info.get("parameters", None))
         table.add_column(outname, outcol)
     log.debug("Applied Cuts")
-        
+
     for cut in cut_dict:
         ct_mask = data[cut].nda & ct_mask
     return cut_mask
@@ -410,6 +411,7 @@ def find_pulser_properties(df, energy="daqenergy"):
             continue
     return out_pulsers
 
+
 def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
     if isinstance(channel, str):
         if channel[:2] == "ch":
@@ -454,6 +456,7 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
         mask = np.zeros(len(data.query(f"array_id=={channel}")), dtype="bool")
         mask[ids] = True
     return ids, mask
+
 
 def tag_pulsers(df, chan_info, window=0.01):
     df["isPulser"] = 0

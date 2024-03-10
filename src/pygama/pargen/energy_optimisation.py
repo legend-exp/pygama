@@ -5,33 +5,15 @@ separately using the optimiser, then the resulting grids are interpolated
 to provide the best energy resolution at Qbb
 """
 
-import json
 import logging
-import os
-import pathlib
-import sys
-from collections import namedtuple
 
 import lgdo.lh5 as lh5
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import pint
-from dspeed.units import unit_registry as ureg
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.colors import LogNorm
-from scipy.optimize import curve_fit, minimize
-from scipy.stats import norm
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.utils._testing import ignore_warnings
+from scipy.optimize import curve_fit
 
-import pygama.math.histogram as pgh
 import pygama.math.distributions as pgd
-import pygama.math.binned_fitting as pgf
-import pygama.pargen.cuts as cts
-import pygama.pargen.dsp_optimize as opt
+import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
@@ -71,7 +53,7 @@ def simple_guess(energy, func, fit_range=None, bin_width=1):
             "hstep": hstep,
             "x_lo": fit_range[0],
             "x_hi": fit_range[1],
-        } 
+        }
 
     elif func == pgd.gauss_on_step:
         mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
@@ -516,6 +498,7 @@ def fom_fwhm_fit(tb_in, kwarg_dict):
         "n_sig": n_sig,
         "n_sig_err": n_sig_err,
     }
+
 
 # use energy cal classes?
 def fwhm_slope(x, m0, m1, m2):

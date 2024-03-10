@@ -5,7 +5,6 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 from dspeed import build_processing_chain
-
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.utils._testing import ignore_warnings
@@ -379,6 +378,7 @@ def run_grid_multiprocess_parallel(
     pool.close()
     pool.join()
     return grid_values
+
 
 OptimiserDimension = namedtuple(
     "OptimiserDimension", "name parameter min_val max_val round unit"
