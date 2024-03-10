@@ -14,9 +14,10 @@ from lgdo import Table, lh5
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
+from pygama.math.distributions import gauss_on_step
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
-from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
+from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -58,6 +59,17 @@ def dplms_ge_dict(
     log.info("Selecting baselines")
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
+
+    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
+    log.debug(f"Cuts are {cut_dict}")
+    idxs = np.full(len(dsp_fft), True, dtype=bool)
+    for outname, info in cut_dict.items():
+        outcol = dsp_fft.eval(info["expression"], info.get("parameters", None))
+        dsp_fft.add_column(outname, outcol)
+    for cut in cut_dict:
+        idxs = dsp_fft[cut].nda & idxs
+    log.debug("Applied Cuts")
+
     idxs = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
     bl_field = dplms_dict["bl_field"]
     log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
@@ -97,8 +109,7 @@ def dplms_ge_dict(
         "peak": peaks_kev[-1],
         "kev_width": kev_widths[-1],
         "parameter": ene_par,
-        "func": extended_gauss_step_pdf,
-        "gof_func": gauss_step_pdf,
+        "func": gauss_on_step,
     }
 
     if display > 0:
@@ -153,7 +164,7 @@ def dplms_ge_dict(
         dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
 
         try:
-            res = fom_FWHM_with_dt_corr_fit(
+            res = fom_fwhm_with_alpha_fit(
                 dsp_opt,
                 peak_dict,
                 "QDrift",
