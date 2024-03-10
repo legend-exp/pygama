@@ -153,7 +153,6 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         the value of the fwhm and its error
     """
     req_args = np.array(self.required_args())
-    nsig_idx = np.where(req_args == "n_sig")[0][0]
     sigma_idx = np.where(req_args == "sigma")[0][0]
     mu_idx = np.where(req_args == "mu")[0][0]
 
@@ -164,7 +163,7 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         cov = np.array(cov)
         dropped_cov = cov[:, 2:][2:, :]
         
-        return hpge_peak_mode(pars[nsig_idx],  pars[mu_idx], pars[sigma_idx], pars[htail_idx], 
+        return hpge_peak_mode(pars[mu_idx], pars[sigma_idx], pars[htail_idx], 
         pars[tau_idx], dropped_cov)
 
     else: 

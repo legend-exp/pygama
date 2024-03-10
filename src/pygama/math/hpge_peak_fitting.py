@@ -138,22 +138,15 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
     #calculate uncertainty
     #amp set to 1, mu to 0, hstep+bg set to 0
     pars = [1,0, sigma, htail, tau,0,0]
-    step_norm = 1
-    gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
-    gradmax *= 0.5
-    grad1 = hpge_peak_parameter_gradient(lower_hm, pars,step_norm)
-    grad1 -= gradmax
-    grad1 /= hpge_peak_peakshape_derivative(lower_hm, pars,step_norm)
-    grad2 = hpge_peak_parameter_gradient(upper_hm, pars,step_norm)
-    grad2 -= gradmax
-    grad2 /= hpge_peak_peakshape_derivative(upper_hm, pars,step_norm)
-    grad2 -= grad1
 
-    fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
+    rng = np.random.default_rng(1)
+    par_b = rng.multivariate_normal(pars, cov, size=100)
+    modes = np.array([hpge_peak_mode(p[2],p[3],p[4], cov = None) for p in par_b])
+    mode_err_boot = np.nanstd(modes, axis=0)
 
-    return upper_hm - lower_hm, fwfm_unc
+    return upper_hm - lower_hm, mode_err_boot
 
-def hpge_peak_mode(nsig, mu, sigma, htail, tau, cov = None):
+def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
         
     if htail<0 or htail>1:
         if cov is not None:
@@ -165,16 +158,16 @@ def hpge_peak_mode(nsig, mu, sigma, htail, tau, cov = None):
                     args = ([nsig,mu,sigma,htail,tau,0,0],1 ))
 
 
-    if cov is not None:
-        pars = np.array([nsig, mu, sigma, htail, tau,0,0])
+    if cov not None:
+        return mode 
+    else:
+        pars = np.array([1, mu, sigma, htail, tau,0,0])
         rng = np.random.default_rng(1)
         par_b = rng.multivariate_normal(pars, cov, size=100)
         modes = np.array([hpge_peak_mode(p[0],p[1],p[2],p[3],p[4], cov = None) for p in par_b])
         mode_err_boot = np.nanstd(modes, axis=0)
 
         return mode, mode_err_boot
-    else:
-        return mode
 
 
 def hpge_peak_peakshape_derivative(E: np.ndarray, pars: np.ndarray, step_norm: float) -> np.ndarray:
