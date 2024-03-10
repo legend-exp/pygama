@@ -14,7 +14,9 @@ import scipy.stats
 from scipy.interpolate import splev, splrep
 from scipy.optimize import minimize
 
-import pygama.math.peak_fitting as pgf
+from pygama.math.binned_fitting import goodness_of_fit
+from pygama.math.distributions import gauss
+from pygama.math.unbinned_fitting import fit_unbinned
 from pygama.math.histogram import get_hist
 from pygama.pargen.dsp_optimize import run_one_dsp
 
@@ -247,12 +249,12 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     fit_range = [np.percentile(energies, 0.2), np.percentile(energies, 99.8)]
 
     hist, bins, var = get_hist(energies, range=fit_range, dx=dx)
-    guess, bounds = simple_gaussian_guess(hist, bins, pgf.extended_gauss_pdf)
+    guess, bounds = simple_gaussian_guess(hist, bins, gauss)
     fit_range = [guess[0] - sigma_thr * guess[1], guess[0] + sigma_thr * guess[1]]
 
     energies_fit = energies[(energies > fit_range[0]) & (energies < fit_range[1])]
-    pars, errs, cov = pgf.fit_unbinned(
-        pgf.extended_gauss_pdf,
+    pars, errs, cov = fit_unbinned(
+        gauss,
         energies_fit,
         guess=guess,
         bounds=bounds,
@@ -265,8 +267,8 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     hist, bins, var = get_hist(energies_fit, range=fit_range, dx=dx)
     gof_pars = pars
     gof_pars[2] *= dx
-    chisq, dof = pgf.goodness_of_fit(
-        hist, bins, None, pgf.gauss_pdf, gof_pars, method="Pearson"
+    chisq, dof = goodness_of_fit(
+        hist, bins, None, gauss.get_pdf, gof_pars, method="Pearson"
     )
     p_val = scipy.stats.chi2.sf(chisq, dof + len(gof_pars))
 
@@ -340,11 +342,11 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
         (n_sig + n_sig * toll, n_sig + n_sig * toll),
     ]
 
-    for par in inspect.getfullargspec(func)[0][1:]:
-        if par == "lower_range" or par == "upper_range":
+    for par in func.required_args():
+        if par == "x_lo" or par == "x_hi":
             guess.append(np.inf)
             bounds.append(None)
-        elif par == "n_bkg" or par == "hstep" or par == "components":
+        elif par == "n_bkg" or par == "hstep":
             guess.append(0)
             bounds.append(None)
     return guess, bounds

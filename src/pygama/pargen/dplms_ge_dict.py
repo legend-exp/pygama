@@ -14,8 +14,8 @@ from lgdo import Table, lh5
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-from pygama.math.peak_fitting import extended_gauss_step_pdf, gauss_step_pdf
-from pygama.pargen.cuts import generate_cuts, get_cut_indexes
+from pygama.math.distributions import gauss_on_step
+from pygama.pargen.data_cleaning import generate_cuts, get_cut_indexes
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
 
@@ -59,8 +59,7 @@ def dplms_ge_dict(
     log.info("Selecting baselines")
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
-    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
-    idxs = get_cut_indexes(dsp_fft, cut_dict)
+    idxs = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
     bl_field = dplms_dict["bl_field"]
     log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
 
