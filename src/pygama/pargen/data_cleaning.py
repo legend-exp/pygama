@@ -285,6 +285,28 @@ def generate_cuts(
     else:
         return output_dict
 
+def get_cut_indexes(data, cut_parameters):
+    """
+    Get the indexes of the data that pass the cuts in
+    """
+    if data is not isinstance(Table):
+        try:
+            tb_data = Table(data)
+        except Exception:
+            raise ValueError("Data must be a Table")
+
+    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
+    log.debug(f"Cuts are {cut_dict}")
+    ct_mask = np.full(len(tb_data), True, dtype=bool)
+    for outname, info in cut_dict.items():
+        outcol = tb_data.eval(info["expression"], info.get("parameters", None))
+        table.add_column(outname, outcol)
+    log.debug("Applied Cuts")
+        
+    for cut in cut_dict:
+        ct_mask = data[cut].nda & ct_mask
+    return cut_mask
+
 
 def find_pulser_properties(df, energy="daqenergy"):
     """
@@ -388,6 +410,50 @@ def find_pulser_properties(df, energy="daqenergy"):
             continue
     return out_pulsers
 
+def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
+    if isinstance(channel, str):
+        if channel[:2] == "ch":
+            chan = int(channel[2:])
+        else:
+            chan = int(channel)
+    else:
+        chan = channel
+    if isinstance(tcm_file, list):
+        mask = np.array([], dtype=bool)
+        for file in tcm_file:
+            _, file_mask = get_tcm_pulser_ids(file, chan, multiplicity_threshold)
+            mask = np.append(mask, file_mask)
+        ids = np.where(mask)[0]
+    else:
+        data = pd.DataFrame(
+            {
+                "array_id": sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as(
+                    "np"
+                ),
+                "array_idx": sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as(
+                    "np"
+                ),
+            }
+        )
+        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as(
+            "np"
+        )
+        cumulength = np.append(np.array([0]), cumulength)
+        n_channels = np.diff(cumulength)
+        evt_numbers = np.repeat(np.arange(0, len(cumulength) - 1), np.diff(cumulength))
+        evt_mult = np.repeat(np.diff(cumulength), np.diff(cumulength))
+        data["evt_number"] = evt_numbers
+        data["evt_mult"] = evt_mult
+        high_mult_events = np.where(n_channels > multiplicity_threshold)[  # noqa: F841
+            0
+        ]
+
+        ids = data.query(f"array_id=={channel} and evt_number in @high_mult_events")[
+            "array_idx"
+        ].to_numpy()
+        mask = np.zeros(len(data.query(f"array_id=={channel}")), dtype="bool")
+        mask[ids] = True
+    return ids, mask
 
 def tag_pulsers(df, chan_info, window=0.01):
     df["isPulser"] = 0
