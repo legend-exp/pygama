@@ -75,7 +75,7 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     if cov is None: return upper_hm - lower_hm
 
     #calculate uncertainty
-    #amp set to 1, mu to 0, hstep+bg set to 0
+    #nsig set to 1, mu to 0, hstep+nbkg set to 0
     pars = [1,0, sigma, htail, tau, 0,0]
     step_norm = 1
     gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
@@ -134,9 +134,8 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
                    args = (sigma, htail, tau, val_frac_max) )
 
     if cov is None: return upper_hm - lower_hm
-    # this needs fixing at some point
     #calculate uncertainty
-    #amp set to 1, mu to 0, hstep+bg set to 0
+    #nsig set to 1, mu to 0, hstep+nbkg set to 0
     pars = [1,0, sigma, htail, tau,0,0]
 
     rng = np.random.default_rng(1)
@@ -155,12 +154,12 @@ def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
             return np.nan
     mode = brentq(hpge_peak_peakshape_derivative,
                     mu-sigma - htail*tau, mu+sigma + htail*tau,
-                    args = ([nsig,mu,sigma,htail,tau,0,0],1 ))
+                    args = ([1,mu,sigma,htail,tau,0,0],1 ))
 
 
-    if cov not None:
-        return mode 
+    if cov is None: return mode 
     else:
+        #nsig set to 1, hstep+nbkg set to 0
         pars = np.array([1, mu, sigma, htail, tau,0,0])
         rng = np.random.default_rng(1)
         par_b = rng.multivariate_normal(pars, cov, size=100)
