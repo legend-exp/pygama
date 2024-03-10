@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 
+import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +19,7 @@ import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 
 log = logging.getLogger(__name__)
-
+sto = lh5.LH5Store()
 mpl.use("agg")
 
 
@@ -292,21 +293,21 @@ def get_cut_indexes(data, cut_parameters):
     """
     if data is not isinstance(Table):
         try:
-            tb_data = Table(data)
+            data = Table(data)
         except Exception:
             raise ValueError("Data must be a Table")
 
-    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
+    cut_dict = generate_cuts(data, parameters=cut_parameters)
     log.debug(f"Cuts are {cut_dict}")
-    ct_mask = np.full(len(tb_data), True, dtype=bool)
+    ct_mask = np.full(len(data), True, dtype=bool)
     for outname, info in cut_dict.items():
-        outcol = tb_data.eval(info["expression"], info.get("parameters", None))
-        table.add_column(outname, outcol)
+        outcol = data.eval(info["expression"], info.get("parameters", None))
+        data.add_column(outname, outcol)
     log.debug("Applied Cuts")
 
     for cut in cut_dict:
         ct_mask = data[cut].nda & ct_mask
-    return cut_mask
+    return ct_mask
 
 
 def find_pulser_properties(df, energy="daqenergy"):
