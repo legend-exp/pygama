@@ -3,7 +3,12 @@ import multiprocessing as mp
 from collections import namedtuple
 
 import numpy as np
+import pandas as pd
 from dspeed import build_processing_chain
+
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.utils._testing import ignore_warnings
 
 log = logging.getLogger(__name__)
 
@@ -374,3 +379,452 @@ def run_grid_multiprocess_parallel(
     pool.close()
     pool.join()
     return grid_values
+
+OptimiserDimension = namedtuple(
+    "OptimiserDimension", "name parameter min_val max_val round unit"
+)
+
+
+class BayesianOptimizer:
+
+    """
+    Bayesian optimiser uses Gaussian Process Regressor from sklearn to fit kernel
+    to data, takes in a series of init samples for this fit and then calculates
+    the next point using the acquisition function specified.
+    """
+
+    np.random.seed(55)
+    lambda_param = 0.01
+    eta_param = 0
+
+    def __init__(self, acq_func, batch_size, kernel=None, sampling_rate=None):
+        self.dims = []
+        self.current_iter = 0
+
+        self.batch_size = batch_size
+        self.iters = 0
+
+        if isinstance(sampling_rate, str):
+            self.sampling_rate = ureg.Quantity(sampling_rate)
+        elif isinstance(sampling_rate, pint.Quantity):
+            self.sampling_rate = sampling_rate
+        else:
+            if sampling_rate is not None:
+                raise TypeError("Unknown type for sampling rate")
+
+        self.gauss_pr = GaussianProcessRegressor(kernel=kernel)
+        self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
+        self.distances_ = []
+
+        if acq_func == "ei":
+            self.acq_function = self._get_expected_improvement
+        elif acq_func == "ucb":
+            self.acq_function = self._get_ucb
+        elif acq_func == "lcb":
+            self.acq_function = self._get_lcb
+
+    def add_dimension(
+        self, name, parameter, min_val, max_val, round_to_samples=False, unit=None
+    ):
+        if round_to_samples is True and self.sampling_rate is None:
+            raise ValueError("Must provide sampling rate to round to samples")
+        if unit is not None:
+            unit = ureg.Quantity(unit)
+        self.dims.append(
+            OptimiserDimension(
+                name, parameter, min_val, max_val, round_to_samples, unit
+            )
+        )
+
+    def get_n_dimensions(self):
+        return len(self.dims)
+
+    def add_initial_values(self, x_init, y_init, yerr_init):
+        self.x_init = x_init
+        self.y_init = y_init
+        self.yerr_init = yerr_init
+
+    def _get_expected_improvement(self, x_new):
+        mean_y_new, sigma_y_new = self.gauss_pr.predict(
+            np.array([x_new]), return_std=True
+        )
+
+        mean_y = self.gauss_pr.predict(self.x_init)
+        min_mean_y = np.min(mean_y)
+        z = (mean_y_new[0] - min_mean_y - 1) / (sigma_y_new[0] + 1e-9)
+        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(z) + sigma_y_new[
+            0
+        ] * norm.pdf(z)
+        return exp_imp
+
+    def _get_ucb(self, x_new):
+        mean_y_new, sigma_y_new = self.gauss_pr.predict(
+            np.array([x_new]), return_std=True
+        )
+        return mean_y_new[0] + self.lambda_param * sigma_y_new[0]
+
+    def _get_lcb(self, x_new):
+        mean_y_new, sigma_y_new = self.gauss_pr.predict(
+            np.array([x_new]), return_std=True
+        )
+        return mean_y_new[0] - self.lambda_param * sigma_y_new[0]
+
+    def _get_next_probable_point(self):
+        min_ei = float(sys.maxsize)
+        x_optimal = None
+        # Trial with an array of random data points
+        rands = np.random.uniform(
+            np.array([dim.min_val for dim in self.dims]),
+            np.array([dim.max_val for dim in self.dims]),
+            (self.batch_size, self.get_n_dimensions()),
+        )
+        for x_start in rands:
+            response = minimize(
+                fun=self.acq_function,
+                x0=x_start,
+                bounds=[(dim.min_val, dim.max_val) for dim in self.dims],
+                method="L-BFGS-B",
+            )
+            if response.fun < min_ei:
+                min_ei = response.fun
+                x_optimal = []
+                for y, dim in zip(response.x, self.dims):
+                    if dim.round is True and dim.unit is not None:
+                        # round so samples is integer
+
+                        x_optimal.append(
+                            float(
+                                round(
+                                    (y * (dim.unit / self.sampling_rate)).to(
+                                        "dimensionless"
+                                    ),
+                                    0,
+                                )
+                                * (self.sampling_rate / dim.unit)
+                            )
+                        )
+                    else:
+                        x_optimal.append(y)
+        if x_optimal in self.x_init:
+            perturb = np.random.uniform(
+                -np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
+                (1, len(self.dims)),
+            )
+            x_optimal += perturb
+            new_x_optimal = []
+            for y, dim in zip(x_optimal[0], self.dims):
+                if dim.round is True and dim.unit is not None:
+                    # round so samples is integer
+                    new_x_optimal.append(
+                        float(
+                            round(
+                                (y * (dim.unit / self.sampling_rate)).to(
+                                    "dimensionless"
+                                ),
+                                0,
+                            )
+                            * (self.sampling_rate / dim.unit)
+                        )
+                    )
+                else:
+                    new_x_optimal.append(y)
+            x_optimal = new_x_optimal
+            for i, y in enumerate(x_optimal):
+                if y > self.dims[i].max_val:
+                    x_optimal[i] = self.dims[i].max_val
+                elif y < self.dims[i].min_val:
+                    x_optimal[i] = self.dims[i].min_val
+        return x_optimal, min_ei
+
+    def _extend_prior_with_posterior_data(self, x, y, yerr):
+        self.x_init = np.append(self.x_init, np.array([x]), axis=0)
+        self.y_init = np.append(self.y_init, np.array(y), axis=0)
+        self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
+
+    def get_first_point(self):
+        y_min_ind = np.nanargmin(self.y_init)
+        self.y_min = self.y_init[y_min_ind]
+        self.optimal_x = self.x_init[y_min_ind]
+        self.optimal_ei = None
+        return self.optimal_x, self.optimal_ei
+
+    @ignore_warnings(category=ConvergenceWarning)
+    def iterate_values(self):
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        x_next, ei = self._get_next_probable_point()
+        return x_next, ei
+
+    def update_db_dict(self, db_dict):
+        if self.current_iter == 0:
+            x_new, ei = self.get_first_point()
+        x_new, ei = self.iterate_values()
+        self.current_x = x_new
+        self.current_ei = ei
+        for i, val in enumerate(x_new):
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
+            if unit is not None:
+                value_str = f"{val}*{unit.units:~}"
+                if "µ" in value_str:
+                    value_str = value_str.replace("µ", "u")
+            else:
+                value_str = f"{val}"
+            if name not in db_dict.keys():
+                db_dict[name] = {parameter: value_str}
+            else:
+                db_dict[name][parameter] = value_str
+        self.current_iter += 1
+        return db_dict
+
+    def update(self, results):
+        y_val = results["y_val"]
+        y_err = results["y_err"]
+        self._extend_prior_with_posterior_data(
+            self.current_x, np.array([y_val]), np.array([y_err])
+        )
+
+        if np.isnan(y_val) | np.isnan(y_err):
+            pass
+        else:
+            if y_val < self.y_min:
+                self.y_min = y_val
+                self.optimal_x = self.current_x
+                self.optimal_ei = self.current_ei
+                self.optimal_results = results
+
+        if self.current_iter == 1:
+            self.prev_x = self.current_x
+        else:
+            self.distances_.append(
+                np.linalg.norm(np.array(self.prev_x) - np.array(self.current_x))
+            )
+            self.prev_x = self.current_x
+
+        self.best_samples_ = pd.concat(
+            [
+                self.best_samples_,
+                pd.DataFrame(
+                    {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
+                ),
+            ],
+            ignore_index=True,
+        )
+
+    def get_best_vals(self):
+        out_dict = {}
+        for i, val in enumerate(self.optimal_x):
+            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
+            if unit is not None:
+                value_str = f"{val}*{unit.units:~}"
+                if "µ" in value_str:
+                    value_str = value_str.replace("µ", "u")
+            else:
+                value_str = f"{val}"
+            if name not in out_dict.keys():
+                out_dict[name] = {parameter: value_str}
+            else:
+                out_dict[name][parameter] = value_str
+        return out_dict
+
+    @ignore_warnings(category=ConvergenceWarning)
+    def plot(self, init_samples=None):
+        nan_idxs = np.isnan(self.y_init)
+        fail_idxs = np.isnan(self.yerr_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
+            ys = np.zeros_like(points)
+            ys_err = np.zeros_like(points)
+            for i, point in enumerate(points):
+                ys[i], ys_err[i] = self.gauss_pr.predict(
+                    np.array([point]).reshape(1, -1), return_std=True
+                )
+            fig = plt.figure()
+
+            plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
+            plt.scatter(
+                np.array(self.x_init)[fail_idxs],
+                np.array(self.y_init)[fail_idxs],
+                color="green",
+                label="Failed samples",
+            )
+            plt.fill_between(points, ys - ys_err, ys + ys_err, alpha=0.1)
+            if init_samples is not None:
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
+                plt.scatter(
+                    np.array(init_samples)[:, 0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                    label="Init Samples",
+                )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
+
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+            plt.ylabel("Kernel Value")
+            plt.legend()
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self.gauss_pr.predict(
+                    points[j].reshape(1, -1), return_std=False
+                )
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+        plt.title(f"{self.dims[0].name} Kernel Prediction")
+        plt.tight_layout()
+        plt.close()
+        return fig
+
+    @ignore_warnings(category=ConvergenceWarning)
+    def plot_acq(self, init_samples=None):
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if (len(self.dims) != 2) and (len(self.dims) != 1):
+            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+        elif len(self.dims) == 1:
+            points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
+            ys = np.zeros_like(points)
+            for i, point in enumerate(points):
+                ys[i] = self.acq_function(np.array([point]).reshape(1, -1)[0])
+            fig = plt.figure()
+            plt.plot(points, ys)
+            plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
+            if init_samples is not None:
+                init_ys = np.array(
+                    [
+                        np.where(init_sample == self.x_init)[0][0]
+                        for init_sample in init_samples
+                    ]
+                )
+                plt.scatter(
+                    np.array(init_samples)[:, 0],
+                    np.array(self.y_init)[init_ys],
+                    color="red",
+                    label="Init Samples",
+                )
+            plt.scatter(self.optimal_x[0], self.y_min, color="orange", label="Optimal")
+
+            plt.xlabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+            plt.ylabel("Acquisition Function Value")
+            plt.legend()
+
+        elif len(self.dims) == 2:
+            x, y = np.mgrid[
+                self.dims[0].min_val : self.dims[0].max_val : 0.1,
+                self.dims[1].min_val : self.dims[1].max_val : 0.1,
+            ]
+            points = np.vstack((x.flatten(), y.flatten())).T
+            out_grid = np.zeros(
+                (
+                    int((self.dims[0].max_val - self.dims[0].min_val) * 10),
+                    int((self.dims[1].max_val - self.dims[1].min_val) * 10),
+                )
+            )
+
+            j = 0
+            for i, _ in np.ndenumerate(out_grid):
+                out_grid[i] = self.acq_function(points[j])
+                j += 1
+
+            fig = plt.figure()
+            plt.imshow(
+                out_grid,
+                norm=LogNorm(),
+                origin="lower",
+                aspect="auto",
+                extent=(0, out_grid.shape[1], 0, out_grid.shape[0]),
+            )
+            plt.scatter(
+                np.array(self.x_init - self.dims[1].min_val)[:, 1] * 10,
+                np.array(self.x_init - self.dims[0].min_val)[:, 0] * 10,
+            )
+            if init_samples is not None:
+                plt.scatter(
+                    (init_samples[:, 1] - self.dims[1].min_val) * 10,
+                    (init_samples[:, 0] - self.dims[0].min_val) * 10,
+                    color="red",
+                )
+            plt.scatter(
+                (self.optimal_x[1] - self.dims[1].min_val) * 10,
+                (self.optimal_x[0] - self.dims[0].min_val) * 10,
+                color="orange",
+            )
+            ticks, labels = plt.xticks()
+            labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[1], 5)
+            plt.xticks(ticks=ticks, labels=labels, rotation=45)
+            ticks, labels = plt.yticks()
+            labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
+            ticks = np.linspace(0, out_grid.shape[0], 5)
+            plt.yticks(ticks=ticks, labels=labels, rotation=45)
+            plt.xlabel(
+                f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
+            )
+            plt.ylabel(
+                f"{self.dims[0].name}-{self.dims[0].parameter}({self.dims[0].unit})"
+            )
+        plt.title(f"{self.dims[0].name} Acquisition Space")
+        plt.tight_layout()
+        plt.close()
+        return fig
