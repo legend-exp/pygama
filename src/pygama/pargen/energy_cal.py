@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import string
 from datetime import datetime
 
 import matplotlib.pyplot as plt
@@ -49,7 +50,8 @@ class HPGeCalibration:
     deg : non-negative int
         degree of the polynomial for the E_cal function E_kev = poly(e_uncal).
         deg = 0 corresponds to a simple scaling E_kev = scale * e_uncal.
-        Otherwise follows the convention in np.polyfit
+        Otherwise follows the convention in np.polynomial.polynomial of
+        lowest order to highest order
     uncal_is_int : bool
         if True, attempts will be made to avoid picket-fencing when binning
         e_uncal
@@ -100,34 +102,27 @@ class HPGeCalibration:
         self.uncal_is_int = uncal_is_int
         self.plot_options = plot_options
 
-        # if not isinstance(range_kev, list):
-        #     if np.isscalar(range_kev):
-        #         range_kev = (range_kev / 2, range_kev / 2)
-        #     range_kev = [range_kev for peak in glines]
-
-        # if not hasattr(funcs, "__len__"):
-        #     funcs = [funcs for peak in glines]
-
-        # self.peak_args = [
-        #     (peak, ranges, func) for peak, ranges, func in zip(glines, range_kev, funcs)
-        # ]
-
     def gen_pars_dict(self):
-        # rewrite this
-        out_dict = {}
+        """
+        Generate a dictionary containing the expression and parameters used for energy calibration.
 
-        return out_dict
-
-    def fill_plot_dict(self, data, plot_dict=None):
-        if plot_dict is not None:
-            for key, item in self.plot_options.items():
-                if item["options"] is not None:
-                    plot_dict[key] = item["function"](self, data, **item["options"])
-                else:
-                    plot_dict[key] = item["function"](self, data)
-        else:
-            plot_dict = {}
-        return plot_dict
+        Returns:
+            dict: A dictionary with keys 'expression' and 'parameters'.
+                  'expression' is a string representing the energy calibration expression.
+                  'parameters' is a dictionary containing the parameter values used in the expression.
+        """
+        expression = ""
+        parameters = {}
+        for i, coeff in enumerate(self.pars):
+            parameter_name = string.ascii_lowercase[i]
+            if i == 0:
+                expression += f"{parameter_name}"
+            elif i == 1:
+                expression += f"{parameter_name} * self.energy_param"
+            else:
+                expression += f" + {parameter_name} * {self.energy_param}^{i}"
+            parameters[parameter_name] = coeff
+        return {"expression": expression, "parameters": parameters}
 
     def update_results_dict(self, results_dict):
         name = inspect.stack()[1][3]
@@ -156,28 +151,31 @@ class HPGeCalibration:
         var_zero=1,
         update_cal_pars=True,
     ):
-        """Find uncalibrated E peaks whose E spacing matches the pattern in peaks_kev
-        Note: the specialization here to units "kev" in peaks and Etol is
-        unnecessary. However it is kept so that the default value for etol_kev has
-        an unambiguous interpretation.
+        """
+        Find uncalibrated energy peaks whose energy spacing matches the pattern in peaks_kev.
 
         Parameters
         ----------
-        hist, bins, var : array, array, array
-            Histogram of uncalibrated energies, see pgh.get_hist()
-            var cannot contain any zero entries.
-        peaks_kev : array
-            Energies of peaks to search for (in kev)
-        n_sigma : float
-            Threshold for detecting a peak in sigma (i.e. sqrt(var))
-        deg : int
-            deg arg to pass to poly_match
-        etol_kev : float
-            absolute tolerance in energy for matching peaks
-        var_zero : float
-            number used to replace zeros of var to avoid divide-by-zero in
-            hist/sqrt(var). Default value is 1. Usually when var = 0 its because
-            hist = 0, and any value here is fine.
+        e_uncal (array-like):
+            Uncalibrated energy values.
+        peaks_kev (array-like, optional):
+            Pattern of energy peaks to match. If not provided, the peaks from the object's attribute `peaks_kev` will be used.
+        n_sigma (float, optional):
+             Number of standard deviations above the mean to consider a peak significant. Default is 5.
+        etol_kev (float, optional):
+            Tolerance in energy units for matching peaks. If not provided, it will be estimated based on the peak widths.
+        bin_width_kev (float, optional):
+            Width of the energy bins for initial peak search. Default is 1 keV.
+        erange (tuple, optional):
+            Range of uncalibrated energy values to consider. If not provided, the range will be determined based on the peaks.
+        var_zero (float, optional):
+            Value to replace zero variance with. Default is 1.
+        update_cal_pars (bool, optional):
+            Whether to update the calibration parameters. Default is True.
+
+        Returns:
+            None
+
         """
 
         if peaks_kev is None:
@@ -272,21 +270,40 @@ class HPGeCalibration:
 
         Parameters
         ----------
-        hist, bins, var : array, array, array
-            Histogram of uncalibrated energies, see pgh.get_hist()
-            var cannot contain any zero entries.
-        cal_pars : array
-            Estimated energy calibration parameters used to search for peaks
-        peaks_kev : array
-            Energies of peaks to search for (in kev)
-        n_sigma : float
-            Threshold for detecting a peak in sigma (i.e. sqrt(var))
-        etol_kev : float
-            absolute tolerance in energy for matching peaks
-        var_zero : float
-            number used to replace zeros of var to avoid divide-by-zero in
-            hist/sqrt(var). Default value is 1. Usually when var = 0 its because
-            hist = 0, and any value here is fine.
+        e_uncal : array
+            Uncalibrated energy values.
+        peaks_kev : array, optional
+            Energies of peaks to search for (in keV). If not provided, the peaks_kev
+            attribute of the object will be used.
+        n_sigma : float, optional
+            Threshold for detecting a peak in sigma (i.e. sqrt(var)). Default is 3.
+        etol_kev : float, optional
+            Absolute tolerance in energy for matching peaks. Default is 5.
+        var_zero : float, optional
+            Number used to replace zeros of var to avoid divide-by-zero in hist/sqrt(var).
+            Default is 1. Usually when var = 0, it's because hist = 0, and any value here is fine.
+        bin_width_kev : float, optional
+            Width of the energy bins for re-binning the histogram. Default is 0.2 keV.
+        update_cal_pars : bool, optional
+            Flag indicating whether to update the calibration parameters. Default is True.
+        erange : tuple, optional
+            Range of energy values to consider for peak search. If not provided, the range
+            will be determined automatically based on the peaks_kev values.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        This method performs the following steps:
+        1. Re-bins the histogram in ~0.2 keV bins with updated energy scale parameters for peak-top fits.
+        2. Finds all local maxima in the histogram with significance greater than n_sigma.
+        3. Matches the calculated peak energies with the expected peak energies.
+        4. Removes duplicate peak matches.
+        5. Updates the input peaks, got peaks, and got peak locations in the results dictionary.
+        6. If update_cal_pars is True, calculates the updated calibration curve using the matched peak energies.
+
         """
         if peaks_kev is None:
             peaks_kev = self.peaks_kev
@@ -412,30 +429,48 @@ class HPGeCalibration:
         tail_weight=0,
         update_cal_pars=True,
     ):
-        """Fit the Energy peaks specified using the function given
+        """
+        Fit the energy peaks specified using the given function.
 
         Parameters
         ----------
         e_uncal : array
-            unbinned energy data to be fit
-        mode_guesses : array
-            array of guesses for modes of each peak
-        wwidths : float or array of float
-            array of widths to use for the fit windows (in units of e_uncal),
-            typically on the order of 10 sigma where sigma is the peak width
-        n_bins : int or array of ints
-            array of number of bins to use for the fit window histogramming
-        peak_pars : list of tuples
-            list containing tuples of form (peak, range, func) where peak is the energy of the peak to fit,
-            range is the range in kev to fit, and func is the function to fit
-        method : str
-            default is unbinned fit can specify to use binned fit method instead
-        uncal_is_int : bool
-            if True, attempts will be made to avoid picket-fencing when binning
-            e_uncal
-        simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
-        n_events : int number of events to use for unbinned fit
-        allowed_p_val : lower limit on p_val of fit
+            Unbinned energy data to be fit.
+        peaks_kev : array, optional
+            Array of energy values for the peaks to fit. If not provided, it uses the peaks_kev attribute of the class.
+        peak_pars : list of tuples, optional
+            List containing tuples of the form (peak, range, func) where peak is the energy of the peak to fit,
+            range is the range in keV to fit, and func is the function to fit.
+        default_n_bins : int, optional
+            Default number of bins to use for the fit window histogramming. Default is 50.
+        peak_param : str, optional
+            Parameter to use for peak fitting. Default is "mode".
+        method : str, optional
+            Method to use for fitting. Default is "unbinned". Can specify to use binned fit method instead.
+        n_events : int, optional
+            Number of events to use for unbinned fit.
+        allowed_p_val : float, optional
+            Lower limit on p-value of fit.
+        tail_weight : int, optional
+            Weight to apply to the tail of the fit.
+        update_cal_pars : bool, optional
+            Whether to update the calibration parameters. Default is True.
+
+        Returns
+        -------
+        results_dict : dict
+            Dictionary containing the fit results for each peak.
+
+        Raises
+        ------
+        RuntimeError
+            If the fit fails.
+
+        Notes
+        -----
+        This function fits the energy peaks specified using the given function. It calculates the range around each peak to fit,
+        performs the fitting using either unbinned or binned method, and returns the fit results in a dictionary.
+
         """
 
         results_dict = {}
@@ -830,51 +865,8 @@ class HPGeCalibration:
                 + f"| {fwhm:.2f}+-{fwhme:.2f} kev".ljust(5)
             )
 
-    def fit_energy_res_curve(self, fwhm_func, interp_energy_kev=None):
-        peak_parameters = self.results[list(self.results)[-1]].get(
-            "peak_parameters", None
-        )
-        if peak_parameters is None:
-            log.error("No peak parameters found")
-            return
-        fitted_peaks_kev = np.array(
-            [
-                peak
-                for peak, peak_dict in peak_parameters.items()
-                if peak_dict["validity"]
-            ]
-        )
-        if "fwhm_in_kev" not in peak_parameters[fitted_peaks_kev[0]]:
-            self.get_fwhms()
-            peak_parameters = self.results[list(self.results)[-1]].get(
-                "peak_parameters", None
-            )
-
-        fwhm_peaks = np.array([], dtype=np.float32)
-        fwhms = np.array([], dtype=np.float32)
-        dfwhms = np.array([], dtype=np.float32)
-        all_peaks = np.array([], dtype=np.float32)
-        #####
-        # Remove the Doppler Broadened peaks from calibration if found
-        for peak, peak_dict in peak_parameters.items():
-            all_peaks = np.append(all_peaks, peak)
-            if np.abs(peak - 2103.5) < 1:
-                log.info("Tl SEP removed from fwhm fitting")
-            elif np.abs(peak - 1592.53) < 1:
-                log.info("Tl DEP removed from fwhm fitting")
-            elif np.abs(peak - 511.0) < 1:
-                log.info("e annihilation removed from fwhm fitting")
-            elif np.isnan(peak_dict["fwhm_in_kev"]) or np.isnan(
-                peak_dict["fwhm_err_in_kev"]
-            ):
-                log.info(f"{peak} failed, removed from fwhm fitting")
-            else:
-                fwhm_peaks = np.append(fwhm_peaks, peak)
-                fwhms = np.append(fwhms, peak_dict["fwhm_in_kev"])
-                dfwhms = np.append(dfwhms, peak_dict["fwhm_err_in_kev"])
-
-        log.info(f"Running FWHM fit for : {fwhm_func.__name__}")
-
+    @staticmethod
+    def fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms):
         try:
             c_lin = cost.LeastSquares(fwhm_peaks, fwhms, dfwhms, fwhm_func.func)
             c_lin.loss = "soft_l1"
@@ -922,14 +914,11 @@ class HPGeCalibration:
                 "p_val": 0,
             }
             log.error("FWHM fit failed to converge")
-        if interp_energy_kev is not None:
-            results = self.interpolate_energy_res(
-                fwhm_peaks, fwhm_func, results, interp_energy_kev
-            )
-        self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
+        return results
 
+    @staticmethod
     def interpolate_energy_res(
-        self, fwhm_peaks, fwhm_func, fwhm_results, interp_energy_kev=None
+        fwhm_peaks, fwhm_func, fwhm_results, interp_energy_kev=None
     ):
         if interp_energy_kev is not None:
             for key, energy in interp_energy_kev.items():
@@ -960,6 +949,58 @@ class HPGeCalibration:
                     f"FWHM {key} energy resolution at {energy} : {interp_fwhm:1.2f} +- {interp_err:1.2f} kev"
                 )
         return fwhm_results
+
+    def get_energy_res_curve(self, fwhm_func, interp_energy_kev=None):
+        peak_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+        if peak_parameters is None:
+            log.error("No peak parameters found")
+            return
+        fitted_peaks_kev = np.array(
+            [
+                peak
+                for peak, peak_dict in peak_parameters.items()
+                if peak_dict["validity"]
+            ]
+        )
+        if "fwhm_in_kev" not in peak_parameters[fitted_peaks_kev[0]]:
+            self.get_fwhms()
+            peak_parameters = self.results[list(self.results)[-1]].get(
+                "peak_parameters", None
+            )
+
+        fwhm_peaks = np.array([], dtype=np.float32)
+        fwhms = np.array([], dtype=np.float32)
+        dfwhms = np.array([], dtype=np.float32)
+        all_peaks = np.array([], dtype=np.float32)
+        #####
+        # Remove the Doppler Broadened peaks from calibration if found
+        for peak, peak_dict in peak_parameters.items():
+            all_peaks = np.append(all_peaks, peak)
+            if np.abs(peak - 2103.5) < 1:
+                log.info("Tl SEP removed from fwhm fitting")
+            elif np.abs(peak - 1592.53) < 1:
+                log.info("Tl DEP removed from fwhm fitting")
+            elif np.abs(peak - 511.0) < 1:
+                log.info("e annihilation removed from fwhm fitting")
+            elif np.isnan(peak_dict["fwhm_in_kev"]) or np.isnan(
+                peak_dict["fwhm_err_in_kev"]
+            ):
+                log.info(f"{peak} failed, removed from fwhm fitting")
+            else:
+                fwhm_peaks = np.append(fwhm_peaks, peak)
+                fwhms = np.append(fwhms, peak_dict["fwhm_in_kev"])
+                dfwhms = np.append(dfwhms, peak_dict["fwhm_err_in_kev"])
+
+        log.info(f"Running FWHM fit for : {fwhm_func.__name__}")
+
+        results = self.fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms)
+        if interp_energy_kev is not None:
+            results = self.interpolate_energy_res(
+                fwhm_peaks, fwhm_func, results, interp_energy_kev
+            )
+        self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
 
     def full_calibration(
         self,
@@ -1030,11 +1071,11 @@ class HPGeCalibration:
         log.debug("Calibrated found")
         log.info(f"Calibration pars are {self.pars}")
 
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
         )
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMQuadratic,
             interp_energy_kev={"Qbb": 2039.0},
         )
@@ -1047,11 +1088,11 @@ class HPGeCalibration:
         log.debug(f"Fitting {self.energy_param}")
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
         self.hpge_fit_energy_peaks(e_uncal, update_cal_pars=False)
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
         )
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMQuadratic,
             interp_energy_kev={"Qbb": 2039.0},
         )
@@ -1094,11 +1135,11 @@ class HPGeCalibration:
             n_events=n_events,
             update_cal_pars=False,
         )
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
         )
-        self.fit_energy_res_curve(
+        self.get_energy_res_curve(
             FWHMQuadratic,
             interp_energy_kev={"Qbb": 2039.0},
         )
@@ -1209,15 +1250,62 @@ def hpge_fit_energy_peak_tops(
 def get_hpge_energy_peak_par_guess(
     energy, func, fit_range=None, bin_width=1, mode_guess=None
 ):
-    """Get parameter guesses for func fit to peak in hist
+    """
+    Get parameter guesses for func fit to peak in hist
 
     Parameters
     ----------
-    hist, bins, var : array, array, array
-        Histogram of uncalibrated energies, see pgh.get_hist(). Should be
-        windowed around the peak.
+    energy : array
+        An array of energy values in the range around the peak for guessing.
     func : function
-        The function to be fit to the peak in the (windowed) hist
+        The function to be fit to the peak in the histogram.
+    fit_range : tuple, optional
+        A tuple specifying the range around the peak to perform the fit. If not provided, the entire range of energy values will be used.
+    bin_width : float, optional
+        The width of the bins in the histogram. Default is 1.
+    mode_guess : float, optional
+        A guess for the mode (mu) parameter of the function. If not provided, it will be estimated from the data.
+
+    Returns
+    -------
+    ValueView
+        A ValueView object from iminuit containing the parameter guesses for the function fit.
+
+    Notes
+    -----
+    This function calculates parameter guesses for fitting a function to a peak in a histogram. It uses various methods to estimate the parameters based on the provided energy values and the selected function.
+
+    If the function is 'gauss_on_step', the following parameters will be estimated:
+    - n_sig: Number of signal events in the peak.
+    - mu: Mean of the peak.
+    - sigma: Standard deviation of the peak.
+    - n_bkg: Number of background events.
+    - hstep: Height of the step between the peak and the background.
+    - x_lo: Lower bound of the fit range.
+    - x_hi: Upper bound of the fit range.
+
+    If the function is 'hpge_peak', the following parameters will be estimated:
+    - n_sig: Number of signal events in the peak.
+    - mu: Mean of the peak.
+    - sigma: Standard deviation of the peak.
+    - htail: Height of the tail component.
+    - tau: Decay constant of the tail component.
+    - n_bkg: Number of background events.
+    - hstep: Height of the step between the peak and the background.
+    - x_lo: Lower bound of the fit range.
+    - x_hi: Upper bound of the fit range.
+
+    If the provided function is not implemented, an error will be raised.
+
+    Examples
+    --------
+    >>> energy = [1, 2, 3, 4, 5]
+    >>> func = pgf.gauss_on_step
+    >>> fit_range = (2, 4)
+    >>> bin_width = 0.5
+    >>> mode_guess = 3.5
+    >>> get_hpge_energy_peak_par_guess(energy, func, fit_range, bin_width, mode_guess)
+    {'n_sig': 3, 'mu': 3.5, 'sigma': 0.5, 'n_bkg': 2, 'hstep': 0.5, 'x_lo': 2, 'x_hi': 4}
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
@@ -1392,7 +1480,19 @@ def get_hpge_energy_peak_par_guess(
 
 def get_hpge_energy_fixed(func):
     """
-    Returns: Sequence list of fixed indexes for fitting and mask for parameters
+    Get the fixed indexes for fitting and mask for parameters based on the given function.
+
+    Parameters
+    ----------
+    func : function
+        The function for which the fixed indexes and mask are to be determined.
+
+    Returns
+    -------
+    fixed : list
+        A sequence list of fixed indexes for fitting.
+    mask : ndarray
+        A boolean mask indicating which parameters are fixed (False) and which are not fixed (True).
     """
 
     if func == pgf.gauss_on_step:
