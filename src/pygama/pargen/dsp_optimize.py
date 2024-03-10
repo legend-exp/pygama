@@ -1,10 +1,16 @@
 import logging
-import multiprocessing as mp
+import sys
 from collections import namedtuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pint
 from dspeed import build_processing_chain
+from dspeed.units import unit_registry as ureg
+from matplotlib.colors import LogNorm
+from scipy.optimize import minimize
+from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.utils._testing import ignore_warnings
@@ -279,107 +285,6 @@ def get_grid_points(grid):
     return out
 
 
-def run_grid_multiprocess_parallel(
-    tb_data,
-    dsp_config,
-    grid,
-    fom_function,
-    db_dict=None,
-    verbosity=1,
-    processes=5,
-    fom_kwargs=None,
-):
-    """
-    run one iteration of DSP on tb_data with multiprocessing, can handle
-    multiple grids if they are the same dimensions
-
-    Optionally returns a value for optimization
-
-    Parameters
-    ----------
-    tb_data : lh5 Table
-        An input table of lh5 data. Typically a selection is made prior to
-        sending tb_data to this function: optimization typically doesn't have to
-        run over all data
-    dsp_config : dict
-        Specifies the DSP to be performed for this iteration (see
-        build_processing_chain()) and the list of output variables to appear in
-        the output table
-    grid : pargrid, list of pargrids
-        Grids to run optimization on
-    db_dict : dict (optional)
-        DSP parameters database. See build_processing_chain for formatting info
-    fom_function : function or None (optional)
-        When given the output lh5 table of this DSP iteration, the
-        fom_function must return a scalar figure-of-merit value upon which the
-        optimization will be based. Should accept verbosity as a second argument.
-        If multiple grids provided can either pass one fom to have it run for each grid
-        or a list of fom to run different fom on each grid.
-    verbosity : int (optional)
-        verbosity for the processing chain and fom_function calls
-    processes : int
-        DOCME
-    fom_kwargs
-        any keyword arguments to pass to the fom,
-        if multiple grids given will need to be a list of the fom_kwargs for each grid
-
-    Returns
-    -------
-    figure_of_merit : float
-        If fom_function is not None, returns figure-of-merit value for the DSP iteration
-    tb_out : lh5 Table
-        If fom_function is None, returns the output lh5 table for the DSP iteration
-    """
-
-    if not isinstance(grid, list):
-        grid = [grid]
-    if not isinstance(fom_function, list) and fom_function is not None:
-        fom_function = [fom_function]
-    if not isinstance(fom_kwargs, list):
-        fom_kwargs = [fom_kwargs for gri in grid]
-    grid_values = []
-    shapes = [gri.get_shape() for gri in grid]
-    if fom_function is not None:
-        for i in range(len(grid)):
-            grid_values.append(np.ndarray(shape=shapes[i], dtype="O"))
-    else:
-        grid_lengths = np.array([gri.get_n_grid_points() for gri in grid])
-        grid_values.append(np.ndarray(shape=shapes[np.argmax(grid_lengths)], dtype="O"))
-    grid_list = get_grid_points(grid)
-    pool = mp.Pool(processes=processes)
-    results = [
-        pool.apply_async(
-            run_grid_point,
-            args=(
-                tb_data,
-                dsp_config,
-                grid,
-                fom_function,
-                np.asarray(gl),
-                db_dict,
-                verbosity,
-                fom_kwargs,
-            ),
-        )
-        for gl in grid_list
-    ]
-
-    for result in results:
-        res = result.get()
-        indexes = res["indexes"]
-        if fom_function is not None:
-            for i in range(len(grid)):
-                index = indexes[i]
-                if grid_values[i][index] is None:
-                    grid_values[i][index] = res["results"][i]
-        else:
-            grid_values[0][indexes[0]] = {f"{indexes[0]}": res["results"]}
-
-    pool.close()
-    pool.join()
-    return grid_values
-
-
 OptimiserDimension = namedtuple(
     "OptimiserDimension", "name parameter min_val max_val round unit"
 )
@@ -397,7 +302,15 @@ class BayesianOptimizer:
     lambda_param = 0.01
     eta_param = 0
 
-    def __init__(self, acq_func, batch_size, kernel=None, sampling_rate=None):
+    def __init__(
+        self,
+        acq_func,
+        batch_size,
+        kernel=None,
+        sampling_rate=None,
+        fom_value="y_val",
+        fom_error="y_val_err",
+    ):
         self.dims = []
         self.current_iter = 0
 
@@ -422,6 +335,9 @@ class BayesianOptimizer:
             self.acq_function = self._get_ucb
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
+
+        self.fom_value = fom_value
+        self.fom_error = fom_error
 
     def add_dimension(
         self, name, parameter, min_val, max_val, round_to_samples=False, unit=None
@@ -578,8 +494,8 @@ class BayesianOptimizer:
         return db_dict
 
     def update(self, results):
-        y_val = results["y_val"]
-        y_err = results["y_err"]
+        y_val = results[self.fom_value]
+        y_err = results[self.fom_error]
         self._extend_prior_with_posterior_data(
             self.current_x, np.array([y_val]), np.array([y_err])
         )
