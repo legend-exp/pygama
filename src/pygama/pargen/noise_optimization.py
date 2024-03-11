@@ -334,11 +334,11 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
 
     n_sig = np.sum(hist[min_idx:max_idx])
 
-    guess = {"mu":mu, "sigma":sigma, "n_sig":n_sig}
+    guess = {"mu": mu, "sigma": sigma, "n_sig": n_sig}
     bounds = {
-        "mu":(mu - sigma, mu + sigma),
-        "sigma":(sigma - sigma * toll, sigma + sigma * toll),
-        "n_sig":(n_sig + n_sig * toll, n_sig + n_sig * toll)
+        "mu": (mu - sigma, mu + sigma),
+        "sigma": (sigma - sigma * toll, sigma + sigma * toll),
+        "n_sig": (n_sig + n_sig * toll, n_sig + n_sig * toll),
     }
 
     for par in func.required_args():

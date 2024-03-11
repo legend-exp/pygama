@@ -673,7 +673,7 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict):
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
-    frac_max = kwarg_dict.get("frac_max",0.2)
+    frac_max = kwarg_dict.get("frac_max", 0.2)
     out_dict = fom_fwhm_with_alpha_fit(
         data, peak_dicts[0], ctc_param, idxs=idx_list[0], frac_max=frac_max, display=0
     )
@@ -685,9 +685,9 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(data, kwarg_dict):
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
-    interp_energy = kwarg_dict.get("interp_energy",{"Qbb": 2039})
+    interp_energy = kwarg_dict.get("interp_energy", {"Qbb": 2039})
     fwhm_func = kwarg_dict.get("fwhm_func", pgc.FWHMLinear)
-    frac_max = kwarg_dict.get("frac_max",0.2)
+    frac_max = kwarg_dict.get("frac_max", 0.2)
 
     out_dict = fom_fwhm_with_alpha_fit(
         data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], frac_max=frac_max, display=0

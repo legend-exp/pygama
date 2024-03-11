@@ -13,23 +13,22 @@ import numpy as np
 
 import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
-import pygama.pargen.data_cleaning as cts
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
+
 class ExtractTau:
     def __init__(self, dsp_config, wf_field):
         self.dsp_config = dsp_config
         self.wf_field = wf_field
         self.output_dict = {}
-        self.results_dict={}
+        self.results_dict = {}
 
     def get_decay_constant(
-        self,
-        slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
+        self, slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
     ) -> dict:
         """
         Finds the decay constant from the modal value of the tail slope after cuts
@@ -46,8 +45,11 @@ class ExtractTau:
         - out_plot_dict: dictionary containing the plot figure (only returned if display > 0)
         """
 
-        counts, bins, var = pgh.get_hist(slopes, dx=np.nanpercentile(slopes,51)- np.nanpercentile(slopes,50), 
-                                         range=(np.nanpercentile(slopes,1), np.nanpercentile(slopes,99)))
+        counts, bins, var = pgh.get_hist(
+            slopes,
+            dx=np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
+            range=(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99)),
+        )
         bin_centres = pgh.get_bin_centers(bins)
         high_bin = bin_centres[np.argmax(counts)]
         try:
@@ -75,18 +77,15 @@ class ExtractTau:
         else:
             self.output_dict["pz"] = {"tau": tau}
 
-        self.results_dict.update({
-            "single_decay_constant":{
-                "slope_pars":pars
-        }})
-        if display <=0:
+        self.results_dict.update({"single_decay_constant": {"slope_pars": pars}})
+        if display <= 0:
             return
         else:
             out_plot_dict = {}
-            
+
             return out_plot_dict
-        
-    def get_dpz_consts(self,grid_out, opt_dict):
+
+    def get_dpz_consts(self, grid_out, opt_dict):
         std_grid = np.ndarray(shape=grid_out.shape)
         for i in range(grid_out.shape[0]):
             for j in range(grid_out.shape[1]):
@@ -115,15 +114,17 @@ class ExtractTau:
                         {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
                     )
                 except Exception:
-                    db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
+                    db_dict[opt_name] = {
+                        key: f"{param_list[i][min_point[i]][0]}*{unit}"
+                    }
             else:
                 try:
                     db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
                 except Exception:
                     db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
         return db_dict
-    
-    def calculate_dpz(self,tb_data, opt_dict):
+
+    def calculate_dpz(self, tb_data, opt_dict):
         log.debug("Calculating double pz constants")
         pspace = om.set_par_space(opt_dict)
         grid_out = opt.run_grid(
@@ -134,8 +135,10 @@ class ExtractTau:
             self.output_dict["pz"].update(out_dict["pz"])
         else:
             self.output_dict["pz"] = out_dict["pz"]
-    
-    def plot_waveforms_after_correction(self,tb_data, wf_field, norm_param=None, display=0):
+
+    def plot_waveforms_after_correction(
+        self, tb_data, wf_field, norm_param=None, display=0
+    ):
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
         wf_idxs = np.random.choice(len(wfs), 100)
@@ -151,13 +154,13 @@ class ExtractTau:
         plt.axhline(0, color="black")
         plt.xlabel("Samples")
         plt.ylabel("ADU")
-        plot_dict = {"waveforms":fig}
+        plot_dict = {"waveforms": fig}
         if display > 1:
             plt.show()
         else:
             plt.close()
         return plot_dict
-    
+
     def plot_slopes(self, slopes, display=0):
         high_bin = self.results_dict["single_decay_constant"]["pars"][0]
         plt.rcParams["figure.figsize"] = (10, 6)
@@ -185,7 +188,7 @@ class ExtractTau:
         axins.set_xlim(bins[in_min], bins[in_max])
         ax.set_xticks(ax.get_xticks())
         ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45)
-        out_plot_dict = {"slope":fig}
+        out_plot_dict = {"slope": fig}
         if display > 1:
             plt.show()
         else:
