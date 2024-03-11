@@ -605,7 +605,7 @@ class HPGeCalibration:
                     bounds = get_hpge_energy_bounds(func_i, x0)
 
                     pars_i, errs_i, cov_i = pgb.fit_binned(
-                        func_i.get_pdf,
+                        func_i.pdf_norm,
                         hist,
                         bins,
                         var=var,
@@ -621,7 +621,7 @@ class HPGeCalibration:
                         hist,
                         bins,
                         None,
-                        func_i.get_pdf,
+                        func_i.pdf_norm,
                         pars_i,
                         method="Pearson",
                         scale_bins=False,
@@ -918,7 +918,7 @@ class HPGeCalibration:
 
     @staticmethod
     def interpolate_energy_res(
-        fwhm_peaks, fwhm_func, fwhm_results, interp_energy_kev=None
+        fwhm_func, fwhm_peaks, fwhm_results, interp_energy_kev=None
     ):
         if interp_energy_kev is not None:
             for key, energy in interp_energy_kev.items():
@@ -941,6 +941,7 @@ class HPGeCalibration:
                     interp_err = np.nan
                 fwhm_results = fwhm_results.update(
                     {
+                        "interp_energy_in_keV":energy,
                         f"{key}_fwhm_in_kev": interp_fwhm,
                         f"{key}_fwhm_err_in_kev": interp_err,
                     }
@@ -998,7 +999,7 @@ class HPGeCalibration:
         results = self.fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms)
         if interp_energy_kev is not None:
             results = self.interpolate_energy_res(
-                fwhm_peaks, fwhm_func, results, interp_energy_kev
+                fwhm_func, fwhm_peaks, results, interp_energy_kev
             )
         self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
 
@@ -1080,10 +1081,6 @@ class HPGeCalibration:
             interp_energy_kev={"Qbb": 2039.0},
         )
 
-        # these go in dataflow
-        # self.hit_dict = {self.cal_energy_param: self.gen_pars_dict()}
-        # data[self.cal_energy_param] = pgf.nb_poly(data[self.energy_param], self.pars)
-
     def fit_calibrated_peaks(self, e_uncal):
         log.debug(f"Fitting {self.energy_param}")
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
@@ -1144,15 +1141,237 @@ class HPGeCalibration:
             interp_energy_kev={"Qbb": 2039.0},
         )
 
+    def plot_cal_fit(self, data, figsize=(12, 8), fontsize=12, erange=(200, 2700)):
 
-def fwhm_slope(x: np.array, m0: float, m1: float, m2: float = None) -> np.array:
-    """
-    Fit the energy resolution curve
-    """
-    if m2 is None:
-        return np.sqrt(m0 + m1 * x)
-    else:
-        return np.sqrt(m0 + m1 * x + m2 * x**2)
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]},
+            figsize = figsize
+        )
+
+        cal_bins = np.linspace(0, np.nanmax(self.peak_locs) * 1.1, 20)
+
+        ax1.scatter(self.peaks_kev, self.peak_locs, marker="x", c="b")
+
+        ax1.plot(pgf.nb_poly(cal_bins, self.pars), cal_bins, lw=1, c="g")
+
+        ax1.grid()
+        ax1.set_xlim([erange[0], erange[1]])
+        ax1.set_ylabel("Energy (ADC)", fontsize = fontsize)
+        ax2.scatter(
+            self.peaks_kev,
+            pgf.nb_poly(np.array(self.peak_locs), self.pars) - self.peaks_kev,
+            marker="x",
+            c="b",
+        )
+        ax2.grid()
+        ax2.set_xlabel("Energy (keV)", fontsize = fontsize)
+        ax2.set_ylabel("Residuals (keV)", fontsize = fontsize)
+        plt.close()
+        return fig
+    
+        
+    def plot_fits(
+        self, energies, figsize=(12, 8), fontsize=12, ncols=3, nrows=3, binning_kev=5
+    ):
+        plt.rcParams["font.size"] = fontsize
+
+        pk_parameters =  self.results[list(self.results)[-1]].get(
+                "peak_parameters", None
+            )
+
+        fig = plt.figure(figsize=figsize)
+        derco = Polynomial(self.pars).deriv().coef
+        der = [pgf.nb_poly(5, derco) for _ in list(pk_parameters)]
+        for i, peak in enumerate(pk_parameters):
+            range_adu = 5 / der[i]
+            plt.subplot(nrows, ncols, i + 1)
+            pk_dict = pk_parameters[peak]
+            pk_pars = pk_dict["parameters"]
+            pk_ranges = pk_dict["range"]
+            pk_func = pk_dict["function"]
+            mu = pk_func.get_mu(pk_pars) if pk_pars is not None else np.nan
+
+            
+            try:
+                binning = np.arange(pk_ranges[0], pk_ranges[1], 0.1 / der[i])
+                bin_cs = (binning[1:] + binning[:-1]) / 2
+
+                counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
+                if pk_pars is not None:
+                    fit_vals = (
+                        pk_func.get_pdf(bin_cs, *pk_pars, 0) * np.diff(bs)[0]
+                    )
+                    plt.plot(bin_cs, fit_vals)
+                    plt.step(
+                        bin_cs,
+                        [
+                            (fval - count) / count if count != 0 else (fval - count)
+                            for count, fval in zip(counts, fit_vals)
+                        ],
+                        where="mid",
+                    )
+
+                    plt.annotate(
+                        f"{peak:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
+                    )
+                    plt.annotate(
+                        f"p-value : {pk_dict['p_value']:.4f}", (0.02, 0.7), xycoords="axes fraction"
+                    )
+                    plt.xlabel("Energy (keV)")
+                    plt.ylabel("Counts")
+                    plt.legend(loc="upper left", frameon=False)
+
+                    plt.xlim([mu - range_adu, mu + range_adu])
+                    locs, labels = plt.xticks()
+                    
+                    def get_peak_labels(
+                        labels: list[str], pars: list[float]
+                    ) -> tuple(list[float], list[float]):
+                        out = []
+                        out_labels = []
+                        for i, label in enumerate(labels):
+                            if i % 2 == 1:
+                                continue
+                            else:
+                                out.append(f"{pgf.nb_poly(label, pars):.1f}")
+                                out_labels.append(label)
+                        return out_labels, out
+                    
+                    new_locs, new_labels = pgc.get_peak_labels(locs, self.pars)
+                    plt.xticks(ticks=new_locs, labels=new_labels)
+                
+                
+            except Exception:
+                pass
+
+        plt.tight_layout()
+        plt.close()
+        return fig
+
+    def plot_eres_fit(self, data, erange=(200, 2700), figsize=(12, 8), fontsize=12):
+         
+        plt.rcParams["font.size"] = fontsize
+
+        pk_parameters =  self.results[list(self.results)[-1]].get(
+                    "peak_parameters", None
+                )
+        
+        if pk_parameters is None:
+            fig = plt.figure()
+            return fig
+
+        #####
+        # Remove the Tl SEP and DEP from calibration if found
+        fwhm_peaks = np.array([], dtype=np.float32)
+        fwhms = np.array([], dtype=np.float32)
+        dfwhms = np.array([], dtype=np.float32)
+
+        for peak,pk_dict in pk_parameters.items():
+            if peak == 2103.53:
+                pass
+            elif peak == 1592.53:
+                pass
+            elif peak == 511.0:
+                pass
+            elif pk_dict["validity"] is False:
+                pass
+            elif np.isnan(pk_dict["fwhm_err_in_kev"]):
+                pass
+            else:
+                fwhm_peaks = np.append(fwhm_peaks, peak)
+                fwhms = np.append(fwhms, pk_dict["fwhm_in_kev"])
+                dfwhms = np.append(dfwhms, pk_dict["fwhm_err_in_kev"])
+                
+        fwhm_dicts = {}
+        interp_energy = None
+        interp_fwhm_name = None
+        for name,item in self.results[list(self.results)[-1]].items():
+            print(name)
+            if "FWHM" in name:
+                fwhm_dicts[name] = item
+                print(item)
+                if "interp_energy_in_keV" in item:
+                    interp_energy = item["interp_energy_in_keV"]
+                    for field in item:
+                        if "_fwhm_in_kev" in field:
+                            interp_fwhm_name = field.replace("_fwhm_in_kev","")
+
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]},
+            figize=figsize
+        )
+        if len(np.where((~np.isnan(fwhms)) & (~np.isnan(dfwhms)))[0]) > 0:
+            ax1.errorbar(
+                fwhm_peaks, fwhms, yerr=dfwhms, marker="x", ls=" ", c="black"
+            )
+
+            fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
+
+            if interp_energy is not None:
+                qbb_line_vx = [interp_energy, interp_energy]
+                qbb_line_hx = [erange[0], interp_energy]
+                qbb_line_vy=[np.inf, -np.inf]
+                for name,fwhm_dict in fwhm_dicts.items():
+                    low_lim = 0.9 * np.nanmin(
+                            fwhm_dict["function"].func(
+                                fwhm_slope_bins, *fwhm_dict["parameters"]
+                            )
+                        )
+                    up_lim = fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]
+                    if low_lim<qbb_line_vy[0]:
+                        qbb_line_vy[0] = low_lim
+                    if up_lim>qbb_line_vy[1]:
+                        qbb_line_vy = up_lim
+                
+                    ax1.plot(
+                        qbb_line_hx,
+                        [
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
+                        ],
+                        lw=1,
+                        c="r",
+                        ls="--",
+                    )
+                    ax1.plot(
+                        qbb_line_hx,
+                        [
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
+                        ],
+                        lw=1,
+                        c="r",
+                        ls="--",
+                    )
+                ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
+                
+
+                ax1.plot(
+                    fwhm_slope_bins,
+                    fwhm_dict["function"].func(fwhm_slope_bins, *fwhm_dict["parameters"]),
+                    lw=1,
+                    label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_keV"]:1.2f} keV',
+                )
+
+            ax1.set_xlim(erange)
+            ax1.set_ylabel("FWHM energy resolution (keV)")
+            for name,fwhm_dict in fwhm_dicts.items():
+                ax2.plot(
+                    fwhm_peaks,
+                    (
+                        fit_fwhms
+                        - fwhm_dict["function"].func(fwhm_peaks, *fwhm_dict["parameters"])
+                    )
+                    / fit_dfwhms,
+                    lw=0,
+                    marker="x",
+                )
+            ax2.plot(erange, [0, 0], color="black", lw=0.5)
+            ax2.set_xlabel("Energy (keV)")
+            ax2.set_ylabel("Normalised Residuals")
+        plt.tight_layout()
+        plt.close()
+        return fig
 
 
 class FWHMLinear:
@@ -1623,10 +1842,10 @@ def unbinned_staged_energy_fit(
         if lock_guess is False:
             if len(x0) == len(x1):
                 cs, _ = pgb.goodness_of_fit(
-                    gof_hist, gof_bins, None, func.get_pdf, x0, method="Pearson"
+                    gof_hist, gof_bins, None, func.pdf_norm, x0, method="Pearson"
                 )
                 cs2, _ = pgb.goodness_of_fit(
-                    gof_hist, gof_bins, None, func.get_pdf, x1, method="Pearson"
+                    gof_hist, gof_bins, None, func.pdf_norm, x1, method="Pearson"
                 )
                 if cs >= cs2:
                     x0 = x1
@@ -1654,8 +1873,7 @@ def unbinned_staged_energy_fit(
                 pgf.gauss_on_step,
                 **fixed_kwargs if fixed_kwargs is not None else {},
             )
-            for fix in fixed:
-                m.fixed[fix] = True
+            m.fixed[fixed] = True
             m.simplex().migrad()
             m.hesse()
             x0 = guess_func(
@@ -1709,8 +1927,7 @@ def unbinned_staged_energy_fit(
     m = Minuit(c, *x0)
     if tol is not None:
         m.tol = tol
-    for fix in fixed:
-        m.fixed[fix] = True
+    m.fixed[fixed] = True
     for arg, val in bounds.items():
         m.limits[arg] = val
     m.migrad()
@@ -1726,7 +1943,7 @@ def unbinned_staged_energy_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        func.get_pdf,
+        func.pdf_norm,
         m.values,
         method="Pearson",
         scale_bins=True,
@@ -1739,8 +1956,7 @@ def unbinned_staged_energy_fit(
     m2 = Minuit(c, *x0)
     if tol is not None:
         m2.tol = tol
-    for fix in fixed:
-        m2.fixed[fix] = True
+    m2.fixed[fixed] = True
     for arg, val in bounds.items():
         m2.limits[arg] = val
     m2.simplex().migrad()
@@ -1756,7 +1972,7 @@ def unbinned_staged_energy_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        func.get_pdf,
+        func.pdf_norm,
         m2.values,
         method="Pearson",
         scale_bins=True,
@@ -1769,8 +1985,8 @@ def unbinned_staged_energy_fit(
     frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
 
     if display > 1:
-        m_fit = func.get_pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
-        m2_fit = func.get_pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
+        m_fit = func.pdf_norm(bin_cs, *m.values) * np.diff(bin_cs)[0]
+        m2_fit = func.pdf_norm(bin_cs, *m2.values) * np.diff(bin_cs)[0]
         plt.figure()
         plt.step(bin_cs, hist, label="hist")
         plt.plot(bin_cs, func(bin_cs, *x0)[1], label="Guess")
@@ -1784,8 +2000,7 @@ def unbinned_staged_energy_fit(
         m = Minuit(c, *x0)
         if tol is not None:
             m.tol = tol
-        for fix in fixed:
-            m.fixed[fix] = True
+        m.fixed[fixed] = True
         for arg, val in bounds.items():
             m.limits[arg] = val
         m.simplex().simplex().migrad()
@@ -1794,7 +2009,7 @@ def unbinned_staged_energy_fit(
             gof_hist,
             gof_bins,
             gof_var,
-            func.get_pdf,
+            func.pdf_norm,
             m.values,
             method="Pearson",
             scale_bins=True,
@@ -1848,8 +2063,8 @@ def unbinned_staged_energy_fit(
             log.debug(debug_string)
 
             # if display > 0:
-            m_fit = pgf.gauss_on_step.get_pdf(bin_cs, *fit_no_tail[0])
-            m_fit_tail = pgf.hpge_peak.get_pdf(bin_cs, *fit[0])
+            m_fit = pgf.gauss_on_step.pdf_norm(bin_cs, *fit_no_tail[0])
+            m_fit_tail = pgf.hpge_peak.pdf_norm(bin_cs, *fit[0])
             plt.figure()
             plt.step(bin_cs, hist, where="mid", label="hist")
             plt.plot(
@@ -2157,546 +2372,3 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
         gof = np.inf
 
     return pars, best_ixtup, best_iytup
-
-
-# move these to dataflow
-def get_peak_labels(
-    labels: list[str], pars: list[float]
-) -> tuple(list[float], list[float]):
-    out = []
-    out_labels = []
-    for i, label in enumerate(labels):
-        if i % 2 == 1:
-            continue
-        else:
-            out.append(f"{pgf.nb_poly(label, pars):.1f}")
-            out_labels.append(label)
-    return out_labels, out
-
-
-def get_peak_label(peak: float) -> str:
-    if peak == 583.191:
-        return "Tl 583"
-    elif peak == 727.33:
-        return "Bi 727"
-    elif peak == 860.564:
-        return "Tl 860"
-    elif peak == 1592.53:
-        return "Tl DEP"
-    elif peak == 1620.5:
-        return "Bi FEP"
-    elif peak == 2103.53:
-        return "Tl SEP"
-    elif peak == 2614.5:
-        return "Tl FEP"
-    else:
-        return ""
-
-
-def plot_fits(
-    ecal_class, data, figsize=(12, 8), fontsize=12, ncols=3, nrows=3, binning_kev=5
-):
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-
-    fitted_peaks = ecal_class.results["got_peaks_keV"]
-    pk_pars = ecal_class.results["pk_pars"]
-    pk_ranges = ecal_class.results["pk_ranges"]
-    p_vals = ecal_class.results["pk_pvals"]
-
-    fitted_gof_funcs = []
-    for i, peak in enumerate(ecal_class.glines):
-        if peak in fitted_peaks:
-            fitted_gof_funcs.append(ecal_class.gof_funcs[i])
-
-    mus = [
-        pgf.get_mu_func(func_i, pars_i) if pars_i is not None else np.nan
-        for func_i, pars_i in zip(fitted_gof_funcs, pk_pars)
-    ]
-
-    fig = plt.figure()
-    derco = Polynomial(ecal_class.pars).deriv().coef
-    der = [pgf.nb_poly(5, derco) for _ in fitted_peaks]
-    for i, peak in enumerate(mus):
-        range_adu = 5 / der[i]
-        plt.subplot(nrows, ncols, i + 1)
-        try:
-            binning = np.arange(pk_ranges[i][0], pk_ranges[i][1], 0.1 / der[i])
-            bin_cs = (binning[1:] + binning[:-1]) / 2
-            energies = data.query(
-                f"{ecal_class.energy_param}>{pk_ranges[i][0]}&{ecal_class.energy_param}<{pk_ranges[i][1]}&{ecal_class.selection_string}"
-            )[ecal_class.energy_param]
-            energies = energies.iloc[: ecal_class.n_events]
-
-            counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
-            if pk_pars[i] is not None:
-                fit_vals = (
-                    fitted_gof_funcs[i](bin_cs, *pk_pars[i][:-1], 0) * np.diff(bs)[0]
-                )
-                plt.plot(bin_cs, fit_vals)
-                plt.step(
-                    bin_cs,
-                    [
-                        (fval - count) / count if count != 0 else (fval - count)
-                        for count, fval in zip(counts, fit_vals)
-                    ],
-                    where="mid",
-                )
-
-                plt.annotate(
-                    get_peak_label(fitted_peaks[i]),
-                    (0.02, 0.9),
-                    xycoords="axes fraction",
-                )
-                plt.annotate(
-                    f"{fitted_peaks[i]:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
-                )
-                plt.annotate(
-                    f"p-value : {p_vals[i]:.4f}", (0.02, 0.7), xycoords="axes fraction"
-                )
-                plt.xlabel("Energy (keV)")
-                plt.ylabel("Counts")
-                plt.legend(loc="upper left", frameon=False)
-                plt.xlim([peak - range_adu, peak + range_adu])
-                locs, labels = plt.xticks()
-                new_locs, new_labels = get_peak_labels(locs, ecal_class.pars)
-                plt.xticks(ticks=new_locs, labels=new_labels)
-        except Exception:
-            pass
-
-    plt.tight_layout()
-    plt.close()
-    return fig
-
-
-def plot_2614_timemap(
-    ecal_class,
-    data,
-    figsize=(12, 8),
-    fontsize=12,
-    erange=(2580, 2630),
-    dx=1,
-    time_dx=180,
-):
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-
-    selection = data.query(
-        f"{ecal_class.cal_energy_param}>2560&{ecal_class.cal_energy_param}<2660&{ecal_class.selection_string}"
-    )
-
-    fig = plt.figure()
-    if len(selection) == 0:
-        pass
-    else:
-        time_bins = np.arange(
-            (np.amin(data["timestamp"]) // time_dx) * time_dx,
-            ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
-            time_dx,
-        )
-
-        plt.hist2d(
-            selection["timestamp"],
-            selection[ecal_class.cal_energy_param],
-            bins=[time_bins, np.arange(erange[0], erange[1] + dx, dx)],
-            norm=LogNorm(),
-        )
-
-    ticks, labels = plt.xticks()
-    plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
-    )
-    plt.ylabel("Energy(keV)")
-    plt.ylim([erange[0], erange[1]])
-
-    plt.xticks(
-        ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
-    )
-    plt.close()
-    return fig
-
-
-def plot_pulser_timemap(
-    ecal_class,
-    data,
-    pulser_field="is_pulser",
-    figsize=(12, 8),
-    fontsize=12,
-    dx=0.2,
-    time_dx=180,
-    n_spread=3,
-):
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-
-    time_bins = np.arange(
-        (np.amin(data["timestamp"]) // time_dx) * time_dx,
-        ((np.amax(data["timestamp"]) // time_dx) + 2) * time_dx,
-        time_dx,
-    )
-
-    selection = data.query(pulser_field)
-    fig = plt.figure()
-    if len(selection) == 0:
-        pass
-
-    else:
-        mean = np.nanpercentile(selection[ecal_class.cal_energy_param], 50)
-        spread = mean - np.nanpercentile(selection[ecal_class.cal_energy_param], 10)
-
-        plt.hist2d(
-            selection["timestamp"],
-            selection[ecal_class.cal_energy_param],
-            bins=[
-                time_bins,
-                np.arange(mean - n_spread * spread, mean + n_spread * spread + dx, dx),
-            ],
-            norm=LogNorm(),
-        )
-        plt.ylim([mean - n_spread * spread, mean + n_spread * spread])
-    ticks, labels = plt.xticks()
-    plt.xlabel(
-        f"Time starting : {datetime.utcfromtimestamp(ticks[0]).strftime('%d/%m/%y %H:%M')}"
-    )
-    plt.ylabel("Energy(keV)")
-
-    plt.xticks(
-        ticks,
-        [datetime.utcfromtimestamp(tick).strftime("%H:%M") for tick in ticks],
-    )
-    plt.close()
-    return fig
-
-
-def bin_pulser_stability(ecal_class, data, pulser_field="is_pulser", time_slice=180):
-    selection = data.query(pulser_field)
-
-    utime_array = data["timestamp"]
-    select_energies = selection[ecal_class.cal_energy_param].to_numpy()
-
-    time_bins = np.arange(
-        (np.amin(utime_array) // time_slice) * time_slice,
-        ((np.amax(utime_array) // time_slice) + 2) * time_slice,
-        time_slice,
-    )
-    # bin time values
-    times_average = (time_bins[:-1] + time_bins[1:]) / 2
-
-    if len(selection) == 0:
-        return {
-            "time": times_average,
-            "energy": np.full_like(times_average, np.nan),
-            "spread": np.full_like(times_average, np.nan),
-        }
-
-    nanmedian = (
-        lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
-    )
-    error = (
-        lambda x: np.nanvar(x) / np.sqrt(len(x))
-        if len(x[~np.isnan(x)]) >= 10
-        else np.nan
-    )
-
-    par_average, _, _ = binned_statistic(
-        selection["timestamp"], select_energies, statistic=nanmedian, bins=time_bins
-    )
-    par_error, _, _ = binned_statistic(
-        selection["timestamp"], select_energies, statistic=error, bins=time_bins
-    )
-
-    return {"time": times_average, "energy": par_average, "spread": par_error}
-
-
-def bin_stability(ecal_class, data, time_slice=180, energy_range=(2585, 2660)):
-    selection = data.query(
-        f"{ecal_class.cal_energy_param}>{energy_range[0]}&{ecal_class.cal_energy_param}<{energy_range[1]}&{ecal_class.selection_string}"
-    )
-
-    utime_array = data["timestamp"]
-    select_energies = selection[ecal_class.cal_energy_param].to_numpy()
-
-    time_bins = np.arange(
-        (np.amin(utime_array) // time_slice) * time_slice,
-        ((np.amax(utime_array) // time_slice) + 2) * time_slice,
-        time_slice,
-    )
-    # bin time values
-    times_average = (time_bins[:-1] + time_bins[1:]) / 2
-
-    if len(selection) == 0:
-        return {
-            "time": times_average,
-            "energy": np.full_like(times_average, np.nan),
-            "spread": np.full_like(times_average, np.nan),
-        }
-
-    nanmedian = (
-        lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
-    )
-    error = (
-        lambda x: np.nanvar(x) / np.sqrt(len(x))
-        if len(x[~np.isnan(x)]) >= 10
-        else np.nan
-    )
-
-    par_average, _, _ = binned_statistic(
-        selection["timestamp"], select_energies, statistic=nanmedian, bins=time_bins
-    )
-    par_error, _, _ = binned_statistic(
-        selection["timestamp"], select_energies, statistic=error, bins=time_bins
-    )
-
-    return {"time": times_average, "energy": par_average, "spread": par_error}
-
-
-def plot_cal_fit(ecal_class, data, figsize=(12, 8), fontsize=12, erange=(200, 2700)):
-    valid_fits = ecal_class.results["pk_validities"]
-    mus = ecal_class.results["pk_pos"]
-    mu_errs = ecal_class.results["pk_pos_uncertainties"]
-    fitted_peaks = ecal_class.results["got_peaks_keV"]
-
-    fitted_gof_funcs = []
-    for i, peak in enumerate(ecal_class.glines):
-        if peak in fitted_peaks:
-            fitted_gof_funcs.append(ecal_class.gof_funcs[i])
-
-    fitted_gof_funcs = np.array(fitted_gof_funcs)[valid_fits]
-    fitted_peaks = np.array(fitted_peaks)[valid_fits]
-
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-
-    fig, (ax1, ax2) = plt.subplots(
-        2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
-    )
-
-    cal_bins = np.linspace(0, np.nanmax(mus) * 1.1, 20)
-
-    ax1.scatter(fitted_peaks, mus, marker="x", c="b")
-
-    ax1.plot(pgf.nb_poly(cal_bins, ecal_class.pars), cal_bins, lw=1, c="g")
-
-    ax1.grid()
-    ax1.set_xlim([erange[0], erange[1]])
-    ax1.set_ylabel("Energy (ADC)")
-    ax2.errorbar(
-        fitted_peaks,
-        pgf.nb_poly(np.array(mus), ecal_class.pars) - fitted_peaks,
-        yerr=pgf.nb_poly(np.array(mus) + np.array(mu_errs), ecal_class.pars)
-        - pgf.nb_poly(np.array(mus), ecal_class.pars),
-        linestyle=" ",
-        marker="x",
-        c="b",
-    )
-    ax2.grid()
-    ax2.set_xlabel("Energy (keV)")
-    ax2.set_ylabel("Residuals (keV)")
-    plt.close()
-    return fig
-
-
-def plot_eres_fit(ecal_class, data, erange=(200, 2700), figsize=(12, 8), fontsize=12):
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-
-    fwhms = ecal_class.results["pk_fwhms"][:, 0]
-    dfwhms = ecal_class.results["pk_fwhms"][:, 1]
-    fitted_peaks = ecal_class.results["fitted_keV"]
-
-    #####
-    # Remove the Tl SEP and DEP from calibration if found
-    fwhm_peaks = np.array([], dtype=np.float32)
-    indexes = []
-    for i, peak in enumerate(fitted_peaks):
-        if peak == 2103.53:
-            log.info(f"Tl SEP found at index {i}")
-            indexes.append(i)
-            continue
-        elif peak == 1592.53:
-            log.info(f"Tl DEP found at index {i}")
-            indexes.append(i)
-            continue
-        elif np.isnan(dfwhms[i]):
-            log.info(f"{peak} failed")
-            indexes.append(i)
-            continue
-        elif peak == 511.0:
-            log.info(f"e annihilation found at index {i}")
-            indexes.append(i)
-            continue
-        else:
-            fwhm_peaks = np.append(fwhm_peaks, peak)
-    fit_fwhms = np.delete(fwhms, [indexes])
-    fit_dfwhms = np.delete(dfwhms, [indexes])
-
-    fig, (ax1, ax2) = plt.subplots(
-        2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}
-    )
-    if len(np.where((~np.isnan(fit_fwhms)) & (~np.isnan(fit_dfwhms)))[0]) > 0:
-        ax1.errorbar(
-            fwhm_peaks, fit_fwhms, yerr=fit_dfwhms, marker="x", ls=" ", c="black"
-        )
-
-        fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
-
-        qbb_line_vx = [2039.0, 2039.0]
-        qbb_line_vy = [
-            0.9
-            * np.nanmin(
-                FWHMLinear.func(
-                    fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
-                )
-            ),
-            np.nanmax(
-                [
-                    ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-                    ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-                ]
-            ),
-        ]
-        qbb_line_hx = [erange[0], 2039.0]
-
-        ax1.plot(
-            fwhm_slope_bins,
-            FWHMLinear.func(fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]),
-            lw=1,
-            c="g",
-            label=f'linear, Qbb fwhm: {ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_linear["Qbb_fwhm_err_in_keV"]:1.2f} keV',
-        )
-        ax1.plot(
-            fwhm_slope_bins,
-            FWHMQuadratic.func(
-                fwhm_slope_bins, *ecal_class.fwhm_fit_quadratic["parameters"]
-            ),
-            lw=1,
-            c="b",
-            label=f'quadratic, Qbb fwhm: {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"]:1.2f} +- {ecal_class.fwhm_fit_quadratic["Qbb_fwhm_err_in_keV"]:1.2f} keV',
-        )
-        ax1.plot(
-            qbb_line_hx,
-            [
-                ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-                ecal_class.fwhm_fit_linear["Qbb_fwhm_in_keV"],
-            ],
-            lw=1,
-            c="r",
-            ls="--",
-        )
-        ax1.plot(
-            qbb_line_hx,
-            [
-                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-                ecal_class.fwhm_fit_quadratic["Qbb_fwhm_in_keV"],
-            ],
-            lw=1,
-            c="r",
-            ls="--",
-        )
-        ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
-
-        ax1.legend(loc="upper left", frameon=False)
-        if np.isnan(ecal_class.fwhm_fit_linear["parameters"]).all():
-            ax1.set_ylim(
-                [
-                    0.9 * np.nanmin(fit_fwhms),
-                    1.1 * np.nanmax(fit_fwhms),
-                ]
-            )
-        else:
-            ax1.set_ylim(
-                [
-                    0.9
-                    * np.nanmin(
-                        FWHMLinear.func(
-                            fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
-                        )
-                    ),
-                    1.1
-                    * np.nanmax(
-                        FWHMLinear.func(
-                            fwhm_slope_bins, *ecal_class.fwhm_fit_linear["parameters"]
-                        )
-                    ),
-                ]
-            )
-        ax1.set_xlim(erange)
-        ax1.set_ylabel("FWHM energy resolution (keV)")
-        ax2.plot(
-            fwhm_peaks,
-            (
-                fit_fwhms
-                - FWHMLinear.func(fwhm_peaks, *ecal_class.fwhm_fit_linear["parameters"])
-            )
-            / fit_dfwhms,
-            lw=0,
-            marker="x",
-            c="g",
-        )
-        ax2.plot(
-            fwhm_peaks,
-            (
-                fit_fwhms
-                - FWHMQuadratic.func(
-                    fwhm_peaks, *ecal_class.fwhm_fit_quadratic["parameters"]
-                )
-            )
-            / fit_dfwhms,
-            lw=0,
-            marker="x",
-            c="b",
-        )
-        ax2.plot(erange, [0, 0], color="black", lw=0.5)
-        ax2.set_xlabel("Energy (keV)")
-        ax2.set_ylabel("Normalised Residuals")
-    plt.tight_layout()
-    plt.close()
-    return fig
-
-
-def bin_spectrum(
-    ecal_class,
-    data,
-    cut_field="is_valid_cal",
-    pulser_field="is_pulser",
-    erange=(0, 3000),
-    dx=2,
-):
-    bins = np.arange(erange[0], erange[1] + dx, dx)
-    return {
-        "bins": pgh.get_bin_centers(bins),
-        "counts": np.histogram(
-            data.query(ecal_class.selection_string)[ecal_class.cal_energy_param], bins
-        )[0],
-        "cut_counts": np.histogram(
-            data.query(f"(~{cut_field})&(~{pulser_field})")[
-                ecal_class.cal_energy_param
-            ],
-            bins,
-        )[0],
-        "pulser_counts": np.histogram(
-            data.query(pulser_field)[ecal_class.cal_energy_param],
-            bins,
-        )[0],
-    }
-
-
-def bin_survival_fraction(
-    ecal_class,
-    data,
-    cut_field="is_valid_cal",
-    pulser_field="is_pulser",
-    erange=(0, 3000),
-    dx=6,
-):
-    counts_pass, bins_pass, _ = pgh.get_hist(
-        data.query(ecal_class.selection_string)[ecal_class.cal_energy_param],
-        bins=np.arange(erange[0], erange[1] + dx, dx),
-    )
-    counts_fail, bins_fail, _ = pgh.get_hist(
-        data.query(f"(~{cut_field})&(~{pulser_field})")[ecal_class.cal_energy_param],
-        bins=np.arange(erange[0], erange[1] + dx, dx),
-    )
-    sf = 100 * (counts_pass + 10 ** (-6)) / (counts_pass + counts_fail + 10 ** (-6))
-    return {"bins": pgh.get_bin_centers(bins_pass), "sf": sf}
