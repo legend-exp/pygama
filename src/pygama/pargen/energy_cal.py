@@ -1231,7 +1231,7 @@ class HPGeCalibration:
                                 out_labels.append(label)
                         return out_labels, out
 
-                    new_locs, new_labels = pgc.get_peak_labels(locs, self.pars)
+                    new_locs, new_labels = get_peak_labels(locs, self.pars)
                     plt.xticks(ticks=new_locs, labels=new_labels)
 
             except Exception:
@@ -1278,10 +1278,8 @@ class HPGeCalibration:
         interp_energy = None
         interp_fwhm_name = None
         for name, item in self.results[list(self.results)[-1]].items():
-            print(name)
             if "FWHM" in name:
                 fwhm_dicts[name] = item
-                print(item)
                 if "interp_energy_in_keV" in item:
                     interp_energy = item["interp_energy_in_keV"]
                     for field in item:
@@ -1332,29 +1330,28 @@ class HPGeCalibration:
                         c="r",
                         ls="--",
                     )
+                    ax1.plot(
+                        fwhm_slope_bins,
+                        fwhm_dict["function"].func(
+                            fwhm_slope_bins, *fwhm_dict["parameters"]
+                        ),
+                        lw=1,
+                        label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_keV"]:1.2f} keV',
+                    )
                 ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
-
-                ax1.plot(
-                    fwhm_slope_bins,
-                    fwhm_dict["function"].func(
-                        fwhm_slope_bins, *fwhm_dict["parameters"]
-                    ),
-                    lw=1,
-                    label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_keV"]:1.2f} keV',
-                )
 
             ax1.set_xlim(erange)
             ax1.set_ylabel("FWHM energy resolution (keV)")
-            for name, fwhm_dict in fwhm_dicts.items():
+            for _, fwhm_dict in fwhm_dicts.items():
                 ax2.plot(
                     fwhm_peaks,
                     (
-                        fit_fwhms
+                        fwhms
                         - fwhm_dict["function"].func(
                             fwhm_peaks, *fwhm_dict["parameters"]
                         )
                     )
-                    / fit_dfwhms,
+                    / dfwhms,
                     lw=0,
                     marker="x",
                 )
