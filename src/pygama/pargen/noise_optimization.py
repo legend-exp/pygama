@@ -14,7 +14,7 @@ from scipy.interpolate import splev, splrep
 from scipy.optimize import minimize
 
 from pygama.math.binned_fitting import goodness_of_fit
-from pygama.math.distributions import gauss
+from pygama.math.distributions import gauss_on_uniform
 from pygama.math.histogram import get_hist
 from pygama.math.unbinned_fitting import fit_unbinned
 from pygama.pargen.dsp_optimize import run_one_dsp
@@ -248,12 +248,12 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     fit_range = [np.percentile(energies, 0.2), np.percentile(energies, 99.8)]
 
     hist, bins, var = get_hist(energies, range=fit_range, dx=dx)
-    guess, bounds = simple_gaussian_guess(hist, bins, gauss)
+    guess, bounds = simple_gaussian_guess(hist, bins, gauss_on_uniform)
     fit_range = [guess[0] - sigma_thr * guess[1], guess[0] + sigma_thr * guess[1]]
 
     energies_fit = energies[(energies > fit_range[0]) & (energies < fit_range[1])]
     pars, errs, cov = fit_unbinned(
-        gauss,
+        gauss_on_uniform.pdf_ext,
         energies_fit,
         guess=guess,
         bounds=bounds,
@@ -267,19 +267,19 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     gof_pars = pars
     gof_pars[2] *= dx
     chisq, dof = goodness_of_fit(
-        hist, bins, None, gauss.get_pdf, gof_pars, method="Pearson"
+        hist, bins, None, gauss_on_uniform.pdf_norm, gof_pars, method="Pearson"
     )
     p_val = scipy.stats.chi2.sf(chisq, dof + len(gof_pars))
 
     if (
-        sum(sum(c) if c is not None else 0 for c in cov[:3, :][:, :3]) == np.inf
-        or sum(sum(c) if c is not None else 0 for c in cov[:3, :][:, :3]) == 0
-        or np.isnan(sum(sum(c) if c is not None else 0 for c in cov[:3, :][:, :3]))
+        sum(sum(c) if c is not None else 0 for c in cov[2:, :][:, 2:]) == np.inf
+        or sum(sum(c) if c is not None else 0 for c in cov[2:, :][:, 2:]) == 0
+        or np.isnan(sum(sum(c) if c is not None else 0 for c in cov[2:, :][:, 2:]))
     ):
         log.debug("fit failed, cov estimation failed")
         fit_failed = True
-    elif (np.abs(np.array(errs)[:3] / np.array(pars)[:3]) < 1e-7).any() or np.isnan(
-        np.array(errs)[:3]
+    elif (np.abs(np.array(errs)[2:] / np.array(pars)[2:]) < 1e-7).any() or np.isnan(
+        np.array(errs)[2:]
     ).any():
         log.debug("fit failed, parameter error too low")
         fit_failed = True
@@ -297,9 +297,9 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
         fwhm_err = 0
 
     results = {
-        "pars": pars[:3],
-        "errors": errs[:3],
-        "covariance": cov[:3],
+        "pars": pars,
+        "errors": errs,
+        "covariance": cov,
         "mu": mu,
         "mu_err": mu_err,
         "fom": fwhm,
@@ -334,18 +334,18 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
 
     n_sig = np.sum(hist[min_idx:max_idx])
 
-    guess = [mu, sigma, n_sig]
-    bounds = [
-        (mu - sigma, mu + sigma),
-        (sigma - sigma * toll, sigma + sigma * toll),
-        (n_sig + n_sig * toll, n_sig + n_sig * toll),
-    ]
+    guess = {"mu":mu, "sigma":sigma, "n_sig":n_sig}
+    bounds = {
+        "mu":(mu - sigma, mu + sigma),
+        "sigma":(sigma - sigma * toll, sigma + sigma * toll),
+        "n_sig":(n_sig + n_sig * toll, n_sig + n_sig * toll)
+    }
 
     for par in func.required_args():
         if par == "x_lo" or par == "x_hi":
-            guess.append(np.inf)
-            bounds.append(None)
+            guess[par] = np.inf
+            bounds[par] = None
         elif par == "n_bkg" or par == "hstep":
-            guess.append(0)
-            bounds.append(None)
+            guess[par] = 0
+            bounds[par] = None
     return guess, bounds

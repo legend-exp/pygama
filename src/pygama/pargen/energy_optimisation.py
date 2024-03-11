@@ -34,7 +34,6 @@ def event_selection(
     cut_parameters=None,
     pulser_mask=None,
     energy_parameter="trapTmax",
-    wf_field: str = "waveform",
     n_events=10000,
     threshold=1000,
     initial_energy="daqenergy",
@@ -319,9 +318,6 @@ def get_peak_fwhm_with_dt_corr(
         gof_range = (mu - (7 * adc_to_kev), mu + (7 * adc_to_kev))
     else:
         gof_range = (mu - (5 * adc_to_kev), mu + (5 * adc_to_kev))
-    # if kev==True:
-    # else:
-    #    tol=0.01
     tol = None
     try:
         if display > 0:
@@ -387,8 +383,6 @@ def get_peak_fwhm_with_dt_corr(
         y_max = np.array([func(xs, *p)[1] for p in par_b])
         maxs = np.nanmax(y_max, axis=1)
 
-        yerr_boot = np.nanstd(y_max, axis=0)
-
         if func == pgd.hpge_peak and not (
             energy_pars["htail"] < 1e-6 and energy_err["htail"] < 1e-6
         ):
@@ -421,6 +415,7 @@ def get_peak_fwhm_with_dt_corr(
             )
             plt.step((bins[1:] + bins[:-1]) / 2, hist)
             plt.plot(xs, y, color="orange")
+            yerr_boot = np.nanstd(y_max, axis=0)
             plt.fill_between(
                 xs, y - yerr_boot, y + yerr_boot, facecolor="C1", alpha=0.5
             )
@@ -430,8 +425,8 @@ def get_peak_fwhm_with_dt_corr(
         return np.nan, np.nan, np.nan, np.nan, (np.nan, np.nan), np.nan, np.nan, None
 
     if kev is True:
-        fwhm *= peak / energy_pars[1]
-        fwhm_err *= peak / energy_pars[1]
+        fwhm *= peak / energy_pars["mu"]
+        fwhm_err *= peak / energy_pars["mu"]
 
     return (
         fwhm,
@@ -439,8 +434,8 @@ def get_peak_fwhm_with_dt_corr(
         fwhm_err,
         fwhm_o_max_err,
         chisqr,
-        energy_pars[0],
-        energy_err[0],
+        energy_pars["n_sig"],
+        energy_err["n_sig"],
         energy_pars,
     )
 
@@ -678,16 +673,10 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict):
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
-    if "frac_max" in kwarg_dict:
-        frac_max = kwarg_dict["frac_max"]
-    else:
-        frac_max = 0.2
+    frac_max = kwarg_dict.get("frac_max",0.2)
     out_dict = fom_fwhm_with_alpha_fit(
         data, peak_dicts[0], ctc_param, idxs=idx_list[0], frac_max=frac_max, display=0
     )
-
-    out_dict["y_val"] = out_dict["fwhm"]
-    out_dict["y_err"] = out_dict["fwhm_err"]
     return out_dict
 
 
@@ -696,13 +685,9 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(data, kwarg_dict):
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
-    interp_energy = kwarg_dict.get("interp_energy", {"Qbb": 2039})
+    interp_energy = kwarg_dict.get("interp_energy",{"Qbb": 2039})
     fwhm_func = kwarg_dict.get("fwhm_func", pgc.FWHMLinear)
-
-    if "frac_max" in kwarg_dict:
-        frac_max = kwarg_dict["frac_max"]
-    else:
-        frac_max = 0.2
+    frac_max = kwarg_dict.get("frac_max",0.2)
 
     out_dict = fom_fwhm_with_alpha_fit(
         data, peak_dicts[-1], ctc_param, idxs=idx_list[-1], frac_max=frac_max, display=0
@@ -734,14 +719,14 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(data, kwarg_dict):
     log.info(f"fwhms are {fwhms}keV +- {fwhm_errs}")
 
     nan_mask = np.isnan(fwhms) | (fwhms < 0)
-    if len(fwhms[~nan_mask]) < 3:
+    if len(fwhms[~nan_mask]) < 2:
         return np.nan, np.nan, np.nan
     else:
         results = pgc.HPGeCalibration.fit_energy_res_curve(
             fwhm_func, peaks[~nan_mask], fwhms[~nan_mask], fwhm_errs[~nan_mask]
         )
         results = pgc.HPGeCalibration.interpolate_energy_res(
-            peaks[~nan_mask], fwhm_func, results, interp_energy
+            fwhm_func, peaks[~nan_mask], results, interp_energy
         )
         interp_res = results[f"{list(interp_energy)[0]}_fwhm_in_kev"]
         interp_res_err = results[f"{list(interp_energy)[0]}_fwhm_err_in_kev"]
@@ -760,6 +745,6 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(data, kwarg_dict):
         "peaks": peaks.tolist(),
         "fwhms": fwhms,
         "fwhm_errs": fwhm_errs,
-        "n_events": n_sig,
+        "n_sig": n_sig,
         "n_sig_err": n_sig_err,
     }
