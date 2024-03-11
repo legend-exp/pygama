@@ -43,7 +43,7 @@ def test_unbinned_nll():
 def test_extended_unbinned_nll():
     c = cost.ExtendedUnbinnedNLL(xmix, exgauss.pdf_ext)
 
-    m = Minuit(c, x_lo=-7, x_hi=7, tau=1, mu=0, sigma=3, area=100)
+    m = Minuit(c, x_lo=-7, x_hi=7, tau=1, mu=2, sigma=3, area=100)
     m.fixed["x_lo", "x_hi"] = True
     m.limits["tau", "mu", "sigma"] = (0.01, 5)
     m.limits["area"] = (0, 2000)
