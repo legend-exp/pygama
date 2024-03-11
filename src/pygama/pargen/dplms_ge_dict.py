@@ -5,41 +5,33 @@ This module is for creating dplms dictionary for ge processing
 from __future__ import annotations
 
 import itertools
-import json
 import logging
-import os
 import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from lgdo import Array, Table, lh5
+from lgdo import Table, lh5
 from scipy.signal import convolve, convolve2d
+from scipy.stats import chi2
 
-from pygama.math.histogram import get_hist
-from pygama.math.peak_fitting import (
-    extended_gauss_step_pdf,
-    extended_radford_pdf,
-    gauss_step_pdf,
-    radford_pdf,
-)
-from pygama.pargen.cuts import generate_cuts, get_cut_indexes
+from pygama.math.distributions import gauss_on_step
+from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
-from pygama.pargen.energy_optimisation import fom_FWHM_with_dt_corr_fit
+from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
 
 def dplms_ge_dict(
-    lh5_path: str,
     raw_fft: Table,
     raw_cal: Table,
     dsp_config: dict,
     par_dsp: dict,
-    par_dsp_lh5: str,
     dplms_dict: dict,
     decay_const: float = 0,
     ene_par: str = "dplmsEmax",
+    p_val_lim: float = 10**-20,
     display: int = 0,
 ) -> dict:
     """
@@ -47,8 +39,6 @@ def dplms_ge_dict(
 
     Parameters
     ----------
-    lh5_path
-        Name of channel to process, should be name of lh5 group in raw files
     fft_files
         table with fft data
     raw_cal
@@ -57,8 +47,6 @@ def dplms_ge_dict(
         dsp config file
     par_dsp
         Dictionary with db parameters for dsp processing
-    par_dsp_lh5
-        Path for saving dplms coefficients
     dplms_dict
         Dictionary with various parameters
 
@@ -68,11 +56,21 @@ def dplms_ge_dict(
     """
 
     t0 = time.time()
-    log.info(f"\nSelecting baselines")
+    log.info("Selecting baselines")
 
-    dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp[lh5_path])
+    dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
+
     cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
-    idxs = get_cut_indexes(dsp_fft, cut_dict)
+    log.debug(f"Cuts are {cut_dict}")
+    idxs = np.full(len(dsp_fft), True, dtype=bool)
+    for outname, info in cut_dict.items():
+        outcol = dsp_fft.eval(info["expression"], info.get("parameters", None))
+        dsp_fft.add_column(outname, outcol)
+    for cut in cut_dict:
+        idxs = dsp_fft[cut].nda & idxs
+    log.debug("Applied Cuts")
+
+    idxs = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
     bl_field = dplms_dict["bl_field"]
     log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
 
@@ -87,25 +85,20 @@ def dplms_ge_dict(
     )
 
     log.info(
-        "\nCalculating noise matrix of length",
-        dplms_dict["length"],
-        "n. events",
-        bls.shape[0],
-        "size",
-        bls.shape[1],
+        f'Calculating noise matrix of length {dplms_dict["length"]} n. events: {bls.shape[0]}, size: {bls.shape[1]}'
     )
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
     log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
 
-    log.info("\nSelecting signals")
+    log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
     wf_field = dplms_dict["wf_field"]
-    peaks_keV = np.array(dplms_dict["peaks_keV"])
+    peaks_kev = np.array(dplms_dict["peaks_kev"])
     kev_widths = [tuple(kev_width) for kev_width in dplms_dict["kev_widths"]]
 
     log.info(f"Produce dsp data for {len(raw_cal)} events")
-    dsp_cal = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
+    dsp_cal = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
     t3 = time.time()
     log.info(f"Time to run dsp production {(t3-t2):.2f} s")
 
@@ -113,11 +106,10 @@ def dplms_ge_dict(
 
     # dictionary for peak fitting
     peak_dict = {
-        "peak": peaks_keV[-1],
+        "peak": peaks_kev[-1],
         "kev_width": kev_widths[-1],
         "parameter": ene_par,
-        "func": extended_gauss_step_pdf,
-        "gof_func": gauss_step_pdf,
+        "func": gauss_on_step,
     }
 
     if display > 0:
@@ -138,13 +130,10 @@ def dplms_ge_dict(
 
     for i, values in enumerate(prod):
         coeff_values = dict(zip(coeff_keys, values))
+        log_msg = f"Case {i} ->"
+        for key, value in coeff_values.items():
+            log_msg += f" {key} = {value}"
 
-        log.info(
-            "\nCase",
-            i,
-            "->",
-            ", ".join(f"{key} = {value}" for key, value in coeff_values.items()),
-        )
         grid_dict[i] = coeff_values
 
         sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
@@ -166,22 +155,22 @@ def dplms_ge_dict(
             dplms_dict["length"],
             wsize,
         )
-        par_dsp[lh5_path]["dplms"] = {"length": dplms_dict["length"], "coefficients": x}
+        par_dsp["dplms"] = {"length": dplms_dict["length"], "coefficients": x}
         log.info(
-            f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area", np.sum(x)
+            f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area {np.sum(x)}"
         )
 
         t_tmp = time.time()
-        dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp[lh5_path])
+        dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
 
         try:
-            res = fom_FWHM_with_dt_corr_fit(
+            res = fom_fwhm_with_alpha_fit(
                 dsp_opt,
                 peak_dict,
                 "QDrift",
                 idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
             )
-        except:
+        except Exception:
             log.debug("FWHM not calculated")
             continue
 
@@ -198,11 +187,12 @@ def dplms_ge_dict(
         grid_dict[i]["fwhm"] = fwhm
         grid_dict[i]["fwhm_err"] = fwhm_err
         grid_dict[i]["alpha"] = alpha
-
+        p_val = chi2.sf(chisquare[0], chisquare[1])
         if (
             fwhm < dplms_dict["fwhm_limit"]
             and fwhm_err < dplms_dict["err_limit"]
-            and chisquare < dplms_dict["chi_limit"]
+            and p_val > p_val_lim
+            and ~np.isnan(fwhm)
         ):
             if fwhm < min_fom:
                 min_idx, min_fom = i, fwhm
@@ -242,6 +232,8 @@ def dplms_ge_dict(
         ft_coeff = dplms_dict["dp_def"]["ft"]
         rt_coeff = dplms_dict["dp_def"]["rt"]
         pt_coeff = dplms_dict["dp_def"]["pt"]
+        best_case_values = {}
+        alpha = 0
 
     # filter synthesis
     sel_dict = signal_selection(dsp_cal, dplms_dict, best_case_values)
@@ -260,18 +252,10 @@ def dplms_ge_dict(
         wsize,
     )
 
-    sto.write(
-        Array(x),
-        name="dplms",
-        lh5_file=par_dsp_lh5,
-        wo_mode="overwrite",
-        group=lh5_path,
-    )
-
     out_dict = {
         "dplms": {
             "length": dplms_dict["length"],
-            "coefficients": f"loadlh5('{par_dsp_lh5}', '{lh5_path}/dplms')",
+            "coefficients": x,
             "dp_coeffs": {
                 "nm": nm_coeff,
                 "za": za_coeff,
@@ -292,8 +276,7 @@ def dplms_ge_dict(
     log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
 
     if display > 0:
-        plot_dict["dplms"]["ref"] = ref
-        plot_dict["dplms"]["coefficients"] = x
+        plot_dict = {"ref": ref, "coefficients": x}
 
         bl_idxs = np.random.choice(len(bls), dplms_dict["n_plot"])
         bls = bls[bl_idxs]
@@ -303,8 +286,8 @@ def dplms_ge_dict(
                 ax.plot(wf, label=f"mean = {wf.mean():.1f}")
             else:
                 ax.plot(wf)
-        ax.legend(title=f"{lh5_path}", loc="upper right")
-        plot_dict["dplms"]["bls"] = fig
+        ax.legend(loc="upper right")
+        plot_dict["bls"] = fig
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
         for ii, par in enumerate(bls_cut_pars):
             mean = cut_dict[par]["Mean Value"]
@@ -316,13 +299,12 @@ def dplms_ge_dict(
             ax.flat[ii].axvline(llo, color="k", linestyle=":")
             ax.flat[ii].set_xlabel(par)
             ax.flat[ii].set_yscale("log")
-            ax.flat[ii].legend(title=f"{lh5_path}", loc="upper right")
-        plot_dict["dplms"]["bl_sel"] = fig
+            ax.flat[ii].legend(loc="upper right")
+        plot_dict["bl_sel"] = fig
 
         wf_idxs = np.random.choice(len(wfs), dplms_dict["n_plot"])
         wfs = wfs[wf_idxs]
         peak_pos = dsp_cal["peak_pos"].nda
-        peak_pos_neg = dsp_cal["peak_pos_neg"].nda
         centroid = dsp_cal["centroid"].nda
         risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
         rt_low = dplms_dict["rt_low"]
@@ -338,13 +320,13 @@ def dplms_ge_dict(
                 ax.plot(wf, label=f"centr = {centroid[ii]}")
             else:
                 ax.plot(wf)
-        ax.legend(title=f"{lh5_path}", loc="upper right")
+        ax.legend(loc="upper right")
         axin = ax.inset_axes([0.1, 0.15, 0.35, 0.5])
         for wf in wfs:
             axin.plot(wf)
         axin.set_xlim(wsize / 2 - dplms_dict["zoom"], wsize / 2 + dplms_dict["zoom"])
         axin.set_yticklabels("")
-        plot_dict["dplms"]["wfs"] = fig
+        plot_dict["wfs"] = fig
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
         wfs_cut_pars.append("centroid")
         wfs_cut_pars.append("peak_pos")
@@ -375,7 +357,7 @@ def dplms_ge_dict(
                 ax.flat[ii + 1].axvline(lup, color="k", linestyle=":")
             ax.flat[ii + 1].set_xlabel(par)
             ax.flat[ii + 1].set_yscale("log")
-            ax.flat[ii + 1].legend(title=f"{lh5_path}", loc="upper right")
+            ax.flat[ii + 1].legend(loc="upper right")
         roughenergy = dsp_cal["trapTmax"].nda
         roughenergy_sel = roughenergy[idxs]
         ell, ehh = roughenergy.min(), roughenergy.max()
@@ -385,13 +367,13 @@ def dplms_ge_dict(
         ax.flat[0].plot(be[1:], hs, c="r", ds="steps", label="selected")
         ax.flat[0].set_xlabel("rough energy (ADC)")
         ax.flat[0].set_yscale("log")
-        ax.flat[0].legend(loc="upper right", title=f"{lh5_path}")
-        plot_dict["dplms"]["wf_sel"] = fig
+        ax.flat[0].legend(loc="upper right")
+        plot_dict["wf_sel"] = fig
 
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
-        ax.plot(x, "r-", label=f"filter")
+        ax.plot(x, "r-", label="filter")
         ax.axhline(0, color="black", linestyle=":")
-        ax.legend(loc="upper right", title=f"{lh5_path}")
+        ax.legend(loc="upper right")
         axin = ax.inset_axes([0.6, 0.1, 0.35, 0.33])
         axin.plot(x, "r-")
         axin.set_xlim(
@@ -456,7 +438,6 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
     risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
 
     rt_low = dplms_dict["rt_low"]
-    rt_high = dplms_dict["rt_high"]
     peak_lim = dplms_dict["peak_lim"]
     wsize = dplms_dict["wsize"]
     bsize = dplms_dict["bsize"]

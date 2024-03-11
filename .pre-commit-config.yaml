@@ -57,14 +57,12 @@ repos:
   rev: "v2.4.0"
   hooks:
   - id: pycln
-    exclude: ^src/pygama/pargen
     args: [--all]
 
 - repo: https://github.com/PyCQA/flake8
   rev: "6.1.0"
   hooks:
   - id: flake8
-    exclude: ^src/pygama/pargen
     additional_dependencies: [
       flake8-bugbear>=23.1.17,
       flake8-print,
@@ -89,6 +87,8 @@ repos:
   rev: "v2.2.6"
   hooks:
   - id: codespell
+    additional_dependencies:
+      - tomli
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
   rev: "v0.9.0.6"
