@@ -58,6 +58,8 @@ def nb_gauss_tail_exact(x: float, mu: float, sigma: float, tau: float, tmp: floa
     abstau = np.absolute(tau)
     if tmp < limit: tmp = tmp
     else: tmp = limit
+    if sigma ==0 or abstau ==0:
+         return x*0
     z = (x-mu)/sigma
     tail_f = (1/(2*abstau)) * np.exp(tmp) * erfc( (tau*z + sigma)/(np.sqrt(2)*abstau))
     return tail_f
@@ -86,7 +88,10 @@ def nb_gauss_tail_approx(x: np.ndarray, mu: float, sigma: float, tau: float) -> 
     --------
     :func:`nb_exgauss_pdf`
     """
-
+    if sigma ==0:
+         return x*0
+    elif (sigma + tau*(x-mu)/sigma)==0:
+        return x*0
     den = 1/(sigma + tau*(x-mu)/sigma)
     tail_f = sigma * nb_gauss_pdf(x, mu, sigma) * den * (1.-tau*tau*den*den)
     return tail_f
