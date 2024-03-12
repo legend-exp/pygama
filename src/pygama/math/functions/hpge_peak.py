@@ -83,10 +83,12 @@ def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         htail_idx = np.where(req_args == "htail")[0][0]
         tau_idx = np.where(req_args == "tau")[0][0]
         # We need to ditch the x_lo and x_hi columns and rows
-        cov = np.array(cov)
-        dropped_cov = cov[:, 2:][2:, :]
-        
-        return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov)
+        if cov is not None:
+            cov = np.array(cov)
+            dropped_cov = cov[:, 2:][2:, :]
+            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov)
+        else:
+            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx])
 
     else: 
         if cov is None:
@@ -95,11 +97,11 @@ def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
             return pars[sigma_idx]*2*np.sqrt(2*np.log(2)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(2*np.log(2))
 
 # This is defined here as to avoid a circular import inside `sum_dists`
-def hpge_get_fwfm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
+def hpge_get_fwfm(self, pars: np.ndarray, frac_max=0.5, cov: np.ndarray = None) -> tuple:
     r"""
     Get the fwhm value from the output of a fit quickly
     Need to overload this to use hpge_peak_fwhm (to avoid a circular import) for when self is an hpge peak, 
-    and otherwise returns 2sqrt(2log(2))*sigma
+    and otherwise returns 2sqrt(-2log(frac_max))*sigma
 
     Parameters 
     ----------
@@ -121,16 +123,18 @@ def hpge_get_fwfm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         htail_idx = np.where(req_args == "htail")[0][0]
         tau_idx = np.where(req_args == "tau")[0][0]
         # We need to ditch the x_lo and x_hi columns and rows
-        cov = np.array(cov)
-        dropped_cov = cov[:, 2:][2:, :]
-        
-        return hpge_peak_fwfm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov)
+        if cov is not None:
+            cov = np.array(cov)
+            dropped_cov = cov[:, 2:][2:, :]
+            return hpge_peak_fwfm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], frac_max=frac_max, cov=dropped_cov)
+        else:
+            return hpge_peak_fwfm(pars[sigma_idx], pars[htail_idx], pars[tau_idx], frac_max=frac_max)
 
     else: 
         if cov is None:
             return pars[sigma_idx]*2*np.sqrt(2*np.log(2))
         else:
-            return pars[sigma_idx]*2*np.sqrt(2*np.log(2)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(2*np.log(2))
+            return pars[sigma_idx]*2*np.sqrt(-2*np.log(frac_max)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(-2*np.log(frac_max))
         
 # This is defined here as to avoid a circular import inside `sum_dists`
 def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
