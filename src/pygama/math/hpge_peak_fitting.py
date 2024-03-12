@@ -140,10 +140,15 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
 
     rng = np.random.default_rng(1)
     par_b = rng.multivariate_normal(pars, cov, size=100)
-    modes = np.array([hpge_peak_mode(p[2],p[3],p[4], cov = None) for p in par_b])
-    mode_err_boot = np.nanstd(modes, axis=0)
+    y_b = np.zeros(len(par_b))
+    for p in par_b:
+        try:
+            y_b[i] = hpge_peak_fwfm(p[2],p[3],p[4], frac_max=frac_max)
+        except Exception:
+            y_b[i] = np.nan
+    yerr_boot = np.nanstd(y_b, axis=0)
 
-    return upper_hm - lower_hm, mode_err_boot
+    return upper_hm - lower_hm, yerr_boot
 
 def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
         
