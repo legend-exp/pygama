@@ -162,32 +162,30 @@ class ExtractTau:
         return plot_dict
 
     def plot_slopes(self, slopes, display=0):
-        high_bin = self.results_dict["single_decay_constant"]["pars"][0]
+        high_bin, sigma, _ = self.results_dict["single_decay_constant"]["slope_pars"]
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
-        bins = np.linspace(-0.01, 0, 100000)  # change if needed
+        bins = np.arange(
+            np.nanpercentile(slopes, 1),
+            np.nanpercentile(slopes, 99),
+            np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
+        )
         counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
-        plot_max = np.argmax(counts)
-        in_min = plot_max - 20
-        if in_min < 0:
-            in_min = 0
-        in_max = plot_max + 21
-        if in_max >= len(bins):
-            in_min = len(bins) - 1
+        ax.axvline(high_bin, color="red")
+        in_min = high_bin - 4 * sigma
+        in_max = high_bin + 4 * sigma
         plt.xlabel("Slope")
         plt.ylabel("Counts")
-        plt.yscale("log")
-        axins = ax.inset_axes([0.5, 0.45, 0.47, 0.47])
+        axins = ax.inset_axes([0.6, 0.6, 0.4, 0.4])
         axins.hist(
-            slopes[(slopes > bins[in_min]) & (slopes < bins[in_max])],
-            bins=200,
+            slopes[(slopes > in_min) & (slopes < in_max)],
+            bins=50,
             histtype="step",
         )
         axins.axvline(high_bin, color="red")
-        axins.set_xlim(bins[in_min], bins[in_max])
-        ax.set_xticks(ax.get_xticks())
-        ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45)
+        axins.set_xlim(in_min, in_max)
+        ax.set_xlim(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99))
         out_plot_dict = {"slope": fig}
         if display > 1:
             plt.show()

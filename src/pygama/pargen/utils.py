@@ -45,9 +45,6 @@ def get_params(file_params, param_list):
     return np.unique(out_params).tolist()
 
 
-# do these all belong in dataflow?
-
-
 def load_data(
     files: list,
     lh5_path: str,
@@ -133,36 +130,3 @@ def load_data(
         return df, masks
     else:
         return df
-
-
-def get_wf_indexes(sorted_indexs, n_events):
-    out_list = []
-    if isinstance(n_events, list):
-        for i in range(len(n_events)):
-            new_list = []
-            for idx, entry in enumerate(sorted_indexs):
-                if (entry >= np.sum(n_events[:i])) and (
-                    entry < np.sum(n_events[: i + 1])
-                ):
-                    new_list.append(idx)
-            out_list.append(new_list)
-    else:
-        for i in range(int(len(sorted_indexs) / n_events)):
-            new_list = []
-            for idx, entry in enumerate(sorted_indexs):
-                if (entry >= i * n_events) and (entry < (i + 1) * n_events):
-                    new_list.append(idx)
-            out_list.append(new_list)
-    return out_list
-
-
-def index_data(data, indexes, wf_field="waveform"):
-    new_baselines = lh5.Array(data["baseline"].nda[indexes])
-    new_waveform_values = data[wf_field]["values"].nda[indexes]
-    new_waveform_dts = data[wf_field]["dt"].nda[indexes]
-    new_waveform_t0 = data[wf_field]["t0"].nda[indexes]
-    new_waveform = lh5.WaveformTable(
-        None, new_waveform_t0, "ns", new_waveform_dts, "ns", new_waveform_values
-    )
-    new_data = lh5.Table(col_dict={wf_field: new_waveform, "baseline": new_baselines})
-    return new_data

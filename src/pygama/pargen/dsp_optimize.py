@@ -744,3 +744,67 @@ class BayesianOptimizer:
         plt.tight_layout()
         plt.close()
         return fig
+
+
+def run_bayesian_optimisation(
+    tb_data,
+    dsp_config,
+    fom_function,
+    optimisers,
+    fom_kwargs=None,
+    db_dict=None,
+    nan_val=10,
+    n_iter=10,
+):
+    if not isinstance(optimisers, list):
+        optimisers = [optimisers]
+    if not isinstance(fom_kwargs, list):
+        fom_kwargs = [fom_kwargs]
+    if not isinstance(fom_function, list):
+        fom_function = [fom_function]
+
+    for j in range(n_iter):
+        for optimiser in optimisers:
+            db_dict = optimiser.update_db_dict(db_dict)
+
+        log.info(f"Iteration number: {j+1}")
+        log.info(f"Processing with {db_dict}")
+
+        tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict)
+
+        res = np.ndarray(shape=len(optimisers), dtype="O")
+
+        for i in range(len(optimisers)):
+            if fom_kwargs[i] is not None:
+                if len(fom_function) > 1:
+                    res[i] = fom_function[i](tb_out, fom_kwargs[i])
+                else:
+                    res[i] = fom_function[0](tb_out, fom_kwargs[i])
+            else:
+                if len(fom_function) > 1:
+                    res[i] = fom_function[i](tb_out)
+                else:
+                    res[i] = fom_function[0](tb_out)
+
+        log.info(f"Results of iteration {j+1} are {res}")
+
+        for i, optimiser in enumerate(optimisers):
+            if np.isnan(res[i][optimiser.fom_value]):
+                if isinstance(nan_val, list):
+                    res[i][optimiser.fom_value] = nan_val[i]
+                else:
+                    res[i][optimiser.fom_value] = nan_val
+
+            optimiser.update(res[i])
+
+    out_param_dict = {}
+    out_results_list = []
+    for optimiser in optimisers:
+        param_dict = optimiser.get_best_vals()
+        out_param_dict.update(param_dict)
+        results_dict = optimiser.optimal_results
+        if np.isnan(results_dict[optimiser.fom_value]):
+            log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
+        out_results_list.append(results_dict)
+
+    return out_param_dict, out_results_list

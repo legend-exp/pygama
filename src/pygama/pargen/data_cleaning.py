@@ -291,7 +291,7 @@ def get_cut_indexes(data, cut_parameters):
     """
     Get the indexes of the data that pass the cuts in
     """
-    if data is not isinstance(Table):
+    if not isinstance(data, Table):
         try:
             data = Table(data)
         except Exception:

@@ -603,7 +603,7 @@ class HPGeCalibration:
                     bounds = get_hpge_energy_bounds(func_i, x0)
 
                     pars_i, errs_i, cov_i = pgb.fit_binned(
-                        func_i.pdf_norm,
+                        func_i.get_pdf,
                         hist,
                         bins,
                         var=var,
@@ -619,7 +619,7 @@ class HPGeCalibration:
                         hist,
                         bins,
                         None,
-                        func_i.pdf_norm,
+                        func_i.get_pdf,
                         pars_i,
                         method="Pearson",
                         scale_bins=False,
@@ -937,7 +937,7 @@ class HPGeCalibration:
                 except Exception:
                     interp_fwhm = np.nan
                     interp_err = np.nan
-                fwhm_results = fwhm_results.update(
+                fwhm_results.update(
                     {
                         "interp_energy_in_keV": energy,
                         f"{key}_fwhm_in_kev": interp_fwhm,
@@ -1600,15 +1600,15 @@ def get_hpge_energy_peak_par_guess(
         # guess mu, height
         pars, cov = pgb.gauss_mode_width_max(hist, bins, var, n_bins=10)
         bin_centres = pgh.get_bin_centers(bins)
+        # height=pars[2]
+        i_0 = np.argmax(hist)
+        height = hist[i_0]
         if pars is None:
             log.info("get_hpge_energy_peak_par_guess: gauss_mode_width_max failed")
             sigma_guess = None
         else:
             mu = mode_guess if mode_guess is not None else bin_centres[i_0]
             sigma_guess = pars[1]
-            # height=pars[2]
-        i_0 = np.argmax(hist)
-        height = hist[i_0]
 
         # get bg and step from edges of hist
         bg0 = np.mean(hist[-10:])
@@ -1724,7 +1724,7 @@ def get_hpge_energy_bounds(func, parguess):
             "n_sig": (0, None),
             "mu": (parguess["x_lo"], parguess["x_hi"]),
             "sigma": (0, None),
-            "n_bkg": (None, None),
+            "n_bkg": (0, None),
             "hstep": (-1, 1),
             "x_lo": (None, None),
             "x_hi": (None, None),
@@ -1737,7 +1737,7 @@ def get_hpge_energy_bounds(func, parguess):
             "sigma": (0, None),
             "htail": (0, 0.5),
             "tau": (0.1 * parguess["sigma"], 10 * parguess["sigma"]),
-            "n_bkg": (None, None),
+            "n_bkg": (0, None),
             "hstep": (-1, 1),
             "x_lo": (None, None),
             "x_hi": (None, None),
@@ -1847,7 +1847,7 @@ def unbinned_staged_energy_fit(
                 pgf.gauss_on_step,
                 fit_range,
                 bin_width=bin_width,
-                **guess_kwargs,
+                **guess_kwargs if guess_kwargs is not None else {},
             )
             c = cost.ExtendedUnbinnedNLL(energy, pgf.gauss_on_step.pdf_ext)
             m = Minuit(c, *x0_notail)
@@ -1932,7 +1932,7 @@ def unbinned_staged_energy_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        func.pdf_norm,
+        func.get_pdf,
         m.values,
         method="Pearson",
         scale_bins=True,
@@ -1961,7 +1961,7 @@ def unbinned_staged_energy_fit(
         gof_hist,
         gof_bins,
         gof_var,
-        func.pdf_norm,
+        func.get_pdf,
         m2.values,
         method="Pearson",
         scale_bins=True,
@@ -1974,8 +1974,8 @@ def unbinned_staged_energy_fit(
     frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
 
     if display > 1:
-        m_fit = func.pdf_norm(bin_cs, *m.values) * np.diff(bin_cs)[0]
-        m2_fit = func.pdf_norm(bin_cs, *m2.values) * np.diff(bin_cs)[0]
+        m_fit = func.get_pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
+        m2_fit = func.get_pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
         plt.figure()
         plt.step(bin_cs, hist, label="hist")
         plt.plot(bin_cs, func(bin_cs, *x0)[1], label="Guess")
@@ -1998,7 +1998,7 @@ def unbinned_staged_energy_fit(
             gof_hist,
             gof_bins,
             gof_var,
-            func.pdf_norm,
+            func.get_pdf,
             m.values,
             method="Pearson",
             scale_bins=True,
@@ -2051,28 +2051,24 @@ def unbinned_staged_energy_fit(
             debug_string += f"p_val no tail: : {p_val_no_tail} p_val with tail: {p_val}"
             log.debug(debug_string)
 
-            # if display > 0:
-            m_fit = pgf.gauss_on_step.pdf_norm(bin_cs, *fit_no_tail[0])
-            m_fit_tail = pgf.hpge_peak.pdf_norm(bin_cs, *fit[0])
-            plt.figure()
-            plt.step(bin_cs, hist, where="mid", label="hist")
-            plt.plot(
-                bin_cs,
-                m_fit * np.diff(bin_cs)[0],
-                label=f"Drop tail: {p_val_no_tail}",
-            )
-            plt.plot(
-                bin_cs,
-                m_fit_tail * np.diff(bin_cs)[0],
-                label=f"Drop tail: {p_val}",
-            )
-            plt.plot(
-                bin_cs,
-                pgf.hpge_peak.pdf_ext(bin_cs, *fit[0])[1] * np.diff(bin_cs)[0],
-                label=f"Drop tail: {p_val}",
-            )
-            plt.legend()
-            plt.show()
+            if display > 0:
+                m_fit = pgf.gauss_on_step.get_pdf(bin_cs, *fit_no_tail[0])
+                m_fit_tail = pgf.hpge_peak.get_pdf(bin_cs, *fit[0])
+                plt.figure()
+                plt.step(bin_cs, hist, where="mid", label="hist")
+                plt.plot(
+                    bin_cs,
+                    m_fit * np.diff(bin_cs)[0],
+                    label=f"Drop tail: {p_val_no_tail}",
+                )
+                plt.plot(
+                    bin_cs,
+                    m_fit_tail * np.diff(bin_cs)[0],
+                    label=f"Drop tail: {p_val}",
+                )
+                plt.legend()
+                plt.show()
+
             fit = fit_no_tail
     return fit
 
