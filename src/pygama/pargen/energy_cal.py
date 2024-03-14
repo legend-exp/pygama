@@ -380,7 +380,7 @@ class HPGeCalibration:
 
         # Calculate updated calibration curve
         poly_pars = (
-            Polynomial.fit(got_peak_locations, matched_energies, len(self.pars))
+            Polynomial.fit(got_peak_locations, matched_energies, len(self.pars) - 1)
             .convert()
             .coef
         )
@@ -400,6 +400,8 @@ class HPGeCalibration:
         if self.fixed is not None:
             for idx in list(self.fixed):
                 m.fixed[idx] = True
+
+        self.pars = np.array(m.values)
 
         log.info(f"{len(self.peak_locs)} peaks obtained:")
         log.info("\t   Energy   | Position  ")
@@ -577,7 +579,7 @@ class HPGeCalibration:
                         bounds_func=get_hpge_energy_bounds,
                         fixed_func=get_hpge_energy_fixed,
                         allow_tail_drop=True,
-                        bin_width=binw_1,
+                        bin_width=2 * binw_1,
                         tail_weight=tail_weight,
                         guess_kwargs={"mode_guess": mode_guess},
                     )
@@ -716,34 +718,26 @@ class HPGeCalibration:
                     )
 
         # Drop failed fits
-        pk_funcs = np.array(
-            [
-                fit_dict[peak]["function"]
-                for peak in fit_dict
-                if fit_dict[peak]["validity"]
-            ]
-        )
-        pk_pars = np.array(
-            [
-                fit_dict[peak]["parameters"]
-                for peak in fit_dict
-                if fit_dict[peak]["validity"]
-            ]
-        )
-        pk_errors = np.array(
-            [
-                fit_dict[peak]["uncertainties"]
-                for peak in fit_dict
-                if fit_dict[peak]["validity"]
-            ]
-        )
-        pk_covs = np.array(
-            [
-                fit_dict[peak]["covariance"]
-                for peak in fit_dict
-                if fit_dict[peak]["validity"]
-            ]
-        )
+        pk_funcs = [
+            fit_dict[peak]["function"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        pk_pars = [
+            fit_dict[peak]["parameters"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        pk_errors = [
+            fit_dict[peak]["uncertainties"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        pk_covs = [
+            fit_dict[peak]["covariance"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
 
         if len(pk_pars) == 0:
             log.error("hpge_fit_energy_peaks: no peaks fitted")
@@ -824,10 +818,13 @@ class HPGeCalibration:
         cal_fwhm_errs = []
         for peak, peak_dict in peak_parameters.items():
             # Calculate the uncalibrated fwhm
-            uncal_fwhm, uncal_fwhm_err = peak_dict["function"].get_fwhm(
-                peak_dict["parameters"],
-                cov=peak_dict["covariance"],
-            )
+            if peak_dict["validity"] is True:
+                uncal_fwhm, uncal_fwhm_err = peak_dict["function"].get_fwhm(
+                    peak_dict["parameters"],
+                    cov=peak_dict["covariance"],
+                )
+            else:
+                uncal_fwhm, uncal_fwhm_err = (np.nan, np.nan)
 
             # Apply calibration
 
@@ -867,10 +864,10 @@ class HPGeCalibration:
     def fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms):
         try:
             c_lin = cost.LeastSquares(fwhm_peaks, fwhms, dfwhms, fwhm_func.func)
-            c_lin.loss = "soft_l1"
+            # c_lin.loss = "soft_l1"
             m = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fwhms, dfwhms))
-            bounds = fwhm_func.bounds()
-            for arg, val in bounds:
+            bounds = fwhm_func.bounds(fwhms)
+            for arg, val in enumerate(bounds):
                 m.limits[arg] = val
             m.simplex()
             m.migrad()
@@ -879,7 +876,7 @@ class HPGeCalibration:
             p_val = scipy.stats.chi2.sf(m.fval, len(fwhm_peaks) - len(m.values))
 
             results = {
-                "function": fwhm_func.__name__,
+                "function": fwhm_func,
                 "module": fwhm_func.__module__,
                 "expression": fwhm_func.string_func("x"),
                 "parameters": m.values,
@@ -902,7 +899,7 @@ class HPGeCalibration:
         except RuntimeError:
             pars, errs, cov = return_nans(fwhm_func.func)
             results = {
-                "function": fwhm_func.__name__,
+                "function": fwhm_func,
                 "module": fwhm_func.__module__,
                 "expression": fwhm_func.string_func("x"),
                 "parameters": pars,
@@ -939,7 +936,7 @@ class HPGeCalibration:
                     interp_err = np.nan
                 fwhm_results.update(
                     {
-                        "interp_energy_in_keV": energy,
+                        "interp_energy_in_kev": energy,
                         f"{key}_fwhm_in_kev": interp_fwhm,
                         f"{key}_fwhm_err_in_kev": interp_err,
                     }
@@ -963,6 +960,8 @@ class HPGeCalibration:
                 if peak_dict["validity"]
             ]
         )
+        if len(fitted_peaks_kev) == 0:
+            return
         if "fwhm_in_kev" not in peak_parameters[fitted_peaks_kev[0]]:
             self.get_fwhms()
             peak_parameters = self.results[list(self.results)[-1]].get(
@@ -1280,14 +1279,14 @@ class HPGeCalibration:
         for name, item in self.results[list(self.results)[-1]].items():
             if "FWHM" in name:
                 fwhm_dicts[name] = item
-                if "interp_energy_in_keV" in item:
-                    interp_energy = item["interp_energy_in_keV"]
+                if "interp_energy_in_kev" in item:
+                    interp_energy = item["interp_energy_in_kev"]
                     for field in item:
                         if "_fwhm_in_kev" in field:
                             interp_fwhm_name = field.replace("_fwhm_in_kev", "")
 
         fig, (ax1, ax2) = plt.subplots(
-            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figize=figsize
+            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figsize=figsize
         )
         if len(np.where((~np.isnan(fwhms)) & (~np.isnan(dfwhms)))[0]) > 0:
             ax1.errorbar(fwhm_peaks, fwhms, yerr=dfwhms, marker="x", ls=" ", c="black")
@@ -1297,34 +1296,23 @@ class HPGeCalibration:
             if interp_energy is not None:
                 qbb_line_vx = [interp_energy, interp_energy]
                 qbb_line_hx = [erange[0], interp_energy]
-                qbb_line_vy = [np.inf, -np.inf]
                 for name, fwhm_dict in fwhm_dicts.items():
+                    qbb_line_vy = [np.inf, -np.inf]
                     low_lim = 0.9 * np.nanmin(
                         fwhm_dict["function"].func(
                             fwhm_slope_bins, *fwhm_dict["parameters"]
                         )
                     )
-                    up_lim = fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]
+                    up_lim = fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"]
                     if low_lim < qbb_line_vy[0]:
                         qbb_line_vy[0] = low_lim
                     if up_lim > qbb_line_vy[1]:
-                        qbb_line_vy = up_lim
-
+                        qbb_line_vy[1] = up_lim
                     ax1.plot(
                         qbb_line_hx,
                         [
-                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
-                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
-                        ],
-                        lw=1,
-                        c="r",
-                        ls="--",
-                    )
-                    ax1.plot(
-                        qbb_line_hx,
-                        [
-                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
-                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"],
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"],
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"],
                         ],
                         lw=1,
                         c="r",
@@ -1336,11 +1324,12 @@ class HPGeCalibration:
                             fwhm_slope_bins, *fwhm_dict["parameters"]
                         ),
                         lw=1,
-                        label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_keV"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_keV"]:1.2f} keV',
+                        label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_kev"]:1.2f} keV',
                     )
-                ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
+                    ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
 
             ax1.set_xlim(erange)
+            ax1.set_ylim([low_lim, None])
             ax1.set_ylabel("FWHM energy resolution (keV)")
             for _, fwhm_dict in fwhm_dicts.items():
                 ax2.plot(
@@ -1377,7 +1366,7 @@ class FWHMLinear:
         return [np.nanmin(ys), 10**-3]
 
     @staticmethod
-    def bounds():
+    def bounds(ys):
         return [(0, None), (0, None)]
 
 
@@ -1392,11 +1381,11 @@ class FWHMQuadratic:
 
     @staticmethod
     def guess(xs, ys, y_errs):
-        return [np.nanmin(ys), 10**-3, 10**-5]
+        return [np.nanmin(ys), 2 * 10**-3, 10**-8]
 
     @staticmethod
-    def bounds():
-        return [(0, None), (0, None), (0, None)]
+    def bounds(ys):
+        return [(0, np.nanmin(ys) ** 2), (10**-3, None), (0, None)]
 
 
 def hpge_fit_energy_peak_tops(
@@ -2176,7 +2165,7 @@ def hpge_fit_energy_cal_func(
         d_mu_d_es = np.zeros(len(mus))
         for n in range(len(energy_scale_pars) - 1):
             d_mu_d_es += energy_scale_pars[n] * mus ** (len(energy_scale_pars) - 2 - n)
-        e_weights = d_mu_d_es * mu_vars
+        e_weights = np.sqrt(d_mu_d_es * mu_vars)
         poly_pars = (
             Polynomial.fit(mus, energies_kev, deg=deg, w=1 / e_weights).convert().coef
         )
