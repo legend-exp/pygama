@@ -60,7 +60,7 @@ def dplms_ge_dict(
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
 
-    cut_dict = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
+    cut_dict = generate_cuts(dsp_fft, cut_dict=dplms_dict["bls_cut_pars"])
     log.debug(f"Cuts are {cut_dict}")
     idxs = np.full(len(dsp_fft), True, dtype=bool)
     for outname, info in cut_dict.items():
@@ -70,7 +70,6 @@ def dplms_ge_dict(
         idxs = dsp_fft[cut].nda & idxs
     log.debug("Applied Cuts")
 
-    idxs = generate_cuts(dsp_fft, parameters=dplms_dict["bls_cut_pars"])
     bl_field = dplms_dict["bl_field"]
     log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
 
@@ -290,8 +289,16 @@ def dplms_ge_dict(
         plot_dict["bls"] = fig
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
         for ii, par in enumerate(bls_cut_pars):
-            mean = cut_dict[par]["Mean Value"]
-            llo, lup = cut_dict[par]["Lower Boundary"], cut_dict[par]["Upper Boundary"]
+            if "parameters" in cut_dict[par]:
+                if "a" in cut_dict[par]["parameters"]:
+                    llo = cut_dict[par]["parameters"]["a"]
+                else:
+                    llo = np.nan
+                if "b" in cut_dict[par]["parameters"]:
+                    lup = cut_dict[par]["parameters"]["b"]
+                else:
+                    lup = np.nan
+            mean = (lup + llo) / 2
             plo, pup = mean - 2 * (mean - llo), mean + 2 * (lup - mean)
             hh, bb = np.histogram(bls_par[par], bins=np.linspace(plo, pup, 200))
             ax.flat[ii].plot(bb[1:], hh, ds="steps", label=f"cut on {par}")
@@ -304,16 +311,8 @@ def dplms_ge_dict(
 
         wf_idxs = np.random.choice(len(wfs), dplms_dict["n_plot"])
         wfs = wfs[wf_idxs]
-        peak_pos = dsp_cal["peak_pos"].nda
         centroid = dsp_cal["centroid"].nda
-        risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
-        rt_low = dplms_dict["rt_low"]
-        rt_high = dplms_dict["rt_high"]
-        peak_lim = dplms_dict["peak_lim"]
-        cal_par = {}
-        wfs_cut_pars = [par for par in dplms_dict["wfs_cut_pars"].keys()]
-        for par in wfs_cut_pars:
-            cal_par[par] = dsp_cal[par].nda
+
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
         for ii, wf in enumerate(wfs):
             if ii < 10:
@@ -327,10 +326,17 @@ def dplms_ge_dict(
         axin.set_xlim(wsize / 2 - dplms_dict["zoom"], wsize / 2 + dplms_dict["zoom"])
         axin.set_yticklabels("")
         plot_dict["wfs"] = fig
+
+        peak_pos = dsp_cal["peak_pos"].nda
+        risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
+        rt_low = dplms_dict["rt_low"]
+        rt_high = dplms_dict["rt_high"]
+        peak_lim = dplms_dict["peak_lim"]
+        cal_par = {}
+        wfs_cut_pars = ["centroid", "peak_pos", "risetime"]
+
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
-        wfs_cut_pars.append("centroid")
-        wfs_cut_pars.append("peak_pos")
-        wfs_cut_pars.append("risetime")
+
         for ii, par in enumerate(wfs_cut_pars):
             pspace = np.linspace(
                 wsize / 2 - peak_lim, wsize / 2 + peak_lim, 2 * peak_lim

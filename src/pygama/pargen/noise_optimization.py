@@ -10,7 +10,7 @@ import lgdo
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
-from scipy.interpolate import splev, splrep
+from scipy.interpolate import BSpline, splev, splrep
 from scipy.optimize import minimize
 
 from pygama.math.binned_fitting import goodness_of_fit
@@ -130,8 +130,9 @@ def noise_optimization(
         guess_par = sample_list[np.nanargmin(fom_list)]
 
         tck = splrep(sample_list, fom_list, k=opt_dict["fit_deg"])
+        tck = BSpline(tck[0], tck[1], tck[2])
 
-        result = minimize(splev, guess_par, args=tck)
+        result = minimize(splev, guess_par, args=(tck))
         best_par = result.x[0]
         if (best_par < np.min(sample_list)) or (best_par > np.max(sample_list)):
             log.info(
