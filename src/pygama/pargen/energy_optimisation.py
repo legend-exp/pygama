@@ -252,7 +252,7 @@ def fom_fwhm_with_alpha_fit(
     try:
         dt = tb_in[ctc_parameter].nda
     except KeyError:
-        dt = tb_in.eval(ctc_parameter, None, None)
+        dt = tb_in.eval(ctc_parameter)
     if idxs is not None:
         energies = energies[idxs]
         dt = dt[idxs]
@@ -414,7 +414,7 @@ def fom_fwhm_no_alpha_sweep(
         try:
             dt = tb_in[ctc_param].nda
         except KeyError:
-            dt = tb_in.eval(ctc_param, None, None)
+            dt = tb_in.eval(ctc_param)
             dt = tb_in[ctc_param].nda
     else:
         dt = 0
