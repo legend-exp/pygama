@@ -5,6 +5,7 @@ This module provides routines for calculating and applying quality cuts
 from __future__ import annotations
 
 import logging
+import re
 
 import lgdo.lh5 as lh5
 import matplotlib as mpl
@@ -291,22 +292,32 @@ def get_cut_indexes(data, cut_parameters):
     """
     Get the indexes of the data that pass the cuts in
     """
-    if not isinstance(data, Table):
-        try:
-            data = Table(data)
-        except Exception:
-            raise ValueError("Data must be a Table")
-
-    cut_dict = generate_cuts(data, parameters=cut_parameters)
+    cut_dict = generate_cuts(data, cut_dict=cut_parameters)
     log.debug(f"Cuts are {cut_dict}")
-    ct_mask = np.full(len(data), True, dtype=bool)
-    for outname, info in cut_dict.items():
-        outcol = data.eval(info["expression"], info.get("parameters", None))
-        data.add_column(outname, outcol)
-    log.debug("Applied Cuts")
 
-    for cut in cut_dict:
-        ct_mask = data[cut].nda & ct_mask
+    if isinstance(data, Table):
+        ct_mask = np.full(len(data), True, dtype=bool)
+        for outname, info in cut_dict.items():
+            outcol = data.eval(info["expression"], info.get("parameters", None))
+            data.add_column(outname, outcol)
+        log.debug("Applied Cuts")
+
+        for cut in cut_dict:
+            ct_mask = data[cut].nda & ct_mask
+    elif isinstance(data, pd.DataFrame):
+        ct_mask = np.full(len(data), True, dtype=bool)
+
+        for outname, info in cut_dict.items():
+            # convert to pandas eval
+            exp = info["expression"]
+            for key in info.get("parameters", None):
+                exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
+            data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
+        for outname in cut_dict:
+            ct_mask = ct_mask & data[outname]
+    else:
+        raise ValueError("Data must be a Table or DataFrame")
+
     return ct_mask
 
 
