@@ -168,7 +168,7 @@ def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
         pars = np.array([1, mu, sigma, htail, tau,0,0])
         rng = np.random.default_rng(1)
         par_b = rng.multivariate_normal(pars, cov, size=100)
-        modes = np.array([hpge_peak_mode(p[0],p[1],p[2],p[3],p[4], cov = None) for p in par_b])
+        modes = np.array([hpge_peak_mode(p[1],p[2],p[3],p[4]) for p in par_b])
         mode_err_boot = np.nanstd(modes, axis=0)
 
         return mode, mode_err_boot
