@@ -47,7 +47,7 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
         raise TypeError("allow_non_existing must be a Boolean")
 
     # first check that energies and rawids have the same dimensions
-    if (ak.num(energies,axis=-1)!=ak.num(rawids,axis=-1)):
+    if (ak.all(ak.num(energies,axis=-1)!=ak.num(rawids,axis=-1))):
         raise ValueError("Error: the length of each subarray of energies and rawids must be equal")
     
     if (ak.num(energies,axis=-2)!=ak.num(rawids,axis=-2)):
@@ -73,23 +73,27 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
                     else:
                         raise ValueError(f"Error allow_non_existing is set to False and {c2} isnt present in the matrix[{c1}]")
 
-    
-    ## sort the energies and rawids
+    ## add a check that the matrix is symmetric
 
+    for c1 in matrix.keys():
+        for c2 in matrix[c1].keys():
+            if abs(matrix[c1][c2]-matrix[c2][c1])>1e-6:
+                raise ValueError(f"Error input cross talk matrix is not symmetric for {c1},{c2}")
+
+
+    ## sort the energies and rawids
     args = ak.argsort(energies,ascending=False)
 
     energies= energies[args]
     rawids = rawids[args]
 
     energies_corrected = []
-
     ## we should try to speed this up
     for energy_vec_tmp,rawid_vec_tmp in zip(energies,rawids):
         
-        energies_corrected_tmp = energy_vec_tmp
-
-        for id_main, (energy_main,rawid_main) in zip(energy_vec_tmp,rawid_vec_tmp):
-            for id_other, (energy_other,rawid_other) in zip(energy_vec_tmp,rawid_vec_tmp):
+        energies_corrected_tmp = list(energy_vec_tmp)
+        for id_main, (energy_main,rawid_main) in enumerate(zip(energy_vec_tmp,rawid_vec_tmp)):
+            for id_other, (energy_other,rawid_other) in enumerate(zip(energy_vec_tmp,rawid_vec_tmp)):
 
                 if (id_main!=id_other):
                     energies_corrected_tmp[id_other]+=matrix[rawid_main][rawid_other]*energy_main
