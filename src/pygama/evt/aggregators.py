@@ -18,12 +18,12 @@ def evaluate_to_first_or_last(
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    chns: list,
-    chns_rm: list,
+    channels: list,
+    channels_rm: list,
     expr: str,
     exprl: list,
-    qry: str | NDArray,
-    nrows: int,
+    query: str | NDArray,
+    n_rows: int,
     sorter: tuple,
     var_ph: dict = None,
     default_value: bool | int | float = np.nan,
@@ -41,17 +41,17 @@ def evaluate_to_first_or_last(
        `tcm` index array.
     ids
        `tcm` id array.
-    chns
+    channels
        list of channels to be aggregated.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
     exprl
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
+    query
        query expression to mask aggregation.
-    nrows
+    n_rows
        length of output array.
     sorter
        tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
@@ -62,18 +62,18 @@ def evaluate_to_first_or_last(
     is_first
        defines if sorted by smallest or largest value of `sorter`
     chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
+        pattern to format `tcm` id values to table name in higher tiers. Must
+        have one placeholder which is the `tcm` id.
     """
     f = utils.make_files_config(files_cfg)
 
     # define dimension of output array
-    out = np.full(nrows, default_value, dtype=type(default_value))
+    out = np.full(n_rows, default_value, dtype=type(default_value))
     outt = np.zeros(len(out))
 
     store = LH5Store()
 
-    for ch in chns:
+    for ch in channels:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
@@ -91,7 +91,7 @@ def evaluate_to_first_or_last(
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
+            is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
         )
@@ -99,7 +99,7 @@ def evaluate_to_first_or_last(
         # get mask from query
         limarr = utils.get_mask_from_query(
             files_cfg=files_cfg,
-            qry=qry,
+            query=query,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
@@ -116,7 +116,7 @@ def evaluate_to_first_or_last(
             raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
 
         if is_first:
-            if ch == chns[0]:
+            if ch == channels[0]:
                 outt[:] = np.inf
 
             out[evt_ids_ch] = np.where(
@@ -143,12 +143,12 @@ def evaluate_to_scalar(
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    chns: list,
-    chns_rm: list,
+    channels: list,
+    channels_rm: list,
     expr: str,
     exprl: list,
-    qry: str | NDArray,
-    nrows: int,
+    query: str | NDArray,
+    n_rows: int,
     var_ph: dict = None,
     default_value: bool | int | float = np.nan,
     chname_fmt: str = "ch{}",
@@ -165,17 +165,17 @@ def evaluate_to_scalar(
        `tcm` index array.
     ids
        `tcm` id array.
-    chns
+    channels
        list of channels to be aggregated.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
     exprl
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
+    query
        query expression to mask aggregation.
-    nrows
+    n_rows
        length of output array
     var_ph
        dictionary of `evt` and additional parameters and their values.
@@ -187,9 +187,9 @@ def evaluate_to_scalar(
     """
 
     # define dimension of output array
-    out = np.full(nrows, default_value, dtype=type(default_value))
+    out = np.full(n_rows, default_value, dtype=type(default_value))
 
-    for ch in chns:
+    for ch in channels:
         # get index list for this channel to be loaded
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
@@ -206,7 +206,7 @@ def evaluate_to_scalar(
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
+            is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
         )
@@ -214,7 +214,7 @@ def evaluate_to_scalar(
         # get mask from query
         limarr = utils.get_mask_from_query(
             files_cfg=files_cfg,
-            qry=qry,
+            query=query,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
@@ -242,7 +242,7 @@ def evaluate_at_channel(
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    chns_rm: list,
+    channels_rm: list,
     expr: str,
     exprl: list,
     ch_comp: Array,
@@ -260,7 +260,7 @@ def evaluate_at_channel(
        `tcm` index array.
     ids
        `tcm` id array.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
@@ -294,7 +294,8 @@ def evaluate_at_channel(
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch) not in chns_rm,
+            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
+            not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
         )
@@ -312,7 +313,7 @@ def evaluate_at_channel_vov(
     expr: str,
     exprl: list,
     ch_comp: VectorOfVectors,
-    chns_rm: list,
+    channels_rm: list,
     var_ph: dict = None,
     default_value: bool | int | float = np.nan,
     chname_fmt: str = "ch{}",
@@ -334,7 +335,7 @@ def evaluate_at_channel_vov(
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
        array of "rawid"s at which the expression is evaluated.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     var_ph
        dictionary of `evt` and additional parameters and their values.
@@ -348,11 +349,11 @@ def evaluate_at_channel_vov(
     # blow up vov to aoesa
     out = ak.Array([[] for _ in range(len(ch_comp))])
 
-    chns = np.unique(ch_comp.flattened_data.nda).astype(int)
+    channels = np.unique(ch_comp.flattened_data.nda).astype(int)
     ch_comp = ch_comp.view_as("ak")
 
     type_name = None
-    for ch in chns:
+    for ch in channels:
         evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
@@ -362,7 +363,8 @@ def evaluate_at_channel_vov(
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch) not in chns_rm,
+            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
+            not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
         )
@@ -376,7 +378,7 @@ def evaluate_at_channel_vov(
 
         out = ak.concatenate((out, cv), axis=-1)
 
-        if ch == chns[0]:
+        if ch == channels[0]:
             type_name = res.dtype
 
     return VectorOfVectors(ak.values_astype(out, type_name), dtype=type_name)
@@ -387,12 +389,12 @@ def evaluate_to_aoesa(
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    chns: list,
-    chns_rm: list,
+    channels: list,
+    channels_rm: list,
     expr: str,
     exprl: list,
-    qry: str | NDArray,
-    nrows: int,
+    query: str | NDArray,
+    n_rows: int,
     var_ph: dict = None,
     default_value: bool | int | float = np.nan,
     missv=np.nan,
@@ -409,17 +411,17 @@ def evaluate_to_aoesa(
        `tcm` index array.
     ids
        `tcm` id array.
-    chns
+    channels
        list of channels to be aggregated.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
     exprl
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
+    query
        query expression to mask aggregation.
-    nrows
+    n_rows
        length of output :class:`.VectorOfVectors`.
     ch_comp
        array of "rawid"s at which the expression is evaluated.
@@ -436,10 +438,10 @@ def evaluate_to_aoesa(
         placeholder which is the `tcm` id.
     """
     # define dimension of output array
-    out = np.full((nrows, len(chns)), missv)
+    out = np.full((n_rows, len(channels)), missv)
 
     i = 0
-    for ch in chns:
+    for ch in channels:
         idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             cumulength,
@@ -454,7 +456,7 @@ def evaluate_to_aoesa(
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=ch not in chns_rm,
+            is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
         )
@@ -462,7 +464,7 @@ def evaluate_to_aoesa(
         # get mask from query
         limarr = utils.get_mask_from_query(
             files_cfg=files_cfg,
-            qry=qry,
+            query=query,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
@@ -480,12 +482,12 @@ def evaluate_to_vector(
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    chns: list,
-    chns_rm: list,
+    channels: list,
+    channels_rm: list,
     expr: str,
     exprl: list,
-    qry: str | NDArray,
-    nrows: int,
+    query: str | NDArray,
+    n_rows: int,
     var_ph: dict = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
@@ -502,17 +504,17 @@ def evaluate_to_vector(
        `tcm` index array.
     ids
        `tcm` id array.
-    chns
+    channels
        list of channels to be aggregated.
-    chns_rm
+    channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
     exprl
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
-    qry
+    query
        query expression to mask aggregation.
-    nrows
+    n_rows
        length of output :class:`.VectorOfVectors`.
     ch_comp
        array of "rawids" at which the expression is evaluated.
@@ -533,12 +535,12 @@ def evaluate_to_vector(
         cumulength=cumulength,
         idx=idx,
         ids=ids,
-        chns=chns,
-        chns_rm=chns_rm,
+        channels=channels,
+        channels_rm=channels_rm,
         expr=expr,
         exprl=exprl,
-        qry=qry,
-        nrows=nrows,
+        query=query,
+        n_rows=n_rows,
         var_ph=var_ph,
         default_value=default_value,
         missv=np.nan,
@@ -553,12 +555,12 @@ def evaluate_to_vector(
             cumulength=cumulength,
             idx=idx,
             ids=ids,
-            chns=chns,
-            chns_rm=chns_rm,
+            channels=channels,
+            channels_rm=channels_rm,
             expr=fld,
             exprl=[tuple(fld.split("."))],
-            qry=None,
-            nrows=nrows,
+            query=None,
+            n_rows=n_rows,
             missv=np.nan,
             chname_fmt=chname_fmt,
         ).view_as("np")

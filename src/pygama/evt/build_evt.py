@@ -145,7 +145,7 @@ def build_evt(
     # or a list of channel names
     log.debug("creating channel dictionary")
 
-    chns = {}
+    channels = {}
 
     for k, v in config["channels"].items():
         if isinstance(v, dict):
@@ -168,18 +168,18 @@ def build_evt(
             # load module
             p, m = v["module"].rsplit(".", 1)
             met = getattr(import_module(p, package=__package__), m)
-            chns[k] = met(v | attr)
+            channels[k] = met(v | attr)
 
         elif isinstance(v, str):
-            chns[k] = [v]
+            channels[k] = [v]
 
         elif isinstance(v, list):
-            chns[k] = [e for e in v]
+            channels[k] = [e for e in v]
 
     # get number of events in file (ask the TCM)
     store = LH5Store()
-    nrows = store.read_n_rows(f"/{f.tcm.group}/cumulative_length", f.tcm.file)
-    table = Table(size=nrows)
+    n_rows = store.read_n_rows(f"/{f.tcm.group}/cumulative_length", f.tcm.file)
+    table = Table(size=n_rows)
 
     # now loop over operations (columns in evt table)
     for k, v in config["operations"].items():
@@ -205,29 +205,29 @@ def build_evt(
         # else we build the event entry
         else:
             if "channels" not in v.keys():
-                chns_e = []
+                channels_e = []
             elif isinstance(v["channels"], str):
-                chns_e = chns[v["channels"]]
+                channels_e = channels[v["channels"]]
             elif isinstance(v["channels"], list):
-                chns_e = list(
-                    itertools.chain.from_iterable([chns[e] for e in v["channels"]])
+                channels_e = list(
+                    itertools.chain.from_iterable([channels[e] for e in v["channels"]])
                 )
-            chns_rm = []
+            channels_rm = []
             if "exclude_channels" in v.keys():
                 if isinstance(v["exclude_channels"], str):
-                    chns_rm = chns[v["exclude_channels"]]
+                    channels_rm = channels[v["exclude_channels"]]
                 elif isinstance(v["exclude_channels"], list):
-                    chns_rm = list(
+                    channels_rm = list(
                         itertools.chain.from_iterable(
-                            [chns[e] for e in v["exclude_channels"]]
+                            [channels[e] for e in v["exclude_channels"]]
                         )
                     )
 
-            pars, qry, defaultv, srter = None, None, np.nan, None
+            pars, query, defaultv, srter = None, None, np.nan, None
             if "parameters" in v.keys():
                 pars = v["parameters"]
             if "query" in v.keys():
-                qry = v["query"]
+                query = v["query"]
             if "initial" in v.keys():
                 defaultv = v["initial"]
                 if isinstance(defaultv, str) and (
@@ -240,14 +240,14 @@ def build_evt(
 
             obj = evaluate_expression(
                 files_cfg,
-                chns=chns_e,
-                chns_rm=chns_rm,
+                channels=channels_e,
+                channels_rm=channels_rm,
                 mode=v["aggregation_mode"],
                 expr=v["expression"],
-                nrows=nrows,
+                n_rows=n_rows,
                 table=table,
-                para=pars,
-                qry=qry,
+                parameters=pars,
+                query=query,
                 default_value=defaultv,
                 sorter=srter,
                 chname_fmt=chname_fmt,
@@ -284,20 +284,20 @@ def build_evt(
     key = re.search(r"\d{8}T\d{6}Z", f.hit.file).group(0)
     log.info(
         f"Applied {len(config['operations'])} operations to key {key} and saved "
-        f"{len(config['outputs'])} evt fields across {len(chns)} channel groups"
+        f"{len(config['outputs'])} evt fields across {len(channels)} channel groups"
     )
 
 
 def evaluate_expression(
     files_cfg: Mapping[str, Sequence[str, str]],
-    chns: list,
-    chns_rm: list,
+    channels: list,
+    channels_rm: list,
     mode: str,
     expr: str,
-    nrows: int,
+    n_rows: int,
     table: Table = None,
-    para: dict = None,
-    qry: str = None,
+    parameters: dict = None,
+    query: str = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
     chname_fmt: str = "ch{}",
@@ -309,9 +309,9 @@ def evaluate_expression(
     ----------
     files_cfg
         input and output LH5 files with HDF5 groups where tables are found.
-    chns
+    channels
        list of channel names across which expression gets evaluated
-    chns_rm
+    channels_rm
        list of channels which get set to default value during evaluation. In
        function mode they are removed entirely
     mode
@@ -331,7 +331,7 @@ def evaluate_expression(
        - ``gather``: Channels are not combined, but result saved as
          :class:`.VectorOfVectors`.
 
-    qry
+    query
        a query that can mask the aggregation.
     expr
        the expression. That can be any mathematical equation/comparison. If
@@ -340,11 +340,11 @@ def evaluate_expression(
        the expression parameters from either hit, dsp, evt tier (from
        operations performed before this one! Dictionary operations order
        matters), or from the ``parameters`` field can be used.
-    nrows
+    n_rows
        number of rows to be processed.
     table
        table of `evt` tier data.
-    para
+    parameters
        dictionary of parameters defined in the ``parameters`` field in the
        configuration dictionary.
     default_value
@@ -369,8 +369,8 @@ def evaluate_expression(
             for e in table.keys()
             if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
         }
-    if para:
-        var_ph = var_ph | para
+    if parameters:
+        var_ph = var_ph | parameters
 
     if mode == "function":
         # evaluate expression
@@ -388,7 +388,7 @@ def evaluate_expression(
             f.dsp.group,
             f.tcm.group,
             chname_fmt,
-            [x for x in chns if x not in chns_rm],
+            [x for x in channels if x not in channels_rm],
         ] + [utils.num_and_pars(e, var_ph) for e in params[:-1].split(",")]
 
         # load function dynamically
@@ -398,18 +398,18 @@ def evaluate_expression(
 
     else:
         # check if query is either on channel basis or evt basis (and not a mix)
-        qry_mask = qry
-        if qry is not None:
-            if f"{f.evt.group}." in qry and (
-                f"{f.hit.group}." in qry or f"{f.dsp.group}." in qry
+        query_mask = query
+        if query is not None:
+            if f"{f.evt.group}." in query and (
+                f"{f.hit.group}." in query or f"{f.dsp.group}." in query
             ):
                 raise ValueError(
                     f"Query can't be a mix of {f.evt.group} tier and lower tiers."
                 )
 
             # if it is an evt query we can evaluate it directly here
-            if table and f"{f.evt.group}." in qry:
-                qry_mask = eval(qry.replace(f"{f.evt.group}.", ""), table)
+            if table and f"{f.evt.group}." in query:
+                query_mask = eval(query.replace(f"{f.evt.group}.", ""), table)
 
         # load TCM data to define an event
         store = LH5Store()
@@ -448,7 +448,7 @@ def evaluate_expression(
                     cumulength=cumulength,
                     idx=idx,
                     ids=ids,
-                    chns_rm=chns_rm,
+                    channels_rm=channels_rm,
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
@@ -466,7 +466,7 @@ def evaluate_expression(
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
-                    chns_rm=chns_rm,
+                    channels_rm=channels_rm,
                     var_ph=var_ph,
                     default_value=default_value,
                     chname_fmt=chname_fmt,
@@ -489,12 +489,12 @@ def evaluate_expression(
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                chns=chns,
-                chns_rm=chns_rm,
+                channels=channels,
+                channels_rm=channels_rm,
                 expr=expr,
                 exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
+                query=query_mask,
+                n_rows=n_rows,
                 sorter=sorter,
                 var_ph=var_ph,
                 default_value=default_value,
@@ -509,12 +509,12 @@ def evaluate_expression(
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                chns=chns,
-                chns_rm=chns_rm,
+                channels=channels,
+                channels_rm=channels_rm,
                 expr=expr,
                 exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
+                query=query_mask,
+                n_rows=n_rows,
                 var_ph=var_ph,
                 default_value=default_value,
                 chname_fmt=chname_fmt,
@@ -525,12 +525,12 @@ def evaluate_expression(
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                chns=chns,
-                chns_rm=chns_rm,
+                channels=channels,
+                channels_rm=channels_rm,
                 expr=expr,
                 exprl=exprl,
-                qry=qry_mask,
-                nrows=nrows,
+                query=query_mask,
+                n_rows=n_rows,
                 var_ph=var_ph,
                 default_value=default_value,
                 sorter=sorter,

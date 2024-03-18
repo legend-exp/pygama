@@ -11,10 +11,12 @@ import numpy as np
 from lgdo.lh5 import LH5Store
 from numpy.typing import NDArray
 
+H5DataLoc = namedtuple("H5DataLoc", ("file", "group"), defaults=2 * (None,))
 TierData = namedtuple(
     "TierData", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
 )
-H5DataLoc = namedtuple("H5DataLoc", ("file", "group"), defaults=2 * (None,))
+
+TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
 
 
 def make_files_config(data):
@@ -67,8 +69,7 @@ def find_parameters(
     idx_ch: NDArray,
     exprl: list,
 ) -> dict:
-    """Wraps :func:`load_vars_to_nda` to return parameters from `hit` and `dsp`
-    tiers.
+    """Finds and returns parameters from `hit` and `dsp` tiers.
 
     Parameters
     ----------
@@ -89,6 +90,7 @@ def find_parameters(
 
     store = LH5Store()
     hit_dict, dsp_dict = {}, {}
+
     if len(hit_flds) > 0:
         hit_ak = store.read(
             f"{ch.replace('/','')}/{f.hit.group}/",
@@ -99,6 +101,7 @@ def find_parameters(
         hit_dict = dict(
             zip([f"{f.hit.group}_" + e for e in ak.fields(hit_ak)], ak.unzip(hit_ak))
         )
+
     if len(dsp_flds) > 0:
         dsp_ak = store.read(
             f"{ch.replace('/','')}/{f.dsp.group}/",
@@ -204,7 +207,7 @@ def get_data_at_channel(
 
 def get_mask_from_query(
     files_cfg,
-    qry: str | NDArray,
+    query: str | NDArray,
     length: int,
     ch: str,
     idx_ch: NDArray,
@@ -215,7 +218,7 @@ def get_mask_from_query(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    qry
+    query
        query expression.
     length
        length of the return mask.
@@ -227,19 +230,19 @@ def get_mask_from_query(
     f = make_files_config(files_cfg)
 
     # get sub evt based query condition if needed
-    if isinstance(qry, str):
-        qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-        qry_var = find_parameters(
+    if isinstance(query, str):
+        query_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", query)
+        query_var = find_parameters(
             files_cfg=files_cfg,
             ch=ch,
             idx_ch=idx_ch,
-            exprl=qry_lst,
+            exprl=query_lst,
         )
         limarr = eval(
-            qry.replace(f"{f.dsp.group}.", f"{f.dsp.group}_").replace(
+            query.replace(f"{f.dsp.group}.", f"{f.dsp.group}_").replace(
                 f"{f.hit.group}.", f"{f.hit.group}_"
             ),
-            qry_var,
+            query_var,
         )
 
         # in case the expression evaluates to a single value blow it up
@@ -249,12 +252,12 @@ def get_mask_from_query(
         limarr = ak.to_numpy(limarr, allow_missing=False)
         if limarr.ndim > 1:
             raise ValueError(
-                f"query '{qry}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
+                f"query '{query}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
             )
 
     # or forward the array
-    elif isinstance(qry, np.ndarray):
-        limarr = qry
+    elif isinstance(query, np.ndarray):
+        limarr = query
 
     # if no condition, it must be true
     else:
