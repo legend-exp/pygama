@@ -13,7 +13,10 @@ sto = lh5.LH5Store()
 
 
 def convert_to_minuit(pars, func):
-    c = cost.UnbinnedNLL(np.array([0]), func.get_pdf)
+    if isinstance(input, FunctionType):
+        c = cost.UnbinnedNLL(np.array([0]), func)
+    else:
+        c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
     if isinstance(pars, dict):
         m = Minuit(c, **pars)
     else:
@@ -57,6 +60,9 @@ def load_data(
     """
     Loads in the A/E parameters needed and applies calibration constants to energy
     """
+
+    if isinstance(files, str):
+        files = [files]
 
     if isinstance(files, dict):
         keys = lh5.ls(
