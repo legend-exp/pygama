@@ -22,18 +22,18 @@ log = logging.getLogger(__name__)
 
 
 def build_evt(
-    files: Mapping[str, Sequence[str, str]],
+    files_cfg: Mapping[str, Sequence[str, str]],
     config: str | dict,
     wo_mode: str = "write_safe",
-    tcm_id_table_pattern: str = "ch{}",
+    chname_fmt: str = "ch{}",
 ) -> None | Table:
     """Transform data from the `hit` and `dsp` levels which a channel sorted to a
     event sorted data format.
 
     Parameters
     ----------
-    files
-        input and output LH5 files with HDF5 groups where tables are found. Example:
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found. Example:
 
         .. code-block:: json
 
@@ -83,7 +83,7 @@ def build_evt(
                 "is_muon_rejected":{
                   "channels": "muon",
                   "aggregation_mode": "any",
-                  "expression": "dsp.wf_max>a",
+                  "expression": "dsp.wf_max > a",
                   "parameters": {"a":15100},
                   "initial": false
                 },
@@ -108,7 +108,7 @@ def build_evt(
 
     wo_mode
         writing mode.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must
         have one placeholder which is the `tcm` id.
     """
@@ -121,28 +121,24 @@ def build_evt(
     if "operations" not in config.keys():
         raise ValueError("operations field needs to be specified in the config")
 
-    # check tcm_id_table_pattern validity
-    pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)
+    # check chname_fmt validity
+    pattern_check = re.findall(r"{([^}]*?)}", chname_fmt)
     if len(pattern_check) != 1:
-        raise ValueError("tcm_id_table_pattern must have exactly one placeholder {}")
+        raise ValueError("chname_fmt must have exactly one placeholder {}")
     elif "{" in pattern_check[0] or "}" in pattern_check[0]:
-        raise ValueError(f"{tcm_id_table_pattern=} has an invalid placeholder.")
+        raise ValueError(f"{chname_fmt=} has an invalid placeholder.")
 
-    f_tcm = files["tcm"][0]
-    f_hit = files["hit"][0]
-    f_dsp = files["dsp"][0]
-    f_evt = files["evt"][0]
+    # convert into a nice named tuple
+    f = utils.make_files_config(files_cfg)
 
     if (
         utils.get_table_name_by_pattern(
-            tcm_id_table_pattern,
-            utils.get_tcm_id_by_pattern(tcm_id_table_pattern, lh5.ls(f_hit)[0]),
+            chname_fmt,
+            utils.get_tcm_id_by_pattern(chname_fmt, lh5.ls(f.hit.file)[0]),
         )
-        != lh5.ls(f_hit)[0]
+        != lh5.ls(f.hit.file)[0]
     ):
-        raise ValueError(
-            f"tcm_id_table_pattern {tcm_id_table_pattern} does not match keys in data!"
-        )
+        raise ValueError(f"chname_fmt {chname_fmt} does not match keys in data!")
 
     # create channel list according to config
     # This can be either read from the meta data
@@ -163,7 +159,7 @@ def build_evt(
             # the time_key argument is set to the time key of the DSP file
             # in case it is not provided by the config
             if "time_key" not in v.keys():
-                attr["time_key"] = re.search(r"\d{8}T\d{6}Z", f_dsp).group(0)
+                attr["time_key"] = re.search(r"\d{8}T\d{6}Z", f.dsp.file).group(0)
 
             # if "None" do None
             elif "None" == v["time_key"]:
@@ -182,7 +178,7 @@ def build_evt(
 
     # get number of events in file (ask the TCM)
     store = LH5Store()
-    nrows = store.read_n_rows(f"/{files['tcm'][1]}/cumulative_length", f_tcm)
+    nrows = store.read_n_rows(f"/{f.tcm.group}/cumulative_length", f.tcm.file)
     table = Table(size=nrows)
 
     # now loop over operations (columns in evt table)
@@ -197,7 +193,7 @@ def build_evt(
                 var = var | v["parameters"]
 
             # compute and eventually get rid of evt. suffix
-            res = table.eval(v["expression"].replace(f"{files['evt'][1]}.", ""), var)
+            res = table.eval(v["expression"].replace(f"{f.evt.group}.", ""), var)
 
             # add attributes if present
             if "lgdo_attrs" in v.keys():
@@ -243,9 +239,7 @@ def build_evt(
                 srter = v["sort"]
 
             obj = evaluate_expression(
-                f_tcm=f_tcm,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
+                files_cfg,
                 chns=chns_e,
                 chns_rm=chns_rm,
                 mode=v["aggregation_mode"],
@@ -254,13 +248,9 @@ def build_evt(
                 table=table,
                 para=pars,
                 qry=qry,
-                defv=defaultv,
+                default_value=defaultv,
                 sorter=srter,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=files["evt"][1],
-                hit_group=files["hit"][1],
-                dsp_group=files["dsp"][1],
-                tcm_group=files["tcm"][1],
+                chname_fmt=chname_fmt,
             )
 
             # add attribute if present
@@ -279,11 +269,11 @@ def build_evt(
             for fld in clms_to_remove:
                 table.remove_field(fld, True)
 
-            if f_evt:
+            if f.evt.file:
                 store.write(
                     obj=table,
-                    name=f"/{files['evt'][1]}/",
-                    lh5_file=f_evt,
+                    name=f"/{f.evt.group}/",
+                    lh5_file=f.evt.file,
                     wo_mode=wo_mode,
                 )
             else:
@@ -291,7 +281,7 @@ def build_evt(
     else:
         log.warning("No output fields specified, no file will be written.")
 
-    key = re.search(r"\d{8}T\d{6}Z", f_hit).group(0)
+    key = re.search(r"\d{8}T\d{6}Z", f.hit.file).group(0)
     log.info(
         f"Applied {len(config['operations'])} operations to key {key} and saved "
         f"{len(config['outputs'])} evt fields across {len(chns)} channel groups"
@@ -299,9 +289,7 @@ def build_evt(
 
 
 def evaluate_expression(
-    f_tcm: str,
-    f_hit: str,
-    f_dsp: str,
+    files_cfg: Mapping[str, Sequence[str, str]],
     chns: list,
     chns_rm: list,
     mode: str,
@@ -310,25 +298,17 @@ def evaluate_expression(
     table: Table = None,
     para: dict = None,
     qry: str = None,
-    defv: bool | int | float = np.nan,
+    default_value: bool | int | float = np.nan,
     sorter: str = None,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-    tcm_group: str = "tcm",
+    chname_fmt: str = "ch{}",
 ) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
     """Evaluates the expression defined by the user across all channels
     according to the mode.
 
     Parameters
     ----------
-    f_tcm
-       path to `tcm` tier file.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
+    files_cfg
+        input and output LH5 files with HDF5 groups where tables are found.
     chns
        list of channel names across which expression gets evaluated
     chns_rm
@@ -367,28 +347,20 @@ def evaluate_expression(
     para
        dictionary of parameters defined in the ``parameters`` field in the
        configuration dictionary.
-    defv
+    default_value
        default value of evaluation.
     sorter
        can be used to sort vector outputs according to sorter expression (see
        :func:`evaluate_to_vector`).
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format tcm id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-    evt group
-        LH5 root group name of `evt` tier.
-    tcm_group
-        LH5 root group in `tcm` file.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
     """
-    store = LH5Store()
+    f = utils.make_files_config(files_cfg)
 
     # find parameters in evt file or in parameters
     exprl = re.findall(
-        rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)", expr
+        rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
     )
     var_ph = {}
     if table:
@@ -404,18 +376,18 @@ def evaluate_expression(
         # evaluate expression
         func, params = expr.split("(")
         params = (
-            params.replace(f"{dsp_group}.", f"{dsp_group}_")
-            .replace(f"{hit_group}.", f"{hit_group}_")
-            .replace(f"{evt_group}.", "")
+            params.replace(f"{f.dsp.group}.", f"{f.dsp.group}_")
+            .replace(f"{f.hit.group}.", f"{f.hit.group}_")
+            .replace(f"{f.evt.group}.", "")
         )
         params = [
-            f_hit,
-            f_dsp,
-            f_tcm,
-            hit_group,
-            dsp_group,
-            tcm_group,
-            tcm_id_table_pattern,
+            f.hit.file,
+            f.dsp.file,
+            f.tcm.file,
+            f.hit.group,
+            f.dsp.group,
+            f.tcm.group,
+            chname_fmt,
             [x for x in chns if x not in chns_rm],
         ] + [utils.num_and_pars(e, var_ph) for e in params[:-1].split(",")]
 
@@ -428,32 +400,33 @@ def evaluate_expression(
         # check if query is either on channel basis or evt basis (and not a mix)
         qry_mask = qry
         if qry is not None:
-            if f"{evt_group}." in qry and (
-                f"{hit_group}." in qry or f"{dsp_group}." in qry
+            if f"{f.evt.group}." in qry and (
+                f"{f.hit.group}." in qry or f"{f.dsp.group}." in qry
             ):
                 raise ValueError(
-                    f"Query can't be a mix of {evt_group} tier and lower tiers."
+                    f"Query can't be a mix of {f.evt.group} tier and lower tiers."
                 )
 
             # if it is an evt query we can evaluate it directly here
-            if table and f"{evt_group}." in qry:
-                qry_mask = eval(qry.replace(f"{evt_group}.", ""), table)
+            if table and f"{f.evt.group}." in qry:
+                qry_mask = eval(qry.replace(f"{f.evt.group}.", ""), table)
 
         # load TCM data to define an event
-        ids = store.read(f"/{tcm_group}/array_id", f_tcm)[0].view_as("np")
-        idx = store.read(f"/{tcm_group}/array_idx", f_tcm)[0].view_as("np")
-        cumulength = store.read(f"/{tcm_group}/cumulative_length", f_tcm)[0].view_as(
-            "np"
-        )
+        store = LH5Store()
+        ids = store.read(f"/{f.tcm.group}/array_id", f.tcm.file)[0].view_as("np")
+        idx = store.read(f"/{f.tcm.group}/array_idx", f.tcm.file)[0].view_as("np")
+        cumulength = store.read(f"/{f.tcm.group}/cumulative_length", f.tcm.file)[
+            0
+        ].view_as("np")
 
         # switch through modes
         if table and (
             mode.startswith("keep_at_ch:") or mode.startswith("keep_at_idx:")
         ):
             if mode.startswith("keep_at_ch:"):
-                ch_comp = table[mode[11:].replace(f"{evt_group}.", "")]
+                ch_comp = table[mode[11:].replace(f"{f.evt.group}.", "")]
             else:
-                ch_comp = table[mode[12:].replace(f"{evt_group}.", "")]
+                ch_comp = table[mode[12:].replace(f"{f.evt.group}.", "")]
                 if isinstance(ch_comp, Array):
                     ch_comp = Array(nda=ids[ch_comp.view_as("np")])
                 elif isinstance(ch_comp, VectorOfVectors):
@@ -471,40 +444,32 @@ def evaluate_expression(
 
             if isinstance(ch_comp, Array):
                 return aggregators.evaluate_at_channel(
+                    files_cfg=files_cfg,
                     cumulength=cumulength,
                     idx=idx,
                     ids=ids,
-                    f_hit=f_hit,
-                    f_dsp=f_dsp,
                     chns_rm=chns_rm,
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
                     var_ph=var_ph,
-                    defv=defv,
-                    tcm_id_table_pattern=tcm_id_table_pattern,
-                    evt_group=evt_group,
-                    hit_group=hit_group,
-                    dsp_group=dsp_group,
+                    default_value=default_value,
+                    chname_fmt=chname_fmt,
                 )
 
             if isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
+                    files_cfg=files_cfg,
                     cumulength=cumulength,
                     idx=idx,
                     ids=ids,
-                    f_hit=f_hit,
-                    f_dsp=f_dsp,
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
                     chns_rm=chns_rm,
                     var_ph=var_ph,
-                    defv=defv,
-                    tcm_id_table_pattern=tcm_id_table_pattern,
-                    evt_group=evt_group,
-                    hit_group=hit_group,
-                    dsp_group=dsp_group,
+                    default_value=default_value,
+                    chname_fmt=chname_fmt,
                 )
 
             raise NotImplementedError(
@@ -515,16 +480,15 @@ def evaluate_expression(
         if "first_at:" in mode or "last_at:" in mode:
             sorter = tuple(
                 re.findall(
-                    rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)",
+                    rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)",
                     mode.split("first_at:")[-1],
                 )[0]
             )
             return aggregators.evaluate_to_first_or_last(
+                files_cfg=files_cfg,
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
                 chns=chns,
                 chns_rm=chns_rm,
                 expr=expr,
@@ -533,22 +497,18 @@ def evaluate_expression(
                 nrows=nrows,
                 sorter=sorter,
                 var_ph=var_ph,
-                defv=defv,
+                default_value=default_value,
                 is_first=True if "first_at:" in mode else False,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
+                chname_fmt=chname_fmt,
             )
 
         if mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
+                files_cfg=files_cfg,
                 mode=mode,
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
                 chns=chns,
                 chns_rm=chns_rm,
                 expr=expr,
@@ -556,19 +516,15 @@ def evaluate_expression(
                 qry=qry_mask,
                 nrows=nrows,
                 var_ph=var_ph,
-                defv=defv,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
+                default_value=default_value,
+                chname_fmt=chname_fmt,
             )
         if "gather" == mode:
             return aggregators.evaluate_to_vector(
+                files_cfg=files_cfg,
                 cumulength=cumulength,
                 idx=idx,
                 ids=ids,
-                f_hit=f_hit,
-                f_dsp=f_dsp,
                 chns=chns,
                 chns_rm=chns_rm,
                 expr=expr,
@@ -576,12 +532,9 @@ def evaluate_expression(
                 qry=qry_mask,
                 nrows=nrows,
                 var_ph=var_ph,
-                defv=defv,
+                default_value=default_value,
                 sorter=sorter,
-                tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
+                chname_fmt=chname_fmt,
             )
 
         raise ValueError(mode + " not a valid mode")

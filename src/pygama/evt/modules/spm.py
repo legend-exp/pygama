@@ -86,7 +86,7 @@ def get_masked_tcm_idx(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,  # pe threshold
     trgr,  # (ge) trigger position
@@ -108,7 +108,7 @@ def get_masked_tcm_idx(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"
@@ -133,14 +133,14 @@ def get_masked_tcm_idx(
         elif mode == 1:
             out_idx = np.full((np.max(idx) + 1), np.nan)
             out_idx[idx_ch] = np.where(
-                ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)
+                ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)
             )[0]
             out_idx = ak.drop_none(ak.nan_to_none(ak.Array(out_idx)[:, None]))
             out_idx = out_idx[mask[mask] - 1]
 
         elif mode == 2:
             out_idx = ak.Array(
-                [utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)] * len(mask)
+                [utils.get_tcm_id_by_pattern(chname_fmt, ch)] * len(mask)
             )
             out_idx = out_idx[:, None][mask[mask] - 1]
 
@@ -163,7 +163,7 @@ def get_spm_ene_or_maj(
     f_tcm,
     hit_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -187,7 +187,7 @@ def get_spm_ene_or_maj(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
 
         if mode in ["energy_dplms", "majority_dplms"]:
             pe = ak.drop_none(
@@ -247,7 +247,7 @@ def get_energy(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -260,7 +260,7 @@ def get_energy(
         f_tcm,
         hit_group,
         tcm_group,
-        tcm_id_table_pattern,
+        chname_fmt,
         chs,
         lim,
         trgr,
@@ -279,7 +279,7 @@ def get_majority(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -292,7 +292,7 @@ def get_majority(
         f_tcm,
         hit_group,
         tcm_group,
-        tcm_id_table_pattern,
+        chname_fmt,
         chs,
         lim,
         trgr,
@@ -311,7 +311,7 @@ def get_energy_dplms(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -324,7 +324,7 @@ def get_energy_dplms(
         f_tcm,
         hit_group,
         tcm_group,
-        tcm_id_table_pattern,
+        chname_fmt,
         chs,
         lim,
         trgr,
@@ -343,7 +343,7 @@ def get_majority_dplms(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -356,7 +356,7 @@ def get_majority_dplms(
         f_tcm,
         hit_group,
         tcm_group,
-        tcm_id_table_pattern,
+        chname_fmt,
         chs,
         lim,
         trgr,
@@ -380,7 +380,7 @@ def get_etc(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -405,7 +405,7 @@ def get_etc(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"
@@ -476,7 +476,7 @@ def get_time_shift(
     hit_group,
     dsp_group,
     tcm_group,
-    tcm_id_table_pattern,
+    chname_fmt,
     chs,
     lim,
     trgr,
@@ -496,7 +496,7 @@ def get_time_shift(
         tge = cast_trigger(trgr, tdefault, length=None)
 
     for ch in chs:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
 
         pe = store.read(f"{ch}/{hit_group}/energy_in_pe", f_hit, idx=idx_ch)[0].view_as(
             "np"

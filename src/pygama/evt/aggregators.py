@@ -14,11 +14,10 @@ from . import utils
 
 
 def evaluate_to_first_or_last(
+    files_cfg,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
@@ -27,26 +26,21 @@ def evaluate_to_first_or_last(
     nrows: int,
     sorter: tuple,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
+    default_value: bool | int | float = np.nan,
     is_first: bool = True,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     chns
        list of channels to be aggregated.
     chns_rm
@@ -63,38 +57,34 @@ def evaluate_to_first_or_last(
        tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
     is_first
        defines if sorted by smallest or largest value of `sorter`
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
+    f = utils.make_files_config(files_cfg)
 
     # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
+    out = np.full(nrows, default_value, dtype=type(default_value))
     outt = np.zeros(len(out))
 
     store = LH5Store()
 
     for ch in chns:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
 
         # evaluate at channel
         res = utils.get_data_at_channel(
+            files_cfg=files_cfg,
             ch=ch,
             ids=ids,
             idx=idx,
@@ -102,31 +92,23 @@ def evaluate_to_first_or_last(
             exprl=exprl,
             var_ph=var_ph,
             is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            default_value=default_value,
+            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
+            files_cfg=files_cfg,
             qry=qry,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
         )
 
         # find if sorter is in hit or dsp
         t0 = store.read(
             f"{ch}/{sorter[0]}/{sorter[1]}",
-            f_hit if f"{hit_group}" == sorter[0] else f_dsp,
+            f.hit.file if f"{f.hit.group}" == sorter[0] else f.dsp.file,
             idx=idx_ch,
         )[0].view_as("np")
 
@@ -152,16 +134,15 @@ def evaluate_to_first_or_last(
                 (t0 > outt[evt_ids_ch]) & (limarr), t0, outt[evt_ids_ch]
             )
 
-    return Array(nda=out, dtype=type(defv))
+    return Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_to_scalar(
+    files_cfg,
     mode: str,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
@@ -169,26 +150,21 @@ def evaluate_to_scalar(
     qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    default_value: bool | int | float = np.nan,
+    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates by summation across channels.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     mode
        aggregation mode.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     chns
        list of channels to be aggregated.
     chns_rm
@@ -203,32 +179,27 @@ def evaluate_to_scalar(
        length of output array
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
 
     # define dimension of output array
-    out = np.full(nrows, defv, dtype=type(defv))
+    out = np.full(nrows, default_value, dtype=type(default_value))
 
     for ch in chns:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
 
         res = utils.get_data_at_channel(
+            files_cfg=files_cfg,
             ch=ch,
             ids=ids,
             idx=idx,
@@ -236,25 +207,17 @@ def evaluate_to_scalar(
             exprl=exprl,
             var_ph=var_ph,
             is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            default_value=default_value,
+            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
+            files_cfg=files_cfg,
             qry=qry,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
         )
 
         # switch through modes
@@ -271,38 +234,32 @@ def evaluate_to_scalar(
                 res = res.astype(bool)
             out[evt_ids_ch] = out[evt_ids_ch] & res & limarr
 
-    return Array(nda=out, dtype=type(defv))
+    return Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_at_channel(
+    files_cfg,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     chns_rm: list,
     expr: str,
     exprl: list,
     ch_comp: Array,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    default_value: bool | int | float = np.nan,
+    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates by evaluating the expression at a given channel.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     chns_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
@@ -313,82 +270,64 @@ def evaluate_at_channel(
        array of rawids at which the expression is evaluated.
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
+    f = utils.make_files_config(files_cfg)
 
-    out = np.full(len(ch_comp.nda), defv, dtype=type(defv))
+    out = np.full(len(ch_comp.nda), default_value, dtype=type(default_value))
 
     for ch in np.unique(ch_comp.nda.astype(int)):
         # skip default value
-        if utils.get_table_name_by_pattern(tcm_id_table_pattern, ch) not in lh5.ls(
-            f_hit
-        ):
+        if utils.get_table_name_by_pattern(chname_fmt, ch) not in lh5.ls(f.hit.file):
             continue
         idx_ch = idx[ids == ch]
         evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
         res = utils.get_data_at_channel(
-            ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
+            files_cfg=files_cfg,
+            ch=utils.get_table_name_by_pattern(chname_fmt, ch),
             ids=ids,
             idx=idx,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch)
-            not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch) not in chns_rm,
+            default_value=default_value,
+            chname_fmt=chname_fmt,
         )
 
         out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
 
-    return Array(nda=out, dtype=type(defv))
+    return Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_at_channel_vov(
+    files_cfg,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     expr: str,
     exprl: list,
     ch_comp: VectorOfVectors,
     chns_rm: list,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    default_value: bool | int | float = np.nan,
+    chname_fmt: str = "ch{}",
 ) -> VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     expr
        expression string to be evaluated.
     exprl
@@ -399,17 +338,11 @@ def evaluate_at_channel_vov(
        list of channels to be skipped from evaluation and set to default value.
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-     dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
 
     # blow up vov to aoesa
@@ -422,21 +355,16 @@ def evaluate_at_channel_vov(
     for ch in chns:
         evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
         res = utils.get_data_at_channel(
-            ch=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch),
+            files_cfg=files_cfg,
+            ch=utils.get_table_name_by_pattern(chname_fmt, ch),
             ids=ids,
             idx=idx,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
-            is_evaluated=utils.get_table_name_by_pattern(tcm_id_table_pattern, ch)
-            not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch) not in chns_rm,
+            default_value=default_value,
+            chname_fmt=chname_fmt,
         )
 
         # see in which events the current channel is present
@@ -455,11 +383,10 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
+    files_cfg,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
@@ -467,26 +394,21 @@ def evaluate_to_aoesa(
     qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
+    default_value: bool | int | float = np.nan,
     missv=np.nan,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    chname_fmt: str = "ch{}",
 ) -> ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     chns
        list of channels to be aggregated.
     chns_rm
@@ -503,34 +425,29 @@ def evaluate_to_aoesa(
        array of "rawid"s at which the expression is evaluated.
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
     missv
        missing value.
     sorter
        sorts the entries in the vector according to sorter expression.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
     # define dimension of output array
     out = np.full((nrows, len(chns)), missv)
 
     i = 0
     for ch in chns:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0],
+            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
         res = utils.get_data_at_channel(
+            files_cfg=files_cfg,
             ch=ch,
             ids=ids,
             idx=idx,
@@ -538,25 +455,17 @@ def evaluate_to_aoesa(
             exprl=exprl,
             var_ph=var_ph,
             is_evaluated=ch not in chns_rm,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            defv=defv,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            default_value=default_value,
+            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
+            files_cfg=files_cfg,
             qry=qry,
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
         )
 
         out[evt_ids_ch, i] = np.where(limarr, res, out[evt_ids_ch, i])
@@ -567,11 +476,10 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
+    files_cfg,
     cumulength: NDArray,
     idx: NDArray,
     ids: NDArray,
-    f_hit: str,
-    f_dsp: str,
     chns: list,
     chns_rm: list,
     expr: str,
@@ -579,26 +487,21 @@ def evaluate_to_vector(
     qry: str | NDArray,
     nrows: int,
     var_ph: dict = None,
-    defv: bool | int | float = np.nan,
+    default_value: bool | int | float = np.nan,
     sorter: str = None,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    chname_fmt: str = "ch{}",
 ) -> VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
+    files_cfg
+        input and output LH5 files_cfg with HDF5 groups where tables are found.
     idx
        `tcm` index array.
     ids
        `tcm` id array.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
     chns
        list of channels to be aggregated.
     chns_rm
@@ -615,28 +518,21 @@ def evaluate_to_vector(
        array of "rawids" at which the expression is evaluated.
     var_ph
        dictionary of `evt` and additional parameters and their values.
-    defv
+    default_value
        default value.
     sorter
        sorts the entries in the vector according to sorter expression.
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
-    tcm_id_table_pattern
+    chname_fmt
         pattern to format `tcm` id values to table name in higher tiers. Must have one
         placeholder which is the `tcm` id.
-     dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
-    evt_group
-        LH5 root group in `evt` file.
     """
     out = evaluate_to_aoesa(
+        files_cfg=files_cfg,
         cumulength=cumulength,
         idx=idx,
         ids=ids,
-        f_hit=f_hit,
-        f_dsp=f_dsp,
         chns=chns,
         chns_rm=chns_rm,
         expr=expr,
@@ -644,23 +540,19 @@ def evaluate_to_vector(
         qry=qry,
         nrows=nrows,
         var_ph=var_ph,
-        defv=defv,
+        default_value=default_value,
         missv=np.nan,
-        tcm_id_table_pattern=tcm_id_table_pattern,
-        evt_group=evt_group,
-        hit_group=hit_group,
-        dsp_group=dsp_group,
+        chname_fmt=chname_fmt,
     ).view_as("np")
 
     # if a sorter is given sort accordingly
     if sorter is not None:
         md, fld = sorter.split(":")
         s_val = evaluate_to_aoesa(
+            files_cfg=files_cfg,
             cumulength=cumulength,
             idx=idx,
             ids=ids,
-            f_hit=f_hit,
-            f_dsp=f_dsp,
             chns=chns,
             chns_rm=chns_rm,
             expr=fld,
@@ -668,10 +560,7 @@ def evaluate_to_vector(
             qry=None,
             nrows=nrows,
             missv=np.nan,
-            tcm_id_table_pattern=tcm_id_table_pattern,
-            evt_group=evt_group,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            chname_fmt=chname_fmt,
         ).view_as("np")
         if "ascend_by" == md:
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
@@ -684,6 +573,8 @@ def evaluate_to_vector(
             )
 
     return VectorOfVectors(
-        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), type(defv)),
-        dtype=type(defv),
+        ak.values_astype(
+            ak.drop_none(ak.nan_to_none(ak.Array(out))), type(default_value)
+        ),
+        dtype=type(default_value),
     )
