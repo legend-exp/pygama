@@ -166,7 +166,7 @@ def dplms_ge_dict(
             res = fom_fwhm_with_alpha_fit(
                 dsp_opt,
                 peak_dict,
-                "QDrift",
+                "dt_eff",
                 idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
             )
         except Exception:

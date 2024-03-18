@@ -21,11 +21,12 @@ sto = lh5.LH5Store()
 
 
 class ExtractTau:
-    def __init__(self, dsp_config, wf_field):
+    def __init__(self, dsp_config, wf_field, debug_mode):
         self.dsp_config = dsp_config
         self.wf_field = wf_field
         self.output_dict = {}
         self.results_dict = {}
+        self.debug_mode = debug_mode
 
     def get_decay_constant(
         self, slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
@@ -64,8 +65,9 @@ class ExtractTau:
             if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
                 raise ValueError
             high_bin = pars[0]
-        except Exception:
-            pass
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
         tau = round(-1 / (high_bin), 1)
 
         sampling_rate = wfs["dt"].nda[0]
@@ -113,14 +115,18 @@ class ExtractTau:
                     db_dict[opt_name].update(
                         {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
                     )
-                except Exception:
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
                     db_dict[opt_name] = {
                         key: f"{param_list[i][min_point[i]][0]}*{unit}"
                     }
             else:
                 try:
                     db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
-                except Exception:
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
                     db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
         return db_dict
 
