@@ -91,7 +91,11 @@ def get_hist(data: np.ndarray, bins: Optional[Union[int, np.ndarray, str]] = Non
     if wts is not None and np.shape(wts) == (): wts = np.full_like(data, wts)
 
     # initialize the boost_histogram object 
-    boost_histogram = bh.Histogram(bh.axis.Regular(bins=bins, start=range[0], stop=range[1]), storage=bh.storage.Weight())
+    if isinstance(bins, int):
+        boost_histogram = bh.Histogram(bh.axis.Regular(bins=bins, start=range[0], stop=range[1]), storage=bh.storage.Weight())
+    else:
+        # if bins are specified need to use variable
+        boost_histogram = bh.Histogram(bh.axis.Variable(bins), storage=bh.storage.Weight())
     # create the histogram
     boost_histogram.fill(data, weight=wts)
     # read out the histogram, bins, and variances
