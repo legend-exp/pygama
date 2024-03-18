@@ -20,12 +20,15 @@ TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
 
 
 def make_files_config(data):
-    return TierData(
-        *[
-            H5DataLoc(*data[tier]) if tier in data else H5DataLoc()
-            for tier in TierData._fields
-        ]
-    )
+    if not isinstance(data, TierData):
+        return TierData(
+            *[
+                H5DataLoc(*data[tier]) if tier in data else H5DataLoc()
+                for tier in TierData._fields
+            ]
+        )
+
+    return data
 
 
 def get_tcm_id_by_pattern(chname_fmt: str, ch: str) -> int:
@@ -119,8 +122,7 @@ def find_parameters(
 def get_data_at_channel(
     files_cfg,
     ch: str,
-    ids: NDArray,
-    idx: NDArray,
+    tcm: TCMData,
     expr: str,
     exprl: list,
     var_ph: dict,
@@ -158,7 +160,7 @@ def get_data_at_channel(
     f = make_files_config(files_cfg)
 
     # get index list for this channel to be loaded
-    idx_ch = idx[ids == get_tcm_id_by_pattern(chname_fmt, ch)]
+    idx_ch = tcm.idx[tcm.id == get_tcm_id_by_pattern(chname_fmt, ch)]
     outsize = len(idx_ch)
 
     if not is_evaluated:
@@ -166,7 +168,7 @@ def get_data_at_channel(
     elif "tcm.array_id" == expr:
         res = np.full(outsize, get_tcm_id_by_pattern(chname_fmt, ch), dtype=int)
     elif "tcm.index" == expr:
-        res = np.where(ids == get_tcm_id_by_pattern(chname_fmt, ch))[0]
+        res = np.where(tcm.id == get_tcm_id_by_pattern(chname_fmt, ch))[0]
     else:
         var = find_parameters(
             files_cfg=files_cfg,

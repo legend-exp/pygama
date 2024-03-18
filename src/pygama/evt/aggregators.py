@@ -14,10 +14,8 @@ from . import utils
 
 
 def evaluate_to_first_or_last(
-    files_cfg,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
     expr: str,
@@ -75,10 +73,10 @@ def evaluate_to_first_or_last(
 
     for ch in channels:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            tcm.cumulative_length,
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
 
@@ -86,8 +84,7 @@ def evaluate_to_first_or_last(
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
             ch=ch,
-            ids=ids,
-            idx=idx,
+            tcm=tcm,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
@@ -138,11 +135,9 @@ def evaluate_to_first_or_last(
 
 
 def evaluate_to_scalar(
-    files_cfg,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     mode: str,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
     channels: list,
     channels_rm: list,
     expr: str,
@@ -191,18 +186,17 @@ def evaluate_to_scalar(
 
     for ch in channels:
         # get index list for this channel to be loaded
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            tcm.cumulative_length,
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
 
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
             ch=ch,
-            ids=ids,
-            idx=idx,
+            tcm=tcm,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
@@ -238,10 +232,8 @@ def evaluate_to_scalar(
 
 
 def evaluate_at_channel(
-    files_cfg,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     channels_rm: list,
     expr: str,
     exprl: list,
@@ -284,13 +276,14 @@ def evaluate_at_channel(
         # skip default value
         if utils.get_table_name_by_pattern(chname_fmt, ch) not in lh5.ls(f.hit.file):
             continue
-        idx_ch = idx[ids == ch]
-        evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
+        idx_ch = tcm.idx[tcm.id == ch]
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
+        )
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
             ch=utils.get_table_name_by_pattern(chname_fmt, ch),
-            ids=ids,
-            idx=idx,
+            tcm=tcm,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
@@ -306,10 +299,8 @@ def evaluate_at_channel(
 
 
 def evaluate_at_channel_vov(
-    files_cfg,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     expr: str,
     exprl: list,
     ch_comp: VectorOfVectors,
@@ -354,12 +345,13 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in channels:
-        evt_ids_ch = np.searchsorted(cumulength, np.where(ids == ch)[0], "right")
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
+        )
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
             ch=utils.get_table_name_by_pattern(chname_fmt, ch),
-            ids=ids,
-            idx=idx,
+            tcm=tcm,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
@@ -385,10 +377,8 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
-    files_cfg,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
     expr: str,
@@ -442,17 +432,16 @@ def evaluate_to_aoesa(
 
     i = 0
     for ch in channels:
-        idx_ch = idx[ids == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
         evt_ids_ch = np.searchsorted(
-            cumulength,
-            np.where(ids == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            tcm.cumulative_length,
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
             "right",
         )
         res = utils.get_data_at_channel(
             files_cfg=files_cfg,
             ch=ch,
-            ids=ids,
-            idx=idx,
+            tcm=tcm,
             expr=expr,
             exprl=exprl,
             var_ph=var_ph,
@@ -478,10 +467,8 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
-    files_cfg,
-    cumulength: NDArray,
-    idx: NDArray,
-    ids: NDArray,
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
     expr: str,
@@ -532,9 +519,7 @@ def evaluate_to_vector(
     """
     out = evaluate_to_aoesa(
         files_cfg=files_cfg,
-        cumulength=cumulength,
-        idx=idx,
-        ids=ids,
+        tcm=tcm,
         channels=channels,
         channels_rm=channels_rm,
         expr=expr,
@@ -552,9 +537,7 @@ def evaluate_to_vector(
         md, fld = sorter.split(":")
         s_val = evaluate_to_aoesa(
             files_cfg=files_cfg,
-            cumulength=cumulength,
-            idx=idx,
-            ids=ids,
+            tcm=tcm,
             channels=channels,
             channels_rm=channels_rm,
             expr=fld,

@@ -412,12 +412,13 @@ def evaluate_expression(
                 query_mask = eval(query.replace(f"{f.evt.group}.", ""), table)
 
         # load TCM data to define an event
-        store = LH5Store()
-        ids = store.read(f"/{f.tcm.group}/array_id", f.tcm.file)[0].view_as("np")
-        idx = store.read(f"/{f.tcm.group}/array_idx", f.tcm.file)[0].view_as("np")
-        cumulength = store.read(f"/{f.tcm.group}/cumulative_length", f.tcm.file)[
-            0
-        ].view_as("np")
+        tcm = utils.TCMData(
+            id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
+            idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
+            cumulative_length=lh5.read_as(
+                f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
+            ),
+        )
 
         # switch through modes
         if table and (
@@ -428,12 +429,12 @@ def evaluate_expression(
             else:
                 ch_comp = table[mode[12:].replace(f"{f.evt.group}.", "")]
                 if isinstance(ch_comp, Array):
-                    ch_comp = Array(nda=ids[ch_comp.view_as("np")])
+                    ch_comp = Array(nda=tcm.id[ch_comp.view_as("np")])
                 elif isinstance(ch_comp, VectorOfVectors):
                     ch_comp = ch_comp.view_as("ak")
                     ch_comp = VectorOfVectors(
                         array=ak.unflatten(
-                            ids[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
+                            tcm.id[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
                         )
                     )
                 else:
@@ -445,9 +446,7 @@ def evaluate_expression(
             if isinstance(ch_comp, Array):
                 return aggregators.evaluate_at_channel(
                     files_cfg=files_cfg,
-                    cumulength=cumulength,
-                    idx=idx,
-                    ids=ids,
+                    tcm=tcm,
                     channels_rm=channels_rm,
                     expr=expr,
                     exprl=exprl,
@@ -460,9 +459,7 @@ def evaluate_expression(
             if isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
                     files_cfg=files_cfg,
-                    cumulength=cumulength,
-                    idx=idx,
-                    ids=ids,
+                    tcm=tcm,
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
@@ -486,9 +483,7 @@ def evaluate_expression(
             )
             return aggregators.evaluate_to_first_or_last(
                 files_cfg=files_cfg,
-                cumulength=cumulength,
-                idx=idx,
-                ids=ids,
+                tcm=tcm,
                 channels=channels,
                 channels_rm=channels_rm,
                 expr=expr,
@@ -505,10 +500,8 @@ def evaluate_expression(
         if mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
                 files_cfg=files_cfg,
+                tcm=tcm,
                 mode=mode,
-                cumulength=cumulength,
-                idx=idx,
-                ids=ids,
                 channels=channels,
                 channels_rm=channels_rm,
                 expr=expr,
@@ -522,9 +515,7 @@ def evaluate_expression(
         if "gather" == mode:
             return aggregators.evaluate_to_vector(
                 files_cfg=files_cfg,
-                cumulength=cumulength,
-                idx=idx,
-                ids=ids,
+                tcm=tcm,
                 channels=channels,
                 channels_rm=channels_rm,
                 expr=expr,
@@ -537,4 +528,4 @@ def evaluate_expression(
                 chname_fmt=chname_fmt,
             )
 
-        raise ValueError(mode + " not a valid mode")
+        raise ValueError(f"'{mode}' is not a valid mode")
