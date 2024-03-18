@@ -14,8 +14,8 @@ from matplotlib.colors import LogNorm
 from scipy.stats import linregress
 
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
 import pygama.pargen.AoE_cal as AoE
+from pygama.math.distributions import gaussian
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ def binned_lq_fit(
     lq_param: str,
     cal_energy_param: str,
     peak: float,
-    cdf=pgf.gauss_cdf,
+    cdf=gaussian,
     sidebands: bool = True,
 ):
     """Function for fitting a distribution of LQ values within a specified
@@ -147,7 +147,7 @@ def binned_lq_fit(
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
 
-    c1 = cost.BinnedNLL(hist, bins, pgf.gauss_cdf, verbose=0)
+    c1 = cost.BinnedNLL(hist, bins, gaussian.cdf, verbose=0)
     m1 = Minuit(c1, mu, sigma)
     m1.simplex().migrad()
     m1.hesse()
@@ -217,9 +217,8 @@ class LQCal:
         cal_dicts: dict,
         cal_energy_param: str,
         eres_func: callable,
-        cdf: callable = pgf.gauss_cdf,
+        cdf: callable = gaussian,
         selection_string: str = "is_valid_cal&is_not_pulser",
-        plot_options: dict = None,
     ):
         """
         Parameters
@@ -245,7 +244,6 @@ class LQCal:
         self.eres_func = eres_func
         self.cdf = cdf
         self.selection_string = selection_string
-        self.plot_options = plot_options if plot_options is not None else {}
 
     def update_cal_dicts(self, update_dict):
         if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
@@ -485,27 +483,6 @@ class LQCal:
             }
         )
 
-    def get_results_dict(self):
-        return {
-            "cal_energy_param": self.cal_energy_param,
-            "rt_correction": self.dt_fit_pars,
-            "cdf": self.cdf.__name__,
-            "1590-1596keV": self.timecorr_df.to_dict("index"),
-            "cut_value": self.cut_val,
-            "sfs": self.low_side_sf.to_dict("index"),
-        }
-
-    def fill_plot_dict(self, data, plot_dict=None):
-        if plot_dict is not None:
-            for key, item in self.plot_options.items():
-                if item["options"] is not None:
-                    plot_dict[key] = item["function"](self, data, **item["options"])
-                else:
-                    plot_dict[key] = item["function"](self, data)
-        else:
-            plot_dict = {}
-        return plot_dict
-
     def calibrate(self, df, initial_lq_param):
         """Run the LQ calibration and calculate the cut value"""
 
@@ -707,7 +684,7 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
         dx = np.diff(bins)
         ax1.plot(
             xs,
-            pgf.gauss_pdf(xs, fit_pars[0], fit_pars[1], ls) * dx,
+            gaussian.pdf_norm(xs, fit_pars[0], fit_pars[1]) * dx * ls,
             label="Gaussian Fit",
         )
 
@@ -717,8 +694,8 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
 
         bin_centers = (bins[:-1] + bins[1:]) / 2
         reses = (
-            hist - (pgf.gauss_pdf(bin_centers, fit_pars[0], fit_pars[1], ls) * dx)
-        ) / (pgf.gauss_pdf(bin_centers, fit_pars[0], fit_pars[1], ls) * dx)
+            hist - (gaussian.pdf_norm(bin_centers, fit_pars[0], fit_pars[1]) * dx * ls)
+        ) / (gaussian.pdf_norm(bin_centers, fit_pars[0], fit_pars[1]) * dx * ls)
         ax2.plot(bin_centers, reses, marker="s", linestyle="")
         ax2.set_xlabel("LQ")
         ax2.set_ylabel("residuals")
