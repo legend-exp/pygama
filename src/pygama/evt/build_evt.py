@@ -8,6 +8,7 @@ import itertools
 import json
 import logging
 import re
+from collections.abc import Mapping, Sequence
 from importlib import import_module
 
 import awkward as ak
@@ -21,16 +22,9 @@ log = logging.getLogger(__name__)
 
 
 def build_evt(
-    f_tcm: str,
-    f_dsp: str,
-    f_hit: str,
-    evt_config: str | dict,
-    f_evt: str | None = None,
+    files: Mapping[str, Sequence[str, str]],
+    config: str | dict,
     wo_mode: str = "write_safe",
-    evt_group: str = "evt",
-    tcm_group: str = "hardware_tcm_1",
-    dsp_group: str = "dsp",
-    hit_group: str = "hit",
     tcm_id_table_pattern: str = "ch{}",
 ) -> None | Table:
     """Transform data from the `hit` and `dsp` levels which a channel sorted to a
@@ -38,13 +32,19 @@ def build_evt(
 
     Parameters
     ----------
-    f_tcm
-        input LH5 file of the `tcm` level.
-    f_dsp
-        input LH5 file of the `dsp` level.
-    f_hit
-        input LH5 file of the `hit` level.
-    evt_config
+    files
+        input and output LH5 files with HDF5 groups where tables are found. Example:
+
+        .. code-block:: json
+
+            {
+              "tcm": ("data-tier_tcm.lh5", "hardware_tcm_1"),
+              "dsp": ("data-tier_dsp.lh5", "dsp"),
+              "hit": ("data-tier_hit.lh5", "hit"),
+              "evt": ("data-tier_evt.lh5", "evt"),
+            }
+
+    config
         name of configuration file or dictionary defining event fields. Channel
         lists can be defined by importing a metadata module.
 
@@ -106,47 +106,32 @@ def build_evt(
               }
             }
 
-    f_evt
-        name of the output file. If ``None``, return the output :class:`.Table`
-        instead of writing to disk.
     wo_mode
         writing mode.
-    evt group
-        LH5 root group name of `evt` tier.
-    tcm_group
-        LH5 root group in `tcm` file.
-    dsp_group
-        LH5 root group in `dsp` file.
-    hit_group
-        LH5 root group in `hit` file.
     tcm_id_table_pattern
         pattern to format `tcm` id values to table name in higher tiers. Must
         have one placeholder which is the `tcm` id.
     """
+    if not isinstance(config, dict):
+        with open(config) as f:
+            config = json.load(f)
 
-    store = LH5Store()
-    tbl_cfg = evt_config
-    if not isinstance(tbl_cfg, (str, dict)):
-        raise TypeError()
-    if isinstance(tbl_cfg, str):
-        with open(tbl_cfg) as f:
-            tbl_cfg = json.load(f)
-
-    if "channels" not in tbl_cfg.keys():
+    if "channels" not in config.keys():
         raise ValueError("channel field needs to be specified in the config")
-    if "operations" not in tbl_cfg.keys():
+    if "operations" not in config.keys():
         raise ValueError("operations field needs to be specified in the config")
 
     # check tcm_id_table_pattern validity
     pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)
     if len(pattern_check) != 1:
-        raise ValueError(
-            f"tcm_id_table_pattern must have exactly one placeholder. {tcm_id_table_pattern} is invalid."
-        )
+        raise ValueError("tcm_id_table_pattern must have exactly one placeholder {}")
     elif "{" in pattern_check[0] or "}" in pattern_check[0]:
-        raise ValueError(
-            f"tcm_id_table_pattern {tcm_id_table_pattern} has an invalid placeholder."
-        )
+        raise ValueError(f"{tcm_id_table_pattern=} has an invalid placeholder.")
+
+    f_tcm = files["tcm"][0]
+    f_hit = files["hit"][0]
+    f_dsp = files["dsp"][0]
+    f_evt = files["evt"][0]
 
     if (
         utils.get_table_name_by_pattern(
@@ -162,11 +147,11 @@ def build_evt(
     # create channel list according to config
     # This can be either read from the meta data
     # or a list of channel names
-    log.debug("Creating channel dictionary")
+    log.debug("creating channel dictionary")
 
     chns = {}
 
-    for k, v in tbl_cfg["channels"].items():
+    for k, v in config["channels"].items():
         if isinstance(v, dict):
             # it is a meta module. module_name must exist
             if "module" not in v.keys():
@@ -195,27 +180,33 @@ def build_evt(
         elif isinstance(v, list):
             chns[k] = [e for e in v]
 
-    nrows = store.read_n_rows(f"/{tcm_group}/cumulative_length", f_tcm)
-
+    # get number of events in file (ask the TCM)
+    store = LH5Store()
+    nrows = store.read_n_rows(f"/{files['tcm'][1]}/cumulative_length", f_tcm)
     table = Table(size=nrows)
 
-    for k, v in tbl_cfg["operations"].items():
-        log.debug("Processing field " + k)
+    # now loop over operations (columns in evt table)
+    for k, v in config["operations"].items():
+        log.debug("processing field: " + k)
 
-        # if mode not defined in operation, it can only be an operation on the evt level.
+        # if mode not defined in operation, it can only be an operation on the
+        # evt level
         if "aggregation_mode" not in v.keys():
             var = {}
             if "parameters" in v.keys():
                 var = var | v["parameters"]
-            res = table.eval(v["expression"].replace(f"{evt_group}.", ""), var)
 
-            # add attribute if present
+            # compute and eventually get rid of evt. suffix
+            res = table.eval(v["expression"].replace(f"{files['evt'][1]}.", ""), var)
+
+            # add attributes if present
             if "lgdo_attrs" in v.keys():
                 res.attrs |= v["lgdo_attrs"]
 
+            # add output column to the table
             table.add_field(k, res)
 
-        # Else we build the event entry
+        # else we build the event entry
         else:
             if "channels" not in v.keys():
                 chns_e = []
@@ -247,6 +238,7 @@ def build_evt(
                     defaultv in ["np.nan", "np.inf", "-np.inf"]
                 ):
                     defaultv = eval(defaultv)
+
             if "sort" in v.keys():
                 srter = v["sort"]
 
@@ -265,10 +257,10 @@ def build_evt(
                 defv=defaultv,
                 sorter=srter,
                 tcm_id_table_pattern=tcm_id_table_pattern,
-                evt_group=evt_group,
-                hit_group=hit_group,
-                dsp_group=dsp_group,
-                tcm_group=tcm_group,
+                evt_group=files["evt"][1],
+                hit_group=files["hit"][1],
+                dsp_group=files["dsp"][1],
+                tcm_group=files["tcm"][1],
             )
 
             # add attribute if present
@@ -277,19 +269,22 @@ def build_evt(
 
             table.add_field(k, obj)
 
-    # write output fields into f_evt
-    if "outputs" in tbl_cfg.keys():
-        if len(tbl_cfg["outputs"]) < 1:
+    # write output fields into outfile
+    if "outputs" in config.keys():
+        if len(config["outputs"]) < 1:
             log.warning("No output fields specified, no file will be written.")
             return table
         else:
-            clms_to_remove = [e for e in table.keys() if e not in tbl_cfg["outputs"]]
+            clms_to_remove = [e for e in table.keys() if e not in config["outputs"]]
             for fld in clms_to_remove:
                 table.remove_field(fld, True)
 
             if f_evt:
                 store.write(
-                    obj=table, name=f"/{evt_group}/", lh5_file=f_evt, wo_mode=wo_mode
+                    obj=table,
+                    name=f"/{files['evt'][1]}/",
+                    lh5_file=f_evt,
+                    wo_mode=wo_mode,
                 )
             else:
                 return table
@@ -298,8 +293,8 @@ def build_evt(
 
     key = re.search(r"\d{8}T\d{6}Z", f_hit).group(0)
     log.info(
-        f"Applied {len(tbl_cfg['operations'])} operations to key {key} and saved "
-        f"{len(tbl_cfg['outputs'])} evt fields across {len(chns)} channel groups"
+        f"Applied {len(config['operations'])} operations to key {key} and saved "
+        f"{len(config['outputs'])} evt fields across {len(chns)} channel groups"
     )
 
 
@@ -335,11 +330,10 @@ def evaluate_expression(
     f_dsp
        path to `dsp` tier file.
     chns
-       list of channel names across which expression gets evaluated (form:
-       ``ch<rawid>``).
+       list of channel names across which expression gets evaluated
     chns_rm
        list of channels which get set to default value during evaluation. In
-       function mode they are removed entirely (form: ``ch<rawid>``)
+       function mode they are removed entirely
     mode
        The mode determines how the event entry is calculated across channels.
        Options are:
@@ -390,7 +384,6 @@ def evaluate_expression(
     hit_group
         LH5 root group in `hit` file.
     """
-
     store = LH5Store()
 
     # find parameters in evt file or in parameters
@@ -454,8 +447,10 @@ def evaluate_expression(
         )
 
         # switch through modes
-        if table and (("keep_at_ch:" == mode[:11]) or ("keep_at_idx:" == mode[:12])):
-            if "keep_at_ch:" == mode[:11]:
+        if table and (
+            mode.startswith("keep_at_ch:") or mode.startswith("keep_at_idx:")
+        ):
+            if mode.startswith("keep_at_ch:"):
                 ch_comp = table[mode[11:].replace(f"{evt_group}.", "")]
             else:
                 ch_comp = table[mode[12:].replace(f"{evt_group}.", "")]
@@ -492,7 +487,8 @@ def evaluate_expression(
                     hit_group=hit_group,
                     dsp_group=dsp_group,
                 )
-            elif isinstance(ch_comp, VectorOfVectors):
+
+            if isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
                     cumulength=cumulength,
                     idx=idx,
@@ -510,12 +506,13 @@ def evaluate_expression(
                     hit_group=hit_group,
                     dsp_group=dsp_group,
                 )
-            else:
-                raise NotImplementedError(
-                    type(ch_comp)
-                    + " not supported (only Array and VectorOfVectors are supported)"
-                )
-        elif "first_at:" in mode or "last_at:" in mode:
+
+            raise NotImplementedError(
+                type(ch_comp)
+                + " not supported (only Array and VectorOfVectors are supported)"
+            )
+
+        if "first_at:" in mode or "last_at:" in mode:
             sorter = tuple(
                 re.findall(
                     rf"({evt_group}|{hit_group}|{dsp_group}).([a-zA-Z_$][\w$]*)",
@@ -543,7 +540,8 @@ def evaluate_expression(
                 hit_group=hit_group,
                 dsp_group=dsp_group,
             )
-        elif mode in ["sum", "any", "all"]:
+
+        if mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
                 mode=mode,
                 cumulength=cumulength,
@@ -564,7 +562,7 @@ def evaluate_expression(
                 hit_group=hit_group,
                 dsp_group=dsp_group,
             )
-        elif "gather" == mode:
+        if "gather" == mode:
             return aggregators.evaluate_to_vector(
                 cumulength=cumulength,
                 idx=idx,
@@ -585,5 +583,5 @@ def evaluate_expression(
                 hit_group=hit_group,
                 dsp_group=dsp_group,
             )
-        else:
-            raise ValueError(mode + " not a valid mode")
+
+        raise ValueError(mode + " not a valid mode")

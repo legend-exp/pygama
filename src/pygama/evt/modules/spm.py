@@ -58,9 +58,11 @@ def get_spm_mask(
 ) -> ak.Array:
     if trgr.ndim != 1:
         raise ValueError("trigger array muse be 1 dimensional!")
+
     if (len(trgr) != len(pe)) or (len(trgr) != len(times)):
         raise ValueError(
-            f"All arrays must have same dimension across first axis len(pe)={len(pe)}, len(times)={len(times)}, len(trgr)={len(trgr)}"
+            f"All arrays must have same dimension across first axis "
+            f"len(pe)={len(pe)}, len(times)={len(times)}, len(trgr)={len(trgr)}"
         )
 
     tmi = trgr - tmin
@@ -86,11 +88,11 @@ def get_masked_tcm_idx(
     tcm_group,
     tcm_id_table_pattern,
     chs,
-    lim,
-    trgr,
-    tdefault,
-    tmin,
-    tmax,
+    lim,  # pe threshold
+    trgr,  # (ge) trigger position
+    tdefault,  # default ge trigger position
+    tmin,  # lower limit -> -1 us
+    tmax,  # upper limit -> 5 us
     mode=0,
 ) -> VectorOfVectors:
     # load TCM data to define an event
