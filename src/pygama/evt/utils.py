@@ -8,7 +8,7 @@ from collections import namedtuple
 
 import awkward as ak
 import numpy as np
-from lgdo.lh5 import LH5Store
+from lgdo import lh5
 from numpy.typing import NDArray
 
 H5DataLoc = namedtuple("H5DataLoc", ("file", "group"), defaults=2 * (None,))
@@ -91,27 +91,30 @@ def find_parameters(
     dsp_flds = [e[1] for e in exprl if e[0] == f.dsp.group]
     hit_flds = [e[1] for e in exprl if e[0] == f.hit.group]
 
-    store = LH5Store()
     hit_dict, dsp_dict = {}, {}
 
     if len(hit_flds) > 0:
-        hit_ak = store.read(
+        hit_ak = lh5.read_as(
             f"{ch.replace('/','')}/{f.hit.group}/",
             f.hit.file,
             field_mask=hit_flds,
             idx=idx_ch,
-        )[0].view_as("ak")
+            library="ak",
+        )
+
         hit_dict = dict(
             zip([f"{f.hit.group}_" + e for e in ak.fields(hit_ak)], ak.unzip(hit_ak))
         )
 
     if len(dsp_flds) > 0:
-        dsp_ak = store.read(
+        dsp_ak = lh5.read_as(
             f"{ch.replace('/','')}/{f.dsp.group}/",
             f.dsp.file,
             field_mask=dsp_flds,
             idx=idx_ch,
-        )[0].view_as("ak")
+            library="ak",
+        )
+
         dsp_dict = dict(
             zip([f"{f.dsp.group}_" + e for e in ak.fields(dsp_ak)], ak.unzip(dsp_ak))
         )
@@ -138,10 +141,8 @@ def get_data_at_channel(
         input and output LH5 files_cfg with HDF5 groups where tables are found.
     ch
        "rawid" of channel to be evaluated.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     expr
        expression to be evaluated.
     exprl
@@ -201,7 +202,9 @@ def get_data_at_channel(
         # in this method only 1D values are allowed
         if res.ndim > 1:
             raise ValueError(
-                f"expression '{expr}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
+                f"expression '{expr}' must return 1D array. If you are using "
+                "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
+                "reduction functions to reduce the dimension"
             )
 
     return res
@@ -254,7 +257,9 @@ def get_mask_from_query(
         limarr = ak.to_numpy(limarr, allow_missing=False)
         if limarr.ndim > 1:
             raise ValueError(
-                f"query '{query}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
+                f"query '{query}' must return 1D array. If you are using "
+                "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
+                "reduction functions to reduce the dimension"
             )
 
     # or forward the array

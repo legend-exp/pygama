@@ -363,8 +363,8 @@ def evaluate_expression(
         rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
     )
     var_ph = {}
-    if table:
-        var_ph = var_ph | {
+    if table is not None:
+        var_ph |= {
             e: table[e].view_as("ak")
             for e in table.keys()
             if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))

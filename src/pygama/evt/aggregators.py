@@ -35,10 +35,8 @@ def evaluate_to_first_or_last(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
     channels_rm
@@ -154,12 +152,10 @@ def evaluate_to_scalar(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     mode
        aggregation mode.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
     channels
        list of channels to be aggregated.
     channels_rm
@@ -248,10 +244,8 @@ def evaluate_at_channel(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     channels_rm
        list of channels to be skipped from evaluation and set to default value.
     expr
@@ -316,10 +310,8 @@ def evaluate_at_channel_vov(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     expr
        expression string to be evaluated.
     exprl
@@ -397,10 +389,8 @@ def evaluate_to_aoesa(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
     channels_rm
@@ -487,10 +477,8 @@ def evaluate_to_vector(
     ----------
     files_cfg
         input and output LH5 files_cfg with HDF5 groups where tables are found.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
     channels_rm
