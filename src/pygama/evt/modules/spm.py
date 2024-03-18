@@ -32,7 +32,7 @@ def cast_trigger(
     if isinstance(trgr, Array):
         return ak.fill_none(ak.nan_to_none(trgr.view_as("ak")), tdefault)
 
-    elif isinstance(trgr, (VectorOfVectors)):
+    elif isinstance(trgr, VectorOfVectors):
         return ak.fill_none(
             ak.min(ak.fill_none(trgr.view_as("ak"), tdefault), axis=-1), tdefault
         )
@@ -155,7 +155,7 @@ def get_masked_tcm_idx(
 
         arr_lst.append(out_idx)
 
-    return VectorOfVectors(array=ak.concatenate(arr_lst, axis=-1))
+    return VectorOfVectors(ak.concatenate(arr_lst, axis=-1))
 
 
 def get_spm_ene_or_maj(

@@ -433,7 +433,7 @@ def evaluate_expression(
                 elif isinstance(ch_comp, VectorOfVectors):
                     ch_comp = ch_comp.view_as("ak")
                     ch_comp = VectorOfVectors(
-                        array=ak.unflatten(
+                        ak.unflatten(
                             tcm.id[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
                         )
                     )
