@@ -17,703 +17,188 @@ from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
 
+import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
 import pygama.pargen.energy_cal as pgc
-from pygama.math.peak_fitting import nb_erfc
-from pygama.pargen.utils import return_nans
+from pygama.math.distributions import (
+    exgauss,
+    gauss_on_exgauss,
+    gauss_on_step,
+    gaussian,
+    hpge_peak,
+    nb_erfc,
+)
+from pygama.math.functions.hpge_peak import hpge_get_fwfm, hpge_get_fwhm, hpge_get_mode
+from pygama.math.functions.sum_dists import sum_dists
+from pygama.pargen.utils import convert_to_minuit, return_nans
 
 log = logging.getLogger(__name__)
 
-
-class PDF:
-
-    """
-    Base class for A/E pdfs.
-    """
-
-    @staticmethod
-    def pdf(x):
-        return
-
-    @staticmethod
-    def _replace_values(dic, **kwargs):
-        for item, value in kwargs.items():
-            dic[item] = value
-        return dic
+(x_lo, x_hi, n_sig, mu, sigma, n_bkg, tau) = range(7)
+par_array = [(gaussian, [mu, sigma]), (exgauss, [mu, sigma, tau])]
+aoe_peak = sum_dists(
+    par_array,
+    [n_sig, n_bkg],
+    "areas",
+    parameter_names=["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "tau"],
+)
 
 
-class StandardAoE(PDF):
-    @staticmethod
-    def pdf(
-        x: np.array,
-        n_sig: float,
-        mu: float,
-        sigma: float,
-        n_bkg: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-        components: bool = False,
-    ) -> np.array:
-        """
-        PDF for A/E consists of a Gaussian signal with Gaussian tail background
-        """
-        try:
-            sig = n_sig * pgf.gauss_norm(x, mu, sigma)
-            bkg = n_bkg * pgf.gauss_tail_norm(
-                x, mu, sigma, tau_bkg, lower_range, upper_range
-            )
-        except Exception:
-            sig = np.full_like(x, np.nan)
-            bkg = np.full_like(x, np.nan)
+(x_lo, x_hi, n_sig, mu, sigma, frac1, tau, n_bkg, tau_bkg) = range(9)
+par_array = [
+    (gauss_on_exgauss, [mu, sigma, frac1, tau]),
+    (exgauss, [mu, sigma, tau_bkg]),
+]
+aoe_peak_with_high_tail = sum_dists(
+    par_array,
+    [n_sig, n_bkg],
+    "areas",
+    parameter_names=[
+        "x_lo",
+        "x_hi",
+        "n_sig",
+        "mu",
+        "sigma",
+        "htail",
+        "tau",
+        "n_bkg",
+        "tau_bkg",
+    ],
+)
+aoe_peak_with_high_tail.get_fwfm = hpge_get_fwfm.__get__(aoe_peak_with_high_tail)
+aoe_peak_with_high_tail.get_mode = hpge_get_mode.__get__(aoe_peak_with_high_tail)
+aoe_peak_with_high_tail.get_fwhm = hpge_get_fwhm.__get__(aoe_peak_with_high_tail)
 
-        if components is False:
-            return sig + bkg
-        else:
-            return sig, bkg
 
-    @staticmethod
-    def extended_pdf(
-        x: np.array,
-        n_sig: float,
-        mu: float,
-        sigma: float,
-        n_bkg: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-        components: bool = False,
-    ) -> tuple(float, np.array):
-        """
-        Extended PDF for A/E consists of a Gaussian signal with Gaussian tail background
-        """
-        if components is True:
-            sig, bkg = StandardAoE.pdf(
-                x,
-                n_sig,
-                mu,
-                sigma,
-                n_bkg,
-                tau_bkg,
-                lower_range,
-                upper_range,
-                components,
-            )
-            return n_sig + n_bkg, sig, bkg
-        else:
-            return n_sig + n_bkg, StandardAoE.pdf(
-                x,
-                n_sig,
-                mu,
-                sigma,
-                n_bkg,
-                tau_bkg,
-                lower_range,
-                upper_range,
-                components,
-            )
+def aoe_peak_guess(func, hist, bins, var, **kwargs):
+    bin_centers = (bins[:-1] + bins[1:]) / 2
 
-    @staticmethod
-    def guess(hist, bins, var, **kwargs):
-        bin_centers = (bins[:-1] + bins[1:]) / 2
+    mu = bin_centers[np.argmax(hist)]
+    try:
+        _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+    except Exception:
+        pars, cov = pgf.gauss_mode_width_max(hist, bins, var, mode_guess=mu, n_bins=20)
+        _, sigma, _ = pars
+    ls_guess = 2 * np.sum(hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))])
 
-        mu = bin_centers[np.argmax(hist)]
-        try:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
-        except Exception:
-            pars, cov = pgf.gauss_mode_width_max(
-                hist, bins, var, mode_guess=mu, n_bins=20
-            )
-            _, sigma, _ = pars
-        ls_guess = 2 * np.sum(
-            hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))]
-        )
-
+    if func == aoe_peak:
         guess_dict = {
+            "x_lo": bins[0],
+            "x_hi": bins[-1],
             "n_sig": ls_guess,
             "mu": mu,
             "sigma": sigma,
             "n_bkg": np.sum(hist) - ls_guess,
-            "tau_bkg": 0.1,
-            "lower_range": np.nanmin(bins),
-            "upper_range": np.nanmax(bins),
-            "components": 0,
+            "tau": 0.1,
         }
         for key, guess in guess_dict.items():
             if np.isnan(guess):
                 guess_dict[key] = 0
 
-        return StandardAoE._replace_values(guess_dict, **kwargs)
-
-    @staticmethod
-    def bounds(guess, **kwargs):
-        bounds_dict = {
-            "n_sig": (0, None),
-            "mu": (None, None),
-            "sigma": (0, None),
-            "n_bkg": (0, None),
-            "tau_bkg": (0, None),
-            "lower_range": (None, None),
-            "upper_range": (None, None),
-            "components": (None, None),
-        }
-
-        return [
-            bound
-            for field, bound in StandardAoE._replace_values(
-                bounds_dict, **kwargs
-            ).items()
-        ]
-
-    def fixed(**kwargs):
-        fixed_dict = {
-            "n_sig": False,
-            "mu": False,
-            "sigma": False,
-            "n_bkg": False,
-            "tau_bkg": False,
-            "lower_range": True,
-            "upper_range": True,
-            "components": True,
-        }
-
-        return [
-            fixed
-            for field, fixed in StandardAoE._replace_values(
-                fixed_dict, **kwargs
-            ).items()
-        ]
-
-    @staticmethod
-    def width(pars, errs, cov):
-        return pars["sigma"], errs["sigma"]
-
-    @staticmethod
-    def centroid(pars, errs, cov):
-        return pars["mu"], errs["mu"]
-
-
-class StandardAoEplusHighTail(PDF):
-    @staticmethod
-    def pdf(
-        x: np.array,
-        n_sig: float,
-        mu: float,
-        sigma: float,
-        htail: float,
-        tau_sig: float,
-        n_bkg: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-        components: bool = False,
-    ) -> np.array:
-        """
-        PDF for A/E consists of a Gaussian signal with tail with Gaussian tail background
-        """
-        try:
-            sig = n_sig * (
-                (1 - htail) * pgf.gauss_norm(x, mu, sigma)
-                + htail
-                * pgf.gauss_tail_norm(x, mu, sigma, tau_sig, lower_range, upper_range)
-            )
-            bkg = n_bkg * pgf.gauss_tail_norm(
-                x, mu, sigma, tau_bkg, lower_range, upper_range
-            )
-        except Exception:
-            sig = np.full_like(x, np.nan)
-            bkg = np.full_like(x, np.nan)
-
-        if components is False:
-            return sig + bkg
-        else:
-            return sig, bkg
-
-    @staticmethod
-    def extended_pdf(
-        x: np.array,
-        n_sig: float,
-        mu: float,
-        sigma: float,
-        htail: float,
-        tau_sig: float,
-        n_bkg: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-        components: bool = False,
-    ) -> tuple(float, np.array):
-        """
-        Extended PDF for A/E consists of a Gaussian signal with Gaussian tail background
-        """
-        if components is True:
-            sig, bkg = StandardAoEplusHighTail.pdf(
-                x,
-                n_sig,
-                mu,
-                sigma,
-                htail,
-                tau_sig,
-                n_bkg,
-                tau_bkg,
-                lower_range,
-                upper_range,
-                components,
-            )
-            return n_sig + n_bkg, sig, bkg
-        else:
-            return n_sig + n_bkg, StandardAoEplusHighTail.pdf(
-                x,
-                n_sig,
-                mu,
-                sigma,
-                htail,
-                tau_sig,
-                n_bkg,
-                tau_bkg,
-                lower_range,
-                upper_range,
-                components,
-            )
-
-    @staticmethod
-    def guess(hist, bins, var, **kwargs):
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-        mu = bin_centers[np.argmax(hist)]
-        try:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
-        except Exception:
-            pars, cov = pgf.gauss_mode_width_max(
-                hist, bins, var, mode_guess=mu, n_bins=20
-            )
-            _, sigma, _ = pars
-        ls_guess = 2 * np.sum(
-            hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))]
-        )
-
+    elif func == aoe_peak_with_high_tail:
         guess_dict = {
+            "x_lo": bins[0],
+            "x_hi": bins[-1],
             "n_sig": ls_guess,
             "mu": mu,
             "sigma": sigma,
             "htail": 0.1,
-            "tau_sig": -0.1,
+            "tau": -0.1,
             "n_bkg": np.sum(hist) - ls_guess,
             "tau_bkg": 0.1,
-            "lower_range": np.nanmin(bins),
-            "upper_range": np.nanmax(bins),
-            "components": 0,
         }
         for key, guess in guess_dict.items():
             if np.isnan(guess):
                 guess_dict[key] = 0
 
-        return StandardAoEplusHighTail._replace_values(guess_dict, **kwargs)
-
-    @staticmethod
-    def bounds(guess, **kwargs):
-        bounds_dict = {
-            "n_sig": (0, None),
-            "mu": (None, None),
-            "sigma": (0, None),
-            "htail": (0, 1),
-            "tau_sig": (None, 0),
-            "n_bkg": (0, None),
-            "tau_bkg": (0, None),
-            "lower_range": (None, None),
-            "upper_range": (None, None),
-            "components": (None, None),
-        }
-
-        return [
-            bound
-            for field, bound in StandardAoEplusHighTail._replace_values(
-                bounds_dict, **kwargs
-            ).items()
-        ]
-
-    @staticmethod
-    def fixed(**kwargs):
-        fixed_dict = {
-            "n_sig": False,
-            "mu": False,
-            "sigma": False,
-            "htail": False,
-            "tau_sig": False,
-            "n_bkg": False,
-            "tau_bkg": False,
-            "lower_range": True,
-            "upper_range": True,
-            "components": True,
-        }
-
-        return [
-            fixed
-            for field, fixed in StandardAoEplusHighTail._replace_values(
-                fixed_dict, **kwargs
-            ).items()
-        ]
-
-    @staticmethod
-    def width(pars, errs, cov):
-        fwhm, fwhm_err = pgf.radford_fwhm(
-            pars[2], pars[3], np.abs(pars[4]), cov=cov[:7, :7]
-        )
-        return fwhm / 2.355, fwhm_err / 2.355
-
-    @staticmethod
-    def centroid(pars, errs, cov):
-        return pars["mu"], errs["mu"]
-
-
-class StandardAoEbkg(PDF):
-    @staticmethod
-    def pdf(
-        x: np.array,
-        n_events: float,
-        mu: float,
-        sigma: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-    ) -> np.array:
-        """
-        PDF for A/E consists of a Gaussian signal with tail with Gaussian tail background
-        """
-        try:
-            sig = n_events * pgf.gauss_tail_norm(
-                x, mu, sigma, tau_bkg, lower_range, upper_range
-            )
-        except Exception:
-            sig = np.full_like(x, np.nan)
-
-        return sig
-
-    @staticmethod
-    def extended_pdf(
-        x: np.array,
-        n_events: float,
-        mu: float,
-        sigma: float,
-        tau_bkg: float,
-        lower_range: float = np.inf,
-        upper_range: float = np.inf,
-    ) -> tuple(float, np.array):
-        """
-        Extended PDF for A/E consists of a Gaussian signal with Gaussian tail background
-        """
-        return n_events, StandardAoEbkg.pdf(
-            x, n_events, mu, sigma, tau_bkg, lower_range, upper_range
-        )
-
-    @staticmethod
-    def guess(hist, bins, var, **kwargs):
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-
-        mu = bin_centers[np.argmax(hist)]
-        try:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
-        except Exception:
-            pars, cov = pgf.gauss_mode_width_max(
-                hist, bins, var, mode_guess=mu, n_bins=20
-            )
-            _, sigma, _ = pars
-        ls_guess = 2 * np.sum(
-            hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))]
-        )
-
+    elif func == exgauss:
         guess_dict = {
-            "n_events": np.sum(hist) - ls_guess,
+            "x_lo": bins[0],
+            "x_hi": bins[-1],
+            "area": np.sum(hist) - ls_guess,
             "mu": mu,
             "sigma": sigma,
-            "tau_bkg": 0.1,
-            "lower_range": np.nanmin(bins),
-            "upper_range": np.nanmax(bins),
+            "tau": 0.1,
         }
         for key, guess in guess_dict.items():
             if np.isnan(guess):
                 guess_dict[key] = 0
 
-        return StandardAoEbkg._replace_values(guess_dict, **kwargs)
-
-    @staticmethod
-    def bounds(guess, **kwargs):
-        bounds_dict = {
-            "n_events": (0, None),
-            "mu": (None, None),
-            "sigma": (0, None),
-            "tau_bkg": (0, None),
-            "lower_range": (None, None),
-            "upper_range": (None, None),
-        }
-
-        return [
-            bound
-            for field, bound in StandardAoEbkg._replace_values(
-                bounds_dict, **kwargs
-            ).items()
-        ]
-
-    @staticmethod
-    def fixed(**kwargs):
-        fixed_dict = {
-            "n_bkg": False,
-            "mu": False,
-            "sigma": False,
-            "tau_bkg": False,
-            "lower_range": True,
-            "upper_range": True,
-        }
-
-        return [
-            fixed
-            for field, fixed in StandardAoEbkg._replace_values(
-                fixed_dict, **kwargs
-            ).items()
-        ]
-
-
-class Gaussian(PDF):
-    @staticmethod
-    def pdf(x: np.array, n_events: float, mu: float, sigma: float) -> np.array:
-        """
-        PDF for A/E consists of a Gaussian signal with tail with Gaussian tail background
-        """
-        try:
-            sig = n_events * pgf.gauss_norm(x, mu, sigma)
-        except Exception:
-            sig = np.full_like(x, np.nan)
-
-        return sig
-
-    @staticmethod
-    def extended_pdf(
-        x: np.array, n_events: float, mu: float, sigma: float
-    ) -> tuple(float, np.array):
-        """
-        Extended PDF for A/E consists of a Gaussian signal with Gaussian tail background
-        """
-        return n_events, Gaussian.pdf(x, n_events, mu, sigma)
-
-    @staticmethod
-    def guess(hist, bins, var, **kwargs):
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-        mu = bin_centers[np.argmax(hist)]
-        try:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
-        except Exception:
-            pars, cov = pgf.gauss_mode_width_max(
-                hist, bins, var, mode_guess=mu, n_bins=20
-            )
-            _, sigma, _ = pars
-        ls_guess = 2 * np.sum(
-            hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))]
-        )
-
-        guess_dict = {"n_events": ls_guess, "mu": mu, "sigma": sigma}
-        for key, guess in guess_dict.items():
-            if np.isnan(guess):
-                guess_dict[key] = 0
-
-        return Gaussian._replace_values(guess_dict, **kwargs)
-
-    @staticmethod
-    def bounds(gpars, **kwargs):
-        bounds_dict = {"n_events": (0, None), "mu": (None, None), "sigma": (0, None)}
-
-        return [
-            bound
-            for field, bound in Gaussian._replace_values(bounds_dict, **kwargs).items()
-        ]
-
-    @staticmethod
-    def fixed(**kwargs):
-        fixed_dict = {
-            "n_events": False,
-            "mu": False,
-            "sigma": False,
-        }
-
-        return [
-            fixed
-            for field, fixed in Gaussian._replace_values(fixed_dict, **kwargs).items()
-        ]
-
-
-class DriftTimeDistribution(PDF):
-    @staticmethod
-    def pdf(
-        x,
-        n_sig1,
-        mu1,
-        sigma1,
-        htail1,
-        tau1,
-        n_sig2,
-        mu2,
-        sigma2,
-        htail2,
-        tau2,
-        components,
-    ):
-        gauss1 = n_sig1 * pgf.gauss_with_tail_pdf(x, mu1, sigma1, htail1, tau1)
-        gauss2 = n_sig2 * pgf.gauss_with_tail_pdf(x, mu2, sigma2, tau2, htail2)
-        if components is True:
-            return gauss1, gauss2
-        else:
-            return gauss1 + gauss2
-
-    @staticmethod
-    def extended_pdf(
-        x,
-        n_sig1,
-        mu1,
-        sigma1,
-        htail1,
-        tau1,
-        n_sig2,
-        mu2,
-        sigma2,
-        htail2,
-        tau2,
-        components,
-    ):
-        if components is True:
-            gauss1, gauss2 = DriftTimeDistribution.pdf(
-                x,
-                n_sig1,
-                mu1,
-                sigma1,
-                htail1,
-                tau1,
-                n_sig2,
-                mu2,
-                sigma2,
-                htail2,
-                tau2,
-                components,
-            )
-            return n_sig1 + n_sig2, gauss1, gauss2
-
-        else:
-            return n_sig1 + n_sig2, DriftTimeDistribution.pdf(
-                x,
-                n_sig1,
-                mu1,
-                sigma1,
-                htail1,
-                tau1,
-                n_sig2,
-                mu2,
-                sigma2,
-                htail2,
-                tau2,
-                components,
-            )
-
-    @staticmethod
-    def guess(hist: np.array, bins: np.array, var: np.array, **kwargs) -> list:
-        """
-        Guess for fitting dt spectrum
-        """
-        bcs = pgh.get_bin_centers(bins)
-        mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 5)
-        if len(mus) > 2:
-            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 8)
-        elif len(mus) < 2:
-            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 3)
-        mu1 = bcs[mus[0]]
-        mu2 = bcs[mus[-1]]
-
-        pars, cov = pgf.gauss_mode_width_max(
-            hist,
-            bins,
-            var=None,
-            mode_guess=mu1,
-            n_bins=10,
-            cost_func="Least Squares",
-            inflate_errors=False,
-            gof_method="var",
-        )
-        mu1, sigma1, amp = pars
-        ix = np.where(bcs < mu1 + 3 * sigma1)[0][-1]
-        n_sig1 = np.sum(hist[:ix])
-        pars2, cov2 = pgf.gauss_mode_width_max(
-            hist,
-            bins,
-            var=None,
-            mode_guess=mu2,
-            n_bins=10,
-            cost_func="Least Squares",
-            inflate_errors=False,
-            gof_method="var",
-        )
-        mu2, sigma2, amp2 = pars2
-
+    elif func == gaussian:
         guess_dict = {
-            "n_sig1": n_sig1,
-            "mu1": mu1,
-            "sigma1": sigma1,
-            "htail1": 0.5,
-            "tau1": 0.1,
-            "n_sig2": np.sum(hist) - n_sig1,
-            "mu2": mu2,
-            "sigma2": sigma2,
-            "htail2": 0.5,
-            "tau2": 0.1,
-            "components": 0,
+            "x_lo": bins[0],
+            "x_hi": bins[-1],
+            "area": ls_guess,
+            "mu": mu,
+            "sigma": sigma,
         }
         for key, guess in guess_dict.items():
             if np.isnan(guess):
                 guess_dict[key] = 0
 
-        return DriftTimeDistribution._replace_values(guess_dict, **kwargs)
+    for item, value in kwargs.items():
+        guess_dict[item] = value
 
-    @staticmethod
-    def bounds(guess, **kwargs):
+    return convert_to_minuit(guess_dict, func).values
+
+
+def aoe_peak_bounds(func, guess, **kwargs):
+    if func == aoe_peak:
         bounds_dict = {
-            "n_sig1": (0, None),
-            "mu1": (None, None),
-            "sigma1": (0, None),
-            "htail1": (0, 1),
-            "tau1": (None, None),
-            "n_sig2": (0, None),
-            "mu2": (None, None),
-            "sigma2": (0, None),
-            "htail2": (0, 1),
-            "tau2": (None, None),
-            "components": (None, None),
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+            "n_sig": (0, None),
+            "mu": (guess["x_lo"], guess["x_hi"]),
+            "sigma": (0, None),
+            "n_bkg": (0, None),
+            "tau": (0, None),
+        }
+    elif func == aoe_peak_with_high_tail:
+        bounds_dict = {
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+            "n_sig": (0, None),
+            "mu": (guess["x_lo"], guess["x_hi"]),
+            "sigma": (0, None),
+            "htail": (0, 1),
+            "tau": (None, 0),
+            "n_bkg": (0, None),
+            "tau_bkg": (0, None),
+        }
+    elif func == exgauss:
+        bounds_dict = {
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+            "area": (0, None),
+            "mu": (guess["x_lo"], guess["x_hi"]),
+            "sigma": (0, None),
+            "tau": (0, None),
+        }
+    elif func == gaussian:
+        bounds_dict = {
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+            "area": (0, None),
+            "mu": (guess["x_lo"], guess["x_hi"]),
+            "sigma": (0, None),
         }
 
-        return [
-            bound
-            for field, bound in DriftTimeDistribution._replace_values(
-                bounds_dict, **kwargs
-            ).items()
-        ]
+    for item, value in kwargs.items():
+        bounds_dict[item] = value
+    return bounds_dict
 
-    @staticmethod
-    def fixed(**kwargs):
-        fixed_dict = {
-            "n_sig1": False,
-            "mu1": False,
-            "sigma1": False,
-            "htail1": False,
-            "tau1": False,
-            "n_sig2": False,
-            "mu2": False,
-            "sigma2": False,
-            "htail2": False,
-            "tau2": False,
-            "components": True,
-        }
 
-        return [
-            fixed
-            for field, fixed in DriftTimeDistribution._replace_values(
-                fixed_dict, **kwargs
-            ).items()
-        ]
+def aoe_peak_fixed(func, **kwargs):
+    if func == aoe_peak:
+        fixed = ["x_lo", "x_hi"]
+    elif func == aoe_peak_with_high_tail:
+        fixed = ["x_lo", "x_hi"]
+    elif func == exgauss:
+        fixed = ["x_lo", "x_hi"]
+    elif func == gaussian:
+        fixed = ["x_lo", "x_hi"]
+    mask = ~np.in1d(func.required_args(), fixed)
+    return fixed, mask
 
 
 class Pol1:
@@ -756,7 +241,7 @@ class SigmoidFit:
 
 def unbinned_aoe_fit(
     aoe: np.array,
-    pdf=StandardAoE,
+    pdf=aoe_peak,
     display: int = 0,
 ) -> tuple(np.array, np.array):
     """
@@ -774,22 +259,33 @@ def unbinned_aoe_fit(
     Returns: tuple(np.array, np.array)
         Tuple of fit values and errors
     """
+    if not isinstance(aoe, np.ndarray):
+        aoe = np.array(aoe)
+
+    bin_width = (
+        2
+        * (np.nanpercentile(aoe, 75) - np.nanpercentile(aoe, 25))
+        * len(aoe) ** (-1 / 3)
+    )
+    nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))
     hist, bins, var = pgh.get_hist(aoe, bins=500)
 
-    gpars = Gaussian.guess(hist, bins, var)
+    gpars = aoe_peak_guess(gaussian, hist, bins, var)
     c1_min = gpars["mu"] - 2 * gpars["sigma"]
     c1_max = gpars["mu"] + 3 * gpars["sigma"]
 
     # Initial fit just using Gaussian
-    c1 = cost.UnbinnedNLL(aoe[(aoe < c1_max) & (aoe > c1_min)], Gaussian.pdf)
+    c1 = cost.ExtendedUnbinnedNLL(
+        aoe[(aoe < c1_max) & (aoe > c1_min)], gaussian.pdf_ext
+    )
 
-    m1 = Minuit(c1, **gpars)
-    m1.limits = [
-        (0, len(aoe[(aoe < c1_max) & (aoe > c1_min)])),
-        (gpars["mu"] * 0.8, gpars["mu"] * 1.2),
-        (0.8 * gpars["sigma"], gpars["sigma"] * 1.2),
-    ]
-    m1.fixed = Gaussian.fixed()
+    m1 = Minuit(c1, *gpars)
+
+    bounds = aoe_peak_bounds(gaussian, gpars)
+    for arg, val in bounds.items():
+        m1.limits[arg] = val
+    for fix in aoe_peak_fixed(gaussian)[0]:
+        m1.fixed[fix] = True
     m1.migrad()
 
     # Range to fit over, below this tail behaviour more exponential, few events above
@@ -799,52 +295,56 @@ def unbinned_aoe_fit(
     fmax_bkg = m1.values["mu"] - 5 * m1.values["sigma"]
     fmax = m1.values["mu"] + 5 * m1.values["sigma"]
 
-    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - m1.values["n_events"]
+    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - m1.values["area"]
 
-    bkg_guess = StandardAoEbkg.guess(
+    bkg_guess = aoe_peak_guess(
+        exgauss,
         hist,
         bins,
         var,
-        n_events=n_bkg_guess,
+        area=n_bkg_guess,
         mu=m1.values["mu"],
         sigma=m1.values["sigma"],
-        lower_range=fmin,
-        upper_range=fmax_bkg,
+        x_lo=fmin,
+        x_hi=fmax_bkg,
     )
 
-    c2 = cost.ExtendedUnbinnedNLL(
-        aoe[(aoe < fmax_bkg) & (aoe > fmin)], StandardAoEbkg.extended_pdf
-    )
-    m2 = Minuit(c2, **bkg_guess)
-    m2.fixed = StandardAoEbkg.fixed(mu=True)
-    m2.limits = StandardAoEbkg.bounds(
-        bkg_guess, n_events=(0, 2 * len(aoe[(aoe < fmax_bkg) & (aoe > fmin)]))
-    )
+    c2 = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax_bkg) & (aoe > fmin)], exgauss.pdf_ext)
+    m2 = Minuit(c2, *bkg_guess)
+
+    bounds = aoe_peak_bounds(exgauss, bkg_guess)
+
+    for arg, val in bounds.items():
+        m2.limits[arg] = val
+    for fix in aoe_peak_fixed(exgauss)[0]:
+        m2.fixed[fix] = True
     m2.simplex().migrad()
     m2.hesse()
 
-    x0 = pdf.guess(
+    x0 = aoe_peak_guess(
+        pdf,
         hist,
         bins,
         var,
-        n_sig=m1.values["n_events"],
+        n_sig=m1.values["area"],
         mu=m1.values["mu"],
         sigma=m1.values["sigma"],
-        n_bkg=m2.values["n_events"],
-        tau_bkg=m2.values["tau_bkg"],
-        lower_range=fmin,
-        upper_range=fmax,
+        n_bkg=m2.values["area"],
+        tau=m2.values["tau"],
+        x_lo=fmin,
+        x_hi=fmax,
     )
 
+    bounds = aoe_peak_bounds(pdf, x0)
+
     # Full fit using Gaussian signal with Gaussian tail background
-    c = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax) & (aoe > fmin)], pdf.extended_pdf)
-    m = Minuit(c, **x0)
-    m.limits = pdf.bounds(
-        x0,
-        n_sig=(0, 2 * len(aoe[(aoe < fmax) & (aoe > fmin)])),
-        n_bkg=(0, 2 * len(aoe[(aoe < fmax) & (aoe > fmin)])),
-    )
-    m.fixed = pdf.fixed()
+    c = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax) & (aoe > fmin)], pdf.pdf_ext)
+    m = Minuit(c, *x0)
+    for arg, val in bounds.items():
+        m.limits[arg] = val
+    fixed, mask = aoe_peak_fixed(pdf)
+    for fix in fixed:
+        m.fixed[fix] = True
     m.migrad()
     m.hesse()
 
@@ -856,18 +356,28 @@ def unbinned_aoe_fit(
             return return_nans(pdf)
 
     if display > 1:
+        aoe = aoe[(aoe < fmax) & (aoe > fmin)]
+        bin_width = (
+            2
+            * (np.nanpercentile(aoe, 75) - np.nanpercentile(aoe, 25))
+            * len(aoe) ** (-1 / 3)
+        )
+        nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))  # *5
+
         plt.figure()
         xs = np.linspace(fmin, fmax, 1000)
-        counts, bins, bars = plt.hist(
-            aoe[(aoe < fmax) & (aoe > fmin)], bins=200, histtype="step", label="Data"
-        )
+        counts, bins, bars = plt.hist(aoe, bins=nbins, histtype="step", label="Data")
         dx = np.diff(bins)
-        plt.plot(xs, pdf.pdf(xs, *m.values) * dx[0], label="Full fit")
-        sig, bkg = pdf.pdf(xs, *m.values[:-1], True)
+        plt.plot(xs, pdf.get_pdf(xs, *m.values) * dx[0], label="Full fit")
+        pdf.components = True
+        sig, bkg = pdf.get_pdf(xs, *m.values)
+        pdf.components = False
         plt.plot(xs, sig * dx[0], label="Signal")
         plt.plot(xs, bkg * dx[0], label="Background")
-        plt.plot(xs, Gaussian.pdf(xs, *m1.values) * dx[0], label="Initial Gaussian")
-        plt.plot(xs, StandardAoEbkg.pdf(xs, *m2.values) * dx[0], label="Bkg guess")
+        plt.plot(
+            xs, gaussian.pdf_ext(xs, *m1.values)[1] * dx[0], label="Initial Gaussian"
+        )
+        plt.plot(xs, exgauss.pdf_ext(xs, *m2.values)[1] * dx[0], label="Bkg guess")
         plt.xlabel("A/E")
         plt.ylabel("Counts")
         plt.legend(loc="upper left")
@@ -889,7 +399,7 @@ def unbinned_aoe_fit(
         return m.values, m.errors, m.covariance
 
 
-def fit_time_means(tstamps, means, reses):
+def fit_time_means(tstamps, means, sigmas):
     """
     Fit the time dependence of the means of the A/E distribution
 
@@ -899,8 +409,8 @@ def fit_time_means(tstamps, means, reses):
         Timestamps of the data
     means: np.array
         Means of the A/E distribution
-    reses: np.array
-        Resolutions of the A/E distribution
+    sigmas: np.array
+        Sigmas of the A/E distribution
 
     Returns: dict
         Dictionary of the time dependence of the means
@@ -908,143 +418,76 @@ def fit_time_means(tstamps, means, reses):
     out_dict = {}
     current_tstamps = []
     current_means = []
-    current_reses = []
+    current_sigmas = []
     rolling_mean = means[
         np.where(
-            (np.abs(np.diff(means)) < (0.4 * np.array(reses)[1:]))
-            & (~np.isnan(np.abs(np.diff(means)) < (0.4 * np.array(reses)[1:])))
+            (np.abs(np.diff(means)) < (0.4 * np.array(sigmas)[1:]))
+            & (~np.isnan(np.abs(np.diff(means)) < (0.4 * np.array(sigmas)[1:])))
         )[0][0]
     ]
     for i, tstamp in enumerate(tstamps):
         if (
             (
-                np.abs(means[i] - rolling_mean) > 0.4 * reses[i]
+                np.abs(means[i] - rolling_mean) > 0.4 * sigmas[i]
                 and np.abs(means[i] - rolling_mean) > rolling_mean * 0.01
             )
             or np.isnan(means[i])
-            or np.isnan(reses[i])
+            or np.isnan(sigmas[i])
         ):
             if i + 1 == len(means):
                 out_dict[tstamp] = np.nan
             else:
-                if (np.abs(means[i + 1] - means[i]) < 0.4 * reses[i + 1]) and not (
+                if (np.abs(means[i + 1] - means[i]) < 0.4 * sigmas[i + 1]) and not (
                     np.isnan(means[i])
                     or np.isnan(means[i + 1])
-                    or np.isnan(reses[i])
-                    or np.isnan(reses[i + 1])
+                    or np.isnan(sigmas[i])
+                    or np.isnan(sigmas[i + 1])
                 ):
                     for ts in current_tstamps:
                         out_dict[ts] = rolling_mean
                     rolling_mean = means[i]
                     current_means = [means[i]]
                     current_tstamps = [tstamp]
-                    current_reses = [reses[i]]
+                    current_sigmas = [sigmas[i]]
                 else:
                     out_dict[tstamp] = np.nan
         else:
             current_tstamps.append(tstamp)
             current_means.append(means[i])
-            current_reses.append(reses[i])
+            current_sigmas.append(sigmas[i])
             rolling_mean = np.average(
-                current_means, weights=1 / np.array(current_reses)
+                current_means, weights=1 / np.array(current_sigmas)
             )
     for tstamp in current_tstamps:
         out_dict[tstamp] = rolling_mean
     return out_dict
 
 
-def energy_guess(energy, func_i, fit_range=None, bin_width=0.5, peak=None, eres=None):
+def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=None):
     """
     Simple guess for peak fitting
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
-    hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
-    if (func_i == pgf.extended_radford_pdf) or (func_i == pgf.radford_pdf):
-        bin_cs = (bins[1:] + bins[:-1]) / 2
-        i_0 = np.nanargmax(hist)
-
-        if peak is not None:
-            mu = peak
-        else:
-            mu = bin_cs[np.nanmax(hist)]
-
-        if eres is not None:
-            sigma = eres / 2.355
-        else:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
-
-        bg0 = np.mean(hist[-10:])
-        step = np.mean(hist[:10]) - bg0
-        htail = 1.0 / 5
-        tau = 0.5 * sigma
-
-        hstep = step / (bg0 + np.mean(hist[:10]))
-        dx = np.diff(bins)[0]
-        n_bins_range = int((3 * sigma) // dx)
-        nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range]) - (
-            (n_bins_range * 2) * (bg0 - step / 2)
+    if func_i == hpge_peak or func_i == gauss_on_step:
+        parguess = pgc.get_hpge_energy_peak_par_guess(
+            energy, func_i, fit_range=fit_range
         )
-        nbkg_guess = np.sum(hist) - nsig_guess
-        if nbkg_guess < 0:
-            nbkg_guess = 0
-        if nsig_guess < 0:
-            nsig_guess = 0
-        parguess = [
-            nsig_guess,
-            mu,
-            sigma,
-            htail,
-            tau,
-            nbkg_guess,
-            hstep,
-            fit_range[0],
-            fit_range[1],
-            0,
-        ]
-        for i, guess in enumerate(parguess):
-            if np.isnan(guess):
-                parguess[i] = 0
-        return parguess
 
-    elif (func_i == pgf.extended_gauss_step_pdf) or (func_i == pgf.gauss_step_pdf):
         if peak is not None:
-            mu = peak
-        else:
-            mu = bin_cs[np.nanmax(hist)]
+            parguess["mu"] = peak
 
         if eres is not None:
-            sigma = eres / 2.355
-        else:
-            _, sigma, _ = pgh.get_Gaussian_guess(hist, bins)
+            parguess["sigma"] = eres / 2.355
 
-        i_0 = np.argmax(hist)
-        bg = np.mean(hist[-10:])
-        step = bg - np.mean(hist[:10])
-        hstep = step / (bg + np.mean(hist[:10]))
-        dx = np.diff(bins)[0]
-        n_bins_range = int((3 * sigma) // dx)
-        nsig_guess = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
-        nbkg_guess = np.sum(hist) - nsig_guess
-        if nbkg_guess < 0:
-            nbkg_guess = 0
-        if nsig_guess < 0:
-            nsig_guess = 0
-
-        parguess = [
-            nsig_guess,
-            mu,
-            sigma,
-            nbkg_guess,
-            hstep,
-            fit_range[0],
-            fit_range[1],
-            0,
-        ]
         for i, guess in enumerate(parguess):
             if np.isnan(guess):
                 parguess[i] = 0
-        return parguess
+
+    else:
+        log.error(f"energy_guess not implemented for {func_i}")
+        return None
+    return parguess
 
 
 def fix_all_but_nevents(func):
@@ -1052,72 +495,33 @@ def fix_all_but_nevents(func):
     Returns: Sequence list of fixed indexes for fitting and mask for parameters
     """
 
-    if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
-    ):
+    if func == gauss_on_step:
         # pars are: n_sig, mu, sigma, n_bkg, hstep, lower, upper, components
-        return [1, 2, 4, 5, 6, 7], np.array(
-            [True, False, False, True, False, False, False, False]
-        )
+        fixed = ["x_lo", "x_hi", "mu", "sigma", "hstep"]
 
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
-        # pars are: n_sig, mu, sigma, htail,tau, n_bkg, hstep, components
-        return [1, 2, 3, 4, 6, 7, 8, 9], np.array(
-            [True, False, False, False, False, True, False, False, False, False]
-        )
+    elif func == hpge_peak:
+        # pars are: , components
+        fixed = ["x_lo", "x_hi", "mu", "sigma", "htail", "tau", "hstep"]
 
     else:
-        log.error(f"get_hpge_E_fixed not implemented for {func.__name__}")
-        return None
-    return None
+        log.error(f"get_hpge_E_fixed not implemented for {func}")
+        return None, None
+    mask = ~np.in1d(func.required_args(), fixed)
+    return fixed, mask
 
 
 def get_bounds(func, parguess):
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
-        bounds = [
-            (0, 2 * (parguess[0] + parguess[5])),
-            (parguess[1] - 1, parguess[1] + 1),
-            (0, None),
-            (0, 0.5),
-            (0, None),
-            (0, 2 * (parguess[0] + parguess[5])),
-            (-1, 1),
-            (None, None),
-            (None, None),
-            (None, None),
-        ]
-        return bounds
+    if func == hpge_peak or func == gauss_on_step:
+        bounds = pgc.get_hpge_energy_bounds(func, parguess)
 
-    elif (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
-    ):
-        bounds = [
-            (0, 2 * (parguess[0] + parguess[5])),
-            (parguess[1] - 1, parguess[1] + 1),
-            (0, None),
-            (0, 2 * (parguess[0] + parguess[5])),
-            (-1, 1),
-            (None, None),
-            (None, None),
-            (None, None),
-        ]
-        return bounds
+        bounds["mu"] = (parguess["mu"] - 1, parguess["mu"] + 1)
+        bounds["n_sig"] = (0, 2 * (parguess["n_sig"] + parguess["n_bkg"]))
+        bounds["n_bkg"] = (0, 2 * (parguess["n_sig"] + parguess["n_bkg"]))
 
     else:
-        log.error(f"get_bounds not implemented for {func.__name__}")
-        return []
+        log.error(f"get_bounds not implemented for {func}")
+        return None
+    return bounds
 
 
 def get_peak_label(peak: float) -> str:
@@ -1134,38 +538,30 @@ def get_peak_label(peak: float) -> str:
 
 
 def update_guess(func, parguess, energies):
-    if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
-    ):
+    if func == gauss_on_step:
         total_events = len(energies)
-        parguess[0] = len(
+        parguess["n_sig"] = len(
             energies[
-                (energies > parguess[1] - 2 * parguess[2])
-                & (energies < parguess[1] + 2 * parguess[2])
+                (energies > parguess["mu"] - 2 * parguess["sigma"])
+                & (energies < parguess["mu"] + 2 * parguess["sigma"])
             ]
         )
-        parguess[3] = total_events - parguess[0]
+        parguess["n_bkg"] = total_events - parguess["n_sig"]
         return parguess
 
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
+    if func == hpge_peak:
         total_events = len(energies)
-        parguess[0] = len(
+        parguess["n_sig"] = len(
             energies[
-                (energies > parguess[1] - 2 * parguess[2])
-                & (energies < parguess[1] + 2 * parguess[2])
+                (energies > parguess["mu"] - 2 * parguess["sigma"])
+                & (energies < parguess["mu"] + 2 * parguess["sigma"])
             ]
         )
-        parguess[5] = total_events - parguess[0]
+        parguess["n_bkg"] = total_events - parguess["n_sig"]
         return parguess
 
     else:
-        log.error(f"update_guess not implemented for {func.__name__}")
+        log.error(f"update_guess not implemented for {func}")
         return parguess
 
 
@@ -1175,17 +571,25 @@ def get_survival_fraction(
     cut_val,
     peak,
     eres_pars,
+    fit_range=None,
     high_cut=None,
     guess_pars_cut=None,
     guess_pars_surv=None,
     dt_mask=None,
     mode="greater",
-    func=pgf.extended_radford_pdf,
-    gof_func=pgf.radford_pdf,
+    func=hpge_peak,
     display=0,
 ):
     if dt_mask is None:
         dt_mask = np.full(len(cut_param), True, dtype=bool)
+
+    if not isinstance(energy, np.ndarray):
+        energy = np.array(energy)
+    if not isinstance(cut_param, np.ndarray):
+        cut_param = np.array(cut_param)
+
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
 
     nan_idxs = np.isnan(cut_param)
     if high_cut is not None:
@@ -1199,23 +603,22 @@ def get_survival_fraction(
             raise ValueError("mode not recognised")
 
     if guess_pars_cut is None or guess_pars_surv is None:
-        (pars, errs, cov, _, func, gof_func, _, _, _) = pgc.unbinned_staged_energy_fit(
+        (pars, errs, cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
             energy,
             func,
-            gof_func,
             guess_func=energy_guess,
             bounds_func=get_bounds,
             guess_kwargs={"peak": peak, "eres": eres_pars},
+            fit_range=fit_range,
         )
 
         guess_pars_cut = pars
         guess_pars_surv = pars
     # add update guess here for n_sig and n_bkg
     guess_pars_cut = update_guess(func, guess_pars_cut, energy[(~nan_idxs) & (~idxs)])
-    (cut_pars, cut_errs, cut_cov, _, _, _, _, _, _) = pgc.unbinned_staged_energy_fit(
+    (cut_pars, cut_errs, cut_cov, _, _, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy[(~nan_idxs) & (~idxs)],
         func,
-        gof_func,
         guess=guess_pars_cut,
         guess_func=energy_guess,
         bounds_func=get_bounds,
@@ -1223,12 +626,12 @@ def get_survival_fraction(
         guess_kwargs={"peak": peak, "eres": eres_pars},
         lock_guess=True,
         allow_tail_drop=False,
+        fit_range=fit_range,
     )
     guess_pars_surv = update_guess(func, guess_pars_cut, energy[(~nan_idxs) & (idxs)])
-    (surv_pars, surv_errs, surv_cov, _, _, _, _, _, _) = pgc.unbinned_staged_energy_fit(
+    (surv_pars, surv_errs, surv_cov, _, _, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy[(~nan_idxs) & (idxs)],
         func,
-        gof_func,
         guess=guess_pars_surv,
         guess_func=energy_guess,
         bounds_func=get_bounds,
@@ -1236,6 +639,7 @@ def get_survival_fraction(
         guess_kwargs={"peak": peak, "eres": eres_pars},
         lock_guess=True,
         allow_tail_drop=False,
+        fit_range=fit_range,
     )
 
     ct_n = cut_pars["n_sig"]
@@ -1261,6 +665,8 @@ def get_sf_sweep(
     cut_range=(-5, 5),
     n_samples=26,
     mode="greater",
+    fit_range=None,
+    debug_mode=False,
 ) -> tuple(pd.DataFrame, float, float):
     """
     Calculates survival fraction for gamma lines using fitting method as in cut determination
@@ -1269,16 +675,21 @@ def get_sf_sweep(
     if dt_mask is None:
         dt_mask = np.full(len(cut_param), True, dtype=bool)
 
+    if not isinstance(energy, np.ndarray):
+        energy = np.array(energy)
+    if not isinstance(cut_param, np.ndarray):
+        cut_param = np.array(cut_param)
+
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
     out_df = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
 
-    (pars, _, _, _, func, gof_func, _, _, _) = pgc.unbinned_staged_energy_fit(
+    (pars, _, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy,
-        pgf.extended_radford_pdf,
-        pgf.radford_pdf,
+        hpge_peak,
         guess_func=energy_guess,
         bounds_func=get_bounds,
         guess_kwargs={"peak": peak, "eres": eres_pars},
+        fit_range=fit_range,
     )
     guess_pars_cut = pars
     guess_pars_surv = pars
@@ -1291,18 +702,19 @@ def get_sf_sweep(
                 cut_val,
                 peak,
                 eres_pars,
+                fit_range=fit_range,
                 dt_mask=dt_mask,
                 mode=mode,
                 guess_pars_cut=guess_pars_cut,
                 guess_pars_surv=guess_pars_surv,
                 func=func,
-                gof_func=gof_func,
             )
             out_df = pd.concat(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
             )
-        except Exception:
-            pass
+        except BaseException as e:
+            if debug_mode:
+                raise (e)
     out_df.set_index("cut_val", inplace=True)
     if final_cut_value is not None:
         sf, sf_err, cut_pars, surv_pars = get_survival_fraction(
@@ -1311,12 +723,12 @@ def get_sf_sweep(
             final_cut_value,
             peak,
             eres_pars,
+            fit_range=fit_range,
             dt_mask=dt_mask,
             mode=mode,
             guess_pars_cut=guess_pars_cut,
             guess_pars_surv=guess_pars_surv,
             func=func,
-            gof_func=gof_func,
         )
     else:
         sf = None
@@ -1332,6 +744,9 @@ def compton_sf(cut_param, low_cut_val, high_cut_val=None, mode="greater", dt_mas
     if dt_mask is None:
         dt_mask = np.full(len(cut_param), True, dtype=bool)
 
+    if not isinstance(cut_param, np.ndarray):
+        cut_param = np.array(cut_param)
+
     if high_cut_val is not None:
         mask = (cut_param > low_cut_val) & (cut_param < high_cut_val) & dt_mask
     else:
@@ -1342,12 +757,21 @@ def compton_sf(cut_param, low_cut_val, high_cut_val=None, mode="greater", dt_mas
         else:
             raise ValueError("mode not recognised")
 
-    sf = 100 * len(cut_param[mask]) / len(cut_param)
-    sf_err = sf * np.sqrt((1 / len(cut_param)) + 1 / (len(cut_param[mask]) + 10**-99))
+    ct_n = len(cut_param[~mask])
+    ct_err = np.sqrt(len(cut_param[~mask]))
+    surv_n = len(cut_param[mask])
+    surv_err = np.sqrt(len(cut_param[mask]))
+
+    pc_n = ct_n + surv_n
+    pc_err = np.sqrt(surv_err**2 + ct_err**2)
+
+    sf = (surv_n / pc_n) * 100
+    err = sf * np.sqrt((pc_err / pc_n) ** 2 + (surv_err / surv_n) ** 2)
+
     return {
         "low_cut": low_cut_val,
         "sf": sf,
-        "sf_err": sf_err,
+        "sf_err": err,
         "high_cut": high_cut_val,
     }
 
@@ -1366,6 +790,10 @@ def compton_sf_sweep(
     """
     Determines survival fraction for compton continuum by basic counting
     """
+    if not isinstance(energy, np.ndarray):
+        energy = np.array(energy)
+    if not isinstance(cut_param, np.ndarray):
+        cut_param = np.array(cut_param)
 
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
     out_df = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
@@ -1395,10 +823,9 @@ class CalAoE:
         cal_dicts: dict = None,
         cal_energy_param: str = "cuspEmax_ctc_cal",
         eres_func: callable = lambda x: 1,
-        pdf=StandardAoE,
+        pdf=aoe_peak,
         selection_string: str = "",
         dt_corr: bool = False,
-        dep_acc: float = 0.9,
         dep_correct: bool = False,
         dt_cut: dict = None,
         dt_param: str = "dt_eff",
@@ -1406,7 +833,7 @@ class CalAoE:
         mean_func: Callable = Pol1,
         sigma_func: Callable = SigmaFit,
         compt_bands_width: int = 20,
-        plot_options: dict = None,
+        debug_mode: bool = False,
     ):
         self.cal_dicts = cal_dicts if cal_dicts is not None else {}
         self.cal_energy_param = cal_energy_param
@@ -1417,7 +844,6 @@ class CalAoE:
         self.dt_param = "dt_eff"
         self.dep_correct = dep_correct
         self.dt_cut = dt_cut
-        self.dep_acc = dep_acc
         if self.dt_cut is not None:
             self.dt_cut_param = dt_cut["out_param"]
             self.fit_selection = f"{self.selection_string} & {self.dt_cut_param}"
@@ -1430,7 +856,7 @@ class CalAoE:
         self.mean_func = mean_func
         self.sigma_func = sigma_func
         self.compt_bands_width = compt_bands_width
-        self.plot_options = plot_options if plot_options is not None else {}
+        self.debug_mode = debug_mode
 
     def update_cal_dicts(self, update_dict):
         if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
@@ -1445,7 +871,15 @@ class CalAoE:
     def time_correction(self, df, aoe_param, output_name="AoE_Timecorr", display=0):
         log.info("Starting A/E time correction")
         self.timecorr_df = pd.DataFrame(
-            columns=["run_timestamp", "mean", "mean_err", "res", "res_err"]
+            columns=[
+                "run_timestamp",
+                "mean",
+                "mean_err",
+                "sigma",
+                "sigma_err",
+                "res",
+                "res_err",
+            ]
         )
         try:
             if "run_timestamp" in df:
@@ -1467,6 +901,8 @@ class CalAoE:
                                             "run_timestamp": tstamp,
                                             "mean": pars["mu"],
                                             "mean_err": errs["mu"],
+                                            "sigma": pars["sigma"],
+                                            "sigma_err": errs["sigma"],
                                             "res": pars["sigma"] / pars["mu"],
                                             "res_err": (pars["sigma"] / pars["mu"])
                                             * np.sqrt(
@@ -1478,7 +914,9 @@ class CalAoE:
                                 ),
                             ]
                         )
-                    except Exception:
+                    except BaseException as e:
+                        if self.debug_mode:
+                            raise (e)
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -1488,6 +926,8 @@ class CalAoE:
                                             "run_timestamp": tstamp,
                                             "mean": np.nan,
                                             "mean_err": np.nan,
+                                            "sigma": np.nan,
+                                            "sigma_err": np.nan,
                                             "res": np.nan,
                                             "res_err": np.nan,
                                         }
@@ -1499,7 +939,7 @@ class CalAoE:
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
                     np.array(self.timecorr_df["mean"]),
-                    np.array(self.timecorr_df["res"]),
+                    np.array(self.timecorr_df["sigma"]),
                 )
 
                 df[output_name] = df[aoe_param] / np.array(
@@ -1534,6 +974,8 @@ class CalAoE:
                                     {
                                         "mean": pars["mu"],
                                         "mean_err": errs["mu"],
+                                        "sigma": pars["sigma"],
+                                        "sigma_err": errs["sigma"],
                                         "res": pars["sigma"] / pars["mu"],
                                         "res_err": (pars["sigma"] / pars["mu"])
                                         * np.sqrt(
@@ -1545,7 +987,9 @@ class CalAoE:
                             ),
                         ]
                     )
-                except Exception:
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -1554,6 +998,8 @@ class CalAoE:
                                     {
                                         "mean": np.nan,
                                         "mean_err": np.nan,
+                                        "sigma": np.nan,
+                                        "sigma_err": np.nan,
                                         "res": np.nan,
                                         "res_err": np.nan,
                                     }
@@ -1570,8 +1016,10 @@ class CalAoE:
                         }
                     }
                 )
-                log.info("A/E time correction finished")
-        except Exception:
+                log.info("Finished A/E time correction")
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("A/E time correction failed")
             self.update_cal_dicts(
                 {
@@ -1627,56 +1075,72 @@ class CalAoE:
                 ),
             )
 
-            gpars = self.dt_res_dict["dt_guess"] = DriftTimeDistribution.guess(
-                hist, bins, var
-            )
-            cost_func = cost.ExtendedUnbinnedNLL(
-                final_df[self.dt_param], DriftTimeDistribution.extended_pdf
-            )
-            m = Minuit(cost_func, **gpars)
-            m.limits = DriftTimeDistribution.bounds(gpars)
-            m.fixed = DriftTimeDistribution.fixed()
-            m.simplex().migrad()
-            m.hesse()
-
-            self.dt_res_dict["dt_fit"] = {
-                "pars": m.values,
-                "errs": m.errors,
-                "object": m,
-            }
-            aoe_grp1 = self.dt_res_dict[
-                "aoe_grp1"
-            ] = f'{self.dt_param}>{m.values["mu1"] - 2 * m.values["sigma1"]} & {self.dt_param}<{m.values["mu1"] + 2 * m.values["sigma1"]}'
-            aoe_grp2 = self.dt_res_dict[
-                "aoe_grp2"
-            ] = f'{self.dt_param}>{m.values["mu2"] - 2 * m.values["sigma2"]} & {self.dt_param}<{m.values["mu2"] + 2 * m.values["sigma2"]}'
-
-            aoe_pars, aoe_errs, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
+            bcs = pgh.get_bin_centers(bins)
+            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)
+            pk_pars, pk_covs = pgc.hpge_fit_energy_peak_tops(
+                hist,
+                bins,
+                var=var,
+                peak_locs=mus,
+                n_to_fit=5,
             )
 
-            self.dt_res_dict["aoe_fit1"] = {"pars": aoe_pars, "errs": aoe_errs}
+            mus = pk_pars[:, 0]
+            sigmas = pk_pars[:, 1]
+            amps = pk_pars[:, 2]
 
-            aoe_pars2, aoe_errs2, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
-            )
-
-            self.dt_res_dict["aoe_fit2"] = {"pars": aoe_pars2, "errs": aoe_errs2}
-
-            try:
-                self.alpha = (aoe_pars["mu"] - aoe_pars2["mu"]) / (
-                    (m.values["mu2"] * aoe_pars2["mu"])
-                    - (m.values["mu1"] * aoe_pars["mu"])
+            if len(mus) > 2:
+                ids = np.array(
+                    sorted([np.argmax(amps), np.argmax(amps[amps != np.argmax(amps)])])
                 )
-            except ZeroDivisionError:
+            else:
+                ids = np.full(len(mus), True, dtype=bool)
+            mus = [bcs[int(mu)] for mu in mus[ids]]
+            sigmas = sigmas[ids]
+            amps = amps[ids]
+
+            self.dt_res_dict["dt_fit"] = {"mus": mus, "sigmas": sigmas, "amps": amps}
+
+            if len(mus) < 2:
+                log.info("Only 1 drift time peak found, no correction needed")
                 self.alpha = 0
-            self.dt_res_dict["alpha"] = self.alpha
-            log.info(f"dtcorr successful alpha:{self.alpha}")
-            data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
-        except Exception:
+
+            else:
+                aoe_grp1 = self.dt_res_dict[
+                    "aoe_grp1"
+                ] = f"{self.dt_param}>{mus[0] - 2 * sigmas[0]} & {self.dt_param}<{mus[0] + 2 * sigmas[0]}"
+                aoe_grp2 = self.dt_res_dict[
+                    "aoe_grp2"
+                ] = f"{self.dt_param}>{mus[1] - 2 * sigmas[1]} & {self.dt_param}<{mus[1] + 2 * sigmas[1]}"
+
+                aoe_pars, aoe_errs, _ = unbinned_aoe_fit(
+                    final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
+                )
+
+                self.dt_res_dict["aoe_fit1"] = {"pars": aoe_pars, "errs": aoe_errs}
+
+                aoe_pars2, aoe_errs2, _ = unbinned_aoe_fit(
+                    final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
+                )
+
+                self.dt_res_dict["aoe_fit2"] = {"pars": aoe_pars2, "errs": aoe_errs2}
+
+                try:
+                    self.alpha = (aoe_pars["mu"] - aoe_pars2["mu"]) / (
+                        (mus[0] * aoe_pars2["mu"]) - (mus[1] * aoe_pars["mu"])
+                    )
+                except ZeroDivisionError:
+                    self.alpha = 0
+                self.dt_res_dict["alpha"] = self.alpha
+                log.info(f"dtcorr successful alpha:{self.alpha}")
+
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("Drift time correction failed")
             self.alpha = np.nan
 
+        data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
         self.update_cal_dicts(
             {
                 out_param: {
@@ -1743,8 +1207,10 @@ class CalAoE:
                         display=display,
                     )
 
-                    mean, mean_err = self.pdf.centroid(pars, errs, cov)
-                    sigma, sigma_err = self.pdf.width(pars, errs, cov)
+                    mean, mean_err = self.pdf.get_mu(pars, cov)
+                    sigma, sigma_err = self.pdf.get_fwhm(pars, cov)
+                    sigma = sigma / 2.355
+                    sigma_err = sigma_err / 2.355
 
                     self.energy_corr_fits = pd.concat(
                         [
@@ -1770,7 +1236,9 @@ class CalAoE:
                         ]
                     )
 
-                except Exception:
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
                     self.energy_corr_fits = pd.concat(
                         [
                             self.energy_corr_fits,
@@ -1876,7 +1344,10 @@ class CalAoE:
                     pdf=self.pdf,
                     display=display,
                 )
-            except Exception:
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
+
                 dep_pars, dep_err, _ = return_nans(self.pdf)
 
             data[corrected_param] = data[aoe_param] / self.mean_func.func(
@@ -1888,7 +1359,10 @@ class CalAoE:
             log.info("Finished A/E energy successful")
             log.info(f"mean pars are {mu_pars.to_dict()}")
             log.info(f"sigma pars are {sig_pars.to_dict()}")
-        except Exception:
+
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("A/E energy correction failed")
             mu_pars, mu_errs, mu_cov = return_nans(self.mean_func.func)
             csqr_mu, dof_mu, p_val_mu = (np.nan, np.nan, np.nan)
@@ -1917,8 +1391,7 @@ class CalAoE:
         }
 
         self.energy_corr_res_dict["dep_fit"] = {
-            "func": self.pdf.__name__,
-            "module": self.pdf.__module__,
+            "func": self.pdf,
             "pars": dep_pars.to_dict(),
             "errs": dep_err.to_dict(),
         }
@@ -1956,10 +1429,10 @@ class CalAoE:
         self.cut_fits = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
 
         min_range, max_range = ranges
-
+        erange = (peak - min_range, peak + max_range)
         try:
             select_df = data.query(
-                f"{self.fit_selection}&({self.cal_energy_param} > {peak - min_range}) & ({self.cal_energy_param} < {peak + max_range})"
+                f"{self.fit_selection}&({self.cal_energy_param} > {erange[0]}) & ({self.cal_energy_param} < {erange[1]})"
             )
 
             # if dep_correct is True:
@@ -1972,10 +1445,12 @@ class CalAoE:
                 None,
                 peak,
                 self.eres_func(peak),
+                fit_range=erange,
                 dt_mask=None,
                 cut_range=(-8, 0),
                 n_samples=40,
                 mode="greater",
+                debug_mode=self.debug_mode,
             )
 
             valid_fits = self.cut_fits.query(
@@ -2005,7 +1480,7 @@ class CalAoE:
                 "pars": m1.values.to_dict(),
                 "errs": m1.errors.to_dict(),
             }
-            self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * self.dep_acc)))], 3)
+            self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * dep_acc)))], 3)
             log.info(f"Cut found at {self.low_cut_val}")
 
             data[output_cut_param] = data[aoe_param] > self.low_cut_val
@@ -2013,9 +1488,12 @@ class CalAoE:
                 data[output_cut_param] = data[output_cut_param] & (
                     data[self.dt_cut_param]
                 )
-        except Exception:
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("A/E cut determination failed")
             self.low_cut_val = np.nan
+            data[output_cut_param] = False
         if self.dt_cut_param is not None and self.dt_cut_hard is True:
             self.update_cal_dicts(
                 {
@@ -2041,7 +1519,7 @@ class CalAoE:
         aoe_param,
         peaks,
         fit_widths,
-        nsamples=26,
+        n_samples=26,
         cut_range=(-5, 5),
         mode="greater",
     ):
@@ -2068,7 +1546,7 @@ class CalAoE:
                         peak,
                         fwhm,
                         cut_range=cut_range,
-                        nsamples=nsamples,
+                        n_samples=n_samples,
                         mode=mode,
                         dt_mask=peak_df[self.dt_cut_param].to_numpy()
                         if self.dt_cut_param is not None
@@ -2083,6 +1561,7 @@ class CalAoE:
                     peak_dfs[peak] = cut_df
                 else:
                     emin, emax = fit_widths[i]
+                    fit_range = (peak - emin, peak + emax)
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
                     )
@@ -2092,12 +1571,14 @@ class CalAoE:
                         self.low_cut_val,
                         peak,
                         fwhm,
+                        fit_range=fit_range,
                         cut_range=cut_range,
-                        nsamples=nsamples,
+                        n_samples=n_samples,
                         mode=mode,
                         dt_mask=peak_df[self.dt_cut_param].to_numpy()
                         if self.dt_cut_param is not None
                         else None,
+                        debug_mode=self.debug_mode,
                     )
 
                     cut_df = cut_df.query(
@@ -2112,7 +1593,9 @@ class CalAoE:
                     )
                     peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
-            except Exception:
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
                 sfs = pd.concat(
                     [
                         sfs,
@@ -2158,6 +1641,7 @@ class CalAoE:
                     )
                 else:
                     emin, emax = fit_widths[i]
+                    fit_range = (peak - emin, peak + emax)
                     peak_df = data.query(
                         f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
                     )
@@ -2167,6 +1651,7 @@ class CalAoE:
                         self.low_cut_val,
                         peak,
                         fwhm,
+                        fit_range=fit_range,
                         mode=mode,
                         high_cut=self.high_cut_val,
                         dt_mask=peak_df[self.dt_cut_param].to_numpy()
@@ -2181,7 +1666,9 @@ class CalAoE:
                     )
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
 
-            except Exception:
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
                 sfs = pd.concat(
                     [
                         sfs,
@@ -2191,31 +1678,6 @@ class CalAoE:
                 log.error(f"A/E survival fraction determination failed for {peak} peak")
         sfs.set_index("peak", inplace=True)
         return sfs
-
-    def get_results_dict(self):
-        return {
-            "cal_energy_param": self.cal_energy_param,
-            "dt_param": self.dt_param,
-            "rt_correction": self.dt_corr,
-            "pdf": self.pdf.__name__,
-            "1000-1300keV": self.timecorr_df.to_dict("index"),
-            "correction_fit_results": self.energy_corr_res_dict,
-            "low_cut": self.low_cut_val,
-            "high_cut": self.high_cut_val,
-            "low_side_sfs": self.low_side_sf.to_dict("index"),
-            "2_side_sfs": self.two_side_sf.to_dict("index"),
-        }
-
-    def fill_plot_dict(self, data, plot_dict=None):
-        if plot_dict is not None:
-            for key, item in self.plot_options.items():
-                if item["options"] is not None:
-                    plot_dict[key] = item["function"](self, data, **item["options"])
-                else:
-                    plot_dict[key] = item["function"](self, data)
-        else:
-            plot_dict = {}
-        return plot_dict
 
     def calibrate(
         self,
@@ -2234,7 +1696,6 @@ class CalAoE:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
         self.time_correction(df, initial_aoe_param, output_name="AoE_Timecorr")
-        log.info("Finished A/E time correction")
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
@@ -2299,15 +1760,36 @@ class CalAoE:
             "AoE_Classifier",
             peaks_of_interest,
             fit_widths,
-            nsamples=sf_nsamples,
+            n_samples=sf_nsamples,
             cut_range=sf_cut_range,
             mode="greater",
         )
 
         log.info("Compute 2 side survival fractions: ")
-        self.two_side_sf = self.calculate_survival_fractions(
+        self.two_side_sfs = self.calculate_survival_fractions(
             df, "AoE_Classifier", peaks_of_interest, fit_widths, mode="greater"
         )
+
+        if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+            for tstamp in self.cal_dicts:
+                self.low_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
+                    df.query(f"run_timestamp == '{tstamp}'"),
+                    "AoE_Classifier",
+                    peaks_of_interest,
+                    fit_widths,
+                    mode="greater",
+                )
+
+                self.two_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
+                    df.query(f"run_timestamp == '{tstamp}'"),
+                    "AoE_Classifier",
+                    peaks_of_interest,
+                    fit_widths,
+                    mode="greater",
+                )
+        else:
+            self.low_side_sfs_by_run = None
+            self.two_side_sfs_by_run = None
 
 
 def plot_aoe_mean_time(
@@ -2417,18 +1899,20 @@ def drifttime_corr_plot(
         plt.subplot(2, 2, 1)
         aoe_pars = aoe_class.dt_res_dict["aoe_fit1"]["pars"]
 
-        xs = np.linspace(aoe_pars["lower_range"], aoe_pars["upper_range"], 100)
+        xs = np.linspace(aoe_pars["x_lo"], aoe_pars["x_hi"], 100)
         counts, aoe_bins, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp1"]}&({aoe_param}<{aoe_pars["upper_range"]})&({aoe_param}>{aoe_pars["lower_range"]})'
+                f'{aoe_class.dt_res_dict["aoe_grp1"]}&({aoe_param}<{aoe_pars["x_hi"]})&({aoe_param}>{aoe_pars["x_lo"]})'
             )[aoe_param],
             bins=400,
             histtype="step",
             label="data",
         )
         dx = np.diff(aoe_bins)
-        plt.plot(xs, aoe_class.pdf.pdf(xs, *aoe_pars) * dx[0], label="full fit")
-        sig, bkg = aoe_class.pdf.pdf(xs, *aoe_pars[:-1], True)
+        plt.plot(xs, aoe_class.pdf.get_pdf(xs, *aoe_pars) * dx[0], label="full fit")
+        aoe_class.pdf.components = True
+        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars)
+        aoe_class.pdf.components = False
         plt.plot(xs, sig * dx[0], label="peak fit")
         plt.plot(xs, bkg * dx[0], label="bkg fit")
         plt.legend(loc="upper left")
@@ -2437,18 +1921,20 @@ def drifttime_corr_plot(
 
         aoe_pars2 = aoe_class.dt_res_dict["aoe_fit2"]["pars"]
         plt.subplot(2, 2, 2)
-        xs = np.linspace(aoe_pars2["lower_range"], aoe_pars2["upper_range"], 100)
+        xs = np.linspace(aoe_pars2["x_lo"], aoe_pars2["x_hi"], 100)
         counts, aoe_bins2, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp2"]}&({aoe_param}<{aoe_pars2["upper_range"]})&({aoe_param}>{aoe_pars2["lower_range"]})'
+                f'{aoe_class.dt_res_dict["aoe_grp2"]}&({aoe_param}<{aoe_pars2["x_hi"]})&({aoe_param}>{aoe_pars2["x_lo"]})'
             )[aoe_param],
             bins=400,
             histtype="step",
             label="Data",
         )
         dx = np.diff(aoe_bins2)
-        plt.plot(xs, aoe_class.pdf.pdf(xs, *aoe_pars2) * dx[0], label="full fit")
-        sig, bkg = aoe_class.pdf.pdf(xs, *aoe_pars2[:-1], True)
+        plt.plot(xs, aoe_class.pdf.get_pdf(xs, *aoe_pars2) * dx[0], label="full fit")
+        aoe_class.pdf.components = True
+        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars2)
+        aoe_class.pdf.components = False
         plt.plot(xs, sig * dx[0], label="peak fit")
         plt.plot(xs, bkg * dx[0], label="bkg fit")
         plt.legend(loc="upper left")
@@ -2466,25 +1952,18 @@ def drifttime_corr_plot(
 
         plt.subplot(2, 2, 3)
         plt.step(pgh.get_bin_centers(bins), hist, label="data")
-        plt.plot(
-            pgh.get_bin_centers(bins),
-            DriftTimeDistribution.pdf(
-                pgh.get_bin_centers(bins), **aoe_class.dt_res_dict["dt_guess"]
+
+        mus = aoe_class.dt_res_dict["dt_fit"]["mus"]
+        sigmas = aoe_class.dt_res_dict["dt_fit"]["sigmas"]
+        amps = aoe_class.dt_res_dict["dt_fit"]["amps"]
+
+        for mu, sigma, amp in zip(mus, sigmas, amps):
+            plt.plot(
+                pgh.get_bin_centers(bins),
+                gaussian.get_pdf(pgh.get_bin_centers(bins), mu, sigma) * amp,
             )
-            * np.diff(bins)[0],
-            label="Guess",
-        )
-        plt.plot(
-            pgh.get_bin_centers(bins),
-            DriftTimeDistribution.pdf(
-                pgh.get_bin_centers(bins), *aoe_class.dt_res_dict["dt_fit"]["pars"]
-            )
-            * np.diff(bins)[0],
-            label="fit",
-        )
         plt.xlabel("drift time (ns)")
         plt.ylabel("Counts")
-        plt.legend(loc="upper left")
 
         plt.subplot(2, 2, 4)
         bins = np.linspace(
@@ -2683,7 +2162,7 @@ def plot_mean_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     return fig
 
 
-def plot_sigmafit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
+def plot_sigma_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
@@ -2752,7 +2231,9 @@ def plot_sigmafit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     return fig
 
 
-def plot_cut_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
+def plot_cut_fit(
+    aoe_class, data, dep_acc=0.9, figsize=(12, 8), fontsize=12
+) -> plt.figure:
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
     fig = plt.figure()
@@ -2771,7 +2252,7 @@ def plot_cut_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
             ),
         )
         plt.hlines(
-            (100 * aoe_class.dep_acc),
+            (100 * dep_acc),
             -8.1,
             aoe_class.low_cut_val,
             color="red",
@@ -2780,7 +2261,7 @@ def plot_cut_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
         plt.vlines(
             aoe_class.low_cut_val,
             np.nanmin(aoe_class.cut_fits["sf"]) * 0.9,
-            (100 * aoe_class.dep_acc),
+            (100 * dep_acc),
             color="red",
             linestyle="--",
         )
@@ -2818,7 +2299,7 @@ def plot_survival_fraction_curves(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
-                    label=f'{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sf.loc[peak]["sf"]:2.1f} +/- {aoe_class.low_side_sf.loc[peak]["sf_err"]:2.1f} %',
+                    label=f'{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sfs.loc[peak]["sf"]:2.1f} +/- {aoe_class.low_side_sfs.loc[peak]["sf_err"]:2.1f} %',
                 )
             except Exception:
                 pass
