@@ -1458,7 +1458,7 @@ def hpge_fit_energy_peak_tops(
 
 
 def get_hpge_energy_peak_par_guess(
-    energy, func, fit_range=None, bin_width=1, mode_guess=None
+    energy, func, fit_range=None, bin_width=None, mode_guess=None
 ):
     """
     Get parameter guesses for func fit to peak in hist
@@ -1530,18 +1530,17 @@ def get_hpge_energy_peak_par_guess(
         init_hist, init_bins, _ = pgh.get_hist(
             energy, dx=init_bin_width, range=fit_range
         )
-        if np.nanmax(init_hist) < np.nanpercentile(init_hist, 50) * 2:
-            init_sigma = np.nanstd(energy)
-        else:
+        try:
+            _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+        except IndexError:
+            init_hist, init_bins, _ = pgh.get_hist(
+                energy, dx=init_bin_width / 2, range=fit_range
+            )
             try:
                 _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
             except IndexError:
-                init_hist, init_bins, _ = pgh.get_hist(
-                    energy, dx=init_bin_width / 2, range=fit_range
-                )
-                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
-
-        bin_width = init_sigma * len(energy) ** (-1 / 3)
+                init_sigma = np.nanstd(energy)
+        bin_width = (init_sigma) * len(energy) ** (-1 / 3)
 
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
@@ -1772,18 +1771,17 @@ def unbinned_staged_energy_fit(
         init_hist, init_bins, _ = pgh.get_hist(
             energy, dx=init_bin_width, range=fit_range
         )
-        if np.nanmax(init_hist) < np.nanpercentile(init_hist, 50) * 2:
-            sigma = np.nanstd(energy)
-        else:
+        try:
+            _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+        except IndexError:
+            init_hist, init_bins, _ = pgh.get_hist(
+                energy, dx=init_bin_width / 2, range=fit_range
+            )
             try:
-                (_, sigma, _) = pgh.get_gaussian_guess(init_hist, init_bins)
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
             except IndexError:
-                init_hist, init_bins, _ = pgh.get_hist(
-                    energy, dx=init_bin_width / 2, range=fit_range
-                )
-                (_, sigma, _) = pgh.get_gaussian_guess(init_hist, init_bins)
-
-        bin_width = (sigma) * len(energy) ** (-1 / 3)
+                init_sigma = np.nanstd(energy)
+        bin_width = (init_sigma) * len(energy) ** (-1 / 3)
 
     gof_hist, gof_bins, gof_var = pgh.get_hist(energy, range=gof_range, dx=bin_width)
 
