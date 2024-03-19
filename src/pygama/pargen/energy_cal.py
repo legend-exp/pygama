@@ -1090,7 +1090,7 @@ class HPGeCalibration:
     def fit_calibrated_peaks(self, e_uncal, peak_pars):
         log.debug(f"Fitting {self.energy_param}")
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
-        self.hpge_fit_energy_peaks(e_uncal, peak_pars =peak_pars, update_cal_pars=False)
+        self.hpge_fit_energy_peaks(e_uncal, peak_pars=peak_pars, update_cal_pars=False)
         self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
