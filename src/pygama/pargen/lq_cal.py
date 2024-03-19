@@ -147,8 +147,8 @@ def binned_lq_fit(
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
 
-    c1 = cost.BinnedNLL(hist, bins, gaussian.cdf, verbose=0)
-    m1 = Minuit(c1, mu, sigma)
+    c1 = cost.BinnedNLL(hist, bins, gaussian.get_cdf, verbose=0)
+    m1 = Minuit(c1, mu=mu, sigma=sigma)
     m1.simplex().migrad()
     m1.hesse()
 
@@ -245,6 +245,7 @@ class LQCal:
         self.eres_func = eres_func
         self.cdf = cdf
         self.selection_string = selection_string
+        self.debug_mode = debug_mode
 
     def update_cal_dicts(self, update_dict):
         if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
