@@ -176,9 +176,16 @@ def build_evt(
         elif isinstance(v, list):
             channels[k] = [e for e in v]
 
+    tcm = utils.TCMData(
+        id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
+        idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
+        cumulative_length=lh5.read_as(
+            f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
+        ),
+    )
+
     # get number of events in file (ask the TCM)
-    store = LH5Store()
-    n_rows = store.read_n_rows(f"/{f.tcm.group}/cumulative_length", f.tcm.file)
+    n_rows = len(tcm.cumulative_length)
     table = Table(size=n_rows)
 
     # now loop over operations (columns in evt table)
@@ -240,6 +247,7 @@ def build_evt(
 
             obj = evaluate_expression(
                 files_cfg,
+                tcm,
                 channels=channels_e,
                 channels_rm=channels_rm,
                 mode=v["aggregation_mode"],
@@ -259,6 +267,8 @@ def build_evt(
 
             table.add_field(k, obj)
 
+    store = LH5Store()
+
     # write output fields into outfile
     if "outputs" in config.keys():
         if len(config["outputs"]) < 1:
@@ -272,7 +282,7 @@ def build_evt(
             if f.evt.file:
                 store.write(
                     obj=table,
-                    name=f"/{f.evt.group}/",
+                    name=f.evt.group,
                     lh5_file=f.evt.file,
                     wo_mode=wo_mode,
                 )
@@ -289,7 +299,8 @@ def build_evt(
 
 
 def evaluate_expression(
-    files_cfg: Mapping[str, Sequence[str, str]],
+    files_cfg: utils.TierData,
+    tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
     mode: str,
@@ -410,15 +421,6 @@ def evaluate_expression(
             # if it is an evt query we can evaluate it directly here
             if table and f"{f.evt.group}." in query:
                 query_mask = eval(query.replace(f"{f.evt.group}.", ""), table)
-
-        # load TCM data to define an event
-        tcm = utils.TCMData(
-            id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
-            idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
-            cumulative_length=lh5.read_as(
-                f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
-            ),
-        )
 
         # switch through modes
         if table and (
