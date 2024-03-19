@@ -219,6 +219,7 @@ class LQCal:
         eres_func: callable,
         cdf: callable = gaussian,
         selection_string: str = "is_valid_cal&is_not_pulser",
+        debug_mode=False,
     ):
         """
         Parameters
@@ -298,7 +299,9 @@ class LQCal:
                                 ),
                             ]
                         )
-                    except Exception:
+                    except BaseException as e:
+                        if self.debug_mode:
+                            raise (e)
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -366,7 +369,9 @@ class LQCal:
                             ),
                         ]
                     )
-                except Exception:
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -392,7 +397,9 @@ class LQCal:
                     }
                 )
                 log.info("LQ time correction finished")
-        except Exception:
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("LQ time correction failed")
             self.update_cal_dicts(
                 {
@@ -435,7 +442,9 @@ class LQCal:
                 df[lq_param] - df["dt_eff"] * self.dt_fit_pars[0] - self.dt_fit_pars[1]
             )
 
-        except Exception:
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
 
@@ -470,7 +479,9 @@ class LQCal:
 
             df["LQ_Cut"] = df[lq_param] < self.cut_val
 
-        except Exception:
+        except BaseException as e:
+            if self.debug_mode:
+                raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
 
@@ -555,7 +566,9 @@ class LQCal:
                     )
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
-            except Exception:
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
                 self.low_side_sf = pd.concat(
                     [
                         self.low_side_sf,
