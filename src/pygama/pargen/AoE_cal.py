@@ -824,7 +824,7 @@ class CalAoE:
         cal_energy_param: str = "cuspEmax_ctc_cal",
         eres_func: callable = lambda x: 1,
         pdf=aoe_peak,
-        selection_string: str = "",
+        selection_string: str = "index==index",
         dt_corr: bool = False,
         dep_correct: bool = False,
         dt_cut: dict = None,
@@ -859,7 +859,9 @@ class CalAoE:
         self.debug_mode = debug_mode
 
     def update_cal_dicts(self, update_dict):
-        if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+        if len(self.cal_dicts) > 0 and re.match(
+            r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]
+        ):
             for tstamp in self.cal_dicts:
                 if tstamp in update_dict:
                     self.cal_dicts[tstamp].update(update_dict[tstamp])
@@ -1745,8 +1747,8 @@ class CalAoE:
         self.update_cal_dicts(
             {
                 "AoE_Double_Sided_Cut": {
-                    "expression": "(a>AoE_Classifier) & (AoE_Low_Cut)",
-                    "parameters": {"a": self.high_cut_val},
+                    "expression": "(AoE_High_Side_Cut) & (AoE_Low_Cut)",
+                    "parameters": {},
                 }
             }
         )
