@@ -55,8 +55,6 @@ class HPGeCalibration:
         e_uncal
     fixed : dict
         dictionary of fixed parameters for the calibration function
-    plot_options : dict
-        dictionary of options for plotting the calibration results
 
     """
 
@@ -68,7 +66,7 @@ class HPGeCalibration:
         deg: int = 1,
         uncal_is_int: bool = False,
         fixed=None,
-        plot_options: dict = None,
+        debug_mode: bool = False,
     ):
         self.energy_param = energy_param
 
@@ -98,7 +96,7 @@ class HPGeCalibration:
         self.results = {}
 
         self.uncal_is_int = uncal_is_int
-        self.plot_options = plot_options
+        self.debug_mode = debug_mode
 
     def gen_pars_dict(self):
         """
@@ -116,9 +114,9 @@ class HPGeCalibration:
             if i == 0:
                 expression += f"{parameter_name}"
             elif i == 1:
-                expression += f"{parameter_name} * self.energy_param"
+                expression += f" + {parameter_name} * {self.energy_param}"
             else:
-                expression += f" + {parameter_name} * {self.energy_param}^{i}"
+                expression += f" + {parameter_name} * {self.energy_param}^{i} "
             parameters[parameter_name] = coeff
         return {"expression": expression, "parameters": parameters}
 
@@ -419,8 +417,8 @@ class HPGeCalibration:
     def hpge_fit_energy_peaks(
         self,
         e_uncal,
-        peaks_kev=None,
         peak_pars=None,
+        peaks_kev=None,
         default_n_bins=50,
         peak_param="mode",
         method="unbinned",
@@ -478,6 +476,9 @@ class HPGeCalibration:
 
         if peaks_kev is None:
             peaks_kev = self.peaks_kev
+
+        if peak_pars is None:
+            peak_pars = [(peak, None, pgf.gauss_on_step) for peak in peaks_kev]
 
         # convert peak pars to array of tuples
         tmp = np.empty(len(peak_pars), dtype=object)
@@ -579,7 +580,6 @@ class HPGeCalibration:
                         bounds_func=get_hpge_energy_bounds,
                         fixed_func=get_hpge_energy_fixed,
                         allow_tail_drop=True,
-                        bin_width=2 * binw_1,
                         tail_weight=tail_weight,
                         guess_kwargs={"mode_guess": mode_guess},
                     )
@@ -679,7 +679,9 @@ class HPGeCalibration:
                 else:
                     valid_pk = True
 
-            except Exception:
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
                 log.debug(
                     f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
                 )
@@ -913,7 +915,7 @@ class HPGeCalibration:
 
     @staticmethod
     def interpolate_energy_res(
-        fwhm_func, fwhm_peaks, fwhm_results, interp_energy_kev=None
+        fwhm_func, fwhm_peaks, fwhm_results, interp_energy_kev=None, debug_mode=False
     ):
         if interp_energy_kev is not None:
             for key, energy in interp_energy_kev.items():
@@ -931,7 +933,9 @@ class HPGeCalibration:
                     )
                     interp_err = np.nanstd(interp_vals)
                     interp_fwhm = fwhm_func.func(energy, *fwhm_results["parameters"])
-                except Exception:
+                except BaseException as e:
+                    if debug_mode:
+                        raise (e)
                     interp_fwhm = np.nan
                     interp_err = np.nan
                 fwhm_results.update(
@@ -996,7 +1000,11 @@ class HPGeCalibration:
         results = self.fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms)
         if interp_energy_kev is not None:
             results = self.interpolate_energy_res(
-                fwhm_func, fwhm_peaks, results, interp_energy_kev
+                fwhm_func,
+                fwhm_peaks,
+                results,
+                interp_energy_kev,
+                debug_mode=self.debug_mode,
             )
         self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
 
@@ -1044,8 +1052,9 @@ class HPGeCalibration:
                                     peak_par[1][1] - 5,
                                 )
                                 peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
-                except Exception:
-                    pass
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
 
             self.hpge_fit_energy_peaks(
                 e_uncal,
@@ -1078,10 +1087,10 @@ class HPGeCalibration:
             interp_energy_kev={"Qbb": 2039.0},
         )
 
-    def fit_calibrated_peaks(self, e_uncal):
+    def fit_calibrated_peaks(self, e_uncal, peak_pars):
         log.debug(f"Fitting {self.energy_param}")
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
-        self.hpge_fit_energy_peaks(e_uncal, update_cal_pars=False)
+        self.hpge_fit_energy_peaks(e_uncal, peak_pars =peak_pars, update_cal_pars=False)
         self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
@@ -1233,8 +1242,9 @@ class HPGeCalibration:
                     new_locs, new_labels = get_peak_labels(locs, self.pars)
                     plt.xticks(ticks=new_locs, labels=new_labels)
 
-            except Exception:
-                pass
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
 
         plt.tight_layout()
         plt.close()
@@ -1397,6 +1407,7 @@ def hpge_fit_energy_peak_tops(
     cost_func="Least Squares",
     inflate_errors=False,
     gof_method="var",
+    debug_mode=False,
 ):
     """Fit gaussians to the tops of peaks
 
@@ -1436,7 +1447,9 @@ def hpge_fit_energy_peak_tops(
                 inflate_errors=inflate_errors,
                 gof_method=gof_method,
             )
-        except Exception:
+        except BaseException as e:
+            if debug_mode:
+                raise (e)
             pars, cov = None, None
 
         pars_list.append(pars)
@@ -1506,11 +1519,36 @@ def get_hpge_energy_peak_par_guess(
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
+
+    energy = energy[(energy >= fit_range[0]) & (energy <= fit_range[1])]
+    if bin_width is None:
+        init_bin_width = (
+            2
+            * (np.nanpercentile(energy, 75) - np.nanpercentile(energy, 25))
+            * len(energy) ** (-1 / 3)
+        )
+        init_hist, init_bins, _ = pgh.get_hist(
+            energy, dx=init_bin_width, range=fit_range
+        )
+        if np.nanmax(init_hist) < np.nanpercentile(init_hist, 50) * 2:
+            init_sigma = np.nanstd(energy)
+        else:
+            try:
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+            except IndexError:
+                init_hist, init_bins, _ = pgh.get_hist(
+                    energy, dx=init_bin_width / 2, range=fit_range
+                )
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+
+        bin_width = init_sigma * len(energy) ** (-1 / 3)
+
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
-    if func == pgf.gauss_on_step:
+
+    if func == pgf.gauss_on_step or func == pgf.hpge_peak:
         # get mu and height from a gauss fit, also sigma as fallback
         pars, cov = pgb.gauss_mode_width_max(
-            hist, bins, var, mode_guess=mode_guess, n_bins=10
+            hist, bins, var, mode_guess=mode_guess, n_bins=5
         )
 
         bin_centres = pgh.get_bin_centers(bins)
@@ -1541,27 +1579,29 @@ def get_hpge_energy_peak_par_guess(
             if sigma <= 0:
                 raise ValueError
         except ValueError:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg - step / 2,
-                method="fit_slopes",
-            )[0]
+            try:
+                sigma = pgh.get_fwfm(
+                    0.6065,
+                    hist,
+                    bins,
+                    var,
+                    mx=height,
+                    bl=bg - step / 2,
+                    method="fit_slopes",
+                )[0]
+            except RuntimeError:
+                sigma = -1
             if sigma <= 0 or sigma > 1000:
-                log.info("get_hpge_energy_peak_par_guess: sigma estimation failed")
                 if sigma_guess is not None and sigma_guess > 0 and sigma_guess < 1000:
                     sigma = sigma_guess
                 else:
-                    (
-                        _,
-                        sigma,
-                    ) = pgh.get_gaussian_guess(hist, bins)
+                    (_, sigma, _) = pgh.get_gaussian_guess(hist, bins)
                     if sigma is not None and sigma_guess > 0 and sigma_guess < 1000:
                         pass
                     else:
+                        log.info(
+                            "get_hpge_energy_peak_par_guess: sigma estimation failed"
+                        )
                         return {}
         # now compute amp and return
         n_sig = np.sum(
@@ -1581,88 +1621,14 @@ def get_hpge_energy_peak_par_guess(
             "x_hi": bins[-1],
         }
 
-        for name, guess in parguess.items():
-            if np.isnan(guess):
-                parguess[name] = 0
-
-    elif func == pgf.hpge_peak:
-        # guess mu, height
-        pars, cov = pgb.gauss_mode_width_max(hist, bins, var, n_bins=10)
-        bin_centres = pgh.get_bin_centers(bins)
-        # height=pars[2]
-        i_0 = np.argmax(hist)
-        height = hist[i_0]
-        if pars is None:
-            log.info("get_hpge_energy_peak_par_guess: gauss_mode_width_max failed")
-            sigma_guess = None
-        else:
-            mu = mode_guess if mode_guess is not None else bin_centres[i_0]
-            sigma_guess = pars[1]
-
-        # get bg and step from edges of hist
-        bg0 = np.mean(hist[-10:])
-        step = bg0 - np.mean(hist[:10])
-
-        # get sigma from fwfm with f = 1/sqrt(e)
-        try:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg0 + step / 2,
-                method="interpolate",
-            )[0]
-            if sigma <= 0:
-                raise ValueError
-        except Exception:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg0 + step / 2,
-                method="fit_slopes",
-            )[0]
-            if sigma <= 0 or sigma > 1000:
-                log.info("get_hpge_energy_peak_par_guess: sigma estimation failed")
-                if sigma_guess is not None and sigma_guess > 0 and sigma_guess < 1000:
-                    sigma = sigma_guess
-                else:
-                    (
-                        _,
-                        sigma,
-                    ) = pgh.get_gaussian_guess(hist, bins)
-                    if sigma is not None and sigma_guess > 0 and sigma_guess < 1000:
-                        pass
-                    else:
-                        return {}
-        sigma = sigma * 0.8  # roughly remove some amount due to tail
-
-        # for now hard-coded
-        htail = 1.0 / 5
-        tau = sigma / 2
-
-        hstep = step / (bg0 + np.mean(hist[:10]))
-
-        n_sig = np.sum(
-            hist[(bin_centres > mu - 3 * sigma) & (bin_centres < mu + 3 * sigma)]
-        )
-        n_bkg = np.sum(hist) - n_sig
-
-        parguess = {
-            "n_sig": n_sig,
-            "mu": mu,
-            "sigma": sigma,
-            "htail": htail,
-            "tau": tau,
-            "n_bkg": n_bkg,
-            "hstep": hstep,
-            "x_lo": bins[0],
-            "x_hi": bins[-1],
-        }
+        if func == pgf.hpge_peak:
+            sigma = sigma * 0.8  # roughly remove some amount due to tail
+            # for now hard-coded
+            htail = 1.0 / 5
+            tau = sigma / 2
+            parguess["sigma"] = sigma
+            parguess["htail"] = htail
+            parguess["tau"] = tau
 
         for name, guess in parguess.items():
             if np.isnan(guess):
@@ -1782,7 +1748,7 @@ def unbinned_staged_energy_fit(
     tol=None,
     tail_weight=0,
     allow_tail_drop=True,
-    bin_width=1,
+    bin_width=None,
     lock_guess=False,
     display=0,
 ):
@@ -1797,27 +1763,50 @@ def unbinned_staged_energy_fit(
     if gof_range is None:
         gof_range = fit_range
 
-    hist, bins, _ = pgh.get_hist(energy, range=fit_range, dx=bin_width)
-    bin_cs = (bins[:-1] + bins[1:]) / 2
+    if bin_width is None:
+        init_bin_width = (
+            2
+            * (np.nanpercentile(energy, 75) - np.nanpercentile(energy, 25))
+            * len(energy) ** (-1 / 3)
+        )
+        init_hist, init_bins, _ = pgh.get_hist(
+            energy, dx=init_bin_width, range=fit_range
+        )
+        if np.nanmax(init_hist) < np.nanpercentile(init_hist, 50) * 2:
+            sigma = np.nanstd(energy)
+        else:
+            try:
+                (_, sigma, _) = pgh.get_gaussian_guess(init_hist, init_bins)
+            except IndexError:
+                init_hist, init_bins, _ = pgh.get_hist(
+                    energy, dx=init_bin_width / 2, range=fit_range
+                )
+                (_, sigma, _) = pgh.get_gaussian_guess(init_hist, init_bins)
+
+        bin_width = (sigma) * len(energy) ** (-1 / 3)
 
     gof_hist, gof_bins, gof_var = pgh.get_hist(energy, range=gof_range, dx=bin_width)
 
     if guess is not None:
         if not isinstance(guess, ValueView):
             x0 = convert_to_minuit(guess, func)
-        x0["x_lo"] = fit_range[0]
-        x0["x_hi"] = fit_range[1]
-        x1 = guess_func(
-            energy,
-            func,
-            fit_range,
-            bin_width=bin_width,
-            **guess_kwargs if guess_kwargs is not None else {},
-        )
-        for arg, val in x1.items():
-            if arg not in x0:
-                x0[arg] = val
-        if lock_guess is False:
+        if lock_guess is True:
+            x0 = guess
+            x0["x_lo"] = fit_range[0]
+            x0["x_hi"] = fit_range[1]
+        else:
+            x0["x_lo"] = fit_range[0]
+            x0["x_hi"] = fit_range[1]
+            x1 = guess_func(
+                energy,
+                func,
+                fit_range,
+                bin_width=bin_width,
+                **guess_kwargs if guess_kwargs is not None else {},
+            )
+            for arg, val in x1.items():
+                if arg not in x0:
+                    x0[arg] = val
             if len(x0) == len(x1):
                 cs, _ = pgb.goodness_of_fit(
                     gof_hist, gof_bins, None, func.pdf_norm, x0, method="Pearson"
@@ -1963,6 +1952,9 @@ def unbinned_staged_energy_fit(
     frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
 
     if display > 1:
+        hist, bins, _ = pgh.get_hist(energy, range=fit_range, dx=bin_width)
+        bin_cs = (bins[:-1] + bins[1:]) / 2
+
         m_fit = func.get_pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
         m2_fit = func.get_pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
         plt.figure()
