@@ -528,7 +528,6 @@ class HPGeCalibration:
             euc_min = x0["mu"] - n_sigmas * x0["sigma"]
             euc_max = x0["mu"] + n_sigmas * x0["sigma"]
 
-            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
             bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
             n_bins_i = int((euc_max - euc_min) / bin_width)
 
