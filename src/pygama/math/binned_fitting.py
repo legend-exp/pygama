@@ -90,7 +90,9 @@ def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarr
 
     m = Minuit(cost_func, *guess)
     if bounds is not None:
-        m.limits = bounds
+        if isinstance(bounds, dict):
+            for key, val in bounds.items():
+                m.limits[key] = val
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True

@@ -81,6 +81,12 @@ def test_hpge_cal(lgnd_test_data):
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
+    cal.hpge_cal_energy_peak_tops(energy)
+
+    assert (cal.peaks_kev == glines).all()
+    assert approx(cal.pars[1], 0.1) == 0.15
+    assert cal.pars[0] == 0.0
+
     cal.hpge_fit_energy_peaks(energy, peak_pars=pk_pars)
 
     assert (cal.peaks_kev == glines).all()
