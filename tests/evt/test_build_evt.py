@@ -20,8 +20,8 @@ def files_config(lgnd_test_data, tmptestdir):
 
     return {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
-        "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp"),
-        "hit": (lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")), "hit"),
+        "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
+        "hit": (lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")), "hit", "ch{}"),
         "evt": (outfile, "evt"),
     }
 
@@ -69,48 +69,18 @@ def test_basics(lgnd_test_data, files_config):
     assert ak.all(ids == eid[eid != 0])
 
 
-def test_lar_module(lgnd_test_data, files_config):
+def test_spms_module(lgnd_test_data, files_config):
     build_evt(
         files_config,
-        config=f"{config_dir}/module-test-evt-config.json",
+        config=f"{config_dir}/spms-module-config.json",
         wo_mode="of",
     )
 
     outfile = files_config["evt"][0]
 
-    assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 10
-    nda = {
-        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
-        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "t0", "lar_time_shift"]
-    }
-    assert np.max(nda["lar_multiplicity"]) <= 3
-    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
-    assert ((nda["lar_time_shift"] + nda["t0"]) >= 0).all()
-
-
-def test_lar_t0_vov_module(lgnd_test_data, files_config):
-    build_evt(
-        files_config,
-        config=f"{config_dir}/module-test-t0-vov-evt-config.json",
-        wo_mode="of",
-    )
-
-    outfile = files_config["evt"][0]
-
-    assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 12
-    nda = {
-        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
-        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"]
-    }
-    assert np.max(nda["lar_multiplicity"]) <= 3
-    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
-
-    ch_idx = store.read("/evt/lar_tcm_index", outfile)[0].view_as("ak")
-    pls_idx = store.read("/evt/lar_pulse_index", outfile)[0].view_as("ak")
-    assert ak.count(ch_idx) == ak.count(pls_idx)
-    assert ak.all(ak.count(ch_idx, axis=-1) == ak.count(pls_idx, axis=-1))
+    obj = lh5.read("/evt/spms_amp", outfile)
+    assert isinstance(obj, VectorOfVectors)
+    assert len(obj) == 10
 
 
 def test_vov(lgnd_test_data, files_config):

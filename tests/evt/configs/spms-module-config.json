@@ -1,0 +1,31 @@
+{
+  "channels": {
+    "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
+    "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
+  },
+  "outputs": ["spms_amp", "spms_amp_full"],
+  "operations": {
+    "t0": {
+      "channels": "geds_on",
+      "aggregation_mode": "first_at:dsp.tp_0_est",
+      "expression": "dsp.tp_0_est",
+      "query": "hit.cuspEmax_ctc_cal > 25",
+      "initial": "np.nan"
+    },
+    "_pulse_mask": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.pulse_data_mask(<...>, a_thr_pe=0.1, t_loc_ns=evt.t0, t_min_ns=-30_000, t_max_ns=30_000, t_loc_default_ns=48_000)"
+    },
+    "spms_amp": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe', pulse_mask=evt._pulse_mask)"
+    },
+    "spms_amp_full": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_all_pulse_data(<...>, observable='hit.trigger_pos')"
+    }
+  }
+}

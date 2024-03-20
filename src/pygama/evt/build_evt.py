@@ -4,12 +4,12 @@ This module implements routines to build the `evt` tier.
 
 from __future__ import annotations
 
+import importlib
 import itertools
 import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
-from importlib import import_module
 
 import awkward as ak
 import numpy as np
@@ -39,8 +39,8 @@ def build_evt(
 
             {
               "tcm": ("data-tier_tcm.lh5", "hardware_tcm_1"),
-              "dsp": ("data-tier_dsp.lh5", "dsp"),
-              "hit": ("data-tier_hit.lh5", "hit"),
+              "dsp": ("data-tier_dsp.lh5", "dsp", "ch{}"),
+              "hit": ("data-tier_hit.lh5", "hit", "ch{}"),
               "evt": ("data-tier_evt.lh5", "evt"),
             }
 
@@ -167,7 +167,7 @@ def build_evt(
 
             # load module
             p, m = v["module"].rsplit(".", 1)
-            met = getattr(import_module(p, package=__package__), m)
+            met = getattr(importlib.import_module(p, package=__package__), m)
             channels[k] = met(v | attr)
 
         elif isinstance(v, str):
@@ -200,14 +200,11 @@ def build_evt(
                 var = var | v["parameters"]
 
             # compute and eventually get rid of evt. suffix
-            res = table.eval(v["expression"].replace(f"{f.evt.group}.", ""), var)
+            obj = table.eval(v["expression"].replace(f"{f.evt.group}.", ""), var)
 
             # add attributes if present
             if "lgdo_attrs" in v.keys():
-                res.attrs |= v["lgdo_attrs"]
-
-            # add output column to the table
-            table.add_field(k, res)
+                obj.attrs |= v["lgdo_attrs"]
 
         # else we build the event entry
         else:
@@ -265,7 +262,8 @@ def build_evt(
             if "lgdo_attrs" in v.keys():
                 obj.attrs |= v["lgdo_attrs"]
 
-            table.add_field(k, obj)
+        log.debug("new column " + repr(obj))
+        table.add_field(k, obj)
 
     store = LH5Store()
 
@@ -373,39 +371,62 @@ def evaluate_expression(
     exprl = re.findall(
         rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
     )
-    var_ph = {}
+
+    # build dictionary of parameter names and their values
+    # a parameter can be a column in the existing table...
+    # TODO: check & rewrite
+    pars_dict = {}
     if table is not None:
-        var_ph |= {
-            e: table[e].view_as("ak")
+        pars_dict |= {
+            e: table[e]
             for e in table.keys()
             if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
         }
+    # ...or defined through the configuration
     if parameters:
-        var_ph = var_ph | parameters
+        pars_dict = pars_dict | parameters
 
     if mode == "function":
-        # evaluate expression
-        func, params = expr.split("(")
-        params = (
-            params.replace(f"{f.dsp.group}.", f"{f.dsp.group}_")
-            .replace(f"{f.hit.group}.", f"{f.hit.group}_")
-            .replace(f"{f.evt.group}.", "")
-        )
-        params = [
-            f.hit.file,
-            f.dsp.file,
-            f.tcm.file,
-            f.hit.group,
-            f.dsp.group,
-            f.tcm.group,
-            chname_fmt,
-            [x for x in channels if x not in channels_rm],
-        ] + [utils.num_and_pars(e, var_ph) for e in params[:-1].split(",")]
+        # syntax:
+        #
+        #     pygama.evt.modules.spms.my_func([...], arg1=val, arg2=val)
 
-        # load function dynamically
-        p, m = func.rsplit(".", 1)
-        met = getattr(import_module(p, package=__package__), m)
-        return met(*params)
+        # get arguments list passed to the function
+        m = re.search(r"(.+)\((.*)\)$", expr.strip())
+        args_str = m.group(2)
+
+        # handle tier scoping: evt.<>
+        if f.evt.group is not None:
+            args_str = args_str.replace(f.evt.group + ".", "")
+
+        good_chns = [x for x in channels if x not in channels_rm]
+
+        # replace stuff before first comma with list of mandatory args
+        full_args_str = "files, tcm, channels," + ",".join(args_str.split(",")[1:])
+
+        # get module and function names
+        subpackage, func = m.group(1).rsplit(".", 1)
+        package = subpackage.split(".")[0]
+
+        # import function into current namespace
+        log.debug(f"importing module {subpackage}")
+        importlib.import_module(subpackage, package=__package__)
+
+        # declare imported package as globals (see eval() call later)
+        globs = {
+            package: importlib.import_module(package),
+        }
+
+        # lookup dictionary for variables used in function arguments (see eval() call later)
+        locs = {"files": f, "tcm": tcm, "channels": good_chns} | pars_dict
+
+        # evil eval() to avoid annoying args casting logic
+        call_str = f"{m.group(1)}({full_args_str})"
+        log.debug(f"evaluating {call_str}")
+        log.debug(f"...globals={globs} and locals={locs}")
+        log.debug(f"...locals={locs}")
+
+        return eval(call_str, globs, locs)
 
     else:
         # check if query is either on channel basis or evt basis (and not a mix)
@@ -453,7 +474,7 @@ def evaluate_expression(
                     expr=expr,
                     exprl=exprl,
                     ch_comp=ch_comp,
-                    var_ph=var_ph,
+                    pars_dict=pars_dict,
                     default_value=default_value,
                     chname_fmt=chname_fmt,
                 )
@@ -466,7 +487,7 @@ def evaluate_expression(
                     exprl=exprl,
                     ch_comp=ch_comp,
                     channels_rm=channels_rm,
-                    var_ph=var_ph,
+                    pars_dict=pars_dict,
                     default_value=default_value,
                     chname_fmt=chname_fmt,
                 )
@@ -493,7 +514,7 @@ def evaluate_expression(
                 query=query_mask,
                 n_rows=n_rows,
                 sorter=sorter,
-                var_ph=var_ph,
+                pars_dict=pars_dict,
                 default_value=default_value,
                 is_first=True if "first_at:" in mode else False,
                 chname_fmt=chname_fmt,
@@ -510,7 +531,7 @@ def evaluate_expression(
                 exprl=exprl,
                 query=query_mask,
                 n_rows=n_rows,
-                var_ph=var_ph,
+                pars_dict=pars_dict,
                 default_value=default_value,
                 chname_fmt=chname_fmt,
             )
@@ -524,7 +545,7 @@ def evaluate_expression(
                 exprl=exprl,
                 query=query_mask,
                 n_rows=n_rows,
-                var_ph=var_ph,
+                pars_dict=pars_dict,
                 default_value=default_value,
                 sorter=sorter,
                 chname_fmt=chname_fmt,

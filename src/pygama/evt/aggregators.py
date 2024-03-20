@@ -23,7 +23,7 @@ def evaluate_to_first_or_last(
     query: str | NDArray,
     n_rows: int,
     sorter: tuple,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     is_first: bool = True,
     chname_fmt: str = "ch{}",
@@ -51,7 +51,7 @@ def evaluate_to_first_or_last(
        length of output array.
     sorter
        tuple of field in `hit/dsp/evt` tier to evaluate ``(tier, field)``.
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -85,7 +85,7 @@ def evaluate_to_first_or_last(
             tcm=tcm,
             expr=expr,
             exprl=exprl,
-            var_ph=var_ph,
+            pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
@@ -142,7 +142,7 @@ def evaluate_to_scalar(
     exprl: list,
     query: str | NDArray,
     n_rows: int,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     chname_fmt: str = "ch{}",
 ) -> Array:
@@ -168,7 +168,7 @@ def evaluate_to_scalar(
        query expression to mask aggregation.
     n_rows
        length of output array
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -195,7 +195,7 @@ def evaluate_to_scalar(
             tcm=tcm,
             expr=expr,
             exprl=exprl,
-            var_ph=var_ph,
+            pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
@@ -234,7 +234,7 @@ def evaluate_at_channel(
     expr: str,
     exprl: list,
     ch_comp: Array,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     chname_fmt: str = "ch{}",
 ) -> Array:
@@ -254,7 +254,7 @@ def evaluate_at_channel(
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
        array of rawids at which the expression is evaluated.
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -280,7 +280,7 @@ def evaluate_at_channel(
             tcm=tcm,
             expr=expr,
             exprl=exprl,
-            var_ph=var_ph,
+            pars_dict=pars_dict,
             is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
             not in channels_rm,
             default_value=default_value,
@@ -299,7 +299,7 @@ def evaluate_at_channel_vov(
     exprl: list,
     ch_comp: VectorOfVectors,
     channels_rm: list,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     chname_fmt: str = "ch{}",
 ) -> VectorOfVectors:
@@ -320,7 +320,7 @@ def evaluate_at_channel_vov(
        array of "rawid"s at which the expression is evaluated.
     channels_rm
        list of channels to be skipped from evaluation and set to default value.
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -346,7 +346,7 @@ def evaluate_at_channel_vov(
             tcm=tcm,
             expr=expr,
             exprl=exprl,
-            var_ph=var_ph,
+            pars_dict=pars_dict,
             is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
             not in channels_rm,
             default_value=default_value,
@@ -377,7 +377,7 @@ def evaluate_to_aoesa(
     exprl: list,
     query: str | NDArray,
     n_rows: int,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     missv=np.nan,
     chname_fmt: str = "ch{}",
@@ -405,7 +405,7 @@ def evaluate_to_aoesa(
        length of output :class:`.VectorOfVectors`.
     ch_comp
        array of "rawid"s at which the expression is evaluated.
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -434,7 +434,7 @@ def evaluate_to_aoesa(
             tcm=tcm,
             expr=expr,
             exprl=exprl,
-            var_ph=var_ph,
+            pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
             chname_fmt=chname_fmt,
@@ -465,7 +465,7 @@ def evaluate_to_vector(
     exprl: list,
     query: str | NDArray,
     n_rows: int,
-    var_ph: dict = None,
+    pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
     chname_fmt: str = "ch{}",
@@ -493,7 +493,7 @@ def evaluate_to_vector(
        length of output :class:`.VectorOfVectors`.
     ch_comp
        array of "rawids" at which the expression is evaluated.
-    var_ph
+    pars_dict
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
@@ -514,7 +514,7 @@ def evaluate_to_vector(
         exprl=exprl,
         query=query,
         n_rows=n_rows,
-        var_ph=var_ph,
+        pars_dict=pars_dict,
         default_value=default_value,
         missv=np.nan,
         chname_fmt=chname_fmt,

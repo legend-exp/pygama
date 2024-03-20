@@ -3,6 +3,7 @@ This module provides utilities to build the `evt` tier.
 """
 from __future__ import annotations
 
+import copy
 import re
 from collections import namedtuple
 
@@ -11,7 +12,9 @@ import numpy as np
 from lgdo import lh5
 from numpy.typing import NDArray
 
-H5DataLoc = namedtuple("H5DataLoc", ("file", "group"), defaults=2 * (None,))
+H5DataLoc = namedtuple(
+    "H5DataLoc", ("file", "group", "table_fmt"), defaults=3 * (None,)
+)
 TierData = namedtuple(
     "TierData", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
 )
@@ -19,7 +22,7 @@ TierData = namedtuple(
 TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
 
 
-def make_files_config(data):
+def make_files_config(data: dict):
     if not isinstance(data, TierData):
         return TierData(
             *[
@@ -29,6 +32,12 @@ def make_files_config(data):
         )
 
     return data
+
+
+def copy_lgdo_attrs(obj):
+    attrs = copy.copy(obj.attrs)
+    attrs.pop("datatype")
+    return attrs
 
 
 def get_tcm_id_by_pattern(chname_fmt: str, ch: str) -> int:
@@ -46,24 +55,6 @@ def get_table_name_by_pattern(chname_fmt: str, ch_id: int) -> str:
         raise NotImplementedError(
             "Only empty placeholders with format specifications are currently implemented"
         )
-
-
-def num_and_pars(value: str, par_dic: dict):
-    # function tries to convert a string to a int, float, bool
-    # or returns the value if value is a key in par_dic
-    if value in par_dic.keys():
-        return par_dic[value]
-    try:
-        value = int(value)
-    except ValueError:
-        try:
-            value = float(value)
-        except ValueError:
-            try:
-                value = bool(value)
-            except ValueError:
-                pass
-    return value
 
 
 def find_parameters(
@@ -128,7 +119,7 @@ def get_data_at_channel(
     tcm: TCMData,
     expr: str,
     exprl: list,
-    var_ph: dict,
+    pars_dict: dict,
     is_evaluated: bool,
     default_value,
     chname_fmt: str = "ch{}",
@@ -147,7 +138,7 @@ def get_data_at_channel(
        expression to be evaluated.
     exprl
        list of parameter-tuples ``(root_group, field)`` found in the expression.
-    var_ph
+    pars_dict
        dict of additional parameters that are not channel dependent.
     is_evaluated
        if false, the expression does not get evaluated but an array of default
@@ -178,8 +169,8 @@ def get_data_at_channel(
             exprl=exprl,
         )
 
-        if var_ph is not None:
-            var = var | var_ph
+        if pars_dict is not None:
+            var = var | pars_dict
 
         # evaluate expression
         # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
