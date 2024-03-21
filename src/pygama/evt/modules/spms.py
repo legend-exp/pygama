@@ -16,8 +16,7 @@ def gather_pulse_data(
     pulse_mask=None,
     a_thr_pe=None,
     t_loc_ns=None,
-    t_min_ns=None,
-    t_max_ns=None,
+    dt_range_ns=None,
     t_loc_default_ns=None,
 ) -> types.VectorOfVectors:
     if pulse_mask is None:
@@ -28,8 +27,7 @@ def gather_pulse_data(
             channels,
             a_thr_pe=a_thr_pe,
             t_loc_ns=t_loc_ns,
-            t_min_ns=t_min_ns,
-            t_max_ns=t_max_ns,
+            dt_range_ns=dt_range_ns,
             t_loc_default_ns=t_loc_default_ns,
         )
 
@@ -99,11 +97,10 @@ def pulse_data_mask(
     tcm,
     channels,
     *,
-    a_thr_pe=0.5,
-    t_loc_ns=48_000,
-    t_min_ns=-1_000,
-    t_max_ns=5_000,
-    t_loc_default_ns=48_000,
+    a_thr_pe=None,
+    t_loc_ns=None,
+    dt_range_ns=None,
+    t_loc_default_ns=None,
 ) -> types.VectorOfVectors:
     # get the t0 of each single pulse
     pulse_t0 = gather_all_pulse_data(
@@ -136,10 +133,14 @@ def pulse_data_mask(
             msg = "t_loc_ns must be 0- or 1-dimensional"
             raise ValueError(msg)
 
+        # NOTE: the assumption is that t0 is np.nan when missing -> replace
+        # with default value
         t_loc_ns = ak.fill_none(ak.nan_to_none(t_loc_ns), t_loc_default_ns)
 
-    return types.VectorOfVectors(
-        (pulse_t0_ns < (t_loc_ns + t_max_ns))
-        & (pulse_t0_ns > (t_loc_ns + t_min_ns))
+    mask = (
+        (pulse_t0_ns < (t_loc_ns + dt_range_ns[1]))
+        & (pulse_t0_ns > (t_loc_ns + dt_range_ns[0]))
         & (pulse_amp > a_thr_pe)
     )
+
+    return types.VectorOfVectors(mask)

@@ -15,7 +15,7 @@
     "_pulse_mask": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.pulse_data_mask(<...>, a_thr_pe=0.1, t_loc_ns=evt.t0, t_min_ns=-30_000, t_max_ns=30_000, t_loc_default_ns=48_000)"
+      "expression": "pygama.evt.modules.spms.pulse_data_mask(<...>, a_thr_pe=0.1, t_loc_ns=evt.t0, dt_range_ns=(-30_000, 30_000), t_loc_default_ns=48_000)"
     },
     "spms_amp": {
       "channels": "spms_on",

@@ -391,9 +391,8 @@ def evaluate_expression(
         #
         #     pygama.evt.modules.spms.my_func([...], arg1=val, arg2=val)
 
-        # get arguments list passed to the function
-        m = re.search(r"(.+)\((.*)\)$", expr.strip())
-        args_str = m.group(2)
+        # get arguments list passed to the function (outermost parentheses)
+        args_str = re.search(r"\((.*)\)$", expr.strip()).group(1)
 
         # handle tier scoping: evt.<>
         if f.evt.group is not None:
@@ -405,7 +404,8 @@ def evaluate_expression(
         full_args_str = "files, tcm, channels," + ",".join(args_str.split(",")[1:])
 
         # get module and function names
-        subpackage, func = m.group(1).rsplit(".", 1)
+        func_call = expr.strip().split("(")[0]
+        subpackage, func = func_call.rsplit(".", 1)
         package = subpackage.split(".")[0]
 
         # import function into current namespace
@@ -421,7 +421,7 @@ def evaluate_expression(
         locs = {"files": f, "tcm": tcm, "channels": good_chns} | pars_dict
 
         # evil eval() to avoid annoying args casting logic
-        call_str = f"{m.group(1)}({full_args_str})"
+        call_str = f"{func_call}({full_args_str})"
         log.debug(f"evaluating {call_str}")
         log.debug(f"...globals={globs} and locals={locs}")
         log.debug(f"...locals={locs}")
