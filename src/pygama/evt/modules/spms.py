@@ -18,45 +18,7 @@ def gather_pulse_data(
     t_loc_ns=None,
     dt_range_ns=None,
     t_loc_default_ns=None,
-) -> types.VectorOfVectors:
-    if pulse_mask is None:
-        # generate the time/amplitude mask from parameters
-        pulse_mask = pulse_data_mask(
-            datainfo,
-            tcm,
-            channels,
-            a_thr_pe=a_thr_pe,
-            t_loc_ns=t_loc_ns,
-            dt_range_ns=dt_range_ns,
-            t_loc_default_ns=t_loc_default_ns,
-        )
-
-    if not isinstance(pulse_mask, ak.Array):
-        pulse_mask = pulse_mask.view_as("ak")
-
-    # get the full data (un-masked)
-    data = gather_all_pulse_data(
-        datainfo,
-        tcm,
-        channels,
-        observable=observable,
-    )
-
-    # apply the mask
-    masked_data = data.view_as("ak")[pulse_mask]
-
-    # remove empty arrays = channels with no pulses
-    masked_data = masked_data[ak.count(masked_data, axis=-1) > 0]
-
-    return types.VectorOfVectors(masked_data, attrs=utils.copy_lgdo_attrs(data))
-
-
-def gather_all_pulse_data(
-    datainfo,
-    tcm,
-    channels,
-    *,
-    observable,
+    drop_empty=True,
 ) -> types.VectorOfVectors:
     # parse observables string. default to hit tier
     p = observable.split(".")
@@ -65,6 +27,7 @@ def gather_all_pulse_data(
 
     tierinfo = datainfo._asdict()[tier]
 
+    # loop over selected channels and load hit data
     concatme = []
     for channel in channels:
         rawid = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
@@ -87,12 +50,38 @@ def gather_all_pulse_data(
         concatme.append(data)
 
     # concatenate along the event axes (i.e. gather channels together)
-    obj = ak.concatenate(concatme, axis=1)
+    data = ak.concatenate(concatme, axis=1)
 
-    return types.VectorOfVectors(obj, attrs=utils.copy_lgdo_attrs(lgdo_obj))
+    # check if user wants to apply a mask
+    if pulse_mask is None and any(
+        [kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)]
+    ):
+        # generate the time/amplitude mask from parameters
+        pulse_mask = make_pulse_data_mask(
+            datainfo,
+            tcm,
+            channels,
+            a_thr_pe=a_thr_pe,
+            t_loc_ns=t_loc_ns,
+            dt_range_ns=dt_range_ns,
+            t_loc_default_ns=t_loc_default_ns,
+        )
+
+    if pulse_mask is not None:
+        if not isinstance(pulse_mask, ak.Array):
+            pulse_mask = pulse_mask.view_as("ak")
+
+        # apply the mask
+        data = data[pulse_mask]
+
+    # remove empty arrays = channels with no pulses
+    if drop_empty:
+        data = data[ak.count(data, axis=-1) > 0]
+
+    return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
-def pulse_data_mask(
+def make_pulse_data_mask(
     datainfo,
     tcm,
     channels,
@@ -103,11 +92,12 @@ def pulse_data_mask(
     t_loc_default_ns=None,
 ) -> types.VectorOfVectors:
     # get the t0 of each single pulse
-    pulse_t0 = gather_all_pulse_data(
+    pulse_t0 = gather_pulse_data(
         datainfo,
         tcm,
         channels,
         observable="hit.trigger_pos",
+        drop_empty=False,
     )
 
     # HACK: handle units
@@ -117,11 +107,12 @@ def pulse_data_mask(
     else:
         pulse_t0_ns = pulse_t0.view_as("ak") * 16
 
-    pulse_amp = gather_all_pulse_data(
+    pulse_amp = gather_pulse_data(
         datainfo,
         tcm,
         channels,
         observable="hit.energy_in_pe",
+        drop_empty=False,
     ).view_as("ak")
 
     # (HPGe) trigger position can vary among events!
@@ -137,10 +128,15 @@ def pulse_data_mask(
         # with default value
         t_loc_ns = ak.fill_none(ak.nan_to_none(t_loc_ns), t_loc_default_ns)
 
-    mask = (
-        (pulse_t0_ns < (t_loc_ns + dt_range_ns[1]))
-        & (pulse_t0_ns > (t_loc_ns + dt_range_ns[0]))
-        & (pulse_amp > a_thr_pe)
-    )
+    mask = pulse_t0_ns == pulse_t0_ns
+
+    if a_thr_pe is not None:
+        mask = mask & (pulse_amp > a_thr_pe)
+
+    if t_loc_ns is not None and dt_range_ns is not None:
+        mask = mask & (
+            (pulse_t0_ns < (t_loc_ns + dt_range_ns[1]))
+            & (pulse_t0_ns > (t_loc_ns + dt_range_ns[0]))
+        )
 
     return types.VectorOfVectors(mask)
