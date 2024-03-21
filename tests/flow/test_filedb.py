@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from lgdo.lh5.exceptions import LH5EncodeError
 from pandas.testing import assert_frame_equal
 
 from pygama.flow import FileDB
@@ -346,7 +347,7 @@ def test_serialization(test_filedb_full, tmptestdir):
     db = test_filedb_full
     db.to_disk(f"{tmptestdir}/filedb.lh5", wo_mode="of")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(LH5EncodeError):
         db.to_disk(f"{tmptestdir}/filedb.lh5")
 
     db2 = FileDB(f"{tmptestdir}/filedb.lh5")
