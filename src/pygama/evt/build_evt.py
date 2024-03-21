@@ -10,6 +10,7 @@ import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 import awkward as ak
 import numpy as np
@@ -22,8 +23,8 @@ log = logging.getLogger(__name__)
 
 
 def build_evt(
-    datainfo: Mapping[str, Sequence[str, str]],
-    config: str | dict,
+    datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
+    config: str | Mapping[str, ...],
     wo_mode: str = "write_safe",
 ) -> None | Table:
     r"""Transform data from hit-structured tiers to event-structured data.
@@ -34,6 +35,7 @@ def build_evt(
         input and output LH5 datainfo with HDF5 groups where tables are found,
         (see :obj:`.utils.DataInfo`). Example: ::
 
+            # syntax: {"tier-name": ("file-name", "hdf5-group"[, "table-format"])}
             {
               "tcm": ("data-tier_tcm.lh5", "hardware_tcm_1"),
               "dsp": ("data-tier_dsp.lh5", "dsp", "ch{}"),
@@ -81,30 +83,31 @@ def build_evt(
                   "channels": "muon",
                   "aggregation_mode": "any",
                   "expression": "dsp.wf_max > a",
-                  "parameters": {"a":15100},
+                  "parameters": {"a": 15100},
                   "initial": false
                 },
                 "multiplicity":{
                   "channels":  ["geds_on", "geds_no_psd", "geds_ac"],
                   "aggregation_mode": "sum",
                   "expression": "hit.cuspEmax_ctc_cal > a",
-                  "parameters": {"a":25},
+                  "parameters": {"a": 25},
                   "initial": 0
                 },
                 "t0":{
                   "aggregation_mode": "keep_at_ch:evt.energy_id",
-                  "expression": "dsp.tp_0_est"
+                  "expression": "dsp.tp_0_est",
+                  "initial": "np.nan"
                 },
                 "lar_energy":{
                   "channels": "spms_on",
                   "aggregation_mode": "function",
-                  "expression": ".modules.spm.get_energy(0.5, evt.t0, 48000, 1000, 5000)"
+                  "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe')"
                 },
               }
             }
 
     wo_mode
-        writing mode.
+        writing mode, see :func:`lgdo.lh5.core.write`.
     """
     if not isinstance(config, dict):
         with open(config) as f:
@@ -151,10 +154,9 @@ def build_evt(
                 )
 
             attr = {}
-            # the time_key argument is set to the time key of the DSP file
-            # in case it is not provided by the config
+            # the time_key argument is mandatory
             if "time_key" not in v.keys():
-                attr["time_key"] = re.search(r"\d{8}T\d{6}Z", f.dsp.file).group(0)
+                raise RuntimeError("the 'time_key' configuration field is mandatory")
 
             # if "None" do None
             elif "None" == v["time_key"]:
@@ -171,6 +173,7 @@ def build_evt(
         elif isinstance(v, list):
             channels[k] = [e for e in v]
 
+    # load tcm data from disk
     tcm = utils.TCMData(
         id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
         idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
@@ -185,7 +188,7 @@ def build_evt(
 
     # now loop over operations (columns in evt table)
     for k, v in config["operations"].items():
-        log.debug("processing field: " + k)
+        log.debug(f"processing evt field: {k}")
 
         # if mode not defined in operation, it can only be an operation on the
         # evt level
@@ -211,12 +214,12 @@ def build_evt(
                 channels_e = list(
                     itertools.chain.from_iterable([channels[e] for e in v["channels"]])
                 )
-            channels_rm = []
+            channels_skip = []
             if "exclude_channels" in v.keys():
                 if isinstance(v["exclude_channels"], str):
-                    channels_rm = channels[v["exclude_channels"]]
+                    channels_skip = channels[v["exclude_channels"]]
                 elif isinstance(v["exclude_channels"], list):
-                    channels_rm = list(
+                    channels_skip = list(
                         itertools.chain.from_iterable(
                             [channels[e] for e in v["exclude_channels"]]
                         )
@@ -241,7 +244,7 @@ def build_evt(
                 datainfo,
                 tcm,
                 channels=channels_e,
-                channels_rm=channels_rm,
+                channels_skip=channels_skip,
                 mode=v["aggregation_mode"],
                 expr=v["expression"],
                 n_rows=n_rows,
@@ -256,7 +259,7 @@ def build_evt(
             if "lgdo_attrs" in v.keys():
                 obj.attrs |= v["lgdo_attrs"]
 
-        log.debug("new column " + repr(obj))
+        log.debug("new column {k!s}" + repr(obj))
         table.add_field(k, obj)
 
     store = LH5Store()
@@ -281,25 +284,19 @@ def build_evt(
             else:
                 return table
     else:
-        log.warning("No output fields specified, no file will be written.")
-
-    key = re.search(r"\d{8}T\d{6}Z", f.hit.file).group(0)
-    log.info(
-        f"Applied {len(config['operations'])} operations to key {key} and saved "
-        f"{len(config['outputs'])} evt fields across {len(channels)} channel groups"
-    )
+        log.warning("no output fields specified, no file will be written.")
 
 
 def evaluate_expression(
-    datainfo: utils.DataInfo,
+    datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
     tcm: utils.TCMData,
-    channels: list,
-    channels_rm: list,
+    channels: Sequence[str],
+    channels_skip: Sequence[list],
     mode: str,
     expr: str,
     n_rows: int,
     table: Table = None,
-    parameters: dict = None,
+    parameters: Mapping[str, Any] = None,
     query: str = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
@@ -316,7 +313,7 @@ def evaluate_expression(
         tcm data structure (see :obj:`.utils.TCMData`)
     channels
        list of channel names across which expression gets evaluated
-    channels_rm
+    channels_skip
        list of channels which get set to default value during evaluation. In
        function mode they are removed entirely
     mode
@@ -333,8 +330,10 @@ def evaluate_expression(
        - ``keep_at_ch:ch_field``: aggregates according to passed ch_field.
        - ``keep_at_idx:tcm_idx_field``: aggregates according to passed tcm
          index field.
-       - ``gather``: Channels are not combined, but result saved as
+       - ``gather``: channels are not combined, but result saved as
          :class:`.VectorOfVectors`.
+       - ``function``: the function call specified in `expr` is evaluated, and
+         the resulting column is inserted into the output table.
 
     query
        a query that can mask the aggregation.
@@ -356,14 +355,14 @@ def evaluate_expression(
        default value of evaluation.
     sorter
        can be used to sort vector outputs according to sorter expression (see
-       :func:`evaluate_to_vector`).
+       :func:`.evaluate_to_vector`).
+
+    Note
+    ----
+    The specification of custom functions that can be used as expression is
+    documented in :mod:`.modules`.
     """
     f = utils.make_files_config(datainfo)
-
-    # find parameters in evt file or in parameters
-    exprl = re.findall(
-        rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
-    )
 
     # build dictionary of parameter names and their values
     # a parameter can be a column in the existing table...
@@ -389,10 +388,12 @@ def evaluate_expression(
         if f.evt.group is not None:
             args_str = args_str.replace(f.evt.group + ".", "")
 
-        good_chns = [x for x in channels if x not in channels_rm]
+        good_chns = [x for x in channels if x not in channels_skip]
 
         # replace stuff before first comma with list of mandatory args
-        full_args_str = "files, tcm, channels," + ",".join(args_str.split(",")[1:])
+        full_args_str = "datainfo, tcm, table_names," + ",".join(
+            args_str.split(",")[1:]
+        )
 
         # get module and function names
         func_call = expr.strip().split("(")[0]
@@ -409,7 +410,7 @@ def evaluate_expression(
         }
 
         # lookup dictionary for variables used in function arguments (see eval() call later)
-        locs = {"files": f, "tcm": tcm, "channels": good_chns} | pars_dict
+        locs = {"datainfo": f, "tcm": tcm, "table_names": good_chns} | pars_dict
 
         # evil eval() to avoid annoying args casting logic
         call_str = f"{func_call}({full_args_str})"
@@ -420,6 +421,11 @@ def evaluate_expression(
         return eval(call_str, globs, locs)
 
     else:
+        # find parameters in evt file or in parameters
+        field_list = re.findall(
+            rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
+        )
+
         # check if query is either on channel basis or evt basis (and not a mix)
         query_mask = query
         if query is not None:
@@ -443,7 +449,7 @@ def evaluate_expression(
             else:
                 ch_comp = table[mode[12:].replace(f"{f.evt.group}.", "")]
                 if isinstance(ch_comp, Array):
-                    ch_comp = Array(nda=tcm.id[ch_comp.view_as("np")])
+                    ch_comp = Array(tcm.id[ch_comp.view_as("np")])
                 elif isinstance(ch_comp, VectorOfVectors):
                     ch_comp = ch_comp.view_as("ak")
                     ch_comp = VectorOfVectors(
@@ -461,9 +467,9 @@ def evaluate_expression(
                 return aggregators.evaluate_at_channel(
                     datainfo=datainfo,
                     tcm=tcm,
-                    channels_rm=channels_rm,
+                    channels_skip=channels_skip,
                     expr=expr,
-                    exprl=exprl,
+                    field_list=field_list,
                     ch_comp=ch_comp,
                     pars_dict=pars_dict,
                     default_value=default_value,
@@ -474,16 +480,16 @@ def evaluate_expression(
                     datainfo=datainfo,
                     tcm=tcm,
                     expr=expr,
-                    exprl=exprl,
+                    field_list=field_list,
                     ch_comp=ch_comp,
-                    channels_rm=channels_rm,
+                    channels_skip=channels_skip,
                     pars_dict=pars_dict,
                     default_value=default_value,
                 )
 
             raise NotImplementedError(
-                type(ch_comp)
-                + " not supported (only Array and VectorOfVectors are supported)"
+                "{type(ch_comp).__name__} not supported "
+                "(only Array and VectorOfVectors are supported)"
             )
 
         if "first_at:" in mode or "last_at:" in mode:
@@ -497,9 +503,9 @@ def evaluate_expression(
                 datainfo=datainfo,
                 tcm=tcm,
                 channels=channels,
-                channels_rm=channels_rm,
+                channels_skip=channels_skip,
                 expr=expr,
-                exprl=exprl,
+                field_list=field_list,
                 query=query_mask,
                 n_rows=n_rows,
                 sorter=sorter,
@@ -514,9 +520,9 @@ def evaluate_expression(
                 tcm=tcm,
                 mode=mode,
                 channels=channels,
-                channels_rm=channels_rm,
+                channels_skip=channels_skip,
                 expr=expr,
-                exprl=exprl,
+                field_list=field_list,
                 query=query_mask,
                 n_rows=n_rows,
                 pars_dict=pars_dict,
@@ -527,9 +533,9 @@ def evaluate_expression(
                 datainfo=datainfo,
                 tcm=tcm,
                 channels=channels,
-                channels_rm=channels_rm,
+                channels_skip=channels_skip,
                 expr=expr,
-                exprl=exprl,
+                field_list=field_list,
                 query=query_mask,
                 n_rows=n_rows,
                 pars_dict=pars_dict,

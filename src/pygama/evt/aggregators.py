@@ -6,27 +6,26 @@ from __future__ import annotations
 
 import awkward as ak
 import numpy as np
-from lgdo import Array, ArrayOfEqualSizedArrays, VectorOfVectors, lh5
+from lgdo import lh5, types
 from lgdo.lh5 import LH5Store
-from numpy.typing import NDArray
 
 from . import utils
 
 
 def evaluate_to_first_or_last(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    channels: list,
-    channels_rm: list,
-    expr: str,
-    exprl: list,
-    query: str | NDArray,
-    n_rows: int,
-    sorter: tuple,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
+    datainfo,
+    tcm,
+    channels,
+    channels_skip,
+    expr,
+    field_list,
+    query,
+    n_rows,
+    sorter,
+    pars_dict=None,
+    default_value=np.nan,
     is_first: bool = True,
-) -> Array:
+) -> types.Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
 
@@ -38,11 +37,11 @@ def evaluate_to_first_or_last(
         TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     query
        query expression to mask aggregation.
@@ -81,9 +80,9 @@ def evaluate_to_first_or_last(
             ch=ch,
             tcm=tcm,
             expr=expr,
-            exprl=exprl,
+            field_list=field_list,
             pars_dict=pars_dict,
-            is_evaluated=ch not in channels_rm,
+            is_evaluated=ch not in channels_skip,
             default_value=default_value,
         )
 
@@ -125,22 +124,22 @@ def evaluate_to_first_or_last(
                 (t0 > outt[evt_ids_ch]) & (limarr), t0, outt[evt_ids_ch]
             )
 
-    return Array(nda=out, dtype=type(default_value))
+    return types.Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_to_scalar(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    mode: str,
-    channels: list,
-    channels_rm: list,
-    expr: str,
-    exprl: list,
-    query: str | NDArray,
-    n_rows: int,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
-) -> Array:
+    datainfo,
+    tcm,
+    mode,
+    channels,
+    channels_skip,
+    expr,
+    field_list,
+    query,
+    n_rows,
+    pars_dict=None,
+    default_value=np.nan,
+) -> types.Array:
     """Aggregates by summation across channels.
 
     Parameters
@@ -153,11 +152,11 @@ def evaluate_to_scalar(
        aggregation mode.
     channels
        list of channels to be aggregated.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     query
        query expression to mask aggregation.
@@ -188,9 +187,9 @@ def evaluate_to_scalar(
             ch=ch,
             tcm=tcm,
             expr=expr,
-            exprl=exprl,
+            field_list=field_list,
             pars_dict=pars_dict,
-            is_evaluated=ch not in channels_rm,
+            is_evaluated=ch not in channels_skip,
             default_value=default_value,
         )
 
@@ -217,19 +216,19 @@ def evaluate_to_scalar(
                 res = res.astype(bool)
             out[evt_ids_ch] = out[evt_ids_ch] & res & limarr
 
-    return Array(nda=out, dtype=type(default_value))
+    return types.Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_at_channel(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    channels_rm: list,
-    expr: str,
-    exprl: list,
-    ch_comp: Array,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
-) -> Array:
+    datainfo,
+    tcm,
+    channels_skip,
+    expr,
+    field_list,
+    ch_comp,
+    pars_dict=None,
+    default_value=np.nan,
+) -> types.Array:
     """Aggregates by evaluating the expression at a given channel.
 
     Parameters
@@ -238,11 +237,11 @@ def evaluate_at_channel(
         input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
        array of rawids at which the expression is evaluated.
@@ -269,28 +268,28 @@ def evaluate_at_channel(
             ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
             tcm=tcm,
             expr=expr,
-            exprl=exprl,
+            field_list=field_list,
             pars_dict=pars_dict,
             is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
-            not in channels_rm,
+            not in channels_skip,
             default_value=default_value,
         )
 
         out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
 
-    return Array(nda=out, dtype=type(default_value))
+    return types.Array(nda=out, dtype=type(default_value))
 
 
 def evaluate_at_channel_vov(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    expr: str,
-    exprl: list,
-    ch_comp: VectorOfVectors,
-    channels_rm: list,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
-) -> VectorOfVectors:
+    datainfo,
+    tcm,
+    expr,
+    field_list,
+    ch_comp,
+    channels_skip,
+    pars_dict=None,
+    default_value=np.nan,
+) -> types.VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
 
@@ -302,11 +301,11 @@ def evaluate_at_channel_vov(
         TCM data arrays in an object that can be accessed by attribute.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
        array of "rawid"s at which the expression is evaluated.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     pars_dict
        dictionary of `evt` and additional parameters and their values.
@@ -332,10 +331,10 @@ def evaluate_at_channel_vov(
             ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
             tcm=tcm,
             expr=expr,
-            exprl=exprl,
+            field_list=field_list,
             pars_dict=pars_dict,
             is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
-            not in channels_rm,
+            not in channels_skip,
             default_value=default_value,
         )
 
@@ -351,22 +350,22 @@ def evaluate_at_channel_vov(
         if ch == channels[0]:
             type_name = res.dtype
 
-    return VectorOfVectors(ak.values_astype(out, type_name), dtype=type_name)
+    return types.VectorOfVectors(ak.values_astype(out, type_name), dtype=type_name)
 
 
 def evaluate_to_aoesa(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    channels: list,
-    channels_rm: list,
-    expr: str,
-    exprl: list,
-    query: str | NDArray,
-    n_rows: int,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
+    datainfo,
+    tcm,
+    channels,
+    channels_skip,
+    expr,
+    field_list,
+    query,
+    n_rows,
+    pars_dict=None,
+    default_value=np.nan,
     missv=np.nan,
-) -> ArrayOfEqualSizedArrays:
+) -> types.ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
 
@@ -378,11 +377,11 @@ def evaluate_to_aoesa(
         TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     query
        query expression to mask aggregation.
@@ -418,9 +417,9 @@ def evaluate_to_aoesa(
             ch=ch,
             tcm=tcm,
             expr=expr,
-            exprl=exprl,
+            field_list=field_list,
             pars_dict=pars_dict,
-            is_evaluated=ch not in channels_rm,
+            is_evaluated=ch not in channels_skip,
             default_value=default_value,
         )
 
@@ -437,22 +436,22 @@ def evaluate_to_aoesa(
 
         i += 1
 
-    return ArrayOfEqualSizedArrays(nda=out)
+    return types.ArrayOfEqualSizedArrays(nda=out)
 
 
 def evaluate_to_vector(
-    datainfo: utils.TierData,
-    tcm: utils.TCMData,
-    channels: list,
-    channels_rm: list,
-    expr: str,
-    exprl: list,
-    query: str | NDArray,
-    n_rows: int,
-    pars_dict: dict = None,
-    default_value: bool | int | float = np.nan,
-    sorter: str = None,
-) -> VectorOfVectors:
+    datainfo,
+    tcm,
+    channels,
+    channels_skip,
+    expr,
+    field_list,
+    query,
+    n_rows,
+    pars_dict=None,
+    default_value=np.nan,
+    sorter=None,
+) -> types.VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
 
@@ -464,11 +463,11 @@ def evaluate_to_vector(
         TCM data arrays in an object that can be accessed by attribute.
     channels
        list of channels to be aggregated.
-    channels_rm
+    channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
        expression string to be evaluated.
-    exprl
+    field_list
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     query
        query expression to mask aggregation.
@@ -489,9 +488,9 @@ def evaluate_to_vector(
         datainfo=datainfo,
         tcm=tcm,
         channels=channels,
-        channels_rm=channels_rm,
+        channels_skip=channels_skip,
         expr=expr,
-        exprl=exprl,
+        field_list=field_list,
         query=query,
         n_rows=n_rows,
         pars_dict=pars_dict,
@@ -506,9 +505,9 @@ def evaluate_to_vector(
             datainfo=datainfo,
             tcm=tcm,
             channels=channels,
-            channels_rm=channels_rm,
+            channels_skip=channels_skip,
             expr=fld,
-            exprl=[tuple(fld.split("."))],
+            field_list=[tuple(fld.split("."))],
             query=None,
             n_rows=n_rows,
             missv=np.nan,
@@ -523,7 +522,7 @@ def evaluate_to_vector(
                 "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
             )
 
-    return VectorOfVectors(
+    return types.VectorOfVectors(
         ak.values_astype(
             ak.drop_none(ak.nan_to_none(ak.Array(out))), type(default_value)
         ),

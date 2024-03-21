@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 H5DataLoc = namedtuple(
     "H5DataLoc", ("file", "group", "table_fmt"), defaults=3 * (None,)
 )
+
 DataInfo = namedtuple(
     "DataInfo", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
 )
@@ -53,15 +54,15 @@ def get_table_name_by_pattern(table_id_fmt: str, ch_id: int) -> str:
         return table_id_fmt.format(ch_id)
     else:
         raise NotImplementedError(
-            "Only empty placeholders with format specifications are currently implemented"
+            "only empty placeholders {} in format specifications are currently supported"
         )
 
 
 def find_parameters(
     datainfo,
-    ch: str,
-    idx_ch: NDArray,
-    exprl: list,
+    ch,
+    idx_ch,
+    field_list,
 ) -> dict:
     """Finds and returns parameters from `hit` and `dsp` tiers.
 
@@ -73,14 +74,14 @@ def find_parameters(
        "rawid" in the tiers.
     idx_ch
        index array of entries to be read from datainfo.
-    exprl
+    field_list
        list of tuples ``(tier, field)`` to be found in the `hit/dsp` tiers.
     """
     f = make_files_config(datainfo)
 
     # find fields in either dsp, hit
-    dsp_flds = [e[1] for e in exprl if e[0] == f.dsp.group]
-    hit_flds = [e[1] for e in exprl if e[0] == f.hit.group]
+    dsp_flds = [e[1] for e in field_list if e[0] == f.dsp.group]
+    hit_flds = [e[1] for e in field_list if e[0] == f.hit.group]
 
     hit_dict, dsp_dict = {}, {}
 
@@ -115,14 +116,14 @@ def find_parameters(
 
 def get_data_at_channel(
     datainfo,
-    ch: str,
-    tcm: TCMData,
-    expr: str,
-    exprl: list,
-    pars_dict: dict,
-    is_evaluated: bool,
+    ch,
+    tcm,
+    expr,
+    field_list,
+    pars_dict,
+    is_evaluated,
     default_value,
-) -> np.ndarray:
+) -> NDArray:
     """Evaluates an expression and returns the result.
 
     Parameters
@@ -135,7 +136,7 @@ def get_data_at_channel(
         TCM data arrays in an object that can be accessed by attribute.
     expr
        expression to be evaluated.
-    exprl
+    field_list
        list of parameter-tuples ``(root_group, field)`` found in the expression.
     pars_dict
        dict of additional parameters that are not channel dependent.
@@ -163,7 +164,7 @@ def get_data_at_channel(
             datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
-            exprl=exprl,
+            field_list=field_list,
         )
 
         if pars_dict is not None:
@@ -200,11 +201,11 @@ def get_data_at_channel(
 
 def get_mask_from_query(
     datainfo,
-    query: str | NDArray,
-    length: int,
-    ch: str,
-    idx_ch: NDArray,
-) -> np.ndarray:
+    query,
+    length,
+    ch,
+    idx_ch,
+) -> NDArray:
     """Evaluates a query expression and returns a mask accordingly.
 
     Parameters
@@ -229,7 +230,7 @@ def get_mask_from_query(
             datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
-            exprl=query_lst,
+            field_list=query_lst,
         )
         limarr = eval(
             query.replace(f"{f.dsp.group}.", f"{f.dsp.group}_").replace(
