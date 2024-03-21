@@ -230,14 +230,3 @@ def test_vector_sort(lgnd_test_data, files_config):
     vov_t0, _ = store.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
-
-
-def test_chname_fmt(lgnd_test_data, files_config):
-    f_config = f"{config_dir}/basic-evt-config.json"
-
-    with pytest.raises(ValueError):
-        build_evt(files_config, f_config, wo_mode="of", chname_fmt="ch{{}}")
-    with pytest.raises(NotImplementedError):
-        build_evt(files_config, f_config, wo_mode="of", chname_fmt="ch{tcm_id}")
-    with pytest.raises(ValueError):
-        build_evt(files_config, f_config, wo_mode="of", chname_fmt="apple{}banana")

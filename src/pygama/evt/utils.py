@@ -15,19 +15,19 @@ from numpy.typing import NDArray
 H5DataLoc = namedtuple(
     "H5DataLoc", ("file", "group", "table_fmt"), defaults=3 * (None,)
 )
-TierData = namedtuple(
-    "TierData", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
+DataInfo = namedtuple(
+    "DataInfo", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
 )
 
 TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
 
 
 def make_files_config(data: dict):
-    if not isinstance(data, TierData):
-        return TierData(
+    if not isinstance(data, DataInfo):
+        return DataInfo(
             *[
                 H5DataLoc(*data[tier]) if tier in data else H5DataLoc()
-                for tier in TierData._fields
+                for tier in DataInfo._fields
             ]
         )
 
@@ -40,17 +40,17 @@ def copy_lgdo_attrs(obj):
     return attrs
 
 
-def get_tcm_id_by_pattern(chname_fmt: str, ch: str) -> int:
-    pre = chname_fmt.split("{")[0]
-    post = chname_fmt.split("}")[1]
+def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:
+    pre = table_id_fmt.split("{")[0]
+    post = table_id_fmt.split("}")[1]
     return int(ch.strip(pre).strip(post))
 
 
-def get_table_name_by_pattern(chname_fmt: str, ch_id: int) -> str:
-    # check chname_fmt validity
-    pattern_check = re.findall(r"{([^}]*?)}", chname_fmt)[0]
+def get_table_name_by_pattern(table_id_fmt: str, ch_id: int) -> str:
+    # check table_id_fmt validity
+    pattern_check = re.findall(r"{([^}]*?)}", table_id_fmt)[0]
     if pattern_check == "" or ":" == pattern_check[0]:
-        return chname_fmt.format(ch_id)
+        return table_id_fmt.format(ch_id)
     else:
         raise NotImplementedError(
             "Only empty placeholders with format specifications are currently implemented"
@@ -58,7 +58,7 @@ def get_table_name_by_pattern(chname_fmt: str, ch_id: int) -> str:
 
 
 def find_parameters(
-    files_cfg,
+    datainfo,
     ch: str,
     idx_ch: NDArray,
     exprl: list,
@@ -67,16 +67,16 @@ def find_parameters(
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     ch
        "rawid" in the tiers.
     idx_ch
-       index array of entries to be read from files_cfg.
+       index array of entries to be read from datainfo.
     exprl
        list of tuples ``(tier, field)`` to be found in the `hit/dsp` tiers.
     """
-    f = make_files_config(files_cfg)
+    f = make_files_config(datainfo)
 
     # find fields in either dsp, hit
     dsp_flds = [e[1] for e in exprl if e[0] == f.dsp.group]
@@ -114,7 +114,7 @@ def find_parameters(
 
 
 def get_data_at_channel(
-    files_cfg,
+    datainfo,
     ch: str,
     tcm: TCMData,
     expr: str,
@@ -122,14 +122,13 @@ def get_data_at_channel(
     pars_dict: dict,
     is_evaluated: bool,
     default_value,
-    chname_fmt: str = "ch{}",
 ) -> np.ndarray:
     """Evaluates an expression and returns the result.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     ch
        "rawid" of channel to be evaluated.
     tcm
@@ -145,25 +144,23 @@ def get_data_at_channel(
        values is returned.
     default_value
        default value.
-    chname_fmt
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
     """
-    f = make_files_config(files_cfg)
+    f = make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
 
     # get index list for this channel to be loaded
-    idx_ch = tcm.idx[tcm.id == get_tcm_id_by_pattern(chname_fmt, ch)]
+    idx_ch = tcm.idx[tcm.id == get_tcm_id_by_pattern(table_id_fmt, ch)]
     outsize = len(idx_ch)
 
     if not is_evaluated:
         res = np.full(outsize, default_value, dtype=type(default_value))
     elif "tcm.array_id" == expr:
-        res = np.full(outsize, get_tcm_id_by_pattern(chname_fmt, ch), dtype=int)
+        res = np.full(outsize, get_tcm_id_by_pattern(table_id_fmt, ch), dtype=int)
     elif "tcm.index" == expr:
-        res = np.where(tcm.id == get_tcm_id_by_pattern(chname_fmt, ch))[0]
+        res = np.where(tcm.id == get_tcm_id_by_pattern(table_id_fmt, ch))[0]
     else:
         var = find_parameters(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
             exprl=exprl,
@@ -202,7 +199,7 @@ def get_data_at_channel(
 
 
 def get_mask_from_query(
-    files_cfg,
+    datainfo,
     query: str | NDArray,
     length: int,
     ch: str,
@@ -212,8 +209,8 @@ def get_mask_from_query(
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     query
        query expression.
     length
@@ -223,13 +220,13 @@ def get_mask_from_query(
     idx_ch
        channel indices to be read.
     """
-    f = make_files_config(files_cfg)
+    f = make_files_config(datainfo)
 
     # get sub evt based query condition if needed
     if isinstance(query, str):
         query_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", query)
         query_var = find_parameters(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
             exprl=query_lst,

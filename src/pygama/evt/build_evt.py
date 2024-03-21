@@ -22,26 +22,23 @@ log = logging.getLogger(__name__)
 
 
 def build_evt(
-    files_cfg: Mapping[str, Sequence[str, str]],
+    datainfo: Mapping[str, Sequence[str, str]],
     config: str | dict,
     wo_mode: str = "write_safe",
-    chname_fmt: str = "ch{}",
 ) -> None | Table:
-    """Transform data from the `hit` and `dsp` levels which a channel sorted to a
-    event sorted data format.
+    r"""Transform data from hit-structured tiers to event-structured data.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found. Example:
-
-        .. code-block:: json
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found,
+        (see :obj:`.utils.DataInfo`). Example: ::
 
             {
               "tcm": ("data-tier_tcm.lh5", "hardware_tcm_1"),
               "dsp": ("data-tier_dsp.lh5", "dsp", "ch{}"),
               "hit": ("data-tier_hit.lh5", "hit", "ch{}"),
-              "evt": ("data-tier_evt.lh5", "evt"),
+              "evt": ("data-tier_evt.lh5", "evt")
             }
 
     config
@@ -108,9 +105,6 @@ def build_evt(
 
     wo_mode
         writing mode.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must
-        have one placeholder which is the `tcm` id.
     """
     if not isinstance(config, dict):
         with open(config) as f:
@@ -121,15 +115,16 @@ def build_evt(
     if "operations" not in config.keys():
         raise ValueError("operations field needs to be specified in the config")
 
+    # convert into a nice named tuple
+    f = utils.make_files_config(datainfo)
+
     # check chname_fmt validity
+    chname_fmt = f.hit.table_fmt
     pattern_check = re.findall(r"{([^}]*?)}", chname_fmt)
     if len(pattern_check) != 1:
         raise ValueError("chname_fmt must have exactly one placeholder {}")
     elif "{" in pattern_check[0] or "}" in pattern_check[0]:
         raise ValueError(f"{chname_fmt=} has an invalid placeholder.")
-
-    # convert into a nice named tuple
-    f = utils.make_files_config(files_cfg)
 
     if (
         utils.get_table_name_by_pattern(
@@ -243,7 +238,7 @@ def build_evt(
                 srter = v["sort"]
 
             obj = evaluate_expression(
-                files_cfg,
+                datainfo,
                 tcm,
                 channels=channels_e,
                 channels_rm=channels_rm,
@@ -255,7 +250,6 @@ def build_evt(
                 query=query,
                 default_value=defaultv,
                 sorter=srter,
-                chname_fmt=chname_fmt,
             )
 
             # add attribute if present
@@ -297,7 +291,7 @@ def build_evt(
 
 
 def evaluate_expression(
-    files_cfg: utils.TierData,
+    datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
@@ -309,15 +303,17 @@ def evaluate_expression(
     query: str = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
-    chname_fmt: str = "ch{}",
 ) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
     """Evaluates the expression defined by the user across all channels
     according to the mode.
 
     Parameters
     ----------
-    files_cfg
+    datainfo
         input and output LH5 files with HDF5 groups where tables are found.
+        (see :obj:`.utils.DataInfo`)
+    tcm
+        tcm data structure (see :obj:`.utils.TCMData`)
     channels
        list of channel names across which expression gets evaluated
     channels_rm
@@ -361,11 +357,8 @@ def evaluate_expression(
     sorter
        can be used to sort vector outputs according to sorter expression (see
        :func:`evaluate_to_vector`).
-    chname_fmt
-        pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
-    f = utils.make_files_config(files_cfg)
+    f = utils.make_files_config(datainfo)
 
     # find parameters in evt file or in parameters
     exprl = re.findall(
@@ -374,14 +367,12 @@ def evaluate_expression(
 
     # build dictionary of parameter names and their values
     # a parameter can be a column in the existing table...
-    # TODO: check & rewrite
     pars_dict = {}
+
     if table is not None:
-        pars_dict |= {
-            e: table[e]
-            for e in table.keys()
-            if isinstance(table[e], (Array, ArrayOfEqualSizedArrays, VectorOfVectors))
-        }
+        ok_types = (Array, ArrayOfEqualSizedArrays, VectorOfVectors)
+        pars_dict = {k: v for k, v in table.items() if isinstance(v, ok_types)}
+
     # ...or defined through the configuration
     if parameters:
         pars_dict = pars_dict | parameters
@@ -468,7 +459,7 @@ def evaluate_expression(
 
             if isinstance(ch_comp, Array):
                 return aggregators.evaluate_at_channel(
-                    files_cfg=files_cfg,
+                    datainfo=datainfo,
                     tcm=tcm,
                     channels_rm=channels_rm,
                     expr=expr,
@@ -476,12 +467,11 @@ def evaluate_expression(
                     ch_comp=ch_comp,
                     pars_dict=pars_dict,
                     default_value=default_value,
-                    chname_fmt=chname_fmt,
                 )
 
             if isinstance(ch_comp, VectorOfVectors):
                 return aggregators.evaluate_at_channel_vov(
-                    files_cfg=files_cfg,
+                    datainfo=datainfo,
                     tcm=tcm,
                     expr=expr,
                     exprl=exprl,
@@ -489,7 +479,6 @@ def evaluate_expression(
                     channels_rm=channels_rm,
                     pars_dict=pars_dict,
                     default_value=default_value,
-                    chname_fmt=chname_fmt,
                 )
 
             raise NotImplementedError(
@@ -505,7 +494,7 @@ def evaluate_expression(
                 )[0]
             )
             return aggregators.evaluate_to_first_or_last(
-                files_cfg=files_cfg,
+                datainfo=datainfo,
                 tcm=tcm,
                 channels=channels,
                 channels_rm=channels_rm,
@@ -517,12 +506,11 @@ def evaluate_expression(
                 pars_dict=pars_dict,
                 default_value=default_value,
                 is_first=True if "first_at:" in mode else False,
-                chname_fmt=chname_fmt,
             )
 
         if mode in ["sum", "any", "all"]:
             return aggregators.evaluate_to_scalar(
-                files_cfg=files_cfg,
+                datainfo=datainfo,
                 tcm=tcm,
                 mode=mode,
                 channels=channels,
@@ -533,11 +521,10 @@ def evaluate_expression(
                 n_rows=n_rows,
                 pars_dict=pars_dict,
                 default_value=default_value,
-                chname_fmt=chname_fmt,
             )
         if "gather" == mode:
             return aggregators.evaluate_to_vector(
-                files_cfg=files_cfg,
+                datainfo=datainfo,
                 tcm=tcm,
                 channels=channels,
                 channels_rm=channels_rm,
@@ -548,7 +535,6 @@ def evaluate_expression(
                 pars_dict=pars_dict,
                 default_value=default_value,
                 sorter=sorter,
-                chname_fmt=chname_fmt,
             )
 
         raise ValueError(f"'{mode}' is not a valid mode")

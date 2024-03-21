@@ -14,7 +14,7 @@ from . import utils
 
 
 def evaluate_to_first_or_last(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
@@ -26,15 +26,14 @@ def evaluate_to_first_or_last(
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     is_first: bool = True,
-    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     channels
@@ -57,11 +56,9 @@ def evaluate_to_first_or_last(
        default value.
     is_first
        defines if sorted by smallest or largest value of `sorter`
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must
-        have one placeholder which is the `tcm` id.
     """
-    f = utils.make_files_config(files_cfg)
+    f = utils.make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
 
     # define dimension of output array
     out = np.full(n_rows, default_value, dtype=type(default_value))
@@ -71,16 +68,16 @@ def evaluate_to_first_or_last(
 
     for ch in channels:
         # get index list for this channel to be loaded
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
             "right",
         )
 
         # evaluate at channel
         res = utils.get_data_at_channel(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             ch=ch,
             tcm=tcm,
             expr=expr,
@@ -88,12 +85,11 @@ def evaluate_to_first_or_last(
             pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
-            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             query=query,
             length=len(res),
             ch=ch,
@@ -133,7 +129,7 @@ def evaluate_to_first_or_last(
 
 
 def evaluate_to_scalar(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     mode: str,
     channels: list,
@@ -144,14 +140,13 @@ def evaluate_to_scalar(
     n_rows: int,
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
-    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates by summation across channels.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     mode
@@ -172,25 +167,24 @@ def evaluate_to_scalar(
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
+    f = utils.make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
 
     # define dimension of output array
     out = np.full(n_rows, default_value, dtype=type(default_value))
 
     for ch in channels:
         # get index list for this channel to be loaded
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
             "right",
         )
 
         res = utils.get_data_at_channel(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             ch=ch,
             tcm=tcm,
             expr=expr,
@@ -198,12 +192,11 @@ def evaluate_to_scalar(
             pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
-            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             query=query,
             length=len(res),
             ch=ch,
@@ -228,7 +221,7 @@ def evaluate_to_scalar(
 
 
 def evaluate_at_channel(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     channels_rm: list,
     expr: str,
@@ -236,14 +229,13 @@ def evaluate_at_channel(
     ch_comp: Array,
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
-    chname_fmt: str = "ch{}",
 ) -> Array:
     """Aggregates by evaluating the expression at a given channel.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     channels_rm
@@ -258,33 +250,30 @@ def evaluate_at_channel(
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
-    f = utils.make_files_config(files_cfg)
+    f = utils.make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
 
     out = np.full(len(ch_comp.nda), default_value, dtype=type(default_value))
 
     for ch in np.unique(ch_comp.nda.astype(int)):
         # skip default value
-        if utils.get_table_name_by_pattern(chname_fmt, ch) not in lh5.ls(f.hit.file):
+        if utils.get_table_name_by_pattern(table_id_fmt, ch) not in lh5.ls(f.hit.file):
             continue
         idx_ch = tcm.idx[tcm.id == ch]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
         res = utils.get_data_at_channel(
-            files_cfg=files_cfg,
-            ch=utils.get_table_name_by_pattern(chname_fmt, ch),
+            datainfo=datainfo,
+            ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
             tcm=tcm,
             expr=expr,
             exprl=exprl,
             pars_dict=pars_dict,
-            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
+            is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
             not in channels_rm,
             default_value=default_value,
-            chname_fmt=chname_fmt,
         )
 
         out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
@@ -293,7 +282,7 @@ def evaluate_at_channel(
 
 
 def evaluate_at_channel_vov(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     expr: str,
     exprl: list,
@@ -301,15 +290,14 @@ def evaluate_at_channel_vov(
     channels_rm: list,
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
-    chname_fmt: str = "ch{}",
 ) -> VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     expr
@@ -324,10 +312,9 @@ def evaluate_at_channel_vov(
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
+    f = utils.make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
 
     # blow up vov to aoesa
     out = ak.Array([[] for _ in range(len(ch_comp))])
@@ -341,16 +328,15 @@ def evaluate_at_channel_vov(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
         res = utils.get_data_at_channel(
-            files_cfg=files_cfg,
-            ch=utils.get_table_name_by_pattern(chname_fmt, ch),
+            datainfo=datainfo,
+            ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
             tcm=tcm,
             expr=expr,
             exprl=exprl,
             pars_dict=pars_dict,
-            is_evaluated=utils.get_table_name_by_pattern(chname_fmt, ch)
+            is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
             not in channels_rm,
             default_value=default_value,
-            chname_fmt=chname_fmt,
         )
 
         # see in which events the current channel is present
@@ -369,7 +355,7 @@ def evaluate_at_channel_vov(
 
 
 def evaluate_to_aoesa(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
@@ -380,15 +366,14 @@ def evaluate_to_aoesa(
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     missv=np.nan,
-    chname_fmt: str = "ch{}",
 ) -> ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     channels
@@ -413,23 +398,23 @@ def evaluate_to_aoesa(
        missing value.
     sorter
        sorts the entries in the vector according to sorter expression.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
+    f = utils.make_files_config(datainfo)
+    table_id_fmt = f.hit.table_fmt
+
     # define dimension of output array
     out = np.full((n_rows, len(channels)), missv)
 
     i = 0
     for ch in channels:
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch)]
+        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(chname_fmt, ch))[0],
+            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
             "right",
         )
         res = utils.get_data_at_channel(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             ch=ch,
             tcm=tcm,
             expr=expr,
@@ -437,12 +422,11 @@ def evaluate_to_aoesa(
             pars_dict=pars_dict,
             is_evaluated=ch not in channels_rm,
             default_value=default_value,
-            chname_fmt=chname_fmt,
         )
 
         # get mask from query
         limarr = utils.get_mask_from_query(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             query=query,
             length=len(res),
             ch=ch,
@@ -457,7 +441,7 @@ def evaluate_to_aoesa(
 
 
 def evaluate_to_vector(
-    files_cfg: utils.TierData,
+    datainfo: utils.TierData,
     tcm: utils.TCMData,
     channels: list,
     channels_rm: list,
@@ -468,15 +452,14 @@ def evaluate_to_vector(
     pars_dict: dict = None,
     default_value: bool | int | float = np.nan,
     sorter: str = None,
-    chname_fmt: str = "ch{}",
 ) -> VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
 
     Parameters
     ----------
-    files_cfg
-        input and output LH5 files_cfg with HDF5 groups where tables are found.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
     channels
@@ -501,12 +484,9 @@ def evaluate_to_vector(
        sorts the entries in the vector according to sorter expression.
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
-    chname_fmt
-        pattern to format `tcm` id values to table name in higher tiers. Must have one
-        placeholder which is the `tcm` id.
     """
     out = evaluate_to_aoesa(
-        files_cfg=files_cfg,
+        datainfo=datainfo,
         tcm=tcm,
         channels=channels,
         channels_rm=channels_rm,
@@ -517,14 +497,13 @@ def evaluate_to_vector(
         pars_dict=pars_dict,
         default_value=default_value,
         missv=np.nan,
-        chname_fmt=chname_fmt,
     ).view_as("np")
 
     # if a sorter is given sort accordingly
     if sorter is not None:
         md, fld = sorter.split(":")
         s_val = evaluate_to_aoesa(
-            files_cfg=files_cfg,
+            datainfo=datainfo,
             tcm=tcm,
             channels=channels,
             channels_rm=channels_rm,
@@ -533,7 +512,6 @@ def evaluate_to_vector(
             query=None,
             n_rows=n_rows,
             missv=np.nan,
-            chname_fmt=chname_fmt,
         ).view_as("np")
         if "ascend_by" == md:
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
