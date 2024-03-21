@@ -78,9 +78,27 @@ def test_spms_module(lgnd_test_data, files_config):
 
     outfile = files_config["evt"][0]
 
-    obj = lh5.read("/evt/spms_amp", outfile)
-    assert isinstance(obj, VectorOfVectors)
-    assert len(obj) == 10
+    evt = lh5.read("/evt", outfile)
+
+    mask = evt._pulse_mask
+    assert isinstance(mask, VectorOfVectors)
+    assert len(mask) == 10
+    assert mask.ndim == 3
+
+    full = evt.spms_amp_full.view_as("ak")
+    amp = evt.spms_amp.view_as("ak")
+
+    assert ak.all(full[mask.view_as("ak")] == amp)
+
+    wo_empty = evt.spms_amp_wo_empty.view_as("ak")
+    assert ak.all(wo_empty == amp[ak.count(amp, axis=-1) > 0])
+
+    rawids = evt.rawid.view_as("ak")
+    assert rawids.ndim == 2
+    assert ak.count(rawids) == 30
+
+    rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
+    assert ak.count(rawids_wo_empty) == 7
 
 
 def test_vov(lgnd_test_data, files_config):

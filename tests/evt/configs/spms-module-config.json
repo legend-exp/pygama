@@ -3,7 +3,15 @@
     "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
     "geds_on": ["ch1084803", "ch1084804", "ch1121600"]
   },
-  "outputs": ["spms_amp", "spms_amp_full"],
+  "outputs": [
+    "t0",
+    "_pulse_mask",
+    "spms_amp",
+    "rawid",
+    "rawid_wo_empty",
+    "spms_amp_full",
+    "spms_amp_wo_empty"
+  ],
   "operations": {
     "t0": {
       "channels": "geds_on",
@@ -20,12 +28,27 @@
     "spms_amp": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe', pulse_mask=evt._pulse_mask)"
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe', pulse_mask=evt._pulse_mask, drop_empty=False)"
+    },
+    "rawid": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_tcm_id_data(<...>, drop_empty=False)"
     },
     "spms_amp_full": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.trigger_pos')"
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe', drop_empty=False)"
+    },
+    "spms_amp_wo_empty": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.energy_in_pe', pulse_mask=evt._pulse_mask)"
+    },
+    "rawid_wo_empty": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_tcm_id_data(<...>, pulse_mask=evt._pulse_mask, drop_empty=True)"
     }
   }
 }

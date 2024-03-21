@@ -30,10 +30,10 @@ def gather_pulse_data(
     # loop over selected channels and load hit data
     concatme = []
     for channel in channels:
-        rawid = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
+        table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
 
         # determine list of indices found in the TCM that we want to load for channel
-        idx = tcm.idx[tcm.id == rawid]
+        idx = tcm.idx[tcm.id == table_id]
 
         # read the data in
         lgdo_obj = lh5.read(
@@ -81,6 +81,67 @@ def gather_pulse_data(
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
+def gather_tcm_id_data(
+    datainfo,
+    tcm,
+    channels,
+    *,
+    pulse_mask=None,
+    a_thr_pe=None,
+    t_loc_ns=None,
+    dt_range_ns=None,
+    t_loc_default_ns=None,
+    drop_empty=True,
+) -> types.VectorOfVectors:
+    # loop over selected channels and load hit data
+    table_ids = [
+        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, channel)
+        for channel in channels
+    ]
+
+    data = ak.Array(
+        np.full(
+            shape=(len(tcm.cumulative_length), len(table_ids)), fill_value=table_ids
+        )
+    )
+
+    # check if user wants to apply a mask
+    if drop_empty:
+        if pulse_mask is None and any(
+            [kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)]
+        ):
+            # generate the time/amplitude mask from parameters
+            pulse_mask = make_pulse_data_mask(
+                datainfo,
+                tcm,
+                channels,
+                a_thr_pe=a_thr_pe,
+                t_loc_ns=t_loc_ns,
+                dt_range_ns=dt_range_ns,
+                t_loc_default_ns=t_loc_default_ns,
+            )
+
+        if pulse_mask is None:
+            msg = "need a valid pulse mask in order to drop table_ids with no pulses"
+            raise ValueError(msg)
+
+        if not isinstance(pulse_mask, ak.Array):
+            pulse_mask = pulse_mask.view_as("ak")
+
+        if pulse_mask.ndim != 3:
+            msg = "pulse_mask must be 3D"
+            raise ValueError(msg)
+
+        # convert the 3D mask to a 2D mask (can be used to filter table_ids)
+        ch_mask = ak.sum(pulse_mask, axis=-1) > 0
+
+        # apply the mask
+        data = data[ch_mask]
+
+    return types.VectorOfVectors(data)
+
+
+# NOTE: the mask never gets the empty arrays removed
 def make_pulse_data_mask(
     datainfo,
     tcm,
@@ -134,6 +195,10 @@ def make_pulse_data_mask(
         mask = mask & (pulse_amp > a_thr_pe)
 
     if t_loc_ns is not None and dt_range_ns is not None:
+        if not isinstance(dt_range_ns, (tuple, list)):
+            msg = "dt_range_ns must be a tuple"
+            raise ValueError(msg)
+
         mask = mask & (
             (pulse_t0_ns < (t_loc_ns + dt_range_ns[1]))
             & (pulse_t0_ns > (t_loc_ns + dt_range_ns[0]))
