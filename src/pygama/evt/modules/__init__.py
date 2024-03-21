@@ -15,7 +15,7 @@ Custom processors must adhere to the following signature: ::
         # ...
 
 The first three arguments are automatically supplied by :func:`.build_evt`,
-when the function is called from the :func:`build_evt` configuration.
+when the function is called from the :func:`.build_evt` configuration.
 
 - `datainfo`: a :obj:`.DataInfo` object that specifies tier names, file names,
   HDF5 groups in which data is found and pattern used by hit table names to
@@ -25,7 +25,7 @@ when the function is called from the :func:`build_evt` configuration.
 - `table_names`: a list of hit table names to read the data from.
 
 The remaining arguments are characteristic to the processor and can be supplied
-in the function call from the :func:.build_evt` configuration.
+in the function call from the :func:`.build_evt` configuration.
 
 The function must return an :class:`~lgdo.types.lgdo.LGDO` object suitable for
 insertion in the final table with event data.

@@ -188,7 +188,7 @@ def build_evt(
 
     # now loop over operations (columns in evt table)
     for k, v in config["operations"].items():
-        log.debug(f"processing evt field: {k}")
+        log.debug(f"processing evt field {k}")
 
         # if mode not defined in operation, it can only be an operation on the
         # evt level
@@ -259,7 +259,7 @@ def build_evt(
             if "lgdo_attrs" in v.keys():
                 obj.attrs |= v["lgdo_attrs"]
 
-        log.debug("new column {k!s}" + repr(obj))
+        log.debug(f"new column {k!s} = {obj!r}")
         table.add_field(k, obj)
 
     store = LH5Store()
@@ -274,7 +274,7 @@ def build_evt(
             for fld in clms_to_remove:
                 table.remove_field(fld, True)
 
-            if f.evt.file:
+            if f.evt.file is not None:
                 store.write(
                     obj=table,
                     name=f.evt.group,
