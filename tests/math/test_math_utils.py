@@ -31,3 +31,11 @@ def test_print_fit_results(caplog):
         "p2 = 1.0 +/- 1.0",
         "",
     ] == [rec.message for rec in caplog.records]
+
+
+def test_math_numba_defaults():
+    assert pgu.numba_math_defaults_kwargs.fastmath
+    assert pgu.numba_math_defaults_kwargs.parallel
+
+    pgu.numba_math_defaults.fastmath = False
+    assert ~pgu.numba_math_defaults.fastmath
