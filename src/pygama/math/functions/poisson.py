@@ -8,8 +8,8 @@ import numpy as np
 from numba import prange
 
 from scipy.stats import rv_discrete
-from ..utils import numba_math_defaults_kwargs as nb_kwargs
-from ..utils import numba_math_defaults as nb_defaults
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
 
 @nb.njit(**nb_defaults(parallel=False))

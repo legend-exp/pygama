@@ -11,11 +11,9 @@ from math import erf
 
 from pygama.math.functions.gauss import nb_gauss
 from pygama.math.functions.pygama_continuous import pygama_continuous
-from ..utils import numba_math_defaults_kwargs as nb_kwargs
-from ..utils import numba_math_defaults as nb_defaults
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
 @nb.njit(**nb_defaults(parallel=False))
 def nb_step_int(x: float, mu: float, sigma: float, hstep: float) -> np.ndarray:

@@ -9,7 +9,7 @@ import numpy as np
 
 from pygama.math.functions.error_function import nb_erf
 from pygama.math.functions.pygama_continuous import pygama_continuous 
-from ..utils import numba_math_defaults as nb_defaults
+from pygama.utils import numba_math_defaults as nb_defaults
 
 
 @nb.njit(**nb_defaults(parallel=False))

@@ -13,8 +13,8 @@ from pygama.math.functions.pygama_continuous import pygama_continuous
 from pygama.math.functions.error_function import nb_erf, nb_erfc
 from pygama.math.functions.gauss import nb_gauss_cdf, nb_gauss_pdf
 
-from ..utils import numba_math_defaults_kwargs as nb_kwargs
-from ..utils import numba_math_defaults as nb_defaults
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
 limit = np.log(sys.float_info.max)/10
 

@@ -1,6 +1,6 @@
 import numba as nb
 import numpy as np
-from ..utils import numba_math_defaults as nb_defaults
+from pygama.utils import numba_math_defaults as nb_defaults
 
 
 @nb.njit(**nb_defaults(parallel=False))
