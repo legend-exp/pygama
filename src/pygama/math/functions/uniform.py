@@ -9,14 +9,12 @@ import numba as nb
 import numpy as np
 from numba import prange
 
-from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
-
-
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_uniform_pdf(x: np.ndarray, a: float, b: float) -> np.ndarray:
     r"""
     Normalised uniform probability density function, w/ args: a, b. Its range of support is :math:`x\in[a,b]`. The pdf is computed as:
@@ -49,7 +47,7 @@ def nb_uniform_pdf(x: np.ndarray, a: float, b: float) -> np.ndarray:
     return p
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_uniform_cdf(x: np.ndarray, a: float, b: float) -> np.ndarray:
     r"""
     Normalised uniform cumulative distribution, w/ args: a, b. Its range of support is :math:`x\in[a,b]`. The cdf is computed as:
@@ -86,7 +84,7 @@ def nb_uniform_cdf(x: np.ndarray, a: float, b: float) -> np.ndarray:
     return p
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_uniform_scaled_pdf(x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
     r"""
     Scaled uniform probability distribution, w/ args: a, b.
@@ -109,7 +107,7 @@ def nb_uniform_scaled_pdf(x: np.ndarray, area: float, a: float, b: float) -> np.
     return area * nb_uniform_pdf(x, a, b)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_uniform_scaled_cdf(x: np.ndarray, area: float, a: float, b: float) -> np.ndarray:
     r"""
     Uniform cdf scaled by the area, used for extended binned fits 

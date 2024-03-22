@@ -9,12 +9,12 @@ import numpy as np
 from math import erf
 
 from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_crystal_ball_pdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     PDF of a power-law tail plus gaussian. Its range of support is :math:`x\in\mathbb{R}, \beta>0, m>1`. It computes:
@@ -73,7 +73,7 @@ def nb_crystal_ball_pdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: 
     return y
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_crystal_ball_cdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     CDF for power-law tail plus gaussian. Its range of support is :math:`x\in\mathbb{R}, \beta>0, m>1`. It computes: 
@@ -135,7 +135,7 @@ def nb_crystal_ball_cdf(x: np.ndarray, mu: float, sigma: float, beta: float, m: 
     return y
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_crystal_ball_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     Scaled PDF of a power-law tail plus gaussian. 
@@ -161,7 +161,7 @@ def nb_crystal_ball_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: flo
     return area * nb_crystal_ball_pdf(x, mu, sigma, beta, m)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
     r"""
     Scaled CDF for power-law tail plus gaussian. Used for extended binned fits. 
@@ -213,7 +213,7 @@ class crystal_ball_gen(pygama_continuous):
 
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
-        return np.diff(nb_crystal_ball_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, beta, m)), nb_crystal_ball_scaled_pdf(x, area, mu, sigma, beta, m)
+        return np.diff(nb_crystal_ball_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, beta, m))[0], nb_crystal_ball_scaled_pdf(x, area, mu, sigma, beta, m)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
         return nb_crystal_ball_scaled_cdf(x, area, mu, sigma, beta, m)
 

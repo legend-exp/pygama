@@ -9,13 +9,13 @@ import numpy as np
 from numba import prange
 from math import erfc
 
-from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_moyal_pdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     r"""
     Normalised Moyal probability distribution function, w/ args: mu, sigma. Its support is :math:`x\in\mathbb{R}`
@@ -47,7 +47,7 @@ def nb_moyal_pdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     return y
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_moyal_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     r"""
     Normalised Moyal cumulative distribution, w/ args: mu, sigma.
@@ -80,7 +80,7 @@ def nb_moyal_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     return y
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_moyal_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     r"""
     Scaled Moyal probability density function, w/ args: mu, sigma, area.
@@ -102,7 +102,7 @@ def nb_moyal_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> 
     return area * nb_moyal_pdf(x, mu, sigma)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_moyal_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     r"""
     Moyal cdf scaled by the area, used for extended binned fits 
@@ -150,7 +150,7 @@ class moyal_gen(pygama_continuous):
         return self._cdf_norm(x, x_lo, x_hi, mu, sigma)
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float) -> np.ndarray:
-        return np.diff(nb_moyal_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma)), nb_moyal_scaled_pdf(x, area, mu, sigma)
+        return np.diff(nb_moyal_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma))[0], nb_moyal_scaled_pdf(x, area, mu, sigma)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
         return nb_moyal_scaled_cdf(x, area, mu, sigma)
 

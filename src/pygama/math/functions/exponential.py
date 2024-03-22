@@ -8,12 +8,12 @@ import numba as nb
 import numpy as np
 
 from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_exponential_pdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
     Normalised exponential probability density distribution, w/ args: mu, sigma, lamb. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
@@ -50,7 +50,7 @@ def nb_exponential_pdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> n
     return y
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_exponential_cdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
     Normalised exponential cumulative distribution, w/ args:  mu, sigma, lamb. Its range of support is :math:`x\in[0,\infty), \lambda>0`. 
@@ -87,7 +87,7 @@ def nb_exponential_cdf(x: np.ndarray, mu: float, sigma: float, lamb: float) -> n
     return y
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_exponential_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
     Scaled exponential probability distribution, w/ args: area, mu, sigma, lambd.
@@ -111,7 +111,7 @@ def nb_exponential_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: floa
     return area * nb_exponential_pdf(x, mu, sigma, lamb)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_exponential_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
     r"""
     Exponential cdf scaled by the area, used for extended binned fits 
@@ -162,7 +162,7 @@ class exponential_gen(pygama_continuous):
         return self._cdf_norm(x, x_lo, x_hi, mu, sigma, lamb)
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
-        return np.diff(nb_exponential_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, lamb)), nb_exponential_scaled_pdf(x, area, mu, sigma, lamb)
+        return np.diff(nb_exponential_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, lamb))[0], nb_exponential_scaled_pdf(x, area, mu, sigma, lamb)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float, lamb: float) -> np.ndarray:
         return nb_exponential_scaled_cdf(x, area, mu, sigma, lamb)
     

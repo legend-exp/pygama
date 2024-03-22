@@ -8,18 +8,18 @@ import numpy as np
 from numba import prange
 
 from scipy.stats import rv_discrete
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def factorial(nn):
     res = 1
     for ii in nb.prange(2, nn + 1):
         res *= ii
     return res
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_poisson_pmf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     r"""
     Normalised Poisson distribution, w/ args: mu, lamb.
@@ -50,7 +50,7 @@ def nb_poisson_pmf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     return y
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_poisson_cdf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     r"""
     Normalised Poisson cumulative distribution, w/ args: mu, lamb.
@@ -82,7 +82,7 @@ def nb_poisson_cdf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
 
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_poisson_scaled_pmf(x: np.ndarray, area: float, mu: int, lamb: float) -> np.ndarray:
     r"""
     Scaled Poisson probability distribution, w/ args: lamb, mu.
@@ -104,7 +104,7 @@ def nb_poisson_scaled_pmf(x: np.ndarray, area: float, mu: int, lamb: float) -> n
     return area * nb_poisson_pmf(x, mu, lamb)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_poisson_scaled_cdf(x: np.ndarray, area: float, mu: int, lamb: float) -> np.ndarray:
     r"""
     Poisson cdf scaled by the number of signal counts for extended binned fits 
@@ -146,7 +146,7 @@ class poisson_gen(rv_discrete):
         return nb_poisson_cdf(x, mu, lamb)
 
     def pmf_ext(self, x: np.array, x_lo: float, x_hi: float, area: float, mu: int, lamb: float) -> np.array:
-        return np.diff(nb_poisson_scaled_cdf(np.array([x_lo, x_hi]), area, mu, lamb)), nb_poisson_scaled_pmf(x, area, mu, lamb)
+        return np.diff(nb_poisson_scaled_cdf(np.array([x_lo, x_hi]), area, mu, lamb))[0], nb_poisson_scaled_pmf(x, area, mu, lamb)
     def cdf_ext(self, x: np.array, area: float, mu: int, lamb: float) -> np.array:
         return nb_poisson_scaled_cdf(x, area, mu, lamb)
 

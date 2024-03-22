@@ -43,7 +43,7 @@ def test_unbinned_nll():
 def test_extended_unbinned_nll():
     c = cost.ExtendedUnbinnedNLL(xmix, exgauss.pdf_ext)
 
-    m = Minuit(c, x_lo=-7, x_hi=7, tau=1, mu=0, sigma=3, area=100)
+    m = Minuit(c, x_lo=-7, x_hi=7, area=100, mu=0, sigma=3, tau=1)
     m.fixed["x_lo", "x_hi"] = True
     m.limits["tau", "mu", "sigma"] = (0.01, 5)
     m.limits["area"] = (0, 2000)
@@ -63,7 +63,7 @@ def test_extended_unbinned_nll():
 def test_binned_nll():
     c = cost.BinnedNLL(n, xe, exgauss.cdf_norm)
 
-    m = Minuit(c, x_lo=-20, x_hi=20, tau=1, mu=0, sigma=3)
+    m = Minuit(c, x_lo=-20, x_hi=20, mu=0, sigma=3, tau=1)
     m.fixed["x_lo", "x_hi"] = True
     m.limits["tau"] = (0.1, 3)
     m.limits["mu"] = (0, 2)
@@ -82,7 +82,7 @@ def test_binned_nll():
 def test_extended_binned_nll():
     c = cost.ExtendedBinnedNLL(n, xe, exgauss.cdf_ext)
 
-    m = Minuit(c, area=100, tau=1, mu=0, sigma=3)
+    m = Minuit(c, area=100, mu=0, sigma=3, tau=1)
     m.limits["tau", "mu", "sigma"] = (0.01, 5)
     m.limits["area"] = (0, 2000)
 
