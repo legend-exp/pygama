@@ -54,7 +54,7 @@ from pygama.math.hpge_peak_fitting import hpge_peak_fwhm
 (x_lo, x_hi, n_sig, mu, sigma, frac1, tau, n_bkg, hstep) = range(9)
 par_array = [(gauss_on_exgauss, [mu, sigma, frac1, tau]), (step, [x_lo, x_hi, mu, sigma, hstep])] 
 
-hpge_peak = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "htail", "tau", "n_bkg", "hstep"])
+hpge_peak = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "htail", "tau", "n_bkg", "hstep"], name="hpge_peak")
 
 # This is defined here as to avoid a circular import inside `sum_dists`
 def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:

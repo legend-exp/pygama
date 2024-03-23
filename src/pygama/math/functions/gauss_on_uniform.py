@@ -25,4 +25,4 @@ from pygama.math.functions.uniform import uniform
 (x_lo, x_hi, n_sig, mu, sigma, n_bkg) = range(6) # the sum_dist array we will pass will be x_lo, x_hi, n_sig, mu, sigma, n_bkg
 par_array = [(gaussian, [mu, sigma]), (uniform, [x_lo, x_hi])] 
 
-gauss_on_uniform = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg"])
+gauss_on_uniform = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg"], name="gauss_on_uniform")

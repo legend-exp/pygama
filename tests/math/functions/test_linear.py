@@ -62,3 +62,7 @@ def test_required_args():
     assert names[1] == "x_hi"
     assert names[2] == "m"
     assert names[3] == "b"
+
+
+def test_name():
+    assert linear.name == "linear"

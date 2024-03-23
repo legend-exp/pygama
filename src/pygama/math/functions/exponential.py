@@ -141,7 +141,7 @@ class exponential_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = 0
         self.x_hi = np.inf
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray, mu: float, sigma: float, lamb: float) -> np.ndarray:
         x.flags.writeable = True

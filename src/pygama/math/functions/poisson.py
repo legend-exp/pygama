@@ -131,7 +131,7 @@ class poisson_gen(rv_discrete):
     def __init__(self, *args, **kwargs):
         self.x_lo = 0
         self.x_hi = np.inf
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
     def _pmf(self, x: np.array, mu: int, lamb: float) -> np.array:
         x.flags.writeable = True
@@ -153,4 +153,4 @@ class poisson_gen(rv_discrete):
     def required_args(self) -> tuple[str, str]:
         return "mu", "lamb"
 
-poisson = poisson_gen(name='poisson')
+poisson = poisson_gen(a=0, name='poisson')

@@ -190,9 +190,9 @@ def nb_crystal_ball_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: flo
 class crystal_ball_gen(pygama_continuous): 
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.x_lo = -1*np.inf
         self.x_hi = np.inf
-        super().__init__(self)
 
     def _pdf(self, x: np.ndarray, mu: float, sigma: float, beta: float, m: float) -> np.ndarray:
         x.flags.writeable = True

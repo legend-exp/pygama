@@ -34,4 +34,4 @@ from pygama.math.functions.linear import linear
 (linear_x_lo, linear_x_hi, n_sig, mu, sigma, n_bkg, m, b) = range(8) # the sum_dist array we will pass will be x_lo, x_hi, n_sig, mu, sigma, n_bkg, m, b
 par_array = [(gaussian, [mu, sigma]), (linear, [linear_x_lo, linear_x_hi, m, b])] 
 
-gauss_on_linear = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "m", "b"])
+gauss_on_linear = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "m", "b"], name="gauss_on_linear")

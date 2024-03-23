@@ -33,4 +33,4 @@ from pygama.math.functions.step import step
 (x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep) = range(7) # the sum_dist array we will pass will be x_lo, x_hi, n_sig, mu, sigma, n_bkg, hstep
 par_array = [(gaussian, [mu, sigma]), (step, [x_lo, x_hi, mu, sigma, hstep])] 
 
-gauss_on_step = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "hstep"])
+gauss_on_step = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "hstep"], name="gauss_on_step")

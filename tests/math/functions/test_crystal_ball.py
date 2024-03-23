@@ -73,3 +73,7 @@ def test_required_args():
     assert names[1] == "sigma"
     assert names[2] == "beta"
     assert names[3] == "m"
+
+
+def test_name():
+    assert crystal_ball.name == "crystal_ball"

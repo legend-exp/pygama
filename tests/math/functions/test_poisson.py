@@ -49,3 +49,7 @@ def test_required_args():
     names = poisson.required_args()
     assert names[0] == "mu"
     assert names[1] == "lamb"
+
+
+def test_name():
+    assert poisson.name == "poisson"

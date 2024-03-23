@@ -68,3 +68,7 @@ def test_required_args():
     assert names[1] == "sigma"
     assert names[2] == "htail"
     assert names[3] == "tau"
+
+
+def test_name():
+    assert gauss_on_exgauss.name == "gauss_on_exgauss"
