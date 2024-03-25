@@ -80,6 +80,11 @@ def test_spms_module(lgnd_test_data, files_config):
 
     evt = lh5.read("/evt", outfile)
 
+    t0 = ak.fill_none(ak.nan_to_none(evt.t0.view_as("ak")), 48_000)
+    tr_pos = evt.trigger_pos.view_as("ak") * 16
+    assert ak.all(tr_pos > t0 - 30_000)
+    assert ak.all(tr_pos < t0 + 30_000)
+
     mask = evt._pulse_mask
     assert isinstance(mask, VectorOfVectors)
     assert len(mask) == 10
@@ -87,6 +92,7 @@ def test_spms_module(lgnd_test_data, files_config):
 
     full = evt.spms_amp_full.view_as("ak")
     amp = evt.spms_amp.view_as("ak")
+    assert ak.all(amp > 0.1)
 
     assert ak.all(full[mask.view_as("ak")] == amp)
 

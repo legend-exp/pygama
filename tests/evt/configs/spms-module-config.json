@@ -10,7 +10,8 @@
     "rawid",
     "rawid_wo_empty",
     "spms_amp_full",
-    "spms_amp_wo_empty"
+    "spms_amp_wo_empty",
+    "trigger_pos"
   ],
   "operations": {
     "t0": {
@@ -24,6 +25,16 @@
       "channels": "spms_on",
       "aggregation_mode": "function",
       "expression": "pygama.evt.modules.spms.make_pulse_data_mask(<...>, a_thr_pe=0.1, t_loc_ns=evt.t0, dt_range_ns=(-30_000, 30_000), t_loc_default_ns=48_000)"
+    },
+    "trigger_pos_full": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.trigger_pos', drop_empty=False)"
+    },
+    "trigger_pos": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_pulse_data(<...>, observable='hit.trigger_pos', pulse_mask=evt._pulse_mask, drop_empty=False)"
     },
     "spms_amp": {
       "channels": "spms_on",

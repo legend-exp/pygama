@@ -188,7 +188,7 @@ def build_evt(
 
     # now loop over operations (columns in evt table)
     for k, v in config["operations"].items():
-        log.debug(f"processing evt field {k}")
+        log.debug(f"processing field: '{k}'")
 
         # if mode not defined in operation, it can only be an operation on the
         # evt level
@@ -265,26 +265,23 @@ def build_evt(
     store = LH5Store()
 
     # write output fields into outfile
-    if "outputs" in config.keys():
-        if len(config["outputs"]) < 1:
-            log.warning("No output fields specified, no file will be written.")
-            return table
-        else:
-            clms_to_remove = [e for e in table.keys() if e not in config["outputs"]]
-            for fld in clms_to_remove:
-                table.remove_field(fld, True)
+    if "outputs" in config.keys() and len(config["outputs"]) > 0:
+        clms_to_remove = [e for e in table.keys() if e not in config["outputs"]]
+        for fld in clms_to_remove:
+            table.remove_field(fld, True)
 
-            if f.evt.file is not None:
-                store.write(
-                    obj=table,
-                    name=f.evt.group,
-                    lh5_file=f.evt.file,
-                    wo_mode=wo_mode,
-                )
-            else:
-                return table
+        if f.evt.file is not None:
+            store.write(
+                obj=table,
+                name=f.evt.group,
+                lh5_file=f.evt.file,
+                wo_mode=wo_mode,
+            )
+        else:
+            return table
     else:
         log.warning("no output fields specified, no file will be written.")
+        return table
 
 
 def evaluate_expression(
@@ -385,8 +382,7 @@ def evaluate_expression(
         args_str = re.search(r"\((.*)\)$", expr.strip()).group(1)
 
         # handle tier scoping: evt.<>
-        if f.evt.group is not None:
-            args_str = args_str.replace(f.evt.group + ".", "")
+        args_str = args_str.replace("evt.", "")
 
         good_chns = [x for x in channels if x not in channels_skip]
 

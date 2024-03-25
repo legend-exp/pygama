@@ -166,10 +166,9 @@ def gather_tcm_id_data(
 
     # check if user wants to apply a mask
     if drop_empty:
-        if pulse_mask is None and any(
-            [kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)]
-        ):
+        if pulse_mask is None:
             # generate the time/amplitude mask from parameters
+            # if all parameters are None, a dummy mask (the identity) will be made
             pulse_mask = make_pulse_data_mask(
                 datainfo,
                 tcm,
@@ -179,10 +178,6 @@ def gather_tcm_id_data(
                 dt_range_ns=dt_range_ns,
                 t_loc_default_ns=t_loc_default_ns,
             )
-
-        if pulse_mask is None:
-            msg = "need a valid pulse mask in order to drop table_ids with no pulses"
-            raise ValueError(msg)
 
         if not isinstance(pulse_mask, ak.Array):
             pulse_mask = pulse_mask.view_as("ak")
@@ -273,11 +268,14 @@ def make_pulse_data_mask(
         # with default value
         t_loc_ns = ak.fill_none(ak.nan_to_none(t_loc_ns), t_loc_default_ns)
 
+    # start with all-true mask
     mask = pulse_t0_ns == pulse_t0_ns
 
+    # apply p.e. threshold
     if a_thr_pe is not None:
         mask = mask & (pulse_amp > a_thr_pe)
 
+    # apply time windowing
     if t_loc_ns is not None and dt_range_ns is not None:
         if not isinstance(dt_range_ns, (tuple, list)):
             msg = "dt_range_ns must be a tuple"
