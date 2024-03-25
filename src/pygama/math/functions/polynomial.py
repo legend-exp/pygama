@@ -6,7 +6,7 @@ kwd = {"parallel": False, "fastmath": True}
 @nb.njit(**kwd)
 def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     r"""
-    A polynomial function with pars following the polyfit convention. It computes:
+    A polynomial function with pars following the numpy polynomial convention. It computes:
 
 
     .. math::
@@ -21,7 +21,7 @@ def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     x
         Input data
     pars
-        Coefficients of the polynomial, in polyfit convention
+        Coefficients of the polynomial, in  numpy polynomial convention
 
     Returns 
     ------- 
@@ -30,7 +30,7 @@ def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     
     Notes
     -----
-    This follows the :func:`numpy.polyfit` convention of :math:`a_n x^n + ... + a_1 x + a_0`
+    This follows the :func:`numpy.polynomial` convention of :math:`a_0 + a_1 x +.... + a_n x^n`
     """
     
     result = x*0 # do x*0 to keep shape of x (scalar or array)
