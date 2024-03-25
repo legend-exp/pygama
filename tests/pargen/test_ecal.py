@@ -71,25 +71,26 @@ def test_hpge_cal(lgnd_test_data):
 
     cal.hpge_find_energy_peaks(energy)
 
-    assert (cal.peaks_kev == glines).all()
+    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
     cal.hpge_get_energy_peaks(energy)
 
-    assert (cal.peaks_kev == glines).all()
+    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
-
+    locs =cal.peak_locs.copy()
     cal.hpge_cal_energy_peak_tops(energy)
 
-    assert (cal.peaks_kev == glines).all()
+    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
+    cal.peak_locs = locs
     cal.hpge_fit_energy_peaks(energy, peak_pars=pk_pars)
 
-    assert (cal.peaks_kev == glines).all()
+    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
@@ -133,7 +134,7 @@ def test_hpge_cal_full_calibration(lgnd_test_data):
 
     cal.full_calibration(energy, peak_pars=pk_pars)
 
-    assert (cal.peaks_kev == glines).all()
+    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
