@@ -1121,13 +1121,13 @@ class CalAoE:
                     final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
                 )
 
-                self.dt_res_dict["aoe_fit1"] = {"pars": aoe_pars, "errs": aoe_errs}
+                self.dt_res_dict["aoe_fit1"] = {"pars": aoe_pars.to_dict(), "errs": aoe_errs.to_dict()}
 
                 aoe_pars2, aoe_errs2, _ = unbinned_aoe_fit(
                     final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
                 )
 
-                self.dt_res_dict["aoe_fit2"] = {"pars": aoe_pars2, "errs": aoe_errs2}
+                self.dt_res_dict["aoe_fit2"] = {"pars": aoe_pars2.to_dict(), "errs": aoe_errs2.to_dict()}
 
                 try:
                     self.alpha = (aoe_pars["mu"] - aoe_pars2["mu"]) / (
