@@ -41,7 +41,7 @@ aoe_peak = sum_dists(
     [n_sig, n_bkg],
     "areas",
     parameter_names=["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "tau"],
-    name="aoe_peak"
+    name="aoe_peak",
 )
 
 
@@ -65,7 +65,7 @@ aoe_peak_with_high_tail = sum_dists(
         "n_bkg",
         "tau_bkg",
     ],
-    name = "aoe_peak_with_high_tail"
+    name="aoe_peak_with_high_tail",
 )
 aoe_peak_with_high_tail.get_fwfm = hpge_get_fwfm.__get__(aoe_peak_with_high_tail)
 aoe_peak_with_high_tail.get_mode = hpge_get_mode.__get__(aoe_peak_with_high_tail)
