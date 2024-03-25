@@ -21,7 +21,7 @@ sto = lh5.LH5Store()
 
 
 class ExtractTau:
-    def __init__(self, dsp_config, wf_field, debug_mode):
+    def __init__(self, dsp_config, wf_field, debug_mode=False):
         self.dsp_config = dsp_config
         self.wf_field = wf_field
         self.output_dict = {}
