@@ -66,7 +66,9 @@ class ExtractTau:
                 raise ValueError
             high_bin = pars[0]
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
         tau = round(-1 / (high_bin), 1)
 
@@ -116,7 +118,9 @@ class ExtractTau:
                         {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
                     )
                 except BaseException as e:
-                    if self.debug_mode:
+                    if e == KeyboardInterrupt:
+                        raise(e)
+                    elif self.debug_mode:
                         raise (e)
                     db_dict[opt_name] = {
                         key: f"{param_list[i][min_point[i]][0]}*{unit}"
@@ -125,7 +129,9 @@ class ExtractTau:
                 try:
                     db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
                 except BaseException as e:
-                    if self.debug_mode:
+                    if e == KeyboardInterrupt:
+                        raise(e)
+                    elif self.debug_mode:
                         raise (e)
                     db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
         return db_dict

@@ -545,7 +545,7 @@ class HPGeCalibration:
 
             fixed, mask = get_hpge_energy_fixed(func_i)
             fixed.append("n_bkg")
-            mask[np.where(x0 == "n_bkg")[0]] = True
+            mask[np.where(np.array(func_i.required_args()) == "n_bkg")[0]] = True
             bounds = get_hpge_energy_bounds(func_i, x0)
 
             pars_i, errs_i, cov_i = pgb.fit_binned(
@@ -980,7 +980,9 @@ class HPGeCalibration:
                     valid_pk = True
 
             except BaseException as e:
-                if self.debug_mode:
+                if e == KeyboardInterrupt:
+                    raise(e)
+                elif self.debug_mode:
                     raise (e)
                 log.debug(
                     f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
@@ -1748,7 +1750,9 @@ def hpge_fit_energy_peak_tops(
                 gof_method=gof_method,
             )
         except BaseException as e:
-            if debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             pars, cov = None, None
 

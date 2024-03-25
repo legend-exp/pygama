@@ -333,9 +333,8 @@ def fom_fwhm_with_alpha_fit(
                 )
                 plt.show()
 
-        except BaseException as be:
+        except Exception:
             log.debug("alpha fit failed")
-            raise be
 
         if np.isnan(fit_vals).all():
             log.debug("alpha fit all nan")

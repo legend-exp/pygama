@@ -301,24 +301,29 @@ class LQCal:
                             ]
                         )
                     except BaseException as e:
-                        if self.debug_mode:
+                        if e == KeyboardInterrupt:
+                            raise(e)
+                        elif self.debug_mode:
                             raise (e)
+
+                        empty_df = pd.DataFrame(
+                                [
+                                    {
+                                        "mean": np.nan,
+                                        "mean_err": np.nan,
+                                        "res": np.nan,
+                                        "res_err": np.nan,
+                                    }
+                                ]
+                            )
+
                         self.timecorr_df = pd.concat(
                             [
-                                self.timecorr_df,
-                                pd.DataFrame(
-                                    [
-                                        {
-                                            "run_timestamp": tstamp,
-                                            "mean": np.nan,
-                                            "mean_err": np.nan,
-                                            "res": np.nan,
-                                            "res_err": np.nan,
-                                        }
-                                    ]
-                                ),
+                                self.timecorr_df.astype(empty_df.dtypes),
+                                empty_df.astype(self.timecorr_df.dtypes),
                             ]
                         )
+                    
                 self.timecorr_df.set_index("run_timestamp", inplace=True)
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
@@ -371,7 +376,9 @@ class LQCal:
                         ]
                     )
                 except BaseException as e:
-                    if self.debug_mode:
+                    if e == KeyboardInterrupt:
+                        raise(e)
+                    elif self.debug_mode:
                         raise (e)
                     self.timecorr_df = pd.concat(
                         [
@@ -399,7 +406,9 @@ class LQCal:
                 )
                 log.info("LQ time correction finished")
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("LQ time correction failed")
             self.update_cal_dicts(
@@ -444,7 +453,9 @@ class LQCal:
             )
 
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
@@ -481,7 +492,9 @@ class LQCal:
             df["LQ_Cut"] = df[lq_param] < self.cut_val
 
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
@@ -572,7 +585,9 @@ class LQCal:
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
-                if self.debug_mode:
+                if e == KeyboardInterrupt:
+                    raise(e)
+                elif self.debug_mode:
                     raise (e)
                 self.low_side_sf = pd.concat(
                     [

@@ -715,7 +715,9 @@ def get_sf_sweep(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
             )
         except BaseException as e:
-            if debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif debug_mode:
                 raise (e)
     out_df.set_index("cut_val", inplace=True)
     if final_cut_value is not None:
@@ -919,7 +921,9 @@ class CalAoE:
                             ]
                         )
                     except BaseException as e:
-                        if self.debug_mode:
+                        if e == KeyboardInterrupt:
+                            raise(e)
+                        elif self.debug_mode:
                             raise (e)
                         self.timecorr_df = pd.concat(
                             [
@@ -992,12 +996,12 @@ class CalAoE:
                         ]
                     )
                 except BaseException as e:
-                    if self.debug_mode:
+                    if e == KeyboardInterrupt:
+                        raise(e)
+                    elif self.debug_mode:
                         raise (e)
-                    self.timecorr_df = pd.concat(
-                        [
-                            self.timecorr_df,
-                            pd.DataFrame(
+
+                    empty_df = pd.DataFrame(
                                 [
                                     {
                                         "mean": np.nan,
@@ -1008,7 +1012,12 @@ class CalAoE:
                                         "res_err": np.nan,
                                     }
                                 ]
-                            ),
+                            )
+
+                    self.timecorr_df = pd.concat(
+                        [
+                            self.timecorr_df.astype(empty_df.dtypes),
+                            empty_df.astype(self.timecorr_df.dtypes),
                         ]
                     )
                 df[output_name] = df[aoe_param] / pars["mu"]
@@ -1022,7 +1031,9 @@ class CalAoE:
                 )
                 log.info("Finished A/E time correction")
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("A/E time correction failed")
             self.update_cal_dicts(
@@ -1145,7 +1156,9 @@ class CalAoE:
                 log.info(f"dtcorr successful alpha:{self.alpha}")
 
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("Drift time correction failed")
             self.alpha = np.nan
@@ -1245,9 +1258,11 @@ class CalAoE:
                             ),
                         ]
                     )
-
+            
                 except BaseException as e:
-                    if self.debug_mode:
+                    if e == KeyboardInterrupt:
+                        raise(e)
+                    elif self.debug_mode:
                         raise (e)
                     self.energy_corr_fits = pd.concat(
                         [
@@ -1355,7 +1370,9 @@ class CalAoE:
                     display=display,
                 )
             except BaseException as e:
-                if self.debug_mode:
+                if e == KeyboardInterrupt:
+                    raise(e)
+                elif self.debug_mode:
                     raise (e)
 
                 dep_pars, dep_err, _ = return_nans(self.pdf)
@@ -1371,7 +1388,9 @@ class CalAoE:
             log.info(f"sigma pars are {sig_pars.to_dict()}")
 
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("A/E energy correction failed")
             mu_pars, mu_errs, mu_cov = return_nans(self.mean_func.func)
@@ -1499,7 +1518,9 @@ class CalAoE:
                     data[self.dt_cut_param]
                 )
         except BaseException as e:
-            if self.debug_mode:
+            if e == KeyboardInterrupt:
+                raise(e)
+            elif self.debug_mode:
                 raise (e)
             log.error("A/E cut determination failed")
             self.low_cut_val = np.nan
@@ -1604,7 +1625,9 @@ class CalAoE:
                     peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
-                if self.debug_mode:
+                if e == KeyboardInterrupt:
+                    raise(e)
+                elif self.debug_mode:
                     raise (e)
                 sfs = pd.concat(
                     [
@@ -1677,7 +1700,9 @@ class CalAoE:
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
 
             except BaseException as e:
-                if self.debug_mode:
+                if e == KeyboardInterrupt:
+                    raise(e)
+                elif self.debug_mode:
                     raise (e)
                 sfs = pd.concat(
                     [
