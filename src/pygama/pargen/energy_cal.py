@@ -2037,6 +2037,9 @@ class TailPrior:
     def _call(self, *pars):
         return self.__call__(*pars[0])
 
+    def _value(self, *pars):
+        return self.__call__(*pars[0])
+
     def __call__(
         self,
         x_lo,

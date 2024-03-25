@@ -980,6 +980,7 @@ class CalAoE:
                             pd.DataFrame(
                                 [
                                     {
+                                        "run_timestamp": np.nan,
                                         "mean": pars["mu"],
                                         "mean_err": errs["mu"],
                                         "sigma": pars["sigma"],
@@ -1001,23 +1002,22 @@ class CalAoE:
                     elif self.debug_mode:
                         raise (e)
 
-                    empty_df = pd.DataFrame(
-                        [
-                            {
-                                "mean": np.nan,
-                                "mean_err": np.nan,
-                                "sigma": np.nan,
-                                "sigma_err": np.nan,
-                                "res": np.nan,
-                                "res_err": np.nan,
-                            }
-                        ]
-                    )
-
                     self.timecorr_df = pd.concat(
                         [
-                            self.timecorr_df.astype(empty_df.dtypes),
-                            empty_df.astype(self.timecorr_df.dtypes),
+                            self.timecorr_df,
+                            pd.DataFrame(
+                                [
+                                    {
+                                        "run_timestamp": np.nan,
+                                        "mean": np.nan,
+                                        "mean_err": np.nan,
+                                        "sigma": np.nan,
+                                        "sigma_err": np.nan,
+                                        "res": np.nan,
+                                        "res_err": np.nan,
+                                    }
+                                ]
+                            ),
                         ]
                     )
                 df[output_name] = df[aoe_param] / pars["mu"]
@@ -1161,7 +1161,7 @@ class CalAoE:
             elif self.debug_mode:
                 raise (e)
             log.error("Drift time correction failed")
-            self.alpha = np.nan
+            self.alpha = 0
 
         data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
         self.update_cal_dicts(
@@ -1317,7 +1317,7 @@ class CalAoE:
                 )
                 / valid_fits["mean_err"]
             )
-            dof_mu = len(valid_fits["mean"]) - len(pars)
+            dof_mu = len(valid_fits["mean"]) - len(mu_pars)
             p_val_mu = chi2.sf(csqr_mu, dof_mu)
             self.mean_fit_obj = m_mu
 

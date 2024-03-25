@@ -362,6 +362,7 @@ class LQCal:
                             pd.DataFrame(
                                 [
                                     {
+                                        "run_timestamp": np.nan,
                                         "mean": pars["mu"],
                                         "mean_err": errs["mu"],
                                         "res": pars["sigma"] / pars["mu"],
@@ -386,6 +387,7 @@ class LQCal:
                             pd.DataFrame(
                                 [
                                     {
+                                        "run_timestamp": np.nan,
                                         "mean": np.nan,
                                         "mean_err": np.nan,
                                         "res": np.nan,

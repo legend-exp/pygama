@@ -13,10 +13,10 @@ sto = lh5.LH5Store()
 
 
 def convert_to_minuit(pars, func):
-    if isinstance(input, FunctionType):
-        c = cost.UnbinnedNLL(np.array([0]), func)
-    else:
+    try:
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
+    except AttributeError:
+        c = cost.UnbinnedNLL(np.array([0]), func)
     if isinstance(pars, dict):
         m = Minuit(c, **pars)
     else:
