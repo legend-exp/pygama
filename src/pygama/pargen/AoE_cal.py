@@ -61,9 +61,9 @@ aoe_peak_with_high_tail = sum_dists(
         "mu",
         "sigma",
         "htail",
-        "tau",
+        "tau_sig",
         "n_bkg",
-        "tau_bkg",
+        "tau",
     ],
     name="aoe_peak_with_high_tail",
 )
@@ -105,9 +105,9 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
             "mu": mu,
             "sigma": sigma,
             "htail": 0.1,
-            "tau": -0.1,
+            "tau_sig": -0.1,
             "n_bkg": np.sum(hist) - ls_guess,
-            "tau_bkg": 0.1,
+            "tau": 0.1,
         }
         for key, guess in guess_dict.items():
             if np.isnan(guess):
@@ -163,9 +163,9 @@ def aoe_peak_bounds(func, guess, **kwargs):
             "mu": (guess["x_lo"], guess["x_hi"]),
             "sigma": (0, None),
             "htail": (0, 1),
-            "tau": (None, 0),
+            "tau_sig": (None, 0),
             "n_bkg": (0, None),
-            "tau_bkg": (0, None),
+            "tau": (0, None),
         }
     elif func == exgauss:
         bounds_dict = {
@@ -1121,13 +1121,19 @@ class CalAoE:
                     final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
                 )
 
-                self.dt_res_dict["aoe_fit1"] = {"pars": aoe_pars.to_dict(), "errs": aoe_errs.to_dict()}
+                self.dt_res_dict["aoe_fit1"] = {
+                    "pars": aoe_pars.to_dict(),
+                    "errs": aoe_errs.to_dict(),
+                }
 
                 aoe_pars2, aoe_errs2, _ = unbinned_aoe_fit(
                     final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
                 )
 
-                self.dt_res_dict["aoe_fit2"] = {"pars": aoe_pars2.to_dict(), "errs": aoe_errs2.to_dict()}
+                self.dt_res_dict["aoe_fit2"] = {
+                    "pars": aoe_pars2.to_dict(),
+                    "errs": aoe_errs2.to_dict(),
+                }
 
                 try:
                     self.alpha = (aoe_pars["mu"] - aoe_pars2["mu"]) / (
