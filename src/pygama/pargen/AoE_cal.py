@@ -41,6 +41,7 @@ aoe_peak = sum_dists(
     [n_sig, n_bkg],
     "areas",
     parameter_names=["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "tau"],
+    name="aoe_peak"
 )
 
 
@@ -64,6 +65,7 @@ aoe_peak_with_high_tail = sum_dists(
         "n_bkg",
         "tau_bkg",
     ],
+    name = "aoe_peak_with_high_tail"
 )
 aoe_peak_with_high_tail.get_fwfm = hpge_get_fwfm.__get__(aoe_peak_with_high_tail)
 aoe_peak_with_high_tail.get_mode = hpge_get_mode.__get__(aoe_peak_with_high_tail)
@@ -1393,7 +1395,7 @@ class CalAoE:
         }
 
         self.energy_corr_res_dict["dep_fit"] = {
-            "func": self.pdf,
+            "func": self.pdf.name,
             "pars": dep_pars.to_dict(),
             "errs": dep_err.to_dict(),
         }
@@ -1773,6 +1775,8 @@ class CalAoE:
         )
 
         if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+            self.low_side_sfs_by_run = {}
+            self.two_side_sfs_by_run = {}
             for tstamp in self.cal_dicts:
                 self.low_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
                     df.query(f"run_timestamp == '{tstamp}'"),
