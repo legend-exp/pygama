@@ -51,4 +51,4 @@ double_gauss_on_double_step = sum_dists(par_array, [], None, parameter_names = [
 (x_lo, x_hi, area1, mu1, sigma1, area2, mu2, sigma2, area3, mu3, sigma3, area4, hstep1, area5, hstep2) = range(15)
 
 par_array = [(gaussian, [mu3, sigma3]), (double_gauss_on_double_step, [x_lo, x_hi, area1, mu1, sigma1, area4, hstep1, area2, mu2, sigma2, area5, hstep2])] 
-triple_gauss_on_double_step = sum_dists(par_array, [area3], "one_area", parameter_names=["x_lo", "x_hi", "n_sig1", "mu1", "sigma1", "n_sig2", "mu2", "sigma2",  "n_sig3", "mu3", "sigma3", "n_bkg1", "hstep1", "n_bkg2", "hstep2"])
+triple_gauss_on_double_step = sum_dists(par_array, [area3], "one_area", parameter_names=["x_lo", "x_hi", "n_sig1", "mu1", "sigma1", "n_sig2", "mu2", "sigma2",  "n_sig3", "mu3", "sigma3", "n_bkg1", "hstep1", "n_bkg2", "hstep2"], name="triple_gauss_on_double_step")

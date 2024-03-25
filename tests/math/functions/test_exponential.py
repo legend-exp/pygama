@@ -65,3 +65,7 @@ def test_required_args():
     assert names[0] == "mu"
     assert names[1] == "sigma"
     assert names[2] == "lambda"
+
+
+def test_name():
+    assert exponential.name == "exponential"

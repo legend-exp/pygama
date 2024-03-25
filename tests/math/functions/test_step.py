@@ -123,3 +123,7 @@ def test_required_args():
     assert names[2] == "mu"
     assert names[3] == "sigma"
     assert names[4] == "hstep"
+
+
+def test_name():
+    assert step.name == "step"

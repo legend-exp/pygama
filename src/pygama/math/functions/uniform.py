@@ -141,7 +141,7 @@ class uniform_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray, a, b) -> np.ndarray:
         return nb_uniform_pdf(x, a[0], b[0])

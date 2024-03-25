@@ -169,9 +169,9 @@ def nb_gauss_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> 
 class gaussian_gen(pygama_continuous):
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.x_lo = -1*np.inf
         self.x_hi = np.inf
-        super().__init__(self)
 
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True

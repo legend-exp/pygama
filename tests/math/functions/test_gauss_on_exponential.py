@@ -75,3 +75,7 @@ def test_required_args():
     assert names[4] == "lambd"
     assert names[5] == "mu_exp"
     assert names[6] == "sigma_exp"
+
+
+def test_name():
+    assert gauss_on_exponential.name == "gauss_on_exponential"

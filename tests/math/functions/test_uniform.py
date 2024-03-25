@@ -57,3 +57,7 @@ def test_required_args():
     names = uniform.required_args()
     assert names[0] == "a"
     assert names[1] == "b"
+
+
+def test_name():
+    assert uniform.name == "uniform"

@@ -245,7 +245,7 @@ class step_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
         x.flags.writeable = True

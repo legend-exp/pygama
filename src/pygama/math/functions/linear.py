@@ -139,7 +139,7 @@ class linear_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _argcheck(self, x_lo, x_hi, m, b):
         return True

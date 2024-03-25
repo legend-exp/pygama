@@ -130,7 +130,7 @@ class moyal_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = -1*np.inf
         self.x_hi = np.inf
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True

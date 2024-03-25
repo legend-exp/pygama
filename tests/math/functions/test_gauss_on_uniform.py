@@ -62,3 +62,7 @@ def test_required_args():
     assert names[3] == "mu"
     assert names[4] == "sigma"
     assert names[5] == "n_bkg"
+
+
+def test_name():
+    assert gauss_on_uniform.name == "gauss_on_uniform"

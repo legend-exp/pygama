@@ -71,3 +71,7 @@ def test_required_args():
     assert names[0] == "mu"
     assert names[1] == "sigma"
     assert names[2] == "tau"
+
+
+def test_name():
+    assert exgauss.name == "exgauss"

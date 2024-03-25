@@ -86,3 +86,7 @@ def test_required_args():
     assert names[5] == "n_bkg"
     assert names[6] == "m"
     assert names[7] == "b"
+
+
+def test_name():
+    assert gauss_on_linear.name == "gauss_on_linear"
