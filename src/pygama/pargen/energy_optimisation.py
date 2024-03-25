@@ -20,42 +20,41 @@ log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
 
-def simple_guess(energy, func, fit_range=None, bin_width=1):
+def simple_guess(energy, func, fit_range=None, bin_width=None):
     """
     Simple guess for peak fitting
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
+
+    energy = energy[(energy >= fit_range[0]) & (energy <= fit_range[1])]
+    if bin_width is None:
+        init_bin_width = (
+            2
+            * (np.nanpercentile(energy, 75) - np.nanpercentile(energy, 25))
+            * len(energy) ** (-1 / 3)
+        )
+        init_hist, init_bins, _ = pgh.get_hist(
+            energy, dx=init_bin_width, range=fit_range
+        )
+        try:
+            _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+        except IndexError:
+            init_hist, init_bins, _ = pgh.get_hist(
+                energy, dx=init_bin_width / 2, range=fit_range
+            )
+            try:
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+            except IndexError:
+                init_sigma = np.nanstd(energy)
+        bin_width = (init_sigma) * len(energy) ** (-1 / 3)
+
+    hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
+
+    # make binning dynamic based on max, % of events/ n of events?
     hist, bins, var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
 
-    if func == pgd.hpge_peak:
-        bin_cs = (bins[1:] + bins[:-1]) / 2
-        _, sigma, amp = pgh.get_gaussian_guess(hist, bins)
-        i_0 = np.nanargmax(hist)
-        mu = bin_cs[i_0]
-        bg0 = np.mean(hist[-10:])
-        step = np.mean(hist[:10]) - bg0
-        htail = 1.0 / 5
-        tau = 0.5 * sigma
-
-        hstep = step / (bg0 + np.mean(hist[:10]))
-        dx = np.diff(bins)[0]
-        n_bins_range = int((4 * sigma) // dx)
-        nsig = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
-        nbkg = np.sum(hist) - nsig
-        parguess = {
-            "n_sig": nsig,
-            "mu": mu,
-            "sigma": sigma,
-            "htail": htail,
-            "tau": tau,
-            "n_bkg": nbkg,
-            "hstep": hstep,
-            "x_lo": fit_range[0],
-            "x_hi": fit_range[1],
-        }
-
-    elif func == pgd.gauss_on_step:
+    if func == pgd.hpge_peak or func == pgd.gauss_on_step:
         mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
@@ -65,6 +64,7 @@ def simple_guess(energy, func, fit_range=None, bin_width=1):
         n_bins_range = int((4 * sigma) // dx)
         nsig = np.sum(hist[i_0 - n_bins_range : i_0 + n_bins_range])
         nbkg = np.sum(hist) - nsig
+
         parguess = {
             "n_sig": nsig,
             "mu": mu,
@@ -74,6 +74,13 @@ def simple_guess(energy, func, fit_range=None, bin_width=1):
             "x_lo": fit_range[0],
             "x_hi": fit_range[1],
         }
+
+        if func == pgd.hpge_peak:
+            htail = 1.0 / 5
+            tau = 0.5 * sigma
+            parguess["htail"] = htail
+            parguess["tau"] = tau
+
     else:
         log.error(f"simple_guess not implemented for {func.__name__}")
         return return_nans(func)
@@ -117,60 +124,36 @@ def get_peak_fwhm_with_dt_corr(
     upper_bound = mu + ((kev_width[1] - 2) * adc_to_kev)
     win_idxs = (ct_energy > lower_bound) & (ct_energy < upper_bound)
     fit_range = (lower_bound, upper_bound)
-    if peak > 1500:
-        gof_range = (mu - (10 * adc_to_kev), mu + (10 * adc_to_kev))
-    else:
-        gof_range = (mu - (5 * adc_to_kev), mu + (5 * adc_to_kev))
     tol = None
     try:
+        (
+            energy_pars,
+            energy_err,
+            cov,
+            chisqr,
+            func,
+            _,
+            _,
+            _,
+        ) = pgc.unbinned_staged_energy_fit(
+            ct_energy[win_idxs],
+            func=func,
+            fit_range=fit_range,
+            guess_func=simple_guess,
+            tol=tol,
+            guess=guess,
+            allow_tail_drop=allow_tail_drop,
+            display=display,
+        )
         if display > 0:
-            (
-                energy_pars,
-                energy_err,
-                cov,
-                chisqr,
-                func,
-                _,
-                _,
-                _,
-            ) = pgc.unbinned_staged_energy_fit(
-                ct_energy[win_idxs],
-                func=func,
-                fit_range=fit_range,
-                guess_func=simple_guess,
-                tol=tol,
-                guess=guess,
-                allow_tail_drop=allow_tail_drop,
-                display=display,
-            )
             plt.figure()
             xs = np.arange(lower_bound, upper_bound, bin_width)
-            hist, bins, var = pgh.get_hist(
+            fit_hist, fit_bins, _ = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
-            plt.step((bins[1:] + bins[:-1]) / 2, hist)
+            plt.step(pgh.get_bin_centers(fit_bins), fit_hist)
             plt.plot(xs, func.get_pdf(xs, *energy_pars))
             plt.show()
-        else:
-            (
-                energy_pars,
-                energy_err,
-                cov,
-                chisqr,
-                func,
-                _,
-                _,
-                _,
-            ) = pgc.unbinned_staged_energy_fit(
-                ct_energy[win_idxs],
-                func=func,
-                gof_range=gof_range,
-                fit_range=fit_range,
-                guess_func=simple_guess,
-                tol=tol,
-                guess=guess,
-                allow_tail_drop=allow_tail_drop,
-            )
 
         fwhm = func.get_fwfm(energy_pars, frac_max=frac_max)
 
@@ -196,7 +179,7 @@ def get_peak_fwhm_with_dt_corr(
 
         if display > 1:
             plt.figure()
-            plt.step((bins[1:] + bins[:-1]) / 2, hist)
+            plt.step(pgh.get_bin_centers(bins), hist)
             for i in range(100):
                 plt.plot(xs, y_max[i, :])
             plt.show()
@@ -206,7 +189,7 @@ def get_peak_fwhm_with_dt_corr(
             hist, bins, var = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
-            plt.step((bins[1:] + bins[:-1]) / 2, hist)
+            plt.step(pgh.get_bin_centers(bins), hist)
             plt.plot(xs, y, color="orange")
             yerr_boot = np.nanstd(y_max, axis=0)
             plt.fill_between(
@@ -234,7 +217,7 @@ def get_peak_fwhm_with_dt_corr(
 
 
 def fom_fwhm_with_alpha_fit(
-    tb_in, kwarg_dict, ctc_parameter, nsteps=29, idxs=None, frac_max=0.2, display=0
+    tb_in, kwarg_dict, ctc_parameter, nsteps=11, idxs=None, frac_max=0.2, display=0
 ):
     """
     FOM for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
@@ -267,6 +250,7 @@ def fom_fwhm_with_alpha_fit(
         final_alphas = np.array([])
         fwhm_errs = np.array([])
         best_fwhm = np.inf
+        early_break = False
         for alpha in alphas:
             (
                 _,
@@ -296,8 +280,16 @@ def fom_fwhm_with_alpha_fit(
                     best_fwhm = fwhms[-1]
             log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
 
+            ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
+                fwhm_errs > 1e-10
+            )
+            if len(fwhms[ids]) > 5:
+                if (np.diff(fwhms[ids])[-3:] > 0).all():
+                    early_break = True
+                    break
+
         # Make sure fit isn't based on only a few points
-        if len(fwhms) < nsteps * 0.2:
+        if len(fwhms) < nsteps * 0.2 and early_break is False:
             log.debug("less than 20% fits successful")
             raise RuntimeError
 
@@ -329,7 +321,7 @@ def fom_fwhm_with_alpha_fit(
             alpha_err = np.nanstd(min_alphas)
             if display > 0:
                 plt.figure()
-                yerr_boot = np.std(fits, axis=0)
+                yerr_boot = np.nanstd(fits, axis=0)
                 plt.errorbar(final_alphas, fwhms, yerr=fwhm_errs, linestyle=" ")
                 plt.plot(alphas, fit_vals)
                 plt.fill_between(
