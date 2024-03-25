@@ -981,7 +981,7 @@ class HPGeCalibration:
 
             except BaseException as e:
                 if e == KeyboardInterrupt:
-                    raise(e)
+                    raise (e)
                 elif self.debug_mode:
                     raise (e)
                 log.debug(
@@ -1751,8 +1751,8 @@ def hpge_fit_energy_peak_tops(
             )
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
-            elif self.debug_mode:
+                raise (e)
+            elif debug_mode:
                 raise (e)
             pars, cov = None, None
 

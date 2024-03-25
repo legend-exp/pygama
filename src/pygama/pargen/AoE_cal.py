@@ -716,7 +716,7 @@ def get_sf_sweep(
             )
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif debug_mode:
                 raise (e)
     out_df.set_index("cut_val", inplace=True)
@@ -922,7 +922,7 @@ class CalAoE:
                         )
                     except BaseException as e:
                         if e == KeyboardInterrupt:
-                            raise(e)
+                            raise (e)
                         elif self.debug_mode:
                             raise (e)
                         self.timecorr_df = pd.concat(
@@ -997,22 +997,22 @@ class CalAoE:
                     )
                 except BaseException as e:
                     if e == KeyboardInterrupt:
-                        raise(e)
+                        raise (e)
                     elif self.debug_mode:
                         raise (e)
 
                     empty_df = pd.DataFrame(
-                                [
-                                    {
-                                        "mean": np.nan,
-                                        "mean_err": np.nan,
-                                        "sigma": np.nan,
-                                        "sigma_err": np.nan,
-                                        "res": np.nan,
-                                        "res_err": np.nan,
-                                    }
-                                ]
-                            )
+                        [
+                            {
+                                "mean": np.nan,
+                                "mean_err": np.nan,
+                                "sigma": np.nan,
+                                "sigma_err": np.nan,
+                                "res": np.nan,
+                                "res_err": np.nan,
+                            }
+                        ]
+                    )
 
                     self.timecorr_df = pd.concat(
                         [
@@ -1032,7 +1032,7 @@ class CalAoE:
                 log.info("Finished A/E time correction")
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("A/E time correction failed")
@@ -1157,7 +1157,7 @@ class CalAoE:
 
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("Drift time correction failed")
@@ -1258,10 +1258,10 @@ class CalAoE:
                             ),
                         ]
                     )
-            
+
                 except BaseException as e:
                     if e == KeyboardInterrupt:
-                        raise(e)
+                        raise (e)
                     elif self.debug_mode:
                         raise (e)
                     self.energy_corr_fits = pd.concat(
@@ -1371,7 +1371,7 @@ class CalAoE:
                 )
             except BaseException as e:
                 if e == KeyboardInterrupt:
-                    raise(e)
+                    raise (e)
                 elif self.debug_mode:
                     raise (e)
 
@@ -1389,7 +1389,7 @@ class CalAoE:
 
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("A/E energy correction failed")
@@ -1519,7 +1519,7 @@ class CalAoE:
                 )
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("A/E cut determination failed")
@@ -1626,7 +1626,7 @@ class CalAoE:
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
                 if e == KeyboardInterrupt:
-                    raise(e)
+                    raise (e)
                 elif self.debug_mode:
                     raise (e)
                 sfs = pd.concat(
@@ -1701,7 +1701,7 @@ class CalAoE:
 
             except BaseException as e:
                 if e == KeyboardInterrupt:
-                    raise(e)
+                    raise (e)
                 elif self.debug_mode:
                     raise (e)
                 sfs = pd.concat(

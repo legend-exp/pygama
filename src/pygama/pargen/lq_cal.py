@@ -302,20 +302,20 @@ class LQCal:
                         )
                     except BaseException as e:
                         if e == KeyboardInterrupt:
-                            raise(e)
+                            raise (e)
                         elif self.debug_mode:
                             raise (e)
 
                         empty_df = pd.DataFrame(
-                                [
-                                    {
-                                        "mean": np.nan,
-                                        "mean_err": np.nan,
-                                        "res": np.nan,
-                                        "res_err": np.nan,
-                                    }
-                                ]
-                            )
+                            [
+                                {
+                                    "mean": np.nan,
+                                    "mean_err": np.nan,
+                                    "res": np.nan,
+                                    "res_err": np.nan,
+                                }
+                            ]
+                        )
 
                         self.timecorr_df = pd.concat(
                             [
@@ -323,7 +323,7 @@ class LQCal:
                                 empty_df.astype(self.timecorr_df.dtypes),
                             ]
                         )
-                    
+
                 self.timecorr_df.set_index("run_timestamp", inplace=True)
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
@@ -377,7 +377,7 @@ class LQCal:
                     )
                 except BaseException as e:
                     if e == KeyboardInterrupt:
-                        raise(e)
+                        raise (e)
                     elif self.debug_mode:
                         raise (e)
                     self.timecorr_df = pd.concat(
@@ -407,7 +407,7 @@ class LQCal:
                 log.info("LQ time correction finished")
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("LQ time correction failed")
@@ -454,7 +454,7 @@ class LQCal:
 
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("LQ drift time correction failed")
@@ -493,7 +493,7 @@ class LQCal:
 
         except BaseException as e:
             if e == KeyboardInterrupt:
-                raise(e)
+                raise (e)
             elif self.debug_mode:
                 raise (e)
             log.error("LQ cut determination failed")
@@ -586,7 +586,7 @@ class LQCal:
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
                 if e == KeyboardInterrupt:
-                    raise(e)
+                    raise (e)
                 elif self.debug_mode:
                     raise (e)
                 self.low_side_sf = pd.concat(

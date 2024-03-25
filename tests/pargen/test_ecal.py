@@ -80,7 +80,7 @@ def test_hpge_cal(lgnd_test_data):
     assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
     assert approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
-    locs =cal.peak_locs.copy()
+    locs = cal.peak_locs.copy()
     cal.hpge_cal_energy_peak_tops(energy)
 
     assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
