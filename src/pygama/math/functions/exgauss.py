@@ -130,11 +130,14 @@ def nb_exgauss_pdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.nda
     x = np.asarray(x)
     tail_f = np.empty_like(x, dtype=np.float64)
     for i in nb.prange(x.shape[0]):
-        tmp = ((x[i]-mu)/tau) + ((sigma**2)/(2*tau**2))
-        if tmp < limit:
-            tail_f[i] = nb_gauss_tail_exact(x[i], mu, sigma, tau, tmp)
+        if tau == 0:
+            tail_f[i] = np.nan
         else:
-            tail_f[i] = nb_gauss_tail_approx(x[i], mu, sigma, tau)
+            tmp = ((x[i]-mu)/tau) + ((sigma**2)/(2*tau**2))
+            if tmp < limit:
+                tail_f[i] = nb_gauss_tail_exact(x[i], mu, sigma, tau, tmp)
+            else:
+                tail_f[i] = nb_gauss_tail_approx(x[i], mu, sigma, tau)
     return tail_f
 
 
@@ -168,12 +171,15 @@ def nb_exgauss_cdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.nda
 
     cdf = np.empty_like(x, dtype=np.float64)
     for i in nb.prange(x.shape[0]):
-        cdf[i] = (tau/(2*abstau)) * erf((tau*(x[i]-mu) )/(np.sqrt(2)*sigma*abstau))
-        tmp = ((x[i]-mu)/tau) + ((sigma**2)/(2*tau**2))
-        if tmp < limit:
-            cdf[i] += tau*nb_gauss_tail_exact(x[i], mu, sigma, tau, tmp) + 0.5 # This is duplicated code from the pdf, but putting it in parallel makes it run faster!
+        if tau == 0:
+            cdf[i] = np.nan
         else:
-            cdf[i] += tau*nb_gauss_tail_approx(x[i], mu, sigma, tau) + 0.5
+            cdf[i] = (tau/(2*abstau)) * erf((tau*(x[i]-mu) )/(np.sqrt(2)*sigma*abstau))
+            tmp = ((x[i]-mu)/tau) + ((sigma**2)/(2*tau**2))
+            if tmp < limit:
+                cdf[i] += tau*nb_gauss_tail_exact(x[i], mu, sigma, tau, tmp) + 0.5 # This is duplicated code from the pdf, but putting it in parallel makes it run faster!
+            else:
+                cdf[i] += tau*nb_gauss_tail_approx(x[i], mu, sigma, tau) + 0.5
     return cdf
 
 
