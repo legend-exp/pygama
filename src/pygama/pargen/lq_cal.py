@@ -536,6 +536,7 @@ class LQCal:
                         peak,
                         fwhm,
                         cut_range=(0, 0.6),
+                        n_samples=10,
                         mode="less",
                     )
                     self.low_side_sf = pd.concat(
@@ -547,8 +548,9 @@ class LQCal:
                     self.low_side_peak_dfs[peak] = cut_df
                 else:
                     emin, emax = fit_widths[i]
+                    fit_range = (peak - emin, peak + emax)
                     peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{fit_range[0]})&({self.cal_energy_param}<{fit_range[1]})"
                     )
                     cut_df, sf, sf_err = AoE.get_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
@@ -556,7 +558,9 @@ class LQCal:
                         self.cut_val,
                         peak,
                         fwhm,
+                        fit_range=fit_range,
                         cut_range=(0, 0.6),
+                        n_samples=10,
                         mode="less",
                     )
                     self.low_side_sf = pd.concat(
