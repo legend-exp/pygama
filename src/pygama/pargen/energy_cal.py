@@ -116,7 +116,7 @@ class HPGeCalibration:
             elif i == 1:
                 expression += f" + {parameter_name} * {self.energy_param}"
             else:
-                expression += f" + {parameter_name} * {self.energy_param}^{i} "
+                expression += f" + {parameter_name} * {self.energy_param}**{i} "
             parameters[parameter_name] = coeff
         return {"expression": expression, "parameters": parameters}
 
@@ -2271,9 +2271,10 @@ def unbinned_staged_energy_fit(
 
         m_fit = func.get_pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
         m2_fit = func.get_pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
+        guess_fit = func.get_pdf(bin_cs, *x0) * np.diff(bin_cs)[0]
         plt.figure()
         plt.step(bin_cs, hist, label="hist")
-        plt.plot(bin_cs, func(bin_cs, *x0)[1], label="Guess")
+        plt.plot(bin_cs, guess_fit, label="Guess")
         plt.plot(bin_cs, m_fit, label=f"Fit 1: {cs}")
         plt.plot(bin_cs, m2_fit, label=f"Fit 2: {cs2}")
         plt.legend()
