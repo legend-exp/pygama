@@ -194,7 +194,7 @@ class sum_dists(rv_continuous):
         return cond
 
 
-    def __init__(self, dists_and_pars_array, area_frac_idxs, flag, parameter_names=None, components=False, support_required=False):
+    def __init__(self, dists_and_pars_array, area_frac_idxs, flag, parameter_names=None, components=False, support_required=False, **kwds):
         """
         Parameters
         ----------
@@ -295,7 +295,7 @@ class sum_dists(rv_continuous):
         shapes = ','.join(str(x) for x in shapes)
 
 
-        super().__init__(self, shapes=shapes)
+        super().__init__(self, shapes=shapes, **kwds)
 
     def _pdf(self, x, *params):
         """

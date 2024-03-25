@@ -6,13 +6,11 @@ import numpy as np
 from numba import prange
 
 from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
-
-
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_linear_pdf(x: np.ndarray, x_lo: float, x_hi: float, m: float, b: float) -> np.ndarray:
     r"""
     Normalised linear probability density function, w/ args: m, b. Its range of support is :math:`x\in(x_{lower},x_{upper})`. 
@@ -48,7 +46,7 @@ def nb_linear_pdf(x: np.ndarray, x_lo: float, x_hi: float, m: float, b: float) -
     return result
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_linear_cdf(x: np.ndarray, x_lo: float, x_hi: float, m: float, b: float) -> np.ndarray:
     r"""
     Normalised linear cumulative density function, w/ args: m, b. Its range of support is :math:`x\in(x_{lower},x_{upper})`. 
@@ -84,7 +82,7 @@ def nb_linear_cdf(x: np.ndarray, x_lo: float, x_hi: float, m: float, b: float) -
     return result
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_linear_scaled_pdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, m: float, b: float) -> np.ndarray:
     r"""
     Scaled linear probability distribution, w/ args: m, b.
@@ -110,7 +108,7 @@ def nb_linear_scaled_pdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, m
     return area * nb_linear_pdf(x, x_lo, x_hi, m, b)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_linear_scaled_cdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, m: float, b: float) -> np.ndarray:
     r"""
     Linear cdf scaled by the area for extended binned fits 
@@ -141,7 +139,7 @@ class linear_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _argcheck(self, x_lo, x_hi, m, b):
         return True

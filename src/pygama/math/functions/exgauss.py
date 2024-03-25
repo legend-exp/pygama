@@ -13,12 +13,14 @@ from pygama.math.functions.pygama_continuous import pygama_continuous
 from pygama.math.functions.error_function import nb_erf, nb_erfc
 from pygama.math.functions.gauss import nb_gauss_cdf, nb_gauss_pdf
 
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
+
 limit = np.log(sys.float_info.max)/10
-kwd = {"parallel": False, "fastmath": True}
-kwd_2 = {"parallel": True, "fastmath": True}
 
 
-@nb.njit(**kwd)
+
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_tail_exact(x: float, mu: float, sigma: float, tau: float, tmp: float) -> float:
     r"""
     Exact form of a normalized exponentially modified Gaussian PDF. 
@@ -65,7 +67,7 @@ def nb_gauss_tail_exact(x: float, mu: float, sigma: float, tau: float, tmp: floa
     return tail_f
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_tail_approx(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.ndarray:
     r"""
     Approximate form of a normalized exponentially modified Gaussian PDF
@@ -97,7 +99,7 @@ def nb_gauss_tail_approx(x: np.ndarray, mu: float, sigma: float, tau: float) -> 
     return tail_f
 
 
-@nb.njit(**kwd_2)
+@nb.njit(**nb_kwargs)
 def nb_exgauss_pdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.ndarray:
     r"""
     Normalized PDF of an exponentially modified Gaussian distribution. Its range of support is :math:`x\in(-\infty,\infty)`, :math:`\tau\in(-\infty,\infty)`
@@ -136,7 +138,7 @@ def nb_exgauss_pdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.nda
     return tail_f
 
 
-@nb.njit(**kwd_2)
+@nb.njit(**nb_kwargs)
 def nb_exgauss_cdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.ndarray:
     r"""
     The CDF for a normalized exponentially modified Gaussian.  Its range of support is :math:`x\in(-\infty,\infty)`, :math:`\tau\in(-\infty,\infty)`
@@ -175,7 +177,7 @@ def nb_exgauss_cdf(x: np.ndarray, mu: float, sigma: float, tau: float) -> np.nda
     return cdf
 
 
-@nb.njit(**kwd_2)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_exgauss_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, tau: float) -> np.ndarray:
     r"""
     Scaled PDF of an exponentially modified Gaussian distribution
@@ -200,7 +202,7 @@ def nb_exgauss_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float, t
     return area * nb_exgauss_pdf(x, mu, sigma, tau)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_exgauss_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float, tau: float) -> np.ndarray:
     r"""
     Scaled CDF of an exponentially modified Gaussian distribution
@@ -229,7 +231,7 @@ class exgauss_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = -1*np.inf
         self.x_hi = np.inf
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray, sigma: float, tau: float) -> np.ndarray:
         x.flags.writeable = True
@@ -249,7 +251,7 @@ class exgauss_gen(pygama_continuous):
         return self._cdf_norm(x, x_lo, x_hi, mu, sigma, tau)
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, tau: float) -> np.ndarray:
-        return np.diff(nb_exgauss_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, tau)), nb_exgauss_scaled_pdf(x, area, mu, sigma, tau)
+        return np.diff(nb_exgauss_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma, tau))[0], nb_exgauss_scaled_pdf(x, area, mu, sigma, tau)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float, tau: float) -> np.ndarray:
         return nb_exgauss_scaled_cdf(x, area, mu, sigma, tau)
 

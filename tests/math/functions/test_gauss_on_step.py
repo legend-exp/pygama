@@ -130,3 +130,7 @@ def test_required_args():
     assert names[4] == "sigma"
     assert names[5] == "n_bkg"
     assert names[6] == "hstep"
+
+
+def test_name():
+    assert gauss_on_step.name == "gauss_on_step"

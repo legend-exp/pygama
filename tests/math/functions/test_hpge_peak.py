@@ -128,3 +128,7 @@ def test_required_args():
     assert names[6] == "tau"
     assert names[7] == "n_bkg"
     assert names[8] == "hstep"
+
+
+def test_name():
+    assert hpge_peak.name == "hpge_peak"

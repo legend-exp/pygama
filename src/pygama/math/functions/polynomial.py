@@ -1,9 +1,9 @@
 import numba as nb
 import numpy as np
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     r"""
     A polynomial function with pars following the numpy polynomial convention. It computes:

@@ -59,3 +59,7 @@ def test_required_args():
     names = moyal.required_args()
     assert names[0] == "mu"
     assert names[1] == "sigma"
+
+
+def test_name():
+    assert moyal.name == "moyal"

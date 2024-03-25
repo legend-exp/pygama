@@ -59,3 +59,7 @@ def test_required_args():
     names = gaussian.required_args()
     assert names[0] == "mu"
     assert names[1] == "sigma"
+
+
+def test_name():
+    assert gaussian.name == "gaussian"

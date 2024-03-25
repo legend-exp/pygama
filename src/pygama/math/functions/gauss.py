@@ -9,11 +9,10 @@ import numpy as np
 
 from pygama.math.functions.error_function import nb_erf
 from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
 
-
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     """
     Gaussian, unnormalised for use in building PDFs
@@ -39,7 +38,7 @@ def nb_gauss(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     return np.exp(-0.5 * z ** 2)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_amp(x: np.ndarray, mu: float, sigma: float, a: float) -> np.ndarray:
     """
     Gaussian with height as a parameter for FWHM etc.
@@ -67,7 +66,7 @@ def nb_gauss_amp(x: np.ndarray, mu: float, sigma: float, a: float) -> np.ndarray
     return a * np.exp(-0.5 * z ** 2)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_pdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     r"""
     Normalised Gaussian PDF, w/ args: mu, sigma. The support is :math:`(-\infty, \infty)`
@@ -95,7 +94,7 @@ def nb_gauss_pdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     return np.exp(-0.5 * z ** 2) * invnorm
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     r"""
     Gaussian CDF, w/ args: mu, sigma. The support is :math:`(-\infty, \infty)`
@@ -123,7 +122,7 @@ def nb_gauss_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
     return 1/2 * (1 + nb_erf(invs*(x - mu)/(np.sqrt(2))))
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     """
     Gaussian with height as a parameter for fwhm etc.
@@ -145,7 +144,7 @@ def nb_gauss_scaled_pdf(x: np.ndarray, area: float, mu: float, sigma: float) -> 
     return area * nb_gauss_pdf(x, mu, sigma)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_gauss_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
     """
     Gaussian CDF scaled by the number of signal counts for extended binned fits 
@@ -170,9 +169,9 @@ def nb_gauss_scaled_cdf(x: np.ndarray, area: float, mu: float, sigma: float) -> 
 class gaussian_gen(pygama_continuous):
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.x_lo = -1*np.inf
         self.x_hi = np.inf
-        super().__init__(self)
 
     def _pdf(self, x: np.ndarray) -> np.ndarray:
         x.flags.writeable = True
@@ -191,7 +190,7 @@ class gaussian_gen(pygama_continuous):
         return self._cdf_norm(x, x_lo, x_hi, mu, sigma)
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float) -> np.ndarray:
-        return np.diff(nb_gauss_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma)), nb_gauss_scaled_pdf(x, area, mu, sigma)
+        return np.diff(nb_gauss_scaled_cdf(np.array([x_lo, x_hi]), area, mu, sigma))[0], nb_gauss_scaled_pdf(x, area, mu, sigma)
     def cdf_ext(self, x: np.ndarray, area: float, mu: float, sigma: float) -> np.ndarray:
         return nb_gauss_scaled_cdf(x, area, mu, sigma)
 

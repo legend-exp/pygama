@@ -28,4 +28,4 @@ from pygama.math.functions.exponential import exponential
 (n_sig, mu, sigma, n_bkg, lamb, mu_exp, sigma_exp)= range(7) # the sum_dist array we will pass will be n_sig, mu, sigma, lambda, n_bkg, mu_exp, sigma_exp
 par_array = [(gaussian, [mu, sigma]), (exponential, [mu_exp, sigma_exp, lamb])] 
 
-gauss_on_exponential = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["n_sig", "mu", "sigma", "n_bkg", "lambd", "mu_exp", "sigma_exp"])
+gauss_on_exponential = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["n_sig", "mu", "sigma", "n_bkg", "lambd", "mu_exp", "sigma_exp"], name="gauss_on_exponential")

@@ -180,3 +180,7 @@ def test_required_args():
     assert names[12] == "hstep1"
     assert names[13] == "n_bkg2"
     assert names[14] == "hstep2"
+
+
+def test_name():
+    assert triple_gauss_on_double_step.name == "triple_gauss_on_double_step"

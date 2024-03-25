@@ -10,12 +10,12 @@ import numpy as np
 from math import erf
 
 from pygama.math.functions.gauss import nb_gauss
-from pygama.math.functions.pygama_continuous import pygama_continuous 
+from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.utils import numba_math_defaults_kwargs as nb_kwargs
+from pygama.utils import numba_math_defaults as nb_defaults
 
-kwd = {"parallel": False, "fastmath": True}
-kwd_parallel = {"parallel": True, "fastmath": True}
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_step_int(x: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     r"""
     Integral of step function w/args mu, sigma, hstep. It computes: 
@@ -54,7 +54,7 @@ def nb_step_int(x: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     return y
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_unnorm_step_pdf(x: float,  mu: float, sigma: float, hstep: float) -> float:
     r"""
     Unnormalised step function for use in pdfs. It computes: 
@@ -89,7 +89,7 @@ def nb_unnorm_step_pdf(x: float,  mu: float, sigma: float, hstep: float) -> floa
         return step_f
 
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_step_pdf(x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     r"""
     Normalised step function w/args mu, sigma, hstep, x_lo, x_hi. Its range of support is :math:`x\in` (x_lo, x_hi). It computes: 
@@ -134,7 +134,7 @@ def nb_step_pdf(x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float
 
     return z
 
-@nb.njit(**kwd_parallel)
+@nb.njit(**nb_kwargs)
 def nb_step_cdf(x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     r"""
     Normalized CDF for step function w/args mu, sigma, hstep, x_lo, x_hi. Its range of support is :math:`x\in` (x_lo, x_hi). It computes: 
@@ -181,7 +181,7 @@ def nb_step_cdf(x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float
     return cdf
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_step_scaled_pdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     r"""
     Scaled step function pdf w/args x_lo, x_hi, area, mu, sigma, hstep.
@@ -209,7 +209,7 @@ def nb_step_scaled_pdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, mu:
     return area * nb_step_pdf(x, x_lo, x_hi, mu, sigma, hstep)
 
 
-@nb.njit(**kwd)
+@nb.njit(**nb_defaults(parallel=False))
 def nb_step_scaled_cdf(x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
     r"""
     Scaled step function CDF w/args  x_lo, x_hi, area, mu, sigma, hstep. Used for extended binned fits.
@@ -245,7 +245,7 @@ class step_gen(pygama_continuous):
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
-        super().__init__(self)
+        super().__init__(*args, **kwargs)
 
     def _pdf(self, x: np.ndarray, x_lo: float, x_hi: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
         x.flags.writeable = True
@@ -266,7 +266,7 @@ class step_gen(pygama_continuous):
         return nb_step_cdf(x, x_lo, x_hi, mu, sigma, hstep)
 
     def pdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
-        return np.diff(nb_step_scaled_cdf(np.array([x_lo, x_hi]), x_lo, x_hi, area, mu, sigma, hstep)), nb_step_scaled_pdf(x, x_lo, x_hi, area, mu, sigma, hstep)
+        return np.diff(nb_step_scaled_cdf(np.array([x_lo, x_hi]), x_lo, x_hi, area, mu, sigma, hstep))[0], nb_step_scaled_pdf(x, x_lo, x_hi, area, mu, sigma, hstep)
     def cdf_ext(self, x: np.ndarray, x_lo: float, x_hi: float, area: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
         return nb_step_scaled_cdf(x, x_lo, x_hi, area, mu, sigma, hstep)
 
