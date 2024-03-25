@@ -313,7 +313,6 @@ def get_cut_indexes(data, cut_parameters):
             for key in info.get("parameters", None):
                 exp = re.sub(f"(?<![a-zA-Z0-9]){key}(?![a-zA-Z0-9])", f"@{key}", exp)
             data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
-        for outname in cut_dict:
             ct_mask = ct_mask & data[outname]
     else:
         raise ValueError("Data must be a Table or DataFrame")
