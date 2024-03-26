@@ -180,8 +180,8 @@ class HPGeCalibration:
 
         # bin the histogram in ~1 kev bins for the initial rough peak search
         if erange is None:
-            euc_min = np.nanmin(peaks_adc)[0] * 0.6
-            euc_max = np.nanmax(peaks_adc)[0] * 1.1
+            euc_min = np.nanmin(peaks_adc) * 0.6
+            euc_max = np.nanmax(peaks_adc) * 1.1
 
         else:
             euc_min, euc_max = erange
