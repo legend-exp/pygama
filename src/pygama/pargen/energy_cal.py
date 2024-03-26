@@ -75,8 +75,7 @@ class HPGeCalibration:
             return
         self.deg = int(deg)
 
-        # could change these to tuples of (kev, adc)?
-        self.peaks_kev = np.asarray(glines)
+        self.peaks_kev = np.asarray(sorted(glines))
         self.peak_locs = []
 
         if guess_kev <= 0:
@@ -310,10 +309,10 @@ class HPGeCalibration:
                 (Polynomial(self.pars) - i).roots()
                 for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
             )
-            euc_min = euc_min[np.logical_and(euc_min >= 0, euc_min <= max(euc_max))][0]
-            euc_max = euc_max[
-                np.logical_and(euc_max >= euc_min, euc_max <= np.nanmax(e_uncal) * 1.1)
-            ][0]
+            if euc_min < 0:
+                euc_min = 0
+            if euc_max > np.nanmax(e_uncal) * 1.1:
+                euc_max = np.nanmax(e_uncal) * 1.1
         else:
             euc_min, euc_max = erange
 
@@ -413,7 +412,7 @@ class HPGeCalibration:
         peaks_kev=None,
         default_n_bins=50,
         n_events=None,
-        allowed_p_val=0.05,
+        allowed_p_val=0.01,
         update_cal_pars=True,
     ):
         """
@@ -468,10 +467,11 @@ class HPGeCalibration:
             (Polynomial(self.pars) - i).roots()
             for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
         )
-        euc_min = euc_min[np.logical_and(euc_min >= 0, euc_min <= max(euc_max))][0]
-        euc_max = euc_max[
-            np.logical_and(euc_max >= euc_min, euc_max <= np.nanmax(e_uncal) * 1.1)
-        ][0]
+
+        if euc_min < 0:
+            euc_min = 0
+        if euc_max > np.nanmax(e_uncal) * 1.1:
+            euc_max = np.nanmax(e_uncal) * 1.1
 
         d_euc = 0.5 / self.pars[1]
         if self.uncal_is_int:
@@ -721,7 +721,7 @@ class HPGeCalibration:
         peak_param="mode",
         method="unbinned",
         n_events=None,
-        allowed_p_val=0.05,
+        allowed_p_val=0.01,
         tail_weight=0,
         update_cal_pars=True,
     ):
@@ -813,14 +813,10 @@ class HPGeCalibration:
                     (Polynomial(self.pars) - i).roots()
                     for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
                 )
-                euc_min = euc_min[
-                    np.logical_and(euc_min >= 0, euc_min <= max(euc_max))
-                ][0]
-                euc_max = euc_max[
-                    np.logical_and(
-                        euc_max >= euc_min, euc_max <= np.nanmax(e_uncal) * 1.1
-                    )
-                ][0]
+                if euc_min < 0:
+                    euc_min = 0
+                if euc_max > np.nanmax(e_uncal) * 1.1:
+                    euc_max = np.nanmax(e_uncal) * 1.1
                 d_euc = 0.5 / self.pars[1]
                 if self.uncal_is_int:
                     euc_min, euc_max, d_euc = pgh.better_int_binning(
