@@ -683,7 +683,7 @@ def get_sf_sweep(
         cut_param = np.array(cut_param)
 
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
-    out_df = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
+    out_df = pd.DataFrame()
 
     (pars, _, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy,
@@ -800,7 +800,7 @@ def compton_sf_sweep(
         cut_param = np.array(cut_param)
 
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
-    out_df = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
+    out_df = pd.DataFrame()
 
     for cut_val in cut_vals:
         ct_dict = compton_sf(cut_param, cut_val, mode=mode, dt_mask=dt_mask)
@@ -1445,7 +1445,7 @@ class CalAoE:
 
         log.info("Starting A/E low cut determination")
         self.low_cut_res_dict = {}
-        self.cut_fits = pd.DataFrame(columns=["cut_val", "sf", "sf_err"])
+        self.cut_fits = pd.DataFrame()
 
         min_range, max_range = ranges
         erange = (peak - min_range, peak + max_range)
@@ -1544,7 +1544,7 @@ class CalAoE:
         cut_range=(-5, 5),
         mode="greater",
     ):
-        sfs = pd.DataFrame(columns=["peak", "sf", "sf_err"])
+        sfs = pd.DataFrame()
         peak_dfs = {}
 
         for i, peak in enumerate(peaks):
@@ -1634,7 +1634,7 @@ class CalAoE:
     def calculate_survival_fractions(
         self, data, aoe_param, peaks, fit_widths, mode="greater"
     ):
-        sfs = pd.DataFrame(columns=["peak", "sf", "sf_err"])
+        sfs = pd.DataFrame()
         for i, peak in enumerate(peaks):
             fwhm = self.eres_func(peak)
             try:

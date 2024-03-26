@@ -525,7 +525,7 @@ class LQCal:
 
         final_lq_param = "LQ_Classifier"
         peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
-        self.low_side_sf = pd.DataFrame(columns=["peak", "sf", "sf_err"])
+        self.low_side_sf = pd.DataFrame()
         fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
         self.low_side_peak_dfs = {}
 
