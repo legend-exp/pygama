@@ -876,17 +876,7 @@ class CalAoE:
 
     def time_correction(self, df, aoe_param, output_name="AoE_Timecorr", display=0):
         log.info("Starting A/E time correction")
-        self.timecorr_df = pd.DataFrame(
-            columns=[
-                "run_timestamp",
-                "mean",
-                "mean_err",
-                "sigma",
-                "sigma_err",
-                "res",
-                "res_err",
-            ]
-        )
+        self.timecorr_df = pd.DataFrame()
         try:
             if "run_timestamp" in df:
                 for tstamp, time_df in df.groupby("run_timestamp", sort=True):
@@ -1722,7 +1712,7 @@ class CalAoE:
         fit_widths=None,
         cut_peak_idx=0,
         dep_acc=0.9,
-        sf_nsamples=26,
+        sf_nsamples=11,
         sf_cut_range=(-5, 5),
     ):
         if peaks_of_interest is None:
@@ -1762,7 +1752,7 @@ class CalAoE:
             self.update_cal_dicts(
                 {
                     "AoE_High_Side_Cut": {
-                        "expression": f"(a<AoE_Classifier)& ({self.dt_cut_param}",
+                        "expression": f"(a<AoE_Classifier)& ({self.dt_cut_param})",
                         "parameters": {"a": self.high_cut_val},
                     }
                 }
@@ -1809,6 +1799,7 @@ class CalAoE:
             self.low_side_sfs_by_run = {}
             self.two_side_sfs_by_run = {}
             for tstamp in self.cal_dicts:
+                log.info(f"Compute survival fractions for {tstamp}: ")
                 self.low_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
                     df.query(f"run_timestamp == '{tstamp}'"),
                     "AoE_Classifier",

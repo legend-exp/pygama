@@ -265,9 +265,7 @@ class LQCal:
         """
 
         log.info("Starting LQ time correction")
-        self.timecorr_df = pd.DataFrame(
-            columns=["run_timestamp", "mean", "mean_err", "res", "res_err"]
-        )
+        self.timecorr_df = pd.DataFrame()
         try:
             if "run_timestamp" in df:
                 for tstamp, time_df in df.groupby("run_timestamp", sort=True):
@@ -306,21 +304,20 @@ class LQCal:
                         elif self.debug_mode:
                             raise (e)
 
-                        empty_df = pd.DataFrame(
-                            [
-                                {
-                                    "mean": np.nan,
-                                    "mean_err": np.nan,
-                                    "res": np.nan,
-                                    "res_err": np.nan,
-                                }
-                            ]
-                        )
-
                         self.timecorr_df = pd.concat(
                             [
-                                self.timecorr_df.astype(empty_df.dtypes),
-                                empty_df.astype(self.timecorr_df.dtypes),
+                                self.timecorr_df,
+                                pd.DataFrame(
+                                    [
+                                        {
+                                            "run_timestamp": tstamp,
+                                            "mean": np.nan,
+                                            "mean_err": np.nan,
+                                            "res": np.nan,
+                                            "res_err": np.nan,
+                                        }
+                                    ]
+                                ),
                             ]
                         )
 
