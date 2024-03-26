@@ -180,8 +180,9 @@ class HPGeCalibration:
 
         # bin the histogram in ~1 kev bins for the initial rough peak search
         if erange is None:
-            euc_min = np.nanmin(peaks_adc) * 0.6
-            euc_max = np.nanmax(peaks_adc) * 1.1
+            euc_min = np.nanmin(peaks_adc)[0] * 0.6
+            euc_max = np.nanmax(peaks_adc)[0] * 1.1
+
         else:
             euc_min, euc_max = erange
         d_euc = bin_width_kev / self.pars[1]
@@ -309,6 +310,8 @@ class HPGeCalibration:
                 (Polynomial(self.pars) - i).roots()
                 for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
             )
+            euc_min = euc_min[0]
+            euc_max = euc_max[0]
             if euc_min < 0:
                 euc_min = 0
             if euc_max > np.nanmax(e_uncal) * 1.1:
@@ -467,6 +470,8 @@ class HPGeCalibration:
             (Polynomial(self.pars) - i).roots()
             for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
         )
+        euc_min = euc_min[0]
+        euc_max = euc_max[0]
 
         if euc_min < 0:
             euc_min = 0
@@ -504,117 +509,134 @@ class HPGeCalibration:
         fit_dict = {}
 
         for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
-            peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
-            wleft_i, wright_i = wwidth_i
-            euc_min = mode_guess - wleft_i
-            euc_max = mode_guess + wright_i
+            try:
+                peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
+                wleft_i, wright_i = wwidth_i
+                euc_min = mode_guess - wleft_i
+                euc_max = mode_guess + wright_i
 
-            if self.uncal_is_int is True:
-                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                if self.uncal_is_int is True:
+                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                    )
+
+                energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
+                binw_1 = (euc_max - euc_min) / n_bins_i
+
+                x0 = get_hpge_energy_peak_par_guess(
+                    energies,
+                    func_i,
+                    (euc_min, euc_max),
+                    bin_width=binw_1,
+                    mode_guess=mode_guess,
                 )
 
-            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
-            binw_1 = (euc_max - euc_min) / n_bins_i
+                euc_min = x0["mu"] - n_sigmas * x0["sigma"]
+                euc_max = x0["mu"] + n_sigmas * x0["sigma"]
 
-            x0 = get_hpge_energy_peak_par_guess(
-                energies,
-                func_i,
-                (euc_min, euc_max),
-                bin_width=binw_1,
-                mode_guess=mode_guess,
-            )
+                bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
+                n_bins_i = int((euc_max - euc_min) / bin_width)
 
-            euc_min = x0["mu"] - n_sigmas * x0["sigma"]
-            euc_max = x0["mu"] + n_sigmas * x0["sigma"]
+                if self.uncal_is_int is True:
+                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                    )
 
-            bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
-            n_bins_i = int((euc_max - euc_min) / bin_width)
-
-            if self.uncal_is_int is True:
-                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                hist, bins, var = pgh.get_hist(
+                    energies, bins=n_bins_i, range=(euc_min, euc_max)
                 )
 
-            hist, bins, var = pgh.get_hist(
-                energies, bins=n_bins_i, range=(euc_min, euc_max)
-            )
+                x0["x_lo"] = euc_min
+                x0["x_hi"] = euc_max
 
-            x0["x_lo"] = euc_min
-            x0["x_hi"] = euc_max
+                fixed, mask = get_hpge_energy_fixed(func_i)
+                fixed.append("n_bkg")
+                mask[np.where(np.array(func_i.required_args()) == "n_bkg")[0]] = True
+                bounds = get_hpge_energy_bounds(func_i, x0)
 
-            fixed, mask = get_hpge_energy_fixed(func_i)
-            fixed.append("n_bkg")
-            mask[np.where(np.array(func_i.required_args()) == "n_bkg")[0]] = True
-            bounds = get_hpge_energy_bounds(func_i, x0)
+                pars_i, errs_i, cov_i = pgb.fit_binned(
+                    func_i.cdf_ext,
+                    hist,
+                    bins,
+                    var=var,
+                    guess=x0,
+                    cost_func="LL",
+                    Extended=True,
+                    fixed=fixed,
+                    bounds=bounds,
+                )
+                valid_fit = True
 
-            pars_i, errs_i, cov_i = pgb.fit_binned(
-                func_i.cdf_ext,
-                hist,
-                bins,
-                var=var,
-                guess=x0,
-                cost_func="LL",
-                Extended=True,
-                fixed=fixed,
-                bounds=bounds,
-            )
-            valid_fit = True
+                csqr = pgb.goodness_of_fit(
+                    hist,
+                    bins,
+                    None,
+                    func_i.get_pdf,
+                    pars_i,
+                    method="Pearson",
+                    scale_bins=True,
+                )
+                csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
 
-            csqr = pgb.goodness_of_fit(
-                hist,
-                bins,
-                None,
-                func_i.get_pdf,
-                pars_i,
-                method="Pearson",
-                scale_bins=True,
-            )
-            csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
+                if np.isnan(pars_i).any():
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
+                    )
+                    raise RuntimeError
 
-            if np.isnan(pars_i).any():
+                p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
+
+                if (
+                    cov_i is None
+                    or cov_i.ndim == 0
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == np.inf
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == 0
+                    or np.isnan(sum(sum(c) for c in cov_i[mask, :][:, mask]))
+                ):
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif valid_fit is False:
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif (
+                    errs_i is None
+                    or pars_i is None
+                    or np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
+                ).any() or np.isnan(np.array(errs_i)[mask]).any():
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
+                    )
+                    valid_pk = False
+
+                elif p_val < allowed_p_val or np.isnan(p_val):
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
+                    )
+                    valid_pk = False
+                else:
+                    valid_pk = True
+
+                mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+
+            except BaseException as e:
+                if e == KeyboardInterrupt:
+                    raise (e)
+                elif self.debug_mode:
+                    raise (e)
                 log.debug(
-                    f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
-                )
-                raise RuntimeError
-
-            p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
-
-            if (
-                cov_i is None
-                or cov_i.ndim == 0
-                or sum(sum(c) for c in cov_i[mask, :][:, mask]) == np.inf
-                or sum(sum(c) for c in cov_i[mask, :][:, mask]) == 0
-                or np.isnan(sum(sum(c) for c in cov_i[mask, :][:, mask]))
-            ):
-                log.debug(
-                    f"hpge_cal_energy_peak_tops: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
                 )
                 valid_pk = False
-
-            elif valid_fit is False:
-                log.debug(
-                    f"hpge_cal_energy_peak_tops: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
-                )
-                valid_pk = False
-
-            elif (
-                errs_i is None
-                or pars_i is None
-                or np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
-            ).any() or np.isnan(np.array(errs_i)[mask]).any():
-                log.debug(
-                    f"hpge_cal_energy_peak_tops: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
-                )
-                valid_pk = False
-
-            elif p_val < allowed_p_val or np.isnan(p_val):
-                log.debug(
-                    f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
-                )
-                valid_pk = False
-            else:
-                valid_pk = True
+                pars_i, errs_i, cov_i = return_nans(func_i)
+                p_val = 0
+                mu = np.nan
+                mu_err = np.nan
 
             fit_dict[peak_kev] = {
                 "function": func_i,
@@ -625,6 +647,8 @@ class HPGeCalibration:
                 "nbins": binw_1,
                 "range": [euc_min, euc_max],
                 "p_value": p_val,
+                "position": mu,
+                "position_uncertainty": mu_err,
             }
 
         results_dict["peak_parameters"] = fit_dict
@@ -646,35 +670,21 @@ class HPGeCalibration:
                         f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
                     )
 
-        # Drop failed fits
-        pk_funcs = [
-            fit_dict[peak]["function"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-        pk_pars = [
-            fit_dict[peak]["parameters"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-        pk_errors = [
-            fit_dict[peak]["uncertainties"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-
-        if len(pk_pars) == 0:
+        if len(fitted_peaks_kev) == 0:
             log.error("hpge_fit_energy_peaks: no peaks fitted")
             self.update_results_dict(results_dict)
             return
 
-        # Do a second calibration to the results of the full peak fits
-        # First, calculate the peak positions
         mus = [
-            func_i.get_mu(pars_i, errors=errors_i)
-            for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
+            fit_dict[peak]["position"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
         ]
-        mus, mu_vars = zip(*mus)
+        mu_vars = [
+            fit_dict[peak]["position_uncertainty"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
 
         mus = results_dict["pk_pos"] = np.asarray(mus)
         mu_vars = results_dict["pk_pos_uncertainties"] = np.asarray(mu_vars) ** 2
@@ -813,6 +823,8 @@ class HPGeCalibration:
                     (Polynomial(self.pars) - i).roots()
                     for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
                 )
+                euc_min = euc_min[0]
+                euc_max = euc_max[0]
                 if euc_min < 0:
                     euc_min = 0
                 if euc_max > np.nanmax(e_uncal) * 1.1:
@@ -975,6 +987,17 @@ class HPGeCalibration:
                 else:
                     valid_pk = True
 
+                if peak_param == "mu":
+                    mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+
+                elif peak_param == "mode":
+                    mu, mu_err = func_i.get_mode(pars_i, cov=cov_i)
+                else:
+                    log.error(
+                        f"hpge_fit_energy_peaks: mode {self.peak_param} not recognized"
+                    )
+                    raise RuntimeError
+
             except BaseException as e:
                 if e == KeyboardInterrupt:
                     raise (e)
@@ -986,6 +1009,8 @@ class HPGeCalibration:
                 valid_pk = False
                 pars_i, errs_i, cov_i = return_nans(func_i)
                 p_val = 0
+                mu = np.nan
+                mu_err = np.nan
 
             fit_dict[peak_kev] = {
                 "function": func_i,
@@ -996,6 +1021,8 @@ class HPGeCalibration:
                 "nbins": binw_1,
                 "range": [euc_min, euc_max],
                 "p_value": p_val,
+                "position": mu,
+                "position_uncertainty": mu_err,
             }
 
         results_dict["peak_parameters"] = fit_dict
@@ -1017,52 +1044,21 @@ class HPGeCalibration:
                         f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
                     )
 
-        # Drop failed fits
-        pk_funcs = [
-            fit_dict[peak]["function"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-        pk_pars = [
-            fit_dict[peak]["parameters"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-        pk_errors = [
-            fit_dict[peak]["uncertainties"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-        pk_covs = [
-            fit_dict[peak]["covariance"]
-            for peak in fit_dict
-            if fit_dict[peak]["validity"]
-        ]
-
-        if len(pk_pars) == 0:
+        if len(fitted_peaks_kev) == 0:
             log.error("hpge_fit_energy_peaks: no peaks fitted")
             self.update_results_dict(results_dict)
             return
 
-        # Do a second calibration to the results of the full peak fits
-        # First, calculate the peak positions
-        if peak_param == "mu":
-            mus = [
-                func_i.get_mu(pars_i, errors=errors_i)
-                for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
-            ]
-            mus, mu_vars = zip(*mus)
-
-        elif peak_param == "mode":
-            mus = [
-                func_i.get_mode(pars_i, cov=cov_i)
-                for func_i, pars_i, cov_i in zip(pk_funcs, pk_pars, pk_covs)
-            ]
-            mus, mu_vars = zip(*mus)
-        else:
-            log.error(f"hpge_E_calibration: mode {self.peak_param} not recognized")
-            self.update_results_dict(results_dict)
-            return
+        mus = [
+            fit_dict[peak]["position"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        mu_vars = [
+            fit_dict[peak]["position_uncertainty"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
 
         results_dict["peak_param"] = peak_param
         mus = results_dict["pk_pos"] = np.asarray(mus)
@@ -2474,7 +2470,7 @@ def hpge_fit_energy_cal_func(
     else:
         d_mu_d_es = np.zeros(len(mus))
         for n in range(len(energy_scale_pars) - 1):
-            d_mu_d_es += energy_scale_pars[n] * mus ** (len(energy_scale_pars) - 2 - n)
+            d_mu_d_es += energy_scale_pars[n + 1] * mus ** (n + 1)
         e_weights = np.sqrt(d_mu_d_es * mu_vars)
         poly_pars = (
             Polynomial.fit(mus, energies_kev, deg=deg, w=1 / e_weights).convert().coef
