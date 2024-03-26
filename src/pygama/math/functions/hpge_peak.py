@@ -164,11 +164,15 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         htail_idx = np.where(req_args == "htail")[0][0]
         tau_idx = np.where(req_args == "tau")[0][0]
         # We need to ditch the x_lo and x_hi columns and rows
-        cov = np.array(cov)
-        dropped_cov = cov[:, 2:][2:, :]
-        
-        return hpge_peak_mode(pars[mu_idx], pars[sigma_idx], pars[htail_idx], 
-        pars[tau_idx], dropped_cov)
+        if cov is not None:
+            cov = np.array(cov)
+            dropped_cov = cov[:, 2:][2:, :]
+            
+            return hpge_peak_mode(pars[mu_idx], pars[sigma_idx], pars[htail_idx], 
+            pars[tau_idx], dropped_cov)
+        else:
+            return hpge_peak_mode(pars[mu_idx], pars[sigma_idx], pars[htail_idx], 
+            pars[tau_idx])
 
     else: 
         if cov is None:
