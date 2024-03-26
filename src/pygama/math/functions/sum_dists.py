@@ -510,6 +510,38 @@ class sum_dists(rv_continuous):
             return mu, np.sqrt(cov[mu_idx][mu_idx])
         else:
             return mu
+        
+    def get_mode(self, pars: np.ndarray, cov:np.ndarray = None, errors:np.ndarray = None) -> tuple:
+        r"""
+        Get the mode value from the output of a fit quickly 
+        Need to overload this to use hpge_peak_fwhm (to avoid a circular import) for when self is an hpge peak
+
+        Parameters 
+        ----------
+        pars 
+            Array of fit parameters
+        cov 
+            Array of covariances
+        errors 
+            Array of erros 
+
+        Returns 
+        -------
+        mu, error 
+            where mu is the fit value, and error is either from the covariance matrix or directly passed
+        """
+
+
+        req_args = np.array(self.required_args())
+        mu_idx = np.where(req_args == "mu")[0][0]
+        mu = pars[mu_idx]
+        
+        if errors is not None:
+            return mu, errors[mu_idx]
+        elif cov is not None:
+            return mu, np.sqrt(cov[mu_idx][mu_idx])
+        else:
+            return mu
 
 
     def get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
@@ -539,6 +571,34 @@ class sum_dists(rv_continuous):
             return pars[sigma_idx]*2*np.sqrt(2*np.log(2))
         else:
             return pars[sigma_idx]*2*np.sqrt(2*np.log(2)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(2*np.log(2))
+        
+    def get_fwfm(self, pars: np.ndarray, cov: np.ndarray = None, frac_max=0.5) -> tuple:
+        r"""
+        Get the fwfm value from the output of a fit quickly
+        Need to overload this to use hpge_peak_fwfm (to avoid a circular import) for when self is an hpge peak, 
+        and otherwise returns 2sqrt(2log(2))*sigma
+
+        Parameters 
+        ----------
+        pars 
+            Array of fit parameters
+        cov 
+            Optional, array of covariances for calculating error on the fwhm
+
+
+        Returns 
+        -------
+        fwhm, error 
+            the value of the fwhm and its error
+        """
+
+        req_args = np.array(self.required_args())
+        sigma_idx = np.where(req_args == "sigma")[0][0]
+
+        if cov is None:
+            return pars[sigma_idx]*2*np.sqrt(-2*np.log(frac_max))
+        else:
+            return pars[sigma_idx]*2*np.sqrt(-2*np.log(frac_max)), np.sqrt(cov[sigma_idx][sigma_idx])*2*np.sqrt(-2*np.log(frac_max))
 
 
     def get_total_events(self, pars: np.ndarray, cov: np.ndarray = None, errors: np.ndarray =None) -> tuple:

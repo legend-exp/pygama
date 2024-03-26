@@ -5,23 +5,33 @@ from types import FunctionType
 
 import numpy as np
 import pandas as pd
-from iminuit import Minuit, cost, util
-from lgdo import Table, lh5
+from iminuit import Minuit, cost
+from lgdo import lh5
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
 
 
+def convert_to_minuit(pars, func):
+    try:
+        c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
+    except AttributeError:
+        c = cost.UnbinnedNLL(np.array([0]), func)
+    if isinstance(pars, dict):
+        m = Minuit(c, **pars)
+    else:
+        m = Minuit(c, *pars)
+    return m
+
+
 def return_nans(input):
     if isinstance(input, FunctionType):
         args = input.__code__.co_varnames[: input.__code__.co_argcount][1:]
-        c = cost.UnbinnedNLL(np.array([0]), input)
-        m = Minuit(c, *[np.nan for arg in args])
+        m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
     else:
-        args = input.pdf.__code__.co_varnames[: input.pdf.__code__.co_argcount][1:]
-        c = cost.UnbinnedNLL(np.array([0]), input.pdf)
-        m = Minuit(c, *[np.nan for arg in args])
+        args = input.required_args()
+        m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
 
 
@@ -42,7 +52,7 @@ def load_data(
     files: list,
     lh5_path: str,
     cal_dict: dict,
-    params=["cuspEmax"],
+    params: list,
     cal_energy_param: str = "cuspEmax_ctc_cal",
     threshold=None,
     return_selection_mask=False,
@@ -51,7 +61,8 @@ def load_data(
     Loads in the A/E parameters needed and applies calibration constants to energy
     """
 
-    out_df = pd.DataFrame(columns=params)
+    if isinstance(files, str):
+        files = [files]
 
     if isinstance(files, dict):
         keys = lh5.ls(
@@ -120,52 +131,8 @@ def load_data(
         if col not in params:
             df.drop(col, inplace=True, axis=1)
 
-    log.debug(f"data loaded")
+    log.debug("data loaded")
     if return_selection_mask:
         return df, masks
     else:
         return df
-
-
-def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
-    if isinstance(channel, str):
-        if channel[:2] == "ch":
-            chan = int(channel[2:])
-        else:
-            chan = int(channel)
-    else:
-        chan = channel
-    if isinstance(tcm_file, list):
-        mask = np.array([], dtype=bool)
-        for file in tcm_file:
-            _, file_mask = get_tcm_pulser_ids(file, chan, multiplicity_threshold)
-            mask = np.append(mask, file_mask)
-        ids = np.where(mask)[0]
-    else:
-        data = pd.DataFrame(
-            {
-                "array_id": sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as(
-                    "np"
-                ),
-                "array_idx": sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as(
-                    "np"
-                ),
-            }
-        )
-        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as(
-            "np"
-        )
-        cumulength = np.append(np.array([0]), cumulength)
-        n_channels = np.diff(cumulength)
-        evt_numbers = np.repeat(np.arange(0, len(cumulength) - 1), np.diff(cumulength))
-        evt_mult = np.repeat(np.diff(cumulength), np.diff(cumulength))
-        data["evt_number"] = evt_numbers
-        data["evt_mult"] = evt_mult
-        high_mult_events = np.where(n_channels > multiplicity_threshold)[0]
-
-        ids = data.query(f"array_id=={channel} and evt_number in @high_mult_events")[
-            "array_idx"
-        ].to_numpy()
-        mask = np.zeros(len(data.query(f"array_id=={channel}")), dtype="bool")
-        mask[ids] = True
-    return ids, mask
