@@ -157,10 +157,13 @@ def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
             return np.nan, np.nan
         else:
             return np.nan
-    mode = brentq(hpge_peak_peakshape_derivative,
-                    mu-sigma - htail*tau, mu+sigma + htail*tau,
-                    args = ([1,mu,sigma,htail,tau,0,0],1 ))
 
+    try:
+        mode = brentq(hpge_peak_peakshape_derivative,
+                        mu-4*sigma - htail*tau, mu+4*sigma + htail*tau,
+                        args = ([1,mu,sigma,htail,tau,0,0],1 ))
+    except ValueError:
+        mode = np.nan
 
     if cov is None: return mode 
     else:
