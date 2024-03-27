@@ -18,9 +18,8 @@ import matplotlib.pyplot as plt
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 from pygama.math.functions.pygama_continuous import pygama_continuous
 from typing import Tuple
-import inspect
 
-from scipy._lib._util import getfullargspec_no_self as _getfullargspec
+
 def get_dists_and_par_idxs(dists_and_pars_array: np.array(tuple, tuple)) -> Tuple[np.array, np.array]:
     r"""
     Split the array of tuples passed to the :func:`sum_dists` constructor into separate arrays with one containing only the
@@ -293,6 +292,17 @@ class sum_dists(rv_continuous):
 
         # Scipy requires the argument names as one string with commas inbetween each parameter name
         shapes = ','.join(str(x) for x in shapes)
+
+        # Necessary to give each method the correct `_parameters` attribute so that Iminuit can get the parameter names
+
+        setattr(sum_dists._pdf, "_parameters", dict.fromkeys(self.x_shapes))
+        setattr(sum_dists._cdf, "_parameters", dict.fromkeys(self.x_shapes))
+        setattr(sum_dists.get_pdf, "_parameters", dict.fromkeys(self.x_shapes))
+        setattr(sum_dists.get_cdf, "_parameters", dict.fromkeys(self.x_shapes))
+        setattr(sum_dists.cdf_ext, "_parameters", dict.fromkeys(self.x_shapes))
+        setattr(sum_dists.pdf_norm, "_parameters", dict.fromkeys(self.extended_shapes))
+        setattr(sum_dists.cdf_norm, "_parameters", dict.fromkeys(self.extended_shapes))
+        setattr(sum_dists.pdf_ext, "_parameters", dict.fromkeys(self.extended_shapes))
 
 
         super().__init__(self, shapes=shapes, **kwds)
@@ -572,22 +582,3 @@ class sum_dists(rv_continuous):
             return pars[n_sig_idx]+pars[n_bkg_idx], np.sqrt(cov[n_sig_idx][n_sig_idx]**2 + cov[n_bkg_idx][n_bkg_idx]**2)
         else:
             return pars[n_sig_idx]+pars[n_bkg_idx]
-
-
-    def __getattribute__(self, attr):
-        """
-        Necessary to overload this so that Iminuit can use inspect.signature to get the correct parameter names
-        """
-        value = object.__getattribute__(self, attr)
-
-        if attr in ['get_pdf','get_cdf', 'cdf_ext']:
-            params = [inspect.Parameter(param,
-                            inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                        for param in self.x_shapes]
-            value = copy_signature(inspect.Signature(params), value)
-        if attr in ['pdf_norm', 'pdf_ext', 'cdf_norm']: # Set these to include the x_lo, x_hi at the correct positions since these always need those params
-            params = [inspect.Parameter(param,
-                            inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                        for param in self.extended_shapes]
-            value = copy_signature(inspect.Signature(params), value)
-        return value
