@@ -53,6 +53,11 @@ Next steps
 
 .. toctree::
    :maxdepth: 1
+
+   tutorials
+
+.. toctree::
+   :maxdepth: 1
    :caption: Related projects
 
    LEGEND Data Objects <https://legend-pydataobj.readthedocs.io>
