@@ -52,7 +52,7 @@ def build_evt(
           list of strings),
         - ``aggregation_mode`` defines how the channels should be combined (see
           :func:`evaluate_expression`).
-        - ``expression`` defnies the mathematical/special function to apply
+        - ``expression`` defines the expression or function call to apply
           (see :func:`evaluate_expression`),
         - ``query`` defines an expression to mask the aggregation.
         - ``parameters`` defines any other parameter used in expression.
@@ -198,7 +198,7 @@ def build_evt(
                 var = var | v["parameters"]
 
             # compute and eventually get rid of evt. suffix
-            obj = table.eval(v["expression"].replace(f"{f.evt.group}.", ""), var)
+            obj = table.eval(v["expression"].replace("evt.", ""), var)
 
             # add attributes if present
             if "lgdo_attrs" in v.keys():
@@ -337,10 +337,11 @@ def evaluate_expression(
     expr
        the expression. That can be any mathematical equation/comparison. If
        `mode` is ``function``, the expression needs to be a special processing
-       function defined in modules (e.g. :func:`.modules.spm.get_energy`). In
-       the expression parameters from either hit, dsp, evt tier (from
-       operations performed before this one! Dictionary operations order
-       matters), or from the ``parameters`` field can be used.
+       function defined in :mod:`.modules`. In the expression, parameters from
+       either `evt` or lower tiers (from operations performed before this one!
+       Dictionary operations order matters), or from the ``parameters`` field
+       can be used. Fields can be prefixed with the tier id (e.g.
+       ``evt.energy`` or `hit.quality_flag``).
     n_rows
        number of rows to be processed.
     table
@@ -419,31 +420,30 @@ def evaluate_expression(
     else:
         # find parameters in evt file or in parameters
         field_list = re.findall(
-            rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)", expr
+            rf"({'|'.join(f._asdict().keys())}).([a-zA-Z_$][\w$]*)", expr
         )
 
         # check if query is either on channel basis or evt basis (and not a mix)
         query_mask = query
         if query is not None:
-            if f"{f.evt.group}." in query and (
-                f"{f.hit.group}." in query or f"{f.dsp.group}." in query
-            ):
+            hit_tiers = [k for k in f._asdict() if k != "evt"]
+            if "evt." in query and (any([t in query for t in hit_tiers])):
                 raise ValueError(
                     f"Query can't be a mix of {f.evt.group} tier and lower tiers."
                 )
 
             # if it is an evt query we can evaluate it directly here
-            if table and f"{f.evt.group}." in query:
-                query_mask = eval(query.replace(f"{f.evt.group}.", ""), table)
+            if table and "evt." in query:
+                query_mask = eval(query.replace("evt.", ""), table)
 
         # switch through modes
         if table and (
             mode.startswith("keep_at_ch:") or mode.startswith("keep_at_idx:")
         ):
             if mode.startswith("keep_at_ch:"):
-                ch_comp = table[mode[11:].replace(f"{f.evt.group}.", "")]
+                ch_comp = table[mode[11:].replace("evt.", "")]
             else:
-                ch_comp = table[mode[12:].replace(f"{f.evt.group}.", "")]
+                ch_comp = table[mode[12:].replace("evt.", "")]
                 if isinstance(ch_comp, Array):
                     ch_comp = Array(tcm.id[ch_comp.view_as("np")])
                 elif isinstance(ch_comp, VectorOfVectors):
@@ -491,7 +491,7 @@ def evaluate_expression(
         if "first_at:" in mode or "last_at:" in mode:
             sorter = tuple(
                 re.findall(
-                    rf"({f.evt.group}|{f.hit.group}|{f.dsp.group}).([a-zA-Z_$][\w$]*)",
+                    rf"({'|'.join(f._asdict().keys())}).([a-zA-Z_$][\w$]*)",
                     mode.split("first_at:")[-1],
                 )[0]
             )
