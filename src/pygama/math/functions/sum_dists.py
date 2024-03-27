@@ -136,17 +136,6 @@ def get_parameter_names(dists: np.array, par_idxs: np.array, par_size: int) -> n
         overall_par_idxs.extend(par_idxs[i])
     return param_names
 
-def copy_signature(signature_to_copy, obj_to_copy_to):
-    """
-    Copy the signature provided in signature_to_copy into the signature for "obj_to_copy_to". 
-    This is necessary so that we can override the signature for the various methods attached to 
-    different objects.
-    """
-    def wrapper(*args, **kwargs):
-        return obj_to_copy_to(*args, **kwargs)
-    wrapper.__signature__ = signature_to_copy
-    return wrapper
-
 class sum_dists(rv_continuous):
     r"""
     Initialize an rv_continuous method so that we gain access to scipy computable methods. 
