@@ -8,6 +8,7 @@ import numpy as np
 from lgdo import lh5, types
 
 from .. import utils
+from . import larveto
 
 
 def gather_pulse_data(
@@ -287,3 +288,59 @@ def make_pulse_data_mask(
         )
 
     return types.VectorOfVectors(mask)
+
+
+def geds_spms_coincidence_classifier(
+    datainfo: utils.DataInfo,
+    tcm: utils.TCMData,
+    table_names: Sequence[str],
+    *,
+    geds_t0: types.Array,
+) -> types.Array:
+    """Calculate the HPGe / SiPMs coincidence classifier.
+
+    The value represents the likelihood of a physical correlation between HPGe
+    and SiPM signals.
+
+    Parameters
+    ----------
+    datainfo, tcm, table_names
+        positional arguments automatically supplied by :func:`.build_evt`.
+    """
+    # mask for windowing data around the HPGe t0
+    pulse_mask = make_pulse_data_mask(
+        datainfo,
+        tcm,
+        table_names,
+        a_thr_pe=None,
+        t_loc_ns=geds_t0,
+        dt_range_ns=(-1_000, 5_000),
+        t_loc_default_ns=48_000,
+    )
+
+    # load the data
+    data = {}
+    for k, obs in {"amp": "hit.energy_in_pe", "t0": "hit.trigger_pos"}.items():
+        data[k] = gather_pulse_data(
+            datainfo,
+            tcm,
+            table_names,
+            observable=obs,
+            pulse_mask=pulse_mask,
+            drop_empty=True,
+        )
+
+    # load the channel info
+    # rawids = spms.gather_tcm_id_data(
+    #     datainfo,
+    #     tcm,
+    #     table_names,
+    #     pulse_mask=pulse_mask,
+    #     drop_empty=True,
+    # )
+
+    ts_data = larveto.l200_combined_test_stat(
+        data["t0"], data["amp"], geds_t0.view_as("ak")
+    )
+
+    return types.Array(ts_data)
