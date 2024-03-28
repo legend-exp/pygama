@@ -13,24 +13,28 @@ config_dir = Path(__file__).parent / "configs"
 store = LH5Store()
 
 
-def test_basics(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+@pytest.fixture(scope="module")
+def files_config(lgnd_test_data, tmptestdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
 
+    return {
+        "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
+        "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
+        "hit": (lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")), "hit", "ch{}"),
+        "evt": (outfile, "evt"),
+    }
+
+
+def test_basics(lgnd_test_data, files_config):
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{config_dir}/basic-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{config_dir}/basic-evt-config.json",
+        wo_mode="of",
     )
+
+    outfile = files_config["evt"][0]
+    f_tcm = files_config["tcm"][0]
 
     assert "statement" in store.read("/evt/multiplicity", outfile)[0].getattrs().keys()
     assert (
@@ -60,92 +64,58 @@ def test_basics(lgnd_test_data, tmptestdir):
     eidx = store.read("/evt/energy_idx", outfile)[0].view_as("np")
     eidx = eidx[eidx != 999999999999]
 
-    ids = store.read("hardware_tcm_1/array_id", lgnd_test_data.get_path(tcm_path))[
-        0
-    ].view_as("np")
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     ids = ids[eidx]
     assert ak.all(ids == eid[eid != 0])
 
 
-def test_lar_module(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
+def test_spms_module(lgnd_test_data, files_config):
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{config_dir}/module-test-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{config_dir}/spms-module-config.json",
+        wo_mode="of",
     )
 
-    assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 10
-    nda = {
-        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
-        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "t0", "lar_time_shift"]
-    }
-    assert np.max(nda["lar_multiplicity"]) <= 3
-    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
-    assert ((nda["lar_time_shift"] + nda["t0"]) >= 0).all()
+    outfile = files_config["evt"][0]
+
+    evt = lh5.read("/evt", outfile)
+
+    t0 = ak.fill_none(ak.nan_to_none(evt.t0.view_as("ak")), 48_000)
+    tr_pos = evt.trigger_pos.view_as("ak") * 16
+    assert ak.all(tr_pos > t0 - 30_000)
+    assert ak.all(tr_pos < t0 + 30_000)
+
+    mask = evt._pulse_mask
+    assert isinstance(mask, VectorOfVectors)
+    assert len(mask) == 10
+    assert mask.ndim == 3
+
+    full = evt.spms_amp_full.view_as("ak")
+    amp = evt.spms_amp.view_as("ak")
+    assert ak.all(amp > 0.1)
+
+    assert ak.all(full[mask.view_as("ak")] == amp)
+
+    wo_empty = evt.spms_amp_wo_empty.view_as("ak")
+    assert ak.all(wo_empty == amp[ak.count(amp, axis=-1) > 0])
+
+    rawids = evt.rawid.view_as("ak")
+    assert rawids.ndim == 2
+    assert ak.count(rawids) == 30
+
+    rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
+    assert ak.count(rawids_wo_empty) == 7
 
 
-def test_lar_t0_vov_module(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
+def test_vov(lgnd_test_data, files_config):
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{config_dir}/module-test-t0-vov-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{config_dir}/vov-test-evt-config.json",
+        wo_mode="of",
     )
 
-    assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 12
-    nda = {
-        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
-        for e in ["lar_multiplicity", "lar_multiplicity_dplms", "lar_time_shift"]
-    }
-    assert np.max(nda["lar_multiplicity"]) <= 3
-    assert np.max(nda["lar_multiplicity_dplms"]) <= 3
-
-    ch_idx = store.read("/evt/lar_tcm_index", outfile)[0].view_as("ak")
-    pls_idx = store.read("/evt/lar_pulse_index", outfile)[0].view_as("ak")
-    assert ak.count(ch_idx) == ak.count(pls_idx)
-    assert ak.all(ak.count(ch_idx, axis=-1) == ak.count(pls_idx, axis=-1))
-
-
-def test_vov(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{config_dir}/vov-test-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
-    )
+    outfile = files_config["evt"][0]
+    f_tcm = files_config["tcm"][0]
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 12
@@ -167,9 +137,7 @@ def test_vov(lgnd_test_data, tmptestdir):
     vov_eidx = store.read("/evt/energy_idx", outfile)[0].view_as("ak")
     vov_aoe_idx = store.read("/evt/aoe_idx", outfile)[0].view_as("ak")
 
-    ids = store.read("hardware_tcm_1/array_id", lgnd_test_data.get_path(tcm_path))[
-        0
-    ].view_as("ak")
+    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("ak")
     ids = ak.unflatten(ids[ak.flatten(vov_eidx)], ak.count(vov_eidx, axis=-1))
     assert ak.all(ids == vov_eid)
 
@@ -178,32 +146,17 @@ def test_vov(lgnd_test_data, tmptestdir):
     assert ak.all(vov_aoe.view_as("ak") == vov_aoe_idx)
 
 
-def test_graceful_crashing(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    f_tcm = lgnd_test_data.get_path(tcm_path)
-    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
-    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    f_config = f"{config_dir}/basic-evt-config.json"
-
-    with pytest.raises(KeyError):
-        build_evt(f_dsp, f_tcm, f_hit, f_config, outfile)
-
-    with pytest.raises(KeyError):
-        build_evt(f_tcm, f_hit, f_dsp, f_config, outfile)
-
+def test_graceful_crashing(lgnd_test_data, files_config):
     with pytest.raises(TypeError):
-        build_evt(f_tcm, f_dsp, f_hit, None, outfile)
+        build_evt(files_config, None, wo_mode="of")
 
     conf = {"operations": {}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
+        build_evt(files_config, conf, wo_mode="of")
 
     conf = {"channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]}}
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
+        build_evt(files_config, conf, wo_mode="of")
 
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
@@ -219,38 +172,25 @@ def test_graceful_crashing(lgnd_test_data, tmptestdir):
         },
     }
     with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
+        build_evt(
+            files_config,
+            conf,
+            wo_mode="of",
+        )
 
 
-def test_query(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
+def test_query(lgnd_test_data, files_config):
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{config_dir}/query-test-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{config_dir}/query-test-evt-config.json",
+        wo_mode="of",
     )
+    outfile = files_config["evt"][0]
+
     assert len(lh5.ls(outfile, "/evt/")) == 12
 
 
-def test_vector_sort(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    f_tcm = lgnd_test_data.get_path(tcm_path)
-    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
-    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-
+def test_vector_sort(lgnd_test_data, files_config):
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "outputs": ["acend_id", "t0_acend", "decend_id", "t0_decend"],
@@ -279,7 +219,14 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
             },
         },
     }
-    build_evt(f_tcm, f_dsp, f_hit, conf, outfile)
+
+    build_evt(
+        files_config,
+        conf,
+        wo_mode="of",
+    )
+
+    outfile = files_config["evt"][0]
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 4
@@ -289,27 +236,3 @@ def test_vector_sort(lgnd_test_data, tmptestdir):
     vov_t0, _ = store.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
-
-
-def test_tcm_id_table_pattern(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
-    f_tcm = lgnd_test_data.get_path(tcm_path)
-    f_dsp = lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp"))
-    f_hit = lgnd_test_data.get_path(tcm_path.replace("tcm", "hit"))
-    f_config = f"{config_dir}/basic-evt-config.json"
-
-    with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{{}}")
-    with pytest.raises(ValueError):
-        build_evt(f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{}{}")
-    with pytest.raises(NotImplementedError):
-        build_evt(
-            f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="ch{tcm_id}"
-        )
-    with pytest.raises(ValueError):
-        build_evt(
-            f_tcm, f_dsp, f_hit, f_config, outfile, tcm_id_table_pattern="apple{}banana"
-        )

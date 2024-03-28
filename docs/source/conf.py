@@ -76,7 +76,7 @@ suppress_warnings = [
 autodoc_default_options = {"ignore-module-all": True}
 # Include __init__() docstring in class docstring
 autoclass_content = "both"
-autodoc_typehints = "both"
+autodoc_typehints = "description"
 autodoc_typehints_description_target = "documented_params"
 autodoc_typehints_format = "short"
 

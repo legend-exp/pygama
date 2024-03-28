@@ -3,6 +3,7 @@ from pathlib import Path
 
 import awkward as ak
 import lgdo
+import pytest
 from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt
@@ -13,33 +14,35 @@ evt_config_dir = Path(__file__).parent.parent / "evt" / "configs"
 store = LH5Store()
 
 
-def test_basics(lgnd_test_data, tmptestdir):
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+@pytest.fixture(scope="module")
+def files_config(lgnd_test_data, tmptestdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    if os.path.exists(outfile):
-        os.remove(outfile)
+    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
 
+    return {
+        "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
+        "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
+        "hit": (lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")), "hit", "ch{}"),
+        "evt": (outfile, "evt"),
+    }
+
+
+def test_basics(tmptestdir, files_config):
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{evt_config_dir}/vov-test-evt-config.json",
+        wo_mode="of",
     )
+    outfile = files_config["evt"][0]
 
     skm_conf = f"{config_dir}/basic-skm-config.json"
     skm_out = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_skm.lh5"
 
     result = build_skm(
         outfile,
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        lgnd_test_data.get_path(tcm_path),
+        files_config["hit"][0],
+        files_config["dsp"][0],
+        files_config["tcm"][0],
         skm_conf,
     )
 
@@ -47,9 +50,9 @@ def test_basics(lgnd_test_data, tmptestdir):
 
     build_skm(
         outfile,
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        lgnd_test_data.get_path(tcm_path),
+        files_config["hit"][0],
+        files_config["dsp"][0],
+        files_config["tcm"][0],
         skm_conf,
         skm_out,
         wo_mode="o",
@@ -90,23 +93,15 @@ def test_basics(lgnd_test_data, tmptestdir):
     assert (vov_eid[:, 2] == df.energy_id_2.to_numpy()).all()
 
 
-def test_attribute_passing(lgnd_test_data, tmptestdir):
+def test_attribute_passing(tmptestdir, files_config):
     outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
-    tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
     if os.path.exists(outfile):
         os.remove(outfile)
 
     build_evt(
-        f_tcm=lgnd_test_data.get_path(tcm_path),
-        f_dsp=lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        f_hit=lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        evt_config=f"{evt_config_dir}/vov-test-evt-config.json",
-        f_evt=outfile,
-        wo_mode="o",
-        evt_group="evt",
-        hit_group="hit",
-        dsp_group="dsp",
-        tcm_group="hardware_tcm_1",
+        files_config,
+        config=f"{evt_config_dir}/vov-test-evt-config.json",
+        wo_mode="of",
     )
 
     skm_conf = f"{config_dir}/basic-skm-config.json"
@@ -115,9 +110,9 @@ def test_attribute_passing(lgnd_test_data, tmptestdir):
 
     build_skm(
         outfile,
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
-        lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")),
-        lgnd_test_data.get_path(tcm_path),
+        files_config["hit"][0],
+        files_config["dsp"][0],
+        files_config["tcm"][0],
         skm_conf,
         f_skm=skm_out,
         wo_mode="o",
