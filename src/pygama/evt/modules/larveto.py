@@ -101,6 +101,7 @@ def pulse_amp_round(amp: float | ArrayLike):
 def l200_tc_time_pdf(
     t0: float | ArrayLike,
     *,
+    domain_ns: tuple[float] = (-1_000, 5_000),
     tau_singlet_ns: float = 6,
     tau_triplet_ns: float = 1100,
     sing2trip_ratio: float = 1 / 3,
@@ -132,6 +133,11 @@ def l200_tc_time_pdf(
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution).
     """
+    if not np.all(t0 <= domain_ns[1] and t0 >= domain_ns[0]):
+        msg = f"{t0=} out of bounds for {domain_ns=}"
+        raise ValueError(msg)
+
+    # TODO: make this a true pdf, i.e. normalize to integral 1
     return (
         # the triplet
         (1 - sing2trip_ratio)
@@ -143,8 +149,9 @@ def l200_tc_time_pdf(
         * scipy.stats.exponnorm.pdf(
             t0, tau_singlet_ns / t0_res_ns, loc=t0_bias_ns, scale=t0_res_ns
         )
-        # the random coincidences (uniform pdf for normalization)
-        + bkg_prob * scipy.stats.uniform.pdf(t0, -1_000, 5_000)
+        # the random coincidences (uniform pdf)
+        + bkg_prob
+        * scipy.stats.uniform.pdf(t0, domain_ns[0], domain_ns[1] - domain_ns[0])
     )
 
 

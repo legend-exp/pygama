@@ -295,7 +295,7 @@ def geds_spms_coincidence_classifier(
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
-    geds_t0: types.Array,
+    geds_t0_ns: types.Array,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
@@ -313,7 +313,7 @@ def geds_spms_coincidence_classifier(
         tcm,
         table_names,
         a_thr_pe=None,
-        t_loc_ns=geds_t0,
+        t_loc_ns=geds_t0_ns,
         dt_range_ns=(-1_000, 5_000),
         t_loc_default_ns=48_000,
     )
@@ -328,7 +328,7 @@ def geds_spms_coincidence_classifier(
             observable=obs,
             pulse_mask=pulse_mask,
             drop_empty=True,
-        )
+        ).view_as("ak")
 
     # load the channel info
     # rawids = spms.gather_tcm_id_data(
@@ -339,8 +339,10 @@ def geds_spms_coincidence_classifier(
     #     drop_empty=True,
     # )
 
-    ts_data = larveto.l200_combined_test_stat(
-        data["t0"], data["amp"], geds_t0.view_as("ak")
-    )
+    # (HPGe) trigger position can vary among events!
+    if isinstance(geds_t0_ns, types.Array):
+        geds_t0_ns = geds_t0_ns.view_as("ak")
+
+    ts_data = larveto.l200_combined_test_stat(data["t0"], data["amp"], geds_t0_ns)
 
     return types.Array(ts_data)
