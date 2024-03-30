@@ -47,6 +47,90 @@ def get_keys(in_data, cut_dict):
     return np.unique(out_params).tolist()
 
 
+def get_mode_stdev(par_array):
+    idxs = (par_array > np.nanpercentile(par_array, 1)) & (
+        par_array < np.nanpercentile(par_array, 99)
+    )
+    par_array = par_array[idxs]
+    bin_width = np.nanpercentile(par_array, 55) - np.nanpercentile(par_array, 50)
+
+    counts, start_bins, var = pgh.get_hist(
+        par_array,
+        range=(np.nanmin(par_array), np.nanmax(par_array)),
+        dx=bin_width,
+    )
+    max_idx = np.argmax(counts)
+    mu = start_bins[max_idx]
+    try:
+        fwhm = pgh.get_fwhm(counts, start_bins)[0]
+        guess_sig = fwhm / 2.355
+
+        lower_bound = mu - 10 * guess_sig
+
+        upper_bound = mu + 10 * guess_sig
+
+    except Exception:
+        lower_bound = np.nanpercentile(par_array, 5)
+        upper_bound = np.nanpercentile(par_array, 95)
+
+    if (lower_bound < np.nanmin(par_array)) or (lower_bound > np.nanmax(par_array)):
+        lower_bound = np.nanmin(par_array)
+    if (upper_bound > np.nanmax(par_array)) or (upper_bound < np.nanmin(par_array)):
+        upper_bound = np.nanmax(par_array)
+
+    try:
+        counts, bins, var = pgh.get_hist(
+            par_array,
+            dx=(np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)),
+            range=(lower_bound, upper_bound),
+        )
+
+        bin_centres = pgh.get_bin_centers(bins)
+
+        fwhm = pgh.get_fwhm(counts, bins)[0]
+        mean = float(bin_centres[np.argmax(counts)])
+        pars, cov = pgf.gauss_mode_width_max(
+            counts,
+            bins,
+            mode_guess=mean,
+            n_bins=20,
+            cost_func="Least Squares",
+            inflate_errors=False,
+            gof_method="var",
+        )
+        mean = pars[0]
+        std = fwhm / 2.355
+
+        if (
+            mean < np.nanmin(bins)
+            or mean > np.nanmax(bins)
+            or (mean + std) < mu
+            or (mean - std) > mu
+        ):
+            raise IndexError
+    except IndexError:
+        try:
+            fwhm = pgh.get_fwhm(counts, bins)[0]
+            mean = float(bin_centres[np.argmax(counts)])
+            std = fwhm / 2.355
+        except Exception:
+            lower_bound = np.nanpercentile(par_array, 5)
+            upper_bound = np.nanpercentile(par_array, 95)
+
+            counts, bins, var = pgh.get_hist(
+                par_array,
+                dx=np.nanpercentile(par_array, 51) - np.nanpercentile(par_array, 50),
+                range=(lower_bound, upper_bound),
+            )
+
+            bin_centres = pgh.get_bin_centers(bins)
+
+            fwhm = pgh.get_fwhm(counts, bins)[0]
+            mean = float(bin_centres[np.argmax(counts)])
+            std = fwhm / 2.355
+    return mean, std
+
+
 def generate_cuts(
     data: dict[str, np.ndarray],
     cut_dict: dict[str, int],
@@ -135,96 +219,8 @@ def generate_cuts(
                 all_par_array = data[par].to_numpy()
             except KeyError:
                 all_par_array = data.eval(par).to_numpy()
-            idxs = (all_par_array > np.nanpercentile(all_par_array, 1)) & (
-                all_par_array < np.nanpercentile(all_par_array, 99)
-            )
-            par_array = all_par_array[idxs]
-            bin_width = np.nanpercentile(par_array, 55) - np.nanpercentile(
-                par_array, 50
-            )
 
-            counts, start_bins, var = pgh.get_hist(
-                par_array,
-                range=(np.nanmin(par_array), np.nanmax(par_array)),
-                dx=bin_width,
-            )
-            max_idx = np.argmax(counts)
-            mu = start_bins[max_idx]
-            try:
-                fwhm = pgh.get_fwhm(counts, start_bins)[0]
-                guess_sig = fwhm / 2.355
-
-                lower_bound = mu - 10 * guess_sig
-
-                upper_bound = mu + 10 * guess_sig
-
-            except Exception:
-                lower_bound = np.nanpercentile(par_array, 5)
-                upper_bound = np.nanpercentile(par_array, 95)
-
-            if (lower_bound < np.nanmin(par_array)) or (
-                lower_bound > np.nanmax(par_array)
-            ):
-                lower_bound = np.nanmin(par_array)
-            if (upper_bound > np.nanmax(par_array)) or (
-                upper_bound < np.nanmin(par_array)
-            ):
-                upper_bound = np.nanmax(par_array)
-
-            try:
-                counts, bins, var = pgh.get_hist(
-                    par_array,
-                    dx=(
-                        np.nanpercentile(par_array, 52)
-                        - np.nanpercentile(par_array, 50)
-                    ),
-                    range=(lower_bound, upper_bound),
-                )
-
-                bin_centres = pgh.get_bin_centers(bins)
-
-                fwhm = pgh.get_fwhm(counts, bins)[0]
-                mean = float(bin_centres[np.argmax(counts)])
-                pars, cov = pgf.gauss_mode_width_max(
-                    counts,
-                    bins,
-                    mode_guess=mean,
-                    n_bins=20,
-                    cost_func="Least Squares",
-                    inflate_errors=False,
-                    gof_method="var",
-                )
-                mean = pars[0]
-                std = fwhm / 2.355
-
-                if (
-                    mean < np.nanmin(bins)
-                    or mean > np.nanmax(bins)
-                    or (mean + std) < mu
-                    or (mean - std) > mu
-                ):
-                    raise IndexError
-            except IndexError:
-                try:
-                    fwhm = pgh.get_fwhm(counts, bins)[0]
-                    mean = float(bin_centres[np.argmax(counts)])
-                    std = fwhm / 2.355
-                except Exception:
-                    lower_bound = np.nanpercentile(par_array, 5)
-                    upper_bound = np.nanpercentile(par_array, 95)
-
-                    counts, bins, var = pgh.get_hist(
-                        par_array,
-                        dx=np.nanpercentile(par_array, 51)
-                        - np.nanpercentile(par_array, 50),
-                        range=(lower_bound, upper_bound),
-                    )
-
-                    bin_centres = pgh.get_bin_centers(bins)
-
-                    fwhm = pgh.get_fwhm(counts, bins)[0]
-                    mean = float(bin_centres[np.argmax(counts)])
-                    std = fwhm / 2.355
+            mean, std = get_mode_stdev(all_par_array)
 
             if isinstance(num_sigmas, (int, float)):
                 num_sigmas_left = num_sigmas
@@ -265,19 +261,27 @@ def generate_cuts(
 
             if display > 0:
                 fig = plt.figure()
+                low_val = np.nanpercentile(all_par_array, 5)
+                up_val = np.nanpercentile(all_par_array, 95)
+                if upper is not None:
+                    plt.axvline(upper)
+                    if up_val < upper:
+                        up_val = upper
+                if lower is not None:
+                    plt.axvline(lower)
+                    if low_val > lower:
+                        low_val = lower
+
                 plt.hist(
                     all_par_array,
                     bins=np.linspace(
-                        np.nanpercentile(all_par_array, 1),
-                        np.nanpercentile(all_par_array, 99),
+                        low_val,
+                        up_val,
                         100,
                     ),
                     histtype="step",
                 )
-                if upper is not None:
-                    plt.axvline(upper)
-                if lower is not None:
-                    plt.axvline(lower)
+
                 plt.ylabel("counts")
                 plt.xlabel(out_par)
                 plot_dict[out_par] = fig
@@ -318,6 +322,162 @@ def get_cut_indexes(data, cut_parameters):
         raise ValueError("Data must be a Table or DataFrame")
 
     return ct_mask
+
+
+def generate_cut_classifiers(
+    data: dict[str, np.ndarray],
+    cut_dict: dict[str, int],
+    rounding: int = 4,
+    display: int = 0,
+) -> dict:
+    """
+    Finds double sided cut boundaries for a file for the parameters specified
+
+    Parameters
+    ----------
+    data : lh5 table, dictionary of arrays or pandas dataframe
+                data to calculate cuts on
+    parameters : dict
+                dictionary of the form:
+                {
+                    "output_parameter_name": {
+                        "cut_parameter": "parameter_to_cut_on",
+                        "cut_level": number_of_sigmas,
+                        "mode": "inclusive" or "exclusive"
+                    }
+                }
+                number of sigmas can instead be a dictionary to specify different cut levels for low and high side
+                or to only have a one sided cut only specify one of the low or high side
+                e.g.
+                {
+                    "output_parameter_name": {
+                        "cut_parameter": "parameter_to_cut_on",
+                        "cut_level": {"low_side": 3, "high_side": 2},
+                        "mode": "inclusive" or "exclusive"
+                    }
+                }
+                alternatively can specify hit dict fields to just copy dict into output dict e.g.
+                {
+                    "is_valid_t0":{
+                        "expression":"(tp_0_est>a)&(tp_0_est<b)",
+                        "parameters":{"a":46000, "b":52000}
+                    }
+                }
+                or
+                {
+                    "is_valid_cal":{
+                        "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
+                    }
+                }
+    rounding : int
+                number of decimal places to round to
+    display : int
+                if 1 will display plots of the cuts
+                if 0 will not display plots
+
+    Returns
+    -------
+    dict
+        dictionary of the form (same as hit dicts):
+        {
+            "output_parameter_name": {
+                "expression": "cut_expression",
+                "parameters": {"a": lower_bound, "b": upper_bound}
+            }
+        }
+    plot_dict
+        dictionary of plots
+
+    """
+
+    output_dict = {}
+    plot_dict = {}
+    if isinstance(data, pd.DataFrame):
+        pass
+    elif isinstance(data, Table):
+        data = {entry: data[entry].nda for entry in get_keys(data, cut_dict)}
+        data = pd.DataFrame.from_dict(data)
+    elif isinstance(data, dict):
+        data = pd.DataFrame.from_dict(data)
+    for out_par, cut in cut_dict.items():
+        if "expression" in cut:
+            output_dict[out_par] = {"expression": cut["expression"]}
+            if "parameters" in cut:
+                output_dict[out_par].update({"parameters": cut["parameters"]})
+        else:
+            par = cut["cut_parameter"]
+            num_sigmas = cut["cut_level"]
+            mode = cut["mode"]
+            try:
+                all_par_array = data[par].to_numpy()
+            except KeyError:
+                all_par_array = data.eval(par).to_numpy()
+
+            mean, std = get_mode_stdev(all_par_array)
+
+            if isinstance(num_sigmas, (int, float)):
+                num_sigmas_left = -num_sigmas
+                num_sigmas_right = num_sigmas
+            elif isinstance(num_sigmas, dict):
+                if "low_side" in num_sigmas:
+                    num_sigmas_left = num_sigmas["low_side"]
+                else:
+                    num_sigmas_left = None
+                if "high_side" in num_sigmas:
+                    num_sigmas_right = num_sigmas["high_side"]
+                else:
+                    num_sigmas_right = None
+
+            if mode == "inclusive":
+                if num_sigmas_right is not None and num_sigmas_left is not None:
+                    cut_string = f"({out_par}_classifier>a) & ({out_par}_classifier<b)"
+                    par_dict = {"a": num_sigmas_left, "b": num_sigmas_right}
+                elif num_sigmas_right is None:
+                    cut_string = f"{out_par}_classifier>a"
+                    par_dict = {"a": num_sigmas_left}
+                elif num_sigmas_left is None:
+                    cut_string = f"{out_par}_classifier<a"
+                    par_dict = {"a": num_sigmas_right}
+            elif mode == "exclusive":
+                if num_sigmas_right is not None and num_sigmas_left is not None:
+                    cut_string = f"({out_par}_classifier<a) | ({out_par}_classifier>b)"
+                    par_dict = {"a": num_sigmas_left, "b": num_sigmas_right}
+                elif num_sigmas_right is None:
+                    cut_string = f"{out_par}_classifier<a"
+                    par_dict = {"a": num_sigmas_left}
+                elif num_sigmas_left is None:
+                    cut_string = f"{out_par}_classifier>a"
+                    par_dict = {"a": num_sigmas_right}
+
+            output_dict[f"{out_par}_classifier"] = {
+                "expression": f"(({par})-a)/b",
+                "parameters": {"a": mean, "b": std},
+            }
+
+            output_dict[out_par] = {"expression": cut_string, "parameters": par_dict}
+
+            if display > 0:
+                fig = plt.figure()
+                low = -10 if num_sigmas_left > -10 else num_sigmas_left
+                hi = 10 if num_sigmas_right < 10 else num_sigmas_right
+                plt.hist(
+                    (all_par_array - mean) / std,
+                    bins=np.arange(low, hi, 0.1),
+                    histtype="step",
+                )
+                if num_sigmas_left is not None:
+                    plt.axvline(num_sigmas_left)
+                if num_sigmas_right is not None:
+                    plt.axvline(num_sigmas_right)
+
+                plt.ylabel("counts")
+                plt.xlabel(f"{out_par}_classifier")
+                plot_dict[out_par] = fig
+                plt.close()
+    if display > 0:
+        return output_dict, plot_dict
+    else:
+        return output_dict
 
 
 def find_pulser_properties(df, energy="daqenergy"):
