@@ -129,11 +129,12 @@ def gather_pulse_data(
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
-def gather_tcm_id_data(
+def gather_tcm_data(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
+    tcm_field="id",
     pulse_mask=None,
     a_thr_pe=None,
     t_loc_ns=None,
@@ -141,11 +142,12 @@ def gather_tcm_id_data(
     t_loc_default_ns=None,
     drop_empty=True,
 ) -> types.VectorOfVectors:
-    """Gather TCM ids (i.e. channel identifiers) into a 2D :class:`~lgdo.types.vectorofvectors.VectorOfVectors`.
+    """Gather TCM data into a 2D :class:`~lgdo.types.vectorofvectors.VectorOfVectors`.
 
-    The returned data structure specifies the event in the first axis and the
-    SiPM channel identifier. Can be used to filter out data from
-    :func:`gather_pulse_data` based on SiPM channel provenance.
+    The returned data structure specifies the event on the first axis and the
+    TCM data (`id` or `idx`) on the second. Can be used to filter out data from
+    :func:`gather_pulse_data` based on SiPM channel provenance (`id`) or to
+    load hit data from lower tiers (with `idx`).
 
     If `drop_empty` is ``True``, channel ids with no pulse data associated are
     removed.
@@ -153,19 +155,29 @@ def gather_tcm_id_data(
     See :func:`gather_pulse_data` for documentation about the other function
     arguments.
     """
-    # loop over selected table_names and load hit data
+    # unflatten the tcm data with cumulative_length, i.e. make a VoV
+    tcm_vov = {}
+    for field in ("id", "idx"):
+        tcm_vov[field] = types.VectorOfVectors(
+            flattened_data=tcm._asdict()[field], cumulative_length=tcm.cumulative_length
+        ).view_as("ak")
+
+    # list user wanted table names
     table_ids = [
-        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, channel)
-        for channel in table_names
+        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) for id in table_names
     ]
+    # find them in tcm.id (we'll filter the rest out)
+    locs = np.isin(tcm_vov["id"], table_ids)
 
-    data = ak.Array(
-        np.full(
-            shape=(len(tcm.cumulative_length), len(table_ids)), fill_value=table_ids
-        )
-    )
+    # select tcm field requested by the user
+    data = tcm_vov[tcm_field]
 
-    # check if user wants to apply a mask
+    # apply mask
+    # NOTE: need to cast to irregular axes, otherwise the masking result is
+    # non-nested
+    data = data[ak.from_regular(locs)]
+
+    # check if user wants to apply a custom mask
     if drop_empty:
         if pulse_mask is None:
             # generate the time/amplitude mask from parameters

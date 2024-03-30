@@ -103,6 +103,10 @@ def test_spms_module(lgnd_test_data, files_config):
     assert rawids.ndim == 2
     assert ak.count(rawids) == 30
 
+    idx = evt.hit_idx.view_as("ak")
+    assert idx.ndim == 2
+    assert ak.count(idx) == 30
+
     rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
     assert ak.count(rawids_wo_empty) == 7
 

@@ -8,6 +8,7 @@
     "_pulse_mask",
     "spms_amp",
     "rawid",
+    "hit_idx",
     "rawid_wo_empty",
     "spms_amp_full",
     "spms_amp_wo_empty",
@@ -45,7 +46,12 @@
     "rawid": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.gather_tcm_id_data(<...>, drop_empty=False)"
+      "expression": "pygama.evt.modules.spms.gather_tcm_data(<...>, drop_empty=False)"
+    },
+    "hit_idx": {
+      "channels": "spms_on",
+      "aggregation_mode": "function",
+      "expression": "pygama.evt.modules.spms.gather_tcm_data(<...>, tcm_field='idx', drop_empty=False)"
     },
     "spms_amp_full": {
       "channels": "spms_on",
@@ -60,7 +66,7 @@
     "rawid_wo_empty": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.gather_tcm_id_data(<...>, pulse_mask=evt._pulse_mask, drop_empty=True)"
+      "expression": "pygama.evt.modules.spms.gather_tcm_data(<...>, pulse_mask=evt._pulse_mask, drop_empty=True)"
     },
     "lar_coin_class": {
       "channels": "spms_on",
