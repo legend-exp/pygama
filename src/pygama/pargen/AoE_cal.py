@@ -934,26 +934,41 @@ class CalAoE:
                             ]
                         )
                 self.timecorr_df.set_index("run_timestamp", inplace=True)
-                time_dict = fit_time_means(
-                    np.array(self.timecorr_df.index),
-                    np.array(self.timecorr_df["mean"]),
-                    np.array(self.timecorr_df["sigma"]),
-                )
+                if len(self.timecorr_df) > 1:
+                    time_dict = fit_time_means(
+                        np.array(self.timecorr_df.index),
+                        np.array(self.timecorr_df["mean"]),
+                        np.array(self.timecorr_df["sigma"]),
+                    )
 
-                df[output_name] = df[aoe_param] / np.array(
-                    [time_dict[tstamp] for tstamp in df["run_timestamp"]]
-                )
-                self.update_cal_dicts(
-                    {
-                        tstamp: {
+                    df[output_name] = df[aoe_param] / np.array(
+                        [time_dict[tstamp] for tstamp in df["run_timestamp"]]
+                    )
+                    self.update_cal_dicts(
+                        {
+                            tstamp: {
+                                output_name: {
+                                    "expression": f"{aoe_param}/a",
+                                    "parameters": {"a": t_dict},
+                                }
+                            }
+                            for tstamp, t_dict in time_dict.items()
+                        }
+                    )
+                else:
+                    df[output_name] = (
+                        df[aoe_param] / np.array(self.timecorr_df["mean"])[0]
+                    )
+                    self.update_cal_dicts(
+                        {
                             output_name: {
                                 "expression": f"{aoe_param}/a",
-                                "parameters": {"a": t_dict},
+                                "parameters": {
+                                    "a": np.array(self.timecorr_df["mean"])[0]
+                                },
                             }
                         }
-                        for tstamp, t_dict in time_dict.items()
-                    }
-                )
+                    )
                 log.info("A/E time correction finished")
             else:
                 try:
@@ -1026,6 +1041,7 @@ class CalAoE:
             elif self.debug_mode:
                 raise (e)
             log.error("A/E time correction failed")
+            df[output_name] = df[aoe_param] / np.nan
             self.update_cal_dicts(
                 {
                     output_name: {
@@ -1388,6 +1404,8 @@ class CalAoE:
             csqr_sig, dof_sig, p_val_sig = (np.nan, np.nan, np.nan)
             sig_pars, sig_errs, sig_cov = return_nans(self.sigma_func.func)
             dep_pars, dep_err, dep_cov = return_nans(self.pdf)
+            data[corrected_param] = data[aoe_param] * np.nan
+            data[classifier_param] = data[aoe_param] * np.nan
 
         self.energy_corr_res_dict["mean_fits"] = {
             "func": self.mean_func.__name__,
