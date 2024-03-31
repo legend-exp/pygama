@@ -56,6 +56,9 @@ def build_evt(
           (see :func:`evaluate_expression`),
         - ``query`` defines an expression to mask the aggregation.
         - ``parameters`` defines any other parameter used in expression.
+        - ``dtype` defines the NumPy data type of the resulting data.
+        - ``initial`` defines the initial/default value. Useful with some types
+          of aggregators.
 
         For example:
 
@@ -258,6 +261,20 @@ def build_evt(
             # add attribute if present
             if "lgdo_attrs" in v.keys():
                 obj.attrs |= v["lgdo_attrs"]
+
+        # cast to type, if required
+        # hijack the poor LGDO
+        if "dtype" in v:
+            type_ = v["dtype"]
+
+            if isinstance(obj, Array):
+                obj.nda = obj.nda.astype(type_)
+            if isinstance(obj, VectorOfVectors):
+                fldata_ptr = obj.flattened_data
+                while isinstance(fldata_ptr, VectorOfVectors):
+                    fldata_ptr = fldata_ptr.flattened_data
+
+                fldata_ptr.nda = fldata_ptr.nda.astype(type_)
 
         log.debug(f"new column {k!s} = {obj!r}")
         table.add_field(k, obj)

@@ -123,18 +123,25 @@ def test_vov(lgnd_test_data, files_config):
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 12
+
     vov_ene, _ = store.read("/evt/energy", outfile)
     vov_aoe, _ = store.read("/evt/aoe", outfile)
     arr_ac, _ = store.read("/evt/multiplicity", outfile)
     vov_aoeene, _ = store.read("/evt/energy_times_aoe", outfile)
     vov_eneac, _ = store.read("/evt/energy_times_multiplicity", outfile)
     arr_ac2, _ = store.read("/evt/multiplicity_squared", outfile)
+
     assert isinstance(vov_ene, VectorOfVectors)
     assert isinstance(vov_aoe, VectorOfVectors)
     assert isinstance(arr_ac, Array)
     assert isinstance(vov_aoeene, VectorOfVectors)
     assert isinstance(vov_eneac, VectorOfVectors)
     assert isinstance(arr_ac2, Array)
+
+    assert vov_ene.dtype == "float32"
+    assert vov_aoe.dtype == "float64"
+    assert arr_ac.dtype == "int16"
+
     assert (np.diff(vov_ene.cumulative_length.nda, prepend=[0]) == arr_ac.nda).all()
 
     vov_eid = store.read("/evt/energy_id", outfile)[0].view_as("ak")
@@ -146,7 +153,9 @@ def test_vov(lgnd_test_data, files_config):
     assert ak.all(ids == vov_eid)
 
     arr_ene = store.read("/evt/energy_sum", outfile)[0].view_as("ak")
-    assert ak.all(arr_ene == ak.nansum(vov_ene.view_as("ak"), axis=-1))
+    assert ak.all(
+        ak.isclose(arr_ene, ak.nansum(vov_ene.view_as("ak"), axis=-1), rtol=1e-3)
+    )
     assert ak.all(vov_aoe.view_as("ak") == vov_aoe_idx)
 
 
