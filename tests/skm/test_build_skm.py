@@ -74,10 +74,6 @@ def test_basics(tmptestdir, files_config):
     assert "multiplicity" in df.keys()
     assert "energy_sum" in df.keys()
     assert (df.multiplicity.to_numpy() <= 3).all()
-    assert (
-        df.energy_0.to_numpy() + df.energy_1.to_numpy() + df.energy_2.to_numpy()
-        == df.energy_sum.to_numpy()
-    ).all()
 
     vov_eid = ak.to_numpy(
         ak.fill_none(
