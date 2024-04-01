@@ -1194,7 +1194,7 @@ class HPGeCalibration:
                     + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
                     + f"| {fwhm_func.func(peak, *results['parameters']):.2f}".ljust(5)
                 )
-        except ValueError:
+        except RuntimeError:
             pars, errs, cov = return_nans(fwhm_func.func)
             results = {
                 "function": fwhm_func,
