@@ -13,7 +13,6 @@ functions must take as the first 8 args in order:
 additional parameters are free to the user and need to be defined in the JSON
 """
 
-
 import awkward as ak
 import numpy as np
 from lgdo import Array, VectorOfVectors

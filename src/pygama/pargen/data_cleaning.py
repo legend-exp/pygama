@@ -5,6 +5,7 @@ mainly pulser tagging
 - find_pulser_properties (find pulser by looking for which peak has a constant time between events)
 - tag_pulsers
 """
+
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
 import numpy as np
