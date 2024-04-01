@@ -1159,6 +1159,8 @@ class HPGeCalibration:
     @staticmethod
     def fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms):
         try:
+            if len(fwhm_peaks) == 0:
+                raise RuntimeError
             c_lin = cost.LeastSquares(fwhm_peaks, fwhms, dfwhms, fwhm_func.func)
             # c_lin.loss = "soft_l1"
             m = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fwhms, dfwhms))
@@ -1192,7 +1194,7 @@ class HPGeCalibration:
                     + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
                     + f"| {fwhm_func.func(peak, *results['parameters']):.2f}".ljust(5)
                 )
-        except RuntimeError:
+        except ValueError:
             pars, errs, cov = return_nans(fwhm_func.func)
             results = {
                 "function": fwhm_func,
@@ -1836,7 +1838,7 @@ def get_hpge_energy_peak_par_guess(
                 _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
             except IndexError:
                 init_sigma = np.nanstd(energy)
-        bin_width = (init_sigma) * len(energy) ** (-1 / 3)
+        bin_width = 2 * (init_sigma) * len(energy) ** (-1 / 3)
 
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
@@ -2096,7 +2098,7 @@ def unbinned_staged_energy_fit(
                 _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
             except IndexError:
                 init_sigma = np.nanstd(energy)
-        bin_width = (init_sigma) * len(energy) ** (-1 / 3)
+        bin_width = 2 * (init_sigma) * len(energy) ** (-1 / 3)
 
     gof_hist, gof_bins, gof_var = pgh.get_hist(energy, range=gof_range, dx=bin_width)
 
