@@ -727,13 +727,14 @@ class HPGeCalibration:
         e_uncal,
         peak_pars=None,
         peaks_kev=None,
-        default_n_bins=50,
+        bin_width_kev=1,
         peak_param="mode",
         method="unbinned",
         n_events=None,
         allowed_p_val=0.01,
         tail_weight=0,
         update_cal_pars=True,
+        use_bin_width_in_fit=True,
     ):
         """
         Fit the energy peaks specified using the given function.
@@ -747,8 +748,8 @@ class HPGeCalibration:
         peak_pars : list of tuples, optional
             List containing tuples of the form (peak, range, func) where peak is the energy of the peak to fit,
             range is the range in keV to fit, and func is the function to fit.
-        default_n_bins : int, optional
-            Default number of bins to use for the fit window histogramming. Default is 50.
+        bin_width_kev : int, optional
+            Default binwidth to use for the fit window histogramming. Default is 1 keV.
         peak_param : str, optional
             Parameter to use for peak fitting. Default is "mode".
         method : str, optional
@@ -844,13 +845,13 @@ class HPGeCalibration:
                 # Drop failed fits
                 if pt_pars[0] is not None:
                     range_uncal = (float(pt_pars[0][1]) * 20, float(pt_pars[0][1]) * 20)
-                    n_bins = default_n_bins
+                    n_bins = int(range_uncal / bin_width_kev)
                 else:
                     range_uncal = None
             elif isinstance(fit_range, tuple):
                 der = pgf.nb_poly(peak, derco)
                 range_uncal = (fit_range[0] / der, fit_range[1] / der)
-                n_bins = int(sum(fit_range) / der)
+                n_bins = int(sum(fit_range) / (der * bin_width_kev))
 
             if range_uncal is not None:
                 uncal_peak_pars.append((peak, loc, range_uncal, n_bins, func))
@@ -889,6 +890,7 @@ class HPGeCalibration:
                         fixed_func=get_hpge_energy_fixed,
                         allow_tail_drop=True,
                         tail_weight=tail_weight,
+                        bin_width=binw_1 if use_bin_width_in_fit is True else None,
                         guess_kwargs={"mode_guess": mode_guess},
                     )
                     if pars_i["n_sig"] < 100:
