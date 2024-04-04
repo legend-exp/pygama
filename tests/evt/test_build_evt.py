@@ -36,29 +36,29 @@ def test_basics(lgnd_test_data, files_config):
     outfile = files_config["evt"][0]
     f_tcm = files_config["tcm"][0]
 
-    assert "statement" in store.read("/evt/multiplicity", outfile)[0].getattrs().keys()
-    assert (
-        store.read("/evt/multiplicity", outfile)[0].getattrs()["statement"]
-        == "0bb decay is real"
-    )
+    evt = lh5.read("evt", outfile)
+
+    assert "statement" in evt.multiplicity.attrs
+    assert evt.multiplicity.attrs["statement"] == "0bb decay is real"
+
     assert os.path.exists(outfile)
-    assert len(lh5.ls(outfile, "/evt/")) == 11
-    nda = {
-        e: store.read(f"/evt/{e}", outfile)[0].view_as("np")
-        for e in ["energy", "energy_aux", "energy_sum", "multiplicity"]
-    }
-    assert (
-        nda["energy"][nda["multiplicity"] == 1]
-        == nda["energy_aux"][nda["multiplicity"] == 1]
-    ).all()
-    assert (
-        nda["energy"][nda["multiplicity"] == 1]
-        == nda["energy_sum"][nda["multiplicity"] == 1]
-    ).all()
-    assert (
-        nda["energy_aux"][nda["multiplicity"] == 1]
-        == nda["energy_sum"][nda["multiplicity"] == 1]
-    ).all()
+    assert sorted(evt.keys()) == [
+        "aoe",
+        "energy",
+        "energy_all_above1MeV",
+        "energy_any_above1MeV",
+        "energy_id",
+        "energy_idx",
+        "energy_sum",
+        "is_aoe_rejected",
+        "is_usable_aoe",
+        "multiplicity",
+        "timestamp",
+    ]
+
+    ak_evt = evt.view_as("ak")
+
+    assert ak.all(ak_evt.energy_sum == ak.sum(ak_evt.energy, axis=-1))
 
     eid = store.read("/evt/energy_id", outfile)[0].view_as("np")
     eidx = store.read("/evt/energy_idx", outfile)[0].view_as("np")
@@ -123,6 +123,9 @@ def test_vov(lgnd_test_data, files_config):
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 12
+
+    timestamp, _ = store.read("/evt/timestamp", outfile)
+    assert np.all(~np.isnan(timestamp.nda))
 
     vov_ene, _ = store.read("/evt/energy", outfile)
     vov_aoe, _ = store.read("/evt/aoe", outfile)

@@ -541,7 +541,7 @@ def evaluate_expression(
                 pars_dict=pars_dict,
                 default_value=default_value,
             )
-        if "gather" == mode:
+        if mode == "gather":
             return aggregators.evaluate_to_vector(
                 datainfo=datainfo,
                 tcm=tcm,

@@ -57,34 +57,34 @@ def evaluate_to_first_or_last(
        defines if sorted by smallest or largest value of `sorter`
     """
     f = utils.make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
 
-    # define dimension of output array
-    out = np.full(n_rows, default_value, dtype=type(default_value))
-    outt = np.zeros(len(out))
-
-    store = LH5Store()
+    out = None
+    outt = None
+    store = LH5Store(keep_open=True)
 
     for ch in channels:
+        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+
         # get index list for this channel to be loaded
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
-            "right",
-        )
+        idx_ch = tcm.idx[tcm.id == table_id]
 
         # evaluate at channel
-        res = utils.get_data_at_channel(
-            datainfo=datainfo,
-            ch=ch,
-            tcm=tcm,
-            expr=expr,
-            field_list=field_list,
-            pars_dict=pars_dict,
-            is_evaluated=ch not in channels_skip,
-            default_value=default_value,
-        )
+        if ch not in channels_skip:
+            res = utils.get_data_at_channel(
+                datainfo=datainfo,
+                ch=ch,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                pars_dict=pars_dict,
+            )
+
+            if out is None:
+                # define dimension of output array
+                out = utils.make_numpy_full(n_rows, default_value, res.dtype)
+                outt = np.zeros(len(out))
+        else:
+            res = np.full(len(idx_ch), default_value)
 
         # get mask from query
         limarr = utils.get_mask_from_query(
@@ -104,6 +104,12 @@ def evaluate_to_first_or_last(
 
         if t0.ndim > 1:
             raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
+
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == table_id)[0],
+            "right",
+        )
 
         if is_first:
             if ch == channels[0]:
@@ -168,30 +174,29 @@ def evaluate_to_scalar(
        default value.
     """
     f = utils.make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
-
-    # define dimension of output array
-    out = np.full(n_rows, default_value, dtype=type(default_value))
+    out = None
 
     for ch in channels:
-        # get index list for this channel to be loaded
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
-            "right",
-        )
+        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
-        res = utils.get_data_at_channel(
-            datainfo=datainfo,
-            ch=ch,
-            tcm=tcm,
-            expr=expr,
-            field_list=field_list,
-            pars_dict=pars_dict,
-            is_evaluated=ch not in channels_skip,
-            default_value=default_value,
-        )
+        # get index list for this channel to be loaded
+        idx_ch = tcm.idx[tcm.id == table_id]
+
+        if ch not in channels_skip:
+            res = utils.get_data_at_channel(
+                datainfo=datainfo,
+                ch=ch,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                pars_dict=pars_dict,
+            )
+
+            if out is None:
+                # define dimension of output array
+                out = utils.make_numpy_full(n_rows, default_value, res.dtype)
+        else:
+            res = np.full(len(idx_ch), default_value)
 
         # get mask from query
         limarr = utils.get_mask_from_query(
@@ -202,18 +207,29 @@ def evaluate_to_scalar(
             idx_ch=idx_ch,
         )
 
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == table_id)[0],
+            side="right",
+        )
+
         # switch through modes
         if "sum" == mode:
             if res.dtype == bool:
                 res = res.astype(int)
+
             out[evt_ids_ch] = np.where(limarr, res + out[evt_ids_ch], out[evt_ids_ch])
+
         if "any" == mode:
             if res.dtype != bool:
                 res = res.astype(bool)
+
             out[evt_ids_ch] = out[evt_ids_ch] | (res & limarr)
+
         if "all" == mode:
             if res.dtype != bool:
                 res = res.astype(bool)
+
             out[evt_ids_ch] = out[evt_ids_ch] & res & limarr
 
     return types.Array(nda=out)
@@ -253,27 +269,32 @@ def evaluate_at_channel(
     f = utils.make_files_config(datainfo)
     table_id_fmt = f.hit.table_fmt
 
-    out = np.full(len(ch_comp.nda), default_value, dtype=type(default_value))
+    out = None
 
     for ch in np.unique(ch_comp.nda.astype(int)):
+        table_id = utils.get_table_name_by_pattern(table_id_fmt, ch)
         # skip default value
-        if utils.get_table_name_by_pattern(table_id_fmt, ch) not in lh5.ls(f.hit.file):
+        if table_id not in lh5.ls(f.hit.file):
             continue
+
         idx_ch = tcm.idx[tcm.id == ch]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        res = utils.get_data_at_channel(
-            datainfo=datainfo,
-            ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
-            tcm=tcm,
-            expr=expr,
-            field_list=field_list,
-            pars_dict=pars_dict,
-            is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
-            not in channels_skip,
-            default_value=default_value,
-        )
+        if table_id not in channels_skip:
+            res = utils.get_data_at_channel(
+                datainfo=datainfo,
+                ch=table_id,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                pars_dict=pars_dict,
+            )
+        else:
+            res = np.full(len(idx_ch), default_value)
+
+        if out is None:
+            out = utils.make_numpy_full(len(ch_comp.nda), default_value, res.dtype)
 
         out[evt_ids_ch] = np.where(ch == ch_comp.nda[idx_ch], res, out[evt_ids_ch])
 
@@ -313,7 +334,6 @@ def evaluate_at_channel_vov(
        default value.
     """
     f = utils.make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
 
     # blow up vov to aoesa
     out = ak.Array([[] for _ in range(len(ch_comp))])
@@ -323,20 +343,22 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in channels:
+        table_id = utils.get_table_name_by_pattern(f.hit.table_fmt, ch)
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        res = utils.get_data_at_channel(
-            datainfo=datainfo,
-            ch=utils.get_table_name_by_pattern(table_id_fmt, ch),
-            tcm=tcm,
-            expr=expr,
-            field_list=field_list,
-            pars_dict=pars_dict,
-            is_evaluated=utils.get_table_name_by_pattern(table_id_fmt, ch)
-            not in channels_skip,
-            default_value=default_value,
-        )
+        if table_id not in channels_skip:
+            res = utils.get_data_at_channel(
+                datainfo=datainfo,
+                ch=table_id,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                pars_dict=pars_dict,
+            )
+        else:
+            idx_ch = tcm.idx[tcm.id == table_id]
+            res = np.full(len(idx_ch), default_value)
 
         # see in which events the current channel is present
         mask = ak.to_numpy(ak.any(ch_comp == ch, axis=-1), allow_missing=False)
@@ -364,7 +386,7 @@ def evaluate_to_aoesa(
     n_rows,
     pars_dict=None,
     default_value=np.nan,
-    missv=np.nan,
+    missing_value=np.nan,
 ) -> types.ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
@@ -393,35 +415,46 @@ def evaluate_to_aoesa(
        dictionary of `evt` and additional parameters and their values.
     default_value
        default value.
-    missv
+    missing_value
        missing value.
     sorter
        sorts the entries in the vector according to sorter expression.
     """
     f = utils.make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
 
     # define dimension of output array
-    out = np.full((n_rows, len(channels)), missv)
+    dtype = None
+    out = None
 
-    i = 0
-    for ch in channels:
-        idx_ch = tcm.idx[tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch)]
+    for i, ch in enumerate(channels):
+        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+        idx_ch = tcm.idx[tcm.id == table_id]
+
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length,
-            np.where(tcm.id == utils.get_tcm_id_by_pattern(table_id_fmt, ch))[0],
+            np.where(tcm.id == table_id)[0],
             "right",
         )
-        res = utils.get_data_at_channel(
-            datainfo=datainfo,
-            ch=ch,
-            tcm=tcm,
-            expr=expr,
-            field_list=field_list,
-            pars_dict=pars_dict,
-            is_evaluated=ch not in channels_skip,
-            default_value=default_value,
-        )
+
+        if ch not in channels_skip:
+            res = utils.get_data_at_channel(
+                datainfo=datainfo,
+                ch=ch,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                pars_dict=pars_dict,
+            )
+
+            if dtype is None:
+                dtype = res.dtype
+
+            if out is None:
+                out = utils.make_numpy_full(
+                    (n_rows, len(channels)), missing_value, res.dtype
+                )
+        else:
+            res = np.full(len(idx_ch), default_value)
 
         # get mask from query
         limarr = utils.get_mask_from_query(
@@ -434,9 +467,7 @@ def evaluate_to_aoesa(
 
         out[evt_ids_ch, i] = np.where(limarr, res, out[evt_ids_ch, i])
 
-        i += 1
-
-    return types.ArrayOfEqualSizedArrays(nda=out)
+    return out, dtype
 
 
 def evaluate_to_vector(
@@ -484,7 +515,7 @@ def evaluate_to_vector(
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
     """
-    out = evaluate_to_aoesa(
+    out, dtype = evaluate_to_aoesa(
         datainfo=datainfo,
         tcm=tcm,
         channels=channels,
@@ -495,13 +526,13 @@ def evaluate_to_vector(
         n_rows=n_rows,
         pars_dict=pars_dict,
         default_value=default_value,
-        missv=np.nan,
-    ).view_as("np")
+        missing_value=np.nan,
+    )
 
     # if a sorter is given sort accordingly
     if sorter is not None:
         md, fld = sorter.split(":")
-        s_val = evaluate_to_aoesa(
+        s_val, _ = evaluate_to_aoesa(
             datainfo=datainfo,
             tcm=tcm,
             channels=channels,
@@ -510,8 +541,9 @@ def evaluate_to_vector(
             field_list=[tuple(fld.split("."))],
             query=None,
             n_rows=n_rows,
-            missv=np.nan,
-        ).view_as("np")
+            missing_value=np.nan,
+        )
+
         if "ascend_by" == md:
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
 
@@ -523,7 +555,5 @@ def evaluate_to_vector(
             )
 
     return types.VectorOfVectors(
-        ak.values_astype(
-            ak.drop_none(ak.nan_to_none(ak.Array(out))), type(default_value)
-        ),
+        ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), dtype)
     )

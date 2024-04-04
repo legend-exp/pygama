@@ -35,6 +35,13 @@ def make_files_config(data: dict):
     return data
 
 
+def make_numpy_full(size, fill_value, try_dtype):
+    if np.can_cast(fill_value, try_dtype):
+        return np.full(size, fill_value, dtype=try_dtype)
+    else:
+        return np.full(size, fill_value)
+
+
 def copy_lgdo_attrs(obj):
     attrs = copy.copy(obj.attrs)
     attrs.pop("datatype")
@@ -121,8 +128,6 @@ def get_data_at_channel(
     expr,
     field_list,
     pars_dict,
-    is_evaluated,
-    default_value,
 ) -> NDArray:
     """Evaluates an expression and returns the result.
 
@@ -147,18 +152,16 @@ def get_data_at_channel(
        default value.
     """
     f = make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
+    table_id = get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
     # get index list for this channel to be loaded
-    idx_ch = tcm.idx[tcm.id == get_tcm_id_by_pattern(table_id_fmt, ch)]
+    idx_ch = tcm.idx[tcm.id == table_id]
     outsize = len(idx_ch)
 
-    if not is_evaluated:
-        res = np.full(outsize, default_value, dtype=type(default_value))
-    elif "tcm.array_id" == expr:
-        res = np.full(outsize, get_tcm_id_by_pattern(table_id_fmt, ch), dtype=int)
-    elif "tcm.index" == expr:
-        res = np.where(tcm.id == get_tcm_id_by_pattern(table_id_fmt, ch))[0]
+    if expr == "tcm.array_id":
+        res = np.full(outsize, table_id, dtype=int)
+    elif expr == "tcm.index":
+        res = np.where(tcm.id == table_id)[0]
     else:
         var = find_parameters(
             datainfo=datainfo,
@@ -180,7 +183,7 @@ def get_data_at_channel(
         )
 
         # in case the expression evaluates to a single value blow it up
-        if (not hasattr(res, "__len__")) or (isinstance(res, str)):
+        if not hasattr(res, "__len__") or isinstance(res, str):
             return np.full(outsize, res)
 
         # the resulting arrays need to be 1D from the operation,
