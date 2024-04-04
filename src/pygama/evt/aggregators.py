@@ -272,19 +272,19 @@ def evaluate_at_channel(
     out = None
 
     for ch in np.unique(ch_comp.nda.astype(int)):
-        table_id = utils.get_table_name_by_pattern(table_id_fmt, ch)
+        table_name = utils.get_table_name_by_pattern(table_id_fmt, ch)
         # skip default value
-        if table_id not in lh5.ls(f.hit.file):
+        if table_name not in lh5.ls(f.hit.file):
             continue
 
         idx_ch = tcm.idx[tcm.id == ch]
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        if table_id not in channels_skip:
+        if table_name not in channels_skip:
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
-                ch=table_id,
+                ch=table_name,
                 tcm=tcm,
                 expr=expr,
                 field_list=field_list,
@@ -343,21 +343,22 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for ch in channels:
-        table_id = utils.get_table_name_by_pattern(f.hit.table_fmt, ch)
+        table_name = utils.get_table_name_by_pattern(f.hit.table_fmt, ch)
+
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        if table_id not in channels_skip:
+        if table_name not in channels_skip:
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
-                ch=table_id,
+                ch=table_name,
                 tcm=tcm,
                 expr=expr,
                 field_list=field_list,
                 pars_dict=pars_dict,
             )
         else:
-            idx_ch = tcm.idx[tcm.id == table_id]
+            idx_ch = tcm.idx[tcm.id == ch]
             res = np.full(len(idx_ch), default_value)
 
         # see in which events the current channel is present
